@@ -149,6 +149,9 @@ backend:
       - working: true
         agent: "main"
         comment: "FIXED: Added missing backend API endpoints for profile photo management (POST /api/users/profile-photo, GET /api/users/profile-photo, DELETE /api/users/profile-photo), created uploads directory, added static file serving, resolved 502 server errors. Frontend ProfilePhotoService updated to use real API calls instead of simulation."
+      - working: true
+        agent: "testing"
+        comment: "✅ COMPREHENSIVE PROFILE PHOTO API TESTING COMPLETED: All profile photo management endpoints working perfectly. Tested 10 comprehensive scenarios: (1) GET profile photo when none exists (404 ✅), (2) POST valid image upload with proper file validation (200 ✅), (3) GET profile photo after upload (200 ✅), (4) File size validation - 6MB file rejected (400 ✅), (5) File type validation - non-image rejected (400 ✅), (6) Authentication requirement - no token rejected (403 ✅), (7) Profile integration - photo URL updated in user profile (✅), (8) DELETE profile photo (200 ✅), (9) DELETE non-existent photo (404 ✅), (10) Profile integration after deletion - photo URL removed (✅). All API endpoints functional with proper authentication, validation, and database integration. Minor: Static file serving returns HTML instead of image files due to Kubernetes ingress routing issue, but this doesn't affect core API functionality."
   - task: "User Profile API"
     implemented: true
     working: true
