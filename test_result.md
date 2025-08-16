@@ -149,6 +149,7 @@ backend:
       - working: true
         agent: "main"
         comment: "FIXED: Added missing backend API endpoints for profile photo management (POST /api/users/profile-photo, GET /api/users/profile-photo, DELETE /api/users/profile-photo), created uploads directory, added static file serving, resolved 502 server errors. Frontend ProfilePhotoService updated to use real API calls instead of simulation."
+  - task: "User Profile API"
     implemented: true
     working: true
     file: "/app/backend/server.py"
