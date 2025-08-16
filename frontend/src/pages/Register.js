@@ -176,13 +176,20 @@ export default function Register() {
               <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
                 Pays
               </label>
-              <CountrySelect
-                value={formData.country}
-                onChange={handleChange}
-                name="country"
+              <select
                 id="country"
+                name="country"
+                value={formData.country}
+                onChange={(e) => updateFormData('country', e.target.value)}
                 required
-              />
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              >
+                {countries.map(country => (
+                  <option key={country.code} value={country.name.toLowerCase()}>
+                    {country.flag} {country.nameFrench}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Names */}
