@@ -1,15 +1,16 @@
 {
-  "name": "Kojo - Service Platform Mali & Senegal",
+  "name": "Kojo - Plateforme de Services Afrique de l'Ouest",
   "short_name": "Kojo",
-  "description": "Connecter les travailleurs et clients au Mali & Sénégal",
+  "description": "Connecter les travailleurs et clients au Mali, Sénégal, Burkina Faso et Côte d'Ivoire",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ea580c",
   "orientation": "portrait-primary",
-  "categories": ["business", "productivity", "utilities"],
+  "categories": ["business", "productivity", "utilities", "lifestyle"],
   "lang": "fr-FR",
   "scope": "/",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -69,17 +70,24 @@
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Messages",
+      "name": "Mes messages",
       "short_name": "Messages",
-      "description": "Voir vos messages",
+      "description": "Voir vos conversations",
       "url": "/messages",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Profil",
+      "name": "Mon profil",
       "short_name": "Profil",
       "description": "Gérer votre profil",
       "url": "/profile",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Tableau de bord",
+      "short_name": "Dashboard",
+      "description": "Vue d'ensemble de votre activité",
+      "url": "/dashboard",
       "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ],
@@ -88,13 +96,20 @@
       "src": "/screenshots/mobile-home.png",
       "sizes": "640x1136",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Page d'accueil mobile"
     },
     {
       "src": "/screenshots/desktop-home.png",
       "sizes": "1280x720",
       "type": "image/png",
-      "form_factor": "wide"
+      "form_factor": "wide",
+      "label": "Page d'accueil desktop"
     }
-  ]
+  ],
+  "related_applications": [],
+  "iarc_rating_id": "",
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
 }
