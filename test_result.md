@@ -329,11 +329,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "FastAPI Authentication System"
-    - "Authentication Screens (Login/Register)"
-    - "Dashboard Screen"
-    - "Jobs Listing and Details"
-    - "Navigation System"
+    - "Profile Photo Management API"
+    - "PWA Profile Photo Management"
+    - "Mobile Profile Photo Management System"
+    - "Backend Profile Photo Integration Testing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
