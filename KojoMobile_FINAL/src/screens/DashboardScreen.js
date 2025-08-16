@@ -15,6 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/theme';
 import { COUNTRIES } from '../constants/countries';
+import ProfilePhoto from '../components/ProfilePhoto';
 import { JOB_CATEGORIES } from '../constants/categories';
 
 const { width } = Dimensions.get('window');
