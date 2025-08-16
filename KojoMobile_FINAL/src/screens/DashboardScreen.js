@@ -78,26 +78,31 @@ export default function DashboardScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header avec photo de profil */}
         <LinearGradient
           colors={[colors.gradientStart, colors.gradientEnd]}
           style={styles.header}
         >
           <View style={styles.headerContent}>
-            <View>
+            <View style={styles.greetingSection}>
               <Text style={styles.greeting}>Bonjour,</Text>
               <Text style={styles.userName}>{user?.first_name}!</Text>
-              <View style={styles.locationContainer}>
-                <Text style={styles.countryFlag}>{userCountry.flag}</Text>
-                <Text style={styles.location}>{userCountry.nameFrench}</Text>
-              </View>
+              <Text style={styles.subtitle}>
+                {userCountry.flag} {userCountry.nameFrench}
+              </Text>
             </View>
-            <TouchableOpacity
-              style={styles.profileButton}
-              onPress={handleLogout}
-            >
-              <MaterialIcons name="logout" size={20} color={colors.background} />
-            </TouchableOpacity>
+            
+            <ProfilePhoto
+              user={user}
+              size={60}
+              editable={true}
+              onPhotoChange={(result) => {
+                if (result.success) {
+                  // Photo updated successfully
+                }
+              }}
+              showChangeButton={true}
+            />
           </View>
         </LinearGradient>
 
