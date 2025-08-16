@@ -120,11 +120,18 @@ export default function ProfilePhoto({
   const handlePhotoDelete = () => {
     if (!editable || !profilePhoto) return;
 
+    // Use consistent user ID resolution
+    const userId = user?.id || user?._id || user?.user_id;
+    if (!userId) {
+      Alert.alert('Erreur', 'ID utilisateur manquant');
+      return;
+    }
+
     ImageService.showDeleteConfirmation(
       async () => {
         setLoading(true);
         try {
-          await ImageService.deleteProfilePhoto(user.id);
+          await ImageService.deleteProfilePhoto(userId);
           setProfilePhoto(null);
           
           if (onPhotoChange) {
