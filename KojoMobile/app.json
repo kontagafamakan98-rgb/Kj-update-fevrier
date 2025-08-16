@@ -43,23 +43,6 @@
         "projectId": "kojo-mobile-app"
       }
     },
-    "plugins": [
-      "expo-camera",
-      "expo-location",
-      "expo-notifications",
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Use Face ID to authenticate with biometric data."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "The app accesses your photos to upload profile pictures and job images.",
-          "cameraPermission": "The app accesses your camera to take profile pictures and job documentation."
-        }
-      ]
-    ]
+    "plugins": []
   }
 }
