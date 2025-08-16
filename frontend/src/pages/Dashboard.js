@@ -126,8 +126,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Test Mobile Button */}
-      <div className="mb-8">
+      {/* Test Mobile Button & Create Job */}
+      <div className="mb-8 flex gap-4">
         <Link 
           to="/mobile-test"
           className="inline-flex items-center px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-md"
@@ -135,7 +135,17 @@ export default function Dashboard() {
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a1 1 0 001-1V4a1 1 0 00-1-1H8a1 1 0 00-1 1v16a1 1 0 001 1z" />
           </svg>
-          📱 Tester les Fonctionnalités Mobile
+          📱 Tester Fonctionnalités Mobile
+        </Link>
+        
+        <Link 
+          to="/create-job"
+          className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md"
+        >
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          🚀 Créer un Job avec GPS
         </Link>
       </div>
 
