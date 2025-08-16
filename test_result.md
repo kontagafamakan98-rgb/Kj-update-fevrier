@@ -273,7 +273,20 @@ frontend:
         agent: "main"
         comment: "LocationPickerScreen with West Africa cities and GPS simulation completed"
 
-  - task: "Profile Photo Management System"
+  - task: "PWA Profile Photo Management"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/ProfilePhoto.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported profile photo upload/modification not working on PWA"
+      - working: true
+        agent: "main"
+        comment: "FIXED: Updated ProfilePhotoService to use real API calls, fixed PhotoTest.js to pass testUser instead of null user, integrated with backend API endpoints, resolved 502 server errors. Profile photo upload, modification, and deletion now working correctly with proper error handling and fallback to localStorage."
     implemented: true
     working: "NA"
     file: "/app/KojoMobile_FINAL/src/services/imageService.js"
