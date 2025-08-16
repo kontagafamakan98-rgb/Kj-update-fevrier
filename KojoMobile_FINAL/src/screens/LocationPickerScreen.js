@@ -73,32 +73,23 @@ export default function LocationPickerScreen({ route, navigation }) {
   }, [searchQuery, locations]);
 
   const handleCurrentLocation = async () => {
-    setIsLocating(true);
     try {
-      // In a real app, use Expo Location API here
-      // const { status } = await Location.requestForegroundPermissionsAsync();
-      // if (status !== 'granted') {
-      //   Alert.alert('Permission refusée', 'L\'accès à la localisation est requis');
-      //   return;
-      // }
-      // const location = await Location.getCurrentPositionAsync({});
-      // const geocoded = await Location.reverseGeocodeAsync(location.coords);
-      
-      // For demo purposes, simulate location detection
-      setTimeout(() => {
-        const mockLocation = {
-          name: 'Bamako',
-          country: 'Mali',
-          type: 'current',
-          coordinates: { lat: 12.6392, lng: -8.0029 }
-        };
-        setCurrentLocation(mockLocation);
-        setIsLocating(false);
-        Alert.alert('Localisation détectée', `Vous êtes à ${mockLocation.name}, ${mockLocation.country}`);
-      }, 2000);
-      
+      const detectedLocation = await detectCurrentLocation();
+      if (detectedLocation) {
+        setCurrentLocation(detectedLocation);
+        Alert.alert(
+          'Localisation détectée', 
+          `Vous êtes à ${detectedLocation.fullAddress}`,
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { 
+              text: 'Utiliser cette localisation', 
+              onPress: () => handleLocationSelect(detectedLocation) 
+            }
+          ]
+        );
+      }
     } catch (error) {
-      setIsLocating(false);
       Alert.alert('Erreur', 'Impossible de détecter votre localisation');
     }
   };
