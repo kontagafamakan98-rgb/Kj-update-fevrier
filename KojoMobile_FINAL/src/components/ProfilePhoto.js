@@ -9,15 +9,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme/theme';
-// Import conditionnel pour web/mobile
-let ImageService;
-if (typeof window !== 'undefined') {
-  // Environnement web
-  ImageService = require('../services/imageServiceWeb').default;
-} else {
-  // Environnement mobile natif
-  ImageService = require('../services/imageService').default;
-}
+import ImageService from '../services/imageService';
 
 export default function ProfilePhoto({
   user,
