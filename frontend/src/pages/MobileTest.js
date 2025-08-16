@@ -64,7 +64,7 @@ export default function MobileTest() {
                   cd /app/KojoMobile_FINAL && npx expo start
                 </code>
                 <p><strong>3. Scanner le QR code</strong> avec Expo Go</p>
-                <p><strong>4. Tester les photos</strong> dans Profil > Modifier photo</p>
+                <p><strong>4. Tester les photos</strong> dans Profil &gt; Modifier photo</p>
               </div>
             </div>
 
