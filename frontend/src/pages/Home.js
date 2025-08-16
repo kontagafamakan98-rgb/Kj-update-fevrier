@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import FlagIcon from '../components/FlagIcon';
+import { getAllCountries } from '../components/CountryDisplay';
 
 export default function Home() {
   const { t } = useLanguage();
