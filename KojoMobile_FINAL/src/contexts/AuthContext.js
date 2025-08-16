@@ -29,9 +29,16 @@ export const AuthProvider = ({ children }) => {
       const storedUser = await AsyncStorage.getItem('user_data');
       
       if (storedToken && storedUser) {
+        const userData = JSON.parse(storedUser);
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(userData);
         api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        
+        // Load profile photo
+        const photo = await ImageService.loadProfilePhoto(userData.id);
+        if (photo) {
+          setProfilePhoto(photo);
+        }
       }
     } catch (error) {
       console.error('Error loading stored auth:', error);
