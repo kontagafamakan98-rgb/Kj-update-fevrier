@@ -32,12 +32,22 @@ export default function ProfilePhoto({
   }, [user, refreshTrigger]); // Add refreshTrigger to dependencies
 
   const loadProfilePhoto = async () => {
-    if (!user?.id) return;
+    const userId = user?.id || user?._id || user?.user_id;
+    console.log('ProfilePhoto loadProfilePhoto called for userId:', userId);
+    
+    if (!userId) {
+      console.warn('No user ID found, cannot load profile photo');
+      return;
+    }
     
     try {
-      const savedPhoto = await ImageService.loadProfilePhoto(user.id);
+      const savedPhoto = await ImageService.loadProfilePhoto(userId);
+      console.log('ProfilePhoto loaded from storage:', savedPhoto);
       if (savedPhoto) {
         setProfilePhoto(savedPhoto);
+        console.log('ProfilePhoto state updated with loaded photo');
+      } else {
+        console.log('No saved photo found for user:', userId);
       }
     } catch (error) {
       console.error('Error loading profile photo:', error);
