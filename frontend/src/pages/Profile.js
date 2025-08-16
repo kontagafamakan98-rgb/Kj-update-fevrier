@@ -232,6 +232,8 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
   };
 
   const handlePhotoChange = (result) => {
+    console.log('Profile page received photo change result:', result);
+    
     if (result.success) {
       setSuccess('Photo de profil mise à jour avec succès !');
       setTimeout(() => setSuccess(''), 3000);
@@ -239,6 +241,7 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
       setSuccess('Photo de profil supprimée !');
       setTimeout(() => setSuccess(''), 3000);
     } else if (result.error) {
+      console.error('Photo change error:', result.error);
       alert('Erreur: ' + result.error);
     }
   };
