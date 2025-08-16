@@ -275,13 +275,12 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
             name="country"
             value={formData.country}
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
-          >
-            <option value="senegal">🇸🇳 Sénégal</option>
-            <option value="mali">🇲🇱 Mali</option>
-            <option value="burkina_faso">🇧🇫 Burkina Faso</option>
-            <option value="ivory_coast">🇨🇮 Côte d'Ivoire</option>
-          </select>
+          <CountrySelect
+            id="country"
+            name="country"
+            value={formData.country}
+            onChange={handleChange}
+          />
         </div>
       </div>
 
