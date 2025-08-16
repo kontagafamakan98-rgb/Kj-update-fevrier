@@ -259,18 +259,38 @@ class ProfilePhotoService {
   }
 
   // Supprimer la photo de profil
-  deleteProfilePhoto(userId) {
+  async deleteProfilePhoto(userId) {
+    try {
+      // D'abord essayer de supprimer sur le serveur
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile-photo`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        console.log('Profile photo deleted from server successfully');
+      } else {
+        console.log('Could not delete from server, continuing with local deletion');
+      }
+    } catch (error) {
+      console.log('Server deletion failed, continuing with local deletion:', error.message);
+    }
+
+    // Supprimer du stockage local
     try {
       const photoData = this.loadProfilePhoto(userId);
-      if (photoData && photoData.url) {
+      if (photoData && photoData.url && photoData.url.startsWith('blob:')) {
         // Libérer l'URL blob
         URL.revokeObjectURL(photoData.url);
       }
       
       localStorage.removeItem(`kojo_profile_photo_${userId}`);
+      console.log('Profile photo deleted from local storage');
       return true;
     } catch (error) {
-      console.error('Erreur suppression photo:', error);
+      console.error('Erreur suppression photo locale:', error);
       return false;
     }
   }
