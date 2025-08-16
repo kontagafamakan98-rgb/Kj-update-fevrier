@@ -4,32 +4,40 @@ export const COUNTRIES = {
     name: 'Mali',
     nameFrench: 'Mali',
     flag: '🇲🇱',
+    color: '#009639',
+    phonePrefix: '+223',
     currency: 'XOF',
-    color: '#22c55e'
+    language: 'fr'
   },
   SENEGAL: {
-    code: 'senegal', 
+    code: 'senegal',
     name: 'Senegal',
     nameFrench: 'Sénégal',
     flag: '🇸🇳',
+    color: '#00853f',
+    phonePrefix: '+221',
     currency: 'XOF',
-    color: '#eab308'
+    language: 'fr'
   },
   BURKINA_FASO: {
     code: 'burkina_faso',
-    name: 'Burkina Faso', 
+    name: 'Burkina Faso',
     nameFrench: 'Burkina Faso',
     flag: '🇧🇫',
+    color: '#009639',
+    phonePrefix: '+226',
     currency: 'XOF',
-    color: '#ef4444'
+    language: 'fr'
   },
-  IVORY_COAST: {
-    code: 'ivory_coast',
+  COTE_DIVOIRE: {
+    code: 'cote_divoire',
     name: 'Ivory Coast',
-    nameFrench: 'Côte d\'Ivoire', 
+    nameFrench: 'Côte d\'Ivoire',
     flag: '🇨🇮',
+    color: '#ff8200',
+    phonePrefix: '+225',
     currency: 'XOF',
-    color: '#f97316'
+    language: 'fr'
   }
 };
 
