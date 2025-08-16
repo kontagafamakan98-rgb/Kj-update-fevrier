@@ -142,7 +142,13 @@ export default function ProfilePhoto({
   };
 
   const renderPhotoContent = () => {
+    console.log('ProfilePhoto renderPhotoContent called');
+    console.log('Current profilePhoto state:', profilePhoto);
+    console.log('Loading state:', loading);
+    console.log('DefaultAvatar state:', defaultAvatar);
+
     if (loading) {
+      console.log('Rendering loading indicator');
       return (
         <View style={[styles.photoContainer, photoSize, styles.loadingContainer]}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -150,13 +156,19 @@ export default function ProfilePhoto({
       );
     }
 
-    if (profilePhoto?.uri) {
+    // Check if we have a profile photo with URI
+    if (profilePhoto && profilePhoto.uri) {
+      console.log('Rendering profile photo with URI:', profilePhoto.uri);
       return (
         <View style={styles.photoWrapper}>
           <Image
             source={{ uri: profilePhoto.uri }}
             style={[styles.photo, photoSize]}
             resizeMode="cover"
+            onLoad={() => console.log('✅ Image loaded successfully')}
+            onError={(error) => console.error('❌ Image load error:', error.nativeEvent)}
+            onLoadStart={() => console.log('🔄 Image load started')}
+            onLoadEnd={() => console.log('🏁 Image load ended')}
           />
           {editable && (
             <TouchableOpacity
@@ -171,6 +183,7 @@ export default function ProfilePhoto({
     }
 
     // Default avatar with initials
+    console.log('Rendering default avatar with initials:', defaultAvatar?.initials);
     return (
       <View style={[
         styles.photoContainer, 
