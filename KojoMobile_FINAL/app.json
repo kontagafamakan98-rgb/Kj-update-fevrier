@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Kojo",
+    "slug": "kojo-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.kojo.app",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.kojo.app",
+      "supportsTablet": true
+    },
+    "web": {},
+    "plugins": []
+  }
+}
