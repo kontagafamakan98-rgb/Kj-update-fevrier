@@ -33,10 +33,86 @@ export const NotificationProvider = ({ children }) => {
   const [offlineQueueSize, setOfflineQueueSize] = useState(0);
 
   useEffect(() => {
-    loadNotificationSettings();
-    loadNotifications();
-    // initializePushNotifications(); // Will be implemented with expo-notifications
+    initializeEnhancedServices();
+    
+    return () => {
+      NotificationService.cleanup();
+      OfflineService.cleanup();
+    };
   }, []);
+
+  const initializeEnhancedServices = async () => {
+    try {
+      console.log('Initializing enhanced notification and offline services...');
+      
+      // Load existing notification data
+      await loadNotificationSettings();
+      await loadNotifications();
+      
+      // Initialize notification service
+      const notificationResult = await NotificationService.initialize();
+      if (notificationResult.success) {
+        setPushToken(notificationResult.token);
+        console.log('✅ Push notification service initialized');
+      } else {
+        console.error('❌ Failed to initialize push notifications:', notificationResult.error);
+      }
+
+      // Initialize offline service
+      const offlineResult = await OfflineService.initialize();
+      if (offlineResult.success) {
+        setIsOnline(offlineResult.isOnline);
+        console.log('✅ Offline service initialized');
+        
+        // Set up offline service listener
+        OfflineService.addListener((online, wasOnline) => {
+          setIsOnline(online);
+          updateOfflineState();
+          
+          if (!wasOnline && online) {
+            // Just came back online
+            addNotification({
+              title: 'Connexion rétablie',
+              body: 'Synchronisation des données en cours...',
+              type: 'system',
+              icon: 'wifi'
+            });
+          } else if (wasOnline && !online) {
+            // Just went offline
+            addNotification({
+              title: 'Mode hors ligne',
+              body: 'Vos actions seront synchronisées quand la connexion sera rétablie',
+              type: 'system',
+              icon: 'wifi-off'
+            });
+          }
+        });
+      } else {
+        console.error('❌ Failed to initialize offline service:', offlineResult.error);
+      }
+
+      // Get initial permission status
+      const permissionResult = await NotificationService.getPermissionStatus();
+      if (permissionResult.success) {
+        setPermissionStatus(permissionResult.status);
+      }
+
+      // Update offline state
+      await updateOfflineState();
+      
+      setIsInitialized(true);
+      console.log('🎉 Enhanced services initialized successfully');
+    } catch (error) {
+      console.error('❌ Error initializing enhanced services:', error);
+      setIsInitialized(true); // Set to true even on error to prevent infinite loading
+    }
+  };
+
+  const updateOfflineState = async () => {
+    const state = OfflineService.getConnectionState();
+    setLastSyncTime(state.lastSyncTime);
+    setOfflineQueueSize(state.queueSize);
+  };
 
   const loadNotificationSettings = async () => {
     try {
