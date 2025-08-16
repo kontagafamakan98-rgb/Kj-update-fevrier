@@ -25,6 +25,13 @@ self.addEventListener('install', (event) => {
 
 // Fetch event
 self.addEventListener('fetch', (event) => {
+  // Only handle GET requests for caching
+  if (event.request.method !== 'GET') {
+    // For non-GET requests (POST, PUT, DELETE), just fetch normally
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -45,6 +52,9 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME)
             .then((cache) => {
               cache.put(event.request, responseToCache);
+            })
+            .catch((error) => {
+              console.warn('Failed to cache request:', error);
             });
 
           return response;
