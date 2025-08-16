@@ -101,11 +101,11 @@ const translations = {
     client: 'Kliyan',
     worker: 'Liggéeykat',
     
-    // Countries
-    mali: 'Mali',
-    senegal: 'Senegaal',
-    burkina_faso: 'Burkina Faso',
-    ivory_coast: 'Côte d\'Ivoire',
+    // Countries with flags  
+    mali: '🇲🇱 Mali',
+    senegal: '🇸🇳 Senegaal',
+    burkina_faso: '🇧🇫 Burkina Faso',
+    ivory_coast: '🇨🇮 Côte d\'Ivoire',
     
     // Job related
     jobTitle: 'Tur liggéey',
