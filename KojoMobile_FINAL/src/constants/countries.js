@@ -41,10 +41,51 @@ export const COUNTRIES = {
   }
 };
 
-export const getCountryByCode = (code) => {
-  return Object.values(COUNTRIES).find(country => country.code === code);
-};
-
 export const getCountriesList = () => {
   return Object.values(COUNTRIES);
+};
+
+export const getCountryByCode = (code) => {
+  const upperCode = code?.toUpperCase();
+  return Object.values(COUNTRIES).find(country => 
+    country.code === code || country.code === upperCode
+  ) || COUNTRIES.MALI;
+};
+
+export const getPhonePrefixByCountry = (countryCode) => {
+  const country = getCountryByCode(countryCode);
+  return country.phonePrefix;
+};
+
+export const detectCountryFromPhone = (phoneNumber) => {
+  if (!phoneNumber) return null;
+  
+  const cleanPhone = phoneNumber.replace(/\s+/g, '');
+  
+  for (const country of Object.values(COUNTRIES)) {
+    if (cleanPhone.startsWith(country.phonePrefix)) {
+      return country;
+    }
+  }
+  return null;
+};
+
+export const formatPhoneNumber = (phone, countryCode) => {
+  if (!phone) return '';
+  
+  const country = getCountryByCode(countryCode);
+  const cleanPhone = phone.replace(/[^\d]/g, '');
+  
+  // Si le numéro commence déjà par le préfixe, on le retourne tel quel
+  if (phone.startsWith(country.phonePrefix)) {
+    return phone;
+  }
+  
+  // Si le numéro commence par 0, on le remplace par le préfixe
+  if (cleanPhone.startsWith('0')) {
+    return country.phonePrefix + ' ' + cleanPhone.substring(1);
+  }
+  
+  // Sinon on ajoute juste le préfixe
+  return country.phonePrefix + ' ' + cleanPhone;
 };
