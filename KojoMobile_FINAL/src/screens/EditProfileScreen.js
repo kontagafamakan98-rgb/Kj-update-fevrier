@@ -35,7 +35,21 @@ export default function EditProfileScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const updateFormData = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [key]: value };
+      
+      // Auto-update phone prefix when country changes
+      if (key === 'country') {
+        const phonePrefix = getPhonePrefixByCountry(value);
+        
+        // Format existing phone number with new country prefix
+        if (newData.phone && !newData.phone.startsWith(phonePrefix)) {
+          newData.phone = formatPhoneNumber(newData.phone, value);
+        }
+      }
+      
+      return newData;
+    });
   };
 
   const handleSave = async () => {
