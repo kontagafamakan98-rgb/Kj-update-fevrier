@@ -234,15 +234,30 @@ export default function RegisterScreen({ navigation, route }) {
               </View>
 
               <View style={styles.inputContainer}>
-                <MaterialIcons name="phone" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Téléphone"
-                  placeholderTextColor={colors.textSecondary}
-                  value={formData.phone}
-                  onChangeText={(value) => updateFormData('phone', value)}
-                  keyboardType="phone-pad"
-                />
+                <Text style={styles.inputLabel}>Téléphone</Text>
+                <View style={styles.phoneInputContainer}>
+                  <View style={styles.phonePrefixContainer}>
+                    <Text style={styles.phonePrefix}>
+                      {getPhonePrefixByCountry(formData.country)}
+                    </Text>
+                  </View>
+                  <TextInput
+                    style={[styles.input, styles.phoneNumberInput]}
+                    placeholder="77 123 45 67"
+                    placeholderTextColor={colors.textSecondary}
+                    value={formData.phone.replace(getPhonePrefixByCountry(formData.country), '').trim()}
+                    onChangeText={(value) => {
+                      const prefix = getPhonePrefixByCountry(formData.country);
+                      const cleanValue = value.replace(/[^\d\s]/g, '');
+                      updateFormData('phone', prefix + ' ' + cleanValue);
+                    }}
+                    keyboardType="phone-pad"
+                    maxLength={15}
+                  />
+                </View>
+                <Text style={styles.inputHelper}>
+                  Format: {getPhonePrefixByCountry(formData.country)} XX XXX XX XX
+                </Text>
               </View>
 
               {/* Country Selection */}
