@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import { colors } from '../theme/theme';
 import { COUNTRIES } from '../constants/countries';
+import { useLocationDetector, getLocationSuggestions } from '../components/LocationDetector';
 
 export default function LocationPickerScreen({ route, navigation }) {
   const { onLocationSelect } = route.params;
