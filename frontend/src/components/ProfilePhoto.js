@@ -15,6 +15,13 @@ const ProfilePhoto = ({
   const [loading, setLoading] = useState(false);
   const [showDeleteButton, setShowDeleteButton] = useState(false);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('ProfilePhoto mounted with user:', user);
+    console.log('User ID available:', user?.id);
+    console.log('Editable mode:', editable);
+  }, [user, editable]);
+
   useEffect(() => {
     if (user) {
       loadProfilePhoto();
@@ -23,15 +30,22 @@ const ProfilePhoto = ({
   }, [user, size]);
 
   const loadProfilePhoto = () => {
-    if (!user?.id) return;
+    const userId = user?.id || user?._id || user?.user_id;
+    console.log('Loading profile photo for user ID:', userId);
+    
+    if (!userId) {
+      console.warn('No user ID found, cannot load profile photo');
+      return;
+    }
     
     try {
-      const savedPhoto = ProfilePhotoService.loadProfilePhoto(user.id);
+      const savedPhoto = ProfilePhotoService.loadProfilePhoto(userId);
+      console.log('Loaded profile photo:', savedPhoto);
       if (savedPhoto) {
         setProfilePhoto(savedPhoto);
       }
     } catch (error) {
-      console.error('Erreur chargement photo:', error);
+      console.error('Error loading profile photo:', error);
     }
   };
 
@@ -42,30 +56,45 @@ const ProfilePhoto = ({
         user.last_name,
         size
       );
+      console.log('Generated default avatar:', avatar);
       setDefaultAvatar(avatar);
     }
   };
 
   const handlePhotoSelect = async () => {
-    if (!editable) return;
+    if (!editable) {
+      console.log('Photo not editable, ignoring click');
+      return;
+    }
 
+    const userId = user?.id || user?._id || user?.user_id;
+    if (!userId) {
+      alert('Erreur: ID utilisateur manquant');
+      return;
+    }
+
+    console.log('Starting photo selection for user:', userId);
     setLoading(true);
+    
     try {
       const imageData = await ProfilePhotoService.selectPhoto();
+      console.log('Image selected:', imageData);
       
       // Sauvegarder localement
-      const savedPhoto = await ProfilePhotoService.saveProfilePhoto(user.id, imageData);
+      const savedPhoto = await ProfilePhotoService.saveProfilePhoto(userId, imageData);
+      console.log('Photo saved locally:', savedPhoto);
       setProfilePhoto(savedPhoto);
       
       // Upload vers serveur (simulation)
-      const uploadResult = await ProfilePhotoService.uploadProfilePhoto(imageData, user.id);
+      const uploadResult = await ProfilePhotoService.uploadProfilePhoto(imageData, userId);
+      console.log('Upload result:', uploadResult);
       
       if (onPhotoChange) {
         onPhotoChange(uploadResult);
       }
       
     } catch (error) {
-      console.error('Erreur sélection photo:', error);
+      console.error('Error in photo selection:', error);
       if (error.message !== 'Aucune image sélectionnée') {
         alert('Erreur lors de la sélection de l\'image: ' + error.message);
       }
@@ -77,19 +106,33 @@ const ProfilePhoto = ({
   const handlePhotoDelete = async () => {
     if (!editable || !profilePhoto) return;
 
+    const userId = user?.id || user?._id || user?.user_id;
+    if (!userId) {
+      alert('Erreur: ID utilisateur manquant');
+      return;
+    }
+
     const confirmed = window.confirm('Êtes-vous sûr de vouloir supprimer votre photo de profil ?');
     if (!confirmed) return;
 
+    console.log('Deleting photo for user:', userId);
     setLoading(true);
+    
     try {
-      ProfilePhotoService.deleteProfilePhoto(user.id);
-      setProfilePhoto(null);
+      const success = ProfilePhotoService.deleteProfilePhoto(userId);
+      console.log('Photo deletion result:', success);
       
-      if (onPhotoChange) {
-        onPhotoChange({ success: true, deleted: true });
+      if (success) {
+        setProfilePhoto(null);
+        
+        if (onPhotoChange) {
+          onPhotoChange({ success: true, deleted: true });
+        }
+      } else {
+        throw new Error('Failed to delete photo');
       }
     } catch (error) {
-      console.error('Erreur suppression photo:', error);
+      console.error('Error deleting photo:', error);
       alert('Erreur lors de la suppression de la photo');
     } finally {
       setLoading(false);
@@ -165,6 +208,9 @@ const ProfilePhoto = ({
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
   };
 
+  // Debug render info
+  console.log('ProfilePhoto render - Photo:', !!profilePhoto, 'DefaultAvatar:', !!defaultAvatar, 'Loading:', loading);
+
   return (
     <div 
       className={`profile-photo-container ${className}`}
@@ -186,16 +232,23 @@ const ProfilePhoto = ({
             src={profilePhoto.url} 
             alt="Photo de profil"
             style={photoStyle}
+            onError={(e) => {
+              console.error('Image load error:', e);
+              setProfilePhoto(null);
+            }}
           />
         ) : defaultAvatar?.dataUrl ? (
           <img 
             src={defaultAvatar.dataUrl} 
             alt="Avatar par défaut"
             style={photoStyle}
+            onError={(e) => {
+              console.error('Default avatar load error:', e);
+            }}
           />
         ) : (
           <div style={defaultAvatarStyle}>
-            {defaultAvatar?.initials || '?'}
+            {defaultAvatar?.initials || (user?.first_name?.charAt(0) || user?.last_name?.charAt(0) || '?').toUpperCase()}
           </div>
         )}
       </div>
