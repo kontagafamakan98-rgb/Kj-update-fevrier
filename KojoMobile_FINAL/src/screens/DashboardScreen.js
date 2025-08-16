@@ -269,6 +269,14 @@ const styles = StyleSheet.create({
     color: colors.background,
     marginBottom: 8,
   },
+  greetingSection: {
+    flex: 1,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.background,
+    opacity: 0.9,
+  },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
