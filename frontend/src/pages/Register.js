@@ -26,12 +26,7 @@ export default function Register() {
   const { t, currentLanguage } = useLanguage();
   const navigate = useNavigate();
 
-  const countries = [
-    { code: 'senegal', name: 'Sénégal', flag: '🇸🇳' },
-    { code: 'mali', name: 'Mali', flag: '🇲🇱' },
-    { code: 'burkina_faso', name: 'Burkina Faso', flag: '🇧🇫' },
-    { code: 'ivory_coast', name: 'Côte d\'Ivoire', flag: '🇨🇮' }
-  ];
+  const countries = getAllCountries();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
