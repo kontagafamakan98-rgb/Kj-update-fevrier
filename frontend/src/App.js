@@ -151,6 +151,7 @@ function AppRoutes() {
               <PhotoTest />
             </ProtectedRoute>
           } />
+          <Route path="/photo-debug" element={<PhotoTest />} />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Profile />
