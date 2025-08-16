@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme/theme';
 import { COUNTRIES } from '../constants/countries';
 import { JOB_CATEGORIES } from '../constants/categories';
+import ProfilePhoto from '../components/ProfilePhoto';
 
 export default function WorkerProfileScreen({ route, navigation }) {
   const { workerId, worker } = route.params;
