@@ -20,8 +20,19 @@ import ProfilePhoto from '../components/ProfilePhoto';
 export default function ProfileScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Add refresh trigger for ProfilePhoto
 
   const { user, logout } = useAuth();
+
+  // Handle photo change to force ProfilePhoto component refresh
+  const handlePhotoChange = (result) => {
+    console.log('Photo changed in ProfileScreen:', result);
+    if (result.success || result.local) {
+      // Force ProfilePhoto component to refresh by incrementing trigger
+      setRefreshTrigger(prev => prev + 1);
+      console.log('ProfilePhoto refresh triggered');
+    }
+  };
 
   const userCountry = COUNTRIES[user?.country?.toUpperCase()] || COUNTRIES.MALI;
 
