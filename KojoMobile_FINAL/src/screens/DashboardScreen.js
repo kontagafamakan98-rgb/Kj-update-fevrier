@@ -144,9 +144,12 @@ export default function DashboardScreen({ navigation }) {
               <MaterialIcons name="person" size={32} color={colors.primary} />
               <Text style={styles.actionText}>Mon profil</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionCard}>
-              <MaterialIcons name="help" size={32} color={colors.primary} />
-              <Text style={styles.actionText}>Support</Text>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('CreateJob')}
+            >
+              <MaterialIcons name="add-circle-outline" size={32} color={colors.primary} />
+              <Text style={styles.actionText}>Créer un job</Text>
             </TouchableOpacity>
           </View>
         </View>
