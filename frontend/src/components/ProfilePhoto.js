@@ -39,13 +39,24 @@ const ProfilePhoto = ({
     }
     
     try {
-      const savedPhoto = await ProfilePhotoService.loadProfilePhoto(userId);
-      console.log('Loaded profile photo:', savedPhoto);
-      if (savedPhoto) {
-        setProfilePhoto(savedPhoto);
+      // Charger directement depuis localStorage
+      const photoKey = `profile_photo_${userId}`;
+      const photoDataString = localStorage.getItem(photoKey);
+      
+      if (photoDataString) {
+        const photoData = JSON.parse(photoDataString);
+        console.log('Found photo in localStorage:', photoKey);
+        
+        // Afficher la photo base64 directement
+        setProfilePhoto({ url: photoData.base64 });
+        console.log('Photo loaded and set from localStorage');
+      } else {
+        console.log('No photo found in localStorage for user:', userId);
+        setProfilePhoto(null);
       }
     } catch (error) {
-      console.error('Error loading profile photo:', error);
+      console.error('Error loading profile photo from localStorage:', error);
+      setProfilePhoto(null);
     }
   };
 
