@@ -278,6 +278,8 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
           >
             <option value="senegal">Sénégal</option>
             <option value="mali">Mali</option>
+            <option value="burkina_faso">Burkina Faso</option>
+            <option value="ivory_coast">Côte d'Ivoire</option>
           </select>
         </div>
       </div>
