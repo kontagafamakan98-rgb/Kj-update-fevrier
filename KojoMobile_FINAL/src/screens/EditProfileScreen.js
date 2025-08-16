@@ -173,13 +173,29 @@ export default function EditProfileScreen({ navigation }) {
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Téléphone</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.phone}
-                onChangeText={(value) => updateFormData('phone', value)}
-                placeholder="Numéro de téléphone"
-                keyboardType="phone-pad"
-              />
+              <View style={styles.phoneInputContainer}>
+                <View style={styles.phonePrefixContainer}>
+                  <Text style={styles.phonePrefix}>
+                    {getPhonePrefixByCountry(formData.country)}
+                  </Text>
+                </View>
+                <TextInput
+                  style={[styles.input, styles.phoneNumberInput]}
+                  placeholder="77 123 45 67"
+                  placeholderTextColor={colors.textSecondary}
+                  value={formData.phone.replace(getPhonePrefixByCountry(formData.country), '').trim()}
+                  onChangeText={(value) => {
+                    const prefix = getPhonePrefixByCountry(formData.country);
+                    const cleanValue = value.replace(/[^\d\s]/g, '');
+                    updateFormData('phone', prefix + ' ' + cleanValue);
+                  }}
+                  keyboardType="phone-pad"
+                  maxLength={15}
+                />
+              </View>
+              <Text style={styles.inputHelper}>
+                Format: {getPhonePrefixByCountry(formData.country)} XX XXX XX XX
+              </Text>
             </View>
 
             <View style={styles.inputContainer}>
