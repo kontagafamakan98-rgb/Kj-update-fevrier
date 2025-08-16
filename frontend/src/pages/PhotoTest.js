@@ -84,7 +84,7 @@ export default function PhotoTest() {
             <div className="text-center">
               <h3 className="font-medium mb-4">Mode Éditable</h3>
               <ProfilePhoto
-                user={user}
+                user={testUser}
                 size={150}
                 editable={true}
                 onPhotoChange={handlePhotoChange}
