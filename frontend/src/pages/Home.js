@@ -21,10 +21,10 @@ export default function Home() {
       <section className="bg-gradient-to-r from-orange-600 to-orange-700 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            {t('heroTitle')}
+            Connecter les travailleurs et clients en Afrique de l'Ouest
           </h1>
           <p className="text-xl md:text-2xl mb-8 opacity-90">
-            {t('heroSubtitle')}
+            Trouvez des services de qualité ou offrez vos compétences au Mali, Sénégal, Burkina Faso et Côte d'Ivoire
           </p>
           <div className="space-x-4">
             {!user ? (
