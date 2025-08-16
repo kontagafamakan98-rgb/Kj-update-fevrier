@@ -28,20 +28,10 @@ export default function CameraScreen({ route, navigation }) {
     
     setIsCapturing(true);
     try {
-      // In a real app, capture photo using expo-camera:
-      // const photo = await cameraRef.current.takePictureAsync({
-      //   quality: 0.8,
-      //   base64: false,
-      //   skipProcessing: false,
-      // });
-      
-      // For demo purposes, we'll simulate photo capture
-      setTimeout(() => {
-        const mockPhotoUri = 'https://via.placeholder.com/400x600/EA580C/FFFFFF?text=Photo+Captured';
-        setPhotoUri(mockPhotoUri);
+      await ImageService.openCamera((imageData) => {
+        setPhotoUri(imageData.uri);
         setIsCapturing(false);
-      }, 1000);
-      
+      });
     } catch (error) {
       setIsCapturing(false);
       Alert.alert('Erreur', 'Impossible de prendre la photo');
