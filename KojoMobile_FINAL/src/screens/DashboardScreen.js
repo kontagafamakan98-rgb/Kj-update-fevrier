@@ -157,6 +157,15 @@ export default function DashboardScreen({ navigation }) {
               <MaterialIcons name="add-circle-outline" size={32} color={colors.primary} />
               <Text style={styles.actionText}>Créer un job</Text>
             </TouchableOpacity>
+            
+            {/* Debug: Camera Test Button */}
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: '#fef3c7' }]}
+              onPress={() => navigation.navigate('CameraTest')}
+            >
+              <MaterialIcons name="camera-alt" size={32} color="#f59e0b" />
+              <Text style={[styles.actionText, { color: '#f59e0b' }]}>Test Caméra</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
