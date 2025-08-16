@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 
 class KojoAPITester:
-    def __init__(self, base_url="https://af150de4-3ac7-482f-a9fa-0bba7325ff50.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-mobile.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.client_token = None
         self.worker_token = None
