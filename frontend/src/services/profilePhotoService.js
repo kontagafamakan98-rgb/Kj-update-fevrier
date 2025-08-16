@@ -213,15 +213,49 @@ class ProfilePhotoService {
     }
   }
 
-  // Charger la photo de profil depuis le stockage local
-  loadProfilePhoto(userId) {
+  // Charger la photo de profil depuis le stockage local et serveur
+  async loadProfilePhoto(userId) {
+    try {
+      // D'abord essayer de récupérer depuis l'API
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile-photo`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const serverData = await response.json();
+        console.log('Loaded profile photo from server:', serverData);
+        
+        const photoData = {
+          url: `${process.env.REACT_APP_BACKEND_URL}${serverData.photo_url}`,
+          server_url: serverData.photo_url,
+          userId: serverData.user_id,
+          loaded_from: 'server',
+          timestamp: new Date().toISOString()
+        };
+        
+        // Sauvegarder en local pour cache
+        localStorage.setItem(`kojo_profile_photo_${userId}`, JSON.stringify(photoData));
+        return photoData;
+      }
+    } catch (error) {
+      console.log('Could not load from server, trying local storage:', error.message);
+    }
+
+    // Fallback vers stockage local
     try {
       const photoData = localStorage.getItem(`kojo_profile_photo_${userId}`);
-      return photoData ? JSON.parse(photoData) : null;
+      if (photoData) {
+        const parsed = JSON.parse(photoData);
+        console.log('Loaded profile photo from local storage:', parsed);
+        return parsed;
+      }
     } catch (error) {
-      console.error('Erreur chargement photo:', error);
-      return null;
+      console.error('Erreur chargement photo local:', error);
     }
+
+    return null;
   }
 
   // Supprimer la photo de profil
