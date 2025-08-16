@@ -17,6 +17,7 @@ import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/theme';
 import { COUNTRIES, getPhonePrefixByCountry, formatPhoneNumber } from '../constants/countries';
+import ProfilePhoto from '../components/ProfilePhoto';
 
 export default function EditProfileScreen({ navigation }) {
   const { user } = useAuth();
