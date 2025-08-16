@@ -46,6 +46,7 @@ export default function EditProfileScreen({ navigation }) {
   };
 
   const updateFormData = (key, value) => {
+    setFormData(prev => {
       const newData = { ...prev, [key]: value };
       
       // Auto-update phone prefix when country changes
