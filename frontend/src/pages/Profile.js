@@ -350,13 +350,19 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
           <label htmlFor="country" className="block text-sm font-medium text-gray-700">
             Pays
           </label>
-          <CountrySelect
+          <select
             id="country"
             name="country"
             value={formData.country}
-            onChange={handleChange}
-            className="mt-1"
-          />
+            onChange={(e) => updateFormData('country', e.target.value)}
+            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+          >
+            {getCountriesList().map(country => (
+              <option key={country.code} value={country.name}>
+                {country.flag} {country.nameFrench}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
