@@ -270,16 +270,12 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
           <label htmlFor="country" className="block text-sm font-medium text-gray-700">
             Pays
           </label>
-          <select
-            id="country"
-            name="country"
-            value={formData.country}
-            onChange={handleChange}
           <CountrySelect
             id="country"
             name="country"
             value={formData.country}
             onChange={handleChange}
+            className="mt-1"
           />
         </div>
       </div>
