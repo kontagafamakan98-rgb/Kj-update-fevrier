@@ -16,10 +16,10 @@ export default function Home() {
   ];
 
   const countries = [
-    { name: 'Mali', flag: '🇲🇱', color: 'bg-green-100' },
-    { name: 'Sénégal', flag: '🇸🇳', color: 'bg-yellow-100' },
-    { name: 'Burkina Faso', flag: '🇧🇫', color: 'bg-red-100' },
-    { name: 'Côte d\'Ivoire', flag: '🇨🇮', color: 'bg-orange-100' }
+    { name: 'Mali', flag: '🇲🇱', color: 'bg-green-100', code: 'mali' },
+    { name: 'Sénégal', flag: '🇸🇳', color: 'bg-yellow-100', code: 'senegal' },
+    { name: 'Burkina Faso', flag: '🇧🇫', color: 'bg-red-100', code: 'burkina_faso' },
+    { name: 'Côte d\'Ivoire', flag: '🇨🇮', color: 'bg-orange-100', code: 'ivory_coast' }
   ];
 
   return (
