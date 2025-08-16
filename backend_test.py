@@ -1,6 +1,7 @@
 import requests
 import sys
 import json
+import io
 from datetime import datetime, timedelta
 
 class KojoAPITester:
