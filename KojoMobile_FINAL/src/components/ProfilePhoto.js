@@ -57,26 +57,42 @@ export default function ProfilePhoto({
 
     ImageService.showImageSourcePicker(
       async (imageData) => {
+        console.log('Photo selected:', imageData);
         setLoading(true);
         try {
           // Save photo locally
+          console.log('Saving photo for user:', user.id);
           const savedPhoto = await ImageService.saveProfilePhoto(user.id, imageData.uri);
+          console.log('Photo saved:', savedPhoto);
+          
+          // Update the display immediately
           setProfilePhoto(savedPhoto);
           
-          // Upload to server (optional)
-          const uploadResult = await ImageService.uploadProfilePhoto(imageData, user.id);
-          
-          if (onPhotoChange) {
-            onPhotoChange(uploadResult);
+          // Upload to server (optional) - dans le contexte mobile, on peut upload vers l'API backend
+          try {
+            const uploadResult = await ImageService.uploadProfilePhoto(imageData, user.id);
+            console.log('Upload result:', uploadResult);
+            
+            if (onPhotoChange) {
+              onPhotoChange(uploadResult);
+            }
+          } catch (uploadError) {
+            console.log('Upload failed, but photo saved locally:', uploadError);
+            // Même si l'upload échoue, on garde la photo locale
+            if (onPhotoChange) {
+              onPhotoChange({ success: true, local: true, uri: savedPhoto.uri });
+            }
           }
           
         } catch (error) {
           console.error('Error handling photo:', error);
+          Alert.alert('Erreur', 'Impossible de sauvegarder la photo');
         } finally {
           setLoading(false);
         }
       },
       () => {
+        console.log('Photo selection cancelled');
         // User cancelled
       }
     );
