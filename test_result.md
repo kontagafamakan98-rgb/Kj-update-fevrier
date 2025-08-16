@@ -135,7 +135,20 @@ backend:
         agent: "testing"
         comment: "✅ COMPREHENSIVE TESTING COMPLETED: All job management APIs working perfectly. Tested job creation (clients only), job listing with filters (category, status), job details retrieval, job proposals system, and proper authorization checks. Mobile integration tests confirm realistic job creation with French language support, location data, and proper JSON responses. All job search scenarios working for mobile app."
 
-  - task: "User Profile API"
+  - task: "Profile Photo Management API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported profile photo upload/modification not working on PWA"
+      - working: true
+        agent: "main"
+        comment: "FIXED: Added missing backend API endpoints for profile photo management (POST /api/users/profile-photo, GET /api/users/profile-photo, DELETE /api/users/profile-photo), created uploads directory, added static file serving, resolved 502 server errors. Frontend ProfilePhotoService updated to use real API calls instead of simulation."
     implemented: true
     working: true
     file: "/app/backend/server.py"
