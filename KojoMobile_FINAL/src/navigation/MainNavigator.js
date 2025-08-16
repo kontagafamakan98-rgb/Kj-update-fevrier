@@ -9,6 +9,12 @@ import JobsScreen from '../screens/JobsScreen';
 import MessagesScreen from '../screens/MessagesScreen'; 
 import ProfileScreen from '../screens/ProfileScreen';
 import JobDetailsScreen from '../screens/JobDetailsScreen';
+import ChatScreen from '../screens/ChatScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import WorkerProfileScreen from '../screens/WorkerProfileScreen';
+import CreateJobScreen from '../screens/CreateJobScreen';
+import LocationPickerScreen from '../screens/LocationPickerScreen';
+import CameraScreen from '../screens/CameraScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
