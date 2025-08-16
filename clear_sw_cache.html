@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Effacer Cache Service Worker</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>🔧 Maintenance Service Worker</h1>
+    <p>Cette page force la mise à jour du Service Worker.</p>
+    <button onclick="clearCache()">Effacer tout le cache</button>
+    <button onclick="reloadSW()">Recharger Service Worker</button>
+    <div id="status"></div>
+
+    <script>
+        async function clearCache() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<p>🔄 Effacement du cache...</p>';
+            
+            try {
+                // Supprimer tous les caches
+                const cacheNames = await caches.keys();
+                await Promise.all(
+                    cacheNames.map(cacheName => {
+                        console.log('Suppression cache:', cacheName);
+                        return caches.delete(cacheName);
+                    })
+                );
+                
+                statusDiv.innerHTML = '<p>✅ Cache effacé avec succès!</p>';
+                
+                // Attendre un peu puis recharger
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+                
+            } catch (error) {
+                statusDiv.innerHTML = '<p>❌ Erreur: ' + error.message + '</p>';
+            }
+        }
+
+        async function reloadSW() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<p>🔄 Rechargement Service Worker...</p>';
+            
+            try {
+                if ('serviceWorker' in navigator) {
+                    // Désinscrire l'ancien SW
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        console.log('SW désinscrit:', registration);
+                    }
+                    
+                    // Réinscrire le nouveau SW
+                    const registration = await navigator.serviceWorker.register('/sw.js');
+                    console.log('Nouveau SW inscrit:', registration);
+                    
+                    statusDiv.innerHTML = '<p>✅ Service Worker rechargé!</p>';
+                    
+                    // Recharger la page
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<p>❌ Erreur SW: ' + error.message + '</p>';
+            }
+        }
+
+        // Auto-exécution au chargement
+        window.addEventListener('load', () => {
+            console.log('Page de maintenance chargée');
+            document.getElementById('status').innerHTML = '<p>⚠️ Prêt pour la maintenance</p>';
+        });
+    </script>
+</body>
+</html>
