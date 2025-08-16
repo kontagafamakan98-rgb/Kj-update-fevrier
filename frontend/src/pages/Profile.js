@@ -366,6 +366,49 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
         </div>
       </div>
 
+      {/* Champs supplémentaires pour les travailleurs */}
+      {profile?.user_type === 'worker' && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">Informations professionnelles</h3>
+          
+          <div>
+            <label htmlFor="bio" className="block text-sm font-medium text-gray-700">
+              Biographie professionnelle
+            </label>
+            <textarea
+              id="bio"
+              name="bio"
+              rows={4}
+              value={formData.bio}
+              onChange={handleChange}
+              placeholder="Décrivez votre expérience, vos qualifications et ce qui vous distingue..."
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Une bonne biographie attire plus de clients
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="skills" className="block text-sm font-medium text-gray-700">
+              Compétences
+            </label>
+            <input
+              type="text"
+              id="skills"
+              name="skills"
+              value={formData.skills}
+              onChange={handleChange}
+              placeholder="Ex: Plomberie, Électricité, Peinture, Menuiserie..."
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+            />
+            <p className="mt-1 text-sm text-gray-500">
+              Séparez les compétences par des virgules
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end space-x-4">
         <button
           type="button"
