@@ -46,12 +46,17 @@ export default function FlagIcon({ country, className = "w-12 h-8", showEmoji = 
       mali: '🇲🇱',
       senegal: '🇸🇳', 
       burkina_faso: '🇧🇫',
-      ivory_coast: '🇨🇮'
+      ivory_coast: '🇨🇮',
+      // Alternative names
+      ml: '🇲🇱',
+      sn: '🇸🇳',
+      bf: '🇧🇫', 
+      ci: '🇨🇮'
     };
     
     return (
       <div className={`${className} flex items-center justify-center text-4xl`}>
-        {flagEmojis[country] || '🏳️'}
+        {flagEmojis[country] || flagEmojis[country?.toLowerCase()] || '🏳️'}
       </div>
     );
   }
