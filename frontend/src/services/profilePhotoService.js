@@ -136,40 +136,58 @@ class ProfilePhotoService {
 
   // Redimensionner l'image
   async resizeImage(file, maxWidth, maxHeight, quality = 0.8) {
+    console.log('Starting image resize:', maxWidth, maxHeight, quality);
+    
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
 
       img.onload = () => {
-        // Calculer les nouvelles dimensions (carré)
-        const size = Math.min(img.width, img.height);
-        const startX = (img.width - size) / 2;
-        const startY = (img.height - size) / 2;
+        console.log('Image loaded for resize. Original size:', img.width, 'x', img.height);
+        
+        try {
+          // Calculer les nouvelles dimensions (carré)
+          const size = Math.min(img.width, img.height);
+          const startX = (img.width - size) / 2;
+          const startY = (img.height - size) / 2;
 
-        // Configurer le canvas
-        canvas.width = maxWidth;
-        canvas.height = maxHeight;
+          console.log('Crop dimensions:', { size, startX, startY });
 
-        // Dessiner l'image redimensionnée et recadrée
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, maxWidth, maxHeight);
-        ctx.drawImage(img, startX, startY, size, size, 0, 0, maxWidth, maxHeight);
+          // Configurer le canvas
+          canvas.width = maxWidth;
+          canvas.height = maxHeight;
 
-        // Convertir en blob
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Impossible de traiter l\'image'));
-          }
-        }, 'image/jpeg', quality);
+          // Dessiner l'image redimensionnée et recadrée
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, maxWidth, maxHeight);
+          ctx.drawImage(img, startX, startY, size, size, 0, 0, maxWidth, maxHeight);
+
+          console.log('Image drawn on canvas');
+
+          // Convertir en blob
+          canvas.toBlob((blob) => {
+            if (blob) {
+              console.log('Canvas converted to blob, size:', blob.size);
+              resolve(blob);
+            } else {
+              console.error('Failed to convert canvas to blob');
+              reject(new Error('Impossible de traiter l\'image'));
+            }
+          }, 'image/jpeg', quality);
+        } catch (error) {
+          console.error('Error during image processing:', error);
+          reject(new Error('Erreur lors du traitement de l\'image'));
+        }
       };
 
-      img.onerror = () => {
+      img.onerror = (error) => {
+        console.error('Image load error:', error);
         reject(new Error('Impossible de charger l\'image'));
       };
 
+      // Charger l'image
+      console.log('Loading image for resize');
       img.src = URL.createObjectURL(file);
     });
   }
