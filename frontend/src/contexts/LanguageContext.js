@@ -104,6 +104,8 @@ const translations = {
     // Countries
     mali: 'Mali',
     senegal: 'Senegaal',
+    burkina_faso: 'Burkina Faso',
+    ivory_coast: 'Côte d\'Ivoire',
     
     // Job related
     jobTitle: 'Tur liggéey',
