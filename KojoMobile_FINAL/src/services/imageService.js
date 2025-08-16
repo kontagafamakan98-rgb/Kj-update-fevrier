@@ -65,17 +65,31 @@ class ImageService {
   // Open camera to take a photo
   async openCamera(onImageSelected) {
     try {
+      console.log('Starting camera capture...');
       const permissions = await this.requestPermissions();
       
       if (!permissions.camera) {
         Alert.alert(
           'Permission requise',
-          'L\'accès à l\'appareil photo est requis pour prendre une photo.',
-          [{ text: 'OK' }]
+          'L\'accès à l\'appareil photo est requis pour prendre une photo. Veuillez autoriser l\'accès dans les paramètres de l\'application.',
+          [
+            { text: 'Annuler', style: 'cancel' },
+            { 
+              text: 'Paramètres', 
+              onPress: () => {
+                // On mobile, user would need to go to settings manually
+                Alert.alert(
+                  'Paramètres',
+                  'Allez dans Paramètres > Applications > Kojo > Autorisations et activez l\'appareil photo.'
+                );
+              }
+            }
+          ]
         );
         return;
       }
 
+      console.log('Launching camera...');
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -84,8 +98,11 @@ class ImageService {
         base64: false
       });
 
+      console.log('Camera result:', result);
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        console.log('Image captured:', asset);
         
         if (await this.validateImage(asset)) {
           onImageSelected({
@@ -97,10 +114,16 @@ class ImageService {
             height: asset.height
           });
         }
+      } else {
+        console.log('Camera capture cancelled or failed');
       }
     } catch (error) {
       console.error('Error opening camera:', error);
-      Alert.alert('Erreur', 'Impossible d\'ouvrir l\'appareil photo');
+      Alert.alert(
+        'Erreur',
+        'Impossible d\'accéder à l\'appareil photo. Vérifiez que l\'autorisation est accordée et réessayez.',
+        [{ text: 'OK' }]
+      );
     }
   }
 
