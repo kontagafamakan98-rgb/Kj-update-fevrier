@@ -173,16 +173,16 @@ export default function LocationPickerScreen({ route, navigation }) {
       <TouchableOpacity
         style={styles.currentLocationButton}
         onPress={handleCurrentLocation}
-        disabled={isLocating}
+        disabled={isDetecting}
         activeOpacity={0.8}
       >
         <MaterialIcons 
-          name={isLocating ? "hourglass-empty" : "my-location"} 
+          name={isDetecting ? "hourglass-empty" : "my-location"} 
           size={20} 
           color={colors.primary} 
         />
         <Text style={styles.currentLocationText}>
-          {isLocating ? 'Localisation en cours...' : 'Utiliser ma position actuelle'}
+          {isDetecting ? 'Localisation en cours...' : 'Utiliser ma position actuelle'}
         </Text>
       </TouchableOpacity>
 
