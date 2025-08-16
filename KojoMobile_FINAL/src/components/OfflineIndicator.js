@@ -1,16 +1,16 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNotifications } from '../contexts/NotificationContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 const OfflineIndicator = () => {
   const { 
     isOnline, 
     offlineQueueSize, 
     lastSyncTime, 
-    syncOfflineData,
+    syncData,
     isInitialized 
-  } = useNotifications();
+  } = useNotification();
 
   // Don't show anything if services aren't initialized or if online
   if (!isInitialized || isOnline) {
