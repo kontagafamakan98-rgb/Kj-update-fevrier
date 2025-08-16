@@ -150,11 +150,9 @@ export default function SimpleProfilePhoto({
       )}
       
       {/* Debug info */}
-      {__DEV__ && (
-        <Text style={styles.debug}>
-          URI: {photoUri ? '✅' : '❌'} | User: {user?.id || 'N/A'}
-        </Text>
-      )}
+      <Text style={styles.debug}>
+        URI: {photoUri ? '✅' : '❌'} | User: {user?.id || 'N/A'}
+      </Text>
     </TouchableOpacity>
   );
 }
