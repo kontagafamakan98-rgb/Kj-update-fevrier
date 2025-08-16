@@ -32,7 +32,8 @@ function JobsStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="JobsMain" component={JobsScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="JobDetails" component={JobDetailsScreen} options={{ title: 'Détails du job' }} />
+      <Stack.Screen name="JobDetails" component={JobDetailsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
