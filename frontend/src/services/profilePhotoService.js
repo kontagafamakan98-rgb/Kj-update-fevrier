@@ -72,18 +72,24 @@ class ProfilePhotoService {
 
   // Traiter l'image sélectionnée
   async processImage(file) {
+    console.log('Processing image:', file.name, file.size, file.type);
+    
     // Valider le fichier
     if (!this.validateFile(file)) {
       throw new Error('Fichier image invalide');
     }
 
+    console.log('File validation passed');
+
     // Redimensionner et convertir
     const processedBlob = await this.resizeImage(file, 400, 400);
+    console.log('Image resized, blob size:', processedBlob.size);
     
     // Créer l'URL de l'image
     const imageUrl = URL.createObjectURL(processedBlob);
+    console.log('Created blob URL:', imageUrl);
     
-    return {
+    const result = {
       file: processedBlob,
       url: imageUrl,
       name: `profile_photo_${Date.now()}.jpg`,
@@ -91,6 +97,9 @@ class ProfilePhotoService {
       type: 'image/jpeg',
       timestamp: new Date().toISOString()
     };
+    
+    console.log('Image processing completed:', result);
+    return result;
   }
 
   // Valider le fichier image
