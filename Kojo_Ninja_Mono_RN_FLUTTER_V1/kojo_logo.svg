@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="gradKojo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0B7D3A"/>
+      <stop offset="100%" stop-color="#0A5C2F"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(64,64)">
+    <path d="M180 120 C120 40, 40 40, 40 120 C40 200, 180 260, 260 240 C260 260, 340 260, 420 200 C520 60, 320 0, 180 120Z" fill="url(#gradKojo)"/>
+    <text x="140" y="180" font-family="Arial" font-size="64" font-weight="bold" fill="#FFFFFF" text-anchor="middle">KOJO</text>
+    <circle cx="360" cy="120" r="26" fill="#D62828"/>
+    <text x="360" y="128" text-anchor="middle" font-family="Arial" font-size="20" font-weight="bold" fill="#FFFFFF">JOBS</text>
+  

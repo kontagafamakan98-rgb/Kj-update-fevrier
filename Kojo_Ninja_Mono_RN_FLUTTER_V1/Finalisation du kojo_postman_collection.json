@@ -1,0 +1,47 @@
+{
+  "info": {
+    "name": "Kojo API - MVP Mali/Sénégal",
+    "description": "Collection complète pour tester Kojo",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Inscription Client",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"type\": \"client\",\n  \"nom\": \"Amadou Diallo\",\n  \"email\": \"amadou@example.com\",\n  \"telephone\": \"+22370000001\",\n  \"password\": \"Secret123!\",\n  \"pays\": \"Mali\"\n}"},
+            "url": {"raw": "{{base_url}}/auth/signup"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Paiements",
+      "item": [
+        {
+          "name": "Orange Money Mali",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"montant\": 25000,\n  \"devise\": \"XOF\",\n  \"telephone\": \"+22370000001\",\n  \"methode\": \"orange_money\"\n}"},
+            "url": {"raw": "{{base_url}}/payments/orange-money"}
+          }
+        },
+        {
+          "name": "Wave Sénégal",
+          "request": {
+            "method": "POST", 
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\n  \"montant\": 25000,\n  \"devise\": \"XOF\",\n  \"telephone\": \"+22170000001\",\n  \"methode\": \"wave\"\n}"},
+            "url": {"raw": "{{base_url}}/payments/wave"}
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [{"key": "base_url", "value": "https://api.kojo.mali-senegal.com"}]
+}

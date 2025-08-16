@@ -1,0 +1,19 @@
+[
+  {
+    "id": 1,
+    "type": "client",
+    "nom": "Amadou Diallo",
+    "email": "amadou@example.com",
+    "telephone": "+22370000001",
+    "pays": "Mali"
+  },
+  {
+    "id": 2,
+    "type": "worker", 
+    "nom": "Fatou Sow",
+    "email": "fatou@example.com",
+    "telephone": "+22170000002",
+    "pays": "Senegal",
+    "specialite": "Plomberie"
+  }
+]

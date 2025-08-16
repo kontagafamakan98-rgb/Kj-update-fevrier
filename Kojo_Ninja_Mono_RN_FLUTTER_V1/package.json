@@ -1,0 +1,16 @@
+{
+  "name": "kojo-monorepo",
+  "version": "1.0.0",
+  "description": "Kojo Mali/Sénégal - Monorepo RN + Flutter",
+  "scripts": {
+    "setup": "./scripts/setup_ninja_mono.sh",
+    "start:rn": "cd apps/rn-app && npx react-native start",
+    "start:flutter": "cd apps/flutter-app && flutter run",
+    "build": "npm run build:rn && npm run build:flutter",
+    "build:rn": "cd apps/rn-app && npx react-native build-android",
+    "build:flutter": "cd apps/flutter-app && flutter build apk"
+  },
+  "workspaces": ["apps/*", "packages/*"],
+  "keywords": ["kojo", "mali", "senegal", "react-native", "flutter"],
+  "author": "Kojo Team"
+}
