@@ -3,31 +3,36 @@ import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { Provider as PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import AppNavigator from './src/navigation/AppNavigator';
 import { AuthProvider } from './src/contexts/AuthContext';
 import { LanguageProvider } from './src/contexts/LanguageContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { NotificationProvider } from './src/contexts/NotificationContext';
+import OfflineIndicator from './src/components/OfflineIndicator';
 import { theme } from './src/theme/theme';
 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <PaperProvider theme={theme}>
-        <LanguageProvider>
-          <AuthProvider>
-            <LocationProvider>
-              <NotificationProvider>
-                <NavigationContainer>
-                  <StatusBar style="light" backgroundColor="#EA580C" />
-                  <AppNavigator />
-                </NavigationContainer>
-              </NotificationProvider>
-            </LocationProvider>
-          </AuthProvider>
-        </LanguageProvider>
-      </PaperProvider>
+      <SafeAreaProvider>
+        <PaperProvider theme={theme}>
+          <LanguageProvider>
+            <AuthProvider>
+              <LocationProvider>
+                <NotificationProvider>
+                  <NavigationContainer>
+                    <StatusBar style="light" backgroundColor="#EA580C" />
+                    <OfflineIndicator />
+                    <AppNavigator />
+                  </NavigationContainer>
+                </NotificationProvider>
+              </LocationProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </PaperProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
