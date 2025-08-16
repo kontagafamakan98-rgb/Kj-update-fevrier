@@ -153,18 +153,18 @@ const ProfilePhoto = ({
     setLoading(true);
     
     try {
-      const success = await ProfilePhotoService.deleteProfilePhoto(userId);
-      console.log('Photo deletion result:', success);
+      // Supprimer du localStorage
+      const photoKey = `profile_photo_${userId}`;
+      localStorage.removeItem(photoKey);
+      console.log('Photo removed from localStorage:', photoKey);
       
-      if (success) {
-        setProfilePhoto(null);
-        
-        if (onPhotoChange) {
-          onPhotoChange({ success: true, deleted: true });
-        }
-      } else {
-        throw new Error('Failed to delete photo');
+      // Réinitialiser l'état
+      setProfilePhoto(null);
+      
+      if (onPhotoChange) {
+        onPhotoChange({ success: true, deleted: true });
       }
+      
     } catch (error) {
       console.error('Error deleting photo:', error);
       alert('Erreur lors de la suppression de la photo');
