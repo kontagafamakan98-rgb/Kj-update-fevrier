@@ -196,6 +196,28 @@ export default function ProfileScreen({ navigation }) {
           </Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
           
+          {/* Debug button - remove after testing */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 15,
+              marginTop: 8,
+            }}
+            onPress={() => {
+              console.log('Debug: Force refresh ProfilePhoto');
+              console.log('Current user:', user);
+              console.log('Current refreshTrigger:', refreshTrigger);
+              setRefreshTrigger(prev => prev + 1);
+              Alert.alert('Debug', `RefreshTrigger incrémenté à ${refreshTrigger + 1}`);
+            }}
+          >
+            <Text style={{ color: 'white', fontSize: 12 }}>
+              🔄 Debug Refresh ({refreshTrigger})
+            </Text>
+          </TouchableOpacity>
+          
           <View style={styles.userMeta}>
             <View style={styles.userMetaItem}>
               <Text style={styles.userMetaIcon}>{userCountry.flag}</Text>
