@@ -48,16 +48,17 @@ export default function CameraScreen({ route, navigation }) {
     }
   };
 
-  const handleGallery = () => {
-    // In a real app, use expo-image-picker:
-    // const result = await ImagePicker.launchImageLibraryAsync({
-    //   mediaTypes: ImagePicker.MediaTypeOptions.Images,
-    //   allowsEditing: true,
-    //   aspect: [4, 3],
-    //   quality: 0.8,
-    // });
-    
-    Alert.alert('Galerie', 'Sélection depuis la galerie (fonctionnalité en développement)');
+  const handleGallery = async () => {
+    try {
+      await ImageService.openGallery((imageData) => {
+        if (onPhotoCapture) {
+          onPhotoCapture(imageData.uri);
+        }
+        navigation.goBack();
+      });
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible d\'ouvrir la galerie');
+    }
   };
 
   const handleRetake = () => {
