@@ -46,7 +46,7 @@ export default function ProfileScreen({ navigation }) {
       id: 'edit',
       title: 'Modifier le profil',
       icon: 'edit',
-      onPress: () => Alert.alert('Modifier le profil', 'Fonctionnalité bientôt disponible'),
+      onPress: () => navigation.navigate('EditProfile'),
     },
     {
       id: 'documents',
