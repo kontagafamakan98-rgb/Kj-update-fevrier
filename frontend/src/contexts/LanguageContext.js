@@ -40,11 +40,11 @@ const translations = {
     client: 'Client',
     worker: 'Travailleur',
     
-    // Countries
-    mali: 'Mali',
-    senegal: 'Sénégal',
-    burkina_faso: 'Burkina Faso',
-    ivory_coast: 'Côte d\'Ivoire',
+    // Countries with flags
+    mali: '🇲🇱 Mali',
+    senegal: '🇸🇳 Sénégal',
+    burkina_faso: '🇧🇫 Burkina Faso',
+    ivory_coast: '🇨🇮 Côte d\'Ivoire',
     
     // Job related
     jobTitle: 'Titre du travail',
