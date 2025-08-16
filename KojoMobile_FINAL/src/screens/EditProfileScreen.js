@@ -44,7 +44,8 @@ export default function EditProfileScreen({ navigation }) {
       Alert.alert('Erreur', result.error || 'Impossible de mettre à jour la photo');
     }
   };
-    setFormData(prev => {
+
+  const updateFormData = (key, value) => {
       const newData = { ...prev, [key]: value };
       
       // Auto-update phone prefix when country changes
