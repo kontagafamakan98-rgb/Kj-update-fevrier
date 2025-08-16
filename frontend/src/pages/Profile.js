@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { CountrySelect, CountryDisplay } from '../components/CountryDisplay';
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
