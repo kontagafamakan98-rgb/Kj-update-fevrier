@@ -1,29 +1,76 @@
 {
   "expo": {
-    "name": "KojoMobile",
-    "slug": "KojoMobile",
+    "name": "Kojo",
+    "slug": "kojo-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
+    "user Interface Style": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#EA580C"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.kojo.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.kojo.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to take profile photos and job documentation.",
+        "NSLocationWhenInUseUsageDescription": "This app uses location to match you with nearby jobs and services.",
+        "NSMicrophoneUsageDescription": "This app uses the microphone for video messages.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to upload profile photos and job images.",
+        "NSFaceIDUsageDescription": "Use Face ID to quickly and securely access your account."
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#EA580C"
+    },
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#EA580C"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "kojo-mobile-app"
+      }
+    },
+    "plugins": [
+      "expo-camera",
+      "expo-location",
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to authenticate with biometric data."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to upload profile pictures and job images.",
+          "cameraPermission": "The app accesses your camera to take profile pictures and job documentation."
+        }
+      ]
+    ]
   }
 }
