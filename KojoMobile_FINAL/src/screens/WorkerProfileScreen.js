@@ -123,11 +123,11 @@ export default function WorkerProfileScreen({ route, navigation }) {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {workerData.first_name.charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            <ProfilePhoto
+              user={workerData}
+              size={100}
+              editable={false}
+            />
             {workerData.verification_status === 'verified' && (
               <View style={styles.verificationBadge}>
                 <MaterialIcons name="verified" size={16} color={colors.success} />
