@@ -119,7 +119,7 @@ const ProfilePhoto = ({
     setLoading(true);
     
     try {
-      const success = ProfilePhotoService.deleteProfilePhoto(userId);
+      const success = await ProfilePhotoService.deleteProfilePhoto(userId);
       console.log('Photo deletion result:', success);
       
       if (success) {
