@@ -70,7 +70,7 @@ export default function PhotoTest() {
           <h2 className="text-xl font-bold mb-4">Informations Utilisateur</h2>
           <div className="bg-gray-100 p-4 rounded">
             <pre className="text-sm">
-              {JSON.stringify(user, null, 2)}
+              {JSON.stringify(testUser, null, 2)}
             </pre>
           </div>
         </div>
