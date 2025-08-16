@@ -6,6 +6,15 @@ export default function PhotoTest() {
   const { user } = useAuth();
   const [testResults, setTestResults] = useState([]);
 
+  // Utilisateur de test pour le mode debug sans auth
+  const testUser = user || {
+    id: 'test_user_123',
+    first_name: 'Jean',
+    last_name: 'Dupont',
+    email: 'jean.dupont@test.com',
+    user_type: 'client'
+  };
+
   const addTestResult = (message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setTestResults(prev => [...prev, { timestamp, message, type }]);
