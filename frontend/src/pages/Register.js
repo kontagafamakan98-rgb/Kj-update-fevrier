@@ -129,6 +129,8 @@ export default function Register() {
               >
                 <option value="senegal">{t('senegal')}</option>
                 <option value="mali">{t('mali')}</option>
+                <option value="burkina_faso">{t('burkina_faso')}</option>
+                <option value="ivory_coast">{t('ivory_coast')}</option>
               </select>
             </div>
 
