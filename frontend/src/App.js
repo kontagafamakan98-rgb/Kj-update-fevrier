@@ -134,6 +134,11 @@ function AppRoutes() {
               <Messages />
             </ProtectedRoute>
           } />
+          <Route path="/mobile-test" element={
+            <ProtectedRoute>
+              <MobileTest />
+            </ProtectedRoute>
+          } />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Profile />
