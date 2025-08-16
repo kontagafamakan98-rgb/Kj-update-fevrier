@@ -195,7 +195,28 @@ export default function CreateJobScreen({ navigation }) {
                   onChangeText={(value) => updateFormData('location', value)}
                   placeholder="Ex: Bamako, Mali"
                 />
-                <TouchableOpacity style={styles.locationButton}>
+                <TouchableOpacity 
+                  style={styles.locationButton}
+                  onPress={() => {
+                    // Simuler la détection GPS
+                    const userCountry = getCountryByCode(user?.country);
+                    const locationSuggestions = {
+                      'mali': 'Bamako, Mali',
+                      'senegal': 'Dakar, Sénégal', 
+                      'burkina_faso': 'Ouagadougou, Burkina Faso',
+                      'cote_divoire': 'Abidjan, Côte d\'Ivoire'
+                    };
+                    
+                    const detectedLocation = locationSuggestions[user?.country] || locationSuggestions['mali'];
+                    updateFormData('location', detectedLocation);
+                    
+                    Alert.alert(
+                      'Position détectée', 
+                      `Localisation mise à jour: ${detectedLocation}`,
+                      [{ text: 'OK' }]
+                    );
+                  }}
+                >
                   <MaterialIcons name="my-location" size={20} color={colors.primary} />
                 </TouchableOpacity>
               </View>
