@@ -9,10 +9,6 @@
       "**/*"
     ],
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#EA580C"
-      },
       "package": "com.kojo.app",
       "permissions": [
         "android.permission.CAMERA",
