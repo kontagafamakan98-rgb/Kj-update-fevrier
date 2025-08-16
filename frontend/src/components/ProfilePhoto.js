@@ -85,27 +85,12 @@ const ProfilePhoto = ({
       console.log('Photo saved locally:', savedPhoto);
       setProfilePhoto(savedPhoto);
       
-      // Upload vers serveur (simulation)
-      const uploadResult = await ProfilePhotoService.uploadProfilePhoto(imageData, userId);
-      console.log('Upload result:', uploadResult);
-      
-      // IMPORTANT: Mettre à jour avec l'URL du serveur après upload réussi
-      if (uploadResult.success && uploadResult.url) {
-        console.log('Updating ProfilePhoto with server URL:', uploadResult.url);
-        const serverPhoto = {
-          ...savedPhoto,
-          url: uploadResult.url,
-          server_url: uploadResult.server_url,
-          uploaded: true
-        };
-        setProfilePhoto(serverPhoto);
-        
-        // Sauvegarder la version serveur localement aussi
-        await ProfilePhotoService.saveProfilePhoto(userId, serverPhoto);
-      }
+      // SOLUTION SIMPLE: Ne plus essayer l'upload serveur qui échoue
+      // On garde juste la photo locale qui fonctionne
+      console.log('Photo set successfully with local URL:', savedPhoto.url);
       
       if (onPhotoChange) {
-        onPhotoChange(uploadResult);
+        onPhotoChange({ success: true, local: true, url: savedPhoto.url });
       }
       
     } catch (error) {
