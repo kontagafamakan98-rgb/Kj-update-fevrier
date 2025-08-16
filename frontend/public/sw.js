@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kojo-pwa-v1';
+const CACHE_NAME = 'kojo-pwa-v2-fixed';
 const urlsToCache = [
   '/',
   '/static/js/bundle.js',
