@@ -29,9 +29,22 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  /* PWA Standalone styles */
+  body.pwa-standalone {
+    padding-top: env(safe-area-inset-top);
+  }
+
   /* Safe area support for iOS */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-padding-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pt-safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
   }
 
   .h-safe-area-inset-bottom {
