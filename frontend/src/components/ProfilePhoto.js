@@ -29,7 +29,7 @@ const ProfilePhoto = ({
     }
   }, [user, size]);
 
-  const loadProfilePhoto = () => {
+  const loadProfilePhoto = async () => {
     const userId = user?.id || user?._id || user?.user_id;
     console.log('Loading profile photo for user ID:', userId);
     
@@ -39,7 +39,7 @@ const ProfilePhoto = ({
     }
     
     try {
-      const savedPhoto = ProfilePhotoService.loadProfilePhoto(userId);
+      const savedPhoto = await ProfilePhotoService.loadProfilePhoto(userId);
       console.log('Loaded profile photo:', savedPhoto);
       if (savedPhoto) {
         setProfilePhoto(savedPhoto);
