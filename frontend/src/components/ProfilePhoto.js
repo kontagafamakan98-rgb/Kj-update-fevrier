@@ -89,6 +89,21 @@ const ProfilePhoto = ({
       const uploadResult = await ProfilePhotoService.uploadProfilePhoto(imageData, userId);
       console.log('Upload result:', uploadResult);
       
+      // IMPORTANT: Mettre à jour avec l'URL du serveur après upload réussi
+      if (uploadResult.success && uploadResult.url) {
+        console.log('Updating ProfilePhoto with server URL:', uploadResult.url);
+        const serverPhoto = {
+          ...savedPhoto,
+          url: uploadResult.url,
+          server_url: uploadResult.server_url,
+          uploaded: true
+        };
+        setProfilePhoto(serverPhoto);
+        
+        // Sauvegarder la version serveur localement aussi
+        await ProfilePhotoService.saveProfilePhoto(userId, serverPhoto);
+      }
+      
       if (onPhotoChange) {
         onPhotoChange(uploadResult);
       }
