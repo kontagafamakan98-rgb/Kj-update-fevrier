@@ -56,6 +56,7 @@ function ProfileStack() {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Camera" component={CameraScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="CameraTest" component={CameraTestScreen} options={{ headerShown: false }} />
       <Stack.Screen name="LocationPicker" component={LocationPickerScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
