@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCountryFromPhone } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CountrySelect, getAllCountries } from '../components/CountryDisplay';
 
