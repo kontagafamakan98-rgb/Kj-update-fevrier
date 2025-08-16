@@ -23,6 +23,7 @@ function DashboardStack() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="DashboardMain" component={DashboardScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="CreateJob" component={CreateJobScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
