@@ -166,6 +166,15 @@ export default function DashboardScreen({ navigation }) {
               <MaterialIcons name="camera-alt" size={32} color="#f59e0b" />
               <Text style={[styles.actionText, { color: '#f59e0b' }]}>Test Caméra</Text>
             </TouchableOpacity>
+            
+            {/* Debug: Profile Photo Test Button */}
+            <TouchableOpacity
+              style={[styles.actionCard, { backgroundColor: '#e0f2fe' }]}
+              onPress={() => navigation.navigate('ProfilePhotoTest')}
+            >
+              <MaterialIcons name="account-circle" size={32} color="#0284c7" />
+              <Text style={[styles.actionText, { color: '#0284c7' }]}>Test Photo Profil</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
