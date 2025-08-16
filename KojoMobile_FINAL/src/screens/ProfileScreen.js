@@ -50,6 +50,12 @@ export default function ProfileScreen({ navigation }) {
       onPress: () => navigation.navigate('EditProfile'),
     },
     {
+      id: 'notifications',
+      title: 'Notifications',
+      icon: 'notifications',
+      onPress: () => navigation.navigate('NotificationSettings'),
+    },
+    {
       id: 'documents',
       title: 'Mes documents',
       icon: 'folder',
