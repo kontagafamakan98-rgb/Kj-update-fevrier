@@ -536,4 +536,42 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     textDecorationLine: 'underline',
   },
+  inputLabel: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  inputHelper: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  phoneInputContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  phonePrefixContainer: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+    justifyContent: 'center',
+  },
+  phonePrefix: {
+    fontSize: 16,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  phoneNumberInput: {
+    flex: 1,
+    borderWidth: 0,
+    borderRadius: 0,
+    marginBottom: 0,
+  },
 });
