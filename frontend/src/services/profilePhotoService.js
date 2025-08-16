@@ -104,18 +104,33 @@ class ProfilePhotoService {
 
   // Valider le fichier image
   validateFile(file) {
+    console.log('Validating file:', file.name, file.type, file.size);
+    
     // Vérifier le type
     if (!this.allowedFormats.includes(file.type)) {
-      alert('Format non supporté. Utilisez JPG, PNG ou WebP.');
+      const errorMsg = `Format non supporté: ${file.type}. Utilisez JPG, PNG ou WebP.`;
+      console.error(errorMsg);
+      alert(errorMsg);
       return false;
     }
 
     // Vérifier la taille
     if (file.size > this.maxImageSize) {
-      alert('Image trop grande. Maximum 5MB autorisé.');
+      const errorMsg = `Image trop grande: ${Math.round(file.size / 1024 / 1024)}MB. Maximum 5MB autorisé.`;
+      console.error(errorMsg);
+      alert(errorMsg);
       return false;
     }
 
+    // Vérifier que le fichier n'est pas vide
+    if (file.size === 0) {
+      const errorMsg = 'Fichier vide détecté';
+      console.error(errorMsg);
+      alert(errorMsg);
+      return false;
+    }
+
+    console.log('File validation successful');
     return true;
   }
 
