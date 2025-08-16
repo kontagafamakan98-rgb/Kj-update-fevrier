@@ -35,7 +35,15 @@ export default function EditProfileScreen({ navigation }) {
   
   const [loading, setLoading] = useState(false);
 
-  const updateFormData = (key, value) => {
+  const handlePhotoChange = async (result) => {
+    if (result.success) {
+      Alert.alert('Succès', 'Photo de profil mise à jour avec succès');
+    } else if (result.deleted) {
+      Alert.alert('Succès', 'Photo de profil supprimée');
+    } else {
+      Alert.alert('Erreur', result.error || 'Impossible de mettre à jour la photo');
+    }
+  };
     setFormData(prev => {
       const newData = { ...prev, [key]: value };
       
