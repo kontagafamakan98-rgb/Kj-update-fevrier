@@ -131,17 +131,13 @@ export default function EditProfileScreen({ navigation }) {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* Profile Photo Section */}
           <View style={styles.photoSection}>
-            <View style={styles.photoContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {formData.firstName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-              <TouchableOpacity style={styles.cameraButton}>
-                <MaterialIcons name="camera-alt" size={20} color={colors.background} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.photoText}>Changer la photo de profil</Text>
+            <ProfilePhoto
+              user={user}
+              size={120}
+              editable={true}
+              onPhotoChange={handlePhotoChange}
+              showChangeButton={false}
+            />
           </View>
 
           {/* Personal Information */}
