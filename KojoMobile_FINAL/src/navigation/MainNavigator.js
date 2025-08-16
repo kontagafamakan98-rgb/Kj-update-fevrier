@@ -15,6 +15,7 @@ import WorkerProfileScreen from '../screens/WorkerProfileScreen';
 import CreateJobScreen from '../screens/CreateJobScreen';
 import LocationPickerScreen from '../screens/LocationPickerScreen';
 import CameraScreen from '../screens/CameraScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
