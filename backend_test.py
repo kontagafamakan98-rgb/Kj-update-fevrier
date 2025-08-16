@@ -442,6 +442,248 @@ class KojoAPITester:
             token=self.client_token
         )
 
+    def test_profile_photo_management(self):
+        """Test profile photo upload, retrieval, and deletion"""
+        print("\n" + "="*50)
+        print("TESTING PROFILE PHOTO MANAGEMENT")
+        print("="*50)
+        
+        if not self.client_token:
+            print("❌ Skipping profile photo tests - no client token")
+            return
+            
+        # Test 1: Get profile photo when none exists (should return 404)
+        print(f"\n🔍 Testing Get Profile Photo (No Photo)...")
+        url = f"{self.base_url}/users/profile-photo"
+        headers = {'Authorization': f'Bearer {self.client_token}'}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 404:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code} (No photo found as expected)")
+            else:
+                print(f"❌ Failed - Expected 404, got {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 2: Upload profile photo with valid image
+        print(f"\n🔍 Testing Upload Profile Photo (Valid Image)...")
+        url = f"{self.base_url}/users/profile-photo"
+        headers = {'Authorization': f'Bearer {self.client_token}'}
+        
+        # Create a small test image (1x1 pixel PNG)
+        test_image_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xdd\x8d\xb4\x1c\x00\x00\x00\x00IEND\xaeB`\x82'
+        
+        files = {'file': ('test_photo.png', io.BytesIO(test_image_data), 'image/png')}
+        
+        try:
+            response = requests.post(url, headers={'Authorization': f'Bearer {self.client_token}'}, files=files)
+            if response.status_code == 200:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                try:
+                    response_data = response.json()
+                    print(f"   Response: {response_data}")
+                    if 'photo_url' in response_data:
+                        print(f"   Photo URL: {response_data['photo_url']}")
+                except:
+                    pass
+            else:
+                print(f"❌ Failed - Expected 200, got {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    print(f"   Error: {response.text}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 3: Get profile photo after upload (should return 200)
+        print(f"\n🔍 Testing Get Profile Photo (After Upload)...")
+        url = f"{self.base_url}/users/profile-photo"
+        headers = {'Authorization': f'Bearer {self.client_token}'}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                try:
+                    response_data = response.json()
+                    print(f"   Response: {response_data}")
+                except:
+                    pass
+            else:
+                print(f"❌ Failed - Expected 200, got {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    print(f"   Error: {response.text}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 4: Test file size validation (upload large file)
+        print(f"\n🔍 Testing Upload Large File (Should Fail)...")
+        url = f"{self.base_url}/users/profile-photo"
+        
+        # Create a large file (6MB - exceeds 5MB limit)
+        large_file_data = b'x' * (6 * 1024 * 1024)
+        files = {'file': ('large_photo.jpg', io.BytesIO(large_file_data), 'image/jpeg')}
+        
+        try:
+            response = requests.post(url, headers={'Authorization': f'Bearer {self.client_token}'}, files=files)
+            if response.status_code == 400:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code} (File too large as expected)")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    pass
+            else:
+                print(f"❌ Failed - Expected 400, got {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 5: Test file type validation (upload non-image file)
+        print(f"\n🔍 Testing Upload Non-Image File (Should Fail)...")
+        url = f"{self.base_url}/users/profile-photo"
+        
+        text_file_data = b'This is not an image file'
+        files = {'file': ('document.txt', io.BytesIO(text_file_data), 'text/plain')}
+        
+        try:
+            response = requests.post(url, headers={'Authorization': f'Bearer {self.client_token}'}, files=files)
+            if response.status_code == 400:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code} (Non-image file rejected as expected)")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    pass
+            else:
+                print(f"❌ Failed - Expected 400, got {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 6: Test authentication requirement (no token)
+        print(f"\n🔍 Testing Upload Without Authentication (Should Fail)...")
+        url = f"{self.base_url}/users/profile-photo"
+        
+        files = {'file': ('test_photo.png', io.BytesIO(test_image_data), 'image/png')}
+        
+        try:
+            response = requests.post(url, files=files)  # No auth header
+            if response.status_code == 403:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code} (Authentication required as expected)")
+            else:
+                print(f"❌ Failed - Expected 403, got {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 7: Test profile integration (check if profile_photo field is updated)
+        print(f"\n🔍 Testing Profile Integration (Profile Photo in User Profile)...")
+        url = f"{self.base_url}/users/profile"
+        headers = {'Authorization': f'Bearer {self.client_token}'}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                response_data = response.json()
+                if 'profile_photo' in response_data and response_data['profile_photo']:
+                    self.tests_passed += 1
+                    print(f"✅ Passed - Profile photo URL found in user profile")
+                    print(f"   Profile Photo: {response_data['profile_photo']}")
+                else:
+                    print(f"❌ Failed - Profile photo not found in user profile")
+            else:
+                print(f"❌ Failed - Could not get user profile: {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 8: Delete profile photo
+        print(f"\n🔍 Testing Delete Profile Photo...")
+        url = f"{self.base_url}/users/profile-photo"
+        headers = {'Authorization': f'Bearer {self.client_token}'}
+        
+        try:
+            response = requests.delete(url, headers=headers)
+            if response.status_code == 200:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+                try:
+                    response_data = response.json()
+                    print(f"   Response: {response_data}")
+                except:
+                    pass
+            else:
+                print(f"❌ Failed - Expected 200, got {response.status_code}")
+                try:
+                    error_data = response.json()
+                    print(f"   Error: {error_data}")
+                except:
+                    print(f"   Error: {response.text}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 9: Try to delete profile photo again (should return 404)
+        print(f"\n🔍 Testing Delete Non-Existent Profile Photo (Should Fail)...")
+        url = f"{self.base_url}/users/profile-photo"
+        headers = {'Authorization': f'Bearer {self.client_token}'}
+        
+        try:
+            response = requests.delete(url, headers=headers)
+            if response.status_code == 404:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code} (No photo to delete as expected)")
+            else:
+                print(f"❌ Failed - Expected 404, got {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+        
+        # Test 10: Verify profile photo is removed from user profile
+        print(f"\n🔍 Testing Profile Integration After Deletion...")
+        url = f"{self.base_url}/users/profile"
+        headers = {'Authorization': f'Bearer {self.client_token}'}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                response_data = response.json()
+                if not response_data.get('profile_photo'):
+                    self.tests_passed += 1
+                    print(f"✅ Passed - Profile photo removed from user profile")
+                else:
+                    print(f"❌ Failed - Profile photo still exists in user profile: {response_data.get('profile_photo')}")
+            else:
+                print(f"❌ Failed - Could not get user profile: {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
+
     def test_unauthorized_access(self):
         """Test unauthorized access to protected endpoints"""
         print("\n" + "="*50)
@@ -462,6 +704,29 @@ class KojoAPITester:
             "jobs",
             403  # Changed from 401 to 403 as FastAPI returns 403 for missing auth
         )
+        
+        # Test profile photo endpoints without token
+        self.run_test(
+            "Get Profile Photo Without Token",
+            "GET",
+            "users/profile-photo",
+            403
+        )
+        
+        print(f"\n🔍 Testing Delete Profile Photo Without Token...")
+        url = f"{self.base_url}/users/profile-photo"
+        
+        try:
+            response = requests.delete(url)  # No auth header
+            if response.status_code == 403:
+                self.tests_passed += 1
+                print(f"✅ Passed - Status: {response.status_code}")
+            else:
+                print(f"❌ Failed - Expected 403, got {response.status_code}")
+            self.tests_run += 1
+        except Exception as e:
+            print(f"❌ Failed - Error: {str(e)}")
+            self.tests_run += 1
 
     def run_all_tests(self):
         """Run all tests in sequence"""
