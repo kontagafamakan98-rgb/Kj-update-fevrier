@@ -359,9 +359,10 @@ metadata:
 test_plan:
   current_focus:
     - "Profile Photo Management API"
-    - "PWA Profile Photo Management"
+    - "PWA Profile Photo Management" 
+    - "Mobile Push Notifications System"
+    - "Mobile Offline Capabilities System"
     - "Mobile Profile Photo Management System"
-    - "Backend Profile Photo Integration Testing"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
