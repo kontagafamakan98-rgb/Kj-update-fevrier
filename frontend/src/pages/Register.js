@@ -65,10 +65,39 @@ export default function Register() {
   };
 
   const handleChange = (e) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+    const { name, value } = e.target;
+    updateFormData(name, value);
+  };
+
+  const updateFormData = (key, value) => {
+    setFormData(prev => {
+      const newData = { ...prev, [key]: value };
+      
+      // Auto-update phone prefix when country changes
+      if (key === 'country') {
+        const countryData = countries.find(c => c.name.toLowerCase() === value.toLowerCase());
+        const phonePrefix = countryData ? countryData.phonePrefix : '+221';
+        
+        // If phone field is empty or only has old prefix, set new prefix
+        if (!newData.phone || newData.phone.match(/^\+\d{3}\s*$/)) {
+          newData.phone = phonePrefix + ' ';
+        } else {
+          // Format existing phone number with new country prefix
+          const cleanPhone = newData.phone.replace(/^\+\d{3}\s*/, '');
+          newData.phone = phonePrefix + ' ' + cleanPhone;
+        }
+      }
+      
+      // Auto-detect country when phone number changes
+      if (key === 'phone') {
+        const detectedCountry = detectCountryFromPhone(value);
+        if (detectedCountry && detectedCountry.name.toLowerCase() !== newData.country.toLowerCase()) {
+          newData.country = detectedCountry.name.toLowerCase();
+        }
+      }
+      
+      return newData;
+    });
   };
 
   return (
