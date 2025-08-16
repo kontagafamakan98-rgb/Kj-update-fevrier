@@ -140,6 +140,11 @@ function AppRoutes() {
               <MobileTest />
             </ProtectedRoute>
           } />
+          <Route path="/create-job" element={
+            <ProtectedRoute>
+              <CreateJob />
+            </ProtectedRoute>
+          } />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Profile />
