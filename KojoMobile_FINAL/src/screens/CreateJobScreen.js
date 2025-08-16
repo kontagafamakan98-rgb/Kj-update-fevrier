@@ -22,13 +22,16 @@ import { COUNTRIES, getCountryByCode } from '../constants/countries';
 export default function CreateJobScreen({ navigation }) {
   const { user } = useAuth();
   
+  // Get user's country info for auto-location
+  const userCountry = getCountryByCode(user?.country);
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: 'general',
     budget_min: '',
     budget_max: '',
-    location: '',
+    location: `${userCountry?.nameFrench || 'Mali'}`, // Auto-fill with user's country
     deadline: '',
     requirements: '',
     urgency: 'normal',
