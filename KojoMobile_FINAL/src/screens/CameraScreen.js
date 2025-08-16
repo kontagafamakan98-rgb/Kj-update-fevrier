@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { colors } from '../theme/theme';
+import ImageService from '../services/imageService';
 
 export default function CameraScreen({ route, navigation }) {
   const { onPhotoCapture, allowGallery = true } = route.params || {};
