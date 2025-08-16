@@ -7,6 +7,8 @@ class ProfilePhotoService {
 
   // Demander à l'utilisateur de sélectionner une photo
   async selectPhoto() {
+    console.log('ProfilePhotoService: Starting photo selection');
+    
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -14,27 +16,57 @@ class ProfilePhotoService {
       input.style.display = 'none';
       
       input.onchange = async (event) => {
+        console.log('File input change event triggered');
         const file = event.target.files[0];
+        
         if (!file) {
+          console.log('No file selected');
           reject(new Error('Aucune image sélectionnée'));
           return;
         }
 
+        console.log('Selected file:', file.name, file.size, file.type);
+
         try {
           const processedImage = await this.processImage(file);
+          console.log('Image processed successfully:', processedImage);
           resolve(processedImage);
         } catch (error) {
+          console.error('Error processing image:', error);
           reject(error);
+        } finally {
+          // Clean up
+          document.body.removeChild(input);
         }
       };
 
-      input.onerror = () => {
+      input.onerror = (error) => {
+        console.error('File input error:', error);
+        document.body.removeChild(input);
         reject(new Error('Erreur lors de la sélection de l\'image'));
       };
 
+      input.oncancel = () => {
+        console.log('File selection cancelled');
+        document.body.removeChild(input);
+        reject(new Error('Sélection annulée'));
+      };
+
+      // Trigger file picker
+      console.log('Adding input to DOM and triggering click');
       document.body.appendChild(input);
-      input.click();
-      document.body.removeChild(input);
+      
+      // Delay click to ensure DOM is ready
+      setTimeout(() => {
+        try {
+          input.click();
+          console.log('File input clicked');
+        } catch (error) {
+          console.error('Error clicking file input:', error);
+          document.body.removeChild(input);
+          reject(new Error('Impossible d\'ouvrir le sélecteur de fichiers'));
+        }
+      }, 100);
     });
   }
 
