@@ -263,17 +263,92 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
         </div>
       )}
 
-      {/* Photo de profil - VERSION ULTRA SIMPLE */}
+      {/* Photo de profil - TEST ULTRA BASIQUE */}
       <div className="text-center mb-6">
         <div className="mb-4">
-          <div className="flex justify-center">
-            <SimplePhotoUpload 
-              userId={profile?.id || profile?._id || profile?.user_id}
-              size={120}
+          <div className="flex justify-center flex-col items-center">
+            
+            {/* TEST 1: Input file basique */}
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  console.log('Fichier sélectionné:', file.name);
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    const base64 = event.target.result;
+                    console.log('Base64 créé, longueur:', base64.length);
+                    
+                    // Sauver dans localStorage
+                    localStorage.setItem('test_photo', base64);
+                    console.log('Photo sauvée dans localStorage');
+                    
+                    // Forcer le refresh de la page pour voir le résultat
+                    window.location.reload();
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              style={{ marginBottom: '10px' }}
             />
+            
+            {/* TEST 2: Affichage de la photo */}
+            <div style={{
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              border: '2px solid #ccc',
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#f0f0f0'
+            }}>
+              {(() => {
+                const savedPhoto = localStorage.getItem('test_photo');
+                console.log('Photo dans localStorage:', savedPhoto ? 'TROUVÉE' : 'ABSENTE');
+                
+                if (savedPhoto) {
+                  return (
+                    <img 
+                      src={savedPhoto} 
+                      alt="Test" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onLoad={() => console.log('✅ Image chargée avec succès')}
+                      onError={(e) => console.error('❌ Erreur image:', e)}
+                    />
+                  );
+                } else {
+                  return <div style={{ color: '#666' }}>Pas de photo</div>;
+                }
+              })()}
+            </div>
+            
+            {/* TEST 3: Bouton pour vider */}
+            <button 
+              onClick={() => {
+                localStorage.removeItem('test_photo');
+                console.log('Photo supprimée');
+                window.location.reload();
+              }}
+              style={{
+                marginTop: '10px',
+                padding: '5px 10px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Supprimer
+            </button>
+            
           </div>
         </div>
-        <p className="text-sm text-gray-500">Cliquez sur la photo pour la modifier</p>
+        <p className="text-sm text-gray-500">TEST: Sélectionnez une image ci-dessus</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
