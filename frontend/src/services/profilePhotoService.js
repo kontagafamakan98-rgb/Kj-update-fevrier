@@ -241,38 +241,67 @@ class ProfilePhotoService {
     }
   }
 
-  // Upload vers le serveur (simulation)
+  // Upload vers le serveur (API réelle)
   async uploadProfilePhoto(imageData, userId) {
     try {
-      // Simuler l'upload avec délai
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Starting real API upload for user:', userId);
       
-      // En vrai, on ferait quelque chose comme :
-      // const formData = new FormData();
-      // formData.append('profile_photo', imageData.file, imageData.name);
-      // const response = await fetch('/api/users/upload-profile-photo', {
-      //   method: 'POST',
-      //   body: formData,
-      //   headers: { 'Authorization': `Bearer ${token}` }
-      // });
+      // Créer FormData pour l'upload
+      const formData = new FormData();
+      formData.append('file', imageData.file, imageData.name);
+
+      // Utiliser la configuration axios déjà configurée dans App.js
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile-photo`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Erreur lors de l\'upload');
+      }
+
+      const result = await response.json();
+      console.log('Real API upload successful:', result);
       
-      const mockUploadedUrl = `https://api.kojo.app/uploads/profiles/${userId}/${imageData.name}`;
+      // Sauvegarder localement avec la vraie URL du serveur
+      const serverImageData = {
+        ...imageData,
+        url: `${process.env.REACT_APP_BACKEND_URL}${result.photo_url}`,
+        server_url: result.photo_url,
+        uploaded: true
+      };
       
-      // Sauvegarder localement
-      await this.saveProfilePhoto(userId, imageData);
+      await this.saveProfilePhoto(userId, serverImageData);
       
       return {
         success: true,
-        url: mockUploadedUrl,
-        local_url: imageData.url,
-        uploaded: true
+        url: serverImageData.url,
+        server_url: result.photo_url,
+        uploaded: true,
+        filename: result.filename
       };
     } catch (error) {
-      console.error('Erreur upload photo:', error);
-      return {
-        success: false,
-        error: 'Échec du téléchargement de la photo'
-      };
+      console.error('Erreur upload photo vers API:', error);
+      
+      // En cas d'erreur, sauvegarder quand même localement
+      try {
+        await this.saveProfilePhoto(userId, imageData);
+        return {
+          success: false,
+          error: error.message,
+          local_fallback: true,
+          local_url: imageData.url
+        };
+      } catch (localError) {
+        return {
+          success: false,
+          error: `API: ${error.message}, Local: ${localError.message}`
+        };
+      }
     }
   }
 
