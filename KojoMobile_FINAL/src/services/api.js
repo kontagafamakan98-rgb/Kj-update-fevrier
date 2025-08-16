@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://kojo-mobile.preview.emergentagent.com/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://kojo-mobile-1.preview.emergentagent.com/api';
 
 export const api = axios.create({
   baseURL: API_URL,
