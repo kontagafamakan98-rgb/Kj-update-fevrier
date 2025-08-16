@@ -12,7 +12,12 @@
       "package": "com.kojo.app",
       "permissions": [
         "android.permission.INTERNET",
-        "android.permission.ACCESS_NETWORK_STATE"
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "ios": {
@@ -20,6 +25,26 @@
       "supportsTablet": true
     },
     "web": {},
-    "plugins": []
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ea580c",
+          "sounds": ["./assets/notification-sound.wav"]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your profile.",
+          "cameraPermission": "The app accesses your camera to let you take profile photos."
+        }
+      ]
+    ],
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#ea580c"
+    }
   }
 }
