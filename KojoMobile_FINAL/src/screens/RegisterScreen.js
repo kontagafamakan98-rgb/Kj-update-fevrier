@@ -26,7 +26,7 @@ export default function RegisterScreen({ navigation, route }) {
     confirmPassword: '',
     firstName: '',
     lastName: '',
-    phone: '',
+    phone: '+223 ', // Start with Mali prefix
     userType: route?.params?.userType || 'client',
     country: 'mali',
   });
@@ -35,6 +35,14 @@ export default function RegisterScreen({ navigation, route }) {
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
+
+  // Initialize phone prefix when component mounts
+  useEffect(() => {
+    const phonePrefix = getPhonePrefixByCountry(formData.country);
+    if (!formData.phone || formData.phone === '+223 ') {
+      setFormData(prev => ({ ...prev, phone: phonePrefix + ' ' }));
+    }
+  }, []);
 
   const validateForm = () => {
     if (!formData.email.trim()) {
