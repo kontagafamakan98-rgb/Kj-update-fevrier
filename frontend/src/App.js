@@ -5,6 +5,7 @@ import axios from "axios";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import Navbar from "./components/Navbar";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -13,6 +14,7 @@ import Jobs from "./pages/Jobs";
 import JobDetails from "./pages/JobDetails";
 import Messages from "./pages/Messages";
 import Profile from "./pages/Profile";
+import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -32,8 +34,11 @@ function ProtectedRoute({ children }) {
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
+          <div className="mt-4 text-orange-600 font-medium">Chargement...</div>
+        </div>
       </div>
     );
   }
@@ -45,45 +50,132 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-function AppRoutes() {
+// Mobile-optimized loading component
+function MobileLoader() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-orange-600 to-orange-700">
+      <div className="text-center">
+        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl font-bold text-orange-600">K</span>
+        </div>
+        <div className="text-white text-lg font-medium">Kojo</div>
+        <div className="text-orange-200 text-sm mt-2">Mali & Sénégal</div>
+        <div className="mt-4">
+          <div className="animate-pulse flex space-x-1 justify-center">
+            <div className="bg-white bg-opacity-30 h-2 w-2 rounded-full"></div>
+            <div className="bg-white bg-opacity-30 h-2 w-2 rounded-full"></div>
+            <div className="bg-white bg-opacity-30 h-2 w-2 rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppRoutes() {
+  const [pwaReady, setPwaReady] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    // Initialize PWA features
+    const initPWA = async () => {
+      if (isPWASupported()) {
+        // Request notification permission when user is logged in
+        if (user) {
+          await requestNotificationPermission();
+        }
+      }
+      setPwaReady(true);
+    };
+
+    initPWA();
+  }, [user]);
+
+  if (!pwaReady) {
+    return <MobileLoader />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 relative">
       <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/jobs" element={
-          <ProtectedRoute>
-            <Jobs />
-          </ProtectedRoute>
-        } />
-        <Route path="/jobs/:id" element={
-          <ProtectedRoute>
-            <JobDetails />
-          </ProtectedRoute>
-        } />
-        <Route path="/messages" element={
-          <ProtectedRoute>
-            <Messages />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-      </Routes>
+      <main className="pb-safe">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/jobs" element={
+            <ProtectedRoute>
+              <Jobs />
+            </ProtectedRoute>
+          } />
+          <Route path="/jobs/:id" element={
+            <ProtectedRoute>
+              <JobDetails />
+            </ProtectedRoute>
+          } />
+          <Route path="/messages" element={
+            <ProtectedRoute>
+              <Messages />
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </main>
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
+      
+      {/* Mobile-specific bottom padding for safe area */}
+      <div className="h-safe-area-inset-bottom"></div>
     </div>
   );
 }
 
 function App() {
+  useEffect(() => {
+    // Add mobile viewport optimizations
+    const addMobileOptimizations = () => {
+      // Prevent zoom on input focus (iOS)
+      const meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+      
+      const existingMeta = document.querySelector('meta[name="viewport"]');
+      if (existingMeta) {
+        existingMeta.remove();
+      }
+      document.head.appendChild(meta);
+
+      // Add iOS status bar styling
+      if (window.navigator.standalone) {
+        document.body.classList.add('ios-standalone');
+      }
+    };
+
+    addMobileOptimizations();
+
+    // Handle online/offline status
+    const handleOnline = () => console.log('App is online');
+    const handleOffline = () => console.log('App is offline');
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   return (
     <div className="App">
       <BrowserRouter>
