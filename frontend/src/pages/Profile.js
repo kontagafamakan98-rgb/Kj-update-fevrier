@@ -263,17 +263,15 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
         </div>
       )}
 
-      {/* Photo de profil */}
+      {/* Photo de profil - VERSION ULTRA SIMPLE */}
       <div className="text-center mb-6">
         <div className="mb-4">
-          <ProfilePhoto
-            user={profile}
-            size={120}
-            editable={true}
-            onPhotoChange={handlePhotoChange}
-            className="mx-auto"
-            showEditButton={true}
-          />
+          <div className="flex justify-center">
+            <SimplePhotoUpload 
+              userId={profile?.id || profile?._id || profile?.user_id}
+              size={120}
+            />
+          </div>
         </div>
         <p className="text-sm text-gray-500">Cliquez sur la photo pour la modifier</p>
       </div>
