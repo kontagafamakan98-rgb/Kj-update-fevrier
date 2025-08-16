@@ -251,7 +251,29 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Message de succès */}
+      {success && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+          {success}
+        </div>
+      )}
+
+      {/* Photo de profil */}
+      <div className="text-center mb-6">
+        <div className="mb-4">
+          <ProfilePhoto
+            user={profile}
+            size={120}
+            editable={true}
+            onPhotoChange={handlePhotoChange}
+            className="mx-auto"
+            showEditButton={true}
+          />
+        </div>
+        <p className="text-sm text-gray-500">Cliquez sur la photo pour la modifier</p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">
