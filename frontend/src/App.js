@@ -146,6 +146,11 @@ function AppRoutes() {
               <CreateJob />
             </ProtectedRoute>
           } />
+          <Route path="/photo-test" element={
+            <ProtectedRoute>
+              <PhotoTest />
+            </ProtectedRoute>
+          } />
           <Route path="/profile" element={
             <ProtectedRoute>
               <Profile />
