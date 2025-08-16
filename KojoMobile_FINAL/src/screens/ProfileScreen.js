@@ -169,28 +169,33 @@ export default function ProfileScreen({ navigation }) {
           colors={[colors.gradientStart, colors.gradientEnd]}
           style={styles.profileHeader}
         >
-          <ProfilePhoto
-            user={user}
-            size={100}
-            editable={true}
-            refreshTrigger={refreshTrigger}
-            onPhotoChange={(result) => {
-              console.log('ProfilePhoto onPhotoChange called:', result);
-              
-              // Call our handler to trigger refresh
-              handlePhotoChange(result);
-              
-              // Show user feedback
-              if (result.success || result.local) {
-                Alert.alert('Succès', 'Photo mise à jour avec succès');
-              } else if (result.deleted) {
-                Alert.alert('Succès', 'Photo supprimée');
-              } else if (result.error) {
-                Alert.alert('Erreur', result.error);
-              }
-            }}
-            showChangeButton={true}
-          />
+          {/* Test both components */}
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+            <Text style={{ color: 'white', fontSize: 12, marginBottom: 8 }}>
+              Version Complexe
+            </Text>
+            <ProfilePhoto
+              user={user}
+              size={80}
+              editable={true}
+              refreshTrigger={refreshTrigger}
+              onPhotoChange={handlePhotoChange}
+              showChangeButton={true}
+            />
+          </View>
+          
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ color: 'white', fontSize: 12, marginBottom: 8 }}>
+              Version Simple
+            </Text>
+            <SimpleProfilePhoto
+              user={user}
+              size={100}
+              editable={true}
+              refreshTrigger={refreshTrigger}
+              onPhotoChange={handlePhotoChange}
+            />
+          </View>
           
           <Text style={styles.userName}>
             {user?.first_name} {user?.last_name}
