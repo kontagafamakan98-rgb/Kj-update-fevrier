@@ -109,7 +109,7 @@ export default function PhotoTest() {
             <div className="text-center">
               <h3 className="font-medium mb-4">Petit Format</h3>
               <ProfilePhoto
-                user={user}
+                user={testUser}
                 size={80}
                 editable={true}
                 onPhotoChange={handlePhotoChange}
