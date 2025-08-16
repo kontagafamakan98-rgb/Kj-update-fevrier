@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🔧 Nettoyage Forcé</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        button { padding: 15px 30px; margin: 10px; font-size: 16px; cursor: pointer; border-radius: 5px; }
+        .success { background: #4CAF50; color: white; border: none; }
+        .danger { background: #f44336; color: white; border: none; }
+        .warning { background: #ff9800; color: white; border: none; }
+        #status { margin: 20px 0; padding: 15px; border-radius: 5px; }
+        .status-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status-info { background: #d1ecf1; color: #0c5460; border: 1px solid #b8daff; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Nettoyage Service Worker Forcé</h1>
+    <p><strong>Problème :</strong> Service Worker bloque les requêtes POST/PUT pour les photos</p>
+    <p><strong>Solution :</strong> Supprimer complètement tous les caches et service workers</p>
+    
+    <div>
+        <button class="danger" onclick="fullCleanup()">🧹 NETTOYAGE COMPLET</button>
+        <button class="warning" onclick="clearCacheOnly()">🗑️ Cache seulement</button>
+        <button class="success" onclick="testPhotoAPI()">📸 Tester API Photo</button>
+    </div>
+    
+    <div id="status" class="status-info">
+        Prêt pour le nettoyage...
+    </div>
+    
+    <div id="details" style="margin-top: 20px; background: #f5f5f5; padding: 15px; border-radius: 5px;">
+        <h3>Statut actuel :</h3>
+        <div id="current-status">Vérification...</div>
+    </div>
+
+    <script>
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status-${type}`;
+            statusDiv.innerHTML = message;
+        }
+
+        async function fullCleanup() {
+            updateStatus('🔄 Nettoyage complet en cours...', 'info');
+            
+            try {
+                let results = [];
+                
+                // 1. Désinscrire tous les service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        const result = await registration.unregister();
+                        results.push(`Service Worker désinscrit: ${result}`);
+                    }
+                }
+                
+                // 2. Supprimer tous les caches
+                const cacheNames = await caches.keys();
+                for (let name of cacheNames) {
+                    await caches.delete(name);
+                    results.push(`Cache supprimé: ${name}`);
+                }
+                
+                // 3. Vider localStorage/sessionStorage
+                localStorage.clear();
+                sessionStorage.clear();
+                results.push('localStorage et sessionStorage vidés');
+                
+                updateStatus(`✅ Nettoyage terminé !<br><br>${results.join('<br>')}`, 'success');
+                
+                // Attendre puis rediriger
+                setTimeout(() => {
+                    updateStatus('🔄 Redirection vers l\'app...', 'info');
+                    window.location.href = '/';
+                }, 3000);
+                
+            } catch (error) {
+                updateStatus(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function clearCacheOnly() {
+            updateStatus('🔄 Suppression des caches...', 'info');
+            
+            try {
+                const cacheNames = await caches.keys();
+                const results = [];
+                
+                for (let name of cacheNames) {
+                    await caches.delete(name);
+                    results.push(`Cache supprimé: ${name}`);
+                }
+                
+                updateStatus(`✅ Caches supprimés !<br><br>${results.join('<br>')}`, 'success');
+                
+            } catch (error) {
+                updateStatus(`❌ Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPhotoAPI() {
+            updateStatus('🔄 Test de l\'API photo...', 'info');
+            
+            try {
+                // Test simple de l'API backend
+                const response = await fetch('/api/health', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus(`✅ API disponible !<br>Status: ${data.status}`, 'success');
+                } else {
+                    updateStatus(`⚠️ API répond mais avec erreur: ${response.status}`, 'error');
+                }
+                
+            } catch (error) {
+                updateStatus(`❌ API non disponible: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkCurrentStatus() {
+            const detailsDiv = document.getElementById('current-status');
+            const details = [];
+            
+            // Service Workers
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                details.push(`Service Workers actifs: ${registrations.length}`);
+            }
+            
+            // Caches
+            const cacheNames = await caches.keys();
+            details.push(`Caches: ${cacheNames.length} (${cacheNames.join(', ')})`);
+            
+            // Storage
+            details.push(`localStorage: ${Object.keys(localStorage).length} clés`);
+            details.push(`sessionStorage: ${Object.keys(sessionStorage).length} clés`);
+            
+            detailsDiv.innerHTML = details.join('<br>');
+        }
+
+        // Vérifier le statut au chargement
+        window.addEventListener('load', checkCurrentStatus);
+    </script>
+</body>
+</html>
