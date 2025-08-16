@@ -212,7 +212,112 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Simulate receiving notifications (in real app, this would come from push notification service)
+  // Enhanced notification methods
+  const sendPushNotification = async (title, body, data = {}) => {
+    // Send via push notification service
+    const pushResult = await NotificationService.sendLocalNotification(title, body, data);
+    
+    // Also add to local notifications list
+    await addNotification({
+      title,
+      body,
+      type: data.type || 'general',
+      icon: data.icon || 'bell',
+      data
+    });
+    
+    return pushResult;
+  };
+
+  const scheduleNotification = async (title, body, scheduledTime, data = {}) => {
+    return await NotificationService.scheduleNotification(title, body, scheduledTime, data);
+  };
+
+  const requestPushPermissions = async () => {
+    const result = await NotificationService.requestPermissions();
+    if (result.success) {
+      setPermissionStatus(result.status);
+    }
+    return result;
+  };
+
+  // Enhanced offline methods
+  const addToOfflineQueue = async (request) => {
+    const result = await OfflineService.addToOfflineQueue(request);
+    if (result.success) {
+      await updateOfflineState();
+      await addNotification({
+        title: 'Action enregistrée',
+        body: 'Sera exécutée quand la connexion sera rétablie',
+        type: 'offline',
+        icon: 'cloud-upload'
+      });
+    }
+    return result;
+  };
+
+  const syncOfflineData = async () => {
+    const result = await OfflineService.syncData();
+    if (result.success) {
+      await updateOfflineState();
+      await addNotification({
+        title: 'Synchronisation terminée',
+        body: `${result.queueProcessed} actions synchronisées`,
+        type: 'sync',
+        icon: 'check-circle'
+      });
+    }
+    return result;
+  };
+
+  const handleOfflineAction = async (actionType, data) => {
+    if (isOnline) {
+      return null; // Continue with normal processing
+    } else {
+      return await addToOfflineQueue({
+        type: actionType,
+        data: data
+      });
+    }
+  };
+
+  // Job-specific notification helpers
+  const notifyNewJob = async (jobTitle, clientName) => {
+    if (settings.jobNotifications) {
+      return await sendPushNotification(
+        'Nouveau Job Disponible',
+        `${jobTitle} par ${clientName}`,
+        { type: 'job', screen: 'Jobs' }
+      );
+    }
+  };
+
+  const notifyNewMessage = async (senderName, messagePreview) => {
+    if (settings.messageNotifications) {
+      return await sendPushNotification(
+        `Message de ${senderName}`,
+        messagePreview,
+        { type: 'message', screen: 'Messages' }
+      );
+    }
+  };
+
+  const notifyJobStatusUpdate = async (jobTitle, status) => {
+    if (settings.jobNotifications) {
+      const statusMessages = {
+        'accepted': 'Votre proposition a été acceptée',
+        'rejected': 'Votre proposition a été rejetée', 
+        'completed': 'Job marqué comme terminé',
+        'cancelled': 'Job annulé'
+      };
+
+      return await sendPushNotification(
+        `Mise à jour: ${jobTitle}`,
+        statusMessages[status] || `Statut mis à jour: ${status}`,
+        { type: 'job_status', screen: 'Jobs' }
+      );
+    }
+  };
   const simulateNotification = (type = 'message') => {
     const notificationTypes = {
       message: {
