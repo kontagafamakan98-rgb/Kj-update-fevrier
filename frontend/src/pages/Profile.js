@@ -307,14 +307,26 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
           <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
             Téléphone
           </label>
-          <input
-            type="tel"
-            id="phone"
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
-          />
+          <div className="mt-1 flex rounded-md shadow-sm">
+            <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+              {getPhonePrefixByCountry(formData.country.toLowerCase())}
+            </span>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              value={formData.phone.replace(getPhonePrefixByCountry(formData.country.toLowerCase()), '').trim()}
+              onChange={(e) => {
+                const prefix = getPhonePrefixByCountry(formData.country.toLowerCase());
+                updateFormData('phone', prefix + ' ' + e.target.value.replace(/[^\d\s]/g, ''));
+              }}
+              placeholder="77 123 45 67"
+              className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+            />
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            Format: {getPhonePrefixByCountry(formData.country.toLowerCase())} XX XXX XX XX
+          </p>
         </div>
 
         <div>
