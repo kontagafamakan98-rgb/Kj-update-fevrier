@@ -80,25 +80,48 @@ const ProfilePhoto = ({
       const imageData = await ProfilePhotoService.selectPhoto();
       console.log('Image selected:', imageData);
       
-      // Sauvegarder localement
-      const savedPhoto = await ProfilePhotoService.saveProfilePhoto(userId, imageData);
-      console.log('Photo saved locally:', savedPhoto);
-      setProfilePhoto(savedPhoto);
+      // SOLUTION ULTRA SIMPLE: Convertir en base64 et stocker directement
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Image = e.target.result;
+        console.log('Image converted to base64, length:', base64Image.length);
+        
+        // Stocker directement dans localStorage
+        const photoKey = `profile_photo_${userId}`;
+        const photoData = {
+          base64: base64Image,
+          timestamp: Date.now(),
+          userId: userId
+        };
+        
+        localStorage.setItem(photoKey, JSON.stringify(photoData));
+        console.log('Photo saved in localStorage with key:', photoKey);
+        
+        // Afficher immédiatement
+        setProfilePhoto({ url: base64Image });
+        console.log('Photo set in component state');
+        
+        if (onPhotoChange) {
+          onPhotoChange({ success: true, local: true, base64: base64Image });
+        }
+        
+        setLoading(false);
+      };
       
-      // SOLUTION SIMPLE: Ne plus essayer l'upload serveur qui échoue
-      // On garde juste la photo locale qui fonctionne
-      console.log('Photo set successfully with local URL:', savedPhoto.url);
+      reader.onerror = function(error) {
+        console.error('Error reading file:', error);
+        alert('Erreur lors de la lecture du fichier');
+        setLoading(false);
+      };
       
-      if (onPhotoChange) {
-        onPhotoChange({ success: true, local: true, url: savedPhoto.url });
-      }
+      // Lire le fichier comme base64
+      reader.readAsDataURL(imageData.file);
       
     } catch (error) {
       console.error('Error in photo selection:', error);
       if (error.message !== 'Aucune image sélectionnée') {
         alert('Erreur lors de la sélection de l\'image: ' + error.message);
       }
-    } finally {
       setLoading(false);
     }
   };
