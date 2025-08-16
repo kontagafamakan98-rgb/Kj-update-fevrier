@@ -201,6 +201,46 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
     onSave(formData);
   };
 
+  const updateFormData = (key, value) => {
+    setFormData(prev => {
+      const newData = { ...prev, [key]: value };
+      
+      // Auto-update phone prefix when country changes
+      if (key === 'country') {
+        const phonePrefix = getPhonePrefixByCountry(value.toLowerCase());
+        
+        // Format existing phone number with new country prefix
+        if (newData.phone && !newData.phone.startsWith(phonePrefix)) {
+          newData.phone = formatPhoneNumber(newData.phone, value.toLowerCase());
+        } else if (!newData.phone) {
+          newData.phone = phonePrefix + ' ';
+        }
+      }
+      
+      // Auto-detect country when phone number changes
+      if (key === 'phone') {
+        const detectedCountry = detectCountryFromPhone(value);
+        if (detectedCountry && detectedCountry.code !== newData.country.toLowerCase()) {
+          newData.country = detectedCountry.name;
+        }
+      }
+      
+      return newData;
+    });
+  };
+
+  const handlePhotoChange = (result) => {
+    if (result.success) {
+      setSuccess('Photo de profil mise à jour avec succès !');
+      setTimeout(() => setSuccess(''), 3000);
+    } else if (result.deleted) {
+      setSuccess('Photo de profil supprimée !');
+      setTimeout(() => setSuccess(''), 3000);
+    } else if (result.error) {
+      alert('Erreur: ' + result.error);
+    }
+  };
+
   const handleChange = (e) => {
     setFormData(prev => ({
       ...prev,
