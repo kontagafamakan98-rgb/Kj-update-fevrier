@@ -67,14 +67,21 @@ export default function ProfilePhoto({
   const handlePhotoSelect = () => {
     if (!editable) return;
 
+    // Use consistent user ID resolution
+    const userId = user?.id || user?._id || user?.user_id;
+    if (!userId) {
+      Alert.alert('Erreur', 'ID utilisateur manquant');
+      return;
+    }
+
     ImageService.showImageSourcePicker(
       async (imageData) => {
         console.log('Photo selected:', imageData);
         setLoading(true);
         try {
-          // Save photo locally
-          console.log('Saving photo for user:', user.id);
-          const savedPhoto = await ImageService.saveProfilePhoto(user.id, imageData.uri);
+          // Save photo locally with consistent userId
+          console.log('Saving photo for user:', userId);
+          const savedPhoto = await ImageService.saveProfilePhoto(userId, imageData.uri);
           console.log('Photo saved:', savedPhoto);
           
           // Update the display immediately
@@ -82,7 +89,7 @@ export default function ProfilePhoto({
           
           // Upload to server (optional) - dans le contexte mobile, on peut upload vers l'API backend
           try {
-            const uploadResult = await ImageService.uploadProfilePhoto(imageData, user.id);
+            const uploadResult = await ImageService.uploadProfilePhoto(imageData, userId);
             console.log('Upload result:', uploadResult);
             
             if (onPhotoChange) {
