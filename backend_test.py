@@ -97,7 +97,7 @@ class KojoAPITester:
             self.client_user = response['user']
             print(f"   Client ID: {self.client_user['id']}")
         
-        # Test worker registration
+        # Test worker registration with new countries
         worker_data = {
             "email": f"worker_{datetime.now().strftime('%H%M%S')}@test.com",
             "password": "TestPass123!",
@@ -105,8 +105,33 @@ class KojoAPITester:
             "last_name": "Worker",
             "phone": "+223701234567",
             "user_type": "worker",
-            "country": "mali",
-            "preferred_language": "bm"
+            "country": "burkina_faso",
+            "preferred_language": "fr"
+        }
+        
+        success, response = self.run_test(
+            "Worker Registration (Burkina Faso)",
+            "POST",
+            "auth/register",
+            200,
+            data=worker_data
+        )
+        
+        if success and 'access_token' in response:
+            self.worker_token = response['access_token']
+            self.worker_user = response['user']
+            print(f"   Worker ID: {self.worker_user['id']}")
+
+        # Test registration with Ivory Coast
+        ivory_coast_data = {
+            "email": f"ivory_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "IvoryCoast",
+            "phone": "+225701234567",
+            "user_type": "client",
+            "country": "ivory_coast",
+            "preferred_language": "fr"
         }
         
         success, response = self.run_test(
