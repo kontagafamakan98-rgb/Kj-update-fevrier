@@ -15,7 +15,7 @@ export default function Register() {
     confirmPassword: '',
     first_name: '',
     last_name: '',
-    phone: '',
+    phone: '+221 ', // Start with Senegal prefix
     user_type: initialUserType,
     country: 'senegal',
     preferred_language: 'fr'
@@ -27,7 +27,7 @@ export default function Register() {
   const { t, currentLanguage } = useLanguage();
   const navigate = useNavigate();
 
-  const countries = getAllCountries();
+  const countries = getCountriesList();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
