@@ -17,6 +17,7 @@ import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/theme';
 import { JOB_CATEGORIES } from '../constants/categories';
+import { COUNTRIES, getCountryByCode } from '../constants/countries';
 
 export default function CreateJobScreen({ navigation }) {
   const { user } = useAuth();
