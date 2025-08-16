@@ -20,7 +20,7 @@ import { COUNTRIES, getPhonePrefixByCountry, formatPhoneNumber } from '../consta
 import ProfilePhoto from '../components/ProfilePhoto';
 
 export default function EditProfileScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, updateProfilePhoto } = useAuth();
   
   const [formData, setFormData] = useState({
     firstName: user?.first_name || '',
