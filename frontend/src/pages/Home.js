@@ -86,7 +86,7 @@ export default function Home() {
                 className={`${country.color} rounded-2xl p-6 text-center transform transition hover:scale-105 cursor-pointer shadow-md hover:shadow-lg`}
               >
                 <div className="flex justify-center mb-3">
-                  <FlagIcon country={country.code} className="w-16 h-12 md:w-20 md:h-14" />
+                  <div className="text-6xl md:text-8xl">{country.flag}</div>
                 </div>
                 <h3 className="font-semibold text-gray-900 text-sm md:text-base">{country.name}</h3>
                 <p className="text-xs text-gray-600 mt-1">Services disponibles</p>
