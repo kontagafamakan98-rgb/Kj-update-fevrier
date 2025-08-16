@@ -22,7 +22,8 @@ export default function LocationPickerScreen({ route, navigation }) {
   const [locations, setLocations] = useState([]);
   const [filteredLocations, setFilteredLocations] = useState([]);
   const [currentLocation, setCurrentLocation] = useState(null);
-  const [isLocating, setIsLocating] = useState(false);
+  
+  const { detectCurrentLocation, isDetecting } = useLocationDetector('mali');
 
   // Sample locations data for West Africa
   const sampleLocations = [
