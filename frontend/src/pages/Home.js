@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
+import FlagIcon from '../components/FlagIcon';
 
 export default function Home() {
   const { t } = useLanguage();
@@ -84,10 +85,13 @@ export default function Home() {
             {countries.map((country, index) => (
               <div
                 key={index}
-                className={`${country.color} rounded-2xl p-6 text-center transform transition hover:scale-105`}
+                className={`${country.color} rounded-2xl p-6 text-center transform transition hover:scale-105 cursor-pointer shadow-md hover:shadow-lg`}
               >
-                <div className="text-4xl md:text-6xl mb-3">{country.flag}</div>
+                <div className="flex justify-center mb-3">
+                  <FlagIcon country={country.code} className="w-16 h-12 md:w-20 md:h-14" />
+                </div>
                 <h3 className="font-semibold text-gray-900 text-sm md:text-base">{country.name}</h3>
+                <p className="text-xs text-gray-600 mt-1">Services disponibles</p>
               </div>
             ))}
           </div>
