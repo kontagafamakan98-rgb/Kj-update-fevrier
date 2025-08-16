@@ -191,7 +191,9 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
     last_name: profile.last_name || '',
     phone: profile.phone || '',
     preferred_language: profile.preferred_language || 'fr',
-    country: profile.country || 'senegal'
+    country: profile.country || 'senegal',
+    bio: profile.bio || '',
+    skills: profile.skills || ''
   });
 
   const handleSubmit = (e) => {
