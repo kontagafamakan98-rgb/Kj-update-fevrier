@@ -1,20 +1,35 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { Provider as PaperProvider } from 'react-native-paper';
+import Toast from 'react-native-toast-message';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+import AppNavigator from './src/navigation/AppNavigator';
+import { AuthProvider } from './src/contexts/AuthContext';
+import { LanguageProvider } from './src/contexts/LanguageContext';
+import { LocationProvider } from './src/contexts/LocationContext';
+import { NotificationProvider } from './src/contexts/NotificationContext';
+import { theme } from './src/theme/theme';
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider theme={theme}>
+        <LanguageProvider>
+          <AuthProvider>
+            <LocationProvider>
+              <NotificationProvider>
+                <NavigationContainer>
+                  <StatusBar style="light" backgroundColor="#EA580C" />
+                  <AppNavigator />
+                  <Toast />
+                </NavigationContainer>
+              </NotificationProvider>
+            </LocationProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
