@@ -92,7 +92,7 @@ export default function Profile() {
                 {user.first_name} {user.last_name}
               </h1>
               <p className="text-orange-100">
-                {user.user_type === 'client' ? t('client') : t('worker')} • {user.country}
+                <CountryDisplay countryCode={user.country} flagSize="text-lg" />
               </p>
               <div className="flex items-center mt-2">
                 <span className="text-yellow-300">★★★★☆</span>
