@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import FlagIcon from '../components/FlagIcon';
+import { CountrySelect, getAllCountries } from '../components/CountryDisplay';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
