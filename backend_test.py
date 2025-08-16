@@ -738,6 +738,7 @@ class KojoAPITester:
             self.test_user_registration()
             self.test_user_login()
             self.test_user_profile()
+            self.test_profile_photo_management()  # Added profile photo tests
             self.test_worker_profile()
             self.test_job_management()
             self.test_job_proposals()
