@@ -87,7 +87,32 @@ export default function RegisterScreen({ navigation, route }) {
   };
 
   const updateFormData = (key, value) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [key]: value };
+      
+      // Auto-update phone prefix when country changes
+      if (key === 'country') {
+        const phonePrefix = getPhonePrefixByCountry(value);
+        
+        // If phone field is empty or only has old prefix, set new prefix
+        if (!newData.phone || newData.phone.startsWith('+')) {
+          newData.phone = phonePrefix + ' ';
+        } else {
+          // Format existing phone number with new country prefix
+          newData.phone = formatPhoneNumber(newData.phone, value);
+        }
+      }
+      
+      // Auto-detect country when phone number changes
+      if (key === 'phone') {
+        const detectedCountry = detectCountryFromPhone(value);
+        if (detectedCountry && detectedCountry.code !== newData.country) {
+          newData.country = detectedCountry.code;
+        }
+      }
+      
+      return newData;
+    });
   };
 
   return (
