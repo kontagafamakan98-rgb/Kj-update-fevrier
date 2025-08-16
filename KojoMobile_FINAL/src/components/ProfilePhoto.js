@@ -200,8 +200,40 @@ export default function ProfilePhoto({
     );
   };
 
+  // Test method to force display a test photo
+  const testForcePhoto = () => {
+    console.log('🧪 Testing force photo display');
+    const testPhoto = {
+      uri: 'https://picsum.photos/200/200?random=1',
+      userId: user?.id,
+      timestamp: new Date().toISOString(),
+      test: true
+    };
+    console.log('Setting test photo:', testPhoto);
+    setProfilePhoto(testPhoto);
+  };
+
   return (
     <View style={styles.container}>
+      {/* Debug button - remove after testing */}
+      {editable && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: -25,
+            right: 0,
+            backgroundColor: '#ff6b35',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 12,
+            zIndex: 10,
+          }}
+          onPress={testForcePhoto}
+        >
+          <Text style={{ color: 'white', fontSize: 10 }}>TEST</Text>
+        </TouchableOpacity>
+      )}
+      
       <TouchableOpacity
         style={styles.photoTouchable}
         onPress={editable ? handlePhotoSelect : null}
