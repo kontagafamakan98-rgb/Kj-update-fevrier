@@ -17,7 +17,8 @@ export default function ProfilePhoto({
   size = 100,
   editable = false,
   onPhotoChange = null,
-  showChangeButton = true
+  showChangeButton = true,
+  refreshTrigger = 0, // New prop to force refresh
 }) {
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,7 @@ export default function ProfilePhoto({
       loadProfilePhoto();
       generateDefaultAvatar();
     }
-  }, [user]);
+  }, [user, refreshTrigger]); // Add refreshTrigger to dependencies
 
   const loadProfilePhoto = async () => {
     if (!user?.id) return;
