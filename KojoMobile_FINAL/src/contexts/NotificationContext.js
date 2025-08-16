@@ -351,6 +351,7 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const value = {
+    // Existing functionality
     notifications,
     unreadCount,
     pushToken,
@@ -360,7 +361,31 @@ export const NotificationProvider = ({ children }) => {
     markAllAsRead,
     clearAllNotifications,
     saveNotificationSettings,
-    simulateNotification
+    simulateNotification,
+    
+    // Enhanced functionality
+    isInitialized,
+    permissionStatus,
+    isOnline,
+    lastSyncTime,
+    offlineQueueSize,
+    
+    // Enhanced notification methods
+    sendPushNotification,
+    scheduleNotification,
+    requestPushPermissions,
+    notifyNewJob,
+    notifyNewMessage,
+    notifyJobStatusUpdate,
+    
+    // Offline methods
+    addToOfflineQueue,
+    syncOfflineData,
+    handleOfflineAction,
+    
+    // Services (for advanced usage)
+    NotificationService,
+    OfflineService,
   };
 
   return (
