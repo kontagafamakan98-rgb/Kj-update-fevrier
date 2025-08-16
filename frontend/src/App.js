@@ -18,6 +18,7 @@ import JobDetails from "./pages/JobDetails";
 import Messages from "./pages/Messages";
 import MobileTest from './pages/MobileTest';
 import CreateJob from './pages/CreateJob';
+import PhotoTest from './pages/PhotoTest';
 import Profile from "./pages/Profile";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
