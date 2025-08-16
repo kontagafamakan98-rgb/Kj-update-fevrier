@@ -85,16 +85,51 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('user_data');
+      await AsyncStorage.multiRemove(['auth_token', 'user_data']);
       
-      setToken(null);
+      // Clear profile photo
+      if (user?.id) {
+        await ImageService.deleteProfilePhoto(user.id);
+      }
+      
       setUser(null);
+      setToken(null);
+      setProfilePhoto(null);
       delete api.defaults.headers.common['Authorization'];
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const updateProfilePhoto = async (imageData) => {
+    if (!user?.id) return { success: false, error: 'User not found' };
+
+    try {
+      // Save photo locally
+      const savedPhoto = await ImageService.saveProfilePhoto(user.id, imageData.uri);
+      setProfilePhoto(savedPhoto);
+      
+      // Upload to server (in real app)
+      const uploadResult = await ImageService.uploadProfilePhoto(imageData, user.id);
+      
+      return uploadResult;
+    } catch (error) {
+      console.error('Error updating profile photo:', error);
+      return { success: false, error: 'Failed to update photo' };
+    }
+  };
+
+  const removeProfilePhoto = async () => {
+    if (!user?.id) return { success: false, error: 'User not found' };
+
+    try {
+      await ImageService.deleteProfilePhoto(user.id);
+      setProfilePhoto(null);
       
       return { success: true };
     } catch (error) {
-      return { success: false, error: 'Logout failed' };
+      console.error('Error removing profile photo:', error);
+      return { success: false, error: 'Failed to remove photo' };
     }
   };
 
