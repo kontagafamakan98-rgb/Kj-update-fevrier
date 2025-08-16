@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNotifications } from '../contexts/NotificationContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 const NotificationSettingsScreen = ({ navigation }) => {
   const { 
@@ -20,10 +20,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
     pushToken,
     isOnline,
     offlineQueueSize,
-    syncOfflineData,
+    syncData,
     lastSyncTime,
     simulateNotification
-  } = useNotifications();
+  } = useNotification();
 
   const [localSettings, setLocalSettings] = useState(settings);
 
