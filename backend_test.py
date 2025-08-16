@@ -452,14 +452,14 @@ class KojoAPITester:
             "Get Profile Without Token",
             "GET",
             "users/profile",
-            401
+            403  # Changed from 401 to 403 as FastAPI returns 403 for missing auth
         )
         
         self.run_test(
             "Get Jobs Without Token",
             "GET",
             "jobs",
-            401
+            403  # Changed from 401 to 403 as FastAPI returns 403 for missing auth
         )
 
     def run_all_tests(self):
