@@ -151,16 +151,19 @@ export default function ProfileScreen({ navigation }) {
           colors={[colors.gradientStart, colors.gradientEnd]}
           style={styles.profileHeader}
         >
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {user?.first_name?.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.cameraButton}>
-              <MaterialIcons name="camera-alt" size={16} color={colors.background} />
-            </TouchableOpacity>
-          </View>
+          <ProfilePhoto
+            user={user}
+            size={100}
+            editable={true}
+            onPhotoChange={(result) => {
+              if (result.success) {
+                Alert.alert('Succès', 'Photo mise à jour avec succès');
+              } else if (result.deleted) {
+                Alert.alert('Succès', 'Photo supprimée');
+              }
+            }}
+            showChangeButton={true}
+          />
           
           <Text style={styles.userName}>
             {user?.first_name} {user?.last_name}
