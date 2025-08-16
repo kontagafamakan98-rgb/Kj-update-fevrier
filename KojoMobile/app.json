@@ -40,12 +40,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "notification": {
-      "icon": "./assets/notification-icon.png",
-      "color": "#EA580C"
-    },
     "splash": {
-      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#EA580C"
     },
