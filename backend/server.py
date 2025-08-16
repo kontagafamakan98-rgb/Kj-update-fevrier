@@ -60,6 +60,8 @@ class Language(str, Enum):
 class Country(str, Enum):
     MALI = "mali"
     SENEGAL = "senegal"
+    BURKINA_FASO = "burkina_faso"
+    IVORY_COAST = "ivory_coast"
 
 # Models
 class User(BaseModel):
