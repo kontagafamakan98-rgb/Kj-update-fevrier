@@ -195,6 +195,8 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
     bio: profile.bio || '',
     skills: profile.skills || ''
   });
+  
+  const [success, setSuccess] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
