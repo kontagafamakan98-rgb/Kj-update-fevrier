@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../theme/theme';
 import { COUNTRIES } from '../constants/countries';
 import ProfilePhoto from '../components/ProfilePhoto';
+import SimpleProfilePhoto from '../components/SimpleProfilePhoto';
 
 export default function ProfileScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
