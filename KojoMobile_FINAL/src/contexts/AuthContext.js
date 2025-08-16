@@ -137,9 +137,12 @@ export const AuthProvider = ({ children }) => {
     user,
     token,
     loading,
+    profilePhoto,
     login,
     register,
     logout,
+    updateProfilePhoto,
+    removeProfilePhoto,
     isAuthenticated: !!token && !!user
   };
 
