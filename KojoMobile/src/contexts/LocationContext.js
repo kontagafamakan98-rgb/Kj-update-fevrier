@@ -1,8 +1,9 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import * as Location from 'expo-location';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import GeolocationService from '../services/geolocation';
+import { useAuth } from './AuthContext';
 
-const LocationContext = createContext({});
+const LocationContext = createContext();
 
 export const useLocation = () => {
   const context = useContext(LocationContext);
@@ -13,141 +14,93 @@ export const useLocation = () => {
 };
 
 export const LocationProvider = ({ children }) => {
-  const [location, setLocation] = useState(null);
-  const [address, setAddress] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [permissionGranted, setPermissionGranted] = useState(false);
+  const { user } = useAuth();
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [locationHistory, setLocationHistory] = useState([]);
 
+  // Load saved location on app start
   useEffect(() => {
-    checkLocationPermission();
+    loadSavedLocation();
   }, []);
 
-  const checkLocationPermission = async () => {
+  const loadSavedLocation = async () => {
     try {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      setPermissionGranted(status === 'granted');
+      const savedLocation = await AsyncStorage.getItem('currentLocation');
+      if (savedLocation) {
+        setCurrentLocation(JSON.parse(savedLocation));
+      }
+    } catch (error) {
+      console.error('Error loading saved location:', error);
+    }
+  };
+
+  const saveLocation = async (location) => {
+    try {
+      await AsyncStorage.setItem('currentLocation', JSON.stringify(location));
+      setCurrentLocation(location);
       
-      if (status === 'granted') {
-        loadStoredLocation();
-      }
-    } catch (error) {
-      console.error('Error checking location permission:', error);
-    }
-  };
-
-  const loadStoredLocation = async () => {
-    try {
-      const storedLocation = await AsyncStorage.getItem('user_location');
-      const storedAddress = await AsyncStorage.getItem('user_address');
-      
-      if (storedLocation) {
-        setLocation(JSON.parse(storedLocation));
-      }
-      if (storedAddress) {
-        setAddress(JSON.parse(storedAddress));
-      }
-    } catch (error) {
-      console.error('Error loading stored location:', error);
-    }
-  };
-
-  const requestLocationPermission = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setPermissionGranted(status === 'granted');
-      return status === 'granted';
-    } catch (error) {
-      console.error('Error requesting location permission:', error);
-      return false;
-    }
-  };
-
-  const getCurrentLocation = async () => {
-    if (!permissionGranted) {
-      const granted = await requestLocationPermission();
-      if (!granted) {
-        return { success: false, error: 'Location permission denied' };
-      }
-    }
-
-    setLoading(true);
-    try {
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+      // Add to history
+      setLocationHistory(prev => {
+        const newHistory = [location, ...prev.slice(0, 4)]; // Keep last 5 locations
+        return newHistory;
       });
-
-      const coords = {
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-      };
-
-      setLocation(coords);
-      await AsyncStorage.setItem('user_location', JSON.stringify(coords));
-
-      // Reverse geocoding to get address
-      const reverseGeocode = await Location.reverseGeocodeAsync(coords);
-      if (reverseGeocode.length > 0) {
-        const addressData = reverseGeocode[0];
-        const formattedAddress = {
-          street: addressData.street,
-          city: addressData.city,
-          region: addressData.region,
-          country: addressData.country,
-          formatted: `${addressData.street || ''}, ${addressData.city || ''}, ${addressData.region || ''}`.replace(/^,\s*|,\s*$/g, '')
-        };
-        
-        setAddress(formattedAddress);
-        await AsyncStorage.setItem('user_address', JSON.stringify(formattedAddress));
-      }
-
-      setLoading(false);
-      return { success: true, location: coords, address: reverseGeocode[0] };
     } catch (error) {
-      setLoading(false);
-      console.error('Error getting current location:', error);
-      return { success: false, error: 'Failed to get location' };
+      console.error('Error saving location:', error);
     }
   };
 
-  const geocodeAddress = async (addressString) => {
+  const detectCurrentLocation = async () => {
+    if (isDetecting) return null;
+    
+    setIsDetecting(true);
     try {
-      const geocoded = await Location.geocodeAsync(addressString);
-      if (geocoded.length > 0) {
-        const coords = {
-          latitude: geocoded[0].latitude,
-          longitude: geocoded[0].longitude,
-        };
-        return { success: true, location: coords };
+      const userCountry = user?.country || 'mali';
+      const detectedLocation = await GeolocationService.detectUserLocation(userCountry);
+      
+      if (detectedLocation) {
+        await saveLocation(detectedLocation);
+        return detectedLocation;
       }
-      return { success: false, error: 'Address not found' };
     } catch (error) {
-      console.error('Error geocoding address:', error);
-      return { success: false, error: 'Geocoding failed' };
+      console.error('Location detection error:', error);
+      throw error;
+    } finally {
+      setIsDetecting(false);
     }
   };
 
-  const calculateDistance = (coords1, coords2) => {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = (coords2.latitude - coords1.latitude) * Math.PI / 180;
-    const dLon = (coords2.longitude - coords1.longitude) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(coords1.latitude * Math.PI / 180) * Math.cos(coords2.latitude * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c; // Distance in kilometers
-    return distance;
+  const getLocationSuggestions = async (searchQuery = '') => {
+    const userCountry = user?.country || 'mali';
+    return await GeolocationService.getLocationSuggestions(userCountry, searchQuery);
+  };
+
+  const formatPhoneWithCurrentLocation = (phone) => {
+    if (currentLocation) {
+      return GeolocationService.formatPhoneWithLocation(phone, currentLocation);
+    }
+    return phone;
+  };
+
+  const clearLocationData = async () => {
+    try {
+      await AsyncStorage.removeItem('currentLocation');
+      setCurrentLocation(null);
+      setLocationHistory([]);
+    } catch (error) {
+      console.error('Error clearing location data:', error);
+    }
   };
 
   const value = {
-    location,
-    address,
-    loading,
-    permissionGranted,
-    getCurrentLocation,
-    geocodeAddress,
-    calculateDistance,
-    requestLocationPermission
+    currentLocation,
+    isDetecting,
+    locationHistory,
+    detectCurrentLocation,
+    getLocationSuggestions,
+    formatPhoneWithCurrentLocation,
+    saveLocation,
+    clearLocationData
   };
 
   return (
