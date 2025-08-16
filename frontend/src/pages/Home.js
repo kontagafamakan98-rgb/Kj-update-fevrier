@@ -16,12 +16,10 @@ export default function Home() {
     { key: 'tutoring', icon: '📚' }
   ];
 
-  const countries = [
-    { name: 'Mali', flag: '🇲🇱', color: 'bg-green-100', code: 'mali' },
-    { name: 'Sénégal', flag: '🇸🇳', color: 'bg-yellow-100', code: 'senegal' },
-    { name: 'Burkina Faso', flag: '🇧🇫', color: 'bg-red-100', code: 'burkina_faso' },
-    { name: 'Côte d\'Ivoire', flag: '🇨🇮', color: 'bg-orange-100', code: 'ivory_coast' }
-  ];
+  const countries = getAllCountries().map((country, index) => ({
+    ...country,
+    color: ['bg-green-100', 'bg-yellow-100', 'bg-red-100', 'bg-orange-100'][index]
+  }));
 
   return (
     <div className="min-h-screen">
