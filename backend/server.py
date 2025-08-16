@@ -264,6 +264,81 @@ async def update_profile(
     
     return {"message": "Profile updated successfully"}
 
+# Profile Photo Routes
+@api_router.post("/users/profile-photo")
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    # Validate file type
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Validate file size (5MB max)
+    file_size = 0
+    file_content = await file.read()
+    file_size = len(file_content)
+    
+    if file_size > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
+    
+    # Create uploads directory if it doesn't exist
+    uploads_dir = Path("uploads/profile_photos")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename
+    file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+    filename = f"{current_user.id}_{int(datetime.utcnow().timestamp())}.{file_extension}"
+    file_path = uploads_dir / filename
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        buffer.write(file_content)
+    
+    # Update user profile with photo URL
+    photo_url = f"/uploads/profile_photos/{filename}"
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"profile_photo": photo_url, "updated_at": datetime.utcnow()}}
+    )
+    
+    return {
+        "message": "Profile photo uploaded successfully",
+        "photo_url": photo_url,
+        "filename": filename
+    }
+
+@api_router.get("/users/profile-photo")
+async def get_profile_photo(current_user: User = Depends(get_current_user)):
+    if not current_user.profile_photo:
+        raise HTTPException(status_code=404, detail="No profile photo found")
+    
+    return {
+        "photo_url": current_user.profile_photo,
+        "user_id": current_user.id
+    }
+
+@api_router.delete("/users/profile-photo")
+async def delete_profile_photo(current_user: User = Depends(get_current_user)):
+    if not current_user.profile_photo:
+        raise HTTPException(status_code=404, detail="No profile photo to delete")
+    
+    # Try to delete the physical file
+    try:
+        file_path = Path(f".{current_user.profile_photo}")
+        if file_path.exists():
+            file_path.unlink()
+    except Exception as e:
+        logging.warning(f"Could not delete photo file: {e}")
+    
+    # Update user profile
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"profile_photo": None, "updated_at": datetime.utcnow()}}
+    )
+    
+    return {"message": "Profile photo deleted successfully"}
+
 # Worker Profile Routes
 @api_router.post("/workers/profile")
 async def create_worker_profile(
