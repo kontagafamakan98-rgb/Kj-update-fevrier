@@ -6,6 +6,9 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import Navbar from "./components/Navbar";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import OfflineIndicator from "./components/OfflineIndicator";
+import MobileBottomNav from "./components/MobileBottomNav";
+import PWABadge from "./components/PWABadge";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -55,17 +58,15 @@ function MobileLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-orange-600 to-orange-700">
       <div className="text-center">
-        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl font-bold text-orange-600">K</span>
+        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <span className="text-3xl font-bold text-orange-600">K</span>
         </div>
-        <div className="text-white text-lg font-medium">Kojo</div>
-        <div className="text-orange-200 text-sm mt-2">Mali & Sénégal</div>
-        <div className="mt-4">
-          <div className="animate-pulse flex space-x-1 justify-center">
-            <div className="bg-white bg-opacity-30 h-2 w-2 rounded-full"></div>
-            <div className="bg-white bg-opacity-30 h-2 w-2 rounded-full"></div>
-            <div className="bg-white bg-opacity-30 h-2 w-2 rounded-full"></div>
-          </div>
+        <div className="text-white text-2xl font-bold mb-2">Kojo</div>
+        <div className="text-orange-200 text-sm mb-6">Afrique de l'Ouest</div>
+        <div className="flex justify-center space-x-2">
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+          <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
         </div>
       </div>
     </div>
@@ -97,8 +98,17 @@ function AppRoutes() {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
+      {/* Offline Indicator */}
+      <OfflineIndicator />
+      
+      {/* PWA Badge */}
+      <PWABadge />
+      
+      {/* Main Navigation */}
       <Navbar />
-      <main className="pb-safe">
+      
+      {/* Main Content */}
+      <main className="pb-16 md:pb-0">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -131,11 +141,11 @@ function AppRoutes() {
         </Routes>
       </main>
       
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav />
+      
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
-      
-      {/* Mobile-specific bottom padding for safe area */}
-      <div className="h-safe-area-inset-bottom"></div>
     </div>
   );
 }
@@ -159,20 +169,41 @@ function App() {
       if (window.navigator.standalone) {
         document.body.classList.add('ios-standalone');
       }
+
+      // Add PWA display mode class
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+        document.body.classList.add('pwa-standalone');
+      }
     };
 
     addMobileOptimizations();
 
     // Handle online/offline status
-    const handleOnline = () => console.log('App is online');
-    const handleOffline = () => console.log('App is offline');
+    const handleOnline = () => {
+      console.log('App is online');
+      // Could trigger data sync here
+    };
+    
+    const handleOffline = () => {
+      console.log('App is offline');
+      // Could save pending actions for later sync
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Handle PWA app installed event
+    const handleAppInstalled = () => {
+      console.log('PWA was installed');
+      // Could track analytics or show welcome message
+    };
+
+    window.addEventListener('appinstalled', handleAppInstalled);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
