@@ -56,8 +56,10 @@ export default function MessagesScreen({ navigation }) {
     <TouchableOpacity
       style={styles.conversationItem}
       onPress={() => {
-        // In a real app, navigate to chat screen
-        console.log('Open chat with:', conversation.otherUser);
+        navigation.navigate('Chat', {
+          conversation: conversation,
+          otherUser: conversation.otherUser
+        });
       }}
       activeOpacity={0.8}
     >
