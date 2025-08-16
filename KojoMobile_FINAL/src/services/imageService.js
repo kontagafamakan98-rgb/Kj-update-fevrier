@@ -251,39 +251,78 @@ class ImageService {
     }
   }
 
-  // Upload photo to server (placeholder - in real app would upload to backend)
+  // Upload profile photo to server
   async uploadProfilePhoto(imageData, userId) {
     try {
-      // In a real application, you would upload to your backend server
-      // const formData = new FormData();
-      // formData.append('profile_photo', {
-      //   uri: imageData.uri,
-      //   type: imageData.type,
-      //   name: imageData.name,
-      // });
-      // formData.append('user_id', userId);
+      console.log('Uploading photo to server for user:', userId);
       
-      // const response = await api.post('/users/upload-profile-photo', formData, {
-      //   headers: { 'Content-Type': 'multipart/form-data' }
-      // });
+      // Create FormData for upload
+      const formData = new FormData();
+      formData.append('file', {
+        uri: imageData.uri,
+        type: imageData.type || 'image/jpeg',
+        name: imageData.name || `profile_${Date.now()}.jpg`
+      });
+
+      // Get the backend URL - you may need to configure this
+      const BACKEND_URL = 'https://profile-photo-fix-1.preview.emergentagent.com'; // Replace with your backend URL
       
-      // For now, we simulate the upload and return a mock URL
-      const mockUploadedUrl = `https://api.kojo.app/uploads/profiles/${userId}/${imageData.name}`;
-      
-      // Save locally as well
-      await this.saveProfilePhoto(userId, imageData.uri);
-      
-      return {
-        success: true,
-        url: mockUploadedUrl,
-        local_uri: imageData.uri
-      };
+      const response = await fetch(`${BACKEND_URL}/api/users/profile-photo`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          // Add authorization header if available
+          // 'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Photo uploaded successfully:', result);
+        
+        // Save locally as well for offline access
+        await this.saveProfilePhoto(userId, imageData.uri);
+        
+        return {
+          success: true,
+          url: `${BACKEND_URL}${result.photo_url}`,
+          server_url: result.photo_url,
+          local_uri: imageData.uri,
+          uploaded: true
+        };
+      } else {
+        const errorText = await response.text();
+        console.error('Upload failed:', response.status, errorText);
+        
+        // Save locally even if upload fails
+        await this.saveProfilePhoto(userId, imageData.uri);
+        
+        return {
+          success: false,
+          error: `Upload failed: ${response.status}`,
+          local_uri: imageData.uri,
+          local_fallback: true
+        };
+      }
     } catch (error) {
       console.error('Error uploading profile photo:', error);
-      return {
-        success: false,
-        error: 'Échec du téléchargement de la photo'
-      };
+      
+      // Save locally as fallback
+      try {
+        await this.saveProfilePhoto(userId, imageData.uri);
+        return {
+          success: false,
+          error: error.message,
+          local_uri: imageData.uri,
+          local_fallback: true
+        };
+      } catch (localError) {
+        return {
+          success: false,
+          error: `Upload and local save failed: ${error.message}`
+        };
+      }
     }
   }
 
