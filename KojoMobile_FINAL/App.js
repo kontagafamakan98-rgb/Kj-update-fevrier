@@ -11,15 +11,17 @@ import { theme } from './src/theme/theme';
 
 export default function App() {
   return (
-    <PaperProvider theme={theme}>
-      <LanguageProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <StatusBar style="light" backgroundColor="#EA580C" />
-            <AppNavigator />
-          </NavigationContainer>
-        </AuthProvider>
-      </LanguageProvider>
-    </PaperProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PaperProvider theme={theme}>
+        <LanguageProvider>
+          <AuthProvider>
+            <NavigationContainer>
+              <StatusBar style="light" backgroundColor="#EA580C" />
+              <AppNavigator />
+            </NavigationContainer>
+          </AuthProvider>
+        </LanguageProvider>
+      </PaperProvider>
+    </GestureHandlerRootView>
   );
 }
