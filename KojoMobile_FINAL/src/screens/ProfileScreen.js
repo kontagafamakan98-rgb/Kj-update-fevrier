@@ -172,11 +172,20 @@ export default function ProfileScreen({ navigation }) {
             user={user}
             size={100}
             editable={true}
+            refreshTrigger={refreshTrigger}
             onPhotoChange={(result) => {
-              if (result.success) {
+              console.log('ProfilePhoto onPhotoChange called:', result);
+              
+              // Call our handler to trigger refresh
+              handlePhotoChange(result);
+              
+              // Show user feedback
+              if (result.success || result.local) {
                 Alert.alert('Succès', 'Photo mise à jour avec succès');
               } else if (result.deleted) {
                 Alert.alert('Succès', 'Photo supprimée');
+              } else if (result.error) {
+                Alert.alert('Erreur', result.error);
               }
             }}
             showChangeButton={true}
