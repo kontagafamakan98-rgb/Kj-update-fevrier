@@ -240,16 +240,29 @@ export default function Register() {
               <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                 Téléphone
               </label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                placeholder="+221 XX XXX XX XX"
-                value={formData.phone}
-                onChange={handleChange}
-              />
+              <div className="flex rounded-lg shadow-sm">
+                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                  {countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase())?.phonePrefix || '+221'}
+                </span>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  required
+                  className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="77 123 45 67"
+                  value={formData.phone.replace(/^\+\d{3}\s*/, '')}
+                  onChange={(e) => {
+                    const currentCountry = countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase());
+                    const prefix = currentCountry ? currentCountry.phonePrefix : '+221';
+                    const cleanValue = e.target.value.replace(/[^\d\s]/g, '');
+                    updateFormData('phone', prefix + ' ' + cleanValue);
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Format: {countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase())?.phonePrefix || '+221'} XX XXX XX XX
+              </p>
             </div>
             
             <div>
