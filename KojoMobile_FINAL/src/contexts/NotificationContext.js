@@ -24,6 +24,13 @@ export const NotificationProvider = ({ children }) => {
     soundEnabled: true,
     vibrationEnabled: true
   });
+  
+  // New state for enhanced features
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState(null);
+  const [isOnline, setIsOnline] = useState(true);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [offlineQueueSize, setOfflineQueueSize] = useState(0);
 
   useEffect(() => {
     loadNotificationSettings();
