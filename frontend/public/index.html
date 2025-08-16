@@ -44,6 +44,30 @@
     
     <!-- Service Worker Registration -->
     <script>
+      // TEMPORAIREMENT DÉSACTIVÉ POUR CORRIGER LES ERREURS DE CACHE
+      console.log('Service Worker temporairement désactivé');
+      
+      // Désinscrire tout service worker existant
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister().then(function(boolean) {
+              console.log('Service Worker désinscrit:', boolean);
+            });
+          }
+        });
+        
+        // Effacer tous les caches
+        caches.keys().then(function(names) {
+          for (let name of names) {
+            caches.delete(name);
+            console.log('Cache supprimé:', name);
+          }
+        });
+      }
+      
+      /*
+      // Code original - à réactiver plus tard
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
@@ -55,6 +79,7 @@
             });
         });
       }
+      */
     </script>
   </body>
 </html>
