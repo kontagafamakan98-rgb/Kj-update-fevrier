@@ -11,18 +11,30 @@ class ImageService {
   // Request permissions for camera and gallery
   async requestPermissions() {
     try {
+      console.log('Requesting camera and gallery permissions...');
+      
       // Request camera permissions
       const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      console.log('Camera permission status:', cameraPermission.status);
       
       // Request media library permissions
       const galleryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('Gallery permission status:', galleryPermission.status);
       
-      return {
+      const permissions = {
         camera: cameraPermission.status === 'granted',
         gallery: galleryPermission.status === 'granted'
       };
+      
+      console.log('Final permissions:', permissions);
+      return permissions;
     } catch (error) {
       console.error('Error requesting permissions:', error);
+      Alert.alert(
+        'Erreur de permissions',
+        'Impossible de demander les permissions. Veuillez vérifier les paramètres de l\'application.',
+        [{ text: 'OK' }]
+      );
       return { camera: false, gallery: false };
     }
   }
