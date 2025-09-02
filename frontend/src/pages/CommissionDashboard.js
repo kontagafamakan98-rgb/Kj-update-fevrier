@@ -215,7 +215,7 @@ const CommissionDashboard = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Aujourd'hui</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {formatMoney(stats.todayCommissions)} XOF
+                  {formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF
                 </p>
               </div>
             </div>
