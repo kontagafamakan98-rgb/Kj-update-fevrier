@@ -39,8 +39,8 @@ const ProfilePhoto = ({
     }
     
     try {
-      // Charger directement depuis localStorage
-      const photoKey = `profile_photo_${userId}`;
+      // Charger directement depuis localStorage (clé cohérente)
+      const photoKey = `kojo_profile_photo_${userId}`;
       const photoDataString = localStorage.getItem(photoKey);
       
       if (photoDataString) {
