@@ -97,8 +97,8 @@ const ProfilePhoto = ({
         const base64Image = e.target.result;
         console.log('Image converted to base64, length:', base64Image.length);
         
-        // Stocker directement dans localStorage
-        const photoKey = `profile_photo_${userId}`;
+        // Stocker directement dans localStorage (clé cohérente)
+        const photoKey = `kojo_profile_photo_${userId}`;
         const photoData = {
           base64: base64Image,
           timestamp: Date.now(),
