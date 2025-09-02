@@ -993,20 +993,20 @@ class KojoAPITester:
                 self.tests_run += 1
 
     def test_owner_account_creation_verification(self):
-        """Verify owner account was created on startup"""
+        """Verify Famakan Kontaga Master account was created on startup"""
         print("\n" + "="*50)
-        print("TESTING OWNER ACCOUNT CREATION")
+        print("TESTING FAMAKAN KONTAGA MASTER ACCOUNT CREATION")
         print("="*50)
         
-        # Test that we can login with the expected owner credentials
-        print(f"\n🔍 Testing Owner Account Exists...")
+        # Test that we can login with the expected Famakan credentials
+        print(f"\n🔍 Testing Famakan Kontaga Master Account Exists...")
         owner_login_data = {
-            "email": "proprietaire@kojo.app",
-            "password": "ChangeThisPassword2024!"
+            "email": "kontagamakan@gmail.com",
+            "password": "FamakanKojo2024@Master!"
         }
         
         success, response = self.run_test(
-            "Verify Owner Account Creation",
+            "Verify Famakan Kontaga Master Account Creation",
             "POST",
             "auth/login",
             200,
@@ -1016,32 +1016,41 @@ class KojoAPITester:
         if success and response:
             user = response.get('user', {})
             
-            # Verify owner account details
-            expected_id = 'owner_kojo_2024'
-            expected_email = 'proprietaire@kojo.app'
+            # Verify Famakan account details
+            expected_id = 'famakan_kontaga_master_2024'
+            expected_email = 'kontagamakan@gmail.com'
+            expected_name = 'Famakan Kontaga Master'
             
             if user.get('id') == expected_id:
-                print(f"✅ Owner ID verified: {user.get('id')}")
+                print(f"✅ Famakan ID verified: {user.get('id')}")
                 self.tests_passed += 1
             else:
-                print(f"❌ Owner ID incorrect. Expected: {expected_id}, Got: {user.get('id')}")
+                print(f"❌ Famakan ID incorrect. Expected: {expected_id}, Got: {user.get('id')}")
             
             if user.get('email') == expected_email:
-                print(f"✅ Owner email verified: {user.get('email')}")
+                print(f"✅ Famakan email verified: {user.get('email')}")
                 self.tests_passed += 1
             else:
-                print(f"❌ Owner email incorrect. Expected: {expected_email}, Got: {user.get('email')}")
+                print(f"❌ Famakan email incorrect. Expected: {expected_email}, Got: {user.get('email')}")
+            
+            # Check name components
+            if (user.get('first_name') == 'Famakan' and 
+                user.get('last_name') == 'Kontaga Master'):
+                print(f"✅ Famakan name verified: {user.get('first_name')} {user.get('last_name')}")
+                self.tests_passed += 1
+            else:
+                print(f"❌ Famakan name incorrect. Expected: Famakan Kontaga Master, Got: {user.get('first_name')} {user.get('last_name')}")
             
             # Check if owner has special properties
             if user.get('user_type') == 'owner' or user.get('is_owner'):
-                print(f"✅ Owner type verified")
+                print(f"✅ Owner type verified: {user.get('user_type')}")
                 self.tests_passed += 1
             else:
-                print(f"❌ Owner type not set correctly")
+                print(f"❌ Owner type not set correctly. Got: {user.get('user_type')}")
             
-            self.tests_run += 3  # We ran 3 verification checks
+            self.tests_run += 4  # We ran 4 verification checks
         else:
-            print("❌ Could not verify owner account creation")
+            print("❌ Could not verify Famakan Kontaga Master account creation")
             self.tests_run += 1
 
     def run_all_tests(self):
