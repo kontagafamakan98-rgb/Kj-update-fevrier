@@ -50,11 +50,11 @@ async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depend
         user_id = payload.get("sub")
         email = payload.get("email")
         
-        # Vérification stricte: seul le propriétaire a accès
+        # Vérification stricte: seul Famakan Kontaga Master a accès
         if user_id != OWNER_USER_ID or email != OWNER_EMAIL:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Accès interdit: Fonctionnalité réservée au propriétaire"
+                detail="Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
             )
         
         # Récupérer les données utilisateur depuis la DB
