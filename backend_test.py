@@ -5,7 +5,7 @@ import io
 from datetime import datetime, timedelta
 
 class KojoAPITester:
-    def __init__(self, base_url="https://profile-photo-fix-1.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://worker-pay-portal.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.client_token = None
         self.worker_token = None
