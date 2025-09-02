@@ -66,7 +66,84 @@ const translations = {
     construction: 'Construction',
     cleaning: 'Nettoyage',
     gardening: 'Jardinage',
-    tutoring: 'Tutorat'
+    tutoring: 'Tutorat',
+    
+    // Payments
+    payment: 'Paiement',
+    paymentMethods: 'Méthodes de paiement',
+    bankCard: 'Carte bancaire',
+    orangeMoney: 'Orange Money',
+    wave: 'Wave',
+    selectPayment: 'Choisir un mode de paiement'
+  },
+  en: {
+    // Navigation
+    home: 'Home',
+    jobs: 'Jobs',
+    messages: 'Messages',
+    profile: 'Profile',
+    dashboard: 'Dashboard',
+    login: 'Login',
+    register: 'Sign Up',
+    logout: 'Logout',
+    
+    // Common
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    edit: 'Edit',
+    submit: 'Submit',
+    loading: 'Loading...',
+    error: 'Error',
+    success: 'Success',
+    
+    // Auth
+    email: 'Email',
+    password: 'Password',
+    firstName: 'First Name',
+    lastName: 'Last Name',
+    phone: 'Phone',
+    confirmPassword: 'Confirm Password',
+    
+    // User Types
+    client: 'Client',
+    worker: 'Worker',
+    
+    // Countries with flags
+    mali: '🇲🇱 Mali',
+    senegal: '🇸🇳 Senegal',
+    burkina_faso: '🇧🇫 Burkina Faso',
+    ivory_coast: '🇨🇮 Ivory Coast',
+    
+    // Job related
+    jobTitle: 'Job Title',
+    jobDescription: 'Description',
+    budget: 'Budget',
+    location: 'Location',
+    category: 'Category',
+    postJob: 'Post Job',
+    applyJob: 'Apply',
+    
+    // Home page
+    heroTitle: 'Connect Workers and Clients in Mali & Senegal',
+    heroSubtitle: 'Find quality services or offer your skills in your area',
+    getStarted: 'Get Started',
+    
+    // Categories
+    plumbing: 'Plumbing',
+    electrical: 'Electrical',
+    construction: 'Construction',
+    cleaning: 'Cleaning',
+    gardening: 'Gardening',
+    tutoring: 'Tutoring',
+    
+    // Payments
+    payment: 'Payment',
+    paymentMethods: 'Payment Methods',
+    bankCard: 'Bank Card',
+    orangeMoney: 'Orange Money',
+    wave: 'Wave',
+    selectPayment: 'Select payment method'
   },
   wo: {
     // Navigation (Wolof)
@@ -127,7 +204,15 @@ const translations = {
     construction: 'Jëf-jëf',
     cleaning: 'Set',
     gardening: 'Jàng',
-    tutoring: 'Jàngale'
+    tutoring: 'Jàngale',
+    
+    // Payments
+    payment: 'Fey',
+    paymentMethods: 'Yoon yu fey',
+    bankCard: 'Kart bank',
+    orangeMoney: 'Orange Money',
+    wave: 'Wave',
+    selectPayment: 'Tànn fey'
   },
   bm: {
     // Navigation (Bambara)
@@ -188,7 +273,15 @@ const translations = {
     construction: 'Jɔli',
     cleaning: 'Saniya',
     gardening: 'Nakɔ baara',
-    tutoring: 'Kalan'
+    tutoring: 'Kalan',
+    
+    // Payments
+    payment: 'Sara',
+    paymentMethods: 'Sara fɛɛrɛw',
+    bankCard: 'Bank karti',
+    orangeMoney: 'Orange Money',
+    wave: 'Wave',
+    selectPayment: 'Sara fɛɛrɛ sugandi'
   }
 };
 
