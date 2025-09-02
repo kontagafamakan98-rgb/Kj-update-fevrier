@@ -350,6 +350,18 @@ frontend:
         agent: "main"
         comment: "Tab and Stack navigation with all screens integrated completed"
 
+  - task: "Commission System (Uber Model)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/services/commissionService.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "IMPLEMENTED: Complete Uber-style commission system with 14% app owner / 86% worker split. Created CommissionService for automatic commission calculation and fund distribution, CommissionDashboard for owner management, integrated with PaymentContext for seamless payment processing, added routing and navigation links. Features automatic transfer simulation to owner accounts (Orange Money, Wave, Bank Card), real-time statistics tracking, transaction history, and owner account management. Ready for backend integration testing."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
