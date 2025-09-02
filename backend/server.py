@@ -685,7 +685,7 @@ async def get_users_management(owner_user = Depends(verify_owner_access)):
         # Récupérer tous les utilisateurs (sauf le propriétaire)
         users_cursor = db.users.find(
             {"user_type": {"$ne": "owner"}},
-            {"password": 0}  # Exclure les mots de passe
+            {"password_hash": 0, "_id": 0}  # Exclure les mots de passe et _id
         )
         users = await users_cursor.to_list(length=None)
         
