@@ -731,6 +731,257 @@ class KojoAPITester:
         except Exception as e:
             print(f"❌ Failed - Error: {str(e)}")
             self.tests_run += 1
+    def test_owner_authorization_system(self):
+        """Test the new owner authorization system"""
+        print("\n" + "="*50)
+        print("TESTING OWNER AUTHORIZATION SYSTEM")
+        print("="*50)
+        
+        # Test 1: Owner Account Login
+        print(f"\n🔍 Testing Owner Account Login...")
+        owner_login_data = {
+            "email": "proprietaire@kojo.app",
+            "password": "ChangeThisPassword2024!"
+        }
+        
+        success, response = self.run_test(
+            "Owner Account Login",
+            "POST",
+            "auth/login",
+            200,
+            data=owner_login_data
+        )
+        
+        if success and 'access_token' in response:
+            self.owner_token = response['access_token']
+            self.owner_user = response['user']
+            print(f"   Owner ID: {self.owner_user['id']}")
+            print(f"   Owner Email: {self.owner_user['email']}")
+            
+            # Verify owner account details
+            if (self.owner_user['id'] == 'owner_kojo_2024' and 
+                self.owner_user['email'] == 'proprietaire@kojo.app'):
+                print("✅ Owner account details verified correctly")
+            else:
+                print("❌ Owner account details incorrect")
+        else:
+            print("❌ Failed to login as owner - cannot continue owner tests")
+            return
+        
+        # Test 2: Owner-Only Endpoints Access
+        print(f"\n🔍 Testing Owner-Only Endpoints Access...")
+        
+        # Test commission stats endpoint
+        self.run_test(
+            "Owner Commission Stats",
+            "GET",
+            "owner/commission-stats",
+            200,
+            token=self.owner_token
+        )
+        
+        # Test debug info endpoint
+        self.run_test(
+            "Owner Debug Info",
+            "GET",
+            "owner/debug-info",
+            200,
+            token=self.owner_token
+        )
+        
+        # Test users management endpoint
+        self.run_test(
+            "Owner Users Management",
+            "GET",
+            "owner/users-management",
+            200,
+            token=self.owner_token
+        )
+        
+        # Test commission settings update endpoint
+        commission_settings = {
+            "commission_rate": 15,
+            "owner_accounts": {
+                "orange_money": "+221701234567",
+                "wave": "+221701234567",
+                "bank_card": "1234567890123456"
+            }
+        }
+        
+        self.run_test(
+            "Owner Update Commission Settings",
+            "POST",
+            "owner/update-commission-settings",
+            200,
+            data=commission_settings,
+            token=self.owner_token
+        )
+        
+        # Test 3: Regular User Access to Owner Endpoints (Should Fail)
+        print(f"\n🔍 Testing Regular User Access to Owner Endpoints (Should Fail)...")
+        
+        if self.client_token:
+            # Test client access to owner endpoints
+            self.run_test(
+                "Client Access Commission Stats (Should Fail)",
+                "GET",
+                "owner/commission-stats",
+                403,
+                token=self.client_token
+            )
+            
+            self.run_test(
+                "Client Access Debug Info (Should Fail)",
+                "GET",
+                "owner/debug-info",
+                403,
+                token=self.client_token
+            )
+            
+            self.run_test(
+                "Client Access Users Management (Should Fail)",
+                "GET",
+                "owner/users-management",
+                403,
+                token=self.client_token
+            )
+            
+            self.run_test(
+                "Client Update Commission Settings (Should Fail)",
+                "POST",
+                "owner/update-commission-settings",
+                403,
+                data=commission_settings,
+                token=self.client_token
+            )
+        
+        if self.worker_token:
+            # Test worker access to owner endpoints
+            self.run_test(
+                "Worker Access Commission Stats (Should Fail)",
+                "GET",
+                "owner/commission-stats",
+                403,
+                token=self.worker_token
+            )
+            
+            self.run_test(
+                "Worker Access Debug Info (Should Fail)",
+                "GET",
+                "owner/debug-info",
+                403,
+                token=self.worker_token
+            )
+        
+        # Test 4: Unauthorized Access to Owner Endpoints
+        print(f"\n🔍 Testing Unauthorized Access to Owner Endpoints...")
+        
+        self.run_test(
+            "No Token Access Commission Stats (Should Fail)",
+            "GET",
+            "owner/commission-stats",
+            403
+        )
+        
+        self.run_test(
+            "No Token Access Debug Info (Should Fail)",
+            "GET",
+            "owner/debug-info",
+            403
+        )
+        
+        # Test 5: Verify Regular Authentication Still Works
+        print(f"\n🔍 Testing Regular Authentication Still Works...")
+        
+        if self.client_token:
+            self.run_test(
+                "Client Profile Access (Should Work)",
+                "GET",
+                "users/profile",
+                200,
+                token=self.client_token
+            )
+        
+        if self.worker_token:
+            self.run_test(
+                "Worker Profile Access (Should Work)",
+                "GET",
+                "users/profile",
+                200,
+                token=self.worker_token
+            )
+        
+        # Test 6: Owner Access to Regular Endpoints
+        print(f"\n🔍 Testing Owner Access to Regular Endpoints...")
+        
+        if self.owner_token:
+            self.run_test(
+                "Owner Profile Access (Should Work)",
+                "GET",
+                "users/profile",
+                200,
+                token=self.owner_token
+            )
+            
+            self.run_test(
+                "Owner Jobs Access (Should Work)",
+                "GET",
+                "jobs",
+                200,
+                token=self.owner_token
+            )
+
+    def test_owner_account_creation_verification(self):
+        """Verify owner account was created on startup"""
+        print("\n" + "="*50)
+        print("TESTING OWNER ACCOUNT CREATION")
+        print("="*50)
+        
+        # Test that we can login with the expected owner credentials
+        print(f"\n🔍 Testing Owner Account Exists...")
+        owner_login_data = {
+            "email": "proprietaire@kojo.app",
+            "password": "ChangeThisPassword2024!"
+        }
+        
+        success, response = self.run_test(
+            "Verify Owner Account Creation",
+            "POST",
+            "auth/login",
+            200,
+            data=owner_login_data
+        )
+        
+        if success and response:
+            user = response.get('user', {})
+            
+            # Verify owner account details
+            expected_id = 'owner_kojo_2024'
+            expected_email = 'proprietaire@kojo.app'
+            
+            if user.get('id') == expected_id:
+                print(f"✅ Owner ID verified: {user.get('id')}")
+                self.tests_passed += 1
+            else:
+                print(f"❌ Owner ID incorrect. Expected: {expected_id}, Got: {user.get('id')}")
+            
+            if user.get('email') == expected_email:
+                print(f"✅ Owner email verified: {user.get('email')}")
+                self.tests_passed += 1
+            else:
+                print(f"❌ Owner email incorrect. Expected: {expected_email}, Got: {user.get('email')}")
+            
+            # Check if owner has special properties
+            if user.get('user_type') == 'owner' or user.get('is_owner'):
+                print(f"✅ Owner type verified")
+                self.tests_passed += 1
+            else:
+                print(f"❌ Owner type not set correctly")
+            
+            self.tests_run += 3  # We ran 3 verification checks
+        else:
+            print("❌ Could not verify owner account creation")
+            self.tests_run += 1
 
     def run_all_tests(self):
         """Run all tests in sequence"""
