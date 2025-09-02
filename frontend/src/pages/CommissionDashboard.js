@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CommissionService from '../services/commissionService';
+import OwnerService from '../services/ownerService';
+import { useAuth } from '../contexts/AuthContext';
 
 const CommissionDashboard = () => {
   const [stats, setStats] = useState({});
