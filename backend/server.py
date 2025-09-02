@@ -317,7 +317,7 @@ async def login_user(credentials: UserLogin):
     if not user or not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    access_token = create_access_token(data={"sub": user["id"]})
+    access_token = create_access_token(data={"sub": user["id"], "email": user["email"]})
     
     return {
         "access_token": access_token,
