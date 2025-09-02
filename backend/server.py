@@ -713,7 +713,7 @@ async def get_users_management(owner_user = Depends(verify_owner_access)):
         }
         
     except Exception as e:
-        logger.error(f"Error getting users management: {e}")
+        logging.error(f"Error getting users management: {e}")
         raise HTTPException(status_code=500, detail="Erreur serveur")
 
 @api_router.post("/owner/update-commission-settings")
