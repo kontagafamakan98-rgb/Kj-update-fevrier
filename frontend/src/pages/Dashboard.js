@@ -14,12 +14,15 @@ export default function Dashboard() {
   });
   const [recentJobs, setRecentJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isFamakan, setIsFamakan] = useState(false);
   
   const { user } = useAuth();
   const { t } = useLanguage();
 
   useEffect(() => {
     loadDashboardData();
+    // Vérifier si l'utilisateur connecté est Famakan Kontaga Master
+    setIsFamakan(OwnerService.isFamakanLoggedIn());
   }, []);
 
   const loadDashboardData = async () => {
