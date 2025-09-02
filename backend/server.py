@@ -587,6 +587,166 @@ async def health_check():
 # Include the router in the main app
 app.include_router(api_router)
 
+# ============================================================================
+# ENDPOINTS PROTÉGÉS PROPRIÉTAIRE - ACCÈS RESTREINT
+# ============================================================================
+
+@api_router.get("/owner/commission-stats")
+async def get_commission_stats(owner_user = Depends(verify_owner_access)):
+    """Statistiques des commissions - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        # Simuler des statistiques de commission (remplacez par vraies données)
+        stats = {
+            "total_transactions": 156,
+            "total_commission_earned": 2450000,  # En XOF
+            "commission_rate": 14,  # 14%
+            "total_volume": 17500000,  # Volume total des paiements
+            "daily_commission": 35000,
+            "monthly_commission": 875000,
+            "top_payment_methods": [
+                {"method": "orange_money", "volume": 8500000, "commission": 1190000},
+                {"method": "wave", "volume": 5200000, "commission": 728000},
+                {"method": "bank_card", "volume": 3800000, "commission": 532000}
+            ],
+            "recent_transactions": [
+                {
+                    "id": "TXN_001",
+                    "amount": 50000,
+                    "commission": 7000,
+                    "worker_amount": 43000,
+                    "method": "orange_money",
+                    "date": datetime.utcnow().isoformat()
+                }
+            ]
+        }
+        
+        return {
+            "status": "success",
+            "owner_email": owner_user["email"],
+            "stats": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting commission stats: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@api_router.get("/owner/debug-info")
+async def get_debug_info(owner_user = Depends(verify_owner_access)):
+    """Informations de debug - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        # Compter les utilisateurs
+        total_users = await db.users.count_documents({})
+        clients = await db.users.count_documents({"user_type": "client"})
+        workers = await db.users.count_documents({"user_type": "worker"})
+        
+        # Compter les jobs
+        total_jobs = await db.jobs.count_documents({})
+        active_jobs = await db.jobs.count_documents({"status": "open"})
+        
+        debug_info = {
+            "system_status": "running",
+            "database_connected": True,
+            "total_users": total_users,
+            "user_breakdown": {
+                "clients": clients,
+                "workers": workers,
+                "owner": 1
+            },
+            "jobs_stats": {
+                "total_jobs": total_jobs,
+                "active_jobs": active_jobs
+            },
+            "server_info": {
+                "jwt_algorithm": JWT_ALGORITHM,
+                "cors_enabled": True,
+                "uploads_enabled": True
+            },
+            "owner_permissions": owner_user.get("permissions", [])
+        }
+        
+        return {
+            "status": "success",
+            "debug_info": debug_info,
+            "access_level": "OWNER_FULL_ACCESS"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting debug info: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@api_router.get("/owner/users-management")
+async def get_users_management(owner_user = Depends(verify_owner_access)):
+    """Gestion des utilisateurs - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        # Récupérer tous les utilisateurs (sauf le propriétaire)
+        users_cursor = db.users.find(
+            {"user_type": {"$ne": "owner"}},
+            {"password": 0}  # Exclure les mots de passe
+        )
+        users = await users_cursor.to_list(length=None)
+        
+        # Statistiques des utilisateurs
+        user_stats = {
+            "total_users": len(users),
+            "clients": len([u for u in users if u.get("user_type") == "client"]),
+            "workers": len([u for u in users if u.get("user_type") == "worker"]),
+            "by_country": {}
+        }
+        
+        # Compter par pays
+        for user in users:
+            country = user.get("country", "unknown")
+            user_stats["by_country"][country] = user_stats["by_country"].get(country, 0) + 1
+        
+        return {
+            "status": "success",
+            "users": users,
+            "stats": user_stats,
+            "access_level": "OWNER_FULL_ACCESS"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting users management: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@api_router.post("/owner/update-commission-settings")
+async def update_commission_settings(
+    settings: dict,
+    owner_user = Depends(verify_owner_access)
+):
+    """Mettre à jour les paramètres de commission - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        # Valider les paramètres
+        commission_rate = settings.get("commission_rate", 14)
+        if not 0 <= commission_rate <= 50:
+            raise HTTPException(status_code=400, detail="Taux de commission invalide (0-50%)")
+        
+        # Sauvegarder les paramètres en base
+        await db.settings.update_one(
+            {"type": "commission"},
+            {
+                "$set": {
+                    "commission_rate": commission_rate,
+                    "owner_accounts": settings.get("owner_accounts", {}),
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "updated_by": owner_user["id"]
+                }
+            },
+            upsert=True
+        )
+        
+        return {
+            "status": "success",
+            "message": "Paramètres de commission mis à jour",
+            "new_settings": settings
+        }
+        
+    except Exception as e:
+        logger.error(f"Error updating commission settings: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+# ============================================================================
+
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
