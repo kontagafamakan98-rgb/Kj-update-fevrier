@@ -249,7 +249,9 @@ export function PaymentProvider({ children }) {
     // Methods
     selectPaymentMethod,
     setDefaultPaymentMethod,
-    processPayment,
+    processPayment: processPaymentWithCommission, // Méthode principale avec commission
+    processPaymentSimple, // Méthode simple sans commission (pour backward compatibility)
+    processPaymentWithCommission, // Méthode explicite avec commission
     calculateFees,
     getAvailableMethodsForCountry,
     getPaymentHistory,
@@ -257,7 +259,10 @@ export function PaymentProvider({ children }) {
     initializePaymentMethods,
     
     // Constants
-    PAYMENT_METHODS
+    PAYMENT_METHODS,
+    
+    // Commission service access
+    CommissionService
   };
 
   return (
