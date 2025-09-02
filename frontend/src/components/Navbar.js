@@ -71,15 +71,11 @@ export default function Navbar() {
           {/* Right side - Desktop */}
           <div className="hidden md:flex items-center space-x-4">
             {/* Language Selector */}
-            <select 
-              value={currentLanguage}
-              onChange={(e) => changeLanguage(e.target.value)}
-              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            >
-              <option value="fr">Français</option>
-              <option value="wo">Wolof</option>
-              <option value="bm">Bambara</option>
-            </select>
+            <LanguageSelector 
+              showDropdown={true} 
+              showFlags={true}
+              className="mr-4"
+            />
 
             {user ? (
               <div className="flex items-center space-x-4">
