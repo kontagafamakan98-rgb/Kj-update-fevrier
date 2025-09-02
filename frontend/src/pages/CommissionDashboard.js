@@ -20,11 +20,11 @@ const CommissionDashboard = () => {
   const checkOwnerAccessAndLoadData = async () => {
     setLoading(true);
     
-    // Vérifier si l'utilisateur est le propriétaire
-    const ownerAccess = OwnerService.isOwnerLoggedIn();
-    setIsOwner(ownerAccess);
+    // Vérifier si l'utilisateur est Famakan Kontaga Master
+    const famakanAccess = OwnerService.isFamakanLoggedIn();
+    setIsOwner(famakanAccess);
     
-    if (ownerAccess) {
+    if (famakanAccess) {
       await loadOwnerData();
     }
     
