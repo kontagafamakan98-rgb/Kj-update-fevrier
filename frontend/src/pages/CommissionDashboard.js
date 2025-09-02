@@ -4,20 +4,59 @@ import OwnerService from '../services/ownerService';
 import { useAuth } from '../contexts/AuthContext';
 
 const CommissionDashboard = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState({});
   const [transactions, setTransactions] = useState([]);
   const [ownerAccounts, setOwnerAccounts] = useState({});
   const [editingAccounts, setEditingAccounts] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [serverStats, setServerStats] = useState(null);
 
   useEffect(() => {
-    loadData();
+    checkOwnerAccessAndLoadData();
   }, []);
 
+  const checkOwnerAccessAndLoadData = async () => {
+    setLoading(true);
+    
+    // Vérifier si l'utilisateur est le propriétaire
+    const ownerAccess = OwnerService.isOwnerLoggedIn();
+    setIsOwner(ownerAccess);
+    
+    if (ownerAccess) {
+      await loadOwnerData();
+    }
+    
+    setLoading(false);
+  };
+
+  const loadOwnerData = async () => {
+    try {
+      // Charger les données locales (commission service)
+      CommissionService.loadOwnerAccounts();
+      setStats(CommissionService.getCommissionStats());
+      setTransactions(CommissionService.getStoredTransactions());
+      setOwnerAccounts(CommissionService.getOwnerAccounts());
+      
+      // Charger les vraies statistiques du serveur
+      try {
+        const serverData = await OwnerService.getCommissionStats();
+        setServerStats(serverData.stats);
+        console.log('📊 Vraies stats serveur chargées:', serverData.stats);
+      } catch (error) {
+        console.log('📊 Utilisation des stats locales (serveur indisponible)');
+      }
+      
+    } catch (error) {
+      console.error('Erreur chargement données propriétaire:', error);
+    }
+  };
+
   const loadData = () => {
-    CommissionService.loadOwnerAccounts();
-    setStats(CommissionService.getCommissionStats());
-    setTransactions(CommissionService.getStoredTransactions());
-    setOwnerAccounts(CommissionService.getOwnerAccounts());
+    if (isOwner) {
+      loadOwnerData();
+    }
   };
 
   const handleAccountUpdate = (method, field, value) => {
