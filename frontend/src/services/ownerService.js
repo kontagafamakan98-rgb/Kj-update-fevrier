@@ -111,7 +111,7 @@ class OwnerService {
 
       if (!response.ok) {
         if (response.status === 403) {
-          throw new Error('Accès interdit: Fonctionnalité réservée au propriétaire');
+          throw new Error('Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement');
         }
         throw new Error(`Erreur serveur: ${response.status}`);
       }
