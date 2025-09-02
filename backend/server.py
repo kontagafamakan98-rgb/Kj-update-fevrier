@@ -97,7 +97,13 @@ async def ensure_owner_exists():
             "user_type": "owner",  # Type spécial pour le propriétaire
             "phone": "+221701234567",
             "country": "senegal",
+            "preferred_language": "fr",
+            "profile_photo": None,
+            "is_verified": True,
+            "rating": 0.0,
+            "total_reviews": 0,
             "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
             "is_owner": True,
             "permissions": [
                 "commission_access",
