@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { isPWA } from '../utils/pwa';
+import LanguageSelector from './LanguageSelector';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
