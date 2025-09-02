@@ -91,7 +91,7 @@ async def ensure_owner_exists():
         owner_data = {
             "id": OWNER_USER_ID,
             "email": OWNER_EMAIL,
-            "password": hashed_password.decode('utf-8'),
+            "password_hash": hashed_password.decode('utf-8'),
             "first_name": "Propriétaire",
             "last_name": "Kojo",
             "user_type": "owner",  # Type spécial pour le propriétaire
