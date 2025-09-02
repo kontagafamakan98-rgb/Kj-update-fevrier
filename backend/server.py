@@ -124,6 +124,7 @@ async def ensure_owner_exists():
 class UserType(str, Enum):
     CLIENT = "client"
     WORKER = "worker"
+    OWNER = "owner"
 
 class JobStatus(str, Enum):
     OPEN = "open"
