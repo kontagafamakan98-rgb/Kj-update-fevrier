@@ -72,7 +72,7 @@ async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depend
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expiré"
         )
-    except jwt.JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalide"
