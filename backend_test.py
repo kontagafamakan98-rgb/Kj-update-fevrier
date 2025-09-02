@@ -732,20 +732,20 @@ class KojoAPITester:
             print(f"❌ Failed - Error: {str(e)}")
             self.tests_run += 1
     def test_owner_authorization_system(self):
-        """Test the new owner authorization system"""
+        """Test the Famakan Kontaga Master authorization system"""
         print("\n" + "="*50)
-        print("TESTING OWNER AUTHORIZATION SYSTEM")
+        print("TESTING FAMAKAN KONTAGA MASTER AUTHORIZATION SYSTEM")
         print("="*50)
         
-        # Test 1: Owner Account Login
-        print(f"\n🔍 Testing Owner Account Login...")
+        # Test 1: Famakan Account Login
+        print(f"\n🔍 Testing Famakan Kontaga Master Account Login...")
         owner_login_data = {
-            "email": "proprietaire@kojo.app",
-            "password": "ChangeThisPassword2024!"
+            "email": "kontagamakan@gmail.com",
+            "password": "FamakanKojo2024@Master!"
         }
         
         success, response = self.run_test(
-            "Owner Account Login",
+            "Famakan Kontaga Master Login",
             "POST",
             "auth/login",
             200,
@@ -758,14 +758,16 @@ class KojoAPITester:
             print(f"   Owner ID: {self.owner_user['id']}")
             print(f"   Owner Email: {self.owner_user['email']}")
             
-            # Verify owner account details
-            if (self.owner_user['id'] == 'owner_kojo_2024' and 
-                self.owner_user['email'] == 'proprietaire@kojo.app'):
-                print("✅ Owner account details verified correctly")
+            # Verify Famakan account details
+            if (self.owner_user['id'] == 'famakan_kontaga_master_2024' and 
+                self.owner_user['email'] == 'kontagamakan@gmail.com'):
+                print("✅ Famakan Kontaga Master account details verified correctly")
             else:
-                print("❌ Owner account details incorrect")
+                print("❌ Famakan Kontaga Master account details incorrect")
+                print(f"   Expected ID: famakan_kontaga_master_2024, Got: {self.owner_user['id']}")
+                print(f"   Expected Email: kontagamakan@gmail.com, Got: {self.owner_user['email']}")
         else:
-            print("❌ Failed to login as owner - cannot continue owner tests")
+            print("❌ Failed to login as Famakan Kontaga Master - cannot continue owner tests")
             return
         
         # Test 2: Owner-Only Endpoints Access
