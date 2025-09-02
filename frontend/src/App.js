@@ -161,6 +161,11 @@ function AppRoutes() {
               <Profile />
             </ProtectedRoute>
           } />
+          <Route path="/commission-dashboard" element={
+            <ProtectedRoute>
+              <CommissionDashboard />
+            </ProtectedRoute>
+          } />
         </Routes>
       </main>
       
