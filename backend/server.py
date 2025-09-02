@@ -591,9 +591,6 @@ async def root():
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}
 
-# Include the router in the main app
-app.include_router(api_router)
-
 # ============================================================================
 # ENDPOINTS PROTÉGÉS PROPRIÉTAIRE - ACCÈS RESTREINT
 # ============================================================================
@@ -753,6 +750,9 @@ async def update_commission_settings(
         raise HTTPException(status_code=500, detail="Erreur serveur")
 
 # ============================================================================
+
+# Include the router in the main app
+app.include_router(api_router)
 
 # Serve uploaded files
 from fastapi.staticfiles import StaticFiles
