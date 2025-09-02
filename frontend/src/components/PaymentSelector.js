@@ -120,7 +120,7 @@ const PaymentSelector = ({
   );
 };
 
-// Composant pour afficher les détails de paiement
+// Composant pour afficher les détails de paiement AVEC commission
 export const PaymentSummary = ({ amount, currency = 'XOF' }) => {
   const { selectedMethod, calculateFees } = usePayment();
   const { t } = useLanguage();
@@ -128,6 +128,7 @@ export const PaymentSummary = ({ amount, currency = 'XOF' }) => {
   if (!selectedMethod) return null;
 
   const fees = calculateFees(amount, selectedMethod);
+  const commissionData = CommissionService.calculateCommissions(amount);
   const total = amount + fees;
 
   return (
@@ -136,23 +137,37 @@ export const PaymentSummary = ({ amount, currency = 'XOF' }) => {
       
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span>Montant:</span>
+          <span>Montant du service:</span>
           <span>{amount.toLocaleString()} {currency}</span>
         </div>
         
         <div className="flex justify-between">
-          <span>Frais ({selectedMethod.fees}):</span>
+          <span>Frais de transaction ({selectedMethod.fees}):</span>
           <span>{fees.toLocaleString()} {currency}</span>
         </div>
         
         <div className="border-t pt-2 flex justify-between font-medium">
-          <span>Total:</span>
+          <span>Total à payer:</span>
           <span>{total.toLocaleString()} {currency}</span>
+        </div>
+        
+        <div className="bg-blue-50 p-3 rounded-lg mt-3">
+          <p className="text-xs text-blue-800 font-medium mb-2">💰 Répartition automatique:</p>
+          <div className="space-y-1 text-xs text-blue-700">
+            <div className="flex justify-between">
+              <span>• Travailleur (86%):</span>
+              <span className="font-medium">{commissionData.workerAmount.toLocaleString()} {currency}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>• Commission plateforme (14%):</span>
+              <span className="font-medium">{commissionData.ownerCommission.toLocaleString()} {currency}</span>
+            </div>
+          </div>
         </div>
         
         <div className="mt-3 flex items-center text-xs text-gray-600">
           <span className="mr-1">{selectedMethod.icon}</span>
-          Via {selectedMethod.name}
+          Via {selectedMethod.name} - Transfert automatique
         </div>
       </div>
     </div>
