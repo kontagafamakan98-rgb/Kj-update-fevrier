@@ -1061,10 +1061,10 @@ class KojoAPITester:
         
         try:
             self.test_health_check()
-            self.test_owner_account_creation_verification()  # Test owner account creation first
+            self.test_owner_account_creation_verification()  # Test Famakan account creation first
             self.test_user_registration()
             self.test_user_login()
-            self.test_owner_authorization_system()  # Test owner authorization system
+            self.test_owner_authorization_system()  # Test Famakan authorization system
             self.test_user_profile()
             self.test_profile_photo_management()  # Added profile photo tests
             self.test_worker_profile()
