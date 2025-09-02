@@ -771,47 +771,62 @@ class KojoAPITester:
             return
         
         # Test 2: Owner-Only Endpoints Access
-        print(f"\n🔍 Testing Owner-Only Endpoints Access...")
+        print(f"\n🔍 Testing Famakan-Only Endpoints Access...")
         
         # Test commission stats endpoint
-        self.run_test(
-            "Owner Commission Stats",
+        success, response = self.run_test(
+            "Famakan Commission Stats Access",
             "GET",
             "owner/commission-stats",
             200,
             token=self.owner_token
         )
         
+        if success and response:
+            print(f"   ✅ Commission stats accessible to Famakan")
+            if 'owner_email' in response and response['owner_email'] == 'kontagamakan@gmail.com':
+                print(f"   ✅ Response confirms Famakan's email: {response['owner_email']}")
+        
         # Test debug info endpoint
-        self.run_test(
-            "Owner Debug Info",
+        success, response = self.run_test(
+            "Famakan Debug Info Access",
             "GET",
             "owner/debug-info",
             200,
             token=self.owner_token
         )
         
+        if success and response:
+            print(f"   ✅ Debug info accessible to Famakan")
+            if 'access_level' in response and response['access_level'] == 'OWNER_FULL_ACCESS':
+                print(f"   ✅ Access level confirmed: {response['access_level']}")
+        
         # Test users management endpoint
-        self.run_test(
-            "Owner Users Management",
+        success, response = self.run_test(
+            "Famakan Users Management Access",
             "GET",
             "owner/users-management",
             200,
             token=self.owner_token
         )
         
+        if success and response:
+            print(f"   ✅ Users management accessible to Famakan")
+            if 'access_level' in response and response['access_level'] == 'OWNER_FULL_ACCESS':
+                print(f"   ✅ Access level confirmed: {response['access_level']}")
+        
         # Test commission settings update endpoint
         commission_settings = {
             "commission_rate": 15,
             "owner_accounts": {
-                "orange_money": "+221701234567",
-                "wave": "+221701234567",
+                "orange_money": "+223701234567",
+                "wave": "+223701234567",
                 "bank_card": "1234567890123456"
             }
         }
         
         self.run_test(
-            "Owner Update Commission Settings",
+            "Famakan Update Commission Settings",
             "POST",
             "owner/update-commission-settings",
             200,
@@ -819,12 +834,12 @@ class KojoAPITester:
             token=self.owner_token
         )
         
-        # Test 3: Regular User Access to Owner Endpoints (Should Fail)
-        print(f"\n🔍 Testing Regular User Access to Owner Endpoints (Should Fail)...")
+        # Test 3: Regular User Access to Owner Endpoints (Should Fail with Specific Message)
+        print(f"\n🔍 Testing Regular User Access to Owner Endpoints (Should Fail with Specific Message)...")
         
         if self.client_token:
-            # Test client access to owner endpoints
-            self.run_test(
+            # Test client access to owner endpoints - should get specific French error message
+            success, response = self.run_test(
                 "Client Access Commission Stats (Should Fail)",
                 "GET",
                 "owner/commission-stats",
@@ -832,13 +847,26 @@ class KojoAPITester:
                 token=self.client_token
             )
             
-            self.run_test(
+            if not success and response and 'detail' in response:
+                expected_message = "Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
+                if response['detail'] == expected_message:
+                    print(f"   ✅ Correct French error message received: {response['detail']}")
+                else:
+                    print(f"   ❌ Incorrect error message. Expected: {expected_message}")
+                    print(f"       Got: {response['detail']}")
+            
+            success, response = self.run_test(
                 "Client Access Debug Info (Should Fail)",
                 "GET",
                 "owner/debug-info",
                 403,
                 token=self.client_token
             )
+            
+            if not success and response and 'detail' in response:
+                expected_message = "Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
+                if response['detail'] == expected_message:
+                    print(f"   ✅ Correct French error message received: {response['detail']}")
             
             self.run_test(
                 "Client Access Users Management (Should Fail)",
@@ -859,13 +887,18 @@ class KojoAPITester:
         
         if self.worker_token:
             # Test worker access to owner endpoints
-            self.run_test(
+            success, response = self.run_test(
                 "Worker Access Commission Stats (Should Fail)",
                 "GET",
                 "owner/commission-stats",
                 403,
                 token=self.worker_token
             )
+            
+            if not success and response and 'detail' in response:
+                expected_message = "Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
+                if response['detail'] == expected_message:
+                    print(f"   ✅ Correct French error message received: {response['detail']}")
             
             self.run_test(
                 "Worker Access Debug Info (Should Fail)",
