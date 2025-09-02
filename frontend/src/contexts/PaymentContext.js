@@ -79,13 +79,67 @@ export function PaymentProvider({ children }) {
     }
   };
 
-  // Simuler un paiement
-  const processPayment = async (amount, currency = 'XOF', jobId = null) => {
+  // Traiter un paiement avec commission automatique (comme Uber)
+  const processPaymentWithCommission = async (amount, currency = 'XOF', workerId, jobId = null) => {
     if (!selectedMethod) {
       throw new Error('Aucune méthode de paiement sélectionnée');
     }
 
-    // Simulation d'un paiement
+    try {
+      console.log('🚗 Traitement paiement avec commission Uber-style...');
+      
+      // Utiliser le service de commission pour le traitement complet
+      const result = await CommissionService.simulateFullPayment(
+        amount,
+        selectedMethod,
+        workerId,
+        jobId
+      );
+
+      if (result.success) {
+        // Ajouter à l'historique avec détails de commission
+        const paymentData = {
+          id: result.transactionId,
+          method: selectedMethod,
+          amount,
+          currency,
+          jobId,
+          workerId,
+          status: 'success',
+          timestamp: new Date().toISOString(),
+          fees: calculateFees(amount, selectedMethod),
+          commission: result.commission,
+          ownerCommission: result.commission.ownerCommission,
+          workerAmount: result.commission.workerAmount
+        };
+        
+        setPaymentHistory(prev => [paymentData, ...prev]);
+        
+        return {
+          success: true,
+          transactionId: result.transactionId,
+          commission: result.commission,
+          message: result.message
+        };
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('❌ Erreur paiement avec commission:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  };
+
+  // Simuler un paiement (version originale sans commission)
+  const processPaymentSimple = async (amount, currency = 'XOF', jobId = null) => {
+    if (!selectedMethod) {
+      throw new Error('Aucune méthode de paiement sélectionnée');
+    }
+
+    // Simulation d'un paiement simple
     const paymentData = {
       id: Date.now().toString(),
       method: selectedMethod,
