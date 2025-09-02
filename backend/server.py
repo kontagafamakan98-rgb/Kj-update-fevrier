@@ -28,9 +28,9 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production'
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
-# Owner/Admin configuration - SEUL LE PROPRIÉTAIRE A ACCÈS
-OWNER_EMAIL = os.environ.get('OWNER_EMAIL', 'proprietaire@kojo.app')  # Changez cette email
-OWNER_USER_ID = 'owner_kojo_2024'  # ID unique pour le propriétaire
+# Owner/Admin configuration - SEUL FAMAKAN KONTAGA MASTER A ACCÈS
+OWNER_EMAIL = os.environ.get('OWNER_EMAIL', 'kontagamakan@gmail.com')  # Email de Famakan Kontaga Master
+OWNER_USER_ID = 'famakan_kontaga_master_2024'  # ID unique pour Famakan
 
 # Create the main app without a prefix
 app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & Senegal")
