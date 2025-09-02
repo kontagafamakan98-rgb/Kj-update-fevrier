@@ -121,15 +121,16 @@ const CommissionDashboard = () => {
           <div className="bg-red-50 border border-red-200 rounded-lg p-8">
             <div className="text-6xl mb-4">🚫</div>
             <h1 className="text-2xl font-bold text-red-800 mb-4">
-              Accès Interdit
+              Accès Réservé à Famakan Kontaga Master
             </h1>
             <p className="text-red-700 mb-6">
-              Cette section est réservée exclusivement au propriétaire de l'application.
+              Cette section est réservée exclusivement à <strong>Famakan Kontaga Master</strong>, 
+              le propriétaire de l'application Kojo.
             </p>
             <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6">
               <p className="text-sm text-red-800">
                 <strong>Note de sécurité:</strong> Le tableau de bord des commissions contient des informations 
-                financières sensibles et n'est accessible qu'avec les permissions appropriées.
+                financières sensibles et n'est accessible qu'avec l'autorisation de Famakan Kontaga Master.
               </p>
             </div>
             <div className="space-y-2 text-sm text-red-600">
