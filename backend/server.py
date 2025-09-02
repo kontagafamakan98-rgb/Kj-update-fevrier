@@ -749,7 +749,7 @@ async def update_commission_settings(
         }
         
     except Exception as e:
-        logger.error(f"Error updating commission settings: {e}")
+        logging.error(f"Error updating commission settings: {e}")
         raise HTTPException(status_code=500, detail="Erreur serveur")
 
 # ============================================================================
