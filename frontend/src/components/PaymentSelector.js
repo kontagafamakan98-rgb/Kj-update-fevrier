@@ -174,9 +174,16 @@ export const PaymentSummary = ({ amount, currency = 'XOF' }) => {
   );
 };
 
-// Composant pour le processus de paiement
-export const PaymentProcess = ({ amount, currency = 'XOF', jobId = null, onSuccess = null, onError = null }) => {
-  const { selectedMethod, processPayment } = usePayment();
+// Composant pour le processus de paiement AVEC commission automatique
+export const PaymentProcess = ({ 
+  amount, 
+  currency = 'XOF', 
+  jobId = null, 
+  workerId = 'worker_demo_123',
+  onSuccess = null, 
+  onError = null 
+}) => {
+  const { selectedMethod } = usePayment();
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -190,7 +197,14 @@ export const PaymentProcess = ({ amount, currency = 'XOF', jobId = null, onSucce
     setResult(null);
 
     try {
-      const paymentResult = await processPayment(amount, currency, jobId);
+      // Utiliser le service de commission pour traiter le paiement
+      const paymentResult = await CommissionService.simulateFullPayment(
+        amount, 
+        selectedMethod, 
+        workerId, 
+        jobId
+      );
+      
       setResult(paymentResult);
       
       if (paymentResult.success && onSuccess) {
@@ -223,10 +237,10 @@ export const PaymentProcess = ({ amount, currency = 'XOF', jobId = null, onSucce
         {isProcessing ? (
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-            Traitement en cours...
+            Traitement + Distribution...
           </div>
         ) : (
-          `Payer ${amount?.toLocaleString()} ${currency}`
+          `💰 Payer ${amount?.toLocaleString()} ${currency}`
         )}
       </button>
 
@@ -238,9 +252,9 @@ export const PaymentProcess = ({ amount, currency = 'XOF', jobId = null, onSucce
             result.success ? 'text-green-800' : 'text-red-800'
           }`}>
             <span className="mr-2">{result.success ? '✅' : '❌'}</span>
-            <div>
+            <div className="w-full">
               <p className="font-medium">
-                {result.success ? 'Paiement réussi!' : 'Paiement échoué'}
+                {result.success ? 'Paiement réussi avec distribution!' : 'Paiement échoué'}
               </p>
               <p className="text-sm mt-1">
                 {result.success ? result.message : result.error}
@@ -249,6 +263,15 @@ export const PaymentProcess = ({ amount, currency = 'XOF', jobId = null, onSucce
                 <p className="text-xs mt-1 font-mono">
                   ID: {result.transactionId}
                 </p>
+              )}
+              {result.commission && (
+                <div className="mt-2 text-xs space-y-1">
+                  <div className="bg-white bg-opacity-50 p-2 rounded">
+                    <p className="font-medium">💰 Distribution effectuée:</p>
+                    <p>• Propriétaire: {result.commission.ownerCommission.toLocaleString()} {currency} (14%)</p>
+                    <p>• Travailleur: {result.commission.workerAmount.toLocaleString()} {currency} (86%)</p>
+                  </div>
+                </div>
               )}
             </div>
           </div>
