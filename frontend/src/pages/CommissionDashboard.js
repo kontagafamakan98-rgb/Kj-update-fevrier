@@ -201,7 +201,7 @@ const CommissionDashboard = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Transactions</p>
                 <p className="text-2xl font-bold text-purple-600">
-                  {stats.totalTransactions}
+                  {displayStats.total_transactions || displayStats.totalTransactions}
                 </p>
               </div>
             </div>
