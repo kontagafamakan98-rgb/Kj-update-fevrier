@@ -3,30 +3,6 @@ import PaymentSelector, { PaymentSummary, PaymentProcess } from '../components/P
 import LanguageSelector from '../components/LanguageSelector';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-
-const PaymentDemo = () => {
-  const { t } = useLanguage();
-  const { profile } = useAuth();
-  const [paymentAmount, setPaymentAmount] = useState(5000);
-  const [selectedCountry, setSelectedCountry] = useState('senegal');
-
-  const handlePaymentSuccess = (result) => {
-    alert(`Paiement réussi! Transaction: ${result.transactionId}`);
-  };
-
-  const handlePaymentError = (error) => {
-    alert(`Erreur de paiement: ${error}`);
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        
-import React, { useState } from 'react';
-import PaymentSelector, { PaymentSummary, PaymentProcess } from '../components/PaymentSelector';
-import LanguageSelector from '../components/LanguageSelector';
-import { useLanguage } from '../contexts/LanguageContext';
-import { useAuth } from '../contexts/AuthContext';
 import { usePayment } from '../contexts/PaymentContext';
 
 const PaymentDemo = () => {
@@ -294,7 +270,7 @@ const PaymentDemo = () => {
         {/* Section principale de démonstration paiement */}
         <div className="mt-8 bg-white rounded-lg shadow-md p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            💰 Simulation de Paiement
+            💰 Simulation de Paiement (Sans Commission)
           </h2>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -337,6 +313,7 @@ const PaymentDemo = () => {
             <p><strong>Méthodes de paiement:</strong> Carte bancaire (2.5%), Orange Money (1%), Wave (gratuit)</p>
             <p><strong>Pays supportés:</strong> Mali, Sénégal, Burkina Faso, Côte d'Ivoire</p>
             <p><strong>Monnaie:</strong> Franc CFA (XOF)</p>
+            <p><strong>Commission automatique:</strong> 14% propriétaire, 86% travailleur (modèle Uber)</p>
             <p><strong>Note:</strong> Ceci est une démonstration - les paiements sont simulés</p>
           </div>
         </div>
