@@ -187,7 +187,7 @@ const CommissionDashboard = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Volume Total</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {formatMoney(stats.totalVolume)} XOF
+                  {formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF
                 </p>
               </div>
             </div>
