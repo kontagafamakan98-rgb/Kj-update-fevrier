@@ -153,8 +153,8 @@ const ProfilePhoto = ({
     setLoading(true);
     
     try {
-      // Supprimer du localStorage
-      const photoKey = `profile_photo_${userId}`;
+      // Supprimer du localStorage (clé cohérente)
+      const photoKey = `kojo_profile_photo_${userId}`;
       localStorage.removeItem(photoKey);
       console.log('Photo removed from localStorage:', photoKey);
       
