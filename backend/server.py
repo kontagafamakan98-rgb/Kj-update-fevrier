@@ -41,6 +41,79 @@ api_router = APIRouter(prefix="/api")
 # Security
 security = HTTPBearer()
 
+# Fonction pour vérifier si l'utilisateur est le propriétaire
+async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Vérifie que seul le propriétaire peut accéder aux fonctionnalités sensibles"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        email = payload.get("email")
+        
+        # Vérification stricte: seul le propriétaire a accès
+        if user_id != OWNER_USER_ID or email != OWNER_EMAIL:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès interdit: Fonctionnalité réservée au propriétaire"
+            )
+        
+        # Récupérer les données utilisateur depuis la DB
+        user = await db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Propriétaire non trouvé"
+            )
+            
+        return user
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expiré"
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide"
+        )
+
+# Fonction pour créer le compte propriétaire s'il n'existe pas
+async def ensure_owner_exists():
+    """Crée le compte propriétaire s'il n'existe pas déjà"""
+    existing_owner = await db.users.find_one({"id": OWNER_USER_ID})
+    
+    if not existing_owner:
+        # Hasher un mot de passe par défaut (à changer en production)
+        default_password = "ChangeThisPassword2024!"
+        hashed_password = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
+        
+        owner_data = {
+            "id": OWNER_USER_ID,
+            "email": OWNER_EMAIL,
+            "password": hashed_password.decode('utf-8'),
+            "first_name": "Propriétaire",
+            "last_name": "Kojo",
+            "user_type": "owner",  # Type spécial pour le propriétaire
+            "phone": "+221701234567",
+            "country": "senegal",
+            "created_at": datetime.utcnow().isoformat(),
+            "is_owner": True,
+            "permissions": [
+                "commission_access",
+                "debug_access", 
+                "admin_access",
+                "full_dashboard_access"
+            ]
+        }
+        
+        await db.users.insert_one(owner_data)
+        print(f"✅ Compte propriétaire créé: {OWNER_EMAIL}")
+        print(f"🔐 Mot de passe par défaut: {default_password}")
+        print("⚠️  CHANGEZ CE MOT DE PASSE EN PRODUCTION!")
+    else:
+        print(f"✅ Compte propriétaire existe déjà: {OWNER_EMAIL}")
+
 # Enums
 class UserType(str, Enum):
     CLIENT = "client"
