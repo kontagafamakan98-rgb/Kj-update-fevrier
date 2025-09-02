@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePayment } from '../contexts/PaymentContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import CommissionService from '../services/commissionService';
 
 const PaymentSelector = ({ 
   userCountry = 'senegal', 
