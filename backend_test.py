@@ -9,8 +9,10 @@ class KojoAPITester:
         self.base_url = base_url
         self.client_token = None
         self.worker_token = None
+        self.owner_token = None
         self.client_user = None
         self.worker_user = None
+        self.owner_user = None
         self.test_job_id = None
         self.tests_run = 0
         self.tests_passed = 0
