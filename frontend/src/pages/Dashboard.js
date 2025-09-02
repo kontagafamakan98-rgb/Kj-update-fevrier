@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import OwnerService from '../services/ownerService';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
