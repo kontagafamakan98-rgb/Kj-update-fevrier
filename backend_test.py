@@ -2,6 +2,7 @@ import requests
 import sys
 import json
 import io
+import jwt
 from datetime import datetime, timedelta
 
 class KojoAPITester:
