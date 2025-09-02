@@ -99,7 +99,55 @@ const CommissionDashboard = () => {
     }
   };
 
-  return (
+  // Utiliser les stats serveur si disponibles, sinon les stats locales
+  const displayStats = serverStats || stats;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
+          <div className="mt-4 text-orange-600 font-medium">Vérification des accès...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Affichage pour utilisateurs non-propriétaires
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-8">
+            <div className="text-6xl mb-4">🚫</div>
+            <h1 className="text-2xl font-bold text-red-800 mb-4">
+              Accès Interdit
+            </h1>
+            <p className="text-red-700 mb-6">
+              Cette section est réservée exclusivement au propriétaire de l'application.
+            </p>
+            <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-800">
+                <strong>Note de sécurité:</strong> Le tableau de bord des commissions contient des informations 
+                financières sensibles et n'est accessible qu'avec les permissions appropriées.
+              </p>
+            </div>
+            <div className="space-y-2 text-sm text-red-600">
+              <p>👤 Utilisateur connecté: {user?.first_name} {user?.last_name}</p>
+              <p>📧 Email: {user?.email}</p>
+              <p>🔐 Niveau d'accès: Utilisateur standard</p>
+            </div>
+            <button 
+              onClick={() => window.history.back()} 
+              className="mt-6 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              ← Retour
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4">
         
