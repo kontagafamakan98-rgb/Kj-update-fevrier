@@ -946,12 +946,12 @@ class KojoAPITester:
                 token=self.worker_token
             )
         
-        # Test 6: Owner Access to Regular Endpoints
-        print(f"\n🔍 Testing Owner Access to Regular Endpoints...")
+        # Test 6: Famakan Access to Regular Endpoints
+        print(f"\n🔍 Testing Famakan Access to Regular Endpoints...")
         
         if self.owner_token:
             self.run_test(
-                "Owner Profile Access (Should Work)",
+                "Famakan Profile Access (Should Work)",
                 "GET",
                 "users/profile",
                 200,
@@ -959,12 +959,38 @@ class KojoAPITester:
             )
             
             self.run_test(
-                "Owner Jobs Access (Should Work)",
+                "Famakan Jobs Access (Should Work)",
                 "GET",
                 "jobs",
                 200,
                 token=self.owner_token
             )
+        
+        # Test 7: JWT Token Verification for Famakan
+        print(f"\n🔍 Testing JWT Token Content for Famakan...")
+        if self.owner_token:
+            import jwt
+            try:
+                # Decode without verification to check content (for testing purposes only)
+                decoded = jwt.decode(self.owner_token, options={"verify_signature": False})
+                
+                if decoded.get('sub') == 'famakan_kontaga_master_2024':
+                    print(f"   ✅ JWT contains correct user_id: {decoded.get('sub')}")
+                    self.tests_passed += 1
+                else:
+                    print(f"   ❌ JWT user_id incorrect. Expected: famakan_kontaga_master_2024, Got: {decoded.get('sub')}")
+                
+                if decoded.get('email') == 'kontagamakan@gmail.com':
+                    print(f"   ✅ JWT contains correct email: {decoded.get('email')}")
+                    self.tests_passed += 1
+                else:
+                    print(f"   ❌ JWT email incorrect. Expected: kontagamakan@gmail.com, Got: {decoded.get('email')}")
+                
+                self.tests_run += 2
+                
+            except Exception as e:
+                print(f"   ❌ Failed to decode JWT token: {e}")
+                self.tests_run += 1
 
     def test_owner_account_creation_verification(self):
         """Verify owner account was created on startup"""
