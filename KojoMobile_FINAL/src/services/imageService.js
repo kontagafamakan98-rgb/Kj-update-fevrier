@@ -265,7 +265,7 @@ class ImageService {
       });
 
       // Get the backend URL - you may need to configure this
-      const BACKEND_URL = 'https://profile-photo-fix-1.preview.emergentagent.com'; // Replace with your backend URL
+      const BACKEND_URL = 'https://worker-pay-portal.preview.emergentagent.com'; // Replace with your backend URL
       
       const response = await fetch(`${BACKEND_URL}/api/users/profile-photo`, {
         method: 'POST',
