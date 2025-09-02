@@ -232,7 +232,9 @@ function App() {
       <BrowserRouter>
         <LanguageProvider>
           <AuthProvider>
-            <AppRoutes />
+            <PaymentProvider>
+              <AppRoutes />
+            </PaymentProvider>
           </AuthProvider>
         </LanguageProvider>
       </BrowserRouter>
