@@ -678,7 +678,7 @@ async def get_debug_info(owner_user = Depends(verify_owner_access)):
         }
         
     except Exception as e:
-        logger.error(f"Error getting debug info: {e}")
+        logging.error(f"Error getting debug info: {e}")
         raise HTTPException(status_code=500, detail="Erreur serveur")
 
 @api_router.get("/owner/users-management")
