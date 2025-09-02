@@ -116,8 +116,8 @@ const PaymentDemo = () => {
           <div className="text-sm text-green-800 mb-4">
             <p><strong>Comment ça marche:</strong> Comme chez Uber, chaque paiement est automatiquement divisé:</p>
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li><strong>14%</strong> → Propriétaire de l'application (vous)</li>
-              <li><strong>86%</strong> → Travailleur qui réalise la mission</li>
+              <li><strong>14%</strong> vers Propriétaire de l'application (vous)</li>
+              <li><strong>86%</strong> vers Travailleur qui réalise la mission</li>
               <li>Les transferts sont automatiques vers les comptes préférés</li>
             </ul>
           </div>
