@@ -80,23 +80,23 @@ async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depend
 
 # Fonction pour créer le compte propriétaire s'il n'existe pas
 async def ensure_owner_exists():
-    """Crée le compte propriétaire s'il n'existe pas déjà"""
+    """Crée le compte de Famakan Kontaga Master s'il n'existe pas déjà"""
     existing_owner = await db.users.find_one({"id": OWNER_USER_ID})
     
     if not existing_owner:
-        # Hasher un mot de passe par défaut (à changer en production)
-        default_password = "ChangeThisPassword2024!"
+        # Hasher un mot de passe sécurisé pour Famakan
+        default_password = "FamakanKojo2024@Master!"
         hashed_password = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
         
         owner_data = {
             "id": OWNER_USER_ID,
             "email": OWNER_EMAIL,
             "password_hash": hashed_password.decode('utf-8'),
-            "first_name": "Propriétaire",
-            "last_name": "Kojo",
+            "first_name": "Famakan",
+            "last_name": "Kontaga Master",
             "user_type": "owner",  # Type spécial pour le propriétaire
-            "phone": "+221701234567",
-            "country": "senegal",
+            "phone": "+223701234567",  # Mali
+            "country": "mali",
             "preferred_language": "fr",
             "profile_photo": None,
             "is_verified": True,
@@ -109,16 +109,18 @@ async def ensure_owner_exists():
                 "commission_access",
                 "debug_access", 
                 "admin_access",
-                "full_dashboard_access"
+                "full_dashboard_access",
+                "mobile_test_access",
+                "photo_debug_access"
             ]
         }
         
         await db.users.insert_one(owner_data)
-        print(f"✅ Compte propriétaire créé: {OWNER_EMAIL}")
-        print(f"🔐 Mot de passe par défaut: {default_password}")
-        print("⚠️  CHANGEZ CE MOT DE PASSE EN PRODUCTION!")
+        print(f"✅ Compte Famakan Kontaga Master créé: {OWNER_EMAIL}")
+        print(f"🔐 Mot de passe: {default_password}")
+        print("⚠️  SEUL FAMAKAN KONTAGA MASTER PEUT ACCÉDER AUX FONCTIONNALITÉS SENSIBLES!")
     else:
-        print(f"✅ Compte propriétaire existe déjà: {OWNER_EMAIL}")
+        print(f"✅ Compte Famakan Kontaga Master existe déjà: {OWNER_EMAIL}")
 
 # Enums
 class UserType(str, Enum):
