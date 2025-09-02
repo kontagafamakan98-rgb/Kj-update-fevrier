@@ -373,8 +373,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Profile Photo Management API"
-    - "PWA Profile Photo Management" 
     - "Mobile Push Notifications System"
     - "Mobile Offline Capabilities System"
     - "Mobile Profile Photo Management System"
