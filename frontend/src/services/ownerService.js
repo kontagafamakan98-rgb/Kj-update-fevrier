@@ -139,20 +139,20 @@ class OwnerService {
   }
 
   // Obtenir le statut propriétaire depuis le localStorage
-  isOwnerLoggedIn() {
+  isFamakanLoggedIn() {
     try {
       const token = localStorage.getItem('token');
       if (!token) return false;
 
       // Décoder le token JWT (simple, sans vérification de signature)
       const payload = JSON.parse(atob(token.split('.')[1]));
-      const isOwner = payload.sub === 'owner_kojo_2024' && payload.email === 'proprietaire@kojo.app';
+      const isFamakan = payload.sub === 'famakan_kontaga_master_2024' && payload.email === 'kontagamakan@gmail.com';
       
-      console.log('🔍 Vérification propriétaire:', isOwner ? '✅ PROPRIÉTAIRE' : '👤 Utilisateur normal');
-      return isOwner;
+      console.log('🔍 Vérification Famakan Kontaga Master:', isFamakan ? '✅ FAMAKAN KONTAGA MASTER' : '👤 Utilisateur normal');
+      return isFamakan;
       
     } catch (error) {
-      console.error('Erreur vérification propriétaire:', error);
+      console.error('Erreur vérification Famakan:', error);
       return false;
     }
   }
