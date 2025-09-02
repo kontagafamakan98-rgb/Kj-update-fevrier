@@ -22,6 +22,60 @@ const PaymentDemo = () => {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         
+import React, { useState } from 'react';
+import PaymentSelector, { PaymentSummary, PaymentProcess } from '../components/PaymentSelector';
+import LanguageSelector from '../components/LanguageSelector';
+import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { usePayment } from '../contexts/PaymentContext';
+
+const PaymentDemo = () => {
+  const { t } = useLanguage();
+  const { profile } = useAuth();
+  const { processPaymentWithCommission } = usePayment();
+  const [paymentAmount, setPaymentAmount] = useState(25000); // Increased for better demonstration
+  const [selectedCountry, setSelectedCountry] = useState('senegal');
+  const [showCommissionDemo, setShowCommissionDemo] = useState(false);
+  const [commissionResult, setCommissionResult] = useState(null);
+  const [processing, setProcessing] = useState(false);
+
+  const handlePaymentSuccess = (result) => {
+    alert(`Paiement réussi! Transaction: ${result.transactionId}`);
+  };
+
+  const handlePaymentError = (error) => {
+    alert(`Erreur de paiement: ${error}`);
+  };
+
+  // Démo commission style Uber
+  const simulateUberStylePayment = async () => {
+    setProcessing(true);
+    setCommissionResult(null);
+    
+    try {
+      // Simuler un paiement avec commission automatique
+      const result = await processPaymentWithCommission(
+        paymentAmount,
+        'XOF',
+        'worker_123',
+        'job_uber_demo_456'
+      );
+      
+      setCommissionResult(result);
+    } catch (error) {
+      setCommissionResult({
+        success: false,
+        error: error.message
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        
         {/* Header avec sélecteur de langue */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
@@ -38,10 +92,124 @@ const PaymentDemo = () => {
             <ul className="text-sm text-blue-800 space-y-1">
               <li>✅ Support de l'anglais (English) ajouté</li>
               <li>✅ Méthodes de paiement: Carte bancaire, Orange Money, Wave</li>
+              <li>✅ Système de commission automatique (modèle Uber: 14% propriétaire, 86% travailleur)</li>
               <li>✅ Traductions complètes en 4 langues (FR, EN, WO, BM)</li>
               <li>✅ Sélecteur de pays automatique</li>
             </ul>
           </div>
+        </div>
+
+        {/* Section Commission Uber Style */}
+        <div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-green-900">
+              🚗 Commission Automatique (Modèle Uber)
+            </h2>
+            <button
+              onClick={() => setShowCommissionDemo(!showCommissionDemo)}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              {showCommissionDemo ? 'Masquer' : 'Tester Commission'}
+            </button>
+          </div>
+          
+          <div className="text-sm text-green-800 mb-4">
+            <p><strong>Comment ça marche:</strong> Comme chez Uber, chaque paiement est automatiquement divisé:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li><strong>14%</strong> → Propriétaire de l'application (vous)</li>
+              <li><strong>86%</strong> → Travailleur qui réalise la mission</li>
+              <li>Les transferts sont automatiques vers les comptes préférés</li>
+            </ul>
+          </div>
+
+          {showCommissionDemo && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Configuration montant */}
+                <div className="bg-white p-4 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Montant du service (XOF):
+                  </label>
+                  <input
+                    type="number"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    min="1000"
+                    step="1000"
+                  />
+                </div>
+
+                {/* Calcul automatique */}
+                <div className="bg-white p-4 rounded-lg">
+                  <div className="text-sm">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-gray-600">Montant total:</span>
+                      <span className="font-semibold">{paymentAmount.toLocaleString()} XOF</span>
+                    </div>
+                    <div className="flex justify-between mb-2 text-green-600">
+                      <span>Votre commission (14%):</span>
+                      <span className="font-semibold">{Math.round(paymentAmount * 0.14).toLocaleString()} XOF</span>
+                    </div>
+                    <div className="flex justify-between text-blue-600">
+                      <span>Vers travailleur (86%):</span>
+                      <span className="font-semibold">{Math.round(paymentAmount * 0.86).toLocaleString()} XOF</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bouton test */}
+                <div className="bg-white p-4 rounded-lg flex items-center">
+                  <button
+                    onClick={simulateUberStylePayment}
+                    disabled={processing}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {processing ? '⏳ Traitement...' : '🚀 Simuler Paiement'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Résultat de la commission */}
+              {commissionResult && (
+                <div className={`p-4 rounded-lg ${
+                  commissionResult.success 
+                    ? 'bg-green-100 border border-green-200' 
+                    : 'bg-red-100 border border-red-200'
+                }`}>
+                  {commissionResult.success ? (
+                    <div>
+                      <h3 className="font-semibold text-green-800 mb-2">
+                        ✅ Paiement et Commission Réussis!
+                      </h3>
+                      <div className="text-sm text-green-700 space-y-1">
+                        <p><strong>Transaction ID:</strong> {commissionResult.transactionId}</p>
+                        <p><strong>Message:</strong> {commissionResult.message}</p>
+                        {commissionResult.commission && (
+                          <div className="mt-2 p-2 bg-white rounded">
+                            <p><strong>Détails commission:</strong></p>
+                            <p>• Total: {commissionResult.commission.totalAmount.toLocaleString()} XOF</p>
+                            <p>• Votre part: {commissionResult.commission.ownerCommission.toLocaleString()} XOF (14%)</p>
+                            <p>• Travailleur: {commissionResult.commission.workerAmount.toLocaleString()} XOF (86%)</p>
+                          </div>
+                        )}
+                        <p className="mt-3 text-xs">
+                          🔗 <a href="/commission-dashboard" className="text-green-600 hover:underline">
+                            Voir le tableau de bord des commissions
+                          </a>
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <h3 className="font-semibold text-red-800 mb-2">❌ Erreur de paiement</h3>
+                      <p className="text-sm text-red-700">{commissionResult.error}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
