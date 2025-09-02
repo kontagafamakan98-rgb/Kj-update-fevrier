@@ -258,7 +258,7 @@ export default function Dashboard() {
               <span className="font-medium text-gray-900">{t('messages')}</span>
             </Link>
             
-            {/* Nouveau lien vers la démo */}
+            {/* Nouveau lien vers la démo - Accessible à tous */}
             <Link
               to="/payment-demo"
               className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-gradient-to-r from-orange-50 to-yellow-50"
@@ -270,23 +270,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <span className="font-medium text-gray-900">🌍 Langues & Paiements</span>
-                <p className="text-xs text-gray-500 mt-1">Nouvelle fonctionnalité!</p>
-              </div>
-            </Link>
-            
-            {/* Nouveau lien vers le tableau de bord commission */}
-            <Link
-              to="/commission-dashboard"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-gradient-to-r from-green-50 to-emerald-50"
-            >
-              <div className="p-2 bg-green-100 rounded-lg mr-3">
-                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                </svg>
-              </div>
-              <div>
-                <span className="font-medium text-gray-900">💼 Commission Dashboard</span>
-                <p className="text-xs text-gray-500 mt-1">Modèle Uber - 14% propriétaire!</p>
+                <p className="text-xs text-gray-500 mt-1">Fonctionnalité publique</p>
               </div>
             </Link>
           </div>
