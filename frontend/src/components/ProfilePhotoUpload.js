@@ -60,8 +60,16 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
     setDragActive(false);
   };
 
-  const handleClick = () => {
+  const handleGalleryClick = () => {
     inputRef.current?.click();
+  };
+
+  const handleCameraClick = () => {
+    cameraInputRef.current?.click();
+  };
+
+  const showPhotoOptions = () => {
+    setShowCameraOptions(true);
   };
 
   const handleFileInput = (e) => {
