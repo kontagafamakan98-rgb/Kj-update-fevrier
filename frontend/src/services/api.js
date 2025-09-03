@@ -192,15 +192,24 @@ export const api = {
 };
 
 /**
- * Authentication API endpoints
+ * Authentication API endpoints with intelligent caching
  */
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   registerVerified: (userData) => api.post('/auth/register-verified', userData),
-  logout: () => api.post('/auth/logout'),
-  getProfile: () => api.get('/users/profile'),
-  updateProfile: (data) => api.put('/users/profile', data),
+  logout: () => {
+    // Clear all cache on logout
+    kojoCache.clear();
+    return api.post('/auth/logout');
+  },
+  getProfile: () => api.getWithCache('/users/profile', CACHE_KEYS.USER_PROFILE),
+  updateProfile: async (data) => {
+    const result = await api.put('/users/profile', data);
+    // Update cache with new profile data
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
   changePassword: (data) => api.put('/users/change-password', data),
 };
 
