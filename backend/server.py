@@ -339,7 +339,7 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) 
         if linked_accounts < 1:
             raise HTTPException(
                 status_code=400, 
-                detail="Les clients doivent lier au moins 1 moyen de paiement (Orange Money, Wave ou Carte bancaire)"
+                detail="Les clients doivent lier au moins 1 moyen de paiement (Orange Money, Wave ou Compte bancaire)"
             )
     elif user_type == "worker":
         if linked_accounts < 2:
