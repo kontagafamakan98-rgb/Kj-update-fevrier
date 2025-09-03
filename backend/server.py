@@ -167,6 +167,8 @@ class User(BaseModel):
     preferred_language: Language
     profile_photo: Optional[str] = None
     is_verified: bool = False
+    payment_accounts: Optional[dict] = None
+    payment_accounts_count: int = 0
     rating: float = 0.0
     total_reviews: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
