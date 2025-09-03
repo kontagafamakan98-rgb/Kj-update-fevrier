@@ -214,7 +214,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
               
               <div className="mt-2 flex items-center text-sm text-green-600">
                 <span className="mr-2">✓</span>
-                Photo prête pour l'inscription
+                {t('photoReadyForRegistration')}
               </div>
             </div>
           </div>
