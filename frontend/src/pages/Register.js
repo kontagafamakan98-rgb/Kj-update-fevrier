@@ -106,16 +106,44 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
+        <div className="text-center mb-8">
           <div className="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">
             <span className="text-white text-2xl font-bold">K</span>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
             Créer un compte
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Rejoignez la communauté Kojo en Afrique de l'Ouest
+            Rejoignez la communauté Kojo
           </p>
+          
+          {/* Information sur le processus */}
+          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-center space-x-4 text-sm">
+              <div className="flex items-center">
+                <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                  1
+                </div>
+                <span className="ml-2 text-orange-600 font-medium">Informations personnelles</span>
+              </div>
+              
+              <div className="w-12 h-1 bg-gray-200"></div>
+              
+              <div className="flex items-center">
+                <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
+                  2
+                </div>
+                <span className="ml-2 text-gray-500 font-medium">Comptes de paiement</span>
+              </div>
+            </div>
+            
+            <p className="text-xs text-blue-700 mt-3">
+              {formData.user_type === 'worker' 
+                ? '⚠️ Prochaine étape : Vous devrez lier au minimum 2 moyens de paiement (Orange Money, Wave, Carte bancaire)'
+                : '⚠️ Prochaine étape : Vous devrez lier au moins 1 moyen de paiement (Orange Money, Wave, Carte bancaire)'
+              }
+            </p>
+          </div>
         </div>
         
         <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-md" onSubmit={handleSubmit}>
