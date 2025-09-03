@@ -69,7 +69,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
           {/* Compétences sélectionnées */}
           {formData.worker_specialties && formData.worker_specialties.length > 0 && (
             <div className="mb-3">
-              <p className="text-xs text-blue-700 mb-2">Vos compétences sélectionnées :</p>
+              <p className="text-xs text-blue-700 mb-2">{t('selectedSkills')}</p>
               <div className="flex flex-wrap gap-2">
                 {formData.worker_specialties.map((skill, index) => (
                   <span
