@@ -67,6 +67,8 @@ const translations = {
     cleaning: 'Nettoyage',
     gardening: 'Jardinage',
     tutoring: 'Tutorat',
+    mechanics: 'Mécanique',
+    computing: 'Informatique',
     
     // Payments
     payment: 'Paiement',
