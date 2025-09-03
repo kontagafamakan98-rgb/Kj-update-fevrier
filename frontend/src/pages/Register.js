@@ -186,7 +186,7 @@ export default function Register() {
             {geoLoading ? (
               <div className="flex items-center justify-center py-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                <span className="text-xs text-blue-700">Détection de votre position...</span>
+                <span className="text-xs text-blue-700">{t('detectingLocation')}</span>
               </div>
             ) : detectedCountry ? (
               <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-center">
