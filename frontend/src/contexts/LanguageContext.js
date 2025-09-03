@@ -610,6 +610,17 @@ const translations = {
     pleaseSelectImage: 'Ja sugandi (JPG, PNG, etc.)',
     imageTooLarge: 'Ja ka ka bon 5MB kan',
     errorReadingFile: 'Fili ja kalanni na',
+    
+    // Network Status
+    networkOffline: 'I tɛ sira kan. Fɛɛrɛ dɔw bɛ se ka dogo.',
+    networkPoor: 'Sira saganman ye. Optimisation yɛrɛmali kɛra.',
+    networkModerate: 'Sira caman. Donnew kisi kɛra.',
+    networkGood: 'Sira ɲuman',
+    networkExcellent: 'Sira ka ɲi kosɛbɛ',
+    networkUnknown: 'Sira ko dɔnnen tɛ',
+    networkTipsOffline: '• Baaraw bɛ na synchronisé ni sira seginna\n• Cache kɔnɔ donnew sigilen don',
+    networkTipsPoor: '• Jaw optimisé walasa ka bande passante kisi\n• Temps-réel fɛɛrɛw dalen\n• Cache yɛlɛmanen walasa ka rechargement kɔgɛlɛya',
+    networkTipsModerate: '• Jaw ka dogo\n• Synchronisation fitininba\n• Fɛɛrɛ nafamaw ye priorité ye',
     userType: 'Baarakɛla sugu',
     iAmClient: 'Ne bɛ baara ɲini',
     iAmWorker: 'Ne bɛ baara kɛ',
