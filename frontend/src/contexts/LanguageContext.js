@@ -450,6 +450,17 @@ const translations = {
     pleaseSelectImage: 'Tànn nataal (JPG, PNG, etc.)',
     imageTooLarge: 'Nataal bi gëna am 5MB',
     errorReadingFile: 'Njub ci jàngi file bi',
+    
+    // Network Status
+    networkOffline: 'Amul conexion. Yeneen yëf yi man na ñu gëna yàqu.',
+    networkPoor: 'Conexion bu gëna yàq la gis. Optimization otomatik la ñu def.',
+    networkModerate: 'Conexion bu tolluma la. Natangoo donne yi la ñu def.',
+    networkGood: 'Conexion bu baax',
+    networkExcellent: 'Conexion bu gëna baax',
+    networkUnknown: 'Conexion bi xam ko wuul',
+    networkTipsOffline: '• Liggéey yi dinañu defar ngir conexion bi delloo\n• Donne yi ci cache yi dañuy am',
+    networkTipsPoor: '• Nataal yi optimisé na ngir gërëm bande passante\n• Fonctions temps-réel yi dañuy taxaw\n• Cache bu yàq na ngir wareesul rechargement',
+    networkTipsModerate: '• Nataal yi gëna yàq na\n• Synchronisation mu gëna yàq\n• Priorité ci fonctions essentiels yi',
     userType: 'Sugu jëfkoykat',
     iAmClient: 'Dama soxla sëriñ yi',
     iAmWorker: 'Dama def liggéey',
