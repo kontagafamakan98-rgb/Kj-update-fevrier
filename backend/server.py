@@ -752,7 +752,7 @@ async def delete_profile_photo(current_user: User = Depends(get_current_user)):
     # Update user profile
     await db.users.update_one(
         {"id": current_user.id},
-        {"$set": {"profile_photo": None, "updated_at": datetime.utcnow()}}
+        {"$set": {"profile_photo": None, "updated_at": datetime.now(timezone.utc)}}
     )
     
     return {"message": "Profile photo deleted successfully"}
