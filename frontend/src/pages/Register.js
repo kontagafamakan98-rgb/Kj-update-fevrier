@@ -423,7 +423,7 @@ export default function Register() {
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirmer le mot de passe
+                {t('confirmPassword')}
               </label>
               <input
                 id="confirmPassword"
