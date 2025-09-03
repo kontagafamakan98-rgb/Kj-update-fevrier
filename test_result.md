@@ -398,6 +398,18 @@ frontend:
         agent: "main"
         comment: "Tab and Stack navigation with all screens integrated completed"
 
+  - task: "Dynamic Language Interface Implementation"
+    implemented: false
+    working: "NA"
+    file: "/app/frontend/src/contexts/LanguageContext.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Working on making UI language dynamic based on user selection during registration. Need to complete LanguageContext initialization from localStorage, update Register.js to use translated strings, and ensure RegistrationLanguageSelector properly changes interface language."
+
   - task: "Commission System (Uber Model)"
     implemented: true
     working: true
