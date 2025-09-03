@@ -234,6 +234,23 @@ class UserRegister(BaseModel):
     country: Country
     preferred_language: Language
 
+class PaymentAccount(BaseModel):
+    orange_money: Optional[str] = None  # Numéro de téléphone Orange Money
+    wave: Optional[str] = None         # Numéro de téléphone Wave  
+    bank_card: Optional[str] = None    # Numéro de carte bancaire (masqué)
+    bank_name: Optional[str] = None    # Nom de la banque
+
+class UserWithPayment(BaseModel):
+    email: EmailStr
+    password: str
+    first_name: str
+    last_name: str
+    phone: str
+    user_type: UserType
+    country: Country
+    preferred_language: Language
+    payment_accounts: PaymentAccount
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
