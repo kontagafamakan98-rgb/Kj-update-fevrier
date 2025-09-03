@@ -6,6 +6,7 @@ import {
   getPrimaryLanguageForCountry,
   getLocalLanguageForCountry 
 } from '../services/geolocationService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const RegistrationLanguageSelector = ({ 
   detectedCountry, 
@@ -15,6 +16,7 @@ const RegistrationLanguageSelector = ({
 }) => {
   const [orderedLanguages, setOrderedLanguages] = useState([]);
   const [suggestionMessage, setSuggestionMessage] = useState(null);
+  const { changeLanguage, t } = useLanguage(); // Utiliser le contexte de langue
 
   useEffect(() => {
     if (detectedCountry) {
@@ -27,7 +29,6 @@ const RegistrationLanguageSelector = ({
       setSuggestionMessage(suggestion);
       
       // Si aucune langue n'est sélectionnée, suggérer la langue locale du pays
-      // MAIS garder le français comme langue par défaut de l'interface
       if (!selectedLanguage) {
         const localLang = getLocalLanguageForCountry(detectedCountry);
         console.log(`💬 Suggestion de langue pour ${detectedCountry.nameFrench}: ${localLang}`);
@@ -44,6 +45,12 @@ const RegistrationLanguageSelector = ({
   }, [detectedCountry, selectedLanguage]);
 
   const handleLanguageSelect = (languageCode) => {
+    console.log(`🔄 Changement de langue: ${languageCode}`);
+    
+    // Mettre à jour la langue de l'interface immédiatement
+    changeLanguage(languageCode);
+    
+    // Notifier le parent du changement pour le profil
     onLanguageSelect(languageCode);
   };
 
@@ -52,7 +59,7 @@ const RegistrationLanguageSelector = ({
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
         <div className="flex items-center justify-center">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500 mr-3"></div>
-          <span className="text-gray-600">Détection de votre langue préférée...</span>
+          <span className="text-gray-600">{t('detectingLanguage') || 'Détection de votre langue préférée...'}</span>
         </div>
       </div>
     );
@@ -63,7 +70,7 @@ const RegistrationLanguageSelector = ({
       <div className="flex items-center mb-4">
         <span className="text-2xl mr-3">🗣️</span>
         <h3 className="text-lg font-semibold text-orange-900">
-          Choisissez votre langue préférée
+          {t('choosePreferredLanguage') || 'Choisissez votre langue préférée'}
         </h3>
       </div>
 
@@ -74,7 +81,7 @@ const RegistrationLanguageSelector = ({
             <span className="text-blue-500 text-lg mr-2">💡</span>
             <div className="flex-1">
               <p className="text-sm text-blue-800 font-medium">
-                📍 Basé sur votre position ({detectedCountry.flag} {detectedCountry.nameFrench})
+                📍 {t('basedOnLocation') || 'Basé sur votre position'} ({detectedCountry.flag} {detectedCountry.nameFrench})
               </p>
               <p className="text-xs text-blue-700 mt-1">
                 {suggestionMessage.message}
@@ -87,7 +94,7 @@ const RegistrationLanguageSelector = ({
       {/* Sélection des langues */}
       <div>
         <p className="text-sm text-gray-700 mb-3">
-          <strong>Note :</strong> L'interface restera en français, mais votre langue préférée s'affichera sur votre profil.
+          <strong>{t('languageNote') || 'Note :'}</strong> {t('interfaceWillChange') || 'L\'interface changera selon votre choix et cette langue s\'affichera sur votre profil.'}
         </p>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -134,7 +141,7 @@ const RegistrationLanguageSelector = ({
                   {/* Indicateur pour les langues du pays */}
                   {isCountryLanguage && (
                     <div className="mt-2 text-xs font-medium text-blue-600">
-                      Langue locale
+                      {t('localLanguage') || 'Langue locale'}
                     </div>
                   )}
                 </div>
@@ -151,10 +158,10 @@ const RegistrationLanguageSelector = ({
             <span className="text-green-500 text-lg mr-2">✓</span>
             <div>
               <p className="text-sm font-medium text-green-800">
-                Langue préférée sélectionnée : {AVAILABLE_LANGUAGES[selectedLanguage]?.flag} {AVAILABLE_LANGUAGES[selectedLanguage]?.name}
+                {t('selectedLanguage') || 'Langue sélectionnée'} : {AVAILABLE_LANGUAGES[selectedLanguage]?.flag} {AVAILABLE_LANGUAGES[selectedLanguage]?.name}
               </p>
               <p className="text-xs text-green-700">
-                Cette langue s'affichera sur votre profil public
+                {t('interfaceAndProfileUpdated') || 'Interface et profil mis à jour'}
               </p>
             </div>
           </div>
@@ -166,12 +173,12 @@ const RegistrationLanguageSelector = ({
         <div className="flex items-start">
           <span className="text-yellow-600 text-lg mr-2">ℹ️</span>
           <div className="text-xs text-yellow-800">
-            <p className="font-medium mb-1">À propos de votre sélection :</p>
+            <p className="font-medium mb-1">{t('aboutSelection') || 'À propos de votre sélection :'}</p>
             <ul className="space-y-1">
-              <li>• L'interface Kojo restera toujours en <strong>français</strong> (langue par défaut)</li>
-              <li>• Votre langue préférée apparaîtra sur votre profil public</li>
-              <li>• Les clients pourront voir quelle langue vous parlez couramment</li>
-              <li>• Vous pourrez modifier ce choix plus tard dans vos paramètres</li>
+              <li>• {t('interfaceWillChangeNote') || 'L\'interface Kojo changera selon votre langue choisie'}</li>
+              <li>• {t('languageOnProfile') || 'Votre langue apparaîtra sur votre profil public'}</li>
+              <li>• {t('clientsCanSee') || 'Les clients pourront voir quelle langue vous parlez couramment'}</li>
+              <li>• {t('canModifyLater') || 'Vous pourrez modifier ce choix plus tard dans vos paramètres'}</li>
             </ul>
           </div>
         </div>
