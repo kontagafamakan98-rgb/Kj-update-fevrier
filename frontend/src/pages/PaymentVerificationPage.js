@@ -10,6 +10,7 @@ import { devLog, safeLog } from '../utils/env';
 const PaymentVerificationPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { autoLoginAfterRegistration } = useAuth(); // Ajout de la fonction d'auto-login
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [detectedCountry, setDetectedCountry] = useState(null);
