@@ -145,7 +145,7 @@ export default function Profile() {
 
         {/* Worker Profile Section */}
         {user.user_type === 'worker' && (
-          <div className="px-6 py-6">
+          <div className="px-6 py-6 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Profil travailleur</h2>
             
             {workerProfile ? (
@@ -155,6 +155,16 @@ export default function Profile() {
             )}
           </div>
         )}
+
+        {/* Payment Accounts Section */}
+        <div className="px-6 py-6">
+          <PaymentAccountsManager 
+            onSuccess={() => {
+              setSuccess('Comptes de paiement mis à jour avec succès');
+              setTimeout(() => setSuccess(''), 3000);
+            }}
+          />
+        </div>
       </div>
     </div>
   );
