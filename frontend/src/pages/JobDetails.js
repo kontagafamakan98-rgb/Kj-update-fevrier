@@ -99,7 +99,7 @@ export default function JobDetails() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Back Button */}
-      <button
+      <button aria-label="Bouton action"
         onClick={() => navigate(-1)}
         className="mb-6 flex items-center text-orange-600 hover:text-orange-700"
       >

@@ -53,6 +53,20 @@
     "notification": {
       "icon": "./assets/notification-icon.png",
       "color": "#ea580c"
+    },
+    "description": "Kojo - Plateforme de services à domicile en Afrique de l'Ouest",
+    "keywords": [
+      "services",
+      "emploi",
+      "afrique",
+      "travail",
+      "domicile"
+    ],
+    "privacy": "public",
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 30000
     }
   }
 }

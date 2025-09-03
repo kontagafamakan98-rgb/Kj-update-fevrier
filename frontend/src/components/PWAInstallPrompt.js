@@ -93,7 +93,7 @@ export default function PWAInstallPrompt() {
             </button>
           </div>
         </div>
-        <button
+        <button aria-label="Bouton action"
           onClick={handleDismiss}
           className="flex-shrink-0 text-gray-400 hover:text-gray-500"
         >
