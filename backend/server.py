@@ -339,11 +339,14 @@ def validate_orange_money_number(number: str) -> bool:
     return False
 
 def validate_wave_number(number: str) -> bool:
-    """Valide un numéro Wave"""
-    # Similaire à Orange Money mais principalement Sénégal et Côte d'Ivoire
+    """Valide un numéro Wave - Disponible partout en Afrique de l'Ouest"""
+    # Supprimer les espaces et caractères spéciaux
     clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
     
-    valid_prefixes = ['221', '225']  # Sénégal et Côte d'Ivoire
+    # Wave disponible dans toute l'Afrique de l'Ouest
+    # Mali: +223, Sénégal: +221, Burkina Faso: +226, Côte d'Ivoire: +225
+    # Guinée: +224, Niger: +227, Togo: +228, Bénin: +229, etc.
+    valid_prefixes = ['221', '223', '224', '225', '226', '227', '228', '229']  # Afrique de l'Ouest
     
     if len(clean_number) >= 11:
         prefix = clean_number[:3]
