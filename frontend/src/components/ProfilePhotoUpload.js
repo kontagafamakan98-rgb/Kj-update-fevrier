@@ -148,8 +148,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
                   className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-green-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
                 >
                   <div className="text-3xl mb-2">📷</div>
-                  <div className="text-sm font-medium text-green-900">Prendre une photo</div>
-                  <div className="text-xs text-green-600 mt-1">Utiliser l'appareil photo</div>
+                  <div className="text-sm font-medium text-green-900">{t('takePhoto')}</div>
+                  <div className="text-xs text-green-600 mt-1">{t('useCamera')}</div>
                 </button>
               </div>
 
