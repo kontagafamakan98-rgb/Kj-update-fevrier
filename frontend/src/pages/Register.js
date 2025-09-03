@@ -445,6 +445,14 @@ export default function Register() {
             userType={formData.user_type}
           />
 
+          {/* Sélecteur de langue géolocalisé */}
+          <RegistrationLanguageSelector
+            detectedCountry={detectedCountry}
+            selectedLanguage={userSelectedLanguage}
+            onLanguageSelect={setUserSelectedLanguage}
+            isLoading={geoLoading}
+          />
+
           {/* Champs spécifiques aux travailleurs */}
           {formData.user_type === 'worker' && (
             <WorkerRegistrationFields
