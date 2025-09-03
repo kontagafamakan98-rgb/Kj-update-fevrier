@@ -106,7 +106,13 @@ class GradeSPlusAPITester:
         
         response = self.run_api_call('POST', 'messages', invalid_message, self.client_token, 422)
         success = response and response.status_code == 422
-        self.log_test("MessageCreate Field Validation (Invalid Data Rejected)", success)
+        details = f"Status: {response.status_code if response else 'None'}"
+        if response and response.status_code != 422:
+            try:
+                details += f", Response: {response.json()}"
+            except:
+                details += f", Text: {response.text[:200]}"
+        self.log_test("MessageCreate Field Validation (Invalid Data Rejected)", success, details if not success else "")
 
     def test_production_logging(self):
         """Test 2: Logging Production - Vérification que print() est remplacé par logger"""
