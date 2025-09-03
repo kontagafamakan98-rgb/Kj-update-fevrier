@@ -15,19 +15,51 @@ export default function Register() {
     confirmPassword: '',
     first_name: '',
     last_name: '',
-    phone: '+221 ', // Start with Senegal prefix
+    phone: '+221 ', // Sera mis à jour par la géolocalisation
     user_type: initialUserType,
-    country: 'senegal',
+    country: 'senegal', // Sera mis à jour par la géolocalisation
     preferred_language: 'fr'
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [geoLoading, setGeoLoading] = useState(true);
+  const [detectedCountry, setDetectedCountry] = useState(null);
   
   const { register } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const navigate = useNavigate();
 
   const countries = getCountriesList();
+
+  // Géolocalisation automatique au chargement
+  useEffect(() => {
+    detectUserLocationAndSetDefaults();
+  }, []);
+
+  const detectUserLocationAndSetDefaults = async () => {
+    try {
+      console.log('🌍 Détection automatique du pays de l\'utilisateur...');
+      const country = await detectUserCountry();
+      
+      if (country) {
+        setDetectedCountry(country);
+        console.log(`📍 Pays détecté: ${country.nameFrench} ${country.flag}`);
+        
+        // Mettre à jour automatiquement le pays et le préfixe téléphonique
+        setFormData(prev => ({
+          ...prev,
+          country: country.code,
+          phone: country.phonePrefix + ' '
+        }));
+        
+        console.log(`📱 Préfixe ajusté: ${country.phonePrefix}`);
+      }
+    } catch (error) {
+      console.error('❌ Erreur géolocalisation:', error);
+    } finally {
+      setGeoLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
