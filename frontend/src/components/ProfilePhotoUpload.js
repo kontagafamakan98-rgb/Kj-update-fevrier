@@ -90,7 +90,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
       <div className="flex items-center mb-4">
         <span className="text-2xl mr-3">📸</span>
         <h3 className="text-lg font-semibold text-gray-900">
-          Photo de Profil (Optionnel)
+          {t('profilePhotoOptional')}
         </h3>
       </div>
       
