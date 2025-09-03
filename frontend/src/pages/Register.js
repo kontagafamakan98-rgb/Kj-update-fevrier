@@ -400,7 +400,7 @@ export default function Register() {
                 />
               </div>
               <p className="mt-1 text-sm text-gray-500">
-                Format: {countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase())?.phonePrefix || '+221'} XX XXX XX XX
+                {t('phoneFormat')}: {countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase())?.phonePrefix || '+221'} XX XXX XX XX
               </p>
             </div>
             
