@@ -70,7 +70,7 @@ class NotificationService {
       }
       
       token = (await Notifications.getExpoPushTokenAsync({
-        projectId: 'your-project-id', // Replace with actual project ID
+        projectId: '2b14e26f-a1e7-4ecd-a48a-32b3e5c7ce64', // Kojo Mobile project ID
       })).data;
       
       console.log('Expo push token:', token);
