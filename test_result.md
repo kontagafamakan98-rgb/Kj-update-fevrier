@@ -552,8 +552,7 @@ test_plan:
   current_focus:
     - "Authentication Screens (Login/Register)"
     - "Dashboard Screen"
-  stuck_tasks:
-    - "Mobile Push Notifications System"
+  stuck_tasks: []
   test_all: false
   test_priority: "mobile_backend_integration_complete"
 
