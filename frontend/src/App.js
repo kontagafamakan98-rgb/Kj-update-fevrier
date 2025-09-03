@@ -25,18 +25,7 @@ import CommissionDashboard from './pages/CommissionDashboard';
 import Profile from "./pages/Profile";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-// Configure axios defaults
-axios.defaults.baseURL = API;
-axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Note: Axios configuration moved to /services/api.js for centralized management
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
