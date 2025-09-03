@@ -225,6 +225,20 @@ const translations = {
     // Registration
     createAccount: 'Create Account',
     joinKojoCommunity: 'Join the Kojo community',
+    
+    // Professional Skills
+    professionalInformationWorker: 'Professional Information (Worker)',
+    skillsAndSpecialties: 'Skills and Specialties',
+    selectedSkills: 'Your selected skills:',
+    addCustomSkill: 'Add custom skill',
+    customSkillPlaceholder: 'Your custom skill',
+    add: 'Add',
+    yearsExperience: 'Years of experience',
+    selectExperience: 'Select your experience',
+    beginner: 'Beginner (0-1 year)',
+    hourlyRate: 'Hourly rate (FCFA)',
+    rateExamples: 'Hourly rate examples:',
+    profileInfoNote: 'This information will appear on your public profile',
     userType: 'User Type',
     iAmClient: 'I am looking for services',
     iAmWorker: 'I offer my services',
