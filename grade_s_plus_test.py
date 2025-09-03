@@ -47,17 +47,20 @@ class GradeSPlusAPITester:
 
         try:
             if method == 'GET':
-                response = requests.get(url, headers=headers)
+                response = requests.get(url, headers=headers, timeout=30)
             elif method == 'POST':
-                response = requests.post(url, json=data, headers=headers)
+                response = requests.post(url, json=data, headers=headers, timeout=30)
             elif method == 'PUT':
-                response = requests.put(url, json=data, headers=headers)
+                response = requests.put(url, json=data, headers=headers, timeout=30)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers)
+                response = requests.delete(url, headers=headers, timeout=30)
 
             return response
+        except requests.exceptions.RequestException as e:
+            print(f"❌ API call failed for {method} {endpoint}: {e}")
+            return None
         except Exception as e:
-            print(f"❌ API call failed: {e}")
+            print(f"❌ Unexpected error for {method} {endpoint}: {e}")
             return None
 
     def test_pydantic_models_validation(self):
