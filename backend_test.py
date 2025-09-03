@@ -1263,23 +1263,23 @@ class KojoAPITester:
                 data=test_user_data
             )
         
-        # Invalid Wave number (Mali - not supported)
+        # Invalid Wave number (should fail with invalid prefix)
         invalid_wave_data = {
             "email": f"wave_invalid_{datetime.now().strftime('%H%M%S')}@test.com",
             "password": "TestPass123!",
             "first_name": "Test",
             "last_name": "InvalidWave",
-            "phone": "+223701234567",
+            "phone": "+1234567890",
             "user_type": "client",
-            "country": "mali",
+            "country": "senegal",
             "preferred_language": "fr",
             "payment_accounts": {
-                "wave": "+223701234567"  # Mali not supported for Wave
+                "wave": "+1234567890"  # Invalid prefix (not West African)
             }
         }
         
         self.run_test(
-            "Invalid Wave Number (Mali not supported)",
+            "Invalid Wave Number (Non-West African prefix)",
             "POST",
             "auth/register-verified",
             400,
