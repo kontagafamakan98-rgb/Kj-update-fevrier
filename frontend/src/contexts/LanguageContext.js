@@ -89,7 +89,11 @@ const translations = {
     languageOnProfile: 'Votre langue apparaîtra sur votre profil public',
     clientsCanSee: 'Les clients pourront voir quelle langue vous parlez couramment',
     canModifyLater: 'Vous pourrez modifier ce choix plus tard dans vos paramètres',
-    detectingLanguage: 'Détection de votre langue préférée...'
+    detectingLanguage: 'Détection de votre langue préférée...',
+    
+    // Registration
+    createAccount: 'Créer un compte',
+    joinKojoCommunity: 'Rejoignez la communauté Kojo'
   },
   en: {
     // Navigation
