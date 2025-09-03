@@ -10,6 +10,7 @@ import os
 import logging
 import logging.handlers
 import sys
+import re
 
 # Configure logging for West Africa production
 logging.basicConfig(
