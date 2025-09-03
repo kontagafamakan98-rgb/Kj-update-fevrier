@@ -1,4 +1,4 @@
-import React, { useMemo }, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ProfilePhoto from '../components/ProfilePhoto';
 import { devLog, safeLog } from '../utils/env';
