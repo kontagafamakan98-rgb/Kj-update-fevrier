@@ -617,7 +617,9 @@ export function LanguageProvider({ children }) {
   };
 
   const changeLanguage = (lang) => {
-    console.log(`🔄 Changing interface language to: ${lang}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔄 Changing interface language to: ${lang}`);
+    }
     setCurrentLanguage(lang);
     localStorage.setItem('language', lang);
   };
