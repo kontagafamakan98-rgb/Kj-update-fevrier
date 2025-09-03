@@ -19,7 +19,7 @@ const OfflineIndicator = () => {
 
   const handleSyncPress = async () => {
     if (isOnline) {
-      await syncData();
+      await syncOfflineData();
     }
   };
 
