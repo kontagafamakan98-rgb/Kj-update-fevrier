@@ -242,8 +242,10 @@ const ProfilePhoto = ({
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
   };
 
-  // Debug render info
-  console.log('ProfilePhoto render - Photo:', !!profilePhoto, 'DefaultAvatar:', !!defaultAvatar, 'Loading:', loading);
+  // Debug render info (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('ProfilePhoto render - Photo:', !!profilePhoto, 'DefaultAvatar:', !!defaultAvatar, 'Loading:', loading);
+  }
 
   return (
     <div 
