@@ -1,4 +1,4 @@
-import { devLog, safeLog } from 'env';
+import { devLog, safeLog } from './env';
 
 /**
  * Advanced Caching System for Kojo - Optimized for West African Networks
