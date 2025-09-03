@@ -1454,13 +1454,6 @@ app.add_middleware(
 # Add custom security middleware
 app.add_middleware(WestAfricaSecurityMiddleware)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
 @app.on_event("startup")
 async def startup_event():
     """Initialiser le système au démarrage"""
