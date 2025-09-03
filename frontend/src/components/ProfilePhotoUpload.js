@@ -226,7 +226,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
               onClick={showPhotoOptions}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              📷 Changer la photo
+              📷 {t('changePhoto')}
             </button>
           ) : (
             <div className="space-y-3">
