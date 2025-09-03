@@ -452,7 +452,7 @@ KOJO_PRIORITY_COUNTRIES = {
     # Côte d'Ivoire (+225) - Pays prioritaire
     '225': {
         'country': "Côte d'Ivoire", 
-        'orange_prefixes': ['77', '78', '79'],
+        'orange_prefixes': ['77', '78', '79'],  # Pas de 70 pour Orange Côte d'Ivoire
         'wave_prefixes': ['77', '78', '79', '58', '59'],
         'other_operators': ['58', '59', '48', '49'],  # MTN
         'currency': 'FCFA',
