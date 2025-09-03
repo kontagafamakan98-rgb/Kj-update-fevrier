@@ -1,64 +1,6 @@
 {
   "info": {
-    "name": "Kojo API - MVP Mali/Sénégal",
-    "description": "Collection complète pour tester Kojo (Auth, Demandes, Paiements OM/Wave)",
+    "name": "Kojo API Collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "item": [
-    {
-      "name": "Auth",
-      "item": [
-        {
-          "name": "Inscription Client",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"type\": \"client\",\n  \"nom\": \"Amadou Diallo\",\n  \"email\": \"amadou@example.com\",\n  \"telephone\": \"+22370000001\",\n  \"password\": \"Secret123!\",\n  \"pays\": \"Mali\"\n}"
-            },
-            "url": {"raw": "{{base_url}}/auth/signup"}
-          }
-        },
-        {
-          "name": "Connexion",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {
-              "mode": "raw", 
-              "raw": "{\n  \"email\": \"amadou@example.com\",\n  \"password\": \"Secret123!\"\n}"
-            },
-            "url": {"raw": "{{base_url}}/auth/signin"}
-          }
-        }
-      ]
-    },
-    {
-      "name": "Demandes",
-      "item": [
-        {
-          "name": "Publier Demande",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"titre\": \"Réparation plomberie\",\n  \"description\": \"Fuite dans cuisine\",\n  \"prix_depart\": 25000,\n  \"location\": {\"lat\": 12.6392, \"lon\": -8.0029},\n  \"ville\": \"Bamako\"\n}"
-            },
-            "url": {"raw": "{{base_url}}/demandes"}
-          }
-        }
-      ]
-    },
-    {
-      "name": "Paiements",
-      "item": [
-        {
-          "name": "Paiement Orange Money",
-          "request": {
-            "method": "POST",
-            "header": [{"key": "Content-Type", "value": "application/json"}],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"demande_id\": 1,\n  \"montant\": 25000,\n  \"devise\": \"XOF\",\n  \"methode\": \"orange_money\",\n  
+  }
+}
