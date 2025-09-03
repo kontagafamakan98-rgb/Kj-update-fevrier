@@ -1768,6 +1768,368 @@ class KojoAPITester:
                 test_case["expected"],
                 data=test_user_data
             )
+
+    def test_mechanic_requirements_system(self):
+        """Test the new mechanic requirements system for jobs"""
+        print("\n" + "="*50)
+        print("TESTING MECHANIC REQUIREMENTS SYSTEM")
+        print("="*50)
+        
+        if not self.client_token:
+            print("❌ Skipping mechanic requirements tests - no client token")
+            return
+            
+        # Test 1: Create job with mechanic_must_bring_parts = true
+        print(f"\n🔍 Testing Job Creation with mechanic_must_bring_parts = true...")
+        job_with_parts_data = {
+            "title": "Réparation Moteur Voiture",
+            "description": "Besoin de réparer le moteur de ma voiture Toyota",
+            "category": "automotive",
+            "budget_min": 150000.0,
+            "budget_max": 250000.0,
+            "location": {
+                "address": "Bamako, Mali",
+                "latitude": 12.6392,
+                "longitude": -8.0029
+            },
+            "required_skills": ["mécanique automobile", "diagnostic moteur"],
+            "estimated_duration": "4-6 heures",
+            "mechanic_must_bring_parts": True,
+            "mechanic_must_bring_tools": False,
+            "parts_and_tools_notes": "Le mécanicien doit apporter les pièces de rechange nécessaires"
+        }
+        
+        success, response = self.run_test(
+            "Create Job with mechanic_must_bring_parts = true",
+            "POST",
+            "jobs",
+            200,
+            data=job_with_parts_data,
+            token=self.client_token
+        )
+        
+        job_with_parts_id = None
+        if success and 'id' in response:
+            job_with_parts_id = response['id']
+            print(f"   Job ID: {job_with_parts_id}")
+            
+            # Verify the mechanic requirements fields are properly set
+            if (response.get('mechanic_must_bring_parts') == True and
+                response.get('mechanic_must_bring_tools') == False and
+                response.get('parts_and_tools_notes') == "Le mécanicien doit apporter les pièces de rechange nécessaires"):
+                print("   ✅ Mechanic requirements fields properly set in response")
+                self.tests_passed += 1
+            else:
+                print("   ❌ Mechanic requirements fields not properly set in response")
+            self.tests_run += 1
+        
+        # Test 2: Create job with mechanic_must_bring_tools = true
+        print(f"\n🔍 Testing Job Creation with mechanic_must_bring_tools = true...")
+        job_with_tools_data = {
+            "title": "Installation Plomberie Salle de Bain",
+            "description": "Installation complète de la plomberie pour nouvelle salle de bain",
+            "category": "plumbing",
+            "budget_min": 200000.0,
+            "budget_max": 350000.0,
+            "location": {
+                "address": "Dakar, Sénégal",
+                "latitude": 14.6937,
+                "longitude": -17.4441
+            },
+            "required_skills": ["plomberie", "installation sanitaire"],
+            "estimated_duration": "2-3 jours",
+            "mechanic_must_bring_parts": False,
+            "mechanic_must_bring_tools": True,
+            "parts_and_tools_notes": "Apporter tous les outils spécialisés pour plomberie"
+        }
+        
+        success, response = self.run_test(
+            "Create Job with mechanic_must_bring_tools = true",
+            "POST",
+            "jobs",
+            200,
+            data=job_with_tools_data,
+            token=self.client_token
+        )
+        
+        job_with_tools_id = None
+        if success and 'id' in response:
+            job_with_tools_id = response['id']
+            print(f"   Job ID: {job_with_tools_id}")
+            
+            # Verify the mechanic requirements fields
+            if (response.get('mechanic_must_bring_parts') == False and
+                response.get('mechanic_must_bring_tools') == True and
+                response.get('parts_and_tools_notes') == "Apporter tous les outils spécialisés pour plomberie"):
+                print("   ✅ Mechanic requirements fields properly set in response")
+                self.tests_passed += 1
+            else:
+                print("   ❌ Mechanic requirements fields not properly set in response")
+            self.tests_run += 1
+        
+        # Test 3: Create job with both mechanic requirements = true
+        print(f"\n🔍 Testing Job Creation with both mechanic requirements = true...")
+        job_with_both_data = {
+            "title": "Réparation Électrique Complète",
+            "description": "Réparation complète du système électrique de la maison",
+            "category": "electrical",
+            "budget_min": 300000.0,
+            "budget_max": 500000.0,
+            "location": {
+                "address": "Ouagadougou, Burkina Faso",
+                "latitude": 12.3714,
+                "longitude": -1.5197
+            },
+            "required_skills": ["électricité", "câblage", "diagnostic électrique"],
+            "estimated_duration": "1 semaine",
+            "mechanic_must_bring_parts": True,
+            "mechanic_must_bring_tools": True,
+            "parts_and_tools_notes": "Apporter tous les câbles, disjoncteurs et outils électriques nécessaires"
+        }
+        
+        success, response = self.run_test(
+            "Create Job with both mechanic requirements = true",
+            "POST",
+            "jobs",
+            200,
+            data=job_with_both_data,
+            token=self.client_token
+        )
+        
+        job_with_both_id = None
+        if success and 'id' in response:
+            job_with_both_id = response['id']
+            print(f"   Job ID: {job_with_both_id}")
+            
+            # Verify both requirements are true
+            if (response.get('mechanic_must_bring_parts') == True and
+                response.get('mechanic_must_bring_tools') == True and
+                response.get('parts_and_tools_notes') == "Apporter tous les câbles, disjoncteurs et outils électriques nécessaires"):
+                print("   ✅ Both mechanic requirements properly set to true")
+                self.tests_passed += 1
+            else:
+                print("   ❌ Both mechanic requirements not properly set")
+            self.tests_run += 1
+        
+        # Test 4: Create job without specifying mechanic requirements (should default to false)
+        print(f"\n🔍 Testing Job Creation without mechanic requirements (should default to false)...")
+        job_default_data = {
+            "title": "Nettoyage Général Maison",
+            "description": "Nettoyage complet de la maison après travaux",
+            "category": "cleaning",
+            "budget_min": 50000.0,
+            "budget_max": 100000.0,
+            "location": {
+                "address": "Abidjan, Côte d'Ivoire",
+                "latitude": 5.3600,
+                "longitude": -4.0083
+            },
+            "required_skills": ["nettoyage", "organisation"],
+            "estimated_duration": "1 jour"
+            # Note: No mechanic requirements specified
+        }
+        
+        success, response = self.run_test(
+            "Create Job without mechanic requirements (defaults)",
+            "POST",
+            "jobs",
+            200,
+            data=job_default_data,
+            token=self.client_token
+        )
+        
+        job_default_id = None
+        if success and 'id' in response:
+            job_default_id = response['id']
+            print(f"   Job ID: {job_default_id}")
+            
+            # Verify defaults are false and notes is None/empty
+            if (response.get('mechanic_must_bring_parts') == False and
+                response.get('mechanic_must_bring_tools') == False and
+                (response.get('parts_and_tools_notes') is None or response.get('parts_and_tools_notes') == "")):
+                print("   ✅ Mechanic requirements properly defaulted to false")
+                self.tests_passed += 1
+            else:
+                print("   ❌ Mechanic requirements not properly defaulted")
+                print(f"      parts: {response.get('mechanic_must_bring_parts')}")
+                print(f"      tools: {response.get('mechanic_must_bring_tools')}")
+                print(f"      notes: {response.get('parts_and_tools_notes')}")
+            self.tests_run += 1
+        
+        # Test 5: Create job with only parts_and_tools_notes (no boolean flags)
+        print(f"\n🔍 Testing Job Creation with only parts_and_tools_notes...")
+        job_notes_only_data = {
+            "title": "Réparation Climatisation",
+            "description": "Réparation et maintenance du système de climatisation",
+            "category": "hvac",
+            "budget_min": 100000.0,
+            "budget_max": 200000.0,
+            "location": {
+                "address": "Niamey, Niger",
+                "latitude": 13.5116,
+                "longitude": 2.1254
+            },
+            "required_skills": ["climatisation", "réfrigération"],
+            "estimated_duration": "2-3 heures",
+            "parts_and_tools_notes": "Vérifier l'état du compresseur avant intervention"
+        }
+        
+        success, response = self.run_test(
+            "Create Job with only parts_and_tools_notes",
+            "POST",
+            "jobs",
+            200,
+            data=job_notes_only_data,
+            token=self.client_token
+        )
+        
+        job_notes_only_id = None
+        if success and 'id' in response:
+            job_notes_only_id = response['id']
+            print(f"   Job ID: {job_notes_only_id}")
+            
+            # Verify booleans default to false but notes are preserved
+            if (response.get('mechanic_must_bring_parts') == False and
+                response.get('mechanic_must_bring_tools') == False and
+                response.get('parts_and_tools_notes') == "Vérifier l'état du compresseur avant intervention"):
+                print("   ✅ Notes preserved with boolean defaults")
+                self.tests_passed += 1
+            else:
+                print("   ❌ Notes or defaults not properly handled")
+            self.tests_run += 1
+        
+        # Test 6: Get all jobs and verify mechanic requirements are included
+        print(f"\n🔍 Testing GET /api/jobs includes mechanic requirements...")
+        success, response = self.run_test(
+            "Get All Jobs (Check Mechanic Requirements)",
+            "GET",
+            "jobs",
+            200,
+            token=self.client_token
+        )
+        
+        if success and isinstance(response, list) and len(response) > 0:
+            # Check if our created jobs are in the list and have mechanic requirements
+            jobs_with_requirements = []
+            for job in response:
+                if 'mechanic_must_bring_parts' in job and 'mechanic_must_bring_tools' in job:
+                    jobs_with_requirements.append(job)
+            
+            if len(jobs_with_requirements) >= 4:  # We created at least 4 jobs with requirements
+                print(f"   ✅ Found {len(jobs_with_requirements)} jobs with mechanic requirements fields")
+                self.tests_passed += 1
+            else:
+                print(f"   ❌ Only found {len(jobs_with_requirements)} jobs with mechanic requirements fields")
+            self.tests_run += 1
+        
+        # Test 7: Get specific job and verify mechanic requirements
+        if job_with_both_id:
+            print(f"\n🔍 Testing GET /api/jobs/{{job_id}} includes mechanic requirements...")
+            success, response = self.run_test(
+                "Get Specific Job (Check Mechanic Requirements)",
+                "GET",
+                f"jobs/{job_with_both_id}",
+                200,
+                token=self.client_token
+            )
+            
+            if success and response:
+                if (response.get('mechanic_must_bring_parts') == True and
+                    response.get('mechanic_must_bring_tools') == True and
+                    'parts_and_tools_notes' in response):
+                    print("   ✅ Specific job includes all mechanic requirements fields")
+                    self.tests_passed += 1
+                else:
+                    print("   ❌ Specific job missing mechanic requirements fields")
+                self.tests_run += 1
+        
+        # Test 8: Test validation - parts_and_tools_notes with very long text
+        print(f"\n🔍 Testing parts_and_tools_notes with long text...")
+        long_notes = "A" * 1000  # 1000 character string
+        job_long_notes_data = {
+            "title": "Test Long Notes",
+            "description": "Test job with very long parts and tools notes",
+            "category": "test",
+            "budget_min": 10000.0,
+            "budget_max": 20000.0,
+            "location": {
+                "address": "Test Location",
+                "latitude": 0.0,
+                "longitude": 0.0
+            },
+            "mechanic_must_bring_parts": True,
+            "mechanic_must_bring_tools": True,
+            "parts_and_tools_notes": long_notes
+        }
+        
+        success, response = self.run_test(
+            "Create Job with Long parts_and_tools_notes",
+            "POST",
+            "jobs",
+            200,  # Should accept long text
+            data=job_long_notes_data,
+            token=self.client_token
+        )
+        
+        if success and response:
+            if response.get('parts_and_tools_notes') == long_notes:
+                print("   ✅ Long parts_and_tools_notes accepted and stored correctly")
+                self.tests_passed += 1
+            else:
+                print("   ❌ Long parts_and_tools_notes not stored correctly")
+            self.tests_run += 1
+        
+        # Test 9: Test database integration - verify fields are stored in MongoDB
+        print(f"\n🔍 Testing Database Integration (MongoDB Storage)...")
+        if job_with_parts_id:
+            # Get the job again to ensure it's properly stored and retrieved
+            success, response = self.run_test(
+                "Verify Database Storage (Re-fetch Job)",
+                "GET",
+                f"jobs/{job_with_parts_id}",
+                200,
+                token=self.client_token
+            )
+            
+            if success and response:
+                stored_parts = response.get('mechanic_must_bring_parts')
+                stored_tools = response.get('mechanic_must_bring_tools')
+                stored_notes = response.get('parts_and_tools_notes')
+                
+                if (stored_parts == True and 
+                    stored_tools == False and 
+                    stored_notes == "Le mécanicien doit apporter les pièces de rechange nécessaires"):
+                    print("   ✅ Mechanic requirements properly stored and retrieved from database")
+                    self.tests_passed += 1
+                else:
+                    print("   ❌ Mechanic requirements not properly stored in database")
+                    print(f"      Expected: parts=True, tools=False, notes='Le mécanicien...'")
+                    print(f"      Got: parts={stored_parts}, tools={stored_tools}, notes='{stored_notes}'")
+                self.tests_run += 1
+        
+        # Test 10: Test backward compatibility - ensure existing jobs still work
+        print(f"\n🔍 Testing Backward Compatibility...")
+        if self.test_job_id:  # This should be a job created earlier without mechanic requirements
+            success, response = self.run_test(
+                "Get Existing Job (Backward Compatibility)",
+                "GET",
+                f"jobs/{self.test_job_id}",
+                200,
+                token=self.client_token
+            )
+            
+            if success and response:
+                # Should have the new fields with default values
+                if ('mechanic_must_bring_parts' in response and 
+                    'mechanic_must_bring_tools' in response and
+                    response.get('mechanic_must_bring_parts') == False and
+                    response.get('mechanic_must_bring_tools') == False):
+                    print("   ✅ Existing jobs maintain backward compatibility with default values")
+                    self.tests_passed += 1
+                else:
+                    print("   ❌ Existing jobs not backward compatible")
+                self.tests_run += 1
+
     def run_all_tests(self):
         """Run all tests in sequence"""
         print("🚀 Starting Kojo API Tests")
