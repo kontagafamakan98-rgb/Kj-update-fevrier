@@ -1410,7 +1410,7 @@ WEST_AFRICA_ORIGINS = [
     "http://localhost:3000",  # Development
     "https://localhost:3000",  # Development HTTPS
     "http://127.0.0.1:3000",   # Local development
-    "https://kojo-mobile-pro.preview.emergentagent.com",  # Production
+    "https://kojo-native.preview.emergentagent.com",  # Production
     # Add common West African mobile network proxy IPs
     "http://192.168.*",  # Local networks
     "http://10.*",       # Private networks
