@@ -1,4 +1,4 @@
-import { devLog, safeLog } from 'env';
+import { devLog, safeLog } from './env';
 
 // PWA utility functions
 
