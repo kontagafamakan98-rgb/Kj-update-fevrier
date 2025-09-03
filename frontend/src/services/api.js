@@ -5,6 +5,8 @@
 
 import axios from 'axios';
 import { devLog, safeLog } from '../utils/env';
+import kojoCache, { CACHE_KEYS } from '../utils/cache';
+import networkOptimizer from '../utils/networkOptimizer';
 
 // Get backend URL from environment
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
