@@ -304,12 +304,11 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) 
         linked_accounts += 1
         account_details['wave'] = payment_accounts.wave
     
-    if payment_accounts.bank_card:
-        if not validate_bank_card(payment_accounts.bank_card):
-            raise HTTPException(status_code=400, detail="Numéro de carte bancaire invalide")
+    if payment_accounts.bank_account:
+        if not validate_bank_account(payment_accounts.bank_account):
+            raise HTTPException(status_code=400, detail="Informations de compte bancaire invalides")
         linked_accounts += 1
-        account_details['bank_card'] = mask_bank_card(payment_accounts.bank_card)
-        account_details['bank_name'] = payment_accounts.bank_name or 'Banque non spécifiée'
+        account_details['bank_account'] = mask_bank_account_info(payment_accounts.bank_account)
     
     # Validation selon le type d'utilisateur
     if user_type == "client":
