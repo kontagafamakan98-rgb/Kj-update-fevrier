@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) => {
   const [showSkillInput, setShowSkillInput] = useState(false);
   const [newSkill, setNewSkill] = useState('');
+  const { t } = useLanguage();
 
   // Compétences prédéfinies par catégorie
   const predefinedSkills = {
