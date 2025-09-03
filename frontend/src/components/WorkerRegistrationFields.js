@@ -151,7 +151,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
                 onClick={() => setShowSkillInput(true)}
                 className="text-sm text-blue-600 hover:text-blue-700 flex items-center"
               >
-                + Ajouter une compétence personnalisée
+                + {t('addCustomSkill')}
               </button>
             )}
           </div>
