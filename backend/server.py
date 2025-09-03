@@ -927,6 +927,101 @@ async def update_commission_settings(
         logging.error(f"Error updating commission settings: {e}")
         raise HTTPException(status_code=500, detail="Erreur serveur")
 
+@api_router.get("/users/payment-accounts")
+async def get_user_payment_accounts(current_user: User = Depends(get_current_user)):
+    """Obtenir les comptes de paiement de l'utilisateur connecté"""
+    
+    user_data = await db.users.find_one({"id": current_user.id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "user_id": current_user.id,
+        "user_type": user_data["user_type"],
+        "payment_accounts": user_data.get("payment_accounts", {}),
+        "payment_accounts_count": user_data.get("payment_accounts_count", 0),
+        "is_verified": user_data.get("is_verified", False),
+        "minimum_required": 2 if user_data["user_type"] == "worker" else 1
+    }
+
+@api_router.put("/users/payment-accounts")
+async def update_user_payment_accounts(
+    payment_data: PaymentAccount,
+    current_user: User = Depends(get_current_user)
+):
+    """Mettre à jour les comptes de paiement de l'utilisateur"""
+    
+    user_data = await db.users.find_one({"id": current_user.id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Valider les nouveaux comptes de paiement
+    try:
+        payment_validation = validate_payment_accounts(payment_data, user_data["user_type"])
+    except HTTPException as e:
+        raise e
+    
+    # Mettre à jour en base de données
+    await db.users.update_one(
+        {"id": current_user.id},
+        {
+            "$set": {
+                "payment_accounts": payment_validation["account_details"],
+                "payment_accounts_count": payment_validation["linked_accounts_count"],
+                "is_verified": payment_validation["is_verified"],
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        }
+    )
+    
+    return {
+        "message": "Comptes de paiement mis à jour avec succès",
+        "payment_verification": {
+            "linked_accounts": payment_validation["linked_accounts_count"],
+            "required_minimum": 2 if user_data["user_type"] == "worker" else 1,
+            "is_verified": payment_validation["is_verified"],
+            "accounts": payment_validation["account_details"]
+        }
+    }
+
+@api_router.post("/users/verify-payment-access")
+async def verify_payment_access(current_user: User = Depends(get_current_user)):
+    """Vérifier si l'utilisateur peut accéder aux fonctionnalités de paiement"""
+    
+    user_data = await db.users.find_one({"id": current_user.id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    payment_count = user_data.get("payment_accounts_count", 0)
+    user_type = user_data["user_type"]
+    is_verified = user_data.get("is_verified", False)
+    
+    # Vérifier les conditions d'accès
+    if user_type == "client" and payment_count < 1:
+        return {
+            "access_granted": False,
+            "message": "Les clients doivent lier au moins 1 moyen de paiement",
+            "required_minimum": 1,
+            "current_count": payment_count,
+            "user_type": user_type
+        }
+    elif user_type == "worker" and payment_count < 2:
+        return {
+            "access_granted": False,
+            "message": "Les travailleurs doivent lier au minimum 2 moyens de paiement",
+            "required_minimum": 2,
+            "current_count": payment_count,
+            "user_type": user_type
+        }
+    
+    return {
+        "access_granted": True,
+        "message": "Accès autorisé aux fonctionnalités de paiement",
+        "is_verified": is_verified,
+        "payment_accounts_count": payment_count,
+        "user_type": user_type
+    }
+
 # ============================================================================
 
 # Include the router in the main app
