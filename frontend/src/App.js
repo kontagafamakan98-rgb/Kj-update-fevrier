@@ -26,7 +26,6 @@ import PaymentDemo from './pages/PaymentDemo';
 import PaymentVerificationPage from './pages/PaymentVerificationPage';
 import CommissionDashboard from './pages/CommissionDashboard';
 import Profile from "./pages/Profile";
-import TestInfo from "./pages/TestInfo";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
 // Note: Axios configuration moved to /services/api.js for centralized management
