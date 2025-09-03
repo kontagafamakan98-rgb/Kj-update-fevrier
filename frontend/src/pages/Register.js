@@ -341,7 +341,7 @@ export default function Register() {
               
               <div>
                 <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nom
+                  {t('lastName')}
                 </label>
                 <input
                   id="last_name"
