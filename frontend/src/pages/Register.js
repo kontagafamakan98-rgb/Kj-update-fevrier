@@ -291,10 +291,10 @@ export default function Register() {
             {/* Country Selection */}
             <div>
               <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
-                Pays
+                {t('country')}
                 {detectedCountry && (
                   <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    📍 Détecté automatiquement
+                    📍 {t('detectedAutomatically')}
                   </span>
                 )}
               </label>
