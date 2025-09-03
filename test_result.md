@@ -454,12 +454,12 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Orange Money Prefix 90 Validation Complete"
-    - "All 4 Priority Countries Support Prefix 90"
-    - "Backend Ready for West Africa Launch"
+    - "Extension des préfixes Orange Money et Wave de 70 à 99"
+    - "Validation complète pour tous les 4 pays prioritaires"
+    - "Test de compatibilité avec nouvelles gammes de préfixes"
   stuck_tasks: []
   test_all: false
-  test_priority: "prefix_90_validation_complete"
+  test_priority: "prefix_extension_70_99"
 
 agent_communication:
   - agent: "main"
