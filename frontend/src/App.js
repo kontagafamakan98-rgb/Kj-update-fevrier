@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { devLog, safeLog } from 'utils/env';
+import { devLog, safeLog } from './utils/env';
 
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
