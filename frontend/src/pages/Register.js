@@ -200,7 +200,7 @@ export default function Register() {
             ) : (
               <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-center">
                 <p className="text-xs text-yellow-700">
-                  📍 Position non détectée - Utilisation des paramètres par défaut (Sénégal)
+                  📍 {t('positionNotDetected')}
                 </p>
               </div>
             )}
