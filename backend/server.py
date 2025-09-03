@@ -26,7 +26,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("kojo_backend")
 from pathlib import Path
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr, validator, validator
 from typing import List, Optional
 import uuid
 from datetime import datetime, timedelta, timezone
