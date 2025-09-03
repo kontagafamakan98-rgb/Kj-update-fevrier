@@ -900,3 +900,98 @@ export const COUNTRIES = Object.entries(PRECISE_GEOGRAPHIC_DATABASE).reduce((acc
   };
   return acc;
 }, {});
+
+export const getCountriesList = () => {
+  return Object.entries(PRECISE_GEOGRAPHIC_DATABASE).map(([code, data]) => ({
+    code,
+    name: data.country,
+    nameFrench: data.nameFrench,
+    flag: data.flag,
+    phonePrefix: data.phonePrefix,
+    currency: data.currency,
+    language: data.language
+  }));
+};
+
+export const getCountryByCode = (code) => {
+  const countryData = PRECISE_GEOGRAPHIC_DATABASE[code?.toLowerCase()];
+  if (!countryData) {
+    // Fallback vers Sénégal
+    return {
+      code: 'senegal',
+      name: 'Senegal',
+      nameFrench: 'Sénégal',
+      flag: '🇸🇳',
+      phonePrefix: '+221',
+      currency: 'XOF',
+      language: 'fr'
+    };
+  }
+  
+  return {
+    code,
+    name: countryData.country,
+    nameFrench: countryData.nameFrench,
+    flag: countryData.flag,
+    phonePrefix: countryData.phonePrefix,
+    currency: countryData.currency,
+    language: countryData.language
+  };
+};
+
+export const getPhonePrefixByCountry = (countryCode) => {
+  const country = getCountryByCode(countryCode);
+  return country.phonePrefix;
+};
+
+export const detectCountryFromPhone = (phoneNumber) => {
+  if (!phoneNumber) return null;
+  
+  const cleanPhone = phoneNumber.replace(/\s+/g, '');
+  
+  for (const [code, data] of Object.entries(PRECISE_GEOGRAPHIC_DATABASE)) {
+    if (cleanPhone.startsWith(data.phonePrefix)) {
+      return {
+        code,
+        name: data.country,
+        nameFrench: data.nameFrench,
+        flag: data.flag,
+        phonePrefix: data.phonePrefix,
+        currency: data.currency,
+        language: data.language
+      };
+    }
+  }
+  return null;
+};
+
+export const formatPhoneNumber = (phone, countryCode) => {
+  if (!phone) return '';
+  
+  const country = getCountryByCode(countryCode);
+  const cleanPhone = phone.replace(/[^\d]/g, '');
+  
+  // Si le numéro commence déjà par le préfixe, on le retourne tel quel
+  if (phone.startsWith(country.phonePrefix)) {
+    return phone;
+  }
+  
+  // Si le numéro commence par 0, on le remplace par le préfixe
+  if (cleanPhone.startsWith('0')) {
+    return country.phonePrefix + ' ' + cleanPhone.substring(1);
+  }
+  
+  // Sinon on ajoute juste le préfixe
+  return country.phonePrefix + ' ' + cleanPhone;
+};
+
+export const getPhoneExampleForCountry = (country) => {
+  const examples = {
+    'mali': '+223 70 12 34 56',
+    'senegal': '+221 70 12 34 56',
+    'burkina_faso': '+226 70 12 34 56',
+    'cote_divoire': '+225 07 12 34 56'
+  };
+  
+  return examples[country?.code] || examples['senegal'];
+};
