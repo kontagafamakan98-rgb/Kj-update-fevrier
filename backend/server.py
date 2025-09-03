@@ -541,7 +541,7 @@ async def register_user_verified(user_data: UserWithPayment):
             elif user_data.profile_photo_base64.startswith('data:image/webp'):
                 file_extension = "webp"
                 
-            filename = f"profile_{user_id}_{int(datetime.utcnow().timestamp())}.{file_extension}"
+            filename = f"profile_{user_id}_{int(datetime.now(timezone.utc).timestamp())}.{file_extension}"
             profile_photo_path = f"/uploads/profile_photos/{filename}"  # Absolute path for URL
             
             # Sauvegarder l'image (utiliser path relatif pour filesystem)
