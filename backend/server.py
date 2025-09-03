@@ -283,7 +283,7 @@ class JobProposal(BaseModel):
     proposed_amount: float = Field(ge=0.0, le=10000000.0)  # Valid amount range
     estimated_completion_time: str = Field(min_length=1, max_length=100)  # Time estimate
     message: str = Field(min_length=10, max_length=2000)  # Proposal message
-    status: str = Field(default="pending", regex=r'^(pending|accepted|rejected)$')  # Valid statuses only
+    status: str = Field(default="pending", pattern=r'^(pending|accepted|rejected)$')  # Valid statuses only
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Message(BaseModel):
