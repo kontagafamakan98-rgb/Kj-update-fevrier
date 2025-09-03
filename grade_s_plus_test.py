@@ -77,7 +77,13 @@ class GradeSPlusAPITester:
         
         response = self.run_api_call('POST', 'jobs', invalid_job_data, self.client_token, 422)
         success = response and response.status_code == 422
-        self.log_test("JobCreate Field Validation (Invalid Data Rejected)", success)
+        details = f"Status: {response.status_code if response else 'None'}"
+        if response and response.status_code != 422:
+            try:
+                details += f", Response: {response.json()}"
+            except:
+                details += f", Text: {response.text[:200]}"
+        self.log_test("JobCreate Field Validation (Invalid Data Rejected)", success, details if not success else "")
         
         # Test ProposalCreate model validation
         invalid_proposal = {
