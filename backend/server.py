@@ -359,19 +359,25 @@ class UserLogin(BaseModel):
     password: str
 
 class JobCreate(BaseModel):
-    title: str
-    description: str
-    category: str
-    budget_min: float
-    budget_max: float
-    location: dict
-    required_skills: List[str] = []
-    estimated_duration: Optional[str] = None
+    title: str = Field(min_length=5, max_length=200)
+    description: str = Field(min_length=20, max_length=5000)
+    category: str = Field(min_length=3, max_length=50)
+    budget_min: float = Field(ge=0.0, le=10000000.0)
+    budget_max: float = Field(ge=0.0, le=10000000.0)
+    location: dict = Field(min_items=1, max_items=10)
+    required_skills: List[str] = Field(default=[], max_items=20)
+    estimated_duration: Optional[str] = Field(None, max_length=100)
     deadline: Optional[datetime] = None
-    # Nouvelles informations pour mécaniciens
+    # Nouvelles informations pour mécaniciens avec validation
     mechanic_must_bring_parts: bool = False
     mechanic_must_bring_tools: bool = False
-    parts_and_tools_notes: Optional[str] = None
+    parts_and_tools_notes: Optional[str] = Field(None, max_length=1000)
+    
+    @validator('budget_max')
+    def budget_max_must_be_greater_than_min(cls, v, values):
+        if 'budget_min' in values and v < values['budget_min']:
+            raise ValueError('budget_max must be greater than or equal to budget_min')
+        return v
 
 class ProposalCreate(BaseModel):
     proposed_amount: float
