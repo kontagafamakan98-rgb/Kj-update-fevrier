@@ -388,63 +388,43 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) 
         "is_verified": True
     }
 
-# Comprehensive West Africa Mobile Number Validation
-WEST_AFRICA_MOBILE_VALIDATION = {
-    # Sénégal (+221)
+# Mobile Number Validation - 4 PAYS PRIORITAIRES KOJO
+KOJO_PRIORITY_COUNTRIES = {
+    # Sénégal (+221) - Pays principal
     '221': {
         'country': 'Sénégal',
         'orange_prefixes': ['77', '78', '70'],
         'wave_prefixes': ['77', '78', '70', '76', '75'],
-        'other_operators': ['76', '75', '33']  # Tigo, Expresso
+        'other_operators': ['76', '75', '33'],  # Tigo, Expresso
+        'currency': 'FCFA',
+        'primary_language': 'français'
     },
-    # Mali (+223)  
+    # Mali (+223) - Pays prioritaire  
     '223': {
         'country': 'Mali',
         'orange_prefixes': ['77', '78', '79'],
         'wave_prefixes': ['77', '78', '79', '65', '66'],
-        'other_operators': ['65', '66', '67', '68']  # Malitel
+        'other_operators': ['65', '66', '67', '68'],  # Malitel
+        'currency': 'FCFA',
+        'primary_language': 'français'
     },
-    # Guinée (+224)
-    '224': {
-        'country': 'Guinée',
-        'orange_prefixes': ['62', '64', '65'],
-        'wave_prefixes': ['62', '64', '65', '66'],
-        'other_operators': ['66', '67']
-    },
-    # Côte d'Ivoire (+225)
+    # Côte d'Ivoire (+225) - Pays prioritaire
     '225': {
         'country': "Côte d'Ivoire", 
         'orange_prefixes': ['77', '78', '79'],
         'wave_prefixes': ['77', '78', '79', '58', '59'],
-        'other_operators': ['58', '59', '48', '49']  # MTN
+        'other_operators': ['58', '59', '48', '49'],  # MTN
+        'currency': 'FCFA',
+        'primary_language': 'français'
     },
-    # Burkina Faso (+226)
+    # Burkina Faso (+226) - Pays prioritaire
     '226': {
         'country': 'Burkina Faso',
         'orange_prefixes': ['77', '78'],
         'wave_prefixes': ['77', '78', '70', '71'], 
-        'other_operators': ['70', '71', '51', '52']  # Telmob
-    },
-    # Niger (+227)
-    '227': {
-        'country': 'Niger',
-        'orange_prefixes': ['77', '78'],
-        'wave_prefixes': ['77', '78', '80', '81'],
-        'other_operators': ['80', '81', '82']
-    },
-    # Togo (+228)
-    '228': {
-        'country': 'Togo',
-        'orange_prefixes': ['77', '78'],
-        'wave_prefixes': ['77', '78', '90', '91'],
-        'other_operators': ['90', '91', '92']  # Moov
-    },
-    # Bénin (+229)
-    '229': {
-        'country': 'Bénin',
-        'orange_prefixes': ['77', '78'],
-        'wave_prefixes': ['77', '78', '95', '96'],
-        'other_operators': ['95', '96', '97']  # MTN
+        'other_operators': ['70', '71', '51', '52'],  # Telmob
+        'currency': 'FCFA',
+        'primary_language': 'français'
     }
 }
 
@@ -458,8 +438,8 @@ def validate_orange_money_number(number: str) -> bool:
     country_code = clean_number[:3]
     operator_prefix = clean_number[3:5]
     
-    if country_code in WEST_AFRICA_MOBILE_VALIDATION:
-        valid_prefixes = WEST_AFRICA_MOBILE_VALIDATION[country_code]['orange_prefixes']
+    if country_code in KOJO_PRIORITY_COUNTRIES:
+        valid_prefixes = KOJO_PRIORITY_COUNTRIES[country_code]['orange_prefixes']
         return operator_prefix in valid_prefixes
     
     return False
