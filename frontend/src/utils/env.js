@@ -13,19 +13,19 @@ export const isProduction = process.env.NODE_ENV === 'production';
 export const devLog = {
   log: (...args) => {
     if (isDevelopment) {
-      devLog.info(...args);
+      console.log(...args);
     }
   },
   
   error: (...args) => {
     if (isDevelopment) {
-      safeLog.error(...args);
+      console.error(...args);
     }
   },
   
   warn: (...args) => {
     if (isDevelopment) {
-      safeLog.warn(...args);
+      console.warn(...args);
     }
   },
   
