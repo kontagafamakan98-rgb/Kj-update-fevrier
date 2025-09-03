@@ -230,6 +230,21 @@ backend:
         agent: "testing"
         comment: "🎉 ENHANCED PAYMENT ACCOUNT VERIFICATION SYSTEM FULLY TESTED AND WORKING - ALL NEW FEATURES CONFIRMED: (1) WAVE EXPANSION ACROSS ALL WEST AFRICA: Wave validation now working perfectly for ALL 8 West African countries - Senegal (+221), Mali (+223), Guinea (+224), Ivory Coast (+225), Burkina Faso (+226), Niger (+227), Togo (+228), and Benin (+229). This is a MAJOR EXPANSION from previous 2-country limitation, (2) BANK ACCOUNT VALIDATION (NEW): Complete replacement of bank card system with comprehensive bank account validation - requires account_number (min 8 digits), bank_name (min 3 chars), account_holder (min 2 chars), optional bank_code and branch fields. All validation scenarios tested and working, (3) BANK ACCOUNT MASKING: Account numbers properly masked in responses (****1234 format) for security, (4) UPDATED REGISTRATION ENDPOINT: POST /api/auth/register-verified working with new bank_account structure, proper validation for all payment types, (5) VALIDATION FUNCTIONS: validate_bank_account() and mask_bank_account_info() functions working perfectly, all existing Orange Money validation preserved, (6) INTEGRATION TESTING: All 117/117 comprehensive tests passed including 40+ new enhanced validation tests. French error messages working correctly. Backward compatibility maintained. The enhanced payment verification system is production-ready with full West African Wave support and secure bank account management."
 
+  - task: "ValidationError Handling Fix - 'Unexpected token I, Internal S...' Error Resolution"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "CORRECTION DÉFINITIVE APPLIQUÉE: Fixed ValidationError handling in register_user_verified endpoint to prevent 'Unexpected token I, Internal S...' error. Added comprehensive try/catch for ValidationError with French error messages, global endpoint try/catch wrapper, proper 422 JSON responses instead of 500 HTML errors, robust phone validation with cleanup, and structured logging."
+      - working: true
+        agent: "testing"
+        comment: "🎉 CORRECTION DÉFINITIVEMENT VALIDÉE - ERREUR 'Unexpected token I, Internal S...' COMPLÈTEMENT ÉLIMINÉE! Conducted comprehensive testing of all ValidationError scenarios with PERFECT results (10/10 validation tests passed - 100% success rate). VERIFIED CORRECTIONS: (1) ✅ NOMS TROP COURTS: first_name='a', last_name='b' now returns JSON 422 with French message 'Le prénom doit contenir au moins 2 caractères' instead of HTML 500, (2) ✅ FORMATS TÉLÉPHONE INVALIDES: phone without '+', too short, too long, with letters all return JSON 422 with proper French error messages instead of HTML 500, (3) ✅ ERREURS PYDANTIC DIVERSES: All Pydantic validation errors now properly handled and return structured JSON 422 responses, (4) ✅ INSCRIPTIONS VALIDES: Normal registrations still work perfectly and return JSON 200 with access tokens, (5) ✅ MESSAGES FRANÇAIS: All error messages are in French and informative ('Le prénom doit contenir au moins 2 caractères', 'Le numéro de téléphone n'est pas au bon format'), (6) ✅ EMAIL EXISTANT: Duplicate email returns JSON 400 'Cette adresse email est déjà utilisée' instead of HTML 500, (7) ✅ GESTION GLOBALE: Fixed HTTPException re-raising to prevent outer exception handler from converting 422 to 500. The 'Unexpected token I, Internal S...' error is DÉFINITIVEMENT eliminated and replaced with proper JSON responses with informative French error messages. All backend validation now returns proper JSON instead of HTML errors."
+
 frontend:
   - task: "Extension des préfixes Orange Money et Wave de 70 à 99"
     implemented: true
