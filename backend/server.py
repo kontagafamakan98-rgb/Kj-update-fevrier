@@ -673,7 +673,7 @@ async def update_profile(
     # Remove fields that shouldn't be updated via this endpoint
     forbidden_fields = {"id", "email", "password_hash", "created_at"}
     update_data = {k: v for k, v in user_data.items() if k not in forbidden_fields}
-    update_data["updated_at"] = datetime.utcnow()
+    update_data["updated_at"] = datetime.now(timezone.utc)
     
     await db.users.update_one(
         {"id": current_user.id},
