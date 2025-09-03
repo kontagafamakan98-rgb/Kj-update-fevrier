@@ -159,7 +159,6 @@ function AppRoutes() {
               <CommissionDashboard />
             </ProtectedRoute>
           } />
-          <Route path="/test-info" element={<TestInfo />} />
         </Routes>
       </main>
       
