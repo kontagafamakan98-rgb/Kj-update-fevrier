@@ -342,7 +342,10 @@ export default function Register() {
                   type="tel"
                   required
                   className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="77 123 45 67"
+                  placeholder={detectedCountry ? 
+                    getPhoneExampleForCountry(detectedCountry).replace(/^\+\d{3}\s*/, '') : 
+                    "77 123 45 67"
+                  }
                   value={formData.phone.replace(/^\+\d{3}\s*/, '')}
                   onChange={(e) => {
                     const currentCountry = countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase());
