@@ -1402,7 +1402,7 @@ logger = logging.getLogger(__name__)
 @app.on_event("startup")
 async def startup_event():
     """Initialiser le système au démarrage"""
-    print("🚀 Démarrage de l'API Kojo...")
+    logger.info("🚀 Démarrage de l'API Kojo...")
     
     # Créer le compte propriétaire s'il n'existe pas
     await ensure_owner_exists()
