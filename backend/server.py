@@ -174,13 +174,15 @@ class User(BaseModel):
 
 class WorkerProfile(BaseModel):
     user_id: str
-    specialties: List[str]
-    experience_years: int
-    hourly_rate: float
+    specialties: List[str] = []  # Compétences et spécialités
+    experience_years: int = 0    # Années d'expérience
+    hourly_rate: float = 0.0     # Tarif horaire en FCFA
     cv_file: Optional[str] = None
     portfolio_images: List[str] = []
     availability: bool = True
     description: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
