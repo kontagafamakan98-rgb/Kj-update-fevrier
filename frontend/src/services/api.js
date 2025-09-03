@@ -67,12 +67,39 @@ apiClient.interceptors.response.use(
   (error) => {
     const { response, config } = error;
     
+    // Enhanced error handling for non-JSON responses
+    let errorMessage = error.message;
+    let errorData = null;
+    
+    if (response) {
+      // Try to parse JSON response
+      try {
+        errorData = response.data;
+        if (typeof errorData === 'string') {
+          // Handle cases where server returns HTML or plain text errors
+          if (errorData.startsWith('<!DOCTYPE') || errorData.includes('<html>')) {
+            errorMessage = `Erreur serveur (${response.status}): Page d'erreur reçue`;
+            errorData = { detail: errorMessage };
+          } else if (errorData.includes('Internal Server Error')) {
+            errorMessage = `Erreur serveur interne (${response.status})`;
+            errorData = { detail: errorMessage };
+          } else {
+            errorData = { detail: errorData };
+          }
+        }
+      } catch (parseError) {
+        // Response is not JSON
+        errorMessage = `Erreur de format de réponse (${response.status})`;
+        errorData = { detail: errorMessage };
+      }
+    }
+    
     // Log error details
     safeLog.error(`❌ API Error: ${config?.method?.toUpperCase()} ${config?.url}`, {
       status: response?.status,
       statusText: response?.statusText,
-      data: response?.data,
-      message: error.message
+      data: errorData,
+      message: errorMessage
     });
     
     // Handle 401 Unauthorized - logout user
@@ -89,9 +116,20 @@ apiClient.interceptors.response.use(
     // Handle network errors
     if (!response) {
       safeLog.error('❌ Network Error: Unable to reach server');
+      errorData = { detail: 'Impossible de contacter le serveur. Vérifiez votre connexion internet.' };
     }
     
-    return Promise.reject(error);
+    // Create a better error object
+    const enhancedError = {
+      ...error,
+      response: response ? {
+        ...response,
+        data: errorData
+      } : null,
+      message: errorMessage
+    };
+    
+    return Promise.reject(enhancedError);
   }
 );
 
