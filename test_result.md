@@ -547,13 +547,12 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Mobile Push Notifications System"
-    - "Mobile Offline Capabilities System"
     - "Authentication Screens (Login/Register)"
     - "Dashboard Screen"
-  stuck_tasks: []
+  stuck_tasks:
+    - "Mobile Push Notifications System"
   test_all: false
-  test_priority: "ultra_precise_geolocation_complete"
+  test_priority: "mobile_backend_integration_complete"
 
 agent_communication:
   - agent: "main"
