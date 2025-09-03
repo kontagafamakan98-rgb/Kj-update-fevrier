@@ -1786,6 +1786,7 @@ class KojoAPITester:
             self.test_profile_photo_management()  # Added profile photo tests
             self.test_worker_profile()
             self.test_job_management()
+            self.test_mechanic_requirements_system()  # NEW: Test mechanic requirements
             self.test_job_proposals()
             self.test_messaging()
             self.test_unauthorized_access()
