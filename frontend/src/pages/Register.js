@@ -47,19 +47,22 @@ export default function Register() {
       return;
     }
 
+    // Préparer les données utilisateur
     const userData = {
       ...formData,
       preferred_language: currentLanguage
     };
     delete userData.confirmPassword;
 
-    const result = await register(userData);
+    // Au lieu de finaliser l'inscription, rediriger vers la vérification des comptes de paiement
+    console.log('📝 Redirection vers vérification des comptes de paiement...');
     
-    if (result.success) {
-      navigate('/dashboard');
-    } else {
-      setError(result.error);
-    }
+    // Passer les données à la page de vérification
+    navigate('/payment-verification', {
+      state: {
+        userData: userData
+      }
+    });
     
     setLoading(false);
   };
