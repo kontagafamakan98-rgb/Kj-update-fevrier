@@ -248,31 +248,72 @@ class OfflineService {
 
   // Process job application from offline queue
   async processJobApplication(request) {
-    // This would integrate with your API service
-    console.log('Processing offline job application:', request.data);
-    // const result = await api.post('/jobs/applications', request.data);
-    return { success: true }; // Simulated success
+    try {
+      console.log('Processing offline job application:', request.data);
+      const api = require('./api').default;
+      const result = await api.post('/jobs/applications', request.data);
+      console.log('Job application processed successfully:', result.data);
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Failed to process job application:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Process message send from offline queue
   async processMessageSend(request) {
-    console.log('Processing offline message:', request.data);
-    // const result = await api.post('/messages', request.data);
-    return { success: true }; // Simulated success
+    try {
+      console.log('Processing offline message:', request.data);
+      const api = require('./api').default;
+      const result = await api.post('/messages', request.data);
+      console.log('Message sent successfully:', result.data);
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Process profile update from offline queue
   async processProfileUpdate(request) {
-    console.log('Processing offline profile update:', request.data);
-    // const result = await api.put('/users/profile', request.data);
-    return { success: true }; // Simulated success
+    try {
+      console.log('Processing offline profile update:', request.data);
+      const api = require('./api').default;
+      const result = await api.put('/users/profile', request.data);
+      console.log('Profile updated successfully:', result.data);
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Process photo upload from offline queue
   async processPhotoUpload(request) {
-    console.log('Processing offline photo upload:', request.data);
-    // const result = await api.post('/users/profile-photo', request.data);
-    return { success: true }; // Simulated success
+    try {
+      console.log('Processing offline photo upload:', request.data);
+      const api = require('./api').default;
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', {
+        uri: request.data.uri,
+        type: request.data.type || 'image/jpeg',
+        name: request.data.fileName || 'profile.jpg'
+      });
+      
+      const result = await api.post('/users/profile-photo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      console.log('Photo uploaded successfully:', result.data);
+      return { success: true, data: result.data };
+    } catch (error) {
+      console.error('Failed to upload photo:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Save offline queue to storage
