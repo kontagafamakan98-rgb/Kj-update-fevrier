@@ -242,7 +242,22 @@ const translations = {
     bankCard: 'Kart bank',
     orangeMoney: 'Orange Money',
     wave: 'Wave',
-    selectPayment: 'Tànn fey'
+    selectPayment: 'Tànn fey',
+    
+    // Language Selection
+    choosePreferredLanguage: 'Tann sa làkk bu baax',
+    basedOnLocation: 'Ci sa bàcc mi',
+    languageNote: 'Teerukaay:',
+    interfaceWillChange: 'Interface bi dina soppi ak sa tann ak làkk bii dina mel ci sa profil.',
+    localLanguage: 'Làkk bu dekk bi',
+    selectedLanguage: 'Làkk bu tann',
+    interfaceAndProfileUpdated: 'Interface ak profil yi soppi na',
+    aboutSelection: 'Ci sa tann bi:',
+    interfaceWillChangeNote: 'Interface Kojo bi dina soppi ak sa làkk',
+    languageOnProfile: 'Sa làkk dina mel ci sa profil bu xam',
+    clientsCanSee: 'Kiliyaan yi man na ko xam làkk bu nga xam',
+    canModifyLater: 'Man nga ko soppi ci sa paramètres yi',
+    detectingLanguage: 'Daa ngi gis sa làkk...'
   },
   bm: {
     // Navigation (Bambara)
