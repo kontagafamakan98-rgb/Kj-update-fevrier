@@ -9,6 +9,7 @@ import Navbar from "./components/Navbar";
 import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
+import NetworkStatus from "./components/NetworkStatus";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
