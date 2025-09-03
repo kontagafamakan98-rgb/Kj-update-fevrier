@@ -281,6 +281,10 @@ class JobCreate(BaseModel):
     required_skills: List[str] = []
     estimated_duration: Optional[str] = None
     deadline: Optional[datetime] = None
+    # Nouvelles informations pour mécaniciens
+    mechanic_must_bring_parts: bool = False
+    mechanic_must_bring_tools: bool = False
+    parts_and_tools_notes: Optional[str] = None
 
 class ProposalCreate(BaseModel):
     proposed_amount: float
