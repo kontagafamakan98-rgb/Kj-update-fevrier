@@ -505,12 +505,12 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Extension des préfixes Orange Money et Wave de 70 à 99"
-    - "Validation complète pour tous les 4 pays prioritaires"
-    - "Test de compatibilité avec nouvelles gammes de préfixes"
+    - "Validation des numéros de téléphone avec espaces, tirets et parenthèses - COMPLETE"
+    - "Extension des préfixes Orange Money et Wave de 70 à 99 - COMPLETE"
+    - "Validation complète pour tous les 4 pays prioritaires - COMPLETE"
   stuck_tasks: []
   test_all: false
-  test_priority: "prefix_extension_70_99"
+  test_priority: "phone_validation_urgent_correction_complete"
 
 agent_communication:
   - agent: "main"
