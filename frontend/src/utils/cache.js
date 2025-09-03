@@ -313,6 +313,7 @@ export const CACHE_KEYS = {
   USER_PROFILE: 'user_profile',
   USER_JOBS: 'user_jobs',
   AVAILABLE_JOBS: 'available_jobs',
+  AVAILABLE_WORKERS: 'available_workers',
   CONVERSATIONS: 'conversations',
   PAYMENT_ACCOUNTS: 'payment_accounts',
   APP_CONFIG: 'app_config',
