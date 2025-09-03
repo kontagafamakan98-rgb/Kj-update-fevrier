@@ -20,12 +20,17 @@ export default function Register() {
     phone: '+221 ', // Sera mis à jour par la géolocalisation
     user_type: initialUserType,
     country: 'senegal', // Sera mis à jour par la géolocalisation
-    preferred_language: 'fr'
+    preferred_language: 'fr',
+    // Champs spécifiques aux travailleurs
+    worker_specialties: [],
+    worker_experience_years: null,
+    worker_hourly_rate: null
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(true);
   const [detectedCountry, setDetectedCountry] = useState(null);
+  const [profilePhoto, setProfilePhoto] = useState(null);
   
   const { register } = useAuth();
   const { t, currentLanguage } = useLanguage();
