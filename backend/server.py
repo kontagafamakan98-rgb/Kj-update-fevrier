@@ -842,6 +842,9 @@ async def register_user_verified(user_data: UserWithPayment):
         
         return response_data
 
+    except HTTPException:
+        # Re-raise HTTPException (comme les erreurs de validation 422)
+        raise
     except Exception as e:
         # Gestion globale des erreurs non capturées
         logger.error(f"❌ Erreur inattendue lors de l'inscription: {str(e)}")
