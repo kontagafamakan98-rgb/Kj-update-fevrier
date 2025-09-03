@@ -433,6 +433,9 @@ frontend:
       - working: "NA"
         agent: "main"
         comment: "IMPLEMENTED: Complete push notification system with expo-notifications integration. Created NotificationService with push token registration, local/scheduled notifications, permission management, and notification handlers. Added notification types for jobs, messages, and status updates. Integrated with NotificationContext for app-wide access. Added NotificationSettingsScreen for user control."
+      - working: "NA"
+        agent: "main"
+        comment: "ENHANCED: Fixed import issues in OfflineIndicator and NotificationSettingsScreen components. Integrated NotificationService with backend API for push token registration. Updated project ID configuration for Expo push notifications. Added proper error handling and fallback mechanisms for offline token storage."
 
   - task: "Mobile Offline Capabilities System"
     implemented: true
