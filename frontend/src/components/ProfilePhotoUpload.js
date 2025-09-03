@@ -208,7 +208,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
                   onClick={removePhoto}
                   className="text-red-600 hover:text-red-700 text-sm font-medium"
                 >
-                  Supprimer
+                  {t('remove')}
                 </button>
               </div>
               
