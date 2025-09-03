@@ -73,7 +73,7 @@ export default function Register() {
     setLoading(true);
     setError('');
 
-    // Validation
+    // Validation de base
     if (formData.password !== formData.confirmPassword) {
       setError('Les mots de passe ne correspondent pas');
       setLoading(false);
@@ -86,14 +86,37 @@ export default function Register() {
       return;
     }
 
+    // Validation spécifique aux travailleurs
+    if (formData.user_type === 'worker') {
+      if (!formData.worker_specialties || formData.worker_specialties.length === 0) {
+        setError('Les travailleurs doivent sélectionner au moins une compétence');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.worker_experience_years) {
+        setError('Veuillez indiquer vos années d\'expérience');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.worker_hourly_rate || formData.worker_hourly_rate < 500) {
+        setError('Veuillez indiquer un tarif horaire valide (minimum 500 FCFA)');
+        setLoading(false);
+        return;
+      }
+    }
+
     // Préparer les données utilisateur
     const userData = {
       ...formData,
-      preferred_language: currentLanguage
+      preferred_language: currentLanguage,
+      // Ajouter la photo si sélectionnée
+      profile_photo_base64: profilePhoto?.base64 || null
     };
     delete userData.confirmPassword;
 
-    // Au lieu de finaliser l'inscription, rediriger vers la vérification des comptes de paiement
+    // Rediriger vers la vérification des comptes de paiement
     console.log('📝 Redirection vers vérification des comptes de paiement...');
     
     // Passer les données à la page de vérification
