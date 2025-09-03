@@ -225,8 +225,8 @@ export default function Register() {
             
             <p className="text-xs text-blue-700 mt-3">
               {formData.user_type === 'worker' 
-                ? '⚠️ Prochaine étape : Vous devrez lier au minimum 2 moyens de paiement (Orange Money, Wave, Compte bancaire)'
-                : '⚠️ Prochaine étape : Vous devrez lier au moins 1 moyen de paiement (Orange Money, Wave, Compte bancaire)'
+                ? `⚠️ ${t('nextStepWorker')}`
+                : `⚠️ ${t('nextStepClient')}`
               }
             </p>
           </div>
