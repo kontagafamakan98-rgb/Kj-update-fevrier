@@ -243,7 +243,7 @@ export default function Register() {
             {/* User Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                Type d'utilisateur
+                {t('userType')}
               </label>
               <div className="grid grid-cols-2 gap-4">
                 <label className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
