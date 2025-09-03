@@ -225,10 +225,25 @@ class User(BaseModel):
     password_hash: str = Field(min_length=60, max_length=100)  # bcrypt hash length
     first_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9]+$', description="Prénom")
     last_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9]+$', description="Nom de famille")
-    phone: str = Field(pattern=r'^\+\d{1,4}\d{8,12}$')  # International format
+    phone: str = Field(description="Numéro de téléphone international")
     user_type: UserType
     country: Country
     preferred_language: Language
+    
+    @validator('phone')
+    def validate_phone(cls, v):
+        """Nettoie et valide le numéro de téléphone"""
+        if not v:
+            raise ValueError("Le numéro de téléphone est requis")
+        
+        # Nettoyer le numéro - supprimer espaces, tirets, parenthèses
+        clean_phone = re.sub(r'[\s\-\(\)]', '', v)
+        
+        # Vérifier le format international
+        if not re.match(r'^\+\d{1,4}\d{8,12}$', clean_phone):
+            raise ValueError("Le numéro de téléphone doit être au format international (+XXX...)")
+        
+        return clean_phone
     profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
     is_verified: bool = False
     payment_accounts: Optional[dict] = Field(None, max_items=10)  # Limit payment methods
