@@ -77,13 +77,13 @@ export default function Register() {
 
     // Validation de base
     if (formData.password !== formData.confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
+      setError(t('passwordsDontMatch'));
       setLoading(false);
       return;
     }
 
     if (formData.password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères');
+      setError(t('passwordTooShort'));
       setLoading(false);
       return;
     }
