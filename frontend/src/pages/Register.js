@@ -418,7 +418,7 @@ export default function Register() {
                 value={formData.password}
                 onChange={handleChange}
               />
-              <p className="mt-1 text-xs text-gray-500">Au moins 6 caractères</p>
+              <p className="mt-1 text-xs text-gray-500">{t('atLeast6Characters')}</p>
             </div>
 
             <div>
