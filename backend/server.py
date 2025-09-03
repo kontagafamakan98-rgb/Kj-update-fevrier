@@ -523,9 +523,6 @@ async def register_user_verified(user_data: UserWithPayment):
     if user_data.profile_photo_base64:
         try:
             # Décoder et sauvegarder la photo de profil
-            import base64
-            import os
-            from pathlib import Path
             
             # Créer le dossier profile_photos s'il n'existe pas
             profile_photos_dir = Path("uploads/profile_photos")
