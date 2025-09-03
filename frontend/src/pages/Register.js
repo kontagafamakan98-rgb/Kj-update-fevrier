@@ -482,9 +482,9 @@ export default function Register() {
 
           <div className="text-center">
             <span className="text-sm text-gray-600">
-              Déjà un compte?{' '}
+              {t('alreadyHaveAccount')}{' '}
               <Link to="/login" className="font-medium text-orange-600 hover:text-orange-500 transition-colors">
-                Se connecter
+                {t('signIn')}
               </Link>
             </span>
           </div>
