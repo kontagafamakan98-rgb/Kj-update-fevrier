@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { CountrySelect, getAllCountries } from '../components/CountryDisplay';
 import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
 import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
+import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
