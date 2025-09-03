@@ -549,7 +549,7 @@ async def register_user_verified(user_data: UserWithPayment):
             with open(filesystem_path, "wb") as f:
                 f.write(image_data)
                 
-            print(f"✅ Photo de profil sauvegardée: {profile_photo_path}")
+            print(f"✅ Photo de profil sauvegardée: {filesystem_path} -> URL: {profile_photo_path}")
             
         except Exception as e:
             print(f"⚠️ Erreur sauvegarde photo profil: {e}")
