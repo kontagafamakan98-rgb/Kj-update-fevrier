@@ -706,7 +706,7 @@ async def upload_profile_photo(
     
     # Generate unique filename
     file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
-    filename = f"{current_user.id}_{int(datetime.utcnow().timestamp())}.{file_extension}"
+    filename = f"{current_user.id}_{int(datetime.now(timezone.utc).timestamp())}.{file_extension}"
     file_path = uploads_dir / filename
     
     # Save file
