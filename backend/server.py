@@ -471,19 +471,38 @@ KOJO_PRIORITY_COUNTRIES = {
 
 def validate_orange_money_number(number: str) -> bool:
     """Valide un numéro Orange Money avec précision par pays"""
-    clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
-    
-    if len(clean_number) < 11 or len(clean_number) > 12:
-        return False
-    
-    country_code = clean_number[:3]
-    operator_prefix = clean_number[3:5]
-    
-    if country_code in KOJO_PRIORITY_COUNTRIES:
+    try:
+        if not number or not isinstance(number, str):
+            logger.warning(f"Invalid Orange Money number format: {number}")
+            return False
+            
+        # Nettoyage et validation basique
+        clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
+        
+        if len(clean_number) < 11 or len(clean_number) > 12:
+            logger.info(f"Orange Money number length invalid: {len(clean_number)} digits")
+            return False
+        
+        country_code = clean_number[:3]
+        operator_prefix = clean_number[3:5]
+        
+        if country_code not in KOJO_PRIORITY_COUNTRIES:
+            logger.info(f"Orange Money not supported for country code: {country_code}")
+            return False
+            
         valid_prefixes = KOJO_PRIORITY_COUNTRIES[country_code]['orange_prefixes']
-        return operator_prefix in valid_prefixes
-    
-    return False
+        is_valid = operator_prefix in valid_prefixes
+        
+        if not is_valid:
+            logger.info(f"Invalid Orange Money prefix {operator_prefix} for country {country_code}")
+        else:
+            logger.info(f"Valid Orange Money number validated for {KOJO_PRIORITY_COUNTRIES[country_code]['country']}")
+            
+        return is_valid
+        
+    except Exception as e:
+        logger.error(f"Error validating Orange Money number: {e}")
+        return False
 
 def validate_wave_number(number: str) -> bool:
     """Valide un numéro Wave - 4 pays prioritaires Kojo"""
