@@ -48,12 +48,12 @@ export const devLog = {
  */
 export const safeLog = {
   error: (...args) => {
-    safeLog.error(...args);
+    console.error(...args);
   },
   
   warn: (...args) => {
     if (isDevelopment) {
-      safeLog.warn(...args);
+      console.warn(...args);
     }
   },
   
