@@ -1225,13 +1225,19 @@ class KojoAPITester:
             data=invalid_orange_data
         )
         
-        # Test 6: Wave validation tests
-        print(f"\n🔍 Testing Wave Number Validation...")
+        # Test 6: Wave validation tests - NOW AVAILABLE ACROSS ALL WEST AFRICA
+        print(f"\n🔍 Testing Wave Number Validation - All West African Countries...")
         
-        # Valid Wave numbers (Senegal and Ivory Coast only)
+        # Valid Wave numbers (ALL West African countries now supported)
         valid_wave_tests = [
-            {"wave": "+221701234567", "country": "senegal"},
-            {"wave": "+225701234567", "country": "ivory_coast"}
+            {"wave": "+221701234567", "country": "senegal"},      # Senegal
+            {"wave": "+223701234567", "country": "mali"},         # Mali  
+            {"wave": "+224701234567", "country": "guinea"},       # Guinea
+            {"wave": "+225701234567", "country": "ivory_coast"},  # Ivory Coast
+            {"wave": "+226701234567", "country": "burkina_faso"}, # Burkina Faso
+            {"wave": "+227701234567", "country": "niger"},        # Niger
+            {"wave": "+228701234567", "country": "togo"},         # Togo
+            {"wave": "+229701234567", "country": "benin"}         # Benin
         ]
         
         for i, test_data in enumerate(valid_wave_tests):
