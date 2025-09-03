@@ -21,7 +21,6 @@ import CreateJob from './pages/CreateJob';
 import PhotoTest from './pages/PhotoTest';
 import PaymentDemo from './pages/PaymentDemo';
 import PaymentVerificationPage from './pages/PaymentVerificationPage';
-import PaymentAccountSetup from './components/PaymentAccountSetup';
 import CommissionDashboard from './pages/CommissionDashboard';
 import Profile from "./pages/Profile";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
