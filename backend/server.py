@@ -946,12 +946,28 @@ async def create_job(
     job_data: JobCreate,
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.user_type != UserType.CLIENT:
-        raise HTTPException(status_code=403, detail="Only clients can create jobs")
-    
-    job = Job(**job_data.dict(), client_id=current_user.id)
-    await db.jobs.insert_one(job.dict())
-    return job
+    try:
+        if current_user.user_type != UserType.CLIENT:
+            raise HTTPException(status_code=403, detail="Only clients can create jobs")
+        
+        # Additional validation
+        if job_data.budget_min > job_data.budget_max:
+            raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
+        
+        job = Job(**job_data.dict(), client_id=current_user.id)
+        result = await db.jobs.insert_one(job.dict())
+        
+        if not result.inserted_id:
+            raise HTTPException(status_code=500, detail="Failed to create job")
+            
+        logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
+        return job
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to create job: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error creating job")
 
 @api_router.get("/jobs", response_model=List[Job])
 async def get_jobs(
