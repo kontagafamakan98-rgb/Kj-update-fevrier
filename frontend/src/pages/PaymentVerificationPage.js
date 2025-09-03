@@ -58,26 +58,29 @@ const PaymentVerificationPage = () => {
       );
 
       if (result.success) {
-        // Sauvegarder le token et les données utilisateur
-        localStorage.setItem('token', result.data.access_token);
-        localStorage.setItem('user', JSON.stringify(result.data.user));
+        // Connexion automatique après inscription réussie
+        const autoLoginResult = autoLoginAfterRegistration(result.data.user, result.data.access_token);
         
-        // Sauvegarder le statut de vérification
-        PaymentAccountService.storeVerificationStatus({
-          is_verified: result.data.user.is_verified,
-          payment_accounts_count: result.data.user.payment_accounts_count,
-          user_type: result.data.user.user_type
-        });
+        if (autoLoginResult.success) {
+          devLog.info('🎉 Inscription réussie avec connexion automatique!');
+          
+          // Sauvegarder le statut de vérification
+          PaymentAccountService.storeVerificationStatus({
+            is_verified: result.data.user.is_verified,
+            payment_accounts_count: result.data.user.payment_accounts_count,
+            user_type: result.data.user.user_type
+          });
 
-        devLog.info('🎉 Inscription réussie avec vérification paiement!');
-        
-        // Rediriger vers le dashboard
-        navigate('/dashboard', {
-          state: {
-            message: `Inscription réussie! Votre compte est vérifié avec ${result.data.payment_verification.linked_accounts} moyen(s) de paiement.`,
-            type: 'success'
-          }
-        });
+          // Rediriger vers le dashboard avec message de succès
+          navigate('/dashboard', {
+            state: {
+              message: `Bienvenue ${result.data.user.first_name}! Votre compte est vérifié avec ${result.data.payment_verification.linked_accounts} moyen(s) de paiement.`,
+              type: 'success'
+            }
+          });
+        } else {
+          throw new Error('Erreur lors de la connexion automatique');
+        }
 
       } else {
         throw new Error(result.error);
