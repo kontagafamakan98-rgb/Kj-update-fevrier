@@ -279,6 +279,9 @@ function JobCard({ job, userType }) {
           
           <p className="text-gray-600 mb-4 line-clamp-2">{job.description}</p>
           
+          {/* Affichage des exigences mécanicien */}
+          <MechanicRequirements job={job} showTitle={false} compact={true} />
+          
           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
             <div className="flex items-center">
               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
