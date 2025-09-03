@@ -265,7 +265,7 @@ class ImageService {
       });
 
       // Get the backend URL - you may need to configure this
-      const BACKEND_URL = 'https://kojo-native.preview.emergentagent.com'; // Replace with your backend URL
+      const BACKEND_URL = 'https://precise-geo-app.preview.emergentagent.com'; // Replace with your backend URL
       
       const response = await fetch(`${BACKEND_URL}/api/users/profile-photo`, {
         method: 'POST',
