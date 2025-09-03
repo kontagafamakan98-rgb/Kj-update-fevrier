@@ -278,7 +278,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
 
       {/* Conseils pour une bonne photo */}
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 className="font-medium text-yellow-800 mb-1">💡 Conseils pour une bonne photo</h4>
+        <h4 className="font-medium text-yellow-800 mb-1">💡 {t('tipsGoodPhoto')}</h4>
         <ul className="text-xs text-yellow-700 space-y-1">
           <li>• Utilisez une photo récente et claire</li>
           <li>• Regardez l'objectif et souriez naturellement</li>
