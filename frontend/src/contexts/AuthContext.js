@@ -153,7 +153,8 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
-    loadUser
+    loadUser,
+    autoLoginAfterRegistration
   };
 
   return (
