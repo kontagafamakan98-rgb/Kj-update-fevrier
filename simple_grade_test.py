@@ -7,7 +7,7 @@ import requests
 import json
 
 def test_basic_endpoints():
-    base_url = "https://kojo-mobile-pro.preview.emergentagent.com/api"
+    base_url = "https://kojo-native.preview.emergentagent.com/api"
     
     print("🏆 SIMPLE GRADE S+ TESTING")
     print("=" * 40)
