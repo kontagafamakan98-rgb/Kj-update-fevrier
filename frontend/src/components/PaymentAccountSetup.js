@@ -256,7 +256,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             <span className="text-2xl mr-3">🌊</span>
             <h3 className="text-lg font-semibold text-gray-900">Wave</h3>
             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              Sénégal, Côte d'Ivoire
+              Disponible partout en Afrique de l'Ouest
             </span>
           </div>
           
@@ -264,7 +264,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             type="text"
             value={accounts.wave}
             onChange={(e) => handleInputChange('wave', e.target.value)}
-            placeholder="+221701234567"
+            placeholder={phoneExample}
             className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
               validationErrors.wave ? 'border-red-500' : 'border-gray-300'
             }`}
@@ -274,45 +274,90 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           )}
         </div>
 
-        {/* Carte Bancaire */}
+        {/* Compte Bancaire */}
         <div className="border border-green-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
-            <span className="text-2xl mr-3">💳</span>
-            <h3 className="text-lg font-semibold text-gray-900">Carte Bancaire</h3>
+            <span className="text-2xl mr-3">🏦</span>
+            <h3 className="text-lg font-semibold text-gray-900">Compte Bancaire</h3>
             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-              Visa, Mastercard
+              Pour transferts bancaires
             </span>
           </div>
           
           <div className="space-y-3">
             <input
               type="text"
-              value={accounts.bank_card}
-              onChange={(e) => handleInputChange('bank_card', e.target.value)}
-              placeholder="1234-5678-9012-3456"
-              maxLength="19"
+              value={accounts.bank_account.account_number}
+              onChange={(e) => handleInputChange('bank_account.account_number', e.target.value)}
+              placeholder="Numéro de compte bancaire"
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
-                validationErrors.bank_card ? 'border-red-500' : 'border-gray-300'
+                validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
               }`}
             />
-            {validationErrors.bank_card && (
-              <p className="text-red-500 text-sm mt-1">{validationErrors.bank_card}</p>
-            )}
             
-            {accounts.bank_card && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <input
                 type="text"
-                value={accounts.bank_name}
-                onChange={(e) => handleInputChange('bank_name', e.target.value)}
-                placeholder="Nom de la banque (ex: Banque Atlantique)"
+                value={accounts.bank_account.account_holder}
+                onChange={(e) => handleInputChange('bank_account.account_holder', e.target.value)}
+                placeholder="Nom du titulaire du compte"
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
-                  validationErrors.bank_name ? 'border-red-500' : 'border-gray-300'
+                  validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
+              
+              <select
+                value={accounts.bank_account.bank_name}
+                onChange={(e) => handleInputChange('bank_account.bank_name', e.target.value)}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
+                  validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                <option value="">Sélectionner une banque</option>
+                {popularBanks.map((bank, index) => (
+                  <option key={index} value={bank}>{bank}</option>
+                ))}
+                <option value="autre">Autre banque...</option>
+              </select>
+            </div>
+            
+            {accounts.bank_account.bank_name === 'autre' && (
+              <input
+                type="text"
+                onChange={(e) => handleInputChange('bank_account.bank_name', e.target.value)}
+                placeholder="Nom de votre banque"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
             )}
-            {validationErrors.bank_name && (
-              <p className="text-red-500 text-sm mt-1">{validationErrors.bank_name}</p>
-            )}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={accounts.bank_account.bank_code}
+                onChange={(e) => handleInputChange('bank_account.bank_code', e.target.value)}
+                placeholder="Code banque (optionnel)"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
+              
+              <input
+                type="text"
+                value={accounts.bank_account.branch}
+                onChange={(e) => handleInputChange('bank_account.branch', e.target.value)}
+                placeholder="Agence (optionnel)"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+          
+          {validationErrors.bank_account && (
+            <p className="text-red-500 text-sm mt-1">{validationErrors.bank_account}</p>
+          )}
+          
+          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded text-xs text-green-800">
+            <p><strong>💡 Pourquoi ces informations ?</strong></p>
+            <p>• Numéro de compte, nom du titulaire et banque sont <strong>obligatoires</strong></p>
+            <p>• Code banque et agence sont optionnels mais recommandés</p>
+            <p>• Ces informations permettront les transferts bancaires directs</p>
           </div>
         </div>
 
