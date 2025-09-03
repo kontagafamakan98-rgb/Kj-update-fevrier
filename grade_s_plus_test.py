@@ -18,6 +18,7 @@ class GradeSPlusAPITester:
         self.client_token = None
         self.worker_token = None
         self.owner_token = None
+        self.test_job_id = None
         self.tests_run = 0
         self.tests_passed = 0
         self.test_results = []
