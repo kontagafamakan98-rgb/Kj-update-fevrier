@@ -85,6 +85,25 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Nouvelle fonction pour connexion automatique après inscription
+  const autoLoginAfterRegistration = (userData, token) => {
+    try {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+      
+      // Cache user data
+      kojoCache.set(CACHE_KEYS.USER_PROFILE, userData, 24 * 60 * 60 * 1000); // 24 hours
+      
+      devLog.info('✅ User auto-logged in after registration');
+      return { success: true };
+      
+    } catch (error) {
+      safeLog.error('Auto-login after registration failed:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const register = async (userData) => {
     try {
       const response = await authAPI.register(userData);
