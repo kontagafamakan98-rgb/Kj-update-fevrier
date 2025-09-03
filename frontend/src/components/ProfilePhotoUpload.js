@@ -219,20 +219,58 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
             </div>
           </div>
 
-          {/* Changer la photo */}
-          <button
-            type="button"
-            onClick={showPhotoOptions}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            📷 Changer la photo
-          </button>
+          {/* Options pour changer la photo */}
+          {!showCameraOptions ? (
+            <button
+              type="button"
+              onClick={showPhotoOptions}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              📷 Changer la photo
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={handleGalleryClick}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                >
+                  🖼️ Galerie
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCameraClick}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                >
+                  📷 Caméra
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCameraOptions(false)}
+                className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Annuler
+              </button>
+            </div>
+          )}
           
+          {/* Inputs cachés */}
           <input
             ref={inputRef}
             type="file"
             className="hidden"
             accept="image/*"
+            onChange={handleFileInput}
+          />
+          
+          <input
+            ref={cameraInputRef}
+            type="file"
+            className="hidden"
+            accept="image/*"
+            capture="environment"
             onChange={handleFileInput}
           />
         </div>
