@@ -94,7 +94,8 @@ function AppRoutes() {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      {/* Offline Indicator */}
+      {/* Network Status and Offline Indicator */}
+      <NetworkStatus />
       <OfflineIndicator />
       
 
