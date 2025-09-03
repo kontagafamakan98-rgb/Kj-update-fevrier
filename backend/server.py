@@ -53,9 +53,9 @@ try:
     db = client[db_name]
     
     # Test connection on startup
-    print(f"✅ MongoDB connected to: {db_name}")
+    logger.info(f"✅ MongoDB connected to: {db_name}")
 except Exception as e:
-    print(f"❌ MongoDB connection failed: {e}")
+    logger.error(f"❌ MongoDB connection failed: {e}")
     raise
 
 # JWT Settings - Enhanced Security
