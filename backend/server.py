@@ -511,9 +511,47 @@ async def register_user_verified(user_data: UserWithPayment):
     except HTTPException as e:
         raise e
     
+    # Gérer la photo de profil si fournie
+    profile_photo_path = None
+    user_id = str(uuid.uuid4())  # Generate user ID first
+    
+    if user_data.profile_photo_base64:
+        try:
+            # Décoder et sauvegarder la photo de profil
+            import base64
+            import os
+            from pathlib import Path
+            
+            # Créer le dossier profile_photos s'il n'existe pas
+            profile_photos_dir = Path("uploads/profile_photos")
+            profile_photos_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Décoder l'image base64
+            image_data = base64.b64decode(user_data.profile_photo_base64.split(',')[1] if ',' in user_data.profile_photo_base64 else user_data.profile_photo_base64)
+            
+            # Générer un nom de fichier unique
+            file_extension = "jpg"  # Par défaut
+            if user_data.profile_photo_base64.startswith('data:image/png'):
+                file_extension = "png"
+            elif user_data.profile_photo_base64.startswith('data:image/jpeg'):
+                file_extension = "jpg"
+                
+            filename = f"profile_{user_id}.{file_extension}"
+            profile_photo_path = f"uploads/profile_photos/{filename}"
+            
+            # Sauvegarder l'image
+            with open(profile_photo_path, "wb") as f:
+                f.write(image_data)
+                
+            print(f"✅ Photo de profil sauvegardée: {profile_photo_path}")
+            
+        except Exception as e:
+            print(f"⚠️ Erreur sauvegarde photo profil: {e}")
+            # Continuer sans photo si erreur
+
     # Create user with payment verification
     user = User(
-        id=str(uuid.uuid4()),
+        id=user_id,
         email=user_data.email,
         password_hash=hash_password(user_data.password),
         first_name=user_data.first_name,
@@ -522,6 +560,7 @@ async def register_user_verified(user_data: UserWithPayment):
         user_type=user_data.user_type,
         country=user_data.country,
         preferred_language=user_data.preferred_language,
+        profile_photo=profile_photo_path,  # Ajouter le chemin de la photo
         is_verified=payment_validation["is_verified"],
         payment_accounts=payment_validation["account_details"],
         payment_accounts_count=payment_validation["linked_accounts_count"],
@@ -531,10 +570,30 @@ async def register_user_verified(user_data: UserWithPayment):
     
     await db.users.insert_one(user.dict())
     
+    # Créer le profil travailleur si c'est un travailleur avec des informations supplémentaires
+    worker_profile_created = False
+    if user_data.user_type == "worker" and (
+        user_data.worker_specialties or 
+        user_data.worker_experience_years is not None or 
+        user_data.worker_hourly_rate is not None
+    ):
+        worker_profile = WorkerProfile(
+            user_id=user.id,
+            specialties=user_data.worker_specialties or [],
+            experience_years=user_data.worker_experience_years or 0,
+            hourly_rate=user_data.worker_hourly_rate or 0.0,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        await db.worker_profiles.insert_one(worker_profile.dict())
+        worker_profile_created = True
+        print(f"✅ Profil travailleur créé pour {user.email}")
+    
     # Create access token
     access_token = create_access_token(data={"sub": user.id, "email": user.email})
     
-    return {
+    response_data = {
         "access_token": access_token,
         "token_type": "bearer",
         "user": user.dict(exclude={"password_hash"}),
@@ -545,6 +604,16 @@ async def register_user_verified(user_data: UserWithPayment):
             "message": f"Compte vérifié avec {payment_validation['linked_accounts_count']} moyen(s) de paiement lié(s)"
         }
     }
+    
+    # Ajouter les informations du profil travailleur si créé
+    if worker_profile_created:
+        response_data["worker_profile"] = {
+            "specialties": user_data.worker_specialties or [],
+            "experience_years": user_data.worker_experience_years or 0,
+            "hourly_rate": user_data.worker_hourly_rate or 0.0
+        }
+    
+    return response_data
 
 @api_router.post("/auth/register")
 async def register_user(user_data: UserRegister):
