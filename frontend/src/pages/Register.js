@@ -436,6 +436,23 @@ export default function Register() {
             </div>
           </div>
 
+          {/* Photo de profil pour tous les utilisateurs */}
+          <ProfilePhotoUpload 
+            photoData={profilePhoto}
+            setPhotoData={setProfilePhoto}
+            userType={formData.user_type}
+          />
+
+          {/* Champs spécifiques aux travailleurs */}
+          {formData.user_type === 'worker' && (
+            <WorkerRegistrationFields
+              formData={formData}
+              setFormData={setFormData}
+              errors={{}}
+              setErrors={() => {}}
+            />
+          )}
+
           <div>
             <button
               type="submit"
