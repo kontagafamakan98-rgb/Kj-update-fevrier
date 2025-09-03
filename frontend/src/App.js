@@ -100,6 +100,11 @@ function AppRoutes() {
       <NetworkStatus />
       <OfflineIndicator />
       
+      {/* Test Environment Banner */}
+      <div className="bg-yellow-400 text-black text-center py-2 px-4 text-sm font-medium border-b-2 border-yellow-500">
+        🧪 <strong>VERSION TEST</strong> - Kojo Test App | 
+        <span className="ml-2">🔗 En attente du domaine kojoapptest.app</span>
+      </div>
 
       
       {/* Main Navigation */}
