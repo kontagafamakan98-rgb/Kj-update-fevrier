@@ -221,19 +221,19 @@ class Country(str, Enum):
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
-    password_hash: str
-    first_name: str
-    last_name: str
-    phone: str
+    password_hash: str = Field(min_length=60, max_length=100)  # bcrypt hash length
+    first_name: str = Field(min_length=1, max_length=50, regex=r'^[a-zA-ZÀ-ÿ\s\-\']+$')
+    last_name: str = Field(min_length=1, max_length=50, regex=r'^[a-zA-ZÀ-ÿ\s\-\']+$')
+    phone: str = Field(regex=r'^\+\d{1,4}\d{8,12}$')  # International format
     user_type: UserType
     country: Country
     preferred_language: Language
-    profile_photo: Optional[str] = None
+    profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
     is_verified: bool = False
-    payment_accounts: Optional[dict] = None
-    payment_accounts_count: int = 0
-    rating: float = 0.0
-    total_reviews: int = 0
+    payment_accounts: Optional[dict] = Field(None, max_items=10)  # Limit payment methods
+    payment_accounts_count: int = Field(default=0, ge=0, le=10)  # Non-negative, max 10
+    rating: float = Field(default=0.0, ge=0.0, le=5.0)  # Rating between 0-5
+    total_reviews: int = Field(default=0, ge=0)  # Non-negative
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
