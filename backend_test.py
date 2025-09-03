@@ -1407,6 +1407,7 @@ class KojoAPITester:
             self.test_owner_account_creation_verification()  # Test Famakan account creation first
             self.test_user_registration()
             self.test_user_login()
+            self.test_payment_account_verification_system()  # NEW: Test payment verification system
             self.test_owner_authorization_system()  # Test Famakan authorization system
             self.test_user_profile()
             self.test_profile_photo_management()  # Added profile photo tests
