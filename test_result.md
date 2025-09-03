@@ -535,13 +535,13 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Connexion automatique après inscription - CORRECTION URGENTE - COMPLETE"
-    - "Validation des numéros de téléphone avec espaces, tirets et parenthèses - COMPLETE"
-    - "Extension des préfixes Orange Money et Wave de 70 à 99 - COMPLETE"
-    - "Validation complète pour tous les 4 pays prioritaires - COMPLETE"
+    - "Ultra-Precise Geolocation System - COMPLETE"
+    - "Authentication Screens (Login/Register)"
+    - "Dashboard Screen"
+    - "Jobs Listing and Details"
   stuck_tasks: []
   test_all: false
-  test_priority: "automatic_login_urgent_correction_complete"
+  test_priority: "ultra_precise_geolocation_complete"
 
 agent_communication:
   - agent: "main"
