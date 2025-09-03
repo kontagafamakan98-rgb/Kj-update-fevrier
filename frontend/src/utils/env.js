@@ -13,25 +13,25 @@ export const isProduction = process.env.NODE_ENV === 'production';
 export const devLog = {
   log: (...args) => {
     if (isDevelopment) {
-      console.log(...args);
+      devLog.info(...args);
     }
   },
   
   error: (...args) => {
     if (isDevelopment) {
-      console.error(...args);
+      safeLog.error(...args);
     }
   },
   
   warn: (...args) => {
     if (isDevelopment) {
-      console.warn(...args);
+      safeLog.warn(...args);
     }
   },
   
   info: (...args) => {
     if (isDevelopment) {
-      console.log(...args);
+      devLog.info(...args);
     }
   },
   
@@ -48,18 +48,18 @@ export const devLog = {
  */
 export const safeLog = {
   error: (...args) => {
-    console.error(...args);
+    safeLog.error(...args);
   },
   
   warn: (...args) => {
     if (isDevelopment) {
-      console.warn(...args);
+      safeLog.warn(...args);
     }
   },
   
   info: (...args) => {
     if (isDevelopment) {
-      console.log(...args);
+      devLog.info(...args);
     }
   }
 };

@@ -93,19 +93,19 @@ function cleanLogsInFile(filePath) {
 
     if (hasChanges) {
       fs.writeFileSync(filePath, content, 'utf8');
-      console.log(`✅ Nettoyé: ${filePath}`);
+      devLog.info(`✅ Nettoyé: ${filePath}`);
       return true;
     }
 
     return false;
   } catch (error) {
-    console.error(`❌ Erreur dans ${filePath}:`, error.message);
+    safeLog.error(`❌ Erreur dans ${filePath}:`, error.message);
     return false;
   }
 }
 
 function main() {
-  console.log('🧹 Démarrage du nettoyage des logs...');
+  devLog.info('🧹 Démarrage du nettoyage des logs...');
   
   // Chercher tous les fichiers JS dans le frontend
   const frontendSrc = path.join(__dirname, '../frontend/src');
@@ -120,7 +120,7 @@ function main() {
     }
   });
   
-  console.log(`\n🎉 Nettoyage terminé: ${cleanedCount} fichiers modifiés sur ${jsFiles.length} examinés`);
+  devLog.info(`\n🎉 Nettoyage terminé: ${cleanedCount} fichiers modifiés sur ${jsFiles.length} examinés`);
 }
 
 if (require.main === module) {
