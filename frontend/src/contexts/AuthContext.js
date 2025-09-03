@@ -87,17 +87,26 @@ export function AuthProvider({ children }) {
 
   const register = async (userData) => {
     try {
-      const response = await axios.post('/auth/register', userData);
-      const { access_token, user } = response.data;
+      const response = await authAPI.register(userData);
+      const { access_token, user } = response;
       
       localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       
+      // Cache user data
+      kojoCache.set(CACHE_KEYS.USER_PROFILE, user, 24 * 60 * 60 * 1000); // 24 hours
+      
+      devLog.info('✅ User registered successfully');
       return { success: true };
+      
     } catch (error) {
+      const errorInfo = handleApiError(error);
+      safeLog.error('Registration failed:', errorInfo);
+      
       return { 
         success: false, 
-        error: error.response?.data?.detail || 'Registration failed' 
+        error: errorInfo.message
       };
     }
   };
