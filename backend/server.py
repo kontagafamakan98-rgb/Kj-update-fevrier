@@ -380,9 +380,9 @@ class JobCreate(BaseModel):
         return v
 
 class ProposalCreate(BaseModel):
-    proposed_amount: float
-    estimated_completion_time: str
-    message: str
+    proposed_amount: float = Field(gt=0.0, le=10000000.0)
+    estimated_completion_time: str = Field(min_length=1, max_length=100)
+    message: str = Field(min_length=10, max_length=2000)
 
 class MessageCreate(BaseModel):
     receiver_id: str
