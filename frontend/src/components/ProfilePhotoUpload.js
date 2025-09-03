@@ -111,7 +111,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onClick={handleClick}
+          onClick={showPhotoOptions}
         >
           <input
             ref={inputRef}
