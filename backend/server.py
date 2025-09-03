@@ -1253,6 +1253,18 @@ app.add_middleware(
     max_age=86400,  # 24 hours cache for preflight
 )
 
+# Add compression middleware for better performance on slow networks
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Add trusted host middleware for security
+app.add_middleware(
+    TrustedHostMiddleware, 
+    allowed_hosts=["*"]  # In production, specify exact domains
+)
+
+# Add custom security middleware
+app.add_middleware(WestAfricaSecurityMiddleware)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
