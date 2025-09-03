@@ -1565,7 +1565,209 @@ class KojoAPITester:
                         print(f"   ❌ Bank account number not properly masked: {account_number}")
                     self.tests_run += 1
 
-    def run_all_tests(self):
+    def test_enhanced_wave_validation_system(self):
+        """Test the enhanced Wave validation system - now available across ALL West Africa"""
+        print("\n" + "="*50)
+        print("TESTING ENHANCED WAVE VALIDATION SYSTEM - ALL WEST AFRICA")
+        print("="*50)
+        
+        # Test Wave validation for ALL West African countries
+        west_african_countries = [
+            {"prefix": "+221", "country": "senegal", "name": "Senegal"},
+            {"prefix": "+223", "country": "mali", "name": "Mali"},
+            {"prefix": "+224", "country": "guinea", "name": "Guinea"},
+            {"prefix": "+225", "country": "ivory_coast", "name": "Ivory Coast"},
+            {"prefix": "+226", "country": "burkina_faso", "name": "Burkina Faso"},
+            {"prefix": "+227", "country": "niger", "name": "Niger"},
+            {"prefix": "+228", "country": "togo", "name": "Togo"},
+            {"prefix": "+229", "country": "benin", "name": "Benin"}
+        ]
+        
+        print(f"\n🔍 Testing Wave Validation for All {len(west_african_countries)} West African Countries...")
+        
+        for i, country_data in enumerate(west_african_countries):
+            wave_number = f"{country_data['prefix']}701234567"
+            
+            test_user_data = {
+                "email": f"wave_{country_data['country']}_{datetime.now().strftime('%H%M%S')}_{i}@test.com",
+                "password": "TestPass123!",
+                "first_name": "Test",
+                "last_name": f"Wave{country_data['name']}",
+                "phone": wave_number,
+                "user_type": "client",
+                "country": country_data['country'],
+                "preferred_language": "fr",
+                "payment_accounts": {
+                    "wave": wave_number
+                }
+            }
+            
+            success, response = self.run_test(
+                f"Wave Validation - {country_data['name']} ({wave_number})",
+                "POST",
+                "auth/register-verified",
+                200,
+                data=test_user_data
+            )
+            
+            if success:
+                print(f"   ✅ Wave now supported in {country_data['name']} ({country_data['prefix']})")
+            else:
+                print(f"   ❌ Wave validation failed for {country_data['name']} ({country_data['prefix']})")
+        
+        # Test invalid Wave numbers (non-West African prefixes)
+        invalid_prefixes = ["+1", "+33", "+44", "+91", "+86", "+234"]  # US, France, UK, India, China, Nigeria
+        
+        print(f"\n🔍 Testing Invalid Wave Numbers (Non-West African Prefixes)...")
+        
+        for i, invalid_prefix in enumerate(invalid_prefixes):
+            invalid_wave_number = f"{invalid_prefix}701234567"
+            
+            invalid_test_data = {
+                "email": f"wave_invalid_{i}_{datetime.now().strftime('%H%M%S')}@test.com",
+                "password": "TestPass123!",
+                "first_name": "Test",
+                "last_name": "InvalidWave",
+                "phone": invalid_wave_number,
+                "user_type": "client",
+                "country": "senegal",
+                "preferred_language": "fr",
+                "payment_accounts": {
+                    "wave": invalid_wave_number
+                }
+            }
+            
+            self.run_test(
+                f"Invalid Wave Number ({invalid_prefix})",
+                "POST",
+                "auth/register-verified",
+                400,
+                data=invalid_test_data
+            )
+
+    def test_enhanced_bank_account_validation_system(self):
+        """Test the enhanced bank account validation system (replacing bank cards)"""
+        print("\n" + "="*50)
+        print("TESTING ENHANCED BANK ACCOUNT VALIDATION SYSTEM")
+        print("="*50)
+        
+        # Test various bank account scenarios
+        bank_account_tests = [
+            {
+                "name": "Complete Bank Account Information",
+                "account": {
+                    "account_number": "12345678901234567890",
+                    "bank_name": "Banque Atlantique Mali",
+                    "account_holder": "Amadou Traore",
+                    "bank_code": "BA001",
+                    "branch": "Bamako Plateau"
+                },
+                "expected": 200
+            },
+            {
+                "name": "Minimum Required Fields Only",
+                "account": {
+                    "account_number": "87654321",
+                    "bank_name": "Ecobank",
+                    "account_holder": "Fatou Diallo"
+                },
+                "expected": 200
+            },
+            {
+                "name": "Account Number with Spaces and Dashes",
+                "account": {
+                    "account_number": "1234-5678-9012-3456",
+                    "bank_name": "UBA Senegal",
+                    "account_holder": "Moussa Sow"
+                },
+                "expected": 200
+            },
+            {
+                "name": "Very Long Account Number",
+                "account": {
+                    "account_number": "123456789012345678901234567890",
+                    "bank_name": "BCEAO",
+                    "account_holder": "Mariama Kone"
+                },
+                "expected": 200
+            },
+            {
+                "name": "Account Number Too Short (7 digits)",
+                "account": {
+                    "account_number": "1234567",
+                    "bank_name": "Test Bank",
+                    "account_holder": "Test User"
+                },
+                "expected": 400
+            },
+            {
+                "name": "Missing Account Number",
+                "account": {
+                    "bank_name": "Test Bank",
+                    "account_holder": "Test User"
+                },
+                "expected": 400
+            },
+            {
+                "name": "Missing Bank Name",
+                "account": {
+                    "account_number": "12345678",
+                    "account_holder": "Test User"
+                },
+                "expected": 400
+            },
+            {
+                "name": "Missing Account Holder",
+                "account": {
+                    "account_number": "12345678",
+                    "bank_name": "Test Bank"
+                },
+                "expected": 400
+            },
+            {
+                "name": "Empty Bank Name",
+                "account": {
+                    "account_number": "12345678",
+                    "bank_name": "",
+                    "account_holder": "Test User"
+                },
+                "expected": 400
+            },
+            {
+                "name": "Bank Name Too Short (2 chars)",
+                "account": {
+                    "account_number": "12345678",
+                    "bank_name": "AB",
+                    "account_holder": "Test User"
+                },
+                "expected": 400
+            }
+        ]
+        
+        print(f"\n🔍 Testing {len(bank_account_tests)} Bank Account Validation Scenarios...")
+        
+        for i, test_case in enumerate(bank_account_tests):
+            test_user_data = {
+                "email": f"bank_test_{i}_{datetime.now().strftime('%H%M%S')}@test.com",
+                "password": "TestPass123!",
+                "first_name": "Test",
+                "last_name": f"BankUser{i}",
+                "phone": "+221701234567",
+                "user_type": "client",
+                "country": "senegal",
+                "preferred_language": "fr",
+                "payment_accounts": {
+                    "bank_account": test_case["account"]
+                }
+            }
+            
+            self.run_test(
+                f"Bank Account: {test_case['name']}",
+                "POST",
+                "auth/register-verified",
+                test_case["expected"],
+                data=test_user_data
+            )
         """Run all tests in sequence"""
         print("🚀 Starting Kojo API Tests")
         print(f"Base URL: {self.base_url}")
