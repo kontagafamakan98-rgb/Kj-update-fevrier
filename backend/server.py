@@ -276,6 +276,114 @@ class MessageCreate(BaseModel):
     content: str
 
 # Utility Functions
+# Validation functions
+def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) -> dict:
+    """Valide les comptes de paiement selon le type d'utilisateur"""
+    
+    # Compter le nombre de comptes liés
+    linked_accounts = 0
+    account_details = {}
+    
+    if payment_accounts.orange_money:
+        if not validate_orange_money_number(payment_accounts.orange_money):
+            raise HTTPException(status_code=400, detail="Numéro Orange Money invalide")
+        linked_accounts += 1
+        account_details['orange_money'] = payment_accounts.orange_money
+    
+    if payment_accounts.wave:
+        if not validate_wave_number(payment_accounts.wave):
+            raise HTTPException(status_code=400, detail="Numéro Wave invalide")
+        linked_accounts += 1
+        account_details['wave'] = payment_accounts.wave
+    
+    if payment_accounts.bank_card:
+        if not validate_bank_card(payment_accounts.bank_card):
+            raise HTTPException(status_code=400, detail="Numéro de carte bancaire invalide")
+        linked_accounts += 1
+        account_details['bank_card'] = mask_bank_card(payment_accounts.bank_card)
+        account_details['bank_name'] = payment_accounts.bank_name or 'Banque non spécifiée'
+    
+    # Validation selon le type d'utilisateur
+    if user_type == "client":
+        if linked_accounts < 1:
+            raise HTTPException(
+                status_code=400, 
+                detail="Les clients doivent lier au moins 1 moyen de paiement (Orange Money, Wave ou Carte bancaire)"
+            )
+    elif user_type == "worker":
+        if linked_accounts < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Les travailleurs doivent lier au minimum 2 moyens de paiement sur 3 disponibles (Orange Money, Wave, Carte bancaire)"
+            )
+    
+    return {
+        "linked_accounts_count": linked_accounts,
+        "account_details": account_details,
+        "is_verified": True
+    }
+
+def validate_orange_money_number(number: str) -> bool:
+    """Valide un numéro Orange Money"""
+    # Supprimer les espaces et caractères spéciaux
+    clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
+    
+    # Vérifier les préfixes Orange Money pour l'Afrique de l'Ouest
+    # Mali: +223, Sénégal: +221, Burkina Faso: +226, Côte d'Ivoire: +225
+    valid_prefixes = ['223', '221', '226', '225']
+    
+    if len(clean_number) >= 11:  # Minimum avec indicatif pays
+        prefix = clean_number[:3]
+        return prefix in valid_prefixes and len(clean_number) in [11, 12]
+    
+    return False
+
+def validate_wave_number(number: str) -> bool:
+    """Valide un numéro Wave"""
+    # Similaire à Orange Money mais principalement Sénégal et Côte d'Ivoire
+    clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
+    
+    valid_prefixes = ['221', '225']  # Sénégal et Côte d'Ivoire
+    
+    if len(clean_number) >= 11:
+        prefix = clean_number[:3]
+        return prefix in valid_prefixes and len(clean_number) in [11, 12]
+    
+    return False
+
+def validate_bank_card(card_number: str) -> bool:
+    """Valide basiquement un numéro de carte bancaire"""
+    # Supprimer les espaces et tirets
+    clean_card = ''.join(filter(str.isdigit, card_number))
+    
+    # Vérifier la longueur (16 chiffres généralement)
+    if len(clean_card) not in [15, 16]:
+        return False
+    
+    # Algorithme de Luhn simplifié
+    return luhn_check(clean_card)
+
+def luhn_check(card_number: str) -> bool:
+    """Algorithme de Luhn pour validation carte bancaire"""
+    def digits_of(n):
+        return [int(d) for d in str(n)]
+    
+    digits = digits_of(card_number)
+    odd_digits = digits[-1::-2]
+    even_digits = digits[-2::-2]
+    checksum = sum(odd_digits)
+    for d in even_digits:
+        checksum += sum(digits_of(d*2))
+    return checksum % 10 == 0
+
+def mask_bank_card(card_number: str) -> str:
+    """Masque le numéro de carte bancaire"""
+    clean_card = ''.join(filter(str.isdigit, card_number))
+    if len(clean_card) >= 16:
+        return f"****-****-****-{clean_card[-4:]}"
+    elif len(clean_card) >= 15:
+        return f"****-****-***-{clean_card[-4:]}"
+    return "****-****-****"
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
