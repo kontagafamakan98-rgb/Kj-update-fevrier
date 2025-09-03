@@ -562,11 +562,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Authentication Screens (Login/Register)"
-    - "Dashboard Screen"
+    - "Mobile Push Notifications System"
+    - "Mobile Offline Capabilities System"
   stuck_tasks: []
   test_all: false
-  test_priority: "mobile_backend_integration_complete"
+  test_priority: "mobile_push_notifications_and_offline_complete"
 
 agent_communication:
   - agent: "main"
