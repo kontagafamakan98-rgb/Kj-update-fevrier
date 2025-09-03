@@ -428,7 +428,36 @@ const translations = {
     languageOnProfile: 'I ka kan bɛ na jira i ka profil foroba la',
     clientsCanSee: 'Kiliyanw bɛ se ka a dɔn i bɛ kan min fɔ',
     canModifyLater: 'I bɛ se ka nin changé kɔfɛ i ka paramètres kɔnɔ',
-    detectingLanguage: 'Ka i ka kan diya ɲinini...'
+    detectingLanguage: 'Ka i ka kan diya ɲinini...',
+    
+    // Registration
+    createAccount: 'Konte dilan',
+    joinKojoCommunity: 'Don Kojo jamana kɔnɔ',
+    userType: 'Baarakɛla sugu',
+    iAmClient: 'Ne bɛ baara ɲini',
+    iAmWorker: 'Ne bɛ baara kɛ',
+    country: 'Jamana',
+    detectedAutomatically: 'A yɛrɛko ye a dɔn',
+    positionDetected: 'Yɔrɔ dɔnnen',
+    adjustedAutomatically: 'Misali ni kunnafoni yɛrɛko changé',
+    positionNotDetected: 'Yɔrɔ ma dɔn - Daminɛko sigida (Senegali)',
+    personalInformation: 'Mɔgɔ kunnafoni',
+    paymentAccounts: 'Sara konte',
+    nextStepWorker: 'Kɔnɔko: I ka kan ka sara fɛɛrɛ fila jate (Orange Money, Wave, Bank konte)',
+    nextStepClient: 'Kɔnɔko: I ka kan ka sara fɛɛrɛ kelen jate (Orange Money, Wave, Bank konte)',
+    continueToPaymentVerification: 'Taali → Konte kɔlɔsi',
+    detectingLocation: 'Ka i ka yɔrɔ ɲinini...',
+    detectedViaGeolocation: 'Jamana dɔnnen i ka yɔrɔ la',
+    atLeast6Characters: 'Sɛbɛn wɔrɔ kelen',
+    phoneFormat: 'Cogo',
+    passwordsDontMatch: 'Dogolen daɲègafe tɛ ben ye',
+    passwordTooShort: 'Dogolen daɲègafe ka kan ka kɛ sɛbɛn wɔrɔ ye',
+    workersMustSelectSkills: 'Baarakɛlaw ka kan ka seko kelen sugandi',
+    pleaseIndicateExperience: 'I ka baara san jateminɛ',
+    pleaseIndicateValidRate: 'Lɛrɛ sara ɲuman jateminɛ (minimum 500 FCFA)',
+    preparing: 'Ka labɛn...',
+    alreadyHaveAccount: 'Konte b\'i bolo wa?',
+    signIn: 'Don'
   }
 };
 
