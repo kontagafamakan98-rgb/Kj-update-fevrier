@@ -10,10 +10,12 @@ export default function Home() {
   const categories = [
     { key: 'plumbing', icon: '🔧' },
     { key: 'electrical', icon: '⚡' },
+    { key: 'mechanics', icon: '🔩' },
     { key: 'construction', icon: '🏗️' },
     { key: 'cleaning', icon: '🧽' },
     { key: 'gardening', icon: '🌱' },
-    { key: 'tutoring', icon: '📚' }
+    { key: 'tutoring', icon: '📚' },
+    { key: 'computing', icon: '💻' }
   ];
 
   const countries = getAllCountries().map((country, index) => ({
