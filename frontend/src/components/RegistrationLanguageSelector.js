@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
 import { devLog, safeLog } from '../utils/env';
-
+import { 
   AVAILABLE_LANGUAGES, 
   getOrderedLanguagesForCountry, 
   getLanguageSuggestionMessage, 
