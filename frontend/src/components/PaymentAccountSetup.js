@@ -240,7 +240,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             type="text"
             value={accounts.orange_money}
             onChange={(e) => handleInputChange('orange_money', e.target.value)}
-            placeholder="+221701234567"
+            placeholder={phoneExample}
             className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
               validationErrors.orange_money ? 'border-red-500' : 'border-gray-300'
             }`}
