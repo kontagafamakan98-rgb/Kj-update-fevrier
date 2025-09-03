@@ -59,8 +59,8 @@ function MobileLoader() {
         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
           <span className="text-3xl font-bold text-orange-600">K</span>
         </div>
-        <div className="text-white text-2xl font-bold mb-2">Kojo</div>
-        <div className="text-orange-200 text-sm mb-6">Afrique de l'Ouest</div>
+        <div className="text-white text-2xl font-bold mb-2">Kojo Test</div>
+        <div className="text-orange-200 text-sm mb-6">Version Test - Afrique de l'Ouest</div>
         <div className="flex justify-center space-x-2">
           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
           <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
