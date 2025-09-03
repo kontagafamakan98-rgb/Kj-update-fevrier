@@ -633,6 +633,15 @@ def mask_bank_account_info(bank_account: dict) -> dict:
         "bank_code": bank_account.get("bank_code", ""),
         "branch": bank_account.get("branch", "")
     }
+    
+def log_and_raise_http_exception(status_code: int, detail: str, logger_instance=None):
+    """Enregistre l'erreur et lève une HTTPException de manière centralisée"""
+    if logger_instance is None:
+        logger_instance = logger
+    
+    logger_instance.error(f"HTTP {status_code}: {detail}")
+    raise HTTPException(status_code=status_code, detail=detail)
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
