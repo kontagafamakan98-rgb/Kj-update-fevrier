@@ -1489,8 +1489,8 @@ class KojoAPITester:
                 token=client_verified_token
             )
         
-        # Test 11: Worker with 3 payment methods (all types)
-        print(f"\n🔍 Testing Worker with All 3 Payment Methods...")
+        # Test 11: Worker with 3 payment methods (Orange Money + Wave + Bank Account)
+        print(f"\n🔍 Testing Worker with All 3 Payment Methods (Orange Money + Wave + Bank Account)...")
         worker_all_payments_data = {
             "email": f"worker_all_{datetime.now().strftime('%H%M%S')}@test.com",
             "password": "TestPass123!",
@@ -1503,18 +1503,67 @@ class KojoAPITester:
             "payment_accounts": {
                 "orange_money": "+221701234567",
                 "wave": "+221701234567",
-                "bank_card": "4532015112830366",
-                "bank_name": "Ecobank Senegal"
+                "bank_account": {
+                    "account_number": "98765432101234",
+                    "bank_name": "Ecobank Senegal",
+                    "account_holder": "Ousmane Diop",
+                    "bank_code": "ECO001",
+                    "branch": "Dakar Plateau"
+                }
             }
         }
         
         self.run_test(
-            "Worker Registration with All 3 Payment Methods",
+            "Worker Registration with All 3 Payment Methods (Orange Money + Wave + Bank Account)",
             "POST",
             "auth/register-verified",
             200,
             data=worker_all_payments_data
         )
+        
+        # Test 12: Test bank account masking in responses
+        print(f"\n🔍 Testing Bank Account Masking in Responses...")
+        if client_verified_token:
+            # First, update user with bank account
+            bank_account_update = {
+                "bank_account": {
+                    "account_number": "12345678901234",
+                    "bank_name": "Banque Atlantique",
+                    "account_holder": "Test User",
+                    "bank_code": "BA001",
+                    "branch": "Dakar Centre"
+                }
+            }
+            
+            success, response = self.run_test(
+                "Update User with Bank Account",
+                "PUT",
+                "users/payment-accounts",
+                200,
+                data=bank_account_update,
+                token=client_verified_token
+            )
+            
+            # Then get payment accounts to verify masking
+            success, response = self.run_test(
+                "Get Payment Accounts (Check Bank Account Masking)",
+                "GET",
+                "users/payment-accounts",
+                200,
+                token=client_verified_token
+            )
+            
+            if success and response and 'payment_accounts' in response:
+                payment_accounts = response['payment_accounts']
+                if 'bank_account' in payment_accounts:
+                    bank_account = payment_accounts['bank_account']
+                    account_number = bank_account.get('account_number', '')
+                    if account_number.startswith('****') and account_number.endswith('1234'):
+                        print(f"   ✅ Bank account number properly masked: {account_number}")
+                        self.tests_passed += 1
+                    else:
+                        print(f"   ❌ Bank account number not properly masked: {account_number}")
+                    self.tests_run += 1
 
     def run_all_tests(self):
         """Run all tests in sequence"""
