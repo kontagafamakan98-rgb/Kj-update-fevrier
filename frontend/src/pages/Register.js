@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCountryFromPhone, detectUserCountry, getPhoneExampleForCountry } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { CountrySelect, getAllCountries } from '../components/CountryDisplay';
+import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
+import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
