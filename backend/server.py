@@ -711,7 +711,7 @@ async def register_user_verified(user_data: UserWithPayment):
             logger.info(f"✅ Photo de profil sauvegardée: {filesystem_path} -> URL: {profile_photo_path}")
             
         except Exception as e:
-            print(f"⚠️ Erreur sauvegarde photo profil: {e}")
+            logger.warning(f"⚠️ Erreur sauvegarde photo profil: {e}")
             # Continuer sans photo si erreur
 
     # Create user with payment verification
