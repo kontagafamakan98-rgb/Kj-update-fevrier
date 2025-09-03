@@ -295,15 +295,21 @@ class Message(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     read: bool = False
 
+class PaymentStatus(str, Enum):
+    PENDING = "pending"
+    COMPLETED = "completed" 
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
 class Payment(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str
     payer_id: str
     receiver_id: str
-    amount: float
+    amount: float = Field(gt=0.0, le=10000000.0)  # Positive amount, max 10M FCFA
     payment_method: PaymentMethod
-    transaction_id: Optional[str] = None
-    status: str = "pending"  # pending, completed, failed
+    transaction_id: Optional[str] = Field(None, max_length=200)  # Transaction ID limit
+    status: PaymentStatus = PaymentStatus.PENDING  # Use enum for better validation
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Request/Response Models
