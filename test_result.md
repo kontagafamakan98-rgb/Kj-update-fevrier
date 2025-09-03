@@ -577,11 +577,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Mobile Push Notifications System"
-    - "Mobile Offline Capabilities System"
+    - "Payment Accounts Manager Component"
   stuck_tasks: []
   test_all: false
-  test_priority: "mobile_push_notifications_and_offline_complete"
+  test_priority: "payment_accounts_manager_comprehensive_testing"
 
 agent_communication:
   - agent: "main"
