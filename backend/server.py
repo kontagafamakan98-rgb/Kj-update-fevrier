@@ -698,152 +698,154 @@ async def register_user_verified(user_data: UserWithPayment):
         existing_user = await db.users.find_one({"email": user_data.email})
         if existing_user:
             log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
-    except Exception as e:
-        logger.error(f"❌ Erreur lors de la vérification de l'email: {str(e)}")
-        log_and_raise_http_exception(500, "Erreur lors de la vérification de l'email")
-    
-    # Valider les comptes de paiement selon le type d'utilisateur
-    try:
-        payment_validation = validate_payment_accounts(user_data.payment_accounts, user_data.user_type)
-    except HTTPException as e:
-        raise e
-    
-    # Gérer la photo de profil si fournie
-    profile_photo_path = None
-    user_id = str(uuid.uuid4())  # Generate user ID first
-    
-    if user_data.profile_photo_base64:
+        
+        # Valider les comptes de paiement selon le type d'utilisateur
         try:
-            # Décoder et sauvegarder la photo de profil
-            
-            # Créer le dossier profile_photos s'il n'existe pas
-            profile_photos_dir = Path("uploads/profile_photos")
-            profile_photos_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Décoder l'image base64
-            image_data = base64.b64decode(user_data.profile_photo_base64.split(',')[1] if ',' in user_data.profile_photo_base64 else user_data.profile_photo_base64)
-            
-            # Générer un nom de fichier unique
-            file_extension = "jpg"  # Par défaut
-            if user_data.profile_photo_base64.startswith('data:image/png'):
-                file_extension = "png"
-            elif user_data.profile_photo_base64.startswith('data:image/jpeg'):
-                file_extension = "jpg"
-            elif user_data.profile_photo_base64.startswith('data:image/webp'):
-                file_extension = "webp"
+            payment_validation = validate_payment_accounts(user_data.payment_accounts, user_data.user_type)
+        except HTTPException as e:
+            raise e
+        
+        # Gérer la photo de profil si fournie
+        profile_photo_path = None
+        user_id = str(uuid.uuid4())  # Generate user ID first
+        
+        if user_data.profile_photo_base64:
+            try:
+                # Décoder et sauvegarder la photo de profil
                 
-            filename = f"profile_{user_id}_{int(datetime.now(timezone.utc).timestamp())}.{file_extension}"
-            profile_photo_path = f"/uploads/profile_photos/{filename}"  # Absolute path for URL
-            
-            # Sauvegarder l'image (utiliser path relatif pour filesystem)
-            filesystem_path = f"uploads/profile_photos/{filename}"
-            with open(filesystem_path, "wb") as f:
-                f.write(image_data)
+                # Créer le dossier profile_photos s'il n'existe pas
+                profile_photos_dir = Path("uploads/profile_photos")
+                profile_photos_dir.mkdir(parents=True, exist_ok=True)
                 
-            logger.info(f"✅ Photo de profil sauvegardée: {filesystem_path} -> URL: {profile_photo_path}")
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Erreur sauvegarde photo profil: {e}")
-            # Continuer sans photo si erreur
+                # Décoder l'image base64
+                image_data = base64.b64decode(user_data.profile_photo_base64.split(',')[1] if ',' in user_data.profile_photo_base64 else user_data.profile_photo_base64)
+                
+                # Générer un nom de fichier unique
+                file_extension = "jpg"  # Par défaut
+                if user_data.profile_photo_base64.startswith('data:image/png'):
+                    file_extension = "png"
+                elif user_data.profile_photo_base64.startswith('data:image/jpeg'):
+                    file_extension = "jpg"
+                elif user_data.profile_photo_base64.startswith('data:image/webp'):
+                    file_extension = "webp"
+                    
+                filename = f"profile_{user_id}_{int(datetime.now(timezone.utc).timestamp())}.{file_extension}"
+                profile_photo_path = f"/uploads/profile_photos/{filename}"  # Absolute path for URL
+                
+                # Sauvegarder l'image (utiliser path relatif pour filesystem)
+                filesystem_path = f"uploads/profile_photos/{filename}"
+                with open(filesystem_path, "wb") as f:
+                    f.write(image_data)
+                    
+                logger.info(f"✅ Photo de profil sauvegardée: {filesystem_path} -> URL: {profile_photo_path}")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur sauvegarde photo profil: {e}")
+                # Continuer sans photo si erreur
 
-    # Create user with payment verification - avec gestion d'erreur complète
-    try:
-        user = User(
-            id=user_id,
-            email=user_data.email,
-            password_hash=hash_password(user_data.password),
-            first_name=user_data.first_name,
-            last_name=user_data.last_name,
-            phone=user_data.phone,
-            user_type=user_data.user_type,
-            country=user_data.country,
-            preferred_language=user_data.preferred_language,
-            profile_photo=profile_photo_path,  # Ajouter le chemin de la photo
-            is_verified=payment_validation["is_verified"],
-            payment_accounts=payment_validation["account_details"],
-            payment_accounts_count=payment_validation["linked_accounts_count"],
-            created_at=datetime.now(timezone.utc).isoformat(),
-            updated_at=datetime.now(timezone.utc).isoformat()
-        )
-    except ValidationError as ve:
-        # Gestion spécifique des erreurs de validation Pydantic
-        validation_errors = []
-        for error in ve.errors():
-            field = error.get('loc', [''])[0] if error.get('loc') else 'unknown'
-            message = error.get('msg', 'Erreur de validation')
+        # Create user with payment verification - avec gestion d'erreur complète
+        try:
+            user = User(
+                id=user_id,
+                email=user_data.email,
+                password_hash=hash_password(user_data.password),
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                phone=user_data.phone,
+                user_type=user_data.user_type,
+                country=user_data.country,
+                preferred_language=user_data.preferred_language,
+                profile_photo=profile_photo_path,  # Ajouter le chemin de la photo
+                is_verified=payment_validation["is_verified"],
+                payment_accounts=payment_validation["account_details"],
+                payment_accounts_count=payment_validation["linked_accounts_count"],
+                created_at=datetime.now(timezone.utc).isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat()
+            )
+        except ValidationError as ve:
+            # Gestion spécifique des erreurs de validation Pydantic
+            validation_errors = []
+            for error in ve.errors():
+                field = error.get('loc', [''])[0] if error.get('loc') else 'unknown'
+                message = error.get('msg', 'Erreur de validation')
+                
+                # Messages d'erreur en français
+                if 'string_too_short' in error.get('type', ''):
+                    if field == 'first_name':
+                        message = "Le prénom doit contenir au moins 2 caractères"
+                    elif field == 'last_name':
+                        message = "Le nom de famille doit contenir au moins 2 caractères"
+                    else:
+                        message = f"Le champ {field} doit contenir au moins 2 caractères"
+                elif 'string_pattern_mismatch' in error.get('type', ''):
+                    if field in ['first_name', 'last_name']:
+                        message = f"Le {field} contient des caractères non autorisés"
+                    elif field == 'phone':
+                        message = "Le numéro de téléphone n'est pas au bon format"
+                    else:
+                        message = f"Le format du champ {field} est incorrect"
+                
+                validation_errors.append(f"{message}")
             
-            # Messages d'erreur en français
-            if 'string_too_short' in error.get('type', ''):
-                if field == 'first_name':
-                    message = "Le prénom doit contenir au moins 2 caractères"
-                elif field == 'last_name':
-                    message = "Le nom de famille doit contenir au moins 2 caractères"
-                else:
-                    message = f"Le champ {field} doit contenir au moins 2 caractères"
-            elif 'string_pattern_mismatch' in error.get('type', ''):
-                if field in ['first_name', 'last_name']:
-                    message = f"Le {field} contient des caractères non autorisés"
-                elif field == 'phone':
-                    message = "Le numéro de téléphone n'est pas au bon format"
-                else:
-                    message = f"Le format du champ {field} est incorrect"
-            
-            validation_errors.append(f"{message}")
+            error_message = "; ".join(validation_errors)
+            logger.warning(f"❌ Erreur validation utilisateur: {error_message}")
+            log_and_raise_http_exception(422, f"Erreur de validation: {error_message}")
         
-        error_message = "; ".join(validation_errors)
-        logger.warning(f"❌ Erreur validation utilisateur: {error_message}")
-        log_and_raise_http_exception(422, f"Erreur de validation: {error_message}")
-    
+        except Exception as e:
+            logger.error(f"❌ Erreur création utilisateur: {str(e)}")
+            log_and_raise_http_exception(500, "Erreur lors de la création du compte utilisateur")
+        
+        await db.users.insert_one(user.dict())
+        
+        # Créer le profil travailleur si c'est un travailleur avec des informations supplémentaires
+        worker_profile_created = False
+        if user_data.user_type == "worker" and (
+            user_data.worker_specialties or 
+            user_data.worker_experience_years is not None or 
+            user_data.worker_hourly_rate is not None
+        ):
+            worker_profile = WorkerProfile(
+                user_id=user.id,
+                specialties=user_data.worker_specialties or [],
+                experience_years=user_data.worker_experience_years or 0,
+                hourly_rate=user_data.worker_hourly_rate or 0.0,
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            await db.worker_profiles.insert_one(worker_profile.dict())
+            worker_profile_created = True
+            logger.info(f"✅ Profil travailleur créé pour {user.email}")
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": user.id, "email": user.email})
+        
+        response_data = {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user.dict(exclude={"password_hash"}),
+            "payment_verification": {
+                "linked_accounts": payment_validation["linked_accounts_count"],
+                "required_minimum": 2 if user_data.user_type == "worker" else 1,
+                "is_verified": payment_validation["is_verified"],
+                "message": f"Compte vérifié avec {payment_validation['linked_accounts_count']} moyen(s) de paiement lié(s)"
+            }
+        }
+        
+        # Ajouter les informations du profil travailleur si créé
+        if worker_profile_created:
+            response_data["worker_profile"] = {
+                "specialties": user_data.worker_specialties or [],
+                "experience_years": user_data.worker_experience_years or 0,
+                "hourly_rate": user_data.worker_hourly_rate or 0.0
+            }
+        
+        return response_data
+
     except Exception as e:
-        logger.error(f"❌ Erreur création utilisateur: {str(e)}")
-        log_and_raise_http_exception(500, "Erreur lors de la création du compte utilisateur")
-    
-    await db.users.insert_one(user.dict())
-    
-    # Créer le profil travailleur si c'est un travailleur avec des informations supplémentaires
-    worker_profile_created = False
-    if user_data.user_type == "worker" and (
-        user_data.worker_specialties or 
-        user_data.worker_experience_years is not None or 
-        user_data.worker_hourly_rate is not None
-    ):
-        worker_profile = WorkerProfile(
-            user_id=user.id,
-            specialties=user_data.worker_specialties or [],
-            experience_years=user_data.worker_experience_years or 0,
-            hourly_rate=user_data.worker_hourly_rate or 0.0,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
-        )
-        
-        await db.worker_profiles.insert_one(worker_profile.dict())
-        worker_profile_created = True
-        logger.info(f"✅ Profil travailleur créé pour {user.email}")
-    
-    # Create access token
-    access_token = create_access_token(data={"sub": user.id, "email": user.email})
-    
-    response_data = {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": user.dict(exclude={"password_hash"}),
-        "payment_verification": {
-            "linked_accounts": payment_validation["linked_accounts_count"],
-            "required_minimum": 2 if user_data.user_type == "worker" else 1,
-            "is_verified": payment_validation["is_verified"],
-            "message": f"Compte vérifié avec {payment_validation['linked_accounts_count']} moyen(s) de paiement lié(s)"
-        }
-    }
-    
-    # Ajouter les informations du profil travailleur si créé
-    if worker_profile_created:
-        response_data["worker_profile"] = {
-            "specialties": user_data.worker_specialties or [],
-            "experience_years": user_data.worker_experience_years or 0,
-            "hourly_rate": user_data.worker_hourly_rate or 0.0
-        }
-    
-    return response_data
+        # Gestion globale des erreurs non capturées
+        logger.error(f"❌ Erreur inattendue lors de l'inscription: {str(e)}")
+        log_and_raise_http_exception(500, "Une erreur inattendue s'est produite lors de l'inscription. Veuillez réessayer.")
 
 @api_router.post("/auth/register")
 async def register_user(user_data: UserRegister):
