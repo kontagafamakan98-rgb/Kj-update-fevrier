@@ -2130,6 +2130,339 @@ class KojoAPITester:
                     print("   ❌ Existing jobs not backward compatible")
                 self.tests_run += 1
 
+    def test_push_notification_tokens(self):
+        """Test push notification token endpoints for mobile app integration"""
+        print("\n" + "="*50)
+        print("TESTING PUSH NOTIFICATION TOKEN ENDPOINTS")
+        print("="*50)
+        
+        if not self.client_token or not self.worker_token:
+            print("❌ Skipping push notification tests - missing user tokens")
+            return
+        
+        # Test 1: Register push token for iOS device
+        print(f"\n🔍 Testing iOS Push Token Registration...")
+        ios_token_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+            "device_type": "ios",
+            "device_id": "iPhone_12_Pro_Max_001"
+        }
+        
+        success, response = self.run_test(
+            "Register iOS Push Token",
+            "POST",
+            "users/push-token",
+            200,
+            data=ios_token_data,
+            token=self.client_token
+        )
+        
+        ios_token_id = None
+        if success and 'token_id' in response:
+            ios_token_id = response['token_id']
+            print(f"   iOS Token ID: {ios_token_id}")
+            if response.get('action') == 'created':
+                print(f"   ✅ New iOS token created successfully")
+        
+        # Test 2: Register push token for Android device
+        print(f"\n🔍 Testing Android Push Token Registration...")
+        android_token_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]",
+            "device_type": "android",
+            "device_id": "Samsung_Galaxy_S21_001"
+        }
+        
+        success, response = self.run_test(
+            "Register Android Push Token",
+            "POST",
+            "users/push-token",
+            200,
+            data=android_token_data,
+            token=self.client_token
+        )
+        
+        android_token_id = None
+        if success and 'token_id' in response:
+            android_token_id = response['token_id']
+            print(f"   Android Token ID: {android_token_id}")
+        
+        # Test 3: Register push token for Web device
+        print(f"\n🔍 Testing Web Push Token Registration...")
+        web_token_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "ExponentPushToken[zzzzzzzzzzzzzzzzzzzzzz]",
+            "device_type": "web",
+            "device_id": "Chrome_Browser_001"
+        }
+        
+        success, response = self.run_test(
+            "Register Web Push Token",
+            "POST",
+            "users/push-token",
+            200,
+            data=web_token_data,
+            token=self.client_token
+        )
+        
+        web_token_id = None
+        if success and 'token_id' in response:
+            web_token_id = response['token_id']
+            print(f"   Web Token ID: {web_token_id}")
+        
+        # Test 4: Update existing token (register same device again)
+        print(f"\n🔍 Testing Token Update (Same Device Registration)...")
+        updated_ios_token_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx_updated]",
+            "device_type": "ios",
+            "device_id": "iPhone_12_Pro_Max_001"  # Same device ID
+        }
+        
+        success, response = self.run_test(
+            "Update Existing iOS Push Token",
+            "POST",
+            "users/push-token",
+            200,
+            data=updated_ios_token_data,
+            token=self.client_token
+        )
+        
+        if success and response.get('action') == 'updated':
+            print(f"   ✅ Existing token updated successfully")
+        
+        # Test 5: Authentication requirement (no token)
+        print(f"\n🔍 Testing Authentication Requirement (No Token)...")
+        self.run_test(
+            "Register Push Token Without Authentication",
+            "POST",
+            "users/push-token",
+            403,
+            data=ios_token_data
+        )
+        
+        # Test 6: Invalid device type validation
+        print(f"\n🔍 Testing Invalid Device Type Validation...")
+        invalid_device_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "ExponentPushToken[invaliddevicetype]",
+            "device_type": "invalid_device",  # Invalid device type
+            "device_id": "Invalid_Device_001"
+        }
+        
+        self.run_test(
+            "Register Push Token with Invalid Device Type",
+            "POST",
+            "users/push-token",
+            422,  # Validation error
+            data=invalid_device_data,
+            token=self.client_token
+        )
+        
+        # Test 7: Security check - user can only register tokens for themselves
+        print(f"\n🔍 Testing Security Check (User ID Mismatch)...")
+        if self.worker_user:
+            security_test_data = {
+                "user_id": self.worker_user['id'],  # Different user ID
+                "push_token": "ExponentPushToken[securitytest]",
+                "device_type": "ios",
+                "device_id": "Security_Test_Device"
+            }
+            
+            self.run_test(
+                "Register Push Token for Different User (Should Fail)",
+                "POST",
+                "users/push-token",
+                403,
+                data=security_test_data,
+                token=self.client_token  # Client token but worker user_id
+            )
+        
+        # Test 8: Invalid push token format
+        print(f"\n🔍 Testing Invalid Push Token Format...")
+        invalid_token_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "short",  # Too short
+            "device_type": "ios",
+            "device_id": "Invalid_Token_Test"
+        }
+        
+        self.run_test(
+            "Register Push Token with Invalid Format",
+            "POST",
+            "users/push-token",
+            422,  # Validation error
+            data=invalid_token_data,
+            token=self.client_token
+        )
+        
+        # Test 9: Get all push tokens for user
+        print(f"\n🔍 Testing Get All Push Tokens...")
+        success, response = self.run_test(
+            "Get All Push Tokens for User",
+            "GET",
+            "users/push-tokens",
+            200,
+            token=self.client_token
+        )
+        
+        if success and response:
+            token_count = response.get('count', 0)
+            tokens = response.get('tokens', [])
+            print(f"   ✅ Retrieved {token_count} push tokens")
+            
+            # Verify token structure
+            if tokens and len(tokens) > 0:
+                first_token = tokens[0]
+                required_fields = ['id', 'device_type', 'created_at', 'updated_at']
+                for field in required_fields:
+                    if field in first_token:
+                        print(f"   ✅ Token contains required field: {field}")
+                    else:
+                        print(f"   ❌ Token missing required field: {field}")
+        
+        # Test 10: Get push tokens without authentication
+        print(f"\n🔍 Testing Get Push Tokens Without Authentication...")
+        self.run_test(
+            "Get Push Tokens Without Authentication",
+            "GET",
+            "users/push-tokens",
+            403
+        )
+        
+        # Test 11: Delete push token
+        print(f"\n🔍 Testing Delete Push Token...")
+        if ios_token_id:
+            success, response = self.run_test(
+                "Delete iOS Push Token",
+                "DELETE",
+                f"users/push-token/{ios_token_id}",
+                200,
+                token=self.client_token
+            )
+            
+            if success:
+                print(f"   ✅ Push token deleted successfully")
+        
+        # Test 12: Delete non-existent token
+        print(f"\n🔍 Testing Delete Non-Existent Token...")
+        fake_token_id = "non_existent_token_id_12345"
+        self.run_test(
+            "Delete Non-Existent Push Token",
+            "DELETE",
+            f"users/push-token/{fake_token_id}",
+            404,
+            token=self.client_token
+        )
+        
+        # Test 13: Delete token without authentication
+        print(f"\n🔍 Testing Delete Token Without Authentication...")
+        if android_token_id:
+            self.run_test(
+                "Delete Push Token Without Authentication",
+                "DELETE",
+                f"users/push-token/{android_token_id}",
+                403
+            )
+        
+        # Test 14: Worker user push token registration
+        print(f"\n🔍 Testing Worker Push Token Registration...")
+        worker_token_data = {
+            "user_id": self.worker_user['id'],
+            "push_token": "ExponentPushToken[workerdevicetoken]",
+            "device_type": "android",
+            "device_id": "Worker_Android_Device_001"
+        }
+        
+        success, response = self.run_test(
+            "Register Worker Push Token",
+            "POST",
+            "users/push-token",
+            200,
+            data=worker_token_data,
+            token=self.worker_token
+        )
+        
+        worker_token_id = None
+        if success and 'token_id' in response:
+            worker_token_id = response['token_id']
+            print(f"   Worker Token ID: {worker_token_id}")
+        
+        # Test 15: Verify worker can only delete their own tokens
+        print(f"\n🔍 Testing Token Ownership Security...")
+        if worker_token_id and web_token_id:
+            # Worker tries to delete client's token (should fail)
+            self.run_test(
+                "Worker Delete Client Token (Should Fail)",
+                "DELETE",
+                f"users/push-token/{web_token_id}",
+                404,  # Token not found for this user
+                token=self.worker_token
+            )
+        
+        # Test 16: Realistic Expo push token format validation
+        print(f"\n🔍 Testing Realistic Expo Push Token Formats...")
+        realistic_tokens = [
+            "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+            "ExponentPushToken[AbCdEfGhIjKlMnOpQrStUv]",
+            "ExponentPushToken[1234567890abcdef123456]",
+            "ExponentPushToken[ABCDEFGHIJKLMNOPQRSTUVWXYZ]"
+        ]
+        
+        for i, token in enumerate(realistic_tokens):
+            realistic_token_data = {
+                "user_id": self.client_user['id'],
+                "push_token": token,
+                "device_type": "ios",
+                "device_id": f"Realistic_Test_Device_{i}"
+            }
+            
+            self.run_test(
+                f"Realistic Expo Token Format {i+1}",
+                "POST",
+                "users/push-token",
+                200,
+                data=realistic_token_data,
+                token=self.client_token
+            )
+        
+        # Test 17: Edge case - very long device ID
+        print(f"\n🔍 Testing Edge Case - Long Device ID...")
+        long_device_id_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "ExponentPushToken[longdeviceidtest]",
+            "device_type": "android",
+            "device_id": "Very_Long_Device_ID_" + "x" * 150  # Very long device ID
+        }
+        
+        self.run_test(
+            "Push Token with Long Device ID",
+            "POST",
+            "users/push-token",
+            422,  # Should fail due to max length validation
+            data=long_device_id_data,
+            token=self.client_token
+        )
+        
+        # Test 18: Missing optional device_id (should work)
+        print(f"\n🔍 Testing Missing Optional Device ID...")
+        no_device_id_data = {
+            "user_id": self.client_user['id'],
+            "push_token": "ExponentPushToken[nodeviceidtest]",
+            "device_type": "web"
+            # No device_id field
+        }
+        
+        self.run_test(
+            "Push Token Without Device ID",
+            "POST",
+            "users/push-token",
+            200,
+            data=no_device_id_data,
+            token=self.client_token
+        )
+
     def run_all_tests(self):
         """Run all tests in sequence"""
         print("🚀 Starting Kojo API Tests")
