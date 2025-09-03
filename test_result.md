@@ -541,10 +541,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Ultra-Precise Geolocation System - COMPLETE"
+    - "Mobile Push Notifications System"
+    - "Mobile Offline Capabilities System"
     - "Authentication Screens (Login/Register)"
     - "Dashboard Screen"
-    - "Jobs Listing and Details"
   stuck_tasks: []
   test_all: false
   test_priority: "ultra_precise_geolocation_complete"
