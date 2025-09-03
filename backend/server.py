@@ -239,13 +239,13 @@ class User(BaseModel):
 
 class WorkerProfile(BaseModel):
     user_id: str
-    specialties: List[str] = []  # Compétences et spécialités
-    experience_years: int = 0    # Années d'expérience
-    hourly_rate: float = 0.0     # Tarif horaire en FCFA
-    cv_file: Optional[str] = None
-    portfolio_images: List[str] = []
+    specialties: List[str] = Field(default=[], min_items=1, max_items=10)  # At least 1, max 10 specialties
+    experience_years: int = Field(default=0, ge=0, le=50)  # 0-50 years experience
+    hourly_rate: float = Field(default=0.0, ge=500.0, le=100000.0)  # Min 500 FCFA, max 100k FCFA
+    cv_file: Optional[str] = Field(None, max_length=500)  # File path length limit
+    portfolio_images: List[str] = Field(default=[], max_items=10)  # Max 10 portfolio images
     availability: bool = True
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=1000)  # Description length limit
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
