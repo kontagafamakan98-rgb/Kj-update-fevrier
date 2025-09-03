@@ -102,14 +102,20 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
   const handleInputChange = (field, value) => {
     if (field === 'orange_money' || field === 'wave') {
       value = formatPhoneNumber(value);
-    } else if (field === 'bank_card') {
-      value = formatBankCard(value.replace(/[^\d]/g, ''));
+      setAccounts(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    } else if (field.startsWith('bank_account.')) {
+      const bankField = field.split('.')[1];
+      setAccounts(prev => ({
+        ...prev,
+        bank_account: {
+          ...prev.bank_account,
+          [bankField]: value
+        }
+      }));
     }
-    
-    setAccounts(prev => ({
-      ...prev,
-      [field]: value
-    }));
 
     // Clear validation error for this field
     if (validationErrors[field]) {
