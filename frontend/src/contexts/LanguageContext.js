@@ -315,7 +315,36 @@ const translations = {
     languageOnProfile: 'Sa làkk dina mel ci sa profil bu xam',
     clientsCanSee: 'Kiliyaan yi man na ko xam làkk bu nga xam',
     canModifyLater: 'Man nga ko soppi ci sa paramètres yi',
-    detectingLanguage: 'Daa ngi gis sa làkk...'
+    detectingLanguage: 'Daa ngi gis sa làkk...',
+    
+    // Registration  
+    createAccount: 'Dund konte',
+    joinKojoCommunity: 'Bokk ci jammiit Kojo',
+    userType: 'Sugu jëfkoykat',
+    iAmClient: 'Dama soxla sëriñ yi',
+    iAmWorker: 'Dama def liggéey',
+    country: 'Réew',
+    detectedAutomatically: 'Giss na otomatig',
+    positionDetected: 'Bër bi giss na',
+    adjustedAutomatically: 'Misaal ak xet yi soppi nañu otomatig',
+    positionNotDetected: 'Bër bi gissul - Jëfandikoo paramètres yu defar (Senegaal)',
+    personalInformation: 'Xet yu boole',
+    paymentAccounts: 'Konte fey',
+    nextStepWorker: 'Xànti bu dekk: Banga jëmm benn ñaar ay yoon yu fey (Orange Money, Wave, Konte bank)',
+    nextStepClient: 'Xànti bu dekk: Banga jëmm benn yoon yu fey (Orange Money, Wave, Konte bank)',
+    continueToPaymentVerification: 'Taax → Kontròol konte yi',
+    detectingLocation: 'Daa ngi gis sa bër...',
+    detectedViaGeolocation: 'Réew bi giss na ci sa bër',
+    atLeast6Characters: 'Tang benn juude-kronni',
+    phoneFormat: 'Muj',
+    passwordsDontMatch: 'Kóod yu dugub yi beneen na',
+    passwordTooShort: 'Kóodu dugub bi war na tang benn juude-kronni',
+    workersMustSelectSkills: 'Liggéeykat yi war na tànn benn xel-xel',
+    pleaseIndicateExperience: 'Wadal sa at yu liggéey',
+    pleaseIndicateValidRate: 'Wadal njëkk waxtu bu bax (minimum 500 FCFA)',
+    preparing: 'Daa ngi yeggal...',
+    alreadyHaveAccount: 'Am nga konte?',
+    signIn: 'Dugg'
   },
   bm: {
     // Navigation (Bambara)
