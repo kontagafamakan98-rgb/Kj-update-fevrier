@@ -953,7 +953,7 @@ async def get_commission_stats(owner_user = Depends(verify_owner_access)):
                     "commission": 7000,
                     "worker_amount": 43000,
                     "method": "orange_money",
-                    "date": datetime.utcnow().isoformat()
+                    "date": datetime.now(timezone.utc).isoformat()
                 }
             ]
         }
