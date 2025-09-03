@@ -2479,6 +2479,7 @@ class KojoAPITester:
             self.test_owner_authorization_system()  # Test Famakan authorization system
             self.test_user_profile()
             self.test_profile_photo_management()  # Added profile photo tests
+            self.test_push_notification_tokens()  # NEW: Test push notification endpoints
             self.test_worker_profile()
             self.test_job_management()
             self.test_mechanic_requirements_system()  # NEW: Test mechanic requirements
