@@ -350,13 +350,18 @@ const translations = {
 };
 
 export function LanguageProvider({ children }) {
-  const [currentLanguage, setCurrentLanguage] = useState('fr');
+  const [currentLanguage, setCurrentLanguage] = useState(() => {
+    // Initialize from localStorage or default to French
+    const savedLanguage = localStorage.getItem('language');
+    return savedLanguage && ['fr', 'en', 'wo', 'bm'].includes(savedLanguage) ? savedLanguage : 'fr';
+  });
 
   const t = (key) => {
     return translations[currentLanguage]?.[key] || key;
   };
 
   const changeLanguage = (lang) => {
+    console.log(`🔄 Changing interface language to: ${lang}`);
     setCurrentLanguage(lang);
     localStorage.setItem('language', lang);
   };
