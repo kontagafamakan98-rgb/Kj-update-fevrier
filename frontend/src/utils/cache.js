@@ -1,3 +1,5 @@
+import { devLog, safeLog } from 'env';
+
 /**
  * Advanced Caching System for Kojo - Optimized for West African Networks
  * Handles slow connections, intermittent connectivity, and data optimization
@@ -45,7 +47,7 @@ class KojoCache {
       }
       return jsonString;
     } catch (error) {
-      console.warn('Cache compression failed:', error);
+      safeLog.warn('Cache compression failed:', error);
       return JSON.stringify(data);
     }
   }
@@ -61,7 +63,7 @@ class KojoCache {
       }
       return JSON.parse(compressedData);
     } catch (error) {
-      console.warn('Cache decompression failed:', error);
+      safeLog.warn('Cache decompression failed:', error);
       return null;
     }
   }
@@ -88,7 +90,7 @@ class KojoCache {
       
       return true;
     } catch (error) {
-      console.warn(`Cache set failed for key ${key}:`, error);
+      safeLog.warn(`Cache set failed for key ${key}:`, error);
       // Attempt cleanup if quota exceeded
       if (error.name === 'QuotaExceededError') {
         this.cleanup();
@@ -124,7 +126,7 @@ class KojoCache {
 
       return cacheData.data;
     } catch (error) {
-      console.warn(`Cache get failed for key ${key}:`, error);
+      safeLog.warn(`Cache get failed for key ${key}:`, error);
       this.remove(key);
       return null;
     }
@@ -139,7 +141,7 @@ class KojoCache {
       localStorage.removeItem(cacheKey);
       return true;
     } catch (error) {
-      console.warn(`Cache remove failed for key ${key}:`, error);
+      safeLog.warn(`Cache remove failed for key ${key}:`, error);
       return false;
     }
   }
@@ -157,7 +159,7 @@ class KojoCache {
       });
       return true;
     } catch (error) {
-      console.warn('Cache clear failed:', error);
+      safeLog.warn('Cache clear failed:', error);
       return false;
     }
   }
@@ -188,10 +190,10 @@ class KojoCache {
         }
       });
       
-      console.log(`Cache cleanup completed: ${cleanedCount} entries removed`);
+      devLog.info(`Cache cleanup completed: ${cleanedCount} entries removed`);
       return cleanedCount;
     } catch (error) {
-      console.warn('Cache cleanup failed:', error);
+      safeLog.warn('Cache cleanup failed:', error);
       return 0;
     }
   }
@@ -233,7 +235,7 @@ class KojoCache {
         compressionEnabled: this.compressionEnabled
       };
     } catch (error) {
-      console.warn('Cache stats failed:', error);
+      safeLog.warn('Cache stats failed:', error);
       return null;
     }
   }
@@ -244,7 +246,7 @@ class KojoCache {
   logCacheSize(key, data) {
     if (process.env.NODE_ENV === 'development') {
       const size = new Blob([data]).size;
-      console.log(`💾 Cache set: ${key} (${(size / 1024).toFixed(2)} KB)`);
+      devLog.info(`💾 Cache set: ${key} (${(size / 1024).toFixed(2)} KB)`);
     }
   }
 
@@ -265,13 +267,13 @@ class KojoCache {
         this.set(key, data, expiryTime);
         return data;
       } catch (error) {
-        console.warn(`Cache fetch attempt ${attempt} failed for ${key}:`, error);
+        safeLog.warn(`Cache fetch attempt ${attempt} failed for ${key}:`, error);
         
         if (attempt === maxRetries) {
           // Return stale cache if available on final failure
           const staleCache = this.getStale(key);
           if (staleCache) {
-            console.log(`Returning stale cache for ${key}`);
+            devLog.info(`Returning stale cache for ${key}`);
             return staleCache;
           }
           throw error;
@@ -296,7 +298,7 @@ class KojoCache {
       const cacheData = this.decompress(cachedItem);
       return cacheData ? cacheData.data : null;
     } catch (error) {
-      console.warn(`Stale cache get failed for key ${key}:`, error);
+      safeLog.warn(`Stale cache get failed for key ${key}:`, error);
       return null;
     }
   }

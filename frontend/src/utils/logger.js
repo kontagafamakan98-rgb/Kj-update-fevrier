@@ -1,3 +1,5 @@
+import { devLog, safeLog } from 'env';
+
 /**
  * Logger utility for Kojo application
  * Provides centralized logging with different levels and environments
@@ -53,7 +55,7 @@ class Logger {
     const formattedMessage = this.formatMessage(level, message, context);
 
     // Console output with styling
-    console.log(`%c[${levelName}] ${message}`, `color: ${color}; font-weight: bold`, context);
+    devLog.info(`%c[${levelName}] ${message}`, `color: ${color}; font-weight: bold`, context);
 
     // In production, you could send to logging service
     if (process.env.NODE_ENV === 'production' && level <= LOG_LEVELS.ERROR) {
@@ -102,7 +104,7 @@ class Logger {
   sendToLoggingService(logData) {
     // In production, implement sending logs to external service
     // e.g., LogRocket, Sentry, etc.
-    console.log('Would send to logging service:', logData);
+    devLog.info('Would send to logging service:', logData);
   }
 }
 

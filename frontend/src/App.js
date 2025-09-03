@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { devLog, safeLog } from 'utils/env';
+
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -198,12 +200,12 @@ function App() {
 
     // Handle online/offline status
     const handleOnline = () => {
-      console.log('App is online');
+      devLog.info('App is online');
       // Could trigger data sync here
     };
     
     const handleOffline = () => {
-      console.log('App is offline');
+      devLog.info('App is offline');
       // Could save pending actions for later sync
     };
 
@@ -212,7 +214,7 @@ function App() {
 
     // Handle PWA app installed event
     const handleAppInstalled = () => {
-      console.log('PWA was installed');
+      devLog.info('PWA was installed');
       // Could track analytics or show welcome message
     };
 

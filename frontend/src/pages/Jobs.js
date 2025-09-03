@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import JobCreateModal from '../components/JobCreateModal';
 import MechanicRequirements from '../components/MechanicRequirements';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
@@ -49,7 +51,7 @@ export default function Jobs() {
         setJobs(jobsData);
       }
     } catch (error) {
-      console.error('Error loading jobs:', error);
+      safeLog.error('Error loading jobs:', error);
     } finally {
       setLoading(false);
     }

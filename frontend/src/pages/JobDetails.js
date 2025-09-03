@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import ProposalModal from '../components/ProposalModal';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function JobDetails() {
   const [job, setJob] = useState(null);
@@ -32,11 +34,11 @@ export default function JobDetails() {
           const proposalsResponse = await axios.get(`/jobs/${id}/proposals`);
           setProposals(proposalsResponse.data);
         } catch (error) {
-          console.error('Error loading proposals:', error);
+          safeLog.error('Error loading proposals:', error);
         }
       }
     } catch (error) {
-      console.error('Error loading job details:', error);
+      safeLog.error('Error loading job details:', error);
       setError('Erreur lors du chargement de l\'emploi');
     } finally {
       setLoading(false);

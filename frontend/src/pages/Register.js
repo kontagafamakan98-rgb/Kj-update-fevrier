@@ -6,6 +6,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
 import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -46,12 +48,12 @@ export default function Register() {
 
   const detectUserLocationAndSetDefaults = async () => {
     try {
-      console.log('🌍 Détection automatique du pays de l\'utilisateur...');
+      devLog.info('🌍 Détection automatique du pays de l\'utilisateur...');
       const country = await detectUserCountry();
       
       if (country) {
         setDetectedCountry(country);
-        console.log(`📍 Pays détecté: ${country.nameFrench} ${country.flag}`);
+        devLog.info(`📍 Pays détecté: ${country.nameFrench} ${country.flag}`);
         
         // Mettre à jour automatiquement le pays et le préfixe téléphonique
         setFormData(prev => ({
@@ -60,10 +62,10 @@ export default function Register() {
           phone: country.phonePrefix + ' '
         }));
         
-        console.log(`📱 Préfixe ajusté: ${country.phonePrefix}`);
+        devLog.info(`📱 Préfixe ajusté: ${country.phonePrefix}`);
       }
     } catch (error) {
-      console.error('❌ Erreur géolocalisation:', error);
+      safeLog.error('❌ Erreur géolocalisation:', error);
     } finally {
       setGeoLoading(false);
     }
@@ -118,7 +120,7 @@ export default function Register() {
     delete userData.confirmPassword;
 
     // Rediriger vers la vérification des comptes de paiement
-    console.log('📝 Redirection vers vérification des comptes de paiement...');
+    devLog.info('📝 Redirection vers vérification des comptes de paiement...');
     
     // Passer les données à la page de vérification
     navigate('/payment-verification', {

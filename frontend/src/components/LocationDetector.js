@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { MapPin, Loader2, Navigation } from 'lucide-react';
 import GeolocationService from '../services/geolocationService';
+import { devLog, safeLog } from '../utils/env';
+
 
 const LocationDetector = ({ 
   onLocationDetected, 
@@ -26,7 +28,7 @@ const LocationDetector = ({
       alert(`📍 Localisation détectée: ${location.fullAddress}`);
       
     } catch (error) {
-      console.error('Erreur détection:', error);
+      safeLog.error('Erreur détection:', error);
       alert('Impossible de détecter votre position automatiquement. Veuillez entrer votre localisation manuellement.');
     } finally {
       setDetecting(false);

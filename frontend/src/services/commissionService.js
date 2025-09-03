@@ -1,3 +1,5 @@
+import { devLog, safeLog } from '../utils/env';
+
 // Service de gestion des commissions et transferts automatiques
 class CommissionService {
   constructor() {
@@ -47,11 +49,11 @@ class CommissionService {
     } = paymentData;
 
     try {
-      console.log('🏦 Début du traitement avec commission...');
+      devLog.info('🏦 Début du traitement avec commission...');
       
       // 1. Calculer les commissions
       const commission = this.calculateCommissions(amount);
-      console.log('💰 Commission calculée:', commission);
+      devLog.info('💰 Commission calculée:', commission);
 
       // 2. Effectuer le paiement principal
       const paymentResult = await this.processMainPayment(paymentData);
@@ -92,7 +94,7 @@ class CommissionService {
       };
 
     } catch (error) {
-      console.error('❌ Erreur traitement commission:', error);
+      safeLog.error('❌ Erreur traitement commission:', error);
       return {
         success: false,
         error: error.message
@@ -124,7 +126,7 @@ class CommissionService {
       transactionId
     } = data;
 
-    console.log('📤 Distribution des fonds en cours...');
+    devLog.info('📤 Distribution des fonds en cours...');
 
     try {
       // 1. Transfert vers le propriétaire (14%)
@@ -151,7 +153,7 @@ class CommissionService {
       };
 
     } catch (error) {
-      console.error('❌ Erreur distribution:', error);
+      safeLog.error('❌ Erreur distribution:', error);
       throw new Error('Échec de la distribution des fonds');
     }
   }
@@ -160,8 +162,8 @@ class CommissionService {
   async transferToOwner({ amount, method, reference }) {
     const ownerAccount = this.OWNER_ACCOUNTS[method];
     
-    console.log(`💼 Transfert de ${amount} XOF vers propriétaire via ${method}`);
-    console.log('🏦 Compte propriétaire:', ownerAccount);
+    devLog.info(`💼 Transfert de ${amount} XOF vers propriétaire via ${method}`);
+    devLog.info('🏦 Compte propriétaire:', ownerAccount);
 
     // Simulation du transfert automatique
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -184,8 +186,8 @@ class CommissionService {
 
   // Transfert automatique vers le travailleur
   async transferToWorker({ amount, method, workerId, workerAccount, reference }) {
-    console.log(`👷 Transfert de ${amount} XOF vers travailleur ${workerId} via ${method}`);
-    console.log('💳 Compte travailleur:', workerAccount);
+    devLog.info(`👷 Transfert de ${amount} XOF vers travailleur ${workerId} via ${method}`);
+    devLog.info('💳 Compte travailleur:', workerAccount);
 
     // Simulation du transfert automatique
     await new Promise(resolve => setTimeout(resolve, 800));
@@ -215,7 +217,7 @@ class CommissionService {
     transactions.unshift(record);
     localStorage.setItem('kojo_commission_transactions', JSON.stringify(transactions));
 
-    console.log('📊 Transaction enregistrée:', record.id);
+    devLog.info('📊 Transaction enregistrée:', record.id);
     return record;
   }
 
@@ -264,7 +266,7 @@ class CommissionService {
   updateOwnerAccounts(newAccounts) {
     this.OWNER_ACCOUNTS = { ...this.OWNER_ACCOUNTS, ...newAccounts };
     localStorage.setItem('owner_accounts', JSON.stringify(this.OWNER_ACCOUNTS));
-    console.log('✅ Comptes propriétaire mis à jour');
+    devLog.info('✅ Comptes propriétaire mis à jour');
   }
 
   // Charger les comptes depuis le stockage
@@ -275,7 +277,7 @@ class CommissionService {
         this.OWNER_ACCOUNTS = JSON.parse(stored);
       }
     } catch (error) {
-      console.error('Erreur chargement comptes:', error);
+      safeLog.error('Erreur chargement comptes:', error);
     }
   }
 

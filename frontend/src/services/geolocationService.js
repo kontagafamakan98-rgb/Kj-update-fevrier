@@ -1,3 +1,5 @@
+import { devLog, safeLog } from '../utils/env';
+
 // Service de géolocalisation pour la PWA
 export const COUNTRIES = {
   MALI: {
@@ -121,7 +123,7 @@ class GeolocationService {
           this.isDetecting = false;
           return detectedLocation;
         } catch (geoError) {
-          console.log('Géolocalisation GPS échouée, utilisation simulation:', geoError);
+          devLog.info('Géolocalisation GPS échouée, utilisation simulation:', geoError);
           // Fallback vers simulation
         }
       }
@@ -316,7 +318,7 @@ export const detectUserCountry = async () => {
       });
 
       const { latitude, longitude } = position.coords;
-      console.log(`📍 Position détectée: ${latitude}, ${longitude}`);
+      devLog.info(`📍 Position détectée: ${latitude}, ${longitude}`);
 
       // Approximation géographique pour l'Afrique de l'Ouest
       // Mali: environ 17°N, 4°W
@@ -338,7 +340,7 @@ export const detectUserCountry = async () => {
       }
     }
   } catch (error) {
-    console.log('⚠️ Géolocalisation non disponible:', error.message);
+    devLog.info('⚠️ Géolocalisation non disponible:', error.message);
   }
 
   try {
@@ -349,7 +351,7 @@ export const detectUserCountry = async () => {
     
     if (response.ok) {
       const data = await response.json();
-      console.log('🌍 Pays détecté par IP:', data.country_name);
+      devLog.info('🌍 Pays détecté par IP:', data.country_name);
       
       // Mapper les codes pays vers nos constantes
       const countryMapping = {
@@ -364,11 +366,11 @@ export const detectUserCountry = async () => {
       }
     }
   } catch (error) {
-    console.log('⚠️ Détection par IP échouée:', error.message);
+    devLog.info('⚠️ Détection par IP échouée:', error.message);
   }
 
   // Fallback par défaut: Sénégal (pays le plus connecté de la région)
-  console.log('🇸🇳 Utilisation du pays par défaut: Sénégal');
+  devLog.info('🇸🇳 Utilisation du pays par défaut: Sénégal');
   return COUNTRIES.SENEGAL;
 };
 

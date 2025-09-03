@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function Messages() {
   const [conversations, setConversations] = useState([]);
@@ -27,7 +29,7 @@ export default function Messages() {
       const response = await axios.get('/messages/conversations');
       setConversations(response.data);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      safeLog.error('Error loading conversations:', error);
     } finally {
       setLoading(false);
     }
@@ -39,7 +41,7 @@ export default function Messages() {
       setMessages(response.data);
       setActiveConversation(conversationId);
     } catch (error) {
-      console.error('Error loading messages:', error);
+      safeLog.error('Error loading messages:', error);
     }
   };
 
@@ -62,7 +64,7 @@ export default function Messages() {
       // Reload messages to show the new one
       loadMessages(activeConversation);
     } catch (error) {
-      console.error('Error sending message:', error);
+      safeLog.error('Error sending message:', error);
     }
   };
 

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import PaymentAccountService from '../services/paymentAccountService';
 import PaymentAccountSetup from './PaymentAccountSetup';
+import { devLog, safeLog } from '../utils/env';
+
 
 const PaymentAccessGuard = ({ children, showSetupIfNeeded = true }) => {
   const { user } = useAuth();
@@ -31,10 +33,10 @@ const PaymentAccessGuard = ({ children, showSetupIfNeeded = true }) => {
           setShowSetup(true);
         }
       } else {
-        console.error('Erreur vérification accès:', result.error);
+        safeLog.error('Erreur vérification accès:', result.error);
       }
     } catch (error) {
-      console.error('Erreur accès paiement:', error);
+      safeLog.error('Erreur accès paiement:', error);
     } finally {
       setLoading(false);
     }

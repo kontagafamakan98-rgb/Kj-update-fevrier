@@ -1,5 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import CommissionService from '../services/commissionService';
+import { devLog, safeLog } from '../utils/env';
+
 
 const PaymentContext = createContext();
 
@@ -86,7 +88,7 @@ export function PaymentProvider({ children }) {
     }
 
     try {
-      console.log('🚗 Traitement paiement avec commission Uber-style...');
+      devLog.info('🚗 Traitement paiement avec commission Uber-style...');
       
       // Utiliser le service de commission pour le traitement complet
       const result = await CommissionService.simulateFullPayment(
@@ -125,7 +127,7 @@ export function PaymentProvider({ children }) {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('❌ Erreur paiement avec commission:', error);
+      safeLog.error('❌ Erreur paiement avec commission:', error);
       return {
         success: false,
         error: error.message

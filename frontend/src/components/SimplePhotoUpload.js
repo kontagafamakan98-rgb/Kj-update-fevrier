@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { devLog, safeLog } from '../utils/env';
+
 
 const SimplePhotoUpload = ({ userId, size = 100 }) => {
   const [photo, setPhoto] = useState(null);
@@ -9,7 +11,7 @@ const SimplePhotoUpload = ({ userId, size = 100 }) => {
       const savedPhoto = localStorage.getItem(`photo_${userId}`);
       if (savedPhoto) {
         setPhoto(savedPhoto);
-        console.log('Photo chargée depuis localStorage');
+        devLog.info('Photo chargée depuis localStorage');
       }
     }
   }, [userId]);
@@ -33,7 +35,7 @@ const SimplePhotoUpload = ({ userId, size = 100 }) => {
           // Afficher immédiatement
           setPhoto(base64);
           
-          console.log('Photo sauvée et affichée !');
+          devLog.info('Photo sauvée et affichée !');
         };
         reader.readAsDataURL(file);
       }
@@ -47,7 +49,7 @@ const SimplePhotoUpload = ({ userId, size = 100 }) => {
     if (confirm('Supprimer la photo ?')) {
       localStorage.removeItem(`photo_${userId}`);
       setPhoto(null);
-      console.log('Photo supprimée');
+      devLog.info('Photo supprimée');
     }
   };
 

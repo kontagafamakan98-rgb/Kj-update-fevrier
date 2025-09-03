@@ -1,3 +1,5 @@
+import { devLog, safeLog } from '../utils/env';
+
 // Service de gestion des comptes de paiement pour la vérification
 class PaymentAccountService {
   constructor() {
@@ -16,7 +18,7 @@ class PaymentAccountService {
   // Inscription avec vérification des comptes de paiement
   async registerWithPaymentVerification(userData, paymentAccounts) {
     try {
-      console.log('🏦 Inscription avec vérification paiement...');
+      devLog.info('🏦 Inscription avec vérification paiement...');
       
       const registrationData = {
         ...userData,
@@ -37,7 +39,7 @@ class PaymentAccountService {
       }
 
       const result = await response.json();
-      console.log('✅ Inscription avec paiement réussie:', result);
+      devLog.info('✅ Inscription avec paiement réussie:', result);
       
       return {
         success: true,
@@ -45,7 +47,7 @@ class PaymentAccountService {
       };
 
     } catch (error) {
-      console.error('❌ Erreur inscription avec paiement:', error);
+      safeLog.error('❌ Erreur inscription avec paiement:', error);
       return {
         success: false,
         error: error.message
@@ -56,7 +58,7 @@ class PaymentAccountService {
   // Obtenir les comptes de paiement de l'utilisateur
   async getUserPaymentAccounts() {
     try {
-      console.log('📋 Récupération comptes de paiement...');
+      devLog.info('📋 Récupération comptes de paiement...');
 
       const response = await fetch(`${this.API_BASE}/users/payment-accounts`, {
         method: 'GET',
@@ -69,7 +71,7 @@ class PaymentAccountService {
       }
 
       const result = await response.json();
-      console.log('✅ Comptes de paiement récupérés:', result);
+      devLog.info('✅ Comptes de paiement récupérés:', result);
       
       return {
         success: true,
@@ -77,7 +79,7 @@ class PaymentAccountService {
       };
 
     } catch (error) {
-      console.error('❌ Erreur récupération comptes:', error);
+      safeLog.error('❌ Erreur récupération comptes:', error);
       return {
         success: false,
         error: error.message
@@ -88,7 +90,7 @@ class PaymentAccountService {
   // Mettre à jour les comptes de paiement
   async updatePaymentAccounts(paymentAccounts) {
     try {
-      console.log('🔄 Mise à jour comptes de paiement...');
+      devLog.info('🔄 Mise à jour comptes de paiement...');
 
       const response = await fetch(`${this.API_BASE}/users/payment-accounts`, {
         method: 'PUT',
@@ -102,7 +104,7 @@ class PaymentAccountService {
       }
 
       const result = await response.json();
-      console.log('✅ Comptes de paiement mis à jour:', result);
+      devLog.info('✅ Comptes de paiement mis à jour:', result);
       
       return {
         success: true,
@@ -110,7 +112,7 @@ class PaymentAccountService {
       };
 
     } catch (error) {
-      console.error('❌ Erreur mise à jour comptes:', error);
+      safeLog.error('❌ Erreur mise à jour comptes:', error);
       return {
         success: false,
         error: error.message
@@ -121,7 +123,7 @@ class PaymentAccountService {
   // Vérifier l'accès aux fonctionnalités de paiement
   async verifyPaymentAccess() {
     try {
-      console.log('🔐 Vérification accès paiement...');
+      devLog.info('🔐 Vérification accès paiement...');
 
       const response = await fetch(`${this.API_BASE}/users/verify-payment-access`, {
         method: 'POST',
@@ -134,7 +136,7 @@ class PaymentAccountService {
       }
 
       const result = await response.json();
-      console.log('✅ Vérification accès:', result);
+      devLog.info('✅ Vérification accès:', result);
       
       return {
         success: true,
@@ -142,7 +144,7 @@ class PaymentAccountService {
       };
 
     } catch (error) {
-      console.error('❌ Erreur vérification accès:', error);
+      safeLog.error('❌ Erreur vérification accès:', error);
       return {
         success: false,
         error: error.message
@@ -212,7 +214,7 @@ class PaymentAccountService {
       const stored = localStorage.getItem('payment_verification_status');
       return stored ? JSON.parse(stored) : null;
     } catch (error) {
-      console.error('Erreur lecture statut vérification:', error);
+      safeLog.error('Erreur lecture statut vérification:', error);
       return null;
     }
   }
@@ -224,9 +226,9 @@ class PaymentAccountService {
         ...status,
         timestamp: Date.now()
       }));
-      console.log('✅ Statut vérification sauvegardé');
+      devLog.info('✅ Statut vérification sauvegardé');
     } catch (error) {
-      console.error('Erreur sauvegarde statut:', error);
+      safeLog.error('Erreur sauvegarde statut:', error);
     }
   }
 
@@ -234,9 +236,9 @@ class PaymentAccountService {
   clearVerificationCache() {
     try {
       localStorage.removeItem('payment_verification_status');
-      console.log('🗑️ Cache vérification nettoyé');
+      devLog.info('🗑️ Cache vérification nettoyé');
     } catch (error) {
-      console.error('Erreur nettoyage cache:', error);
+      safeLog.error('Erreur nettoyage cache:', error);
     }
   }
 

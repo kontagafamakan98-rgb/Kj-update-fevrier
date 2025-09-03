@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import PaymentAccountSetup from '../components/PaymentAccountSetup';
 import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry, getPhoneExampleForCountry } from '../services/geolocationService';
+import { devLog, safeLog } from '../utils/env';
+
 
 const PaymentVerificationPage = () => {
   const navigate = useNavigate();
@@ -31,10 +33,10 @@ const PaymentVerificationPage = () => {
       const country = await detectUserCountry();
       if (country) {
         setDetectedCountry(country);
-        console.log(`📍 Pays détecté pour paiements: ${country.nameFrench} ${country.flag}`);
+        devLog.info(`📍 Pays détecté pour paiements: ${country.nameFrench} ${country.flag}`);
       }
     } catch (error) {
-      console.error('Erreur détection pays pour paiements:', error);
+      safeLog.error('Erreur détection pays pour paiements:', error);
     } finally {
       setGeoLoading(false);
     }
@@ -45,7 +47,7 @@ const PaymentVerificationPage = () => {
     setError(null);
 
     try {
-      console.log('📝 Finalisation inscription avec comptes de paiement...');
+      devLog.info('📝 Finalisation inscription avec comptes de paiement...');
       
       // Inscription avec vérification des comptes de paiement
       const result = await PaymentAccountService.registerWithPaymentVerification(
@@ -65,7 +67,7 @@ const PaymentVerificationPage = () => {
           user_type: result.data.user.user_type
         });
 
-        console.log('🎉 Inscription réussie avec vérification paiement!');
+        devLog.info('🎉 Inscription réussie avec vérification paiement!');
         
         // Rediriger vers le dashboard
         navigate('/dashboard', {
@@ -80,7 +82,7 @@ const PaymentVerificationPage = () => {
       }
 
     } catch (error) {
-      console.error('❌ Erreur inscription avec paiement:', error);
+      safeLog.error('❌ Erreur inscription avec paiement:', error);
       setError(error.message || 'Erreur lors de l\'inscription avec vérification paiement');
     } finally {
       setLoading(false);
