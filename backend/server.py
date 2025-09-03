@@ -544,8 +544,9 @@ async def register_user_verified(user_data: UserWithPayment):
             filename = f"profile_{user_id}_{int(datetime.utcnow().timestamp())}.{file_extension}"
             profile_photo_path = f"/uploads/profile_photos/{filename}"  # Absolute path for URL
             
-            # Sauvegarder l'image
-            with open(profile_photo_path, "wb") as f:
+            # Sauvegarder l'image (utiliser path relatif pour filesystem)
+            filesystem_path = f"uploads/profile_photos/{filename}"
+            with open(filesystem_path, "wb") as f:
                 f.write(image_data)
                 
             print(f"✅ Photo de profil sauvegardée: {profile_photo_path}")
