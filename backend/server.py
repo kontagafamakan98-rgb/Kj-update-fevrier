@@ -1125,7 +1125,7 @@ async def update_user_payment_accounts(
                 "payment_accounts": payment_validation["account_details"],
                 "payment_accounts_count": payment_validation["linked_accounts_count"],
                 "is_verified": payment_validation["is_verified"],
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }
         }
     )
