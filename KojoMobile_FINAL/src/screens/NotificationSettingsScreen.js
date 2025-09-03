@@ -20,10 +20,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
     pushToken,
     isOnline,
     offlineQueueSize,
-    syncData,
+    syncOfflineData,
     lastSyncTime,
     simulateNotification
-  } = useNotification();
+  } = useNotifications();
 
   const [localSettings, setLocalSettings] = useState(settings);
 
