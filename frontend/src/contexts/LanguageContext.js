@@ -297,6 +297,8 @@ const translations = {
     cleaning: 'Set',
     gardening: 'Jàng',
     tutoring: 'Jàngale',
+    mechanics: 'Màkina',
+    computing: 'Ordinatër',
     
     // Payments
     payment: 'Fey',
