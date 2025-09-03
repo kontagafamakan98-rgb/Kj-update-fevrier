@@ -302,6 +302,144 @@ export default function CreateJob() {
               </div>
             </div>
 
+            {/* Section Pièces et Outils - Spécial Mécaniciens */}
+            {(formData.category === 'mecanique' || formData.category === 'plomberie' || 
+              formData.category === 'electricite' || formData.category === 'general') && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <div className="flex items-center mb-4">
+                  <span className="text-2xl mr-3">🔧</span>
+                  <h3 className="text-lg font-semibold text-blue-900">
+                    Informations Importantes pour le Mécanicien
+                  </h3>
+                </div>
+                
+                <div className="space-y-4">
+                  {/* Pièces */}
+                  <div className="flex items-center justify-between p-4 bg-white border border-blue-200 rounded-lg">
+                    <div className="flex items-center">
+                      <span className="text-xl mr-3">🔩</span>
+                      <div>
+                        <h4 className="font-medium text-gray-900">Le mécanicien doit-il apporter les pièces ?</h4>
+                        <p className="text-sm text-gray-600">Pièces de rechange, composants, etc.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="mechanic_must_bring_parts"
+                          value="true"
+                          checked={formData.mechanic_must_bring_parts === true}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            mechanic_must_bring_parts: e.target.value === 'true'
+                          }))}
+                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-green-700">✅ Oui</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="mechanic_must_bring_parts"
+                          value="false"
+                          checked={formData.mechanic_must_bring_parts === false}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            mechanic_must_bring_parts: e.target.value === 'true'
+                          }))}
+                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-red-700">❌ Non</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Outils */}
+                  <div className="flex items-center justify-between p-4 bg-white border border-blue-200 rounded-lg">
+                    <div className="flex items-center">
+                      <span className="text-xl mr-3">🛠️</span>
+                      <div>
+                        <h4 className="font-medium text-gray-900">Le mécanicien doit-il apporter les outils ?</h4>
+                        <p className="text-sm text-gray-600">Outils spécialisés, équipements, etc.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="mechanic_must_bring_tools"
+                          value="true"
+                          checked={formData.mechanic_must_bring_tools === true}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            mechanic_must_bring_tools: e.target.value === 'true'
+                          }))}
+                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-green-700">✅ Oui</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="mechanic_must_bring_tools"
+                          value="false"
+                          checked={formData.mechanic_must_bring_tools === false}
+                          onChange={(e) => setFormData(prev => ({
+                            ...prev,
+                            mechanic_must_bring_tools: e.target.value === 'true'
+                          }))}
+                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-red-700">❌ Non</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Notes supplémentaires */}
+                  <div>
+                    <label htmlFor="parts_and_tools_notes" className="block text-sm font-medium text-blue-900 mb-2">
+                      📝 Notes supplémentaires (optionnel)
+                    </label>
+                    <textarea
+                      id="parts_and_tools_notes"
+                      name="parts_and_tools_notes"
+                      rows={3}
+                      value={formData.parts_and_tools_notes}
+                      onChange={handleChange}
+                      placeholder="Ex: Pièces spécifiques nécessaires, modèle du véhicule, marque des outils requis..."
+                      className="block w-full px-4 py-3 border border-blue-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    />
+                    <p className="mt-1 text-xs text-blue-600">
+                      💡 Ces informations aideront le mécanicien à mieux se préparer pour votre intervention
+                    </p>
+                  </div>
+
+                  {/* Résumé */}
+                  <div className="mt-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">📋 Résumé pour le mécanicien :</h4>
+                    <div className="text-sm text-blue-800 space-y-1">
+                      <p>
+                        🔩 <strong>Pièces :</strong> 
+                        <span className={formData.mechanic_must_bring_parts ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                          {formData.mechanic_must_bring_parts ? ' À apporter par le mécanicien' : ' Fournies par le client'}
+                        </span>
+                      </p>
+                      <p>
+                        🛠️ <strong>Outils :</strong> 
+                        <span className={formData.mechanic_must_bring_tools ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
+                          {formData.mechanic_must_bring_tools ? ' À apporter par le mécanicien' : ' Fournis par le client'}
+                        </span>
+                      </p>
+                      {formData.parts_and_tools_notes && (
+                        <p>📝 <strong>Notes :</strong> {formData.parts_and_tools_notes}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Submit Button */}
             <div className="pt-6">
               <button
