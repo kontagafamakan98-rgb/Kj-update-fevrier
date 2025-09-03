@@ -1768,6 +1768,7 @@ class KojoAPITester:
                 test_case["expected"],
                 data=test_user_data
             )
+    def run_all_tests(self):
         """Run all tests in sequence"""
         print("🚀 Starting Kojo API Tests")
         print(f"Base URL: {self.base_url}")
@@ -1777,7 +1778,9 @@ class KojoAPITester:
             self.test_owner_account_creation_verification()  # Test Famakan account creation first
             self.test_user_registration()
             self.test_user_login()
-            self.test_payment_account_verification_system()  # NEW: Test payment verification system
+            self.test_payment_account_verification_system()  # Test payment verification system
+            self.test_enhanced_wave_validation_system()  # NEW: Test enhanced Wave validation
+            self.test_enhanced_bank_account_validation_system()  # NEW: Test enhanced bank account validation
             self.test_owner_authorization_system()  # Test Famakan authorization system
             self.test_user_profile()
             self.test_profile_photo_management()  # Added profile photo tests
