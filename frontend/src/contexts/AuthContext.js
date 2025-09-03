@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { authAPI, handleApiError } from '../services/api';
+import { devLog, safeLog } from '../utils/env';
+import kojoCache, { CACHE_KEYS } from '../utils/cache';
+import networkOptimizer from '../utils/networkOptimizer';
 
 const AuthContext = createContext();
 
