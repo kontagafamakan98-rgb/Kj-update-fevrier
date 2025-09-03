@@ -1,4 +1,4 @@
-import { devLog, safeLog } from 'env';
+import { devLog, safeLog } from './env';
 
 /**
  * Development Logger - Clean logging for Kojo production
