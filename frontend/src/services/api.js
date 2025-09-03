@@ -13,14 +13,20 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API_BASE_URL = `${BACKEND_URL}/api`;
 
 /**
- * Create axios instance with base configuration
+ * Create axios instance with dynamic configuration based on network quality
  */
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // 10 seconds timeout
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Dynamic timeout based on network quality
+apiClient.interceptors.request.use((config) => {
+  const networkConfig = networkOptimizer.getConfig();
+  config.timeout = networkConfig.requestTimeout || 10000;
+  return config;
 });
 
 /**
