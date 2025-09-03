@@ -717,7 +717,7 @@ async def upload_profile_photo(
     photo_url = f"/uploads/profile_photos/{filename}"
     await db.users.update_one(
         {"id": current_user.id},
-        {"$set": {"profile_photo": photo_url, "updated_at": datetime.utcnow()}}
+        {"$set": {"profile_photo": photo_url, "updated_at": datetime.now(timezone.utc)}}
     )
     
     return {
