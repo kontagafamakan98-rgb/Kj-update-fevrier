@@ -126,7 +126,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
                   type="text"
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
-                  placeholder="Votre compétence personnalisée"
+                  placeholder={t('customSkillPlaceholder')}
                   className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   onKeyPress={(e) => e.key === 'Enter' && handleAddCustomSkill()}
                 />
