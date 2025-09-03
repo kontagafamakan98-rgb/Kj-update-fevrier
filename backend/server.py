@@ -414,6 +414,57 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 # Authentication Routes
+# Authentication Routes
+@api_router.post("/auth/register-verified")
+async def register_user_verified(user_data: UserWithPayment):
+    """Inscription avec vérification obligatoire des comptes de paiement"""
+    
+    # Check if email already exists
+    existing_user = await db.users.find_one({"email": user_data.email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Valider les comptes de paiement selon le type d'utilisateur
+    try:
+        payment_validation = validate_payment_accounts(user_data.payment_accounts, user_data.user_type)
+    except HTTPException as e:
+        raise e
+    
+    # Create user with payment verification
+    user = User(
+        id=str(uuid.uuid4()),
+        email=user_data.email,
+        password_hash=hash_password(user_data.password),
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        phone=user_data.phone,
+        user_type=user_data.user_type,
+        country=user_data.country,
+        preferred_language=user_data.preferred_language,
+        is_verified=payment_validation["is_verified"],
+        payment_accounts=payment_validation["account_details"],
+        payment_accounts_count=payment_validation["linked_accounts_count"],
+        created_at=datetime.utcnow().isoformat(),
+        updated_at=datetime.utcnow().isoformat()
+    )
+    
+    await db.users.insert_one(user.dict())
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user.id, "email": user.email})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user.dict(exclude={"password_hash"}),
+        "payment_verification": {
+            "linked_accounts": payment_validation["linked_accounts_count"],
+            "required_minimum": 2 if user_data.user_type == "worker" else 1,
+            "is_verified": payment_validation["is_verified"],
+            "message": f"Compte vérifié avec {payment_validation['linked_accounts_count']} moyen(s) de paiement lié(s)"
+        }
+    }
+
 @api_router.post("/auth/register")
 async def register_user(user_data: UserRegister):
     # Check if user exists
