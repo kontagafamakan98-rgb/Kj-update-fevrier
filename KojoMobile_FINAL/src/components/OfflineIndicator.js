@@ -8,9 +8,9 @@ const OfflineIndicator = () => {
     isOnline, 
     offlineQueueSize, 
     lastSyncTime, 
-    syncData,
+    syncOfflineData,
     isInitialized 
-  } = useNotification();
+  } = useNotifications();
 
   // Don't show anything if services aren't initialized or if online
   if (!isInitialized || isOnline) {
