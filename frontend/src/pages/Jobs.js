@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import JobCreateModal from '../components/JobCreateModal';
+import MechanicRequirements from '../components/MechanicRequirements';
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
