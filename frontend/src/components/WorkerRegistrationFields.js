@@ -11,7 +11,8 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
     'Électricité': ['Installation électrique', 'Dépannage électrique', 'Câblage', 'Tableau électrique', 'Éclairage'],
     'Construction': ['Maçonnerie', 'Carrelage', 'Peinture', 'Menuiserie', 'Toiture'],
     'Informatique': ['Réparation PC', 'Installation logiciels', 'Réseaux', 'Maintenance', 'Formation'],
-    'Jardinage': ['Entretien jardin', 'Élagage', 'Plantation', 'Arrosage automatique', 'Paysagisme']
+    'Jardinage': ['Entretien jardin', 'Élagage', 'Plantation', 'Arrosage automatique', 'Paysagisme'],
+    'Tutorat': ['Mathématiques', 'Français', 'Anglais', 'Sciences', 'Histoire-Géographie', 'Physique-Chimie', 'Informatique scolaire', 'Aide aux devoirs', 'Préparation examens', 'Soutien scolaire']
   };
 
   const handleSpecialtyAdd = (skill) => {
