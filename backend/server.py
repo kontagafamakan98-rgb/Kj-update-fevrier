@@ -291,7 +291,7 @@ class Message(BaseModel):
     conversation_id: str
     sender_id: str
     receiver_id: str
-    content: str
+    content: str = Field(min_length=1, max_length=5000)  # Message content limits
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     read: bool = False
 
