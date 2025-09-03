@@ -180,14 +180,11 @@ class Language(str, Enum):
     BAMBARA = "bm"
 
 class Country(str, Enum):
-    MALI = "mali"
-    SENEGAL = "senegal"
-    BURKINA_FASO = "burkina_faso"
-    IVORY_COAST = "ivory_coast"
-    GUINEA = "guinea"
-    NIGER = "niger"
-    TOGO = "togo"
-    BENIN = "benin"
+    """4 pays prioritaires pour le lancement de Kojo"""
+    SENEGAL = "senegal"      # 🇸🇳 Pays principal - Dakar hub tech
+    MALI = "mali"            # 🇲🇱 Pays prioritaire - Bamako  
+    IVORY_COAST = "ivory_coast"  # 🇨🇮 Pays prioritaire - Abidjan hub économique
+    BURKINA_FASO = "burkina_faso"  # 🇧🇫 Pays prioritaire - Ouagadougou
 
 # Models
 class User(BaseModel):
