@@ -64,7 +64,8 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
 
   const validateWaveNumber = (number) => {
     const cleanNumber = number.replace(/[\s\-\+]/g, '');
-    const validPrefixes = ['221', '225']; // Sénégal, Côte d'Ivoire
+    // Wave disponible partout en Afrique de l'Ouest
+    const validPrefixes = ['221', '223', '224', '225', '226', '227', '228', '229'];
     
     if (cleanNumber.length < 11) return false;
     
@@ -72,9 +73,15 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     return validPrefixes.includes(prefix) && cleanNumber.length <= 12;
   };
 
-  const validateBankCard = (cardNumber) => {
-    const cleanCard = cardNumber.replace(/[\s\-]/g, '');
-    return cleanCard.length >= 15 && cleanCard.length <= 16 && /^\d+$/.test(cleanCard);
+  const validateBankAccount = (bankAccount) => {
+    if (!bankAccount.account_number || !bankAccount.bank_name || !bankAccount.account_holder) {
+      return false;
+    }
+    
+    const accountNumber = bankAccount.account_number.replace(/[\s\-]/g, '');
+    return accountNumber.length >= 8 && 
+           bankAccount.bank_name.trim().length >= 3 && 
+           bankAccount.account_holder.trim().length >= 2;
   };
 
   const formatPhoneNumber = (number) => {
