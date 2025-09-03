@@ -102,8 +102,8 @@ async def ensure_owner_exists():
             "is_verified": True,
             "rating": 0.0,
             "total_reviews": 0,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
             "is_owner": True,
             "permissions": [
                 "commission_access",
