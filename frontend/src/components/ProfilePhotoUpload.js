@@ -118,8 +118,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
               <div className="text-center">
                 <div className="text-4xl mb-3">📸</div>
                 <div className="text-sm text-gray-600">
-                  <p className="font-medium">Ajouter une photo de profil</p>
-                  <p>Cliquez pour choisir une option</p>
+                  <p className="font-medium">{t('addProfilePhoto')}</p>
+                  <p>{t('clickToChooseOption')}</p>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
                   JPG, PNG jusqu'à 5MB
