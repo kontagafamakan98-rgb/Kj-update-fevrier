@@ -210,7 +210,7 @@ export default function Register() {
                 <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
                   1
                 </div>
-                <span className="ml-2 text-orange-600 font-medium">Informations personnelles</span>
+                <span className="ml-2 text-orange-600 font-medium">{t('personalInformation')}</span>
               </div>
               
               <div className="w-12 h-1 bg-gray-200"></div>
