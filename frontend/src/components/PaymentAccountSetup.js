@@ -162,8 +162,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
       const paymentData = {
         orange_money: accounts.orange_money || null,
         wave: accounts.wave || null,
-        bank_card: accounts.bank_card || null,
-        bank_name: accounts.bank_name || null
+        bank_account: (accounts.bank_account && accounts.bank_account.account_number) ? accounts.bank_account : null
       };
 
       if (isRegistration) {
