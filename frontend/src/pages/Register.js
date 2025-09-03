@@ -260,6 +260,11 @@ export default function Register() {
             <div>
               <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
                 Pays
+                {detectedCountry && (
+                  <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                    📍 Détecté automatiquement
+                  </span>
+                )}
               </label>
               <select
                 id="country"
@@ -267,7 +272,9 @@ export default function Register() {
                 value={formData.country}
                 onChange={(e) => updateFormData('country', e.target.value)}
                 required
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
+                  detectedCountry ? 'border-green-300 bg-green-50' : 'border-gray-300'
+                }`}
               >
                 {countries.map(country => (
                   <option key={country.code} value={country.name.toLowerCase()}>
@@ -275,6 +282,11 @@ export default function Register() {
                   </option>
                 ))}
               </select>
+              {detectedCountry && (
+                <p className="mt-1 text-xs text-green-600">
+                  🌍 Pays détecté via votre localisation géographique
+                </p>
+              )}
             </div>
 
             {/* Names */}
