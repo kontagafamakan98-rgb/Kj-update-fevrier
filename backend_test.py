@@ -1286,55 +1286,168 @@ class KojoAPITester:
             data=invalid_wave_data
         )
         
-        # Test 7: Bank card validation with Luhn algorithm
-        print(f"\n🔍 Testing Bank Card Validation with Luhn Algorithm...")
+        # Test 7: Bank account validation (NEW - not bank cards)
+        print(f"\n🔍 Testing Bank Account Validation (NEW Structure)...")
         
-        # Valid bank card (passes Luhn check)
-        valid_card_data = {
-            "email": f"card_valid_{datetime.now().strftime('%H%M%S')}@test.com",
+        # Valid bank account with complete information
+        valid_bank_account_data = {
+            "email": f"bank_valid_{datetime.now().strftime('%H%M%S')}@test.com",
             "password": "TestPass123!",
-            "first_name": "Test",
-            "last_name": "Card",
-            "phone": "+221701234567",
+            "first_name": "Mariam",
+            "last_name": "Kone",
+            "phone": "+223701234567",
             "user_type": "client",
-            "country": "senegal",
+            "country": "mali",
             "preferred_language": "fr",
             "payment_accounts": {
-                "bank_card": "4532015112830366",  # Valid Luhn
-                "bank_name": "Banque Atlantique"
+                "bank_account": {
+                    "account_number": "12345678901234",
+                    "bank_name": "Banque Atlantique Mali",
+                    "account_holder": "Mariam Kone",
+                    "bank_code": "BK001",
+                    "branch": "Bamako Plateau"
+                }
             }
         }
         
         self.run_test(
-            "Valid Bank Card (Luhn Algorithm)",
+            "Valid Bank Account (Complete Information)",
             "POST",
             "auth/register-verified",
             200,
-            data=valid_card_data
+            data=valid_bank_account_data
         )
         
-        # Invalid bank card (fails Luhn check)
-        invalid_card_data = {
-            "email": f"card_invalid_{datetime.now().strftime('%H%M%S')}@test.com",
+        # Valid bank account with minimum required fields only
+        valid_bank_minimal_data = {
+            "email": f"bank_minimal_{datetime.now().strftime('%H%M%S')}@test.com",
             "password": "TestPass123!",
-            "first_name": "Test",
-            "last_name": "InvalidCard",
+            "first_name": "Fatou",
+            "last_name": "Diarra",
             "phone": "+221701234567",
             "user_type": "client",
             "country": "senegal",
             "preferred_language": "fr",
             "payment_accounts": {
-                "bank_card": "1234567890123456",  # Invalid Luhn
-                "bank_name": "Test Bank"
+                "bank_account": {
+                    "account_number": "87654321",
+                    "bank_name": "Ecobank Senegal",
+                    "account_holder": "Fatou Diarra"
+                }
             }
         }
         
         self.run_test(
-            "Invalid Bank Card (Luhn Algorithm)",
+            "Valid Bank Account (Minimum Required Fields)",
+            "POST",
+            "auth/register-verified",
+            200,
+            data=valid_bank_minimal_data
+        )
+        
+        # Invalid bank account - missing required field (account_number)
+        invalid_bank_missing_account_data = {
+            "email": f"bank_invalid_1_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "Invalid",
+            "phone": "+221701234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "bank_account": {
+                    "bank_name": "Test Bank",
+                    "account_holder": "Test Invalid"
+                }
+            }
+        }
+        
+        self.run_test(
+            "Invalid Bank Account (Missing Account Number)",
             "POST",
             "auth/register-verified",
             400,
-            data=invalid_card_data
+            data=invalid_bank_missing_account_data
+        )
+        
+        # Invalid bank account - account number too short (less than 8 digits)
+        invalid_bank_short_account_data = {
+            "email": f"bank_invalid_2_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "Invalid",
+            "phone": "+221701234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "bank_account": {
+                    "account_number": "1234567",  # Only 7 digits
+                    "bank_name": "Test Bank",
+                    "account_holder": "Test Invalid"
+                }
+            }
+        }
+        
+        self.run_test(
+            "Invalid Bank Account (Account Number Too Short)",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=invalid_bank_short_account_data
+        )
+        
+        # Invalid bank account - missing bank_name
+        invalid_bank_missing_name_data = {
+            "email": f"bank_invalid_3_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "Invalid",
+            "phone": "+221701234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "bank_account": {
+                    "account_number": "12345678",
+                    "account_holder": "Test Invalid"
+                }
+            }
+        }
+        
+        self.run_test(
+            "Invalid Bank Account (Missing Bank Name)",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=invalid_bank_missing_name_data
+        )
+        
+        # Invalid bank account - missing account_holder
+        invalid_bank_missing_holder_data = {
+            "email": f"bank_invalid_4_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "Invalid",
+            "phone": "+221701234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "bank_account": {
+                    "account_number": "12345678",
+                    "bank_name": "Test Bank"
+                }
+            }
+        }
+        
+        self.run_test(
+            "Invalid Bank Account (Missing Account Holder)",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=invalid_bank_missing_holder_data
         )
         
         # Test 8: GET /api/users/payment-accounts
