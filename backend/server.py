@@ -440,7 +440,7 @@ KOJO_PRIORITY_COUNTRIES = {
     # Sénégal (+221) - Pays principal
     '221': {
         'country': 'Sénégal',
-        'orange_prefixes': ['77', '78', '70'],  # Orange Sénégal officiels
+        'orange_prefixes': ['77', '78', '70', '90'],  # Orange Sénégal complets avec 90
         'wave_prefixes': ['77', '78', '70', '76', '75'],  # Wave + autres pour flexibilité
         'other_operators': ['76', '75', '33'],  # Tigo, Expresso
         'currency': 'FCFA',
