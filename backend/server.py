@@ -135,8 +135,9 @@ class JobStatus(str, Enum):
     CANCELLED = "cancelled"
 
 class PaymentMethod(str, Enum):
-    ORANGE_MONEY = "orange_money"
+    ORANGE_MONEY = "orange_money"  
     WAVE = "wave"
+    BANK_ACCOUNT = "bank_account"
 
 class Language(str, Enum):
     FRENCH = "fr"
