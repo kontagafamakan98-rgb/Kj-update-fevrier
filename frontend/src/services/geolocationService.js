@@ -303,4 +303,121 @@ class GeolocationService {
   }
 }
 
+// Détection automatique du pays basée sur la géolocalisation
+export const detectUserCountry = async () => {
+  try {
+    // Essayer d'abord la géolocalisation HTML5
+    if (navigator.geolocation) {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          timeout: 5000,
+          enableHighAccuracy: false
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      console.log(`📍 Position détectée: ${latitude}, ${longitude}`);
+
+      // Approximation géographique pour l'Afrique de l'Ouest
+      // Mali: environ 17°N, 4°W
+      // Sénégal: environ 14°N, 14°W  
+      // Burkina Faso: environ 13°N, 2°W
+      // Côte d'Ivoire: environ 8°N, 5°W
+
+      if (latitude >= 10 && latitude <= 25 && longitude >= -18 && longitude <= 5) {
+        // Zone géographique Afrique de l'Ouest
+        if (longitude <= -10) {
+          return COUNTRIES.SENEGAL; // Plus à l'ouest
+        } else if (latitude >= 15) {
+          return COUNTRIES.MALI; // Plus au nord
+        } else if (longitude <= -2) {
+          return COUNTRIES.BURKINA_FASO; // Centre-ouest
+        } else {
+          return COUNTRIES.COTE_DIVOIRE; // Sud-est
+        }
+      }
+    }
+  } catch (error) {
+    console.log('⚠️ Géolocalisation non disponible:', error.message);
+  }
+
+  try {
+    // Fallback: détection par IP avec API externe
+    const response = await fetch('https://ipapi.co/json/', {
+      timeout: 3000
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('🌍 Pays détecté par IP:', data.country_name);
+      
+      // Mapper les codes pays vers nos constantes
+      const countryMapping = {
+        'ML': COUNTRIES.MALI,
+        'SN': COUNTRIES.SENEGAL, 
+        'BF': COUNTRIES.BURKINA_FASO,
+        'CI': COUNTRIES.COTE_DIVOIRE
+      };
+      
+      if (countryMapping[data.country_code]) {
+        return countryMapping[data.country_code];
+      }
+    }
+  } catch (error) {
+    console.log('⚠️ Détection par IP échouée:', error.message);
+  }
+
+  // Fallback par défaut: Sénégal (pays le plus connecté de la région)
+  console.log('🇸🇳 Utilisation du pays par défaut: Sénégal');
+  return COUNTRIES.SENEGAL;
+};
+
+// Obtenir l'exemple de numéro de téléphone selon le pays détecté
+export const getPhoneExampleForCountry = (country) => {
+  const examples = {
+    'mali': '+223 70 12 34 56',
+    'senegal': '+221 70 12 34 56',
+    'burkina_faso': '+226 70 12 34 56',
+    'cote_divoire': '+225 07 12 34 56'
+  };
+  
+  return examples[country?.code] || examples['senegal'];
+};
+
+// Obtenir les banques populaires par pays
+export const getPopularBanksByCountry = (country) => {
+  const banks = {
+    'mali': [
+      'Banque de Développement du Mali (BDM)',
+      'Bank of Africa Mali',
+      'Banque Atlantique Mali',
+      'Ecobank Mali',
+      'UBA Mali'
+    ],
+    'senegal': [
+      'Banque Atlantique Sénégal',
+      'Société Générale Sénégal',
+      'CBAO Groupe Attijariwafa Bank',
+      'Ecobank Sénégal',
+      'UBA Sénégal'
+    ],
+    'burkina_faso': [
+      'Banque Atlantique Burkina Faso',
+      'Ecobank Burkina Faso',
+      'Bank of Africa Burkina Faso',
+      'UBA Burkina Faso',
+      'Coris Bank International'
+    ],
+    'cote_divoire': [
+      'Société Générale Côte d\'Ivoire',
+      'Banque Atlantique Côte d\'Ivoire',
+      'Ecobank Côte d\'Ivoire', 
+      'Bank of Africa Côte d\'Ivoire',
+      'UBA Côte d\'Ivoire'
+    ]
+  };
+  
+  return banks[country?.code] || banks['senegal'];
+};
+
 export default new GeolocationService();
