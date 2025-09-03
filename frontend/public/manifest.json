@@ -1,7 +1,7 @@
 {
-  "name": "Kojo - Plateforme de Services Afrique de l'Ouest",
-  "short_name": "Kojo",
-  "description": "Kojo - Plateforme de services à domicile en Afrique de l'Ouest",
+  "name": "Kojo Test App - Plateforme de Services Afrique de l'Ouest",
+  "short_name": "Kojo Test",
+  "description": "Kojo Test App - Plateforme de services à domicile en Afrique de l'Ouest (Version Test)",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
