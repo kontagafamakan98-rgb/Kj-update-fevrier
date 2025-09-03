@@ -21,7 +21,7 @@ export default function Register() {
     phone: '+221 ', // Sera mis à jour par la géolocalisation
     user_type: initialUserType,
     country: 'senegal', // Sera mis à jour par la géolocalisation
-    preferred_language: 'fr',
+    preferred_language: 'fr', // Français par défaut, mais sera mis à jour par le choix utilisateur
     // Champs spécifiques aux travailleurs
     worker_specialties: [],
     worker_experience_years: null,
@@ -32,6 +32,7 @@ export default function Register() {
   const [geoLoading, setGeoLoading] = useState(true);
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [profilePhoto, setProfilePhoto] = useState(null);
+  const [userSelectedLanguage, setUserSelectedLanguage] = useState('fr'); // Choix utilisateur pour profil
   
   const { register } = useAuth();
   const { t, currentLanguage } = useLanguage();
