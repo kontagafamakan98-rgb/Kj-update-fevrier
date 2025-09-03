@@ -16,7 +16,11 @@ export default function CreateJob() {
     budget_max: '',
     requirements: '',
     deadline: '',
-    urgency: 'normal'
+    urgency: 'normal',
+    // Nouvelles informations pour mécaniciens
+    mechanic_must_bring_parts: false,
+    mechanic_must_bring_tools: false,
+    parts_and_tools_notes: ''
   });
 
   const [errors, setErrors] = useState({});
