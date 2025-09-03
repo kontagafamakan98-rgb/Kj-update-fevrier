@@ -148,6 +148,10 @@ class Country(str, Enum):
     SENEGAL = "senegal"
     BURKINA_FASO = "burkina_faso"
     IVORY_COAST = "ivory_coast"
+    GUINEA = "guinea"
+    NIGER = "niger"
+    TOGO = "togo"
+    BENIN = "benin"
 
 # Models
 class User(BaseModel):
