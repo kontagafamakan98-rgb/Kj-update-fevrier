@@ -235,10 +235,18 @@ class UserRegister(BaseModel):
     preferred_language: Language
 
 class PaymentAccount(BaseModel):
-    orange_money: Optional[str] = None  # Numéro de téléphone Orange Money
-    wave: Optional[str] = None         # Numéro de téléphone Wave  
-    bank_card: Optional[str] = None    # Numéro de carte bancaire (masqué)
-    bank_name: Optional[str] = None    # Nom de la banque
+    orange_money: Optional[str] = None     # Numéro de téléphone Orange Money
+    wave: Optional[str] = None            # Numéro de téléphone Wave  
+    bank_account: Optional[dict] = None   # Informations complètes de compte bancaire
+    # Détails du compte bancaire:
+    # {
+    #   "account_number": "1234567890",
+    #   "bank_name": "Banque Atlantique",
+    #   "account_holder": "Nom du titulaire",
+    #   "bank_code": "BK001",
+    #   "branch": "Dakar Plateau",
+    #   "iban": "SN12 K011 2345 6789 0123 4567 89" (optionnel)
+    # }
 
 class UserWithPayment(BaseModel):
     email: EmailStr
