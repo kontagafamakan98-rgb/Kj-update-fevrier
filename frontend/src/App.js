@@ -108,8 +108,7 @@ function AppRoutes() {
       {/* Offline Indicator */}
       <OfflineIndicator />
       
-      {/* PWA Badge */}
-      <PWABadge />
+
       
       {/* Main Navigation */}
       <Navbar />
