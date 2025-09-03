@@ -74,7 +74,22 @@ const translations = {
     bankCard: 'Carte bancaire',
     orangeMoney: 'Orange Money',
     wave: 'Wave',
-    selectPayment: 'Choisir un mode de paiement'
+    selectPayment: 'Sélectionner méthode de paiement',
+    
+    // Language Selection
+    choosePreferredLanguage: 'Choisissez votre langue préférée',
+    basedOnLocation: 'Basé sur votre position',
+    languageNote: 'Note :',
+    interfaceWillChange: 'L\'interface changera selon votre choix et cette langue s\'affichera sur votre profil.',
+    localLanguage: 'Langue locale',
+    selectedLanguage: 'Langue sélectionnée',
+    interfaceAndProfileUpdated: 'Interface et profil mis à jour',
+    aboutSelection: 'À propos de votre sélection :',
+    interfaceWillChangeNote: 'L\'interface Kojo changera selon votre langue choisie',
+    languageOnProfile: 'Votre langue apparaîtra sur votre profil public',
+    clientsCanSee: 'Les clients pourront voir quelle langue vous parlez couramment',
+    canModifyLater: 'Vous pourrez modifier ce choix plus tard dans vos paramètres',
+    detectingLanguage: 'Détection de votre langue préférée...'
   },
   en: {
     // Navigation
