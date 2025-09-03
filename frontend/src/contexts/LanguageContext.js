@@ -290,6 +290,17 @@ const translations = {
     pleaseSelectImage: 'Please select an image (JPG, PNG, etc.)',
     imageTooLarge: 'Image must be less than 5MB',
     errorReadingFile: 'Error reading file',
+    
+    // Network Status
+    networkOffline: 'You are offline. Some features may be limited.',
+    networkPoor: 'Slow connection detected. Automatic optimization activated.',
+    networkModerate: 'Moderate connection. Data saving activated.',
+    networkGood: 'Good connection',
+    networkExcellent: 'Excellent connection',
+    networkUnknown: 'Network status unknown',
+    networkTipsOffline: '• Actions will sync when connection returns\n• Cached data remains available',
+    networkTipsPoor: '• Images optimized to save bandwidth\n• Real-time features disabled\n• Extended cache to avoid reloads',
+    networkTipsModerate: '• Reduced image quality\n• Less frequent synchronization\n• Priority to essential features',
     userType: 'User Type',
     iAmClient: 'I am looking for services',
     iAmWorker: 'I offer my services',
