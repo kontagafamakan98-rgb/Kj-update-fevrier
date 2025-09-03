@@ -1,5 +1,3 @@
-import { devLog, safeLog } from 'env';
-
 /**
  * Environment configuration utility
  * Centralizes environment checks and provides clean development tools
@@ -15,31 +13,31 @@ export const isProduction = process.env.NODE_ENV === 'production';
 export const devLog = {
   log: (...args) => {
     if (isDevelopment) {
-      devLog.info(...args);
+      console.log(...args);
     }
   },
   
   error: (...args) => {
     if (isDevelopment) {
-      safeLog.error(...args);
+      console.error(...args);
     }
   },
   
   warn: (...args) => {
     if (isDevelopment) {
-      safeLog.warn(...args);
+      console.warn(...args);
     }
   },
   
   info: (...args) => {
     if (isDevelopment) {
-      devLog.info(...args);
+      console.log(...args);
     }
   },
   
   debug: (...args) => {
     if (isDevelopment) {
-      devLog.debug(...args);
+      console.debug(...args);
     }
   }
 };
@@ -50,18 +48,18 @@ export const devLog = {
  */
 export const safeLog = {
   error: (...args) => {
-    safeLog.error(...args);
+    console.error(...args);
   },
   
   warn: (...args) => {
     if (isDevelopment) {
-      safeLog.warn(...args);
+      console.warn(...args);
     }
   },
   
   info: (...args) => {
     if (isDevelopment) {
-      devLog.info(...args);
+      console.log(...args);
     }
   }
 };
