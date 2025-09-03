@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) => {
   const [dragActive, setDragActive] = useState(false);
