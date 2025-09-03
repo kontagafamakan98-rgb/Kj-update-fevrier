@@ -63,7 +63,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
         {/* Compétences et Spécialités */}
         <div>
           <label className="block text-sm font-medium text-blue-900 mb-3">
-            🔧 Compétences et Spécialités *
+            🔧 {t('skillsAndSpecialties')} *
           </label>
           
           {/* Compétences sélectionnées */}
