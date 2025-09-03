@@ -316,7 +316,7 @@ export default function Register() {
               </select>
               {detectedCountry && (
                 <p className="mt-1 text-xs text-green-600">
-                  🌍 Pays détecté via votre localisation géographique
+                  🌍 {t('detectedViaGeolocation')}
                 </p>
               )}
             </div>
