@@ -51,8 +51,9 @@ class PhoneValidationTester:
     def test_phone_registration(self, phone_number, country, expected_success=True, test_description=""):
         """Test registration with specific phone number format"""
         
-        # Generate unique email for each test
-        timestamp = int(datetime.now().timestamp())
+        # Generate unique email for each test using microseconds
+        import time
+        timestamp = int(time.time() * 1000000)  # Use microseconds for uniqueness
         email = f"test_phone_{timestamp}@gmail.com"
         
         registration_data = {
