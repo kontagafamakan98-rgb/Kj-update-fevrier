@@ -173,8 +173,7 @@ function AppRoutes() {
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
       
-      {/* PWA Install Prompt */}
-      <PWAInstallPrompt />
+
     </div>
   );
 }
