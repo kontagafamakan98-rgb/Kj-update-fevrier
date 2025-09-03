@@ -196,6 +196,10 @@ class Job(BaseModel):
     posted_at: datetime = Field(default_factory=datetime.utcnow)
     deadline: Optional[datetime] = None
     assigned_worker_id: Optional[str] = None
+    # Nouvelles informations pour mécaniciens
+    mechanic_must_bring_parts: bool = False  # Le mécanicien doit-il apporter les pièces ?
+    mechanic_must_bring_tools: bool = False  # Le mécanicien doit-il apporter les outils ?
+    parts_and_tools_notes: Optional[str] = None  # Notes supplémentaires sur pièces/outils
 
 class JobProposal(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
