@@ -6,16 +6,23 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
   const [newSkill, setNewSkill] = useState('');
   const { t } = useLanguage();
 
-  // Compétences prédéfinies par catégorie
-  const predefinedSkills = {
-    'Mécanique': ['Réparation moteur', 'Diagnostic automobile', 'Carrosserie', 'Électricité auto', 'Climatisation auto'],
-    'Plomberie': ['Installation sanitaire', 'Réparation fuites', 'Soudure', 'Débouchage canalisations', 'Installation chauffe-eau'],
-    'Électricité': ['Installation électrique', 'Dépannage électrique', 'Câblage', 'Tableau électrique', 'Éclairage'],
-    'Construction': ['Maçonnerie', 'Carrelage', 'Peinture', 'Menuiserie', 'Toiture'],
-    'Informatique': ['Réparation PC', 'Installation logiciels', 'Réseaux', 'Maintenance', 'Formation'],
-    'Jardinage': ['Entretien jardin', 'Élagage', 'Plantation', 'Arrosage automatique', 'Paysagisme'],
-    'Tutorat': ['Mathématiques', 'Français', 'Anglais', 'Sciences', 'Histoire-Géographie', 'Physique-Chimie', 'Informatique scolaire', 'Aide aux devoirs', 'Préparation examens', 'Soutien scolaire']
+  // Compétences prédéfinies par catégorie avec traductions
+  const predefinedSkillsData = {
+    mechanics: ['Réparation moteur', 'Diagnostic automobile', 'Carrosserie', 'Électricité auto', 'Climatisation auto'],
+    plumbing: ['Installation sanitaire', 'Réparation fuites', 'Soudure', 'Débouchage canalisations', 'Installation chauffe-eau'],
+    electrical: ['Installation électrique', 'Dépannage électrique', 'Câblage', 'Tableau électrique', 'Éclairage'],
+    construction: ['Maçonnerie', 'Carrelage', 'Peinture', 'Menuiserie', 'Toiture'],
+    computing: ['Réparation PC', 'Installation logiciels', 'Réseaux', 'Maintenance', 'Formation'],
+    gardening: ['Entretien jardin', 'Élagage', 'Plantation', 'Arrosage automatique', 'Paysagisme'],
+    tutoring: ['Mathématiques', 'Français', 'Anglais', 'Sciences', 'Histoire-Géographie', 'Physique-Chimie', 'Informatique scolaire', 'Aide aux devoirs', 'Préparation examens', 'Soutien scolaire']
   };
+
+  // Construire les compétences avec les traductions des catégories
+  const predefinedSkills = {};
+  Object.keys(predefinedSkillsData).forEach(categoryKey => {
+    const translatedCategory = t(categoryKey);
+    predefinedSkills[translatedCategory] = predefinedSkillsData[categoryKey];
+  });
 
   const handleSpecialtyAdd = (skill) => {
     const currentSpecialties = formData.worker_specialties || [];
