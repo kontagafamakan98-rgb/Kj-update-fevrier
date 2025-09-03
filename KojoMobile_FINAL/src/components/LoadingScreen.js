@@ -1,85 +1,97 @@
 import React from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native-paper';
 import { colors } from '../theme/theme';
 
-export default function LoadingScreen() {
+export default function LoadingScreen({ message = 'Chargement...' }) {
   return (
-    <LinearGradient
-      colors={[colors.gradientStart, colors.gradientEnd]}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <Text style={styles.logo}>Kojo</Text>
+          <Text style={styles.logo}>K</Text>
         </View>
-        <ActivityIndicator size="large" color={colors.background} style={styles.spinner} />
+        <Text style={styles.title}>Kojo</Text>
         <Text style={styles.subtitle}>Afrique de l'Ouest</Text>
-        <View style={styles.dotsContainer}>
-          <View style={[styles.dot, styles.dot1]} />
-          <View style={[styles.dot, styles.dot2]} />
-          <View style={[styles.dot, styles.dot3]} />
-        </View>
+        <ActivityIndicator 
+          animating={true} 
+          color={colors.primary} 
+          size="large" 
+          style={styles.loader}
+        />
+        <Text style={styles.message}>{message}</Text>
       </View>
-    </LinearGradient>
+      <View style={styles.dots}>
+        <View style={[styles.dot, { animationDelay: '0s' }]} />
+        <View style={[styles.dot, { animationDelay: '0.2s' }]} />
+        <View style={[styles.dot, { animationDelay: '0.4s' }]} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryDark} 100%)`,
     justifyContent: 'center',
     alignItems: 'center',
   },
   content: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
   logoContainer: {
     width: 80,
     height: 80,
-    backgroundColor: colors.background,
+    backgroundColor: '#ffffff',
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
   logo: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
     color: colors.primary,
   },
-  spinner: {
-    marginBottom: 16,
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: colors.background,
-    opacity: 0.9,
-    marginBottom: 24,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 32,
   },
-  dotsContainer: {
+  loader: {
+    marginBottom: 16,
+  },
+  message: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+  },
+  dots: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 32,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.background,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     marginHorizontal: 4,
-  },
-  dot1: {
-    opacity: 1,
-  },
-  dot2: {
-    opacity: 0.7,
-  },
-  dot3: {
-    opacity: 0.4,
   },
 });
