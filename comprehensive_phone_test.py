@@ -30,7 +30,7 @@ def test_phone_format(phone_number, country, description, should_succeed=True):
     
     try:
         response = requests.post(
-            "https://kojo-native.preview.emergentagent.com/api/auth/register",
+            "https://precise-geo-app.preview.emergentagent.com/api/auth/register",
             json=registration_data,
             headers={'Content-Type': 'application/json'},
             timeout=10
