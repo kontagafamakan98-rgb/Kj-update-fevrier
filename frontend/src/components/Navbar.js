@@ -71,6 +71,15 @@ export default function Navbar() {
 
           {/* Right side - Desktop */}
           <div className="hidden md:flex items-center space-x-4">
+            {/* Test Info Link */}
+            <Link 
+              to="/test-info"
+              className="bg-yellow-400 hover:bg-yellow-500 text-black px-3 py-1 rounded-full text-xs font-semibold transition-colors flex items-center"
+              title="Informations sur la version test"
+            >
+              🧪 Test Info
+            </Link>
+            
             {/* Language Selector */}
             <LanguageSelector 
               showDropdown={true} 
