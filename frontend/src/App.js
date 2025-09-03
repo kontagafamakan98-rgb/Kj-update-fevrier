@@ -237,15 +237,17 @@ function App() {
 
   return (
     <div className="App">
-      <BrowserRouter>
-        <LanguageProvider>
-          <AuthProvider>
-            <PaymentProvider>
-              <AppRoutes />
-            </PaymentProvider>
-          </AuthProvider>
-        </LanguageProvider>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <LanguageProvider>
+            <AuthProvider>
+              <PaymentProvider>
+                <AppRoutes />
+              </PaymentProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
     </div>
   );
 }
