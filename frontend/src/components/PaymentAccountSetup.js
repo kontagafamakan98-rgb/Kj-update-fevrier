@@ -134,15 +134,11 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     }
 
     if (accounts.wave && !validateWaveNumber(accounts.wave)) {
-      errors.wave = 'Numéro Wave invalide (Sénégal: +221XXXXXXXX, Côte d\'Ivoire: +225XXXXXXXX)';
+      errors.wave = 'Numéro Wave invalide (disponible partout en Afrique de l\'Ouest)';
     }
 
-    if (accounts.bank_card && !validateBankCard(accounts.bank_card)) {
-      errors.bank_card = 'Numéro de carte bancaire invalide (15-16 chiffres)';
-    }
-
-    if (accounts.bank_card && !accounts.bank_name.trim()) {
-      errors.bank_name = 'Nom de la banque requis';
+    if (accounts.bank_account && accounts.bank_account.account_number && !validateBankAccount(accounts.bank_account)) {
+      errors.bank_account = 'Informations de compte bancaire incomplètes ou invalides';
     }
 
     if (linkedAccountsCount < requiredMinimum) {
