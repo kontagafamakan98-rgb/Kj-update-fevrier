@@ -15,11 +15,13 @@ const ProfilePhoto = ({
   const [loading, setLoading] = useState(false);
   const [showDeleteButton, setShowDeleteButton] = useState(false);
 
-  // Debug logging
+  // Debug logging (development only)
   useEffect(() => {
-    console.log('ProfilePhoto mounted with user:', user);
-    console.log('User ID available:', user?.id);
-    console.log('Editable mode:', editable);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('ProfilePhoto mounted with user:', user);
+      console.log('User ID available:', user?.id);
+      console.log('Editable mode:', editable);
+    }
   }, [user, editable]);
 
   useEffect(() => {
