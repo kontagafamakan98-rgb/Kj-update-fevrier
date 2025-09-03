@@ -223,7 +223,7 @@ class Message(BaseModel):
     sender_id: str
     receiver_id: str
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     read: bool = False
 
 class Payment(BaseModel):
