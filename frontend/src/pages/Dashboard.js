@@ -285,6 +285,96 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Popular Categories */}
+      <div className="bg-white rounded-lg shadow mb-8">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-medium text-gray-900">Catégories populaires</h2>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <Link
+              to="/jobs?category=plumbing"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-blue-200">
+                <span className="text-2xl">🔧</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('plumbing')}</span>
+            </Link>
+            
+            <Link
+              to="/jobs?category=electrical"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-yellow-50 hover:border-yellow-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-yellow-200">
+                <span className="text-2xl">⚡</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('electrical')}</span>
+            </Link>
+
+            <Link
+              to="/jobs?category=mechanics"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-red-200">
+                <span className="text-2xl">🔩</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('mechanics')}</span>
+            </Link>
+            
+            <Link
+              to="/jobs?category=construction"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-orange-200">
+                <span className="text-2xl">🏗️</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('construction')}</span>
+            </Link>
+            
+            <Link
+              to="/jobs?category=cleaning"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-green-200">
+                <span className="text-2xl">🧹</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('cleaning')}</span>
+            </Link>
+            
+            <Link
+              to="/jobs?category=gardening"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-green-200">
+                <span className="text-2xl">🌱</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('gardening')}</span>
+            </Link>
+            
+            <Link
+              to="/jobs?category=tutoring"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-purple-50 hover:border-purple-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-purple-200">
+                <span className="text-2xl">📚</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('tutoring')}</span>
+            </Link>
+            
+            <Link
+              to="/jobs?category=computing"
+              className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 transition-colors group"
+            >
+              <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mb-2 group-hover:bg-indigo-200">
+                <span className="text-2xl">💻</span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 text-center">{t('computing')}</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Recent Jobs */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
