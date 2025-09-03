@@ -326,7 +326,22 @@ const translations = {
     bankCard: 'Bank karti',
     orangeMoney: 'Orange Money',
     wave: 'Wave',
-    selectPayment: 'Sara fɛɛrɛ sugandi'
+    selectPayment: 'Sara fɛɛrɛ sugandi',
+    
+    // Language Selection
+    choosePreferredLanguage: 'I ka kan diya sugandi',
+    basedOnLocation: 'I sigiyɔrɔ kɔrɔ',
+    languageNote: 'Kɔlɔsili:',
+    interfaceWillChange: 'Interface bɛ na ka Changé i ka sugandili kɔrɔ ani nin kan bɛ na jira i ka profil la.',
+    localLanguage: 'Sigida kan',
+    selectedLanguage: 'Kan sugandilen',
+    interfaceAndProfileUpdated: 'Interface ni profil changéra',
+    aboutSelection: 'I ka sugandili kan:',
+    interfaceWillChangeNote: 'Kojo interface bɛ na changé i ka kan sugandilen fɛ',
+    languageOnProfile: 'I ka kan bɛ na jira i ka profil foroba la',
+    clientsCanSee: 'Kiliyanw bɛ se ka a dɔn i bɛ kan min fɔ',
+    canModifyLater: 'I bɛ se ka nin changé kɔfɛ i ka paramètres kɔnɔ',
+    detectingLanguage: 'Ka i ka kan diya ɲinini...'
   }
 };
 
