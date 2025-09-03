@@ -317,7 +317,8 @@ export const CACHE_KEYS = {
   PAYMENT_ACCOUNTS: 'payment_accounts',
   APP_CONFIG: 'app_config',
   GEOLOCATION_DATA: 'geolocation_data',
-  LANGUAGE_PREFERENCES: 'language_preferences'
+  LANGUAGE_PREFERENCES: 'language_preferences',
+  PENDING_ACTIONS: 'pending_actions'
 };
 
 export default kojoCache;
