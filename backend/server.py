@@ -269,6 +269,12 @@ class UserWithPayment(BaseModel):
     country: Country
     preferred_language: Language
     payment_accounts: PaymentAccount
+    # Informations spécifiques aux travailleurs (optionnelles)
+    worker_specialties: Optional[List[str]] = None
+    worker_experience_years: Optional[int] = None
+    worker_hourly_rate: Optional[float] = None
+    # Photo de profil optionnelle pour tous
+    profile_photo_base64: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
