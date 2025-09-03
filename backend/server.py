@@ -1196,12 +1196,38 @@ app.include_router(api_router)
 from fastapi.staticfiles import StaticFiles
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+# CORS Configuration optimized for West Africa
+WEST_AFRICA_ORIGINS = [
+    "http://localhost:3000",  # Development
+    "https://localhost:3000",  # Development HTTPS
+    "http://127.0.0.1:3000",   # Local development
+    "https://kojo-mobile-pro.preview.emergentagent.com",  # Production
+    # Add common West African mobile network proxy IPs
+    "http://192.168.*",  # Local networks
+    "http://10.*",       # Private networks
+]
+
+# Get additional origins from environment
+env_origins = os.environ.get('CORS_ORIGINS', '').split(',')
+allowed_origins = WEST_AFRICA_ORIGINS + [origin.strip() for origin in env_origins if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins if env_origins != [''] else ["*"],  # Fallback to all in dev
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language", 
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "X-CSRFToken",
+        "Cache-Control"
+    ],
+    expose_headers=["Content-Range", "X-Content-Range"],
+    max_age=86400,  # 24 hours cache for preflight
 )
 
 # Configure logging
