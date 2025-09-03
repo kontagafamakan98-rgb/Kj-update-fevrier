@@ -235,7 +235,7 @@ class Payment(BaseModel):
     payment_method: PaymentMethod
     transaction_id: Optional[str] = None
     status: str = "pending"  # pending, completed, failed
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Request/Response Models
 class UserRegister(BaseModel):
