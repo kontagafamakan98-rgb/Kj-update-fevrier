@@ -570,8 +570,8 @@ async def register_user_verified(user_data: UserWithPayment):
         is_verified=payment_validation["is_verified"],
         payment_accounts=payment_validation["account_details"],
         payment_accounts_count=payment_validation["linked_accounts_count"],
-        created_at=datetime.utcnow().isoformat(),
-        updated_at=datetime.utcnow().isoformat()
+        created_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=datetime.now(timezone.utc).isoformat()
     )
     
     await db.users.insert_one(user.dict())
