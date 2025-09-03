@@ -1,7 +1,7 @@
 {
   "name": "Kojo - Plateforme de Services Afrique de l'Ouest",
   "short_name": "Kojo",
-  "description": "Connecter les travailleurs et clients au Mali, Sénégal, Burkina Faso et Côte d'Ivoire",
+  "description": "Kojo - Plateforme de services à domicile en Afrique de l'Ouest",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -10,10 +10,9 @@
   "categories": [
     "business",
     "productivity",
-    "utilities",
-    "lifestyle"
+    "utilities"
   ],
-  "lang": "fr-FR",
+  "lang": "fr",
   "scope": "/",
   "prefer_related_applications": false,
   "icons": [
@@ -68,50 +67,26 @@
   ],
   "shortcuts": [
     {
-      "name": "Trouver du travail",
+      "name": "Créer un job",
+      "short_name": "Nouveau job",
+      "description": "Publier un nouveau travail",
+      "url": "/create-job",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "32x32"
+        }
+      ]
+    },
+    {
+      "name": "Mes jobs",
       "short_name": "Jobs",
-      "description": "Parcourir les emplois disponibles",
+      "description": "Voir mes travaux",
       "url": "/jobs",
       "icons": [
         {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Mes messages",
-      "short_name": "Messages",
-      "description": "Voir vos conversations",
-      "url": "/messages",
-      "icons": [
-        {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Mon profil",
-      "short_name": "Profil",
-      "description": "Gérer votre profil",
-      "url": "/profile",
-      "icons": [
-        {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192"
-        }
-      ]
-    },
-    {
-      "name": "Tableau de bord",
-      "short_name": "Dashboard",
-      "description": "Vue d'ensemble de votre activité",
-      "url": "/dashboard",
-      "icons": [
-        {
-          "src": "/icons/icon-192x192.png",
-          "sizes": "192x192"
+          "src": "/favicon.ico",
+          "sizes": "32x32"
         }
       ]
     }
