@@ -3,7 +3,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) => {
   const [dragActive, setDragActive] = useState(false);
+  const [showCameraOptions, setShowCameraOptions] = useState(false);
   const inputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const { t } = useLanguage();
 
   const handleFiles = (files) => {
     const file = files[0];
