@@ -181,11 +181,11 @@ async def ensure_owner_exists():
         }
         
         await db.users.insert_one(owner_data)
-        print(f"✅ Compte Famakan Kontaga Master créé: {OWNER_EMAIL}")
-        print(f"🔐 Mot de passe: {default_password}")
-        print("⚠️  SEUL FAMAKAN KONTAGA MASTER PEUT ACCÉDER AUX FONCTIONNALITÉS SENSIBLES!")
+        logger.info(f"✅ Compte Famakan Kontaga Master créé: {OWNER_EMAIL}")
+        logger.info(f"🔐 Mot de passe: {default_password}")
+        logger.warning("⚠️  SEUL FAMAKAN KONTAGA MASTER PEUT ACCÉDER AUX FONCTIONNALITÉS SENSIBLES!")
     else:
-        print(f"✅ Compte Famakan Kontaga Master existe déjà: {OWNER_EMAIL}")
+        logger.info(f"✅ Compte Famakan Kontaga Master existe déjà: {OWNER_EMAIL}")
 
 # Enums
 class UserType(str, Enum):
