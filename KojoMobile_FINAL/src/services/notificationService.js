@@ -213,16 +213,33 @@ class NotificationService {
   // Send push token to server
   async sendTokenToServer(userId, token) {
     try {
-      // This would integrate with your backend API
-      // const response = await api.post('/users/push-token', { userId, token });
+      console.log('Registering push token with server for user:', userId);
       
-      // For now, just store locally and log
+      // Integrate with backend API
+      const api = require('./api').default;
+      const response = await api.post('/users/push-token', { 
+        user_id: userId, 
+        push_token: token,
+        device_type: Platform.OS 
+      });
+      
+      console.log('Push token registered successfully:', response.data);
+      
+      // Also store locally as backup
       await AsyncStorage.setItem(`pushToken_${userId}`, token);
-      console.log('Push token registered for user:', userId);
       
-      return { success: true };
+      return { success: true, data: response.data };
     } catch (error) {
       console.error('Error sending token to server:', error);
+      
+      // Store locally as fallback if server registration fails
+      try {
+        await AsyncStorage.setItem(`pushToken_${userId}`, token);
+        console.log('Push token stored locally as fallback');
+      } catch (storageError) {
+        console.error('Failed to store token locally:', storageError);
+      }
+      
       return { success: false, error: error.message };
     }
   }
