@@ -386,7 +386,7 @@ class ProposalCreate(BaseModel):
 
 class MessageCreate(BaseModel):
     receiver_id: str
-    content: str
+    content: str = Field(min_length=1, max_length=5000)
 
 # Utility Functions
 # Validation functions
