@@ -445,18 +445,18 @@ def validate_orange_money_number(number: str) -> bool:
     return False
 
 def validate_wave_number(number: str) -> bool:
-    """Valide un numéro Wave - Disponible partout en Afrique de l'Ouest"""
-    # Supprimer les espaces et caractères spéciaux
+    """Valide un numéro Wave - 4 pays prioritaires Kojo"""
     clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
     
-    # Wave disponible dans toute l'Afrique de l'Ouest
-    # Mali: +223, Sénégal: +221, Burkina Faso: +226, Côte d'Ivoire: +225
-    # Guinée: +224, Niger: +227, Togo: +228, Bénin: +229, etc.
-    valid_prefixes = ['221', '223', '224', '225', '226', '227', '228', '229']  # Afrique de l'Ouest
+    if len(clean_number) < 11 or len(clean_number) > 12:
+        return False
     
-    if len(clean_number) >= 11:
-        prefix = clean_number[:3]
-        return prefix in valid_prefixes and len(clean_number) in [11, 12]
+    country_code = clean_number[:3]
+    operator_prefix = clean_number[3:5]
+    
+    if country_code in KOJO_PRIORITY_COUNTRIES:
+        valid_prefixes = KOJO_PRIORITY_COUNTRIES[country_code]['wave_prefixes']
+        return operator_prefix in valid_prefixes
     
     return False
 
