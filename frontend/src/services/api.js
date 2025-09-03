@@ -96,14 +96,35 @@ apiClient.interceptors.response.use(
 );
 
 /**
- * Generic API methods
+ * Generic API methods with intelligent caching for West African networks
  */
 export const api = {
-  // GET request
+  // GET request with smart caching
   get: async (endpoint, config = {}) => {
     try {
       const response = await apiClient.get(endpoint, config);
       return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // GET with cache support
+  getWithCache: async (endpoint, cacheKey, expiryTime = null, config = {}) => {
+    try {
+      // Use network-aware cache expiry
+      const networkConfig = networkOptimizer.getConfig();
+      const defaultExpiry = expiryTime || networkConfig.cacheExpiry;
+      
+      return await kojoCache.cacheWithRetry(
+        cacheKey,
+        async () => {
+          const response = await apiClient.get(endpoint, config);
+          return response.data;
+        },
+        networkOptimizer.getMaxRetries(),
+        defaultExpiry
+      );
     } catch (error) {
       throw error;
     }
