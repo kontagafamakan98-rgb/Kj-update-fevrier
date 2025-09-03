@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
+import { devLog, safeLog } from '../utils/env';
+
   AVAILABLE_LANGUAGES, 
   getOrderedLanguagesForCountry, 
   getLanguageSuggestionMessage, 
@@ -31,7 +33,7 @@ const RegistrationLanguageSelector = ({
       // Si aucune langue n'est sélectionnée, suggérer la langue locale du pays
       if (!selectedLanguage) {
         const localLang = getLocalLanguageForCountry(detectedCountry);
-        console.log(`💬 Suggestion de langue pour ${detectedCountry.nameFrench}: ${localLang}`);
+        devLog.info(`💬 Suggestion de langue pour ${detectedCountry.nameFrench}: ${localLang}`);
       }
     } else {
       // Ordre par défaut sans géolocalisation
@@ -45,7 +47,7 @@ const RegistrationLanguageSelector = ({
   }, [detectedCountry, selectedLanguage]);
 
   const handleLanguageSelect = (languageCode) => {
-    console.log(`🔄 Changement de langue: ${languageCode}`);
+    devLog.info(`🔄 Changement de langue: ${languageCode}`);
     
     // Mettre à jour la langue de l'interface immédiatement
     changeLanguage(languageCode);

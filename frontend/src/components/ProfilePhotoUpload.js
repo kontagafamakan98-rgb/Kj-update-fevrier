@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { devLog, safeLog } from '../utils/env';
+
 
 const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -38,7 +40,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
       });
     };
     reader.onerror = (error) => {
-      console.error('Error reading file:', error);
+      safeLog.error('Error reading file:', error);
       const errorMessage = t('errorReadingFile') || 'Erreur lors de la lecture du fichier';
       alert(errorMessage);
     };

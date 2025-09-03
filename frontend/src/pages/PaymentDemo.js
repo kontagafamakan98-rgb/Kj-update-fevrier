@@ -4,6 +4,8 @@ import LanguageSelector from '../components/LanguageSelector';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { usePayment } from '../contexts/PaymentContext';
+import { devLog, safeLog } from '../utils/env';
+
 
 const PaymentDemo = () => {
   const { t } = useLanguage();
@@ -280,7 +282,7 @@ const PaymentDemo = () => {
               <PaymentSelector 
                 userCountry={selectedCountry}
                 onMethodSelected={(method) => {
-                  console.log('Méthode sélectionnée:', method);
+                  devLog.info('Méthode sélectionnée:', method);
                 }}
               />
             </div>

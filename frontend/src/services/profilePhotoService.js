@@ -1,3 +1,5 @@
+import { devLog, safeLog } from '../utils/env';
+
 // Service de gestion des photos de profil pour PWA
 class ProfilePhotoService {
   constructor() {
@@ -7,7 +9,7 @@ class ProfilePhotoService {
 
   // Demander à l'utilisateur de sélectionner une photo
   async selectPhoto() {
-    console.log('ProfilePhotoService: Starting photo selection');
+    devLog.info('ProfilePhotoService: Starting photo selection');
     
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
@@ -16,23 +18,23 @@ class ProfilePhotoService {
       input.style.display = 'none';
       
       input.onchange = async (event) => {
-        console.log('File input change event triggered');
+        devLog.info('File input change event triggered');
         const file = event.target.files[0];
         
         if (!file) {
-          console.log('No file selected');
+          devLog.info('No file selected');
           reject(new Error('Aucune image sélectionnée'));
           return;
         }
 
-        console.log('Selected file:', file.name, file.size, file.type);
+        devLog.info('Selected file:', file.name, file.size, file.type);
 
         try {
           const processedImage = await this.processImage(file);
-          console.log('Image processed successfully:', processedImage);
+          devLog.info('Image processed successfully:', processedImage);
           resolve(processedImage);
         } catch (error) {
-          console.error('Error processing image:', error);
+          safeLog.error('Error processing image:', error);
           reject(error);
         } finally {
           // Clean up
@@ -41,28 +43,28 @@ class ProfilePhotoService {
       };
 
       input.onerror = (error) => {
-        console.error('File input error:', error);
+        safeLog.error('File input error:', error);
         document.body.removeChild(input);
         reject(new Error('Erreur lors de la sélection de l\'image'));
       };
 
       input.oncancel = () => {
-        console.log('File selection cancelled');
+        devLog.info('File selection cancelled');
         document.body.removeChild(input);
         reject(new Error('Sélection annulée'));
       };
 
       // Trigger file picker
-      console.log('Adding input to DOM and triggering click');
+      devLog.info('Adding input to DOM and triggering click');
       document.body.appendChild(input);
       
       // Delay click to ensure DOM is ready
       setTimeout(() => {
         try {
           input.click();
-          console.log('File input clicked');
+          devLog.info('File input clicked');
         } catch (error) {
-          console.error('Error clicking file input:', error);
+          safeLog.error('Error clicking file input:', error);
           document.body.removeChild(input);
           reject(new Error('Impossible d\'ouvrir le sélecteur de fichiers'));
         }
@@ -72,22 +74,22 @@ class ProfilePhotoService {
 
   // Traiter l'image sélectionnée
   async processImage(file) {
-    console.log('Processing image:', file.name, file.size, file.type);
+    devLog.info('Processing image:', file.name, file.size, file.type);
     
     // Valider le fichier
     if (!this.validateFile(file)) {
       throw new Error('Fichier image invalide');
     }
 
-    console.log('File validation passed');
+    devLog.info('File validation passed');
 
     // Redimensionner et convertir
     const processedBlob = await this.resizeImage(file, 400, 400);
-    console.log('Image resized, blob size:', processedBlob.size);
+    devLog.info('Image resized, blob size:', processedBlob.size);
     
     // Créer l'URL de l'image
     const imageUrl = URL.createObjectURL(processedBlob);
-    console.log('Created blob URL:', imageUrl);
+    devLog.info('Created blob URL:', imageUrl);
     
     const result = {
       file: processedBlob,
@@ -98,18 +100,18 @@ class ProfilePhotoService {
       timestamp: new Date().toISOString()
     };
     
-    console.log('Image processing completed:', result);
+    devLog.info('Image processing completed:', result);
     return result;
   }
 
   // Valider le fichier image
   validateFile(file) {
-    console.log('Validating file:', file.name, file.type, file.size);
+    devLog.info('Validating file:', file.name, file.type, file.size);
     
     // Vérifier le type
     if (!this.allowedFormats.includes(file.type)) {
       const errorMsg = `Format non supporté: ${file.type}. Utilisez JPG, PNG ou WebP.`;
-      console.error(errorMsg);
+      safeLog.error(errorMsg);
       alert(errorMsg);
       return false;
     }
@@ -117,7 +119,7 @@ class ProfilePhotoService {
     // Vérifier la taille
     if (file.size > this.maxImageSize) {
       const errorMsg = `Image trop grande: ${Math.round(file.size / 1024 / 1024)}MB. Maximum 5MB autorisé.`;
-      console.error(errorMsg);
+      safeLog.error(errorMsg);
       alert(errorMsg);
       return false;
     }
@@ -125,18 +127,18 @@ class ProfilePhotoService {
     // Vérifier que le fichier n'est pas vide
     if (file.size === 0) {
       const errorMsg = 'Fichier vide détecté';
-      console.error(errorMsg);
+      safeLog.error(errorMsg);
       alert(errorMsg);
       return false;
     }
 
-    console.log('File validation successful');
+    devLog.info('File validation successful');
     return true;
   }
 
   // Redimensionner l'image
   async resizeImage(file, maxWidth, maxHeight, quality = 0.8) {
-    console.log('Starting image resize:', maxWidth, maxHeight, quality);
+    devLog.info('Starting image resize:', maxWidth, maxHeight, quality);
     
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
@@ -144,7 +146,7 @@ class ProfilePhotoService {
       const img = new Image();
 
       img.onload = () => {
-        console.log('Image loaded for resize. Original size:', img.width, 'x', img.height);
+        devLog.info('Image loaded for resize. Original size:', img.width, 'x', img.height);
         
         try {
           // Calculer les nouvelles dimensions (carré)
@@ -152,7 +154,7 @@ class ProfilePhotoService {
           const startX = (img.width - size) / 2;
           const startY = (img.height - size) / 2;
 
-          console.log('Crop dimensions:', { size, startX, startY });
+          devLog.info('Crop dimensions:', { size, startX, startY });
 
           // Configurer le canvas
           canvas.width = maxWidth;
@@ -163,31 +165,31 @@ class ProfilePhotoService {
           ctx.fillRect(0, 0, maxWidth, maxHeight);
           ctx.drawImage(img, startX, startY, size, size, 0, 0, maxWidth, maxHeight);
 
-          console.log('Image drawn on canvas');
+          devLog.info('Image drawn on canvas');
 
           // Convertir en blob
           canvas.toBlob((blob) => {
             if (blob) {
-              console.log('Canvas converted to blob, size:', blob.size);
+              devLog.info('Canvas converted to blob, size:', blob.size);
               resolve(blob);
             } else {
-              console.error('Failed to convert canvas to blob');
+              safeLog.error('Failed to convert canvas to blob');
               reject(new Error('Impossible de traiter l\'image'));
             }
           }, 'image/jpeg', quality);
         } catch (error) {
-          console.error('Error during image processing:', error);
+          safeLog.error('Error during image processing:', error);
           reject(new Error('Erreur lors du traitement de l\'image'));
         }
       };
 
       img.onerror = (error) => {
-        console.error('Image load error:', error);
+        safeLog.error('Image load error:', error);
         reject(new Error('Impossible de charger l\'image'));
       };
 
       // Charger l'image
-      console.log('Loading image for resize');
+      devLog.info('Loading image for resize');
       img.src = URL.createObjectURL(file);
     });
   }
@@ -208,7 +210,7 @@ class ProfilePhotoService {
       
       return photoData;
     } catch (error) {
-      console.error('Erreur sauvegarde photo:', error);
+      safeLog.error('Erreur sauvegarde photo:', error);
       throw new Error('Impossible de sauvegarder la photo');
     }
   }
@@ -225,7 +227,7 @@ class ProfilePhotoService {
 
       if (response.ok) {
         const serverData = await response.json();
-        console.log('Loaded profile photo from server:', serverData);
+        devLog.info('Loaded profile photo from server:', serverData);
         
         const photoData = {
           url: `${process.env.REACT_APP_BACKEND_URL}${serverData.photo_url}`,
@@ -240,7 +242,7 @@ class ProfilePhotoService {
         return photoData;
       }
     } catch (error) {
-      console.log('Could not load from server, trying local storage:', error.message);
+      devLog.info('Could not load from server, trying local storage:', error.message);
     }
 
     // Fallback vers stockage local
@@ -248,11 +250,11 @@ class ProfilePhotoService {
       const photoData = localStorage.getItem(`kojo_profile_photo_${userId}`);
       if (photoData) {
         const parsed = JSON.parse(photoData);
-        console.log('Loaded profile photo from local storage:', parsed);
+        devLog.info('Loaded profile photo from local storage:', parsed);
         return parsed;
       }
     } catch (error) {
-      console.error('Erreur chargement photo local:', error);
+      safeLog.error('Erreur chargement photo local:', error);
     }
 
     return null;
@@ -270,12 +272,12 @@ class ProfilePhotoService {
       });
 
       if (response.ok) {
-        console.log('Profile photo deleted from server successfully');
+        devLog.info('Profile photo deleted from server successfully');
       } else {
-        console.log('Could not delete from server, continuing with local deletion');
+        devLog.info('Could not delete from server, continuing with local deletion');
       }
     } catch (error) {
-      console.log('Server deletion failed, continuing with local deletion:', error.message);
+      devLog.info('Server deletion failed, continuing with local deletion:', error.message);
     }
 
     // Supprimer du stockage local
@@ -287,10 +289,10 @@ class ProfilePhotoService {
       }
       
       localStorage.removeItem(`kojo_profile_photo_${userId}`);
-      console.log('Profile photo deleted from local storage');
+      devLog.info('Profile photo deleted from local storage');
       return true;
     } catch (error) {
-      console.error('Erreur suppression photo locale:', error);
+      safeLog.error('Erreur suppression photo locale:', error);
       return false;
     }
   }
@@ -298,7 +300,7 @@ class ProfilePhotoService {
   // Upload vers le serveur (API réelle)
   async uploadProfilePhoto(imageData, userId) {
     try {
-      console.log('Starting real API upload for user:', userId);
+      devLog.info('Starting real API upload for user:', userId);
       
       // Créer FormData pour l'upload
       const formData = new FormData();
@@ -319,7 +321,7 @@ class ProfilePhotoService {
       }
 
       const result = await response.json();
-      console.log('Real API upload successful:', result);
+      devLog.info('Real API upload successful:', result);
       
       // Sauvegarder localement avec la vraie URL du serveur
       const serverImageData = {
@@ -339,7 +341,7 @@ class ProfilePhotoService {
         filename: result.filename
       };
     } catch (error) {
-      console.error('Erreur upload photo vers API:', error);
+      safeLog.error('Erreur upload photo vers API:', error);
       
       // En cas d'erreur, sauvegarder quand même localement
       try {
@@ -433,7 +435,7 @@ class ProfilePhotoService {
             URL.revokeObjectURL(photoData.url);
           }
         } catch (e) {
-          console.error('Erreur nettoyage:', e);
+          safeLog.error('Erreur nettoyage:', e);
         }
       }
     });

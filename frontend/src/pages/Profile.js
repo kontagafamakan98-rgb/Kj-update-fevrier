@@ -6,6 +6,8 @@ import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCou
 import ProfilePhoto from '../components/ProfilePhoto';
 import SimplePhotoUpload from '../components/SimplePhotoUpload';
 import { CountrySelect, getCountry } from '../components/CountryDisplay';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
@@ -33,11 +35,11 @@ export default function Profile() {
           setWorkerProfile(workerResponse.data);
         } catch (error) {
           // Worker profile doesn't exist yet
-          console.log('No worker profile found');
+          devLog.info('No worker profile found');
         }
       }
     } catch (error) {
-      console.error('Error loading profile:', error);
+      safeLog.error('Error loading profile:', error);
       setError('Erreur lors du chargement du profil');
     } finally {
       setLoading(false);
@@ -233,7 +235,7 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
   };
 
   const handlePhotoChange = (result) => {
-    console.log('Profile page received photo change result:', result);
+    devLog.info('Profile page received photo change result:', result);
     
     if (result.success) {
       setSuccess('Photo de profil mise à jour avec succès !');
@@ -242,7 +244,7 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
       setSuccess('Photo de profil supprimée !');
       setTimeout(() => setSuccess(''), 3000);
     } else if (result.error) {
-      console.error('Photo change error:', result.error);
+      safeLog.error('Photo change error:', result.error);
       alert('Erreur: ' + result.error);
     }
   };
@@ -275,15 +277,15 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
               onChange={(e) => {
                 const file = e.target.files[0];
                 if (file) {
-                  console.log('Fichier sélectionné:', file.name);
+                  devLog.info('Fichier sélectionné:', file.name);
                   const reader = new FileReader();
                   reader.onload = (event) => {
                     const base64 = event.target.result;
-                    console.log('Base64 créé, longueur:', base64.length);
+                    devLog.info('Base64 créé, longueur:', base64.length);
                     
                     // Sauver dans localStorage
                     localStorage.setItem('test_photo', base64);
-                    console.log('Photo sauvée dans localStorage');
+                    devLog.info('Photo sauvée dans localStorage');
                     
                     // Forcer le refresh de la page pour voir le résultat
                     window.location.reload();
@@ -308,7 +310,7 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
             }}>
               {(() => {
                 const savedPhoto = localStorage.getItem('test_photo');
-                console.log('Photo dans localStorage:', savedPhoto ? 'TROUVÉE' : 'ABSENTE');
+                devLog.info('Photo dans localStorage:', savedPhoto ? 'TROUVÉE' : 'ABSENTE');
                 
                 if (savedPhoto) {
                   return (
@@ -316,8 +318,8 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
                       src={savedPhoto} 
                       alt="Test" 
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onLoad={() => console.log('✅ Image chargée avec succès')}
-                      onError={(e) => console.error('❌ Erreur image:', e)}
+                      onLoad={() => devLog.info('✅ Image chargée avec succès')}
+                      onError={(e) => safeLog.error('❌ Erreur image:', e)}
                     />
                   );
                 } else {
@@ -330,7 +332,7 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
             <button 
               onClick={() => {
                 localStorage.removeItem('test_photo');
-                console.log('Photo supprimée');
+                devLog.info('Photo supprimée');
                 window.location.reload();
               }}
               style={{

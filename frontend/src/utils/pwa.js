@@ -1,3 +1,5 @@
+import { devLog, safeLog } from 'env';
+
 // PWA utility functions
 
 // Check if app is installed as PWA
@@ -14,7 +16,7 @@ export const isPWASupported = () => {
 // Request notification permission
 export const requestNotificationPermission = async () => {
   if (!('Notification' in window)) {
-    console.log('This browser does not support notifications');
+    devLog.info('This browser does not support notifications');
     return false;
   }
 
@@ -64,7 +66,7 @@ export const subscribeToPushNotifications = async () => {
     
     return subscription;
   } catch (error) {
-    console.error('Failed to subscribe to push notifications:', error);
+    safeLog.error('Failed to subscribe to push notifications:', error);
     return null;
   }
 };
@@ -109,7 +111,7 @@ export const shareContent = async (shareData) => {
       await navigator.share(shareData);
       return true;
     } catch (error) {
-      console.error('Error sharing:', error);
+      safeLog.error('Error sharing:', error);
       return false;
     }
   } else {
@@ -126,7 +128,7 @@ export const shareContent = async (shareData) => {
 export const handleAddToHomeScreen = () => {
   // This will be handled by the PWAInstallPrompt component
   // But we can track analytics here
-  console.log('Add to home screen prompted');
+  devLog.info('Add to home screen prompted');
 };
 
 // Detect if running in mobile browser

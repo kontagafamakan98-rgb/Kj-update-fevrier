@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { detectUserCountry, getPhoneExampleForCountry, getPopularBanksByCountry } from '../services/geolocationService';
+import { devLog, safeLog } from '../utils/env';
+
 
 const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration = false }) => {
   const { user } = useAuth();
@@ -36,9 +38,9 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
       setDetectedCountry(country);
       setPhoneExample(getPhoneExampleForCountry(country));
       setPopularBanks(getPopularBanksByCountry(country));
-      console.log(`🌍 Pays détecté: ${country.nameFrench} ${country.flag}`);
+      devLog.info(`🌍 Pays détecté: ${country.nameFrench} ${country.flag}`);
     } catch (error) {
-      console.error('Erreur détection pays:', error);
+      safeLog.error('Erreur détection pays:', error);
     }
   };
 
@@ -189,7 +191,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
       }
 
     } catch (error) {
-      console.error('Erreur validation comptes:', error);
+      safeLog.error('Erreur validation comptes:', error);
       setValidationErrors({ general: error.message });
     } finally {
       setLoading(false);

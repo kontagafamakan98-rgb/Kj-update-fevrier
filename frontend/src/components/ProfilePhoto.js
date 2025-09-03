@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Camera, Edit2, X } from 'lucide-react';
 import ProfilePhotoService from '../services/profilePhotoService';
 import { devConsole } from '../utils/devLogger';
+import { devLog, safeLog } from '../utils/env';
+
 
 const ProfilePhoto = ({ 
   user, 
@@ -33,11 +35,11 @@ const ProfilePhoto = ({
   const loadProfilePhoto = async () => {
     const userId = user?.id || user?._id || user?.user_id;
     if (process.env.NODE_ENV === 'development') {
-      console.log('Loading profile photo for user ID:', userId);
+      devLog.info('Loading profile photo for user ID:', userId);
     }
     
     if (!userId) {
-      console.warn('No user ID found, cannot load profile photo');
+      safeLog.warn('No user ID found, cannot load profile photo');
       return;
     }
     
@@ -48,17 +50,17 @@ const ProfilePhoto = ({
       
       if (photoDataString) {
         const photoData = JSON.parse(photoDataString);
-        console.log('Found photo in localStorage:', photoKey);
+        devLog.info('Found photo in localStorage:', photoKey);
         
         // Afficher la photo base64 directement
         setProfilePhoto({ url: photoData.base64 });
-        console.log('Photo loaded and set from localStorage');
+        devLog.info('Photo loaded and set from localStorage');
       } else {
-        console.log('No photo found in localStorage for user:', userId);
+        devLog.info('No photo found in localStorage for user:', userId);
         setProfilePhoto(null);
       }
     } catch (error) {
-      console.error('Error loading profile photo from localStorage:', error);
+      safeLog.error('Error loading profile photo from localStorage:', error);
       setProfilePhoto(null);
     }
   };
@@ -70,14 +72,14 @@ const ProfilePhoto = ({
         user.last_name,
         size
       );
-      console.log('Generated default avatar:', avatar);
+      devLog.info('Generated default avatar:', avatar);
       setDefaultAvatar(avatar);
     }
   };
 
   const handlePhotoSelect = async () => {
     if (!editable) {
-      console.log('Photo not editable, ignoring click');
+      devLog.info('Photo not editable, ignoring click');
       return;
     }
 
@@ -87,18 +89,18 @@ const ProfilePhoto = ({
       return;
     }
 
-    console.log('Starting photo selection for user:', userId);
+    devLog.info('Starting photo selection for user:', userId);
     setLoading(true);
     
     try {
       const imageData = await ProfilePhotoService.selectPhoto();
-      console.log('Image selected:', imageData);
+      devLog.info('Image selected:', imageData);
       
       // SOLUTION ULTRA SIMPLE: Convertir en base64 et stocker directement
       const reader = new FileReader();
       reader.onload = function(e) {
         const base64Image = e.target.result;
-        console.log('Image converted to base64, length:', base64Image.length);
+        devLog.info('Image converted to base64, length:', base64Image.length);
         
         // Stocker directement dans localStorage (clé cohérente)
         const photoKey = `kojo_profile_photo_${userId}`;
@@ -109,11 +111,11 @@ const ProfilePhoto = ({
         };
         
         localStorage.setItem(photoKey, JSON.stringify(photoData));
-        console.log('Photo saved in localStorage with key:', photoKey);
+        devLog.info('Photo saved in localStorage with key:', photoKey);
         
         // Afficher immédiatement
         setProfilePhoto({ url: base64Image });
-        console.log('Photo set in component state');
+        devLog.info('Photo set in component state');
         
         if (onPhotoChange) {
           onPhotoChange({ success: true, local: true, base64: base64Image });
@@ -123,7 +125,7 @@ const ProfilePhoto = ({
       };
       
       reader.onerror = function(error) {
-        console.error('Error reading file:', error);
+        safeLog.error('Error reading file:', error);
         alert('Erreur lors de la lecture du fichier');
         setLoading(false);
       };
@@ -132,7 +134,7 @@ const ProfilePhoto = ({
       reader.readAsDataURL(imageData.file);
       
     } catch (error) {
-      console.error('Error in photo selection:', error);
+      safeLog.error('Error in photo selection:', error);
       if (error.message !== 'Aucune image sélectionnée') {
         alert('Erreur lors de la sélection de l\'image: ' + error.message);
       }
@@ -152,14 +154,14 @@ const ProfilePhoto = ({
     const confirmed = window.confirm('Êtes-vous sûr de vouloir supprimer votre photo de profil ?');
     if (!confirmed) return;
 
-    console.log('Deleting photo for user:', userId);
+    devLog.info('Deleting photo for user:', userId);
     setLoading(true);
     
     try {
       // Supprimer du localStorage (clé cohérente)
       const photoKey = `kojo_profile_photo_${userId}`;
       localStorage.removeItem(photoKey);
-      console.log('Photo removed from localStorage:', photoKey);
+      devLog.info('Photo removed from localStorage:', photoKey);
       
       // Réinitialiser l'état
       setProfilePhoto(null);
@@ -169,7 +171,7 @@ const ProfilePhoto = ({
       }
       
     } catch (error) {
-      console.error('Error deleting photo:', error);
+      safeLog.error('Error deleting photo:', error);
       alert('Erreur lors de la suppression de la photo');
     } finally {
       setLoading(false);
@@ -247,7 +249,7 @@ const ProfilePhoto = ({
 
   // Debug render info (only in development)
   if (process.env.NODE_ENV === 'development') {
-    console.log('ProfilePhoto render - Photo:', !!profilePhoto, 'DefaultAvatar:', !!defaultAvatar, 'Loading:', loading);
+    devLog.info('ProfilePhoto render - Photo:', !!profilePhoto, 'DefaultAvatar:', !!defaultAvatar, 'Loading:', loading);
   }
 
   return (
@@ -272,7 +274,7 @@ const ProfilePhoto = ({
             alt="Photo de profil"
             style={photoStyle}
             onError={(e) => {
-              console.error('Image load error:', e);
+              safeLog.error('Image load error:', e);
               setProfilePhoto(null);
             }}
           />
@@ -282,7 +284,7 @@ const ProfilePhoto = ({
             alt="Avatar par défaut"
             style={photoStyle}
             onError={(e) => {
-              console.error('Default avatar load error:', e);
+              safeLog.error('Default avatar load error:', e);
             }}
           />
         ) : (

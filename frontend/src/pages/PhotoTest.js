@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ProfilePhoto from '../components/ProfilePhoto';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function PhotoTest() {
   const { user } = useAuth();
@@ -18,7 +20,7 @@ export default function PhotoTest() {
   const addTestResult = (message, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setTestResults(prev => [...prev, { timestamp, message, type }]);
-    console.log(`[${timestamp}] ${message}`);
+    devLog.info(`[${timestamp}] ${message}`);
   };
 
   const handlePhotoChange = (result) => {

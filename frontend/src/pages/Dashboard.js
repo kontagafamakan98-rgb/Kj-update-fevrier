@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import OwnerService from '../services/ownerService';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -45,7 +47,7 @@ export default function Dashboard() {
         setRecentJobs(jobs.slice(0, 5));
       }
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      safeLog.error('Error loading dashboard data:', error);
     } finally {
       setLoading(false);
     }

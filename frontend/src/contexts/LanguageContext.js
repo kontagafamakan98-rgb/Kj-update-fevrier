@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
+import { devLog, safeLog } from '../utils/env';
+
 
 const LanguageContext = createContext();
 
@@ -662,7 +664,7 @@ export function LanguageProvider({ children }) {
 
   const changeLanguage = (lang) => {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`🔄 Changing interface language to: ${lang}`);
+      devLog.info(`🔄 Changing interface language to: ${lang}`);
     }
     setCurrentLanguage(lang);
     localStorage.setItem('language', lang);

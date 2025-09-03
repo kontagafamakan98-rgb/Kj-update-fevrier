@@ -1,3 +1,5 @@
+import { devLog, safeLog } from '../utils/env';
+
 // Service pour les fonctionnalités propriétaire - ACCÈS RESTREINT
 class OwnerService {
   constructor() {
@@ -20,7 +22,7 @@ class OwnerService {
   // Obtenir les statistiques de commission (propriétaire uniquement)
   async getCommissionStats() {
     try {
-      console.log('🔐 Récupération stats commission (propriétaire)...');
+      devLog.info('🔐 Récupération stats commission (propriétaire)...');
       
       const response = await fetch(`${this.API_BASE}/commission-stats`, {
         method: 'GET',
@@ -35,11 +37,11 @@ class OwnerService {
       }
 
       const data = await response.json();
-      console.log('✅ Stats commission récupérées:', data);
+      devLog.info('✅ Stats commission récupérées:', data);
       return data;
       
     } catch (error) {
-      console.error('❌ Erreur stats commission:', error);
+      safeLog.error('❌ Erreur stats commission:', error);
       throw error;
     }
   }
@@ -47,7 +49,7 @@ class OwnerService {
   // Obtenir les informations de debug (propriétaire uniquement)
   async getDebugInfo() {
     try {
-      console.log('🔐 Récupération infos debug (propriétaire)...');
+      devLog.info('🔐 Récupération infos debug (propriétaire)...');
       
       const response = await fetch(`${this.API_BASE}/debug-info`, {
         method: 'GET',
@@ -62,11 +64,11 @@ class OwnerService {
       }
 
       const data = await response.json();
-      console.log('✅ Infos debug récupérées:', data);
+      devLog.info('✅ Infos debug récupérées:', data);
       return data;
       
     } catch (error) {
-      console.error('❌ Erreur infos debug:', error);
+      safeLog.error('❌ Erreur infos debug:', error);
       throw error;
     }
   }
@@ -74,7 +76,7 @@ class OwnerService {
   // Obtenir la gestion des utilisateurs (propriétaire uniquement)
   async getUsersManagement() {
     try {
-      console.log('🔐 Récupération gestion utilisateurs (propriétaire)...');
+      devLog.info('🔐 Récupération gestion utilisateurs (propriétaire)...');
       
       const response = await fetch(`${this.API_BASE}/users-management`, {
         method: 'GET',
@@ -89,11 +91,11 @@ class OwnerService {
       }
 
       const data = await response.json();
-      console.log('✅ Gestion utilisateurs récupérée:', data);
+      devLog.info('✅ Gestion utilisateurs récupérée:', data);
       return data;
       
     } catch (error) {
-      console.error('❌ Erreur gestion utilisateurs:', error);
+      safeLog.error('❌ Erreur gestion utilisateurs:', error);
       throw error;
     }
   }
@@ -101,7 +103,7 @@ class OwnerService {
   // Mettre à jour les paramètres de commission (propriétaire uniquement)
   async updateCommissionSettings(settings) {
     try {
-      console.log('🔐 Mise à jour paramètres commission (propriétaire)...', settings);
+      devLog.info('🔐 Mise à jour paramètres commission (propriétaire)...', settings);
       
       const response = await fetch(`${this.API_BASE}/update-commission-settings`, {
         method: 'POST',
@@ -117,11 +119,11 @@ class OwnerService {
       }
 
       const data = await response.json();
-      console.log('✅ Paramètres commission mis à jour:', data);
+      devLog.info('✅ Paramètres commission mis à jour:', data);
       return data;
       
     } catch (error) {
-      console.error('❌ Erreur mise à jour commission:', error);
+      safeLog.error('❌ Erreur mise à jour commission:', error);
       throw error;
     }
   }
@@ -133,7 +135,7 @@ class OwnerService {
       await this.getDebugInfo();
       return true;
     } catch (error) {
-      console.log('👤 Utilisateur normal détecté (pas propriétaire)');
+      devLog.info('👤 Utilisateur normal détecté (pas propriétaire)');
       return false;
     }
   }
@@ -148,11 +150,11 @@ class OwnerService {
       const payload = JSON.parse(atob(token.split('.')[1]));
       const isFamakan = payload.sub === 'famakan_kontaga_master_2024' && payload.email === 'kontagamakan@gmail.com';
       
-      console.log('🔍 Vérification Famakan Kontaga Master:', isFamakan ? '✅ FAMAKAN KONTAGA MASTER' : '👤 Utilisateur normal');
+      devLog.info('🔍 Vérification Famakan Kontaga Master:', isFamakan ? '✅ FAMAKAN KONTAGA MASTER' : '👤 Utilisateur normal');
       return isFamakan;
       
     } catch (error) {
-      console.error('Erreur vérification Famakan:', error);
+      safeLog.error('Erreur vérification Famakan:', error);
       return false;
     }
   }

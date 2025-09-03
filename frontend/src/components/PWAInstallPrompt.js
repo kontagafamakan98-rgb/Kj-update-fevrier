@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -16,7 +18,7 @@ export default function PWAInstallPrompt() {
     };
 
     const handleAppInstalled = () => {
-      console.log('PWA was installed');
+      devLog.info('PWA was installed');
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
     };
@@ -41,9 +43,9 @@ export default function PWAInstallPrompt() {
       const { outcome } = await deferredPrompt.userChoice;
       
       if (outcome === 'accepted') {
-        console.log('User accepted the install prompt');
+        devLog.info('User accepted the install prompt');
       } else {
-        console.log('User dismissed the install prompt');
+        devLog.info('User dismissed the install prompt');
       }
       
       setDeferredPrompt(null);

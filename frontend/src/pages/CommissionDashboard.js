@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import CommissionService from '../services/commissionService';
 import OwnerService from '../services/ownerService';
 import { useAuth } from '../contexts/AuthContext';
+import { devLog, safeLog } from '../utils/env';
+
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
@@ -43,13 +45,13 @@ const CommissionDashboard = () => {
       try {
         const serverData = await OwnerService.getCommissionStats();
         setServerStats(serverData.stats);
-        console.log('📊 Vraies stats serveur chargées:', serverData.stats);
+        devLog.info('📊 Vraies stats serveur chargées:', serverData.stats);
       } catch (error) {
-        console.log('📊 Utilisation des stats locales (serveur indisponible)');
+        devLog.info('📊 Utilisation des stats locales (serveur indisponible)');
       }
       
     } catch (error) {
-      console.error('Erreur chargement données propriétaire:', error);
+      safeLog.error('Erreur chargement données propriétaire:', error);
     }
   };
 

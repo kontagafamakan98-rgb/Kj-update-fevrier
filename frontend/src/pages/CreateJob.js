@@ -3,6 +3,8 @@ import { MapPin } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import LocationDetector from '../components/LocationDetector';
 import { getCountryByCode } from '../services/geolocationService';
+import { devLog, safeLog } from '../utils/env';
+
 
 export default function CreateJob() {
   const { user } = useAuth();
@@ -71,7 +73,7 @@ export default function CreateJob() {
       });
       
     } catch (error) {
-      console.error('Erreur création job:', error);
+      safeLog.error('Erreur création job:', error);
       alert('Erreur lors de la création du job');
     } finally {
       setLoading(false);
