@@ -53,7 +53,7 @@ class PhoneValidationTester:
         
         # Generate unique email for each test
         timestamp = int(datetime.now().timestamp())
-        email = f"test_phone_{timestamp}@kojo.test"
+        email = f"test_phone_{timestamp}@gmail.com"
         
         registration_data = {
             "email": email,
