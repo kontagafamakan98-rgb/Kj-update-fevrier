@@ -449,8 +449,8 @@ KOJO_PRIORITY_COUNTRIES = {
     # Mali (+223) - Pays prioritaire  
     '223': {
         'country': 'Mali',
-        'orange_prefixes': ['77', '78', '79'],  # Pas de 70 pour Orange Mali
-        'wave_prefixes': ['77', '78', '79', '65', '66'],
+        'orange_prefixes': ['77', '78', '79', '70'],  # Ajout 70 pour compatibilité maximale
+        'wave_prefixes': ['77', '78', '79', '70', '65', '66'],  # Wave étendu
         'other_operators': ['65', '66', '67', '68'],  # Malitel
         'currency': 'FCFA',
         'primary_language': 'français'
