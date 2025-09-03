@@ -14,6 +14,7 @@ import jwt
 import bcrypt
 from enum import Enum
 import shutil
+import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
