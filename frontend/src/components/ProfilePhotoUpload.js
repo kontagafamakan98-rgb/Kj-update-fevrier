@@ -137,8 +137,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
                   className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
                 >
                   <div className="text-3xl mb-2">🖼️</div>
-                  <div className="text-sm font-medium text-blue-900">Choisir depuis la galerie</div>
-                  <div className="text-xs text-blue-600 mt-1">Sélectionner une photo existante</div>
+                  <div className="text-sm font-medium text-blue-900">{t('chooseFromGallery')}</div>
+                  <div className="text-xs text-blue-600 mt-1">{t('selectExistingPhoto')}</div>
                 </button>
 
                 {/* Option Caméra */}
