@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import OwnerService from '../services/ownerService';
+import PreciseLocationDemo from '../components/PreciseLocationDemo';
 import { devLog, safeLog } from '../utils/env';
 
 
