@@ -55,6 +55,26 @@ api_router = APIRouter(prefix="/api")
 # Security
 security = HTTPBearer()
 
+# Custom Security Middleware for West Africa
+class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Add security headers
+        response = await call_next(request)
+        
+        # Security headers optimized for West Africa
+        for header, value in SECURITY_HEADERS.items():
+            response.headers[header] = value
+        
+        # Add server identification
+        response.headers["X-Kojo-Region"] = "west-africa"
+        response.headers["X-Kojo-Version"] = "1.0.0"
+        
+        # Performance headers for slow networks
+        if request.url.path.startswith("/api"):
+            response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes cache
+        
+        return response
+
 # Fonction pour vérifier si l'utilisateur est le propriétaire
 async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Vérifie que seul le propriétaire peut accéder aux fonctionnalités sensibles"""
