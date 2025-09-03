@@ -26,11 +26,34 @@ export function AuthProvider({ children }) {
 
   const loadUser = async () => {
     try {
-      const response = await axios.get('/users/profile');
-      setUser(response.data);
+      // Use cached profile if available for faster loading
+      const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);
+      if (cachedUser && networkOptimizer.getQuality() === 'poor') {
+        setUser(cachedUser);
+        setLoading(false);
+        devLog.info('🚀 User loaded from cache (poor network)');
+        return;
+      }
+      
+      const userData = await authAPI.getProfile();
+      setUser(userData);
+      
+      // Cache user data for offline access
+      kojoCache.set(CACHE_KEYS.USER_PROFILE, userData, 60 * 60 * 1000); // 1 hour
+      devLog.info('✅ User profile loaded and cached');
+      
     } catch (error) {
-      console.error('Error loading user:', error);
-      localStorage.removeItem('token');
+      safeLog.error('Error loading user:', error);
+      
+      // Try to load from cache if API fails
+      const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);
+      if (cachedUser) {
+        setUser(cachedUser);
+        devLog.info('📱 User loaded from cache (API failed)');
+      } else {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     } finally {
       setLoading(false);
     }
