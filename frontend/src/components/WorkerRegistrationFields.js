@@ -219,7 +219,8 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
                 { job: 'Électricien', rate: '3000-5000' },
                 { job: 'Plombier', rate: '2500-4000' },
                 { job: 'Mécanicien', rate: '2000-3500' },
-                { job: 'Maçon', rate: '1500-2500' }
+                { job: 'Maçon', rate: '1500-2500' },
+                { job: 'Tuteur', rate: '1000-2500' }
               ].map((example) => (
                 <span key={example.job} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
                   {example.job}: {example.rate} FCFA
