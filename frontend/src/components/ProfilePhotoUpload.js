@@ -102,36 +102,86 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
       </p>
 
       {!photoData ? (
-        <div
-          className={`relative border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer ${
-            dragActive 
-              ? 'border-blue-500 bg-blue-50' 
-              : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-          }`}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={showPhotoOptions}
-        >
-          <input
-            ref={inputRef}
-            type="file"
-            className="hidden"
-            accept="image/*"
-            onChange={handleFileInput}
-          />
-          
-          <div className="text-center">
-            <div className="text-4xl mb-3">📁</div>
-            <div className="text-sm text-gray-600">
-              <p className="font-medium">Cliquez pour sélectionner une photo</p>
-              <p>ou glissez-déposez votre image ici</p>
+        <>
+          {!showCameraOptions ? (
+            <div
+              className={`relative border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer ${
+                dragActive 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+              }`}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={showPhotoOptions}
+            >
+              <div className="text-center">
+                <div className="text-4xl mb-3">📸</div>
+                <div className="text-sm text-gray-600">
+                  <p className="font-medium">Ajouter une photo de profil</p>
+                  <p>Cliquez pour choisir une option</p>
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  JPG, PNG jusqu'à 5MB
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-gray-500 mt-2">
-              JPG, PNG jusqu'à 5MB
+          ) : (
+            <div className="space-y-4">
+              {/* Options de sélection de photo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Option Galerie */}
+                <button
+                  type="button"
+                  onClick={handleGalleryClick}
+                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                  <div className="text-3xl mb-2">🖼️</div>
+                  <div className="text-sm font-medium text-blue-900">Choisir depuis la galerie</div>
+                  <div className="text-xs text-blue-600 mt-1">Sélectionner une photo existante</div>
+                </button>
+
+                {/* Option Caméra */}
+                <button
+                  type="button"
+                  onClick={handleCameraClick}
+                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-green-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
+                >
+                  <div className="text-3xl mb-2">📷</div>
+                  <div className="text-sm font-medium text-green-900">Prendre une photo</div>
+                  <div className="text-xs text-green-600 mt-1">Utiliser l'appareil photo</div>
+                </button>
+              </div>
+
+              {/* Bouton Annuler */}
+              <button
+                type="button"
+                onClick={() => setShowCameraOptions(false)}
+                className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                ← Retour
+              </button>
+
+              {/* Inputs cachés */}
+              <input
+                ref={inputRef}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                onChange={handleFileInput}
+              />
+              
+              <input
+                ref={cameraInputRef}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileInput}
+              />
             </div>
-          </div>
-        </div>
+          )}
+        </>
       ) : (
         <div className="space-y-4">
           {/* Aperçu de la photo */}
