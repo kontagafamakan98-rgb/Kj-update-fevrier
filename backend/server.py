@@ -199,7 +199,7 @@ class Job(BaseModel):
     status: JobStatus = JobStatus.OPEN
     required_skills: List[str] = []
     estimated_duration: Optional[str] = None
-    posted_at: datetime = Field(default_factory=datetime.utcnow)
+    posted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deadline: Optional[datetime] = None
     assigned_worker_id: Optional[str] = None
     # Nouvelles informations pour mécaniciens
