@@ -693,10 +693,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 async def register_user_verified(user_data: UserWithPayment):
     """Inscription avec vérification obligatoire des comptes de paiement"""
     
-    # Check if email already exists
-    existing_user = await db.users.find_one({"email": user_data.email})
-    if existing_user:
-        log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
+    try:
+        # Check if email already exists
+        existing_user = await db.users.find_one({"email": user_data.email})
+        if existing_user:
+            log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
+    except Exception as e:
+        logger.error(f"❌ Erreur lors de la vérification de l'email: {str(e)}")
+        log_and_raise_http_exception(500, "Erreur lors de la vérification de l'email")
     
     # Valider les comptes de paiement selon le type d'utilisateur
     try:
