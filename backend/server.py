@@ -395,6 +395,56 @@ def mask_bank_card(card_number: str) -> str:
     elif len(clean_card) >= 15:
         return f"****-****-***-{clean_card[-4:]}"
     return "****-****-****"
+
+def validate_bank_account(bank_account: dict) -> bool:
+    """Valide les informations de compte bancaire"""
+    if not isinstance(bank_account, dict):
+        return False
+    
+    # Vérifier les champs obligatoires
+    required_fields = ["account_number", "bank_name", "account_holder"]
+    for field in required_fields:
+        if not bank_account.get(field):
+            return False
+    
+    # Valider le numéro de compte (au moins 8 chiffres)
+    account_number = ''.join(filter(str.isdigit, bank_account["account_number"]))
+    if len(account_number) < 8:
+        return False
+    
+    # Valider le nom de la banque (au moins 3 caractères)
+    if len(bank_account["bank_name"].strip()) < 3:
+        return False
+    
+    # Valider le nom du titulaire (au moins 2 caractères)
+    if len(bank_account["account_holder"].strip()) < 2:
+        return False
+    
+    return True
+
+def mask_bank_account_info(bank_account: dict) -> dict:
+    """Masque les informations sensibles du compte bancaire"""
+    if not isinstance(bank_account, dict):
+        return {}
+    
+    masked_account = bank_account.copy()
+    
+    # Masquer le numéro de compte
+    account_number = bank_account.get("account_number", "")
+    clean_account = ''.join(filter(str.isdigit, account_number))
+    if len(clean_account) >= 8:
+        masked_account["account_number"] = f"****{clean_account[-4:]}"
+    else:
+        masked_account["account_number"] = "****"
+    
+    # Garder les autres informations non sensibles
+    return {
+        "account_number": masked_account["account_number"],
+        "bank_name": bank_account.get("bank_name", ""),
+        "account_holder": bank_account.get("account_holder", ""),
+        "bank_code": bank_account.get("bank_code", ""),
+        "branch": bank_account.get("branch", "")
+    }
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
