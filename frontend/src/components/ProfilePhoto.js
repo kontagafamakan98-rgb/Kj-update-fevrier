@@ -33,7 +33,9 @@ const ProfilePhoto = ({
 
   const loadProfilePhoto = async () => {
     const userId = user?.id || user?._id || user?.user_id;
-    console.log('Loading profile photo for user ID:', userId);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Loading profile photo for user ID:', userId);
+    }
     
     if (!userId) {
       console.warn('No user ID found, cannot load profile photo');
