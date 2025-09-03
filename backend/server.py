@@ -8,6 +8,22 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import sys
+
+# Configure logging for West Africa production
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.handlers.RotatingFileHandler(
+            'kojo_backend.log', 
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5
+        )
+    ]
+)
+logger = logging.getLogger("kojo_backend")
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
