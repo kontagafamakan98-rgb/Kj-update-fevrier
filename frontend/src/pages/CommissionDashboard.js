@@ -7,9 +7,9 @@ import { devLog, safeLog } from '../utils/env';
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState({});
+  const [stats, setStats] = useState(() => ({}));
   const [transactions, setTransactions] = useState([]);
-  const [ownerAccounts, setOwnerAccounts] = useState({});
+  const [ownerAccounts, setOwnerAccounts] = useState(() => ({}));
   const [editingAccounts, setEditingAccounts] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);

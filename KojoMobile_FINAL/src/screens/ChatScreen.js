@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useMemo }, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
