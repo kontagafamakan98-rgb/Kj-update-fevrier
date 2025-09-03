@@ -417,7 +417,7 @@ class MessageCreate(BaseModel):
 class PushTokenCreate(BaseModel):
     user_id: str = Field(min_length=1, max_length=100)
     push_token: str = Field(min_length=10, max_length=500)
-    device_type: str = Field(min_length=2, max_length=50, regex=r'^(ios|android|web)$')
+    device_type: str = Field(min_length=2, max_length=50, pattern=r'^(ios|android|web)$')
     device_id: Optional[str] = Field(None, max_length=200)
 
 # Utility Functions
