@@ -93,7 +93,32 @@ const translations = {
     
     // Registration
     createAccount: 'Créer un compte',
-    joinKojoCommunity: 'Rejoignez la communauté Kojo'
+    joinKojoCommunity: 'Rejoignez la communauté Kojo',
+    userType: 'Type d\'utilisateur',
+    iAmClient: 'Je cherche des services',
+    iAmWorker: 'Je propose mes services',
+    country: 'Pays',
+    detectedAutomatically: 'Détecté automatiquement',
+    positionDetected: 'Position détectée',
+    adjustedAutomatically: 'Exemples et informations ajustés automatiquement',
+    positionNotDetected: 'Position non détectée - Utilisation des paramètres par défaut (Sénégal)',
+    personalInformation: 'Informations personnelles',
+    paymentAccounts: 'Comptes de paiement',
+    nextStepWorker: 'Prochaine étape : Vous devrez lier au minimum 2 moyens de paiement (Orange Money, Wave, Compte bancaire)',
+    nextStepClient: 'Prochaine étape : Vous devrez lier au moins 1 moyen de paiement (Orange Money, Wave, Compte bancaire)',
+    continueToPaymentVerification: 'Continuer → Vérification des comptes',
+    detectingLocation: 'Détection de votre position...',
+    detectedViaGeolocation: 'Pays détecté via votre localisation géographique',
+    atLeast6Characters: 'Au moins 6 caractères',
+    phoneFormat: 'Format',
+    passwordsDontMatch: 'Les mots de passe ne correspondent pas',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
+    workersMustSelectSkills: 'Les travailleurs doivent sélectionner au moins une compétence',
+    pleaseIndicateExperience: 'Veuillez indiquer vos années d\'expérience',
+    pleaseIndicateValidRate: 'Veuillez indiquer un tarif horaire valide (minimum 500 FCFA)',
+    preparing: 'Préparation...',
+    alreadyHaveAccount: 'Déjà un compte?',
+    signIn: 'Se connecter'
   },
   en: {
     // Navigation
