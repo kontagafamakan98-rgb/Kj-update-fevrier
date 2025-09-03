@@ -1066,7 +1066,7 @@ async def update_commission_settings(
                 "$set": {
                     "commission_rate": commission_rate,
                     "owner_accounts": settings.get("owner_accounts", {}),
-                    "updated_at": datetime.utcnow().isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
                     "updated_by": owner_user["id"]
                 }
             },
