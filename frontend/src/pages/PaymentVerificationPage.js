@@ -9,6 +9,8 @@ const PaymentVerificationPage = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [detectedCountry, setDetectedCountry] = useState(null);
+  const [geoLoading, setGeoLoading] = useState(true);
 
   // Données utilisateur passées depuis la page d'inscription
   const userData = location.state?.userData;
@@ -19,7 +21,24 @@ const PaymentVerificationPage = () => {
       navigate('/register');
       return;
     }
+    
+    // Détecter le pays de l'utilisateur
+    detectUserLocationForPayments();
   }, [userData, navigate]);
+
+  const detectUserLocationForPayments = async () => {
+    try {
+      const country = await detectUserCountry();
+      if (country) {
+        setDetectedCountry(country);
+        console.log(`📍 Pays détecté pour paiements: ${country.nameFrench} ${country.flag}`);
+      }
+    } catch (error) {
+      console.error('Erreur détection pays pour paiements:', error);
+    } finally {
+      setGeoLoading(false);
+    }
+  };
 
   const handlePaymentAccountsComplete = async (paymentAccounts) => {
     setLoading(true);
