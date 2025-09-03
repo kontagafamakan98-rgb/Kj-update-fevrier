@@ -14,13 +14,15 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
 
     // Vérifier le type de fichier
     if (!file.type.startsWith('image/')) {
-      alert('Veuillez sélectionner une image (JPG, PNG, etc.)');
+      const errorMessage = t('pleaseSelectImage') || 'Veuillez sélectionner une image (JPG, PNG, etc.)';
+      alert(errorMessage);
       return;
     }
 
     // Vérifier la taille (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('L\'image doit faire moins de 5MB');
+      const errorMessage = t('imageTooLarge') || 'L\'image doit faire moins de 5MB';
+      alert(errorMessage);
       return;
     }
 
@@ -34,6 +36,11 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
         name: file.name,
         size: file.size
       });
+    };
+    reader.onerror = (error) => {
+      console.error('Error reading file:', error);
+      const errorMessage = t('errorReadingFile') || 'Erreur lors de la lecture du fichier';
+      alert(errorMessage);
     };
     reader.readAsDataURL(file);
   };
