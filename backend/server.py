@@ -923,7 +923,7 @@ async def root():
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc)}
 
 # ============================================================================
 # ENDPOINTS PROTÉGÉS PROPRIÉTAIRE - ACCÈS RESTREINT
