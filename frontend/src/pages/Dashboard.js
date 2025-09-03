@@ -188,6 +188,11 @@ export default function Dashboard() {
               💼 Commission Dashboard
             </Link>
           </div>
+
+          {/* Démo Géolocalisation Ultra-Précise */}
+          <div className="mt-6">
+            <PreciseLocationDemo />
+          </div>
         </div>
       )}
 
