@@ -325,7 +325,7 @@ export default function Register() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Prénom
+                  {t('firstName')}
                 </label>
                 <input
                   id="first_name"
