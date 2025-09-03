@@ -424,11 +424,11 @@ frontend:
         comment: "✅ PWA PROFILE PHOTO PERSISTENT ISSUE RESOLVED COMPLETELY: Conducted final verification of the PWA profile photo system via /photo-debug page. CONFIRMED WORKING: (1) ProfilePhoto component displays correctly with default avatar generation (JD initials in teal background), (2) Three profile photo components render properly (editable, read-only, small format), (3) Edit buttons visible and functional with orange camera/edit icons, (4) File selection test works correctly as confirmed by log entry generation, (5) All browser APIs supported (File API ✅, Canvas ✅, LocalStorage ✅), (6) ProfilePhotoService properly handles image processing, validation, and localStorage persistence, (7) Both authenticated (/photo-test) and unauthenticated (/photo-debug) access routes working correctly. The persistent PWA profile photo issue is now fully resolved with comprehensive functionality across all scenarios."
   - task: "Mobile Push Notifications System"
     implemented: true
-    working: "NA"
+    working: false
     file: "/app/KojoMobile_FINAL/src/services/notificationService.js"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
@@ -436,6 +436,9 @@ frontend:
       - working: "NA"
         agent: "main"
         comment: "ENHANCED: Fixed import issues in OfflineIndicator and NotificationSettingsScreen components. Integrated NotificationService with backend API for push token registration. Updated project ID configuration for Expo push notifications. Added proper error handling and fallback mechanisms for offline token storage."
+      - working: false
+        agent: "testing"
+        comment: "❌ BACKEND ENDPOINT MISSING: Mobile push notification system frontend is implemented but backend endpoint POST /api/users/push-token does not exist (404 Not Found). This endpoint is required for mobile app to register push notification tokens with the backend. Frontend NotificationService expects this endpoint for token registration including device_type and user_id. CRITICAL for mobile app functionality - push notifications cannot work without backend token storage."
 
   - task: "Mobile Offline Capabilities System"
     implemented: true
