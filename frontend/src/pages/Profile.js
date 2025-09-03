@@ -6,6 +6,7 @@ import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCou
 import ProfilePhoto from '../components/ProfilePhoto';
 import SimplePhotoUpload from '../components/SimplePhotoUpload';
 import { CountrySelect, getCountry } from '../components/CountryDisplay';
+import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { devLog, safeLog } from '../utils/env';
 
 
