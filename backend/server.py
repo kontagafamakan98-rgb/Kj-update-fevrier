@@ -8,6 +8,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import logging.handlers
 import sys
 
 # Configure logging for West Africa production
