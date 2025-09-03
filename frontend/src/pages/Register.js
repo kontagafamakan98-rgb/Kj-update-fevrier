@@ -281,8 +281,8 @@ export default function Register() {
                   />
                   <div className="text-center">
                     <div className="text-2xl mb-2">🔧</div>
-                    <span className="text-sm font-medium text-gray-700">Travailleur</span>
-                    <p className="text-xs text-gray-500 mt-1">Je propose mes services</p>
+                    <span className="text-sm font-medium text-gray-700">{t('worker')}</span>
+                    <p className="text-xs text-gray-500 mt-1">{t('iAmWorker')}</p>
                   </div>
                 </label>
               </div>
