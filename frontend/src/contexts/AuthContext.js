@@ -111,9 +111,21 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
+  const logout = async () => {
+    try {
+      // Attempt to notify server of logout
+      await authAPI.logout();
+    } catch (error) {
+      devLog.warn('Server logout failed:', error);
+    } finally {
+      // Always clear local data
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      kojoCache.clear(); // Clear all cached data
+      setUser(null);
+      
+      devLog.info('✅ User logged out and cache cleared');
+    }
   };
 
   const value = {
