@@ -328,6 +328,16 @@ class Payment(BaseModel):
     status: PaymentStatus = PaymentStatus.PENDING  # Use enum for better validation
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class PushToken(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    push_token: str = Field(min_length=10, max_length=500)  # Expo push token length
+    device_type: str = Field(min_length=2, max_length=50)  # ios, android, web
+    device_id: Optional[str] = Field(None, max_length=200)  # Optional device identifier
+    active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Request/Response Models
 class UserRegister(BaseModel):
     email: EmailStr
