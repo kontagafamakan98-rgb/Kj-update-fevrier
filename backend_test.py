@@ -1054,6 +1054,349 @@ class KojoAPITester:
             print("❌ Could not verify Famakan Kontaga Master account creation")
             self.tests_run += 1
 
+    def test_payment_account_verification_system(self):
+        """Test the new payment account verification system"""
+        print("\n" + "="*50)
+        print("TESTING PAYMENT ACCOUNT VERIFICATION SYSTEM")
+        print("="*50)
+        
+        # Test 1: Client registration with 1 payment method (should succeed)
+        print(f"\n🔍 Testing Client Registration with 1 Payment Method (Should Succeed)...")
+        client_payment_data = {
+            "email": f"client_payment_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Aminata",
+            "last_name": "Diallo",
+            "phone": "+221701234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "orange_money": "+221701234567"
+            }
+        }
+        
+        success, response = self.run_test(
+            "Client Registration with 1 Payment Method",
+            "POST",
+            "auth/register-verified",
+            200,
+            data=client_payment_data
+        )
+        
+        client_verified_token = None
+        if success and 'access_token' in response:
+            client_verified_token = response['access_token']
+            print(f"   ✅ Client registered with payment verification")
+            if 'payment_verification' in response:
+                verification = response['payment_verification']
+                print(f"   Payment verification: {verification}")
+        
+        # Test 2: Client registration with 0 payment methods (should fail)
+        print(f"\n🔍 Testing Client Registration with 0 Payment Methods (Should Fail)...")
+        client_no_payment_data = {
+            "email": f"client_no_payment_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Fatou",
+            "last_name": "Sow",
+            "phone": "+221701234568",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {}
+        }
+        
+        self.run_test(
+            "Client Registration with 0 Payment Methods",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=client_no_payment_data
+        )
+        
+        # Test 3: Worker registration with 2+ payment methods (should succeed)
+        print(f"\n🔍 Testing Worker Registration with 2+ Payment Methods (Should Succeed)...")
+        worker_payment_data = {
+            "email": f"worker_payment_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Mamadou",
+            "last_name": "Traore",
+            "phone": "+223701234567",
+            "user_type": "worker",
+            "country": "mali",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "orange_money": "+223701234567",
+                "wave": "+221701234567"
+            }
+        }
+        
+        success, response = self.run_test(
+            "Worker Registration with 2+ Payment Methods",
+            "POST",
+            "auth/register-verified",
+            200,
+            data=worker_payment_data
+        )
+        
+        worker_verified_token = None
+        if success and 'access_token' in response:
+            worker_verified_token = response['access_token']
+            print(f"   ✅ Worker registered with payment verification")
+        
+        # Test 4: Worker registration with 1 payment method (should fail)
+        print(f"\n🔍 Testing Worker Registration with 1 Payment Method (Should Fail)...")
+        worker_insufficient_data = {
+            "email": f"worker_insufficient_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Ibrahim",
+            "last_name": "Kone",
+            "phone": "+223701234568",
+            "user_type": "worker",
+            "country": "mali",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "orange_money": "+223701234568"
+            }
+        }
+        
+        self.run_test(
+            "Worker Registration with 1 Payment Method",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=worker_insufficient_data
+        )
+        
+        # Test 5: Orange Money validation tests
+        print(f"\n🔍 Testing Orange Money Number Validation...")
+        
+        # Valid Orange Money numbers
+        valid_orange_tests = [
+            {"orange_money": "+223701234567", "country": "mali"},      # Mali
+            {"orange_money": "+221701234567", "country": "senegal"},   # Senegal
+            {"orange_money": "+226701234567", "country": "burkina_faso"}, # Burkina Faso
+            {"orange_money": "+225701234567", "country": "ivory_coast"}   # Ivory Coast
+        ]
+        
+        for i, test_data in enumerate(valid_orange_tests):
+            test_user_data = {
+                "email": f"orange_valid_{i}_{datetime.now().strftime('%H%M%S')}@test.com",
+                "password": "TestPass123!",
+                "first_name": "Test",
+                "last_name": "Orange",
+                "phone": test_data["orange_money"],
+                "user_type": "client",
+                "country": test_data["country"],
+                "preferred_language": "fr",
+                "payment_accounts": {
+                    "orange_money": test_data["orange_money"]
+                }
+            }
+            
+            self.run_test(
+                f"Valid Orange Money {test_data['country']} ({test_data['orange_money']})",
+                "POST",
+                "auth/register-verified",
+                200,
+                data=test_user_data
+            )
+        
+        # Invalid Orange Money numbers
+        invalid_orange_data = {
+            "email": f"orange_invalid_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "Invalid",
+            "phone": "+1234567890",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "orange_money": "+1234567890"  # Invalid prefix
+            }
+        }
+        
+        self.run_test(
+            "Invalid Orange Money Number",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=invalid_orange_data
+        )
+        
+        # Test 6: Wave validation tests
+        print(f"\n🔍 Testing Wave Number Validation...")
+        
+        # Valid Wave numbers (Senegal and Ivory Coast only)
+        valid_wave_tests = [
+            {"wave": "+221701234567", "country": "senegal"},
+            {"wave": "+225701234567", "country": "ivory_coast"}
+        ]
+        
+        for i, test_data in enumerate(valid_wave_tests):
+            test_user_data = {
+                "email": f"wave_valid_{i}_{datetime.now().strftime('%H%M%S')}@test.com",
+                "password": "TestPass123!",
+                "first_name": "Test",
+                "last_name": "Wave",
+                "phone": test_data["wave"],
+                "user_type": "client",
+                "country": test_data["country"],
+                "preferred_language": "fr",
+                "payment_accounts": {
+                    "wave": test_data["wave"]
+                }
+            }
+            
+            self.run_test(
+                f"Valid Wave {test_data['country']} ({test_data['wave']})",
+                "POST",
+                "auth/register-verified",
+                200,
+                data=test_user_data
+            )
+        
+        # Invalid Wave number (Mali - not supported)
+        invalid_wave_data = {
+            "email": f"wave_invalid_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "InvalidWave",
+            "phone": "+223701234567",
+            "user_type": "client",
+            "country": "mali",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "wave": "+223701234567"  # Mali not supported for Wave
+            }
+        }
+        
+        self.run_test(
+            "Invalid Wave Number (Mali not supported)",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=invalid_wave_data
+        )
+        
+        # Test 7: Bank card validation with Luhn algorithm
+        print(f"\n🔍 Testing Bank Card Validation with Luhn Algorithm...")
+        
+        # Valid bank card (passes Luhn check)
+        valid_card_data = {
+            "email": f"card_valid_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "Card",
+            "phone": "+221701234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "bank_card": "4532015112830366",  # Valid Luhn
+                "bank_name": "Banque Atlantique"
+            }
+        }
+        
+        self.run_test(
+            "Valid Bank Card (Luhn Algorithm)",
+            "POST",
+            "auth/register-verified",
+            200,
+            data=valid_card_data
+        )
+        
+        # Invalid bank card (fails Luhn check)
+        invalid_card_data = {
+            "email": f"card_invalid_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Test",
+            "last_name": "InvalidCard",
+            "phone": "+221701234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "bank_card": "1234567890123456",  # Invalid Luhn
+                "bank_name": "Test Bank"
+            }
+        }
+        
+        self.run_test(
+            "Invalid Bank Card (Luhn Algorithm)",
+            "POST",
+            "auth/register-verified",
+            400,
+            data=invalid_card_data
+        )
+        
+        # Test 8: GET /api/users/payment-accounts
+        if client_verified_token:
+            print(f"\n🔍 Testing GET Payment Accounts...")
+            self.run_test(
+                "Get User Payment Accounts",
+                "GET",
+                "users/payment-accounts",
+                200,
+                token=client_verified_token
+            )
+        
+        # Test 9: PUT /api/users/payment-accounts
+        if client_verified_token:
+            print(f"\n🔍 Testing PUT Payment Accounts...")
+            update_payment_data = {
+                "orange_money": "+221701234567",
+                "wave": "+221701234567"
+            }
+            
+            self.run_test(
+                "Update User Payment Accounts",
+                "PUT",
+                "users/payment-accounts",
+                200,
+                data=update_payment_data,
+                token=client_verified_token
+            )
+        
+        # Test 10: POST /api/users/verify-payment-access
+        if client_verified_token:
+            print(f"\n🔍 Testing Payment Access Verification...")
+            self.run_test(
+                "Verify Payment Access",
+                "POST",
+                "users/verify-payment-access",
+                200,
+                token=client_verified_token
+            )
+        
+        # Test 11: Worker with 3 payment methods (all types)
+        print(f"\n🔍 Testing Worker with All 3 Payment Methods...")
+        worker_all_payments_data = {
+            "email": f"worker_all_{datetime.now().strftime('%H%M%S')}@test.com",
+            "password": "TestPass123!",
+            "first_name": "Ousmane",
+            "last_name": "Diop",
+            "phone": "+221701234567",
+            "user_type": "worker",
+            "country": "senegal",
+            "preferred_language": "fr",
+            "payment_accounts": {
+                "orange_money": "+221701234567",
+                "wave": "+221701234567",
+                "bank_card": "4532015112830366",
+                "bank_name": "Ecobank Senegal"
+            }
+        }
+        
+        self.run_test(
+            "Worker Registration with All 3 Payment Methods",
+            "POST",
+            "auth/register-verified",
+            200,
+            data=worker_all_payments_data
+        )
+
     def run_all_tests(self):
         """Run all tests in sequence"""
         print("🚀 Starting Kojo API Tests")
