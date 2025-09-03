@@ -1,0 +1,209 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import PaymentAccountSetup from '../components/PaymentAccountSetup';
+import PaymentAccountService from '../services/paymentAccountService';
+
+const PaymentVerificationPage = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Données utilisateur passées depuis la page d'inscription
+  const userData = location.state?.userData;
+
+  useEffect(() => {
+    // Rediriger si pas de données utilisateur
+    if (!userData) {
+      navigate('/register');
+      return;
+    }
+  }, [userData, navigate]);
+
+  const handlePaymentAccountsComplete = async (paymentAccounts) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log('📝 Finalisation inscription avec comptes de paiement...');
+      
+      // Inscription avec vérification des comptes de paiement
+      const result = await PaymentAccountService.registerWithPaymentVerification(
+        userData,
+        paymentAccounts
+      );
+
+      if (result.success) {
+        // Sauvegarder le token et les données utilisateur
+        localStorage.setItem('token', result.data.access_token);
+        localStorage.setItem('user', JSON.stringify(result.data.user));
+        
+        // Sauvegarder le statut de vérification
+        PaymentAccountService.storeVerificationStatus({
+          is_verified: result.data.user.is_verified,
+          payment_accounts_count: result.data.user.payment_accounts_count,
+          user_type: result.data.user.user_type
+        });
+
+        console.log('🎉 Inscription réussie avec vérification paiement!');
+        
+        // Rediriger vers le dashboard
+        navigate('/dashboard', {
+          state: {
+            message: `Inscription réussie! Votre compte est vérifié avec ${result.data.payment_verification.linked_accounts} moyen(s) de paiement.`,
+            type: 'success'
+          }
+        });
+
+      } else {
+        throw new Error(result.error);
+      }
+
+    } catch (error) {
+      console.error('❌ Erreur inscription avec paiement:', error);
+      setError(error.message || 'Erreur lors de l\'inscription avec vérification paiement');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!userData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
+          <div className="mt-4 text-orange-600 font-medium">Redirection...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Vérification des Comptes de Paiement
+          </h1>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto">
+            <div className="flex items-center justify-center mb-4">
+              <span className="text-4xl mr-4">👋</span>
+              <div className="text-left">
+                <p className="text-lg font-semibold text-blue-900">
+                  Bienvenue {userData.first_name} {userData.last_name}!
+                </p>
+                <p className="text-blue-700">
+                  Type de compte: <span className="font-medium capitalize">{userData.user_type}</span>
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-sm text-blue-800 space-y-2">
+              <p>
+                <strong>Dernière étape:</strong> Pour finaliser votre inscription, vous devez lier vos comptes de paiement.
+              </p>
+              <p>
+                {userData.user_type === 'worker' 
+                  ? '🎯 En tant que travailleur, vous devez lier au minimum 2 moyens de paiement pour recevoir vos paiements des clients.'
+                  : '🎯 En tant que client, vous devez lier au moins 1 moyen de paiement pour effectuer vos paiements aux travailleurs.'
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Étapes du processus */}
+        <div className="mb-8">
+          <div className="flex items-center justify-center space-x-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                ✓
+              </div>
+              <span className="ml-2 text-sm text-green-600 font-medium">Informations personnelles</span>
+            </div>
+            
+            <div className="w-16 h-1 bg-orange-200"></div>
+            
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                2
+              </div>
+              <span className="ml-2 text-sm text-orange-600 font-medium">Comptes de paiement</span>
+            </div>
+            
+            <div className="w-16 h-1 bg-gray-200"></div>
+            
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-sm font-medium">
+                3
+              </div>
+              <span className="ml-2 text-sm text-gray-500 font-medium">Accès à l'application</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Erreur */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <span className="text-red-500 text-xl mr-3">❌</span>
+              <div>
+                <h3 className="font-semibold text-red-800">Erreur d'inscription</h3>
+                <p className="text-red-700 text-sm">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading overlay */}
+        {loading && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+              <div className="mt-4 text-gray-700 font-medium">Finalisation de l'inscription...</div>
+              <div className="text-sm text-gray-500 mt-2">Vérification des comptes de paiement en cours</div>
+            </div>
+          </div>
+        )}
+
+        {/* Composant de configuration des comptes */}
+        <PaymentAccountSetup
+          userType={userData.user_type}
+          isRegistration={true}
+          onComplete={handlePaymentAccountsComplete}
+        />
+
+        {/* Bouton retour */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => navigate('/register')}
+            disabled={loading}
+            className="text-orange-600 hover:text-orange-700 text-sm font-medium disabled:opacity-50"
+          >
+            ← Retour à l'inscription
+          </button>
+        </div>
+
+        {/* Informations de sécurité */}
+        <div className="mt-12 bg-gray-50 border border-gray-200 rounded-lg p-6">
+          <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+            <span className="text-xl mr-2">🔐</span>
+            Sécurité et Confidentialité
+          </h3>
+          <div className="text-sm text-gray-700 space-y-2">
+            <p>• Vos informations de paiement sont chiffrées et sécurisées</p>
+            <p>• Nous ne stockons jamais vos codes PIN ou mots de passe</p>
+            <p>• Les numéros de cartes bancaires sont masqués après validation</p>
+            <p>• Seuls les numéros de téléphone des portefeuilles mobiles sont conservés</p>
+            <p>• Ces informations servent uniquement aux transferts de paiement Kojo</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default PaymentVerificationPage;
