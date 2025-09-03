@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) => {
   const [showSkillInput, setShowSkillInput] = useState(false);
