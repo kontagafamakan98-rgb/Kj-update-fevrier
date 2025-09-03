@@ -61,17 +61,26 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post('/auth/login', { email, password });
-      const { access_token, user } = response.data;
+      const response = await authAPI.login({ email, password });
+      const { access_token, user } = response;
       
       localStorage.setItem('token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       
+      // Cache user data
+      kojoCache.set(CACHE_KEYS.USER_PROFILE, user, 24 * 60 * 60 * 1000); // 24 hours
+      
+      devLog.info('✅ User logged in successfully');
       return { success: true };
+      
     } catch (error) {
+      const errorInfo = handleApiError(error);
+      safeLog.error('Login failed:', errorInfo);
+      
       return { 
         success: false, 
-        error: error.response?.data?.detail || 'Login failed' 
+        error: errorInfo.message
       };
     }
   };
