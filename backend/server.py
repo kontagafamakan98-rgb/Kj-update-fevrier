@@ -467,7 +467,7 @@ KOJO_PRIORITY_COUNTRIES = {
     # Burkina Faso (+226) - Pays prioritaire
     '226': {
         'country': 'Burkina Faso',
-        'orange_prefixes': ['77', '78', '70'],  # Ajout 70 pour Orange Burkina
+        'orange_prefixes': ['77', '78', '70', '90'],  # Orange Burkina complet avec 90
         'wave_prefixes': ['77', '78', '70', '71'],  # Wave stable
         'other_operators': ['70', '71', '51', '52'],  # Telmob
         'currency': 'FCFA',
