@@ -973,7 +973,7 @@ async def create_job(
 async def get_jobs(
     status: Optional[JobStatus] = None,
     category: Optional[str] = None,
-    limit: int = Field(default=50, ge=1, le=100),
+    limit: int = Query(default=50, ge=1, le=100),
     current_user: User = Depends(get_current_user)
 ):
     try:
