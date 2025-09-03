@@ -191,10 +191,10 @@ export default function Register() {
             ) : detectedCountry ? (
               <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-center">
                 <p className="text-sm text-green-800">
-                  <span className="font-medium">📍 Position détectée:</span> {detectedCountry.flag} {detectedCountry.nameFrench}
+                  <span className="font-medium">📍 {t('positionDetected')}:</span> {detectedCountry.flag} {detectedCountry.nameFrench}
                 </p>
                 <p className="text-xs text-green-600 mt-1">
-                  Exemples et informations ajustés automatiquement
+                  {t('adjustedAutomatically')}
                 </p>
               </div>
             ) : (
