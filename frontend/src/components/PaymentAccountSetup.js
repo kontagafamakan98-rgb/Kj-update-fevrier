@@ -18,7 +18,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     }
   });
   
-  const [validationErrors, setValidationErrors] = useState({});
+  const [validationErrors, setValidationErrors] = useState(() => ({}));
   const [loading, setLoading] = useState(false);
   const [linkedAccountsCount, setLinkedAccountsCount] = useState(0);
   const [detectedCountry, setDetectedCountry] = useState(null);

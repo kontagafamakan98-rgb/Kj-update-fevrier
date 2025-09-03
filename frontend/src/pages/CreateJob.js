@@ -25,7 +25,7 @@ export default function CreateJob() {
     parts_and_tools_notes: ''
   });
 
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState(() => ({}));
   const [loading, setLoading] = useState(false);
 
   const handleLocationDetected = (location) => {
