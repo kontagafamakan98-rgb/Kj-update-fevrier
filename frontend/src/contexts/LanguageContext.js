@@ -202,7 +202,36 @@ const translations = {
     languageOnProfile: 'Your language will appear on your public profile',
     clientsCanSee: 'Clients will be able to see which language you speak fluently',
     canModifyLater: 'You can modify this choice later in your settings',
-    detectingLanguage: 'Detecting your preferred language...'
+    detectingLanguage: 'Detecting your preferred language...',
+    
+    // Registration
+    createAccount: 'Create Account',
+    joinKojoCommunity: 'Join the Kojo community',
+    userType: 'User Type',
+    iAmClient: 'I am looking for services',
+    iAmWorker: 'I offer my services',
+    country: 'Country',
+    detectedAutomatically: 'Detected automatically',
+    positionDetected: 'Position detected',
+    adjustedAutomatically: 'Examples and information adjusted automatically',
+    positionNotDetected: 'Position not detected - Using default settings (Senegal)',
+    personalInformation: 'Personal information',
+    paymentAccounts: 'Payment accounts',
+    nextStepWorker: 'Next step: You must link at least 2 payment methods (Orange Money, Wave, Bank account)',
+    nextStepClient: 'Next step: You must link at least 1 payment method (Orange Money, Wave, Bank account)',
+    continueToPaymentVerification: 'Continue → Account verification',
+    detectingLocation: 'Detecting your location...',
+    detectedViaGeolocation: 'Country detected via your geographic location',
+    atLeast6Characters: 'At least 6 characters',
+    phoneFormat: 'Format',
+    passwordsDontMatch: 'Passwords do not match',
+    passwordTooShort: 'Password must contain at least 6 characters',
+    workersMustSelectSkills: 'Workers must select at least one skill',
+    pleaseIndicateExperience: 'Please indicate your years of experience',
+    pleaseIndicateValidRate: 'Please indicate a valid hourly rate (minimum 500 FCFA)',
+    preparing: 'Preparing...',
+    alreadyHaveAccount: 'Already have an account?',
+    signIn: 'Sign In'
   },
   wo: {
     // Navigation (Wolof)
