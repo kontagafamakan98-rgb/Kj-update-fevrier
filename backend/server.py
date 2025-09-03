@@ -172,8 +172,8 @@ class User(BaseModel):
     payment_accounts_count: int = 0
     rating: float = 0.0
     total_reviews: int = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class WorkerProfile(BaseModel):
     user_id: str
