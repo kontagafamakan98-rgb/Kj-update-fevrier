@@ -252,22 +252,29 @@ class WorkerProfile(BaseModel):
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     client_id: str
-    title: str
-    description: str
-    category: str
-    budget_min: float
-    budget_max: float
-    location: dict  # {"address": str, "latitude": float, "longitude": float}
+    title: str = Field(min_length=5, max_length=200)  # Title length constraints
+    description: str = Field(min_length=20, max_length=5000)  # Description constraints
+    category: str = Field(min_length=3, max_length=50)  # Category constraints
+    budget_min: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
+    budget_max: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
+    location: dict = Field(min_items=1, max_items=10)  # Location structure
     status: JobStatus = JobStatus.OPEN
-    required_skills: List[str] = []
-    estimated_duration: Optional[str] = None
+    required_skills: List[str] = Field(default=[], max_items=20)  # Max 20 skills
+    estimated_duration: Optional[str] = Field(None, max_length=100)  # Duration string limit
     posted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deadline: Optional[datetime] = None
     assigned_worker_id: Optional[str] = None
-    # Nouvelles informations pour mécaniciens
-    mechanic_must_bring_parts: bool = False  # Le mécanicien doit-il apporter les pièces ?
-    mechanic_must_bring_tools: bool = False  # Le mécanicien doit-il apporter les outils ?
-    parts_and_tools_notes: Optional[str] = None  # Notes supplémentaires sur pièces/outils
+    # Nouvelles informations pour mécaniciens avec validation
+    mechanic_must_bring_parts: bool = False
+    mechanic_must_bring_tools: bool = False  
+    parts_and_tools_notes: Optional[str] = Field(None, max_length=1000)  # Notes length limit
+    
+    # Validation custom pour budget cohérent
+    @validator('budget_max')
+    def budget_max_must_be_greater_than_min(cls, v, values):
+        if 'budget_min' in values and v < values['budget_min']:
+            raise ValueError('budget_max must be greater than or equal to budget_min')
+        return v
 
 class JobProposal(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
