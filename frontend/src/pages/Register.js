@@ -219,7 +219,7 @@ export default function Register() {
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
                   2
                 </div>
-                <span className="ml-2 text-gray-500 font-medium">Comptes de paiement</span>
+                <span className="ml-2 text-gray-500 font-medium">{t('paymentAccounts')}</span>
               </div>
             </div>
             
