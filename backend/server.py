@@ -24,10 +24,20 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# JWT Settings
-JWT_SECRET = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
+# JWT Settings - Enhanced Security
+JWT_SECRET = os.environ.get('JWT_SECRET', 'kojo-prod-secret-2025-afrique-ouest-' + str(uuid.uuid4()))
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
+JWT_REFRESH_EXPIRATION_DAYS = 7
+
+# Security Headers for West Africa
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+}
 
 # Owner/Admin configuration - SEUL FAMAKAN KONTAGA MASTER A ACCÈS
 OWNER_EMAIL = os.environ.get('OWNER_EMAIL', 'kontagamakan@gmail.com')  # Email de Famakan Kontaga Master
