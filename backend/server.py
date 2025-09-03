@@ -215,7 +215,7 @@ class JobProposal(BaseModel):
     estimated_completion_time: str
     message: str
     status: str = "pending"  # pending, accepted, rejected
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Message(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
