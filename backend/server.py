@@ -388,19 +388,79 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) 
         "is_verified": True
     }
 
+# Comprehensive West Africa Mobile Number Validation
+WEST_AFRICA_MOBILE_VALIDATION = {
+    # Sénégal (+221)
+    '221': {
+        'country': 'Sénégal',
+        'orange_prefixes': ['77', '78', '70'],
+        'wave_prefixes': ['77', '78', '70', '76', '75'],
+        'other_operators': ['76', '75', '33']  # Tigo, Expresso
+    },
+    # Mali (+223)  
+    '223': {
+        'country': 'Mali',
+        'orange_prefixes': ['77', '78', '79'],
+        'wave_prefixes': ['77', '78', '79', '65', '66'],
+        'other_operators': ['65', '66', '67', '68']  # Malitel
+    },
+    # Guinée (+224)
+    '224': {
+        'country': 'Guinée',
+        'orange_prefixes': ['62', '64', '65'],
+        'wave_prefixes': ['62', '64', '65', '66'],
+        'other_operators': ['66', '67']
+    },
+    # Côte d'Ivoire (+225)
+    '225': {
+        'country': "Côte d'Ivoire", 
+        'orange_prefixes': ['77', '78', '79'],
+        'wave_prefixes': ['77', '78', '79', '58', '59'],
+        'other_operators': ['58', '59', '48', '49']  # MTN
+    },
+    # Burkina Faso (+226)
+    '226': {
+        'country': 'Burkina Faso',
+        'orange_prefixes': ['77', '78'],
+        'wave_prefixes': ['77', '78', '70', '71'], 
+        'other_operators': ['70', '71', '51', '52']  # Telmob
+    },
+    # Niger (+227)
+    '227': {
+        'country': 'Niger',
+        'orange_prefixes': ['77', '78'],
+        'wave_prefixes': ['77', '78', '80', '81'],
+        'other_operators': ['80', '81', '82']
+    },
+    # Togo (+228)
+    '228': {
+        'country': 'Togo',
+        'orange_prefixes': ['77', '78'],
+        'wave_prefixes': ['77', '78', '90', '91'],
+        'other_operators': ['90', '91', '92']  # Moov
+    },
+    # Bénin (+229)
+    '229': {
+        'country': 'Bénin',
+        'orange_prefixes': ['77', '78'],
+        'wave_prefixes': ['77', '78', '95', '96'],
+        'other_operators': ['95', '96', '97']  # MTN
+    }
+}
+
 def validate_orange_money_number(number: str) -> bool:
-    """Valide un numéro Orange Money"""
-    # Supprimer les espaces et caractères spéciaux
+    """Valide un numéro Orange Money avec précision par pays"""
     clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
     
-    # Vérifier les préfixes Orange Money pour l'Afrique de l'Ouest
-    # Mali: +223, Sénégal: +221, Burkina Faso: +226, Côte d'Ivoire: +225
-    # Guinée: +224, Niger: +227, Togo: +228, Bénin: +229
-    valid_prefixes = ['221', '223', '224', '225', '226', '227', '228', '229']
+    if len(clean_number) < 11 or len(clean_number) > 12:
+        return False
     
-    if len(clean_number) >= 11:  # Minimum avec indicatif pays
-        prefix = clean_number[:3]
-        return prefix in valid_prefixes and len(clean_number) in [11, 12]
+    country_code = clean_number[:3]
+    operator_prefix = clean_number[3:5]
+    
+    if country_code in WEST_AFRICA_MOBILE_VALIDATION:
+        valid_prefixes = WEST_AFRICA_MOBILE_VALIDATION[country_code]['orange_prefixes']
+        return operator_prefix in valid_prefixes
     
     return False
 
