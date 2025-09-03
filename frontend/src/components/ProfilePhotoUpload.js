@@ -159,7 +159,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
                 onClick={() => setShowCameraOptions(false)}
                 className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
               >
-                ← Retour
+                ← {t('back')}
               </button>
 
               {/* Inputs cachés */}
