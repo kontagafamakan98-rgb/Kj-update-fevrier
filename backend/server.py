@@ -345,7 +345,7 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) 
         if linked_accounts < 2:
             raise HTTPException(
                 status_code=400,
-                detail="Les travailleurs doivent lier au minimum 2 moyens de paiement sur 3 disponibles (Orange Money, Wave, Carte bancaire)"
+                detail="Les travailleurs doivent lier au minimum 2 moyens de paiement sur 3 disponibles (Orange Money, Wave, Compte bancaire)"
             )
     
     return {
