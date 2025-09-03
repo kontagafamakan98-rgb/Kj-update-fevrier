@@ -361,7 +361,8 @@ def validate_orange_money_number(number: str) -> bool:
     
     # Vérifier les préfixes Orange Money pour l'Afrique de l'Ouest
     # Mali: +223, Sénégal: +221, Burkina Faso: +226, Côte d'Ivoire: +225
-    valid_prefixes = ['223', '221', '226', '225']
+    # Guinée: +224, Niger: +227, Togo: +228, Bénin: +229
+    valid_prefixes = ['221', '223', '224', '225', '226', '227', '228', '229']
     
     if len(clean_number) >= 11:  # Minimum avec indicatif pays
         prefix = clean_number[:3]
