@@ -414,6 +414,12 @@ class MessageCreate(BaseModel):
     receiver_id: str
     content: str = Field(min_length=1, max_length=5000)
 
+class PushTokenCreate(BaseModel):
+    user_id: str = Field(min_length=1, max_length=100)
+    push_token: str = Field(min_length=10, max_length=500)
+    device_type: str = Field(min_length=2, max_length=50, regex=r'^(ios|android|web)$')
+    device_id: Optional[str] = Field(None, max_length=200)
+
 # Utility Functions
 # Validation functions
 def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) -> dict:
