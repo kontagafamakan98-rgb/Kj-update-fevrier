@@ -222,8 +222,8 @@ class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
     password_hash: str = Field(min_length=60, max_length=100)  # bcrypt hash length
-    first_name: str = Field(min_length=1, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9]+$')
-    last_name: str = Field(min_length=1, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9]+$')
+    first_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9]+$', description="Prénom")
+    last_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9]+$', description="Nom de famille")
     phone: str = Field(pattern=r'^\+\d{1,4}\d{8,12}$')  # International format
     user_type: UserType
     country: Country
