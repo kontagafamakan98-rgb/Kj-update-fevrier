@@ -192,7 +192,7 @@ class AdvancedCodeFixer:
             # Ignorer les fichiers de test
             if ("test" in str(py_file).lower() or 
                 "scripts" in str(py_file) or
-                str(py_file).name.endswith("_test.py")):
+                str(py_file).endswith("_test.py")):
                 continue
                 
             try:
