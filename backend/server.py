@@ -435,13 +435,16 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) 
         "is_verified": True
     }
 
+# Génération des préfixes 70-99 pour Orange Money et Wave
+ALL_PREFIXES_70_99 = [str(i) for i in range(70, 100)]
+
 # Mobile Number Validation - 4 PAYS PRIORITAIRES KOJO
 KOJO_PRIORITY_COUNTRIES = {
     # Sénégal (+221) - Pays principal
     '221': {
         'country': 'Sénégal',
-        'orange_prefixes': ['77', '78', '70', '90'],  # Orange Sénégal complets avec 90
-        'wave_prefixes': ['77', '78', '70', '76', '75'],  # Wave + autres pour flexibilité
+        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Sénégal - tous préfixes 70-99
+        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Sénégal - tous préfixes 70-99
         'other_operators': ['76', '75', '33'],  # Tigo, Expresso
         'currency': 'FCFA',
         'primary_language': 'français'
@@ -449,8 +452,8 @@ KOJO_PRIORITY_COUNTRIES = {
     # Mali (+223) - Pays prioritaire  
     '223': {
         'country': 'Mali',
-        'orange_prefixes': ['77', '78', '79', '70', '90'],  # Orange Mali complet avec 90
-        'wave_prefixes': ['77', '78', '79', '70', '65', '66'],  # Wave étendu
+        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Mali - tous préfixes 70-99
+        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Mali - tous préfixes 70-99
         'other_operators': ['65', '66', '67', '68'],  # Malitel
         'currency': 'FCFA',
         'primary_language': 'français'
@@ -458,8 +461,8 @@ KOJO_PRIORITY_COUNTRIES = {
     # Côte d'Ivoire (+225) - Pays prioritaire
     '225': {
         'country': "Côte d'Ivoire", 
-        'orange_prefixes': ['77', '78', '79', '70', '90'],  # Orange Côte d'Ivoire complet avec 90
-        'wave_prefixes': ['77', '78', '79', '70', '58', '59'],  # Wave étendu
+        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Côte d'Ivoire - tous préfixes 70-99
+        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Côte d'Ivoire - tous préfixes 70-99
         'other_operators': ['58', '59', '48', '49'],  # MTN
         'currency': 'FCFA',
         'primary_language': 'français'
@@ -467,8 +470,8 @@ KOJO_PRIORITY_COUNTRIES = {
     # Burkina Faso (+226) - Pays prioritaire
     '226': {
         'country': 'Burkina Faso',
-        'orange_prefixes': ['77', '78', '70', '90'],  # Orange Burkina complet avec 90
-        'wave_prefixes': ['77', '78', '70', '71'],  # Wave stable
+        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Burkina Faso - tous préfixes 70-99
+        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Burkina Faso - tous préfixes 70-99
         'other_operators': ['70', '71', '51', '52'],  # Telmob
         'currency': 'FCFA',
         'primary_language': 'français'
