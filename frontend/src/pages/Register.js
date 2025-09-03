@@ -149,8 +149,30 @@ export default function Register() {
             Rejoignez la communauté Kojo
           </p>
           
-          {/* Information sur le processus */}
+          {/* Information sur le processus avec géolocalisation */}
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            {geoLoading ? (
+              <div className="flex items-center justify-center py-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                <span className="text-xs text-blue-700">Détection de votre position...</span>
+              </div>
+            ) : detectedCountry ? (
+              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-center">
+                <p className="text-sm text-green-800">
+                  <span className="font-medium">📍 Position détectée:</span> {detectedCountry.flag} {detectedCountry.nameFrench}
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Exemples et informations ajustés automatiquement
+                </p>
+              </div>
+            ) : (
+              <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-center">
+                <p className="text-xs text-yellow-700">
+                  📍 Position non détectée - Utilisation des paramètres par défaut (Sénégal)
+                </p>
+              </div>
+            )}
+            
             <div className="flex items-center justify-center space-x-4 text-sm">
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
@@ -171,8 +193,8 @@ export default function Register() {
             
             <p className="text-xs text-blue-700 mt-3">
               {formData.user_type === 'worker' 
-                ? '⚠️ Prochaine étape : Vous devrez lier au minimum 2 moyens de paiement (Orange Money, Wave, Carte bancaire)'
-                : '⚠️ Prochaine étape : Vous devrez lier au moins 1 moyen de paiement (Orange Money, Wave, Carte bancaire)'
+                ? '⚠️ Prochaine étape : Vous devrez lier au minimum 2 moyens de paiement (Orange Money, Wave, Compte bancaire)'
+                : '⚠️ Prochaine étape : Vous devrez lier au moins 1 moyen de paiement (Orange Money, Wave, Compte bancaire)'
               }
             </p>
           </div>
