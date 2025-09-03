@@ -112,7 +112,7 @@ export default function Register() {
     // Préparer les données utilisateur
     const userData = {
       ...formData,
-      preferred_language: currentLanguage,
+      preferred_language: userSelectedLanguage, // Utiliser la langue choisie par l'utilisateur
       // Ajouter la photo si sélectionnée
       profile_photo_base64: profilePhoto?.base64 || null
     };
