@@ -162,6 +162,7 @@ function AppRoutes() {
               <Profile />
             </ProtectedRoute>
           } />
+          <Route path="/payment-verification" element={<PaymentVerificationPage />} />
           <Route path="/commission-dashboard" element={
             <ProtectedRoute>
               <CommissionDashboard />
