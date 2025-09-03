@@ -74,7 +74,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
       return;
     }
 
-    const result = await syncData();
+    const result = await syncOfflineData();
     if (result.success) {
       Alert.alert(
         'Synchronisation réussie',
