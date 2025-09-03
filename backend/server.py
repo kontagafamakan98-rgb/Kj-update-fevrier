@@ -753,7 +753,7 @@ async def register_user_verified(user_data: UserWithPayment):
         
         await db.worker_profiles.insert_one(worker_profile.dict())
         worker_profile_created = True
-        print(f"✅ Profil travailleur créé pour {user.email}")
+        logger.info(f"✅ Profil travailleur créé pour {user.email}")
     
     # Create access token
     access_token = create_access_token(data={"sub": user.id, "email": user.email})
