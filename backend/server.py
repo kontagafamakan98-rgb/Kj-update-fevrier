@@ -1106,7 +1106,42 @@ async def root():
 
 @api_router.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now(timezone.utc)}
+    try:
+        # Test database connection
+        await db.users.count_documents({})
+        
+        return {
+            "status": "healthy", 
+            "timestamp": datetime.now(timezone.utc),
+            "database": "connected",
+            "version": "1.0.0",
+            "environment": "production"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable")
+
+@api_router.get("/stats")
+async def get_system_stats():
+    """Statistics endpoint for monitoring"""
+    try:
+        total_users = await db.users.count_documents({})
+        total_jobs = await db.jobs.count_documents({})
+        total_workers = await db.users.count_documents({"user_type": "worker"})
+        total_clients = await db.users.count_documents({"user_type": "client"})
+        
+        return {
+            "total_users": total_users,
+            "total_jobs": total_jobs,
+            "total_workers": total_workers,
+            "total_clients": total_clients,
+            "supported_countries": ["senegal", "mali", "ivory_coast", "burkina_faso"],
+            "supported_languages": ["fr", "en", "wo", "bm"],
+            "timestamp": datetime.now(timezone.utc)
+        }
+    except Exception as e:
+        logger.error(f"Stats endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve statistics")
 
 # ============================================================================
 # ENDPOINTS PROTÉGÉS PROPRIÉTAIRE - ACCÈS RESTREINT
