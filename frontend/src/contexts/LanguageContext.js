@@ -354,6 +354,20 @@ const translations = {
     // Registration  
     createAccount: 'Dund konte',
     joinKojoCommunity: 'Bokk ci jammiit Kojo',
+    
+    // Professional Skills
+    professionalInformationWorker: 'Xet yu liggéey (Liggéeykat)',
+    skillsAndSpecialties: 'Xel-xel ak mbind',
+    selectedSkills: 'Sa xel-xel yu tànn:',
+    addCustomSkill: 'Yokk xel-xel bu bees',
+    customSkillPlaceholder: 'Sa xel-xel bu bees',
+    add: 'Yokk',
+    yearsExperience: 'At yu liggéey',
+    selectExperience: 'Tànn sa liggéey',
+    beginner: 'Tambali (0-1 at)',
+    hourlyRate: 'Njëkk waxtu (FCFA)',
+    rateExamples: 'Misaal njëkk waxtu:',
+    profileInfoNote: 'Xet yii dina mel ci sa profil bu xam',
     userType: 'Sugu jëfkoykat',
     iAmClient: 'Dama soxla sëriñ yi',
     iAmWorker: 'Dama def liggéey',
