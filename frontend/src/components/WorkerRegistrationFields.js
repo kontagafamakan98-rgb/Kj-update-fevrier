@@ -135,7 +135,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
                   onClick={handleAddCustomSkill}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  Ajouter
+                  {t('add')}
                 </button>
                 <button
                   type="button"
