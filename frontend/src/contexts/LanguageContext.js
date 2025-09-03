@@ -412,6 +412,8 @@ const translations = {
     cleaning: 'Saniya',
     gardening: 'Nakɔ baara',
     tutoring: 'Kalan',
+    mechanics: 'Mɔbili baara',
+    computing: 'Ɔridinatɛri baara',
     
     // Payments
     payment: 'Sara',
