@@ -7,22 +7,48 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
   const [accounts, setAccounts] = useState({
     orange_money: '',
     wave: '',
-    bank_card: '',
-    bank_name: ''
+    bank_account: {
+      account_number: '',
+      bank_name: '',
+      account_holder: '',
+      bank_code: '',
+      branch: ''
+    }
   });
   
   const [validationErrors, setValidationErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [linkedAccountsCount, setLinkedAccountsCount] = useState(0);
+  const [detectedCountry, setDetectedCountry] = useState(null);
+  const [phoneExample, setPhoneExample] = useState('+221 70 12 34 56');
+  const [popularBanks, setPopularBanks] = useState([]);
 
   const requiredMinimum = userType === 'worker' ? 2 : 1;
+
+  useEffect(() => {
+    // Détecter automatiquement le pays de l'utilisateur
+    detectUserCountryAsync();
+  }, []);
+
+  const detectUserCountryAsync = async () => {
+    try {
+      const country = await detectUserCountry();
+      setDetectedCountry(country);
+      setPhoneExample(getPhoneExampleForCountry(country));
+      setPopularBanks(getPopularBanksByCountry(country));
+      console.log(`🌍 Pays détecté: ${country.nameFrench} ${country.flag}`);
+    } catch (error) {
+      console.error('Erreur détection pays:', error);
+    }
+  };
 
   useEffect(() => {
     // Compter les comptes liés
     let count = 0;
     if (accounts.orange_money.trim()) count++;
     if (accounts.wave.trim()) count++;
-    if (accounts.bank_card.trim()) count++;
+    if (accounts.bank_account && accounts.bank_account.account_number.trim() && 
+        accounts.bank_account.bank_name.trim() && accounts.bank_account.account_holder.trim()) count++;
     setLinkedAccountsCount(count);
   }, [accounts]);
 
