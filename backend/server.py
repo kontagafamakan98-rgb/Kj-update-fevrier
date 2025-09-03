@@ -696,7 +696,7 @@ async def register_user_verified(user_data: UserWithPayment):
     # Check if email already exists
     existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
     
     # Valider les comptes de paiement selon le type d'utilisateur
     try:
