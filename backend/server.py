@@ -22,10 +22,24 @@ import base64
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection - Enhanced error handling
+try:
+    mongo_url = os.environ.get('MONGO_URL')
+    if not mongo_url:
+        raise ValueError("MONGO_URL environment variable is required")
+    
+    db_name = os.environ.get('DB_NAME', 'kojo_db')  # Default fallback
+    if not db_name:
+        raise ValueError("DB_NAME environment variable is required")
+    
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
+    
+    # Test connection on startup
+    print(f"✅ MongoDB connected to: {db_name}")
+except Exception as e:
+    print(f"❌ MongoDB connection failed: {e}")
+    raise
 
 # JWT Settings - Enhanced Security
 JWT_SECRET = os.environ.get('JWT_SECRET', 'kojo-prod-secret-2025-afrique-ouest-' + str(uuid.uuid4()))
