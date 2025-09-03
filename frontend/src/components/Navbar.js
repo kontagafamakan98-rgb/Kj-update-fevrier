@@ -156,6 +156,15 @@ export default function Navbar() {
               </select>
             </div>
 
+            {/* Test Info Link - Mobile */}
+            <Link 
+              to="/test-info"
+              className="block bg-yellow-400 hover:bg-yellow-500 text-black px-3 py-2 rounded-md text-sm font-semibold transition-colors mx-3 mb-2 text-center"
+              onClick={closeMobileMenu}
+            >
+              🧪 Test Info - Version Test
+            </Link>
+
             {user ? (
               <>
                 <Link 
