@@ -483,6 +483,20 @@ const translations = {
     // Registration
     createAccount: 'Konte dilan',
     joinKojoCommunity: 'Don Kojo jamana kɔnɔ',
+    
+    // Professional Skills
+    professionalInformationWorker: 'Baarakɛla kunnafoni (Baarakɛla)',
+    skillsAndSpecialties: 'Seko ni dɔnkilidaw',
+    selectedSkills: 'I ka seko sugandilen:',
+    addCustomSkill: 'Seko kɛrɛnkɛrɛnnen fara a kan',
+    customSkillPlaceholder: 'I ka seko kɛrɛnkɛrɛnnen',
+    add: 'Fara a kan',
+    yearsExperience: 'Baara san',
+    selectExperience: 'I ka baara san sugandi',
+    beginner: 'Daminɛla (0-1 san)',
+    hourlyRate: 'Lɛrɛ sara (FCFA)',
+    rateExamples: 'Lɛrɛ misaliw:',
+    profileInfoNote: 'Nin kunnafoni bɛ na jira i ka profil foroba la',
     userType: 'Baarakɛla sugu',
     iAmClient: 'Ne bɛ baara ɲini',
     iAmWorker: 'Ne bɛ baara kɛ',
