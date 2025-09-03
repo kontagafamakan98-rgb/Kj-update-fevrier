@@ -37,7 +37,9 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#ea580c",
-          "sounds": ["./assets/notification-sound.wav"]
+          "sounds": [
+            "./assets/notification-sound.wav"
+          ]
         }
       ],
       [
