@@ -55,7 +55,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
       <div className="flex items-center mb-4">
         <span className="text-2xl mr-3">👷</span>
         <h3 className="text-lg font-semibold text-blue-900">
-          Informations Professionnelles (Travailleur)
+          {t('professionalInformationWorker')}
         </h3>
       </div>
       
