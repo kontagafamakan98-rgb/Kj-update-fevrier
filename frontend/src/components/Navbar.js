@@ -1,9 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { isPWA } from '../utils/pwa';
 import LanguageSelector from './LanguageSelector';
+import logger from '../utils/logger';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
