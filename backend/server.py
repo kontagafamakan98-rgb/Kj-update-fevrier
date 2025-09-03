@@ -1410,9 +1410,9 @@ async def startup_event():
     # Créer le dossier uploads
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(exist_ok=True)
-    print("📁 Dossier uploads créé/vérifié")
+    logger.info("📁 Dossier uploads créé/vérifié")
     
-    print("✅ API Kojo prête!")
+    logger.info("✅ API Kojo prête!")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
