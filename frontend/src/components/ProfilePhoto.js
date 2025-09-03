@@ -18,11 +18,9 @@ const ProfilePhoto = ({
 
   // Debug logging (development only)
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('ProfilePhoto mounted with user:', user);
-      console.log('User ID available:', user?.id);
-      console.log('Editable mode:', editable);
-    }
+    devConsole.log('ProfilePhoto mounted with user:', user);
+    devConsole.log('User ID available:', user?.id);
+    devConsole.log('Editable mode:', editable);
   }, [user, editable]);
 
   useEffect(() => {
