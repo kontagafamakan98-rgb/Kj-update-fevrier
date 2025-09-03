@@ -973,16 +973,24 @@ async def create_job(
 async def get_jobs(
     status: Optional[JobStatus] = None,
     category: Optional[str] = None,
+    limit: int = Field(default=50, ge=1, le=100),
     current_user: User = Depends(get_current_user)
 ):
-    query = {}
-    if status:
-        query["status"] = status
-    if category:
-        query["category"] = category
-    
-    jobs = await db.jobs.find(query).sort("posted_at", -1).to_list(100)
-    return [Job(**job) for job in jobs]
+    try:
+        query = {}
+        if status:
+            query["status"] = status
+        if category:
+            query["category"] = category
+        
+        jobs = await db.jobs.find(query).sort("posted_at", -1).to_list(limit)
+        
+        logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
+        return [Job(**job) for job in jobs]
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to retrieve jobs: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
 
 @api_router.get("/jobs/{job_id}")
 async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
