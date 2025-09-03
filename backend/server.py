@@ -140,6 +140,7 @@ class PaymentMethod(str, Enum):
 
 class Language(str, Enum):
     FRENCH = "fr"
+    ENGLISH = "en"
     WOLOF = "wo"
     BAMBARA = "bm"
 
