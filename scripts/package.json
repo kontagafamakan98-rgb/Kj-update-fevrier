@@ -1,0 +1,8 @@
+{
+  "name": "kojo-scripts",
+  "version": "1.0.0",
+  "description": "Scripts utilitaires pour Kojo",
+  "dependencies": {
+    "glob": "^7.2.0"
+  }
+}
