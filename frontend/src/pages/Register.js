@@ -91,19 +91,19 @@ export default function Register() {
     // Validation spécifique aux travailleurs
     if (formData.user_type === 'worker') {
       if (!formData.worker_specialties || formData.worker_specialties.length === 0) {
-        setError('Les travailleurs doivent sélectionner au moins une compétence');
+        setError(t('workersMustSelectSkills'));
         setLoading(false);
         return;
       }
 
       if (!formData.worker_experience_years) {
-        setError('Veuillez indiquer vos années d\'expérience');
+        setError(t('pleaseIndicateExperience'));
         setLoading(false);
         return;
       }
 
       if (!formData.worker_hourly_rate || formData.worker_hourly_rate < 500) {
-        setError('Veuillez indiquer un tarif horaire valide (minimum 500 FCFA)');
+        setError(t('pleaseIndicateValidRate'));
         setLoading(false);
         return;
       }
