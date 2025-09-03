@@ -1,4 +1,4 @@
-import React, { useMemo }, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 const MobilePhotoTest = () => {
   const [photos, setPhotos] = useState([]);
