@@ -48,10 +48,10 @@ class WorkerVerificationTester:
         
         # Add payment accounts based on count
         if payment_accounts_count >= 1:
-            user_data["payment_accounts"]["orange_money"] = f"+221701234{unique_id[:3]}"
+            user_data["payment_accounts"]["orange_money"] = f"+22170123456{unique_id[:1]}"
         
         if payment_accounts_count >= 2:
-            user_data["payment_accounts"]["wave"] = f"+221771234{unique_id[:3]}"
+            user_data["payment_accounts"]["wave"] = f"+22177123456{unique_id[:1]}"
             
         if payment_accounts_count >= 3:
             user_data["payment_accounts"]["bank_account"] = {
