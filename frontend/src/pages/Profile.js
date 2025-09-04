@@ -574,7 +574,7 @@ function WorkerProfileCreate({ onCreate }) {
     onCreate({
       ...formData,
       experience_years: parseInt(formData.experience_years),
-      hourly_rate: parseFloat(formData.hourly_rate)
+
     });
   };
 
