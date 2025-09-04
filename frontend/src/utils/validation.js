@@ -27,11 +27,7 @@ export const ValidationRules = {
     message: 'Le nom doit contenir entre 2 et 50 caractères (lettres uniquement)'
   },
   
-  hourlyRate: {
-    min: 500,
-    max: 50000,
-    message: 'Le tarif horaire doit être entre 500 et 50,000 FCFA'
-  }
+
 };
 
 /**
