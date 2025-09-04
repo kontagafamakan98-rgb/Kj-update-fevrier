@@ -13,7 +13,7 @@ export const isProduction = process.env.NODE_ENV === 'production';
 export const devLog = {
   log: (...args) => {
     if (isDevelopment) {
-    // console.log(...args); // Removed console.log
+    //  // Removed console.log
     }
   },
   
@@ -25,19 +25,18 @@ export const devLog = {
   
   warn: (...args) => {
     if (isDevelopment) {
-      console.warn(...args);
     }
   },
   
   info: (...args) => {
     if (isDevelopment) {
-    // console.info(...args); // Removed console.log
+    //  // Removed console.log
     }
   },
   
   debug: (...args) => {
     if (isDevelopment) {
-    // console.debug(...args); // Removed console.log
+    //  // Removed console.log
     }
   }
 };
@@ -53,13 +52,12 @@ export const safeLog = {
   
   warn: (...args) => {
     if (isDevelopment) {
-      console.warn(...args);
     }
   },
   
   info: (...args) => {
     if (isDevelopment) {
-    // console.info(...args); // Removed console.log
+    //  // Removed console.log
     }
   }
 };
