@@ -817,8 +817,7 @@ async def register_user_verified(user_data: UserWithPayment):
         worker_profile_created = False
         if user_data.user_type == "worker" and (
             user_data.worker_specialties or 
-            user_data.worker_experience_years is not None or 
-            user_data.worker_hourly_rate is not None
+            user_data.worker_experience_years is not None
         ):
             worker_profile = WorkerProfile(
                 user_id=user.id,
