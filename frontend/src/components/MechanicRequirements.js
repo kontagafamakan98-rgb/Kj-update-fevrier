@@ -2,8 +2,8 @@ import React from 'react';
 
 const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
   // Vérifier s'il y a des exigences de mécanicien
-  const hasRequirements = job.typeof mechanic_must_bring_parts !== "undefined" || 
-                          job.typeof mechanic_must_bring_tools !== "undefined" ||
+  const hasRequirements = typeof job.mechanic_must_bring_parts !== "undefined" || 
+                          typeof job.mechanic_must_bring_tools !== "undefined" ||
                           job.parts_and_tools_notes;
 
   if (!hasRequirements) {
