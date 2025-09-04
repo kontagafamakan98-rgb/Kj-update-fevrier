@@ -164,7 +164,7 @@ const translations = {
     passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
     workersMustSelectSkills: 'Les travailleurs doivent sélectionner au moins une compétence',
     pleaseIndicateExperience: 'Veuillez indiquer vos années d\'expérience',
-    pleaseIndicateValidRate: 'Veuillez indiquer un tarif horaire valide (minimum 500 FCFA)',
+
     preparing: 'Préparation...',
     alreadyHaveAccount: 'Déjà un compte?',
     signIn: 'Se connecter'
