@@ -202,10 +202,7 @@ export function validateRegistrationForm(formData) {
       errors.worker_experience_years = experienceResult.message;
     }
     
-    const rateResult = validateHourlyRate(formData.worker_hourly_rate);
-    if (!rateResult.isValid) {
-      errors.worker_hourly_rate = rateResult.message;
-    }
+
   }
   
   return {
