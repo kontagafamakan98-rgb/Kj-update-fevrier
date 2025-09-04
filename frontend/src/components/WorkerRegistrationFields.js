@@ -202,7 +202,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
               <ul className="text-xs space-y-1">
                 <li>• Vos compétences aideront les clients à vous trouver</li>
                 <li>• Votre expérience rassure sur vos qualifications</li>
-                <li>• Votre tarif aide les clients à estimer le coût</li>
+
                 <li>• Vous pourrez modifier ces informations dans votre profil</li>
               </ul>
             </div>
