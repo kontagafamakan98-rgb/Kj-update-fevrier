@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { detectUserCountry, getPhoneExampleForCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { devLog, safeLog } from '../utils/env';
 
-
 const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration = false }) => {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState({

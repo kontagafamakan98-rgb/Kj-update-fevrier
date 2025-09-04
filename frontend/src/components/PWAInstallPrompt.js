@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);

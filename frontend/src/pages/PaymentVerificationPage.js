@@ -6,7 +6,6 @@ import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry, getPhoneExampleForCountry } from '../services/geolocationService';
 import { devLog, safeLog } from '../utils/env';
 
-
 const PaymentVerificationPage = () => {
   const navigate = useNavigate();
   const location = useLocation();

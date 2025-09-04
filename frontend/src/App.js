@@ -3,7 +3,6 @@ import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { devLog, safeLog } from './utils/env';
 
-
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { PaymentProvider } from './contexts/PaymentContext';
@@ -99,9 +98,7 @@ function AppRoutes() {
       {/* Network Status and Offline Indicator */}
       <NetworkStatus />
       <OfflineIndicator />
-      
 
-      
       {/* Main Navigation */}
       <Navbar />
       
@@ -164,7 +161,6 @@ function AppRoutes() {
       
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
-      
 
     </div>
   );

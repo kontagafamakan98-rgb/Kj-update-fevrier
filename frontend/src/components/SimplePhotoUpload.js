@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { devLog, safeLog } from '../utils/env';
 
-
 const SimplePhotoUpload = ({ userId, size = 100 }) => {
   const [photo, setPhoto] = useState(null);
 

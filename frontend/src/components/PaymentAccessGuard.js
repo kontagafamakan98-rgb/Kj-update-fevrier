@@ -5,7 +5,6 @@ import PaymentAccountService from '../services/paymentAccountService';
 import PaymentAccountSetup from './PaymentAccountSetup';
 import { devLog, safeLog } from '../utils/env';
 
-
 const PaymentAccessGuard = ({ children, showSetupIfNeeded = true }) => {
   const { user } = useAuth();
   const navigate = useNavigate();

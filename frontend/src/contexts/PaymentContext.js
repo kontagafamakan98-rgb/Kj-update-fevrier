@@ -2,7 +2,6 @@ import {  createContext, useContext, useState , useMemo } from 'react';
 import CommissionService from '../services/commissionService';
 import { devLog, safeLog } from '../utils/env';
 
-
 const PaymentContext = createContext();
 
 export function usePayment() {

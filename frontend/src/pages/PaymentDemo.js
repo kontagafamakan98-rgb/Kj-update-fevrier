@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePayment } from '../contexts/PaymentContext';
 import { devLog, safeLog } from '../utils/env';
 
-
 const PaymentDemo = () => {
   const { t } = useLanguage();
   const { profile } = useAuth();

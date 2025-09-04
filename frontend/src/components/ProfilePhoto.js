@@ -4,7 +4,6 @@ import ProfilePhotoService from '../services/profilePhotoService';
 import { devConsole } from '../utils/devLogger';
 import { devLog, safeLog } from '../utils/env';
 
-
 const ProfilePhoto = ({ 
   user, 
   size = 100, 

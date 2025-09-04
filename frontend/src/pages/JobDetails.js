@@ -6,7 +6,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import ProposalModal from '../components/ProposalModal';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function JobDetails() {
   const [job, setJob] = useState(null);
   const [proposals, setProposals] = useState([]);
