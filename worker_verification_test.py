@@ -39,7 +39,7 @@ class WorkerVerificationTester:
             "password": "TestPassword123!",
             "first_name": "Amadou",
             "last_name": f"TestWorker{unique_id}",
-            "phone": f"+221701234{unique_id[:3]}",
+            "phone": f"+22170123456{unique_id[:1]}",
             "user_type": user_type,
             "country": "senegal",
             "preferred_language": "fr",
