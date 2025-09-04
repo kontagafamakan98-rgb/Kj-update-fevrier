@@ -191,53 +191,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
           )}
         </div>
 
-        {/* Tarif horaire */}
-        <div>
-          <label htmlFor="worker_hourly_rate" className="block text-sm font-medium text-blue-900 mb-2">
-            💰 Tarif horaire (FCFA) *
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              id="worker_hourly_rate"
-              value={formData.worker_hourly_rate || ''}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                worker_hourly_rate: parseFloat(e.target.value) || 0
-              }))}
-              placeholder="Ex: 2500"
-              min="500"
-              step="250"
-              className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.worker_hourly_rate ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'
-              }`}
-            />
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <span className="text-gray-500 text-sm">FCFA/h</span>
-            </div>
-          </div>
-          {errors.worker_hourly_rate && (
-            <p className="text-red-500 text-sm mt-1">{errors.worker_hourly_rate}</p>
-          )}
-          
-          {/* Exemples de tarifs */}
-          <div className="mt-2 text-xs text-blue-600">
-            <p>💡 Exemples de tarifs par heure :</p>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {[
-                { job: 'Électricien', rate: '3000-5000' },
-                { job: 'Plombier', rate: '2500-4000' },
-                { job: 'Mécanicien', rate: '2000-3500' },
-                { job: 'Maçon', rate: '1500-2500' },
-                { job: 'Tuteur', rate: '1000-2500' }
-              ].map((example) => (
-                <span key={example.job} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
-                  {example.job}: {example.rate} FCFA
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
+
 
         {/* Message d'information */}
         <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
