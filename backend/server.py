@@ -852,7 +852,7 @@ async def register_user_verified(user_data: UserWithPayment):
             response_data["worker_profile"] = {
                 "specialties": user_data.worker_specialties or [],
                 "experience_years": user_data.worker_experience_years or 0,
-                "hourly_rate": user_data.worker_hourly_rate or 0.0
+
             }
         
         return response_data
