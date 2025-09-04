@@ -1,7 +1,6 @@
 import React from 'react';
 import { devLog, safeLog } from '../utils/env';
 
-
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);

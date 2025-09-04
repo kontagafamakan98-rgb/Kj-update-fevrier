@@ -3,7 +3,6 @@ import { MapPin, Loader2, Navigation } from 'lucide-react';
 import GeolocationService from '../services/geolocationService';
 import { devLog, safeLog } from '../utils/env';
 
-
 const LocationDetector = ({ 
   onLocationDetected, 
   userCountry = 'senegal',

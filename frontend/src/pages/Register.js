@@ -8,7 +8,6 @@ import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function Register() {
   const [searchParams] = useSearchParams();
   const initialUserType = searchParams.get('type') || 'client';
@@ -102,7 +101,6 @@ export default function Register() {
         setLoading(false);
         return;
       }
-
 
     }
 

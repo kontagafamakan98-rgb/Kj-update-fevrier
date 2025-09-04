@@ -191,8 +191,6 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
           )}
         </div>
 
-
-
         {/* Message d'information */}
         <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
           <div className="flex items-start">

@@ -5,7 +5,6 @@ import LocationDetector from '../components/LocationDetector';
 import { getCountryByCode } from '../services/geolocationService';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function CreateJob() {
   const { user } = useAuth();
   

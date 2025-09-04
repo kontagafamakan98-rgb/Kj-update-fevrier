@@ -9,7 +9,6 @@ import { CountrySelect, getCountry } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [workerProfile, setWorkerProfile] = useState(null);
@@ -667,7 +666,6 @@ function WorkerProfileCreate({ onCreate }) {
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
-
 
         </div>
 

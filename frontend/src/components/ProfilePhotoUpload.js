@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { devLog, safeLog } from '../utils/env';
 
-
 const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showCameraOptions, setShowCameraOptions] = useState(false);

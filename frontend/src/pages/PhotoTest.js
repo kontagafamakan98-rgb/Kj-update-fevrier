@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext';
 import ProfilePhoto from '../components/ProfilePhoto';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function PhotoTest() {
   const { user } = useAuth();
   const [testResults, setTestResults] = useState([]);

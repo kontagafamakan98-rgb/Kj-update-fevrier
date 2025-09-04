@@ -26,7 +26,6 @@ export const ValidationRules = {
     pattern: /^[a-zA-ZÀ-ÿ\s\-']+$/,
     message: 'Le nom doit contenir entre 2 et 50 caractères (lettres uniquement)'
   },
-  
 
 };
 
@@ -118,7 +117,6 @@ export function validatePhone(phone) {
  * Validates hourly rate for workers
  */  
 
-
 /**
  * Validates worker specialties
  */
@@ -201,7 +199,6 @@ export function validateRegistrationForm(formData) {
     if (!experienceResult.isValid) {
       errors.worker_experience_years = experienceResult.message;
     }
-    
 
   }
   

@@ -7,7 +7,6 @@ import OwnerService from '../services/ownerService';
 import PreciseLocationDemo from '../components/PreciseLocationDemo';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function Dashboard() {
   const [stats, setStats] = useState({
     totalJobs: 0,

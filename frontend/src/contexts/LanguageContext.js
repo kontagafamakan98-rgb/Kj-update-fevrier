@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { devLog, safeLog } from '../utils/env';
 
-
 const LanguageContext = createContext();
 
 export function useLanguage() {

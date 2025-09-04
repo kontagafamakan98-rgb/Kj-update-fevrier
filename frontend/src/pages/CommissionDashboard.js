@@ -4,7 +4,6 @@ import OwnerService from '../services/ownerService';
 import { useAuth } from '../contexts/AuthContext';
 import { devLog, safeLog } from '../utils/env';
 
-
 const CommissionDashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState(() => ({}));

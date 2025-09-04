@@ -7,7 +7,6 @@ import JobCreateModal from '../components/JobCreateModal';
 import MechanicRequirements from '../components/MechanicRequirements';
 import { devLog, safeLog } from '../utils/env';
 
-
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
