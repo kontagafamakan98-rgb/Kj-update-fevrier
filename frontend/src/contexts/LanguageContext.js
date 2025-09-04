@@ -109,7 +109,7 @@ const translations = {
     yearsExperience: 'Années d\'expérience',
     selectExperience: 'Sélectionnez votre expérience',
     beginner: 'Débutant (0-1 an)',
-    hourlyRate: 'Tarif horaire (FCFA)',
+
     rateExamples: 'Exemples de tarifs par heure :',
     profileInfoNote: 'Ces informations apparaîtront sur votre profil public',
     
