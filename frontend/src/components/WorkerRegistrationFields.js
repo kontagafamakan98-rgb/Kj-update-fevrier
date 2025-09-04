@@ -93,7 +93,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors, setErrors }) 
           {/* Compétences prédéfinies par catégorie */}
           <div className="space-y-3">
             {Object.entries(predefinedSkills).map(([category, skills]) => (
-    // REMOVED HARDCODED SECRET: <div key={category} className="bg-white border border-blue-200 rounded-lg p-3">
+              <div key={category} className="bg-white border border-blue-200 rounded-lg p-3">
                 <h4 className="font-medium text-blue-800 mb-2">{category}</h4>
                 <div className="flex flex-wrap gap-2">
                   {skills.map((skill) => {
