@@ -19,7 +19,7 @@ const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
           <span className="text-xs font-medium text-orange-800">Informations importantes :</span>
         </div>
         <div className="text-xs text-orange-700 space-y-1">
-          {job.typeof mechanic_must_bring_parts !== "undefined" && (
+          {typeof job.mechanic_must_bring_parts !== "undefined" && (
             <div className="flex items-center">
               <span className="mr-2">🔩</span>
               <span>Pièces : {job.mechanic_must_bring_parts ? 
