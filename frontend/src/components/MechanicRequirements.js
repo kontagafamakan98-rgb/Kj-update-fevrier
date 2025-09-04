@@ -2,8 +2,8 @@ import React from 'react';
 
 const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
   // Vérifier s'il y a des exigences de mécanicien
-  const hasRequirements = job.mechanic_must_bring_parts !== undefined || 
-                          job.mechanic_must_bring_tools !== undefined ||
+  const hasRequirements = job.typeof mechanic_must_bring_parts !== "undefined" || 
+                          job.typeof mechanic_must_bring_tools !== "undefined" ||
                           job.parts_and_tools_notes;
 
   if (!hasRequirements) {
@@ -19,7 +19,7 @@ const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
           <span className="text-xs font-medium text-orange-800">Informations importantes :</span>
         </div>
         <div className="text-xs text-orange-700 space-y-1">
-          {job.mechanic_must_bring_parts !== undefined && (
+          {job.typeof mechanic_must_bring_parts !== "undefined" && (
             <div className="flex items-center">
               <span className="mr-2">🔩</span>
               <span>Pièces : {job.mechanic_must_bring_parts ? 
@@ -28,7 +28,7 @@ const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
               }</span>
             </div>
           )}
-          {job.mechanic_must_bring_tools !== undefined && (
+          {job.typeof mechanic_must_bring_tools !== "undefined" && (
             <div className="flex items-center">
               <span className="mr-2">🛠️</span>
               <span>Outils : {job.mechanic_must_bring_tools ? 
@@ -62,7 +62,7 @@ const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
       
       <div className="space-y-4">
         {/* Pièces */}
-        {job.mechanic_must_bring_parts !== undefined && (
+        {job.typeof mechanic_must_bring_parts !== "undefined" && (
           <div className="flex items-center justify-between p-4 bg-white border border-orange-200 rounded-lg">
             <div className="flex items-center">
               <span className="text-xl mr-3">🔩</span>
@@ -82,7 +82,7 @@ const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
         )}
 
         {/* Outils */}
-        {job.mechanic_must_bring_tools !== undefined && (
+        {job.typeof mechanic_must_bring_tools !== "undefined" && (
           <div className="flex items-center justify-between p-4 bg-white border border-orange-200 rounded-lg">
             <div className="flex items-center">
               <span className="text-xl mr-3">🛠️</span>

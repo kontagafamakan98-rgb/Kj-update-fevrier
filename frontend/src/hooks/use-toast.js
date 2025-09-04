@@ -68,7 +68,7 @@ export const reducer = (state, action) => {
       return {
         ...state,
         toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
+          t.id === toastId || typeof toastId === "undefined"
             ? {
                 ...t,
                 open: false,
@@ -77,7 +77,7 @@ export const reducer = (state, action) => {
       };
     }
     case "REMOVE_TOAST":
-      if (action.toastId === undefined) {
+      if (action.typeof toastId === "undefined") {
         return {
           ...state,
           toasts: [],

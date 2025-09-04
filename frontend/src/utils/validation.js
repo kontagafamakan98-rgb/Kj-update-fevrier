@@ -134,7 +134,7 @@ export function validateWorkerSpecialties(specialties) {
  * Validates worker experience years
  */
 export function validateExperienceYears(years) {
-  if (years === null || years === undefined || years === '') {
+  if (years === null || typeof years === "undefined" || years === '') {
     return { isValid: false, message: 'Années d\'expérience requises' };
   }
   
