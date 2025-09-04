@@ -62,7 +62,7 @@ const MechanicRequirements = ({ job, showTitle = true, compact = false }) => {
       
       <div className="space-y-4">
         {/* Pièces */}
-        {job.typeof mechanic_must_bring_parts !== "undefined" && (
+        {typeof job.mechanic_must_bring_parts !== "undefined" && (
           <div className="flex items-center justify-between p-4 bg-white border border-orange-200 rounded-lg">
             <div className="flex items-center">
               <span className="text-xl mr-3">🔩</span>
