@@ -117,23 +117,7 @@ export function validatePhone(phone) {
 /**
  * Validates hourly rate for workers
  */  
-export function validateHourlyRate(rate) {
-  if (!rate || rate === '' || isNaN(rate)) {
-    return { isValid: false, message: 'Tarif horaire requis' };
-  }
-  
-  const numericRate = parseFloat(rate);
-  
-  if (numericRate < ValidationRules.hourlyRate.min) {
-    return { isValid: false, message: `Le tarif horaire minimum est de ${ValidationRules.hourlyRate.min} FCFA` };
-  }
-  
-  if (numericRate > ValidationRules.hourlyRate.max) {
-    return { isValid: false, message: `Le tarif horaire maximum est de ${ValidationRules.hourlyRate.max} FCFA` };
-  }
-  
-  return { isValid: true };
-}
+
 
 /**
  * Validates worker specialties
