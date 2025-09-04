@@ -35,7 +35,7 @@ class WorkerVerificationTester:
         
         # Base user data without hourly rate
         user_data = {
-            "email": f"test_worker_{unique_id}@kojo.test",
+            "email": f"test_worker_{unique_id}@gmail.com",
             "password": "TestPassword123!",
             "first_name": "Amadou",
             "last_name": f"TestWorker{unique_id}",
