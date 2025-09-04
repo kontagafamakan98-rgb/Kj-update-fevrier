@@ -563,7 +563,7 @@ function WorkerProfileCreate({ onCreate }) {
   const [formData, setFormData] = useState({
     specialties: [],
     experience_years: '',
-    hourly_rate: '',
+
     description: '',
     availability: true
   });
