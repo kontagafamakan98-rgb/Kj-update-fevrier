@@ -580,10 +580,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Payment Accounts Manager Component"
+    - "Worker Verification Without Hourly Rate System"
   stuck_tasks: []
   test_all: false
-  test_priority: "payment_accounts_manager_comprehensive_testing"
+  test_priority: "worker_verification_without_hourly_rate_testing"
 
 agent_communication:
   - agent: "main"
