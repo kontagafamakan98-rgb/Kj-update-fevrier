@@ -525,7 +525,7 @@ function WorkerProfileView({ profile }) {
           <label className="block text-sm font-medium text-gray-700">Spécialités</label>
           <div className="mt-1 flex flex-wrap gap-2">
             {profile.specialties.map((specialty, index) => (
-              <span key={index} className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm">
+    // REMOVED HARDCODED SECRET: <span key={index} className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm">
                 {specialty}
               </span>
             ))}

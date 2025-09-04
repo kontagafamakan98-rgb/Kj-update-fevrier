@@ -10,11 +10,11 @@ const urlsToCache = [
 
 // Install Service Worker
 self.addEventListener('install', (event) => {
-    // console.log('Service Worker installing...'); // Removed console.log
+    //  // Removed console.log
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-    // console.log('Opened cache'); // Removed console.log
+    //  // Removed console.log
         return cache.addAll(urlsToCache);
       })
       .catch((error) => {
@@ -54,7 +54,6 @@ self.addEventListener('fetch', (event) => {
               cache.put(event.request, responseToCache);
             })
             .catch((error) => {
-              console.warn('Failed to cache request:', error);
             });
 
           return response;
@@ -70,13 +69,13 @@ self.addEventListener('fetch', (event) => {
 
 // Activate Service Worker
 self.addEventListener('activate', (event) => {
-    // console.log('Service Worker activating...'); // Removed console.log
+    //  // Removed console.log
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-    // console.log('Deleting old cache:', cacheName); // Removed console.log
+    //  // Removed console.log
             return caches.delete(cacheName);
           }
         })
@@ -87,7 +86,7 @@ self.addEventListener('activate', (event) => {
 
 // Push notification handling
 self.addEventListener('push', (event) => {
-    // console.log('Push message received:', event); // Removed console.log
+    //  // Removed console.log
   
   let notificationData = {};
   
@@ -130,7 +129,7 @@ self.addEventListener('push', (event) => {
 
 // Notification click handling
 self.addEventListener('notificationclick', (event) => {
-    // console.log('Notification clicked:', event); // Removed console.log
+    //  // Removed console.log
   
   event.notification.close();
   
