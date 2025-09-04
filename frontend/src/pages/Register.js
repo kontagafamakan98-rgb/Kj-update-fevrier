@@ -103,11 +103,7 @@ export default function Register() {
         return;
       }
 
-      if (!formData.worker_hourly_rate || formData.worker_hourly_rate < 500) {
-        setError(t('pleaseIndicateValidRate'));
-        setLoading(false);
-        return;
-      }
+
     }
 
     // Préparer les données utilisateur
