@@ -345,7 +345,7 @@ export const detectUserCountry = async () => {
 
   try {
     // Fallback: détection par IP avec API externe
-    const response = await fetch('https://ipapi.co/json/', {
+    const response = await fetch(process.env.REACT_APP_IPAPI_CO_URL || "https://ipapi.co", {
       timeout: 3000
     });
     

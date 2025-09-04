@@ -218,7 +218,7 @@ const PRECISE_GEOGRAPHIC_DATABASE = {
 const IP_GEOLOCATION_SERVICES = [
   {
     name: 'IPApi',
-    url: 'https://ipapi.co/json/',
+    url: process.env.REACT_APP_IPAPI_CO_URL || "https://ipapi.co",
     parser: (data) => ({
       country: data.country_code,
       countryName: data.country_name,
@@ -246,7 +246,7 @@ const IP_GEOLOCATION_SERVICES = [
   },
   {
     name: 'IPInfo',
-    url: 'https://ipinfo.io/json',
+    url: process.env.REACT_APP_IPINFO_URL || "https://ipinfo.io",
     parser: (data) => {
       const [lat, lng] = (data.loc || '0,0').split(',');
       return {
