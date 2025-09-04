@@ -532,10 +532,7 @@ function WorkerProfileView({ profile }) {
             ))}
           </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">Tarif horaire</label>
-          <p className="mt-1 text-gray-900">{profile.hourly_rate} FCFA/heure</p>
-        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700">Années d'expérience</label>
           <p className="mt-1 text-gray-900">{profile.experience_years} ans</p>
