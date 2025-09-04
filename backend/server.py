@@ -823,7 +823,7 @@ async def register_user_verified(user_data: UserWithPayment):
                 user_id=user.id,
                 specialties=user_data.worker_specialties or [],
                 experience_years=user_data.worker_experience_years or 0,
-                hourly_rate=user_data.worker_hourly_rate or 0.0,
+
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc)
             )
