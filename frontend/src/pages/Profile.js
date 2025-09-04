@@ -668,21 +668,7 @@ function WorkerProfileCreate({ onCreate }) {
             />
           </div>
 
-          <div>
-            <label htmlFor="hourly_rate" className="block text-sm font-medium text-gray-700">
-              Tarif horaire (FCFA)
-            </label>
-            <input
-              type="number"
-              id="hourly_rate"
-              name="hourly_rate"
-              min="0"
-              required
-              value={formData.hourly_rate}
-              onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
-            />
-          </div>
+
         </div>
 
         <div>
