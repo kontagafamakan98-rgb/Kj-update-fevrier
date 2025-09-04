@@ -26,7 +26,7 @@ export default function Register() {
     // Champs spécifiques aux travailleurs
     worker_specialties: [],
     worker_experience_years: null,
-    worker_hourly_rate: null
+
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
