@@ -55,7 +55,7 @@ export default function Messages() {
       const ids = activeConversation.split('_');
       const receiverId = ids.find(id => id !== user.id);
 
-      await axios.post('/messages', {
+      await messagesAPI.sendMessage(activeConversation, {
         receiver_id: receiverId,
         content: newMessage
       });
@@ -65,7 +65,8 @@ export default function Messages() {
       // Reload messages to show the new one
       loadMessages(activeConversation);
     } catch (error) {
-      safeLog.error('Error sending message:', error);
+      const errorInfo = handleApiError(error);
+      safeLog.error('Error sending message:', errorInfo);
     }
   };
 
