@@ -37,11 +37,12 @@ export default function Messages() {
 
   const loadMessages = async (conversationId) => {
     try {
-      const response = await axios.get(`/messages/${conversationId}`);
-      setMessages(response.data);
+      const data = await messagesAPI.getMessages(conversationId);
+      setMessages(data);
       setActiveConversation(conversationId);
     } catch (error) {
-      safeLog.error('Error loading messages:', error);
+      const errorInfo = handleApiError(error);
+      safeLog.error('Error loading messages:', errorInfo);
     }
   };
 
