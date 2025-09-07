@@ -611,11 +611,10 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Messaging System Between Clients and Workers"
+  current_focus: []
   stuck_tasks: []
   test_all: false
-  test_priority: "messaging_system_testing_completed"
+  test_priority: "messaging_system_frontend_testing_completed"
 
 agent_communication:
   - agent: "main"
