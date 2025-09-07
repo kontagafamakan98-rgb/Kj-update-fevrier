@@ -609,10 +609,10 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Worker Verification Without Hourly Rate System"
+    - "Messaging System Between Clients and Workers"
   stuck_tasks: []
   test_all: false
-  test_priority: "worker_verification_without_hourly_rate_testing"
+  test_priority: "messaging_system_testing_completed"
 
 agent_communication:
   - agent: "main"
