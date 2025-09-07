@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { messagesAPI, handleApiError } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 
 export default function Messages() {
