@@ -131,6 +131,7 @@ const translations = {
     pleaseSelectImage: 'Veuillez sélectionner une image (JPG, PNG, etc.)',
     imageTooLarge: 'L\'image doit faire moins de 5MB',
     errorReadingFile: 'Erreur lors de la lecture du fichier',
+    photoUploadedSuccessfully: 'Photo de profil mise à jour avec succès !',
     
     // Network Status
     networkOffline: 'Vous êtes hors ligne. Certaines fonctionnalités peuvent être limitées.',
