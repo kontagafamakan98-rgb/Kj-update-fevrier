@@ -48,13 +48,12 @@ const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, classNa
         const formData = new FormData();
         formData.append("file", file);
 
-        // ⚡ 3. Envoyer au backend (endpoint Kojo)
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/users/profile-photo`, {
-          method: "POST",
-          body: formData,
+        // ⚡ 3. Envoyer au backend en utilisant le service API centralisé
+        const api = await import('../services/api');
+        const response = await api.default.post('/users/profile-photo', formData, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
+            'Content-Type': 'multipart/form-data',
+          },
         });
 
         if (!response.ok) {
