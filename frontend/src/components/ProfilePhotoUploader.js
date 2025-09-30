@@ -49,7 +49,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, classNa
         formData.append("file", file);
 
         // ⚡ 3. Envoyer au backend (endpoint Kojo)
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile-photo`, {
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/users/profile-photo`, {
           method: "POST",
           body: formData,
           headers: {
