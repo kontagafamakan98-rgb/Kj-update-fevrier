@@ -50,13 +50,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, classNa
         formData.append("file", file);
 
         // ⚡ 3. Envoyer au backend en utilisant le service API centralisé
-        const response = await api.post('/users/profile-photo', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        const data = response.data;
+        const data = await api.uploadFile('/users/profile-photo', formData);
         safeLog.info('Photo uploaded successfully:', data);
 
         // ⚡ 4. Vérifier que la réponse contient photo_url
