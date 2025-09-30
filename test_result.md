@@ -171,7 +171,7 @@ backend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: false
         agent: "user"
@@ -188,6 +188,9 @@ backend:
       - working: true
         agent: "testing"
         comment: "🔍 PROFILE PHOTO DISPLAY ISSUE INVESTIGATION COMPLETED: Conducted comprehensive investigation into user-reported issue where uploaded photos are not showing after login. INVESTIGATION FINDINGS: (1) ✅ DATABASE STORAGE: Found 10 users with profile photos stored correctly in database with proper URLs, all photo metadata properly persisted, (2) ✅ API ENDPOINTS: All profile photo endpoints working perfectly - GET/POST/DELETE operations functional with 90% success rate (9/10 tests passed), proper authentication and validation working, (3) ✅ FILE STORAGE: Files being created and stored correctly in /app/backend/uploads/profile_photos/ directory, proper file permissions and accessibility confirmed, (4) ✅ USER CONTEXT: Profile photo URLs correctly included in user profile responses and login responses, AuthContext integration working properly, (5) 🚨 ROOT CAUSE IDENTIFIED: Static file serving issue - Kubernetes ingress routing problem where photo URLs return HTML (React app) instead of actual image files. Backend serves files correctly on localhost:8001 but external URLs route to frontend instead of backend static files. DIAGNOSIS: Profile photo system is WORKING (90% success rate) but has critical static file serving routing issue preventing photo display in frontend. This is an infrastructure/deployment issue, not a backend code issue. All API functionality is correct and photos are properly uploaded and stored."
+      - working: "NA"
+        agent: "main"
+        comment: "STATIC FILE ROUTING FIXED: Moved static file serving from /uploads to /api/uploads to match Kubernetes ingress routing rules. Updated profile photo URL generation to use /api/uploads prefix. This ensures photo URLs are properly routed to backend server instead of being intercepted by frontend React Router. Backend restarted successfully."
   - task: "User Profile API"
     implemented: true
     working: true
