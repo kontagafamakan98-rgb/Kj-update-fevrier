@@ -276,92 +276,19 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
         </div>
       )}
 
-      {/* Photo de profil - TEST ULTRA BASIQUE */}
-      <div className="text-center mb-6">
-        <div className="mb-4">
-          <div className="flex justify-center flex-col items-center">
-            
-            {/* TEST 1: Input file basique */}
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={(e) => {
-                const file = e.target.files[0];
-                if (file) {
-                  devLog.info('Fichier sélectionné:', file.name);
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    const base64 = event.target.result;
-                    devLog.info('Base64 créé, longueur:', base64.length);
-                    
-                    // Sauver dans localStorage
-                    localStorage.setItem('test_photo', base64);
-                    devLog.info('Photo sauvée dans localStorage');
-                    
-                    // Forcer le refresh de la page pour voir le résultat
-                    window.location.reload();
-                  };
-                  reader.readAsDataURL(file);
-                }
-              }}
-              style={{ marginBottom: '10px' }}
-            />
-            
-            {/* TEST 2: Affichage de la photo */}
-            <div style={{
-              width: '120px',
-              height: '120px',
-              borderRadius: '50%',
-              border: '2px solid #ccc',
-              overflow: 'hidden',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: '#f0f0f0'
-            }}>
-              {(() => {
-                const savedPhoto = localStorage.getItem('test_photo');
-                devLog.info('Photo dans localStorage:', savedPhoto ? 'TROUVÉE' : 'ABSENTE');
-                
-                if (savedPhoto) {
-                  return (
-                    <img 
-                      src={savedPhoto} 
-                      alt="Test" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onLoad={() => devLog.info('✅ Image chargée avec succès')}
-                      onError={(e) => safeLog.error('❌ Erreur image:', e)}
-                    />
-                  );
-                } else {
-                  return <div style={{ color: '#666' }}>Pas de photo</div>;
-                }
-              })()}
-            </div>
-            
-            {/* TEST 3: Bouton pour vider */}
-            <button 
-              onClick={() => {
-                localStorage.removeItem('test_photo');
-                devLog.info('Photo supprimée');
-                window.location.reload();
-              }}
-              style={{
-                marginTop: '10px',
-                padding: '5px 10px',
-                backgroundColor: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Supprimer
-            </button>
-            
-          </div>
-        </div>
-        <p className="text-sm text-gray-500">TEST: Sélectionnez une image ci-dessus</p>
+      {/* Photo de Profil */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Photo de profil</h3>
+        <ProfilePhotoUploader
+          currentPhotoUrl={profile?.profile_photo}
+          onUploadSuccess={(photoUrl, cacheBustedUrl) => {
+            // Mettre à jour le profil local
+            setFormData(prev => ({...prev, profile_photo: photoUrl}));
+            // Optionnel: montrer un message de succès
+            setSuccess('Photo de profil mise à jour avec succès !');
+            setTimeout(() => setSuccess(''), 3000);
+          }}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
