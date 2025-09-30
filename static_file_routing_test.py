@@ -83,7 +83,7 @@ class StaticFileRoutingTester:
         
         timestamp = int(datetime.now().timestamp())
         user_data = {
-            "email": f"statictest_{timestamp}@kojo.test",
+            "email": f"statictest_{timestamp}@gmail.com",
             "password": "StaticTest2024!",
             "first_name": "Static",
             "last_name": "Tester",
