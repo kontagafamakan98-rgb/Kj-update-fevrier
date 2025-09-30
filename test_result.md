@@ -54,9 +54,9 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 ##
-## agent_communication:
-##     -agent: "main"  # or "testing" or "user"
-##     -message: "Communication message between agents"
+agent_communication:
+    -agent: "main"
+    -message: "Fixed static file routing issue by moving from /uploads to /api/uploads and updating photo URL generation. Need to test that profile photos now display correctly in frontend after upload. Focus testing on: (1) Profile photo upload functionality, (2) Photo URL generation with /api/uploads prefix, (3) Static file serving working properly, (4) Photos displaying in UI after upload."
 
 # Protocol Guidelines for Main agent
 #
