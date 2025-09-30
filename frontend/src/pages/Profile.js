@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCountryFromPhone } from '../services/geolocationService';
 import ProfilePhoto from '../components/ProfilePhoto';
 import SimplePhotoUpload from '../components/SimplePhotoUpload';
+import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import { CountrySelect, getCountry } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { devLog, safeLog } from '../utils/env';
