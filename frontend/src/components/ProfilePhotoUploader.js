@@ -99,7 +99,16 @@ const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, classNa
       reader.readAsDataURL(file);
     } catch (error) {
       safeLog.error('Erreur upload photo:', error);
-      alert(error.message || "Impossible d'envoyer la photo, réessayez.");
+      
+      // Gestion des erreurs API avec le service centralisé
+      let errorMessage = "Impossible d'envoyer la photo, réessayez.";
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
       setUploading(false);
     } finally {
       setUploading(false);
