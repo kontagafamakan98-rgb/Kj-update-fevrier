@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
+import api from '../services/api';
 
 const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, className = '' }) => {
   const [photoData, setPhotoData] = useState(null);
