@@ -56,12 +56,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, classNa
           },
         });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || "Erreur lors de l'upload");
-        }
-
-        const data = await response.json();
+        const data = response.data;
         safeLog.info('Photo uploaded successfully:', data);
 
         // ⚡ 4. Récupérer l'URL renvoyée par le backend
