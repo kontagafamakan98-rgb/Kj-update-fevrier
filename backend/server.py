@@ -1610,9 +1610,9 @@ async def verify_payment_access(current_user: User = Depends(get_current_user)):
 # Include the router in the main app
 app.include_router(api_router)
 
-# Serve uploaded files
+# Serve uploaded files under /api prefix for proper Kubernetes ingress routing
 from fastapi.staticfiles import StaticFiles
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS Configuration optimized for West Africa
 WEST_AFRICA_ORIGINS = [
