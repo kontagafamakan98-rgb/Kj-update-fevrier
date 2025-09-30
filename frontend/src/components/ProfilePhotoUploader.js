@@ -59,10 +59,15 @@ const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, classNa
         const data = response.data;
         safeLog.info('Photo uploaded successfully:', data);
 
-        // ⚡ 4. Récupérer l'URL renvoyée par le backend
+        // ⚡ 4. Vérifier que la réponse contient photo_url
+        if (!data || !data.photo_url) {
+          throw new Error('Réponse invalide du serveur: photo_url manquant');
+        }
+
+        // ⚡ 5. Récupérer l'URL renvoyée par le backend
         const uploadedUrl = `${process.env.REACT_APP_BACKEND_URL}${data.photo_url}`;
 
-        // ⚡ 5. Ajouter le timestamp pour éviter le cache
+        // ⚡ 6. Ajouter le timestamp pour éviter le cache
         const cacheBustedUrl = `${uploadedUrl}?t=${Date.now()}`;
 
         // Mettre à jour l'état avec l'URL finale
