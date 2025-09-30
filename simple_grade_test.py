@@ -7,7 +7,7 @@ import requests
 import json
 
 def test_basic_endpoints():
-    base_url = "https://precise-geo-app.preview.emergentagent.com/api"
+    base_url = "https://kojo-service-hub.preview.emergentagent.com/api"
     
     print("🏆 SIMPLE GRADE S+ TESTING")
     print("=" * 40)
