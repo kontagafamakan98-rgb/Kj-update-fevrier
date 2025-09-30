@@ -957,8 +957,8 @@ async def upload_profile_photo(
     with open(file_path, "wb") as buffer:
         buffer.write(file_content)
     
-    # Update user profile with photo URL
-    photo_url = f"/uploads/profile_photos/{filename}"
+    # Update user profile with photo URL (using /api prefix for proper routing)
+    photo_url = f"/api/uploads/profile_photos/{filename}"
     await db.users.update_one(
         {"id": current_user.id},
         {"$set": {"profile_photo": photo_url, "updated_at": datetime.now(timezone.utc)}}
