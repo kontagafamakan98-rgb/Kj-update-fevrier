@@ -42,12 +42,11 @@ const ProfilePhoto = ({
       return;
     }
     
+    setLoading(true);
     try {
-      // Charger directement depuis localStorage (clé cohérente)
-      const photoKey = `kojo_profile_photo_${userId}`;
-      const photoDataString = localStorage.getItem(photoKey);
-      
-      if (photoDataString) {
+      // Load from backend using centralized service
+      const photoUrl = await profilePhotoService.getPhotoUrl(userId);
+      if (photoUrl) {
         const photoData = JSON.parse(photoDataString);
         devLog.info('Found photo in localStorage:', photoKey);
         
