@@ -50,14 +50,15 @@ export default function Profile() {
   const handleProfileUpdate = async (updatedData) => {
     try {
       setError('');
-      await axios.put('/users/profile', updatedData);
+      await usersAPI.updateProfile(updatedData);
       setSuccess('Profil mis à jour avec succès');
       await loadUser(); // Refresh user data
       setIsEditing(false);
       
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      setError(error.response?.data?.detail || 'Erreur lors de la mise à jour');
+      safeLog.error('Profile update error:', error);
+      setError(error.response?.data?.detail || error.message || 'Erreur lors de la mise à jour');
     }
   };
 
