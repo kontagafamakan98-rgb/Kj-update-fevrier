@@ -4,13 +4,18 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
 import profilePhotoService from '../services/ProfilePhotoService';
 
-const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, className = '' }) => {
-  const [photoData, setPhotoData] = useState(null);
+const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className = '' }) => {
+  const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [loading, setLoading] = useState(true);
   
   const { user, updateUser } = useAuth();
   const { t } = useLanguage();
+  
+  // Determine if this is for current user or another user
+  const isCurrentUser = !targetUserId || targetUserId === user?.id;
 
   const handleFiles = async (files) => {
     const file = files[0];
