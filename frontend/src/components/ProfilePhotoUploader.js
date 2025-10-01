@@ -193,17 +193,18 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         </div>
       </div>
 
-      {/* Upload Area */}
-      <div
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-          dragOver 
-            ? 'border-orange-500 bg-orange-50' 
-            : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
-        }`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
+      {/* Upload Area - Only show for current user */}
+      {isCurrentUser && (
+        <div
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            dragOver 
+              ? 'border-orange-500 bg-orange-50' 
+              : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+          }`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+        >
         <input
           id="profilePhotoInput"
           type="file"
