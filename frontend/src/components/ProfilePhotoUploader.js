@@ -139,14 +139,13 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   };
 
   const getCurrentPhotoUrl = () => {
-    if (photoData?.base64) {
-      return photoData.base64;
+    // Show preview URL during upload
+    if (previewUrl) {
+      return previewUrl;
     }
+    // Show current photo URL
     if (currentPhotoUrl) {
-      if (currentPhotoUrl.startsWith('http')) {
-        return currentPhotoUrl;
-      }
-      return `${process.env.REACT_APP_BACKEND_URL}${currentPhotoUrl}?t=${Date.now()}`;
+      return currentPhotoUrl;
     }
     return null;
   };
