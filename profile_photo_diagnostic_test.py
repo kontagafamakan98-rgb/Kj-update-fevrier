@@ -110,7 +110,7 @@ class ProfilePhotoDiagnosticTester:
         # Create test user with payment verification
         timestamp = datetime.now().strftime('%H%M%S')
         user_data = {
-            "email": f"photo_test_{timestamp}@kojo.test",
+            "email": f"photo_test_{timestamp}@gmail.com",
             "password": "PhotoTest123!",
             "first_name": "Photo",
             "last_name": "Tester",
