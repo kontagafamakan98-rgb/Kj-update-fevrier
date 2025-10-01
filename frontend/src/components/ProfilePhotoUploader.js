@@ -235,19 +235,22 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         <button
           type="button"
           onClick={triggerFileSelect}
-          disabled={uploading}
+          disabled={uploading || loading}
           className="mt-4 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {uploading ? 'Upload en cours...' : 'Choisir une photo'}
         </button>
-      </div>
+        </div>
+      )}
 
       {/* Instructions */}
-      <div className="mt-4 text-center">
-        <p className="text-xs text-gray-500">
-          Votre photo de profil sera visible par tous les utilisateurs de Kojo
-        </p>
-      </div>
+      {isCurrentUser && (
+        <div className="mt-4 text-center">
+          <p className="text-xs text-gray-500">
+            Votre photo de profil sera visible par tous les utilisateurs de Kojo
+          </p>
+        </div>
+      )}
     </div>
   );
 };
