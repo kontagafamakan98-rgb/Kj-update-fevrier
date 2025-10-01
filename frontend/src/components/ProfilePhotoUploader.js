@@ -49,102 +49,63 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   };
 
   const handleFiles = async (files) => {
+    if (!isCurrentUser) {
+      alert('Vous ne pouvez modifier que votre propre photo de profil');
+      return;
+    }
+
     const file = files[0];
     if (!file) return;
-
-    // Vérifier le type
-    if (!file.type.startsWith('image/')) {
-      const errorMessage = t('pleaseSelectImage') || 'Veuillez sélectionner une image (JPG, PNG, etc.)';
-      alert(errorMessage);
-      return;
-    }
-
-    // Vérifier la taille
-    if (file.size > 5 * 1024 * 1024) {
-      const errorMessage = t('imageTooLarge') || 'L\'image doit faire moins de 5MB';
-      alert(errorMessage);
-      return;
-    }
 
     setUploading(true);
 
     try {
-      // ⚡ 1. Préparer les données pour l'aperçu local
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64 = e.target.result;
+      // 1. Generate instant preview for user feedback
+      const preview = profilePhotoService.generatePreviewUrl(file);
+      setPreviewUrl(preview);
 
-        setPhotoData({
-          file: file,
-          base64: base64,
-          name: file.name,
-          size: file.size
-        });
+      // 2. Upload to backend using centralized service
+      const result = await profilePhotoService.uploadPhoto(file);
 
-        // ⚡ 2. Préparer les données pour l'upload
-        const formData = new FormData();
-        formData.append("file", file);
-
-        // ⚡ 3. Envoyer au backend en utilisant le service API centralisé
-        const data = await api.uploadFile('/users/profile-photo', formData);
-        safeLog.info('Photo uploaded successfully:', data);
-
-        // ⚡ 4. Vérifier que la réponse contient photo_url
-        if (!data || !data.photo_url) {
-          throw new Error('Réponse invalide du serveur: photo_url manquant');
-        }
-
-        // ⚡ 5. Récupérer l'URL renvoyée par le backend
-        const uploadedUrl = `${process.env.REACT_APP_BACKEND_URL}${data.photo_url}`;
-
-        // ⚡ 6. Ajouter le timestamp pour éviter le cache
-        const cacheBustedUrl = `${uploadedUrl}?t=${Date.now()}`;
-
-        // Mettre à jour l'état avec l'URL finale
-        setPhotoData({
-          file: file,
-          base64: cacheBustedUrl,
-          name: file.name,
-          size: file.size,
-          uploadedUrl: uploadedUrl
-        });
-
-        // Mettre à jour le contexte utilisateur
-        if (updateUser) {
-          updateUser({
-            ...user,
-            profile_photo: data.photo_url
-          });
-        }
-
-        // Callback de succès
-        if (onUploadSuccess) {
-          onUploadSuccess(data.photo_url, cacheBustedUrl);
-        }
-
-        alert(t('photoUploadedSuccessfully') || 'Photo de profil mise à jour avec succès !');
-      };
-
-      reader.onerror = (error) => {
-        safeLog.error('Erreur lecture fichier:', error);
-        alert(t('errorReadingFile') || 'Erreur lors de la lecture du fichier');
-        setUploading(false);
-      };
-
-      reader.readAsDataURL(file);
-    } catch (error) {
-      safeLog.error('Erreur upload photo:', error);
+      // 3. Update current photo URL from backend response
+      const photoUrl = result.photo_url;
+      const fullUrl = photoUrl.startsWith('http') 
+        ? photoUrl 
+        : `${process.env.REACT_APP_BACKEND_URL}${photoUrl}`;
       
-      // Gestion des erreurs API avec le service centralisé
-      let errorMessage = "Impossible d'envoyer la photo, réessayez.";
-      if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error.message) {
-        errorMessage = error.message;
+      setCurrentPhotoUrl(`${fullUrl}?t=${Date.now()}`);
+
+      // 4. Clean up preview
+      if (preview) {
+        profilePhotoService.revokePreviewUrl(preview);
+        setPreviewUrl(null);
+      }
+
+      // 5. Update user context
+      if (updateUser && user) {
+        updateUser({
+          ...user,
+          profile_photo: photoUrl
+        });
+      }
+
+      // 6. Success callback
+      if (onUploadSuccess) {
+        onUploadSuccess(photoUrl, fullUrl);
+      }
+
+      alert(t('photoUploadedSuccessfully') || 'Photo de profil mise à jour avec succès !');
+    } catch (error) {
+      safeLog.error('Error uploading photo:', error);
+      
+      // Clean up preview on error
+      if (previewUrl) {
+        profilePhotoService.revokePreviewUrl(previewUrl);
+        setPreviewUrl(null);
       }
       
+      const errorMessage = error.message || "Impossible d'envoyer la photo, réessayez.";
       alert(errorMessage);
-      setUploading(false);
     } finally {
       setUploading(false);
     }
