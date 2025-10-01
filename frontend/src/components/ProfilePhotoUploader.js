@@ -227,12 +227,6 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
             </p>
           </div>
 
-          {photoData && (
-            <div className="mt-3 text-xs text-gray-600">
-              <p>📁 {photoData.name}</p>
-              <p>📊 {(photoData.size / 1024 / 1024).toFixed(2)} MB</p>
-            </div>
-          )}
         </div>
 
         <button
