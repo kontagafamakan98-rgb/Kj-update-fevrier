@@ -333,7 +333,7 @@ class ProfilePhotoDiagnosticTester:
         
         timestamp = datetime.now().strftime('%H%M%S')
         user_data = {
-            "email": f"photo_reg_{timestamp}@kojo.test",
+            "email": f"photo_reg_{timestamp}@gmail.com",
             "password": "PhotoReg123!",
             "first_name": "PhotoReg",
             "last_name": "User",
