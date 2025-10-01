@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
-import api from '../services/api';
+import profilePhotoService from '../services/ProfilePhotoService';
 
 const ProfilePhotoUploader = ({ onUploadSuccess, currentPhotoUrl = null, className = '' }) => {
   const [photoData, setPhotoData] = useState(null);
