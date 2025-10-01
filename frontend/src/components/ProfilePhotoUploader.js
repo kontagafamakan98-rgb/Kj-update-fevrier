@@ -162,32 +162,30 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       <div className="mb-4 text-center">
         <div className="relative inline-block">
           <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden border-4 border-white shadow-lg">
-            {currentPhoto ? (
+            {loading ? (
+              <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+              </div>
+            ) : currentPhoto ? (
               <img
                 src={currentPhoto}
-                alt="Photo de profil"
+                alt={isCurrentUser ? "Votre photo de profil" : "Photo de profil"}
                 className="w-full h-full object-cover"
                 onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.parentNode.innerHTML = `
-                    <div class="w-full h-full bg-orange-100 flex items-center justify-center">
-                      <span class="text-orange-600 text-2xl font-bold">
-                        ${user?.first_name?.charAt(0) || user?.email?.charAt(0) || '?'}
-                      </span>
-                    </div>
-                  `;
+                  // Fallback to default avatar on error
+                  e.target.src = profilePhotoService.generateDefaultAvatar(user);
                 }}
               />
             ) : (
               <div className="w-full h-full bg-orange-100 flex items-center justify-center">
                 <span className="text-orange-600 text-2xl font-bold">
-                  {user?.first_name?.charAt(0) || user?.email?.charAt(0) || '?'}
+                  {profilePhotoService.getUserInitials(user)}
                 </span>
               </div>
             )}
           </div>
           
-          {uploading && (
+          {(uploading || loading) && (
             <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             </div>
