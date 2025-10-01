@@ -65,13 +65,28 @@ export default function Profile() {
   const handleWorkerProfileCreate = async (workerData) => {
     try {
       setError('');
-      await axios.post('/workers/profile', workerData);
+      // Note: Need to add workersAPI if this endpoint is used
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/workers/profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(workerData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Erreur lors de la création');
+      }
+      
       setSuccess('Profil travailleur créé avec succès');
       await loadProfile();
       
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
-      setError(error.response?.data?.detail || 'Erreur lors de la création');
+      safeLog.error('Worker profile creation error:', error);
+      setError(error.message || 'Erreur lors de la création');
     }
   };
 
