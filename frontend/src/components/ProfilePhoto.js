@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Edit2, X } from 'lucide-react';
-import ProfilePhotoService from '../services/profilePhotoService';
+import profilePhotoService from '../services/ProfilePhotoService';
 import { devConsole } from '../utils/devLogger';
 import { devLog, safeLog } from '../utils/env';
 
