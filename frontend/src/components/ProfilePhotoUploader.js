@@ -17,6 +17,37 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   // Determine if this is for current user or another user
   const isCurrentUser = !targetUserId || targetUserId === user?.id;
 
+  // Load current photo on component mount
+  useEffect(() => {
+    loadCurrentPhoto();
+  }, [targetUserId, user?.id]);
+
+  // Clean up preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        profilePhotoService.revokePreviewUrl(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const loadCurrentPhoto = async () => {
+    setLoading(true);
+    try {
+      let photoUrl;
+      if (isCurrentUser) {
+        photoUrl = await profilePhotoService.getCurrentUserPhotoUrl();
+      } else {
+        photoUrl = await profilePhotoService.getPhotoUrl(targetUserId);
+      }
+      setCurrentPhotoUrl(photoUrl);
+    } catch (error) {
+      safeLog.error('Error loading current photo:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFiles = async (files) => {
     const file = files[0];
     if (!file) return;
