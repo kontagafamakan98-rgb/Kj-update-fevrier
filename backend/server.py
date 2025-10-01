@@ -746,7 +746,7 @@ async def register_user_verified(user_data: UserWithPayment):
                     file_extension = "webp"
                     
                 filename = f"profile_{user_id}_{int(datetime.now(timezone.utc).timestamp())}.{file_extension}"
-                profile_photo_path = f"/uploads/profile_photos/{filename}"  # Absolute path for URL
+                profile_photo_path = f"/api/uploads/profile_photos/{filename}"  # Absolute path for URL with proper routing
                 
                 # Sauvegarder l'image (utiliser path relatif pour filesystem)
                 filesystem_path = f"uploads/profile_photos/{filename}"
