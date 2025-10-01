@@ -139,13 +139,17 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   };
 
   const getCurrentPhotoUrl = () => {
-    // Show preview URL during upload
+    // Show preview URL during upload for instant feedback
     if (previewUrl) {
       return previewUrl;
     }
-    // Show current photo URL
+    // Show current photo URL from backend
     if (currentPhotoUrl) {
       return currentPhotoUrl;
+    }
+    // Generate default avatar if no photo
+    if (user) {
+      return profilePhotoService.generateDefaultAvatar(user);
     }
     return null;
   };
