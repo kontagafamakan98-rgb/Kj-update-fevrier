@@ -319,17 +319,26 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUs
               });
             }
             
+            // Forcer le rafraîchissement du ProfilePhoto dans l'header
+            setPhotoRefreshKey(prev => prev + 1);
+            
             // Recharger les données utilisateur depuis le backend
             if (loadUser) {
-              await loadUser();
+              try {
+                await loadUser();
+              } catch (error) {
+                console.error('Error reloading user data:', error);
+              }
             }
-            
-            // Sortir du mode édition pour voir les changements
-            onCancel();
             
             // Montrer un message de succès
             setSuccess('Photo de profil mise à jour avec succès !');
-            setTimeout(() => setSuccess(''), 3000);
+            
+            // Sortir du mode édition après 1 seconde pour voir les changements
+            setTimeout(() => {
+              onCancel();
+              setSuccess('');
+            }, 1500);
           }}
         />
       </div>
