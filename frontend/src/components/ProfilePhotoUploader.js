@@ -81,15 +81,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         setPreviewUrl(null);
       }
 
-      // 5. Update user context
-      if (updateUser && user) {
-        updateUser({
-          ...user,
-          profile_photo: photoUrl
-        });
-      }
-
-      // 6. Success callback
+      // 5. Success callback
       if (onUploadSuccess) {
         onUploadSuccess(photoUrl, fullUrl);
       }
