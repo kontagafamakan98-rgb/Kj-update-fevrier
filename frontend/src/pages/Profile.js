@@ -18,7 +18,7 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
-  const { user, loadUser } = useAuth();
+  const { user, loadUser, updateUser } = useAuth();
   const { t, changeLanguage } = useLanguage();
 
   useEffect(() => {
