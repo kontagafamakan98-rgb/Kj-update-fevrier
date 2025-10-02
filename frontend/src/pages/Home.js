@@ -178,13 +178,13 @@ export default function Home() {
                 to="/register?type=client"
                 className="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transform transition hover:scale-105"
               >
-                Je cherche des services
+                {t('lookingForServices')}
               </Link>
               <Link 
                 to="/register?type=worker"
                 className="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition"
               >
-                Je propose mes services
+                {t('offerServices')}
               </Link>
             </div>
           )}
