@@ -306,39 +306,13 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUs
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Photo de profil</h3>
         <ProfilePhotoUploader
           targetUserId={user?.id}
-          onUploadSuccess={async (photoUrl, cacheBustedUrl) => {
-            // Mettre à jour le profil local
+          onUploadSuccess={(photoUrl, cacheBustedUrl) => {
+            // Seulement mettre à jour le formData pour le preview (pas de sauvegarde définitive)
             setFormData(prev => ({...prev, profile_photo: photoUrl}));
-            setProfile(prev => ({...prev, profile_photo: photoUrl}));
             
-            // Mettre à jour le contexte utilisateur global
-            if (updateUser && user) {
-              updateUser({
-                ...user,
-                profile_photo: photoUrl
-              });
-            }
-            
-            // Forcer le rafraîchissement du ProfilePhoto dans l'header
-            setPhotoRefreshKey(prev => prev + 1);
-            
-            // Recharger les données utilisateur depuis le backend
-            if (loadUser) {
-              try {
-                await loadUser();
-              } catch (error) {
-                console.error('Error reloading user data:', error);
-              }
-            }
-            
-            // Montrer un message de succès
-            setSuccess('Photo de profil mise à jour avec succès !');
-            
-            // Sortir du mode édition après 1 seconde pour voir les changements
-            setTimeout(() => {
-              onCancel();
-              setSuccess('');
-            }, 1500);
+            // Montrer un message temporaire que la photo est prête
+            setSuccess('Photo prête - cliquez "Enregistrer" pour confirmer');
+            setTimeout(() => setSuccess(''), 3000);
           }}
         />
       </div>
