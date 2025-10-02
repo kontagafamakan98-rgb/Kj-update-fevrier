@@ -197,19 +197,19 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
               <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">1000+</div>
-              <div className="text-sm md:text-base text-gray-600">Travailleurs actifs</div>
+              <div className="text-sm md:text-base text-gray-600">{t('activeWorkers')}</div>
             </div>
             <div>
               <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">500+</div>
-              <div className="text-sm md:text-base text-gray-600">Projets complétés</div>
+              <div className="text-sm md:text-base text-gray-600">{t('completedProjects')}</div>
             </div>
             <div>
               <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">4</div>
-              <div className="text-sm md:text-base text-gray-600">Pays couverts</div>
+              <div className="text-sm md:text-base text-gray-600">{t('countriesCovered')}</div>
             </div>
             <div>
               <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">24/7</div>
-              <div className="text-sm md:text-base text-gray-600">Support client</div>
+              <div className="text-sm md:text-base text-gray-600">{t('customerSupport')}</div>
             </div>
           </div>
         </div>
