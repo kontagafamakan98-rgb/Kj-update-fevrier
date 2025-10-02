@@ -161,6 +161,7 @@ export default function Profile() {
               setProfile={setProfile}
               updateUser={updateUser}
               loadUser={loadUser}
+              setPhotoRefreshKey={setPhotoRefreshKey}
             />
           ) : (
             <ProfileView profile={profile} user={user} />
