@@ -86,7 +86,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         onUploadSuccess(photoUrl, fullUrl);
       }
 
-      alert(t('photoUploadedSuccessfully') || 'Photo de profil mise à jour avec succès !');
+      // Photo uploaded - waiting for user to click "Save" to confirm
     } catch (error) {
       safeLog.error('Error uploading photo:', error);
       
