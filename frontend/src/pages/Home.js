@@ -31,10 +31,10 @@ export default function Home() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
           <div className="text-center">
             <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight">
-              Connecter les travailleurs et clients en Afrique de l'Ouest
+              {t('heroTitle')}
             </h1>
             <p className="text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto">
-              Trouvez des services de qualité ou offrez vos compétences au Mali, Sénégal, Burkina Faso et Côte d'Ivoire
+              {t('heroSubtitle')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               {!user ? (
