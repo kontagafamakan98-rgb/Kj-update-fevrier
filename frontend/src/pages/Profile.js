@@ -58,19 +58,24 @@ export default function Profile() {
       // Mettre à jour le profil local
       setProfile(prev => ({...prev, ...updatedData}));
       
-      // Si une nouvelle photo a été uploadée, mettre à jour le contexte global
-      if (updatedData.profile_photo && updateUser && user) {
+      // Toujours mettre à jour le contexte global et forcer le refresh
+      if (updateUser && user) {
         updateUser({
           ...user,
-          profile_photo: updatedData.profile_photo
+          ...updatedData
         });
-        
-        // Forcer le rafraîchissement du ProfilePhoto dans l'header
-        setPhotoRefreshKey(prev => prev + 1);
       }
+      
+      // Forcer le rafraîchissement du ProfilePhoto dans l'header
+      setPhotoRefreshKey(prev => prev + 1);
       
       // Recharger les données utilisateur depuis le backend pour être sûr
       await loadUser();
+      
+      // Forcer un re-render complet après une petite pause
+      setTimeout(() => {
+        setPhotoRefreshKey(prev => prev + 1);
+      }, 500);
       
       // Sortir du mode édition
       setIsEditing(false);
