@@ -157,6 +157,8 @@ export default function Profile() {
               onSave={handleProfileUpdate}
               onCancel={() => setIsEditing(false)}
               setProfile={setProfile}
+              updateUser={updateUser}
+              loadUser={loadUser}
             />
           ) : (
             <ProfileView profile={profile} user={user} />
