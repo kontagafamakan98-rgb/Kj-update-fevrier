@@ -905,8 +905,11 @@ async def register_user_verified(user_data: UserWithPayment):
 @api_router.post("/auth/register")
 async def register_user(user_data: UserRegister):
     try:
+        # Sanitize email input to prevent injection
+        clean_email = sanitize_email(user_data.email)
+        
         # Check if user exists
-        existing_user = await db.users.find_one({"email": user_data.email})
+        existing_user = await db.users.find_one({"email": clean_email})
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
         
