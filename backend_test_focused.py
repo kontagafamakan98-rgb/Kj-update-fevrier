@@ -99,7 +99,7 @@ class KojoBackendAuditFocused:
         # User Registration with unique email
         unique_id = str(uuid.uuid4())[:8]
         client_data = {
-            "email": f"client_{unique_id}@kojo.test",
+            "email": f"client_{unique_id}@example.com",
             "password": "KojoTest2024!",
             "first_name": "Aminata",
             "last_name": "Diallo",
