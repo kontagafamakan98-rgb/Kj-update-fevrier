@@ -157,7 +157,7 @@ export default function Profile() {
               onCancel={() => setIsEditing(false)}
             />
           ) : (
-            <ProfileView profile={profile} />
+            <ProfileView profile={profile} user={user} />
           )}
         </div>
 
