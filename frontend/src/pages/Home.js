@@ -166,10 +166,10 @@ export default function Home() {
       <section className="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-6">
-            Rejoignez des milliers d'utilisateurs
+            {t('joinThousands')}
           </h2>
           <p className="text-lg md:text-xl mb-8 opacity-90">
-            Commencez dès aujourd'hui à connecter avec des clients ou travailleurs qualifiés
+            {t('startConnectingToday')}
           </p>
           
           {!user && (
