@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 
 class StaticFileRoutingTester:
-    def __init__(self, base_url="https://kojo-service-hub.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-profile.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
@@ -158,7 +158,7 @@ class StaticFileRoutingTester:
             return False
 
         # Construct full URL
-        full_url = f"https://kojo-service-hub.preview.emergentagent.com{photo_url}"
+        full_url = f"https://kojo-profile.preview.emergentagent.com{photo_url}"
         
         try:
             response = requests.get(full_url, timeout=10)
@@ -209,7 +209,7 @@ class StaticFileRoutingTester:
                     
                     if photo_url and photo_url.startswith("/api/uploads/profile_photos/"):
                         # Test static file serving for this format
-                        full_url = f"https://kojo-service-hub.preview.emergentagent.com{photo_url}"
+                        full_url = f"https://kojo-profile.preview.emergentagent.com{photo_url}"
                         static_response = requests.get(full_url, timeout=5)
                         
                         if static_response.status_code == 200 and 'image/' in static_response.headers.get('content-type', ''):

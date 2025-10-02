@@ -12,7 +12,7 @@ from datetime import datetime
 from PIL import Image
 
 class FocusedProfilePhotoTester:
-    def __init__(self, base_url="https://kojo-service-hub.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-profile.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.test_user_token = None
         self.test_user_id = None
@@ -195,7 +195,7 @@ class FocusedProfilePhotoTester:
                 # Step 3: Test photo accessibility
                 self.log("Step 3: Testing photo accessibility...")
                 if photo_url.startswith('/api/uploads/'):
-                    full_url = f"https://kojo-service-hub.preview.emergentagent.com{photo_url}"
+                    full_url = f"https://kojo-profile.preview.emergentagent.com{photo_url}"
                     photo_response = requests.get(full_url)
                     
                     if photo_response.status_code == 200:

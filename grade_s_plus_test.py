@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 import base64
 
 class GradeSPlusAPITester:
-    def __init__(self, base_url="https://kojo-service-hub.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-profile.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.client_token = None
         self.worker_token = None
