@@ -104,11 +104,13 @@ export default function Profile() {
         {/* Header */}
         <div className="bg-orange-600 px-6 py-8">
           <div className="flex items-center">
-            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-orange-600">
-                {user.first_name?.charAt(0)}{user.last_name?.charAt(0)}
-              </span>
-            </div>
+            <ProfilePhoto 
+              user={user}
+              size={80}
+              editable={false}
+              showEditButton={false}
+              className="border-2 border-white"
+            />
             <div className="ml-6">
               <h1 className="text-2xl font-bold text-white">
                 {user.first_name} {user.last_name}
