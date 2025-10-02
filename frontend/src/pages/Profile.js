@@ -17,6 +17,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
   
   const { user, loadUser, updateUser } = useAuth();
   const { t, changeLanguage } = useLanguage();
