@@ -631,9 +631,40 @@ const translations = {
     applyJob: 'Ɲinini kɛ',
     
     // Home page
-    heroTitle: 'Baarakɛlaw ni kiliyanw jɛɲɔgɔnya Mali ni Senegali',
-    heroSubtitle: 'Baara ɲuman sɔrɔ walima i ka seko di i ka sigida la',
-    getStarted: 'A daminɛ',
+    heroTitle: 'Baarakɛlaw ni kiliyanw jɛɲɔgɔnya Afiriki Kɔrɔn fɛ',
+    heroSubtitle: 'Baara ɲuman sɔrɔ walima i ka seko di Mali, Senegali, Burkina Faso ani Côte d\'Ivoire',
+    getStarted: 'A daminɛ sisan',
+    viewJobs: 'Baara filɛ',
+    myDashboard: 'N ka baara yɔrɔ',
+    
+    // Countries section
+    availableIn4Countries: 'A bɛ jamana naani kɔnɔ',
+    kojoConnectsDescription: 'Kojo bɛ baarakɛlaw ni kiliyanw jɛɲɔgɔnya Afiriki Kɔrɔn fɛ',
+    servicesAvailable: 'Baara minnu bɛ yen',
+    
+    // Services section  
+    popularServices: 'Baara dilenw',
+    findServiceYouNeed: 'I mako baara ɲinini',
+    
+    // Features section
+    findWork: 'Baara ɲinini',
+    findWorkDescription: 'I sigida kɔnɔ cogo ɲumanw ɲinini ani i ka baara yiriwali',
+    connect: 'Jɛɲɔgɔnya',
+    connectDescription: 'Kiliyanw ni baarakɛlaw ka kumaɲɔgɔnya an ka cikan sira la',
+    securePayments: 'Sara lakananen',
+    securePaymentsDescription: 'Orange Money, Wave ani sara fɛɛrɛ wɛrɛw',
+    
+    // Call to action
+    joinThousands: 'Don ba caman hakɛ',
+    startConnectingToday: 'Bi daminɛ ka jɛɲɔgɔnya da kiliyan walima baarakɛla ɲumanw ma',
+    lookingForServices: 'N bɛ baara ɲinini',
+    offerServices: 'N bɛ baara di',
+    
+    // Stats section
+    activeWorkers: 'Baarakɛla baarakɛlaw',
+    completedProjects: 'Porozɛ dafalen', 
+    countriesCovered: 'Jamana minnu kɔrɔ',
+    customerSupport: 'Kiliyan dɛmɛni',
     
     // Categories
     plumbing: 'Ji baara',
