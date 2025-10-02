@@ -189,8 +189,28 @@ export default function Profile() {
 }
 
 function ProfileView({ profile }) {
+  const { user } = useAuth();
+  
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="space-y-6">
+      {/* Photo de profil section */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">Photo de profil</label>
+        <ProfilePhoto 
+          user={user}
+          size={120}
+          editable={true}
+          showEditButton={true}
+          onPhotoChange={(result) => {
+            if (result.success) {
+              // Optionally handle success feedback
+              console.log('Photo updated successfully');
+            }
+          }}
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
         <label className="block text-sm font-medium text-gray-700">Email</label>
         <p className="mt-1 text-gray-900">{profile.email}</p>
