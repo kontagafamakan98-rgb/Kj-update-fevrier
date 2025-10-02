@@ -280,7 +280,7 @@ class KojoBackendAuditFocused:
         
         # Worker Registration with 2+ Payment Methods
         worker_payment_data = {
-            "email": f"worker_payment_{unique_id}@kojo.test",
+            "email": f"worker_payment_{unique_id}@example.com",
             "password": "KojoTest2024!",
             "first_name": "Ousmane",
             "last_name": "Diop",
