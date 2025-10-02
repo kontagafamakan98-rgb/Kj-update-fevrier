@@ -152,7 +152,8 @@ export default function Profile() {
 
           {isEditing ? (
             <ProfileEditForm 
-              profile={profile} 
+              profile={profile}
+              user={user}
               onSave={handleProfileUpdate}
               onCancel={() => setIsEditing(false)}
             />
