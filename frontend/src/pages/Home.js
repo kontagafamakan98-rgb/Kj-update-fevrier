@@ -57,7 +57,7 @@ export default function Home() {
                   to="/dashboard"
                   className="w-full sm:w-auto bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold text-lg shadow-lg transform transition hover:scale-105"
                 >
-                  Mon tableau de bord
+                  {t('myDashboard')}
                 </Link>
               )}
             </div>
