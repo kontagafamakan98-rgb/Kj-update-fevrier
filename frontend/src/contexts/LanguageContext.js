@@ -440,9 +440,40 @@ const translations = {
     applyJob: 'Dàgg-dàgg',
     
     // Home page
-    heroTitle: 'Jëmmel liggéeykat ak kliyan ci Mali ak Senegaal',
-    heroSubtitle: 'Wut sëriñ yu baax wala fekkali sa xel-xel ci sa cornur',
-    getStarted: 'Tambali',
+    heroTitle: 'Jëmmel liggéeykat ak kliyan ci Afrik bu Sowwu',
+    heroSubtitle: 'Wut sëriñ yu baax wala fekkali sa xel-xel ci Mali, Senegaal, Burkina Faso ak Côte d\'Ivoire',
+    getStarted: 'Tambali leegi',
+    viewJobs: 'Gis liggéey yi',
+    myDashboard: 'Sama wàllu liggéey',
+    
+    // Countries section
+    availableIn4Countries: 'Am ci ñent réew',
+    kojoConnectsDescription: 'Kojo dafa jëmmal liggéeykat ak kliyan ci Afrik bu Sowwu',
+    servicesAvailable: 'Sëriñ yi am',
+    
+    // Services section  
+    popularServices: 'Sëriñ yu bari',
+    findServiceYouNeed: 'Soxla sëriñ bu nga bëgg',
+    
+    // Features section
+    findWork: 'Soxla liggéey',
+    findWorkDescription: 'Gis tey yu am ci sa cornur te yaatu sa liggéey',
+    connect: 'Jëmme',
+    connectDescription: 'Waxtaan ak kliyan ak liggéeykat ci bataaxal bu ñu',
+    securePayments: 'Fey yu suur',
+    securePaymentsDescription: 'Orange Money, Wave ak yeneen yoon yu fey yi',
+    
+    // Call to action
+    joinThousands: 'Bokk ak junni yu am',
+    startConnectingToday: 'Tàmbal leegi ak kliyan wala liggéeykat yu gëna baax',
+    lookingForServices: 'Dama soxla sëriñ yi',
+    offerServices: 'Dama def sëriñ',
+    
+    // Stats section
+    activeWorkers: 'Liggéeykat yu liggéey',
+    completedProjects: 'Projet yi jeex', 
+    countriesCovered: 'Réew yi daję',
+    customerSupport: 'Ndimbal kliyan',
     
     // Categories
     plumbing: 'Ndox',
