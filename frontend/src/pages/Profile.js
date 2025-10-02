@@ -157,7 +157,6 @@ export default function Profile() {
               onSave={handleProfileUpdate}
               onCancel={() => setIsEditing(false)}
               setProfile={setProfile}
-              setSuccess={setSuccess}
             />
           ) : (
             <ProfileView profile={profile} user={user} />
