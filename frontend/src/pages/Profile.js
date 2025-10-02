@@ -51,12 +51,34 @@ export default function Profile() {
   const handleProfileUpdate = async (updatedData) => {
     try {
       setError('');
+      
+      // Sauvegarder le profil avec les nouvelles données (y compris photo)
       await usersAPI.updateProfile(updatedData);
-      setSuccess('Profil mis à jour avec succès');
-      await loadUser(); // Refresh user data
+      
+      // Mettre à jour le profil local
+      setProfile(prev => ({...prev, ...updatedData}));
+      
+      // Si une nouvelle photo a été uploadée, mettre à jour le contexte global
+      if (updatedData.profile_photo && updateUser && user) {
+        updateUser({
+          ...user,
+          profile_photo: updatedData.profile_photo
+        });
+        
+        // Forcer le rafraîchissement du ProfilePhoto dans l'header
+        setPhotoRefreshKey(prev => prev + 1);
+      }
+      
+      // Recharger les données utilisateur depuis le backend pour être sûr
+      await loadUser();
+      
+      // Sortir du mode édition
       setIsEditing(false);
       
+      // Message de succès
+      setSuccess('Profil mis à jour avec succès');
       setTimeout(() => setSuccess(''), 3000);
+      
     } catch (error) {
       safeLog.error('Profile update error:', error);
       setError(error.response?.data?.detail || error.message || 'Erreur lors de la mise à jour');
