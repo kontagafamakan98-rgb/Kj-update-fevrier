@@ -43,13 +43,13 @@ export default function Home() {
                     to="/register"
                     className="w-full sm:w-auto bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold text-lg shadow-lg transform transition hover:scale-105"
                   >
-                    Commencer maintenant
+                    {t('getStarted')}
                   </Link>
                   <Link 
                     to="/jobs"
                     className="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold text-lg transition"
                   >
-                    Voir les emplois
+                    {t('viewJobs')}
                   </Link>
                 </>
               ) : (
