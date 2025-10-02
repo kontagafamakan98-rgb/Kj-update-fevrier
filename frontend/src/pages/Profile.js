@@ -296,10 +296,11 @@ function ProfileEditForm({ profile, onSave, onCancel }) {
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Photo de profil</h3>
         <ProfilePhotoUploader
-          currentPhotoUrl={profile?.profile_photo}
+          targetUserId={user?.id}
           onUploadSuccess={(photoUrl, cacheBustedUrl) => {
             // Mettre à jour le profil local
             setFormData(prev => ({...prev, profile_photo: photoUrl}));
+            setProfile(prev => ({...prev, profile_photo: photoUrl}));
             // Optionnel: montrer un message de succès
             setSuccess('Photo de profil mise à jour avec succès !');
             setTimeout(() => setSuccess(''), 3000);
