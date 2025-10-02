@@ -7,6 +7,7 @@ Focused testing for critical error corrections as requested in French review.
 import requests
 import json
 import time
+import sys
 from datetime import datetime
 
 class CriticalErrorsTester:
