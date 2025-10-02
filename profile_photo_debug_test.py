@@ -139,7 +139,7 @@ class ProfilePhotoDebugTester:
         print("TEST 1: DATABASE PHOTO URL CHECK")
         print("="*70)
         
-        if not self.db:
+        if self.db is None:
             print("❌ Skipping database tests - no MongoDB connection")
             self.log_issue("HIGH", "Cannot inspect database", "MongoDB connection not available")
             return
