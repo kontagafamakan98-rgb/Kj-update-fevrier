@@ -307,7 +307,7 @@ class KojoBackendAuditFocused:
         
         for country, prefix in orange_countries:
             test_data = {
-                "email": f"orange_{country}_{unique_id}@kojo.test",
+                "email": f"orange_{country}_{unique_id}@example.com",
                 "password": "KojoTest2024!",
                 "first_name": "Test",
                 "last_name": f"Orange{country.title()}",
