@@ -59,7 +59,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   };
 
   const handleFiles = async (files) => {
-    if (!isCurrentUser) {
+    if (!isCurrentUser && targetUserId) {
       alert('Vous ne pouvez modifier que votre propre photo de profil');
       return;
     }
