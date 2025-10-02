@@ -133,9 +133,9 @@ export default function Home() {
               <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
                 <span className="text-2xl">💼</span>
               </div>
-              <h3 className="text-xl font-semibold mb-4 text-gray-900">Trouvez du travail</h3>
+              <h3 className="text-xl font-semibold mb-4 text-gray-900">{t('findWork')}</h3>
               <p className="text-gray-600">
-                Découvrez des opportunités dans votre région et développez votre activité
+                {t('findWorkDescription')}
               </p>
             </div>
             
