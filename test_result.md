@@ -49,7 +49,7 @@
 ##
 test_plan:
   current_focus:
-    - "Profile Photo Management API"
+    - "Critical Language System Translation Issues"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
