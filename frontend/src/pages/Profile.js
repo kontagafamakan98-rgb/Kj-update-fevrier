@@ -106,6 +106,7 @@ export default function Profile() {
         <div className="bg-orange-600 px-6 py-8">
           <div className="flex items-center">
             <ProfilePhoto 
+              key={photoRefreshKey}
               user={user}
               size={80}
               editable={false}
