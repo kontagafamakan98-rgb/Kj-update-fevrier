@@ -232,7 +232,7 @@ const IP_GEOLOCATION_SERVICES = [
   },
   {
     name: 'IP-API',
-    url: 'http://ip-api.com/json/',
+    url: 'https://ip-api.com/json/',
     parser: (data) => ({
       country: data.countryCode,
       countryName: data.country,
