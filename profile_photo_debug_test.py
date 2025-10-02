@@ -447,7 +447,7 @@ class ProfilePhotoDebugTester:
                          "Security issue - unauthenticated upload allowed")
         
         # Test with specific user if available in database
-        if self.db:
+        if self.db is not None:
             try:
                 # Look for users with photos to test association
                 users_with_photos = list(self.db.users.find(
