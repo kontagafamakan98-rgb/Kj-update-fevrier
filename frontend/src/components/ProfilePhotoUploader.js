@@ -254,7 +254,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       )}
 
       {/* Instructions */}
-      {isCurrentUser && (
+      {(isCurrentUser || !targetUserId) && (
         <div className="mt-4 text-center">
           <p className="text-xs text-gray-500">
             Votre photo de profil sera visible par tous les utilisateurs de Kojo
