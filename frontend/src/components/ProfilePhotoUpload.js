@@ -77,7 +77,9 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
   };
 
   const showPhotoOptions = () => {
+    console.log('ProfilePhotoUpload: showPhotoOptions clicked, current showCameraOptions:', showCameraOptions);
     setShowCameraOptions(true);
+    console.log('ProfilePhotoUpload: setShowCameraOptions(true) called');
   };
 
   const handleFileInput = (e) => {
