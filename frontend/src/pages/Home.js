@@ -91,7 +91,7 @@ export default function Home() {
                   <div className="text-6xl md:text-8xl">{country.flag}</div>
                 </div>
                 <h3 className="font-semibold text-gray-900 text-sm md:text-base">{country.name}</h3>
-                <p className="text-xs text-gray-600 mt-1">Services disponibles</p>
+                <p className="text-xs text-gray-600 mt-1">{t('servicesAvailable')}</p>
               </div>
             ))}
           </div>
