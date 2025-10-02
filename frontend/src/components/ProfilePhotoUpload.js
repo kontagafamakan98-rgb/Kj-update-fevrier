@@ -6,10 +6,6 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
   const [dragActive, setDragActive] = useState(false);
   const [showCameraOptions, setShowCameraOptions] = useState(false);
   
-  // Debug logging
-  useEffect(() => {
-    console.log('ProfilePhotoUpload: showCameraOptions state changed to:', showCameraOptions);
-  }, [showCameraOptions]);
   const inputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const { t } = useLanguage();
