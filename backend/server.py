@@ -913,10 +913,12 @@ async def register_user(user_data: UserRegister):
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
         
-        # Create new user
+        # Create new user with sanitized email
         hashed_password = hash_password(user_data.password)
+        user_dict = user_data.dict(exclude={"password"})
+        user_dict["email"] = clean_email  # Use sanitized email
         user = User(
-            **user_data.dict(exclude={"password"}),
+            **user_dict,
             password_hash=hashed_password
         )
         
