@@ -16,6 +16,16 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   
   // Determine if this is for current user or another user
   const isCurrentUser = !targetUserId || targetUserId === user?.id;
+  
+  // Debug logging to help identify the issue
+  useEffect(() => {
+    console.log('ProfilePhotoUploader Debug:', {
+      targetUserId,
+      userId: user?.id,
+      isCurrentUser,
+      user: user ? 'exists' : 'null'
+    });
+  }, [targetUserId, user?.id, isCurrentUser]);
 
   // Load current photo on component mount
   useEffect(() => {
