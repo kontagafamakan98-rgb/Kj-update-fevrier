@@ -219,7 +219,7 @@ function ProfileView({ profile }) {
   );
 }
 
-function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, setSuccess }) {
+function ProfileEditForm({ profile, user, onSave, onCancel, setProfile }) {
   const [formData, setFormData] = useState({
     first_name: profile.first_name || '',
     last_name: profile.last_name || '',
