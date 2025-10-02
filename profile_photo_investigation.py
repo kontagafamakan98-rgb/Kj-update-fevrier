@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 class ProfilePhotoInvestigator:
-    def __init__(self, base_url="https://kojo-service-hub.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-profile.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.test_token = None
         self.test_user = None
@@ -266,7 +266,7 @@ class ProfilePhotoInvestigator:
                     # Test direct access to photo URL
                     if photo_url.startswith('/uploads/'):
                         # Construct full URL
-                        full_photo_url = f"https://kojo-service-hub.preview.emergentagent.com{photo_url}"
+                        full_photo_url = f"https://kojo-profile.preview.emergentagent.com{photo_url}"
                         
                         try:
                             photo_response = requests.get(full_photo_url)

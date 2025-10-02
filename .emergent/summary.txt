@@ -1,92 +1,83 @@
 <analysis>
-My analysis of the trajectory reveals a comprehensive development cycle, starting with the implementation of core mobile features and transitioning through a series of user-driven bug fixes and feature enhancements. The initial work focused on integrating push notifications and offline capabilities into the React Native mobile app. This involved fixing code-level import issues and adding a necessary backend endpoint () for token registration.
+The trajectory details a complex, multi-stage debugging and refactoring process centered on the profile photo feature. The initial task was to fix a photo display issue, which the AI first diagnosed as a simple backend static file routing problem. After implementing a fix, user feedback revealed a series of deeper issues.
 
-A significant portion of the work was highly reactive to user feedback. Key tasks included:
-1.  **Fixing a critical PWA bug:** A Maximum call stack size exceeded error, caused by recursive logging functions, was identified by a troubleshooter and promptly fixed.
-2.  **Implementing UI/UX changes:** Adding the Mécanique category to the homepage, removing the worker's hourly rate field from the entire stack (UI, validation, backend models), and fixing a bug where English was missing from the mobile language selector.
-3.  **Refactoring the Profile Photo Upload:** The user reported the feature was broken and provided a new implementation logic. This was integrated, but it led to subsequent bugs (an upstream JSON error and the photo not displaying post-upload).
+A critical turning point was the user's clarification that the architecture was flawed, relying on local storage instead of a shared backend. This prompted a major refactoring of the entire photo management system, introducing a dedicated frontend service () and modifying backend endpoints in  for a centralized, database-driven approach.
 
-The most recent activity involved a deep dive into the non-functional profile photo feature. After confirming the backend upload mechanism was working correctly, the root cause was identified as a static file routing issue: the frontend's client-side router was incorrectly intercepting image URL requests intended for the backend. The work concluded at the point of this diagnosis, with the next logical step being the implementation of a fix for serving static files from the backend.
+This refactor, however, introduced a cascade of new frontend bugs. The AI systematically addressed these issues based on user-provided screenshots and error messages. These included: a hidden upload UI due to a missing React import (), multiple  exceptions in  caused by missing props (, ) being passed to child components, and scope conflicts.
+
+The final phase involved refining the user workflow. The AI initially made the photo update happen instantly upon upload, but the user corrected this, specifying that the change should only be finalized upon clicking the Enregistrer (Save) button. The last actions taken were to implement this exact logic, separating the temporary preview from the final profile update.
 </analysis>
 
 <product_requirements>
-The primary goal is to build the Kojo application, a service platform for West African countries (Senegal, Mali, Côte d'Ivoire, Burkina Faso), available as a PWA and evolving into native mobile apps (iOS/Android via React Native).
+The Kojo application is a service platform for West African countries, built as a PWA with a React Native mobile app.
 
 **Core Features & Status:**
--   **User Registration & Profiles:** Separate flows for Clients and Workers. Profile photos are a key feature, though currently experiencing a display issue.
--   **Payment Integration:** Supports Bank Card, Orange Money, and Wave. Account verification is mandatory: clients need at least one payment method, while workers require at least two. A feature was added to allow users to manage these methods from their profile.
--   **Job Categories:** A system for categorizing jobs. The Mécanique (Mechanics) category was explicitly requested and added to the public homepage.
--   **Worker Hourly Rate:** This was initially a feature but was completely removed from the registration, profile, and backend models per the user's request, as it was deemed unnecessary for worker verification.
--   **Multi-Language Support:** The application supports French, English, Wolof, and Bambara. A bug preventing English from appearing on mobile devices was fixed.
--   **Client-Worker Messaging:** A fully functional, real-time messaging system is implemented and accessible to authenticated users.
--   **Mobile App Features:** Push notifications and offline capabilities have been implemented and tested on both the frontend and backend.
+*   **User Registration & Profiles:** Separate flows for Clients and Workers. A key feature is profile photo management, which has undergone significant debugging and refactoring to use a centralized backend storage system. The main goal is for users to upload a photo, have it persist across sessions and devices, and be visible to other users.
+*   **Job Categories & Payments:** The platform supports various job categories (Mécanique was recently added) and integrates multiple payment methods (Bank Card, Orange Money, Wave).
+*   **User Workflow:** A critical requirement for the profile page is that changes, including the profile photo, should not be saved automatically. The user must first upload a photo (which shows as a preview) and then explicitly click an Enregistrer (Save) button to finalize all changes. Upon saving, the UI must update automatically to reflect the new photo without requiring a manual page refresh.
+*   **Multi-Language & Messaging:** The app supports multiple languages and includes a real-time messaging system.
+*   **Mobile:** Core mobile features like push notifications and offline support are implemented.
 </product_requirements>
 
 <key_technical_concepts>
-- **Full-Stack Monorepo:** Frontend (React PWA), Backend (FastAPI), Mobile (React Native/Expo).
-- **Backend:** FastAPI with Pydantic for data validation. MongoDB for the database.
-- **Frontend:** React with Context API for state management (Auth, Language). Axios for centralized API calls.
-- **Mobile:** Expo for React Native development, using  for push notifications and  for offline detection.
-- **Authentication:** JWT (JSON Web Tokens) are used for securing API endpoints.
+- **Full-Stack Monorepo:** React (PWA Frontend), FastAPI (Python Backend), React Native (Mobile).
+- **Backend:** FastAPI for the API, Pydantic for data validation, and MongoDB for the database. Static file serving is configured for user uploads.
+- **Frontend:** React with Context API for global state (Authentication, Language). A centralized Axios instance () manages API calls, including interceptors for JWT authentication.
+- **Authentication:** JSON Web Tokens (JWT) are used to secure API endpoints.
 </key_technical_concepts>
 
 <code_architecture>
-The application is a monorepo located in  containing three main projects: , , and .
+The application is a monorepo located in .
 
 
 
 -   ****
-    -   **Importance:** This is the core FastAPI application file containing all API routes, Pydantic models, and business logic.
+    -   **Importance:** The core FastAPI application. It handles all API logic, including user authentication, profile management, and file uploads.
     -   **Changes:**
-        -   Added a new endpoint  to register push notification tokens for mobile clients.
-        -   Removed the  field from the  and  Pydantic models.
-        -   Verified that endpoints for managing payment accounts () and profile photos () are present and functional.
+        -   Configured to serve static files from  under the  route to avoid conflicts with the frontend router.
+        -   Endpoints for uploading (), retrieving, and deleting profile photos were verified and corrected to ensure consistent URL generation (prefixed with ).
 
 -   ****
-    -   **Importance:** The user's profile page, where they can view and edit their information.
+    -   **Importance:** The main user profile page, which contains complex logic for viewing and editing user data. It manages the state for view mode and edit mode.
     -   **Changes:**
-        -   Integrated the new  component to allow users to edit their payment methods.
-        -   Removed all UI elements related to displaying or editing the worker's .
-        -   Replaced the old photo upload logic with the new  component.
+        -   This file was the epicenter of recent debugging.
+        -   Fixed multiple  bugs by correctly passing props (, , ) from the main  component down to the  child component.
+        -   Implemented logic to handle the Save button click (). This function now saves all form data and triggers a state update to automatically refresh the user's profile photo across the application without a manual page reload.
 
 -   ****
-    -   **Importance:** The public landing page for the application.
-    -   **Changes:** The hardcoded list of Popular Services was modified to include Mécanique (Mechanics) and the grid layout was adjusted to accommodate the new item.
-
--   ****
-    -   **Importance:** A key component in the worker registration flow.
+    -   **Importance:** The component used within the  page for handling photo uploads when in edit mode.
     -   **Changes:**
-        -   The entire form section for  was removed.
-        -   An informational bullet point mentioning the hourly rate () was also removed.
-
--   ** (NEW)**
-    -   **Importance:** A new component created to handle profile photo uploads based on user-provided code.
-    -   **Changes:** Initially created with a direct  call, it was refactored to use the centralized  service to fix a JSON parsing error caused by missing auth headers and incorrect URL handling.
+        -   Refactored to no longer save the photo or update the global user context automatically upon upload.
+        -   It now takes the selected file, uploads it, and uses a callback () to pass the temporary file information back to the parent  page. The parent component holds this temporary state until the user clicks Save.
 
 -   ****
-    -   **Importance:** A utility for environment-aware logging.
-    -   **Changes:** Fixed a critical Maximum call stack size exceeded error by removing circular recursive calls within the logging functions (, ).
+    -   **Importance:** A similar uploader component used during the user registration flow.
+    -   **Changes:**
+        -   A critical bug preventing the upload options (Gallery/Camera) from appearing was fixed. The root cause was a missing  import from React, which caused a silent JavaScript error.
+
+-   ** (NEWER)**
+    -   **Importance:** A dedicated service created to centralize all backend communication related to profile photos (uploading, fetching URLs).
+    -   **Changes:** Created during the major refactor to move away from local storage and ensure all photo operations go through the backend API, using the centralized  client to handle authentication headers.
 </code_architecture>
 
 <pending_tasks>
-- There are no outstanding feature requests from the user that haven't been addressed. The primary pending task is to resolve the bug preventing uploaded profile photos from being displayed.
+-   The primary task of fixing the profile photo functionality, including the correct save workflow, has been completed. There are no other outstanding user requests from the provided trajectory.
 </pending_tasks>
 
 <current_work>
-The AI engineer was in the process of debugging a critical issue where a user's profile photo, despite being successfully uploaded to the backend, does not appear in the application's UI.
+The engineer just completed a critical bug fix related to the user profile update workflow. The user reported that after selecting a new profile photo, the change should **not** be applied automatically. Instead, the application should wait for the user to click the main Enregistrer (Save) button on the profile page to commit all changes, including the new photo.
 
-The investigation proceeded as follows:
-1.  **User Report:** The user stated that after uploading a new profile picture and logging back in, the photo was not visible.
-2.  **Initial Diagnosis:** The engineer first suspected an issue with the upload process itself or data persistence.
-3.  **Backend Testing:** A series of automated tests were run against the backend API. The results were positive (90% success rate), confirming that:
-    -   The  endpoint correctly receives the image file.
-    -   The image is successfully saved to the server's filesystem at a path like .
-    -   The user's record in the MongoDB database is updated with the correct URL to the stored image.
-4.  **Root Cause Identification:** The tests revealed that while the backend was functioning correctly, there was a fundamental static file routing problem. When the frontend attempts to fetch the image using a URL like , the request is being intercepted by the frontend's client-side router (React Router) instead of being routed to the backend server where the image file resides. This causes the frontend to serve its  file (the single-page application shell) instead of the actual image, leading to a broken image display.
+The previous implementation incorrectly updated the user's profile immediately after a photo was selected. The work involved refactoring this logic:
 
-The work concluded precisely at this point, with a clear understanding of the problem but before a solution was implemented.
+1.  **Modified **: Removed the logic that automatically updated the user's state and saved the photo. Instead, it now uses a callback () to pass the newly selected (but unsaved) photo file to the parent  component.
+2.  **Modified **:
+    *   It now holds the newly selected photo in a temporary state variable ().
+    *   The  function (triggered by the Save button) was updated. It now first uploads the new photo file if one exists, gets the new URL from the backend, and then saves all profile data (including the new photo URL) in a single update request.
+    *   Upon a successful save, it calls  from the  and uses a state key () to force a re-render of the  component in the header, ensuring the UI updates automatically without a manual refresh.
+
+This final change aligns the application's behavior with the user's explicit workflow requirement.
 </current_work>
 
 <optional_next_step>
-Configure the backend server to correctly serve the static files from the  directory, resolving the routing conflict with the frontend application.
+Ask the user to test the complete profile photo change workflow: 1. Go to Profile, 2. Click Modifier, 3. Upload a new photo, 4. Click Enregistrer, and confirm the photo updates everywhere automatically without a page refresh.
 </optional_next_step>

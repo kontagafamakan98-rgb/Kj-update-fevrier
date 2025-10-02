@@ -9,7 +9,7 @@ import json
 
 def test_prefix_90_comprehensive():
     """Test complet du préfixe 90 Orange Money"""
-    base_url = "https://kojo-service-hub.preview.emergentagent.com/api"
+    base_url = "https://kojo-profile.preview.emergentagent.com/api"
     
     print("🎯 VALIDATION FINALE PRÉFIXE 90 ORANGE MONEY")
     print("=" * 60)

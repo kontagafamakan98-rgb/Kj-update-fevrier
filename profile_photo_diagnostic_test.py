@@ -14,7 +14,7 @@ from datetime import datetime
 from PIL import Image
 
 class ProfilePhotoDiagnosticTester:
-    def __init__(self, base_url="https://kojo-service-hub.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-profile.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.test_user_token = None
         self.test_user_id = None
@@ -296,7 +296,7 @@ class ProfilePhotoDiagnosticTester:
             
             # Convert relative URL to full URL
             if photo_url.startswith('/api/uploads/'):
-                full_url = f"https://kojo-service-hub.preview.emergentagent.com{photo_url}"
+                full_url = f"https://kojo-profile.preview.emergentagent.com{photo_url}"
             else:
                 full_url = photo_url
             
@@ -370,7 +370,7 @@ class ProfilePhotoDiagnosticTester:
                 
                 # Test static file access
                 if profile_photo.startswith('/api/uploads/'):
-                    full_url = f"https://kojo-service-hub.preview.emergentagent.com{profile_photo}"
+                    full_url = f"https://kojo-profile.preview.emergentagent.com{profile_photo}"
                     try:
                         response = requests.get(full_url)
                         if response.status_code == 200 and response.headers.get('content-type', '').startswith('image/'):
