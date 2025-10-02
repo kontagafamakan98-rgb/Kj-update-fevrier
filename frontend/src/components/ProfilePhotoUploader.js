@@ -32,16 +32,23 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   }, [previewUrl]);
 
   const loadCurrentPhoto = async () => {
+    console.log('ProfilePhotoUploader: loadCurrentPhoto called', { isCurrentUser, targetUserId, userId: user?.id });
     setLoading(true);
     try {
       let photoUrl;
       if (isCurrentUser) {
+        console.log('ProfilePhotoUploader: Calling getCurrentUserPhotoUrl');
         photoUrl = await profilePhotoService.getCurrentUserPhotoUrl();
+        console.log('ProfilePhotoUploader: getCurrentUserPhotoUrl returned:', photoUrl);
       } else {
+        console.log('ProfilePhotoUploader: Calling getPhotoUrl for targetUserId:', targetUserId);
         photoUrl = await profilePhotoService.getPhotoUrl(targetUserId);
+        console.log('ProfilePhotoUploader: getPhotoUrl returned:', photoUrl);
       }
       setCurrentPhotoUrl(photoUrl);
+      console.log('ProfilePhotoUploader: setCurrentPhotoUrl called with:', photoUrl);
     } catch (error) {
+      console.error('ProfilePhotoUploader: Error loading current photo:', error);
       safeLog.error('Error loading current photo:', error);
     } finally {
       setLoading(false);
