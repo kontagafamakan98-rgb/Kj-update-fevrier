@@ -301,11 +301,28 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile }) {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Photo de profil</h3>
         <ProfilePhotoUploader
           targetUserId={user?.id}
-          onUploadSuccess={(photoUrl, cacheBustedUrl) => {
+          onUploadSuccess={async (photoUrl, cacheBustedUrl) => {
             // Mettre à jour le profil local
             setFormData(prev => ({...prev, profile_photo: photoUrl}));
             setProfile(prev => ({...prev, profile_photo: photoUrl}));
-            // Optionnel: montrer un message de succès
+            
+            // Mettre à jour le contexte utilisateur global
+            if (updateUser && user) {
+              updateUser({
+                ...user,
+                profile_photo: photoUrl
+              });
+            }
+            
+            // Recharger les données utilisateur depuis le backend
+            if (loadUser) {
+              await loadUser();
+            }
+            
+            // Sortir du mode édition pour voir les changements
+            onCancel();
+            
+            // Montrer un message de succès
             setSuccess('Photo de profil mise à jour avec succès !');
             setTimeout(() => setSuccess(''), 3000);
           }}
