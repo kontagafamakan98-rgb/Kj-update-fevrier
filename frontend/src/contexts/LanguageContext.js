@@ -57,9 +57,40 @@ const translations = {
     applyJob: 'Postuler',
     
     // Home page
-    heroTitle: 'Connecter les travailleurs et clients au Mali & Sénégal',
-    heroSubtitle: 'Trouvez des services de qualité ou offrez vos compétences dans votre région',
-    getStarted: 'Commencer',
+    heroTitle: 'Connecter les travailleurs et clients en Afrique de l\'Ouest',
+    heroSubtitle: 'Trouvez des services de qualité ou offrez vos compétences au Mali, Sénégal, Burkina Faso et Côte d\'Ivoire',
+    getStarted: 'Commencer maintenant',
+    viewJobs: 'Voir les emplois',
+    myDashboard: 'Mon tableau de bord',
+    
+    // Countries section
+    availableIn4Countries: 'Disponible dans 4 pays',
+    kojoConnectsDescription: 'Kojo connecte les travailleurs et clients à travers l\'Afrique de l\'Ouest',
+    servicesAvailable: 'Services disponibles',
+    
+    // Services section  
+    popularServices: 'Services populaires',
+    findServiceYouNeed: 'Trouvez le service dont vous avez besoin',
+    
+    // Features section
+    findWork: 'Trouvez du travail',
+    findWorkDescription: 'Découvrez des opportunités dans votre région et développez votre activité',
+    connect: 'Connectez-vous',
+    connectDescription: 'Échangez directement avec clients et travailleurs via notre messagerie',
+    securePayments: 'Paiements sécurisés',
+    securePaymentsDescription: 'Orange Money, Wave et autres méthodes de paiement intégrées',
+    
+    // Call to action
+    joinThousands: 'Rejoignez des milliers d\'utilisateurs',
+    startConnectingToday: 'Commencez dès aujourd\'hui à connecter avec des clients ou travailleurs qualifiés',
+    lookingForServices: 'Je cherche des services',
+    offerServices: 'Je propose mes services',
+    
+    // Stats section
+    activeWorkers: 'Travailleurs actifs',
+    completedProjects: 'Projets complétés', 
+    countriesCovered: 'Pays couverts',
+    customerSupport: 'Support client',
     
     // Categories
     plumbing: 'Plomberie',
