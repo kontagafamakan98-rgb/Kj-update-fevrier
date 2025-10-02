@@ -49,7 +49,7 @@
 ##
 test_plan:
   current_focus:
-    - "Critical Language System Translation Issues"
+    - "Audit Complet du Frontend Kojo - Détection et Résolution de Toutes les Erreurs"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
