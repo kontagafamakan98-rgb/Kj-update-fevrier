@@ -537,7 +537,7 @@ class ProfilePhotoDebugTester:
                              "Files may have been deleted or moved")
         
         # Check if these files are associated with any user in database
-        if self.db:
+        if self.db is not None:
             try:
                 for filename in specific_files:
                     photo_url = f"/api/uploads/profile_photos/{filename}"
