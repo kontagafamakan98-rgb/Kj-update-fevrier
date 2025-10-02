@@ -680,6 +680,40 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
+def sanitize_email(email: str) -> str:
+    """Sanitize email to prevent injection attacks"""
+    if not email:
+        raise ValueError("Email cannot be empty")
+    
+    # Remove potentially dangerous characters
+    dangerous_chars = ['*', '/', '\\', '$', '{', '}', '[', ']', '(', ')', '#', '&', '|', '<', '>']
+    for char in dangerous_chars:
+        if char in email:
+            raise ValueError(f"Email contains invalid character: {char}")
+    
+    # Additional check for SQL-like patterns
+    sql_patterns = ['OR', 'AND', 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'UNION', '--', '/*', '*/']
+    email_upper = email.upper()
+    for pattern in sql_patterns:
+        if pattern in email_upper:
+            raise ValueError(f"Email contains prohibited pattern: {pattern}")
+    
+    return email.lower().strip()
+
+def sanitize_input_string(input_str: str, field_name: str = "field") -> str:
+    """Sanitize general string inputs"""
+    if not input_str:
+        return ""
+    
+    # Remove control characters
+    sanitized = ''.join(char for char in input_str if ord(char) >= 32 or char in '\n\t')
+    
+    # Limit length to prevent buffer overflow attacks
+    if len(sanitized) > 1000:
+        raise ValueError(f"{field_name} is too long (max 1000 characters)")
+    
+    return sanitized.strip()
+
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
