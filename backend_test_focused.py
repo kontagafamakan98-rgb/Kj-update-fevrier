@@ -120,7 +120,7 @@ class KojoBackendAuditFocused:
         
         # Worker Registration
         worker_data = {
-            "email": f"worker_{unique_id}@kojo.test",
+            "email": f"worker_{unique_id}@example.com",
             "password": "KojoTest2024!",
             "first_name": "Mamadou",
             "last_name": "Traoré",
