@@ -188,9 +188,7 @@ export default function Profile() {
   );
 }
 
-function ProfileView({ profile }) {
-  const { user } = useAuth();
-  
+function ProfileView({ profile, user }) {
   return (
     <div className="space-y-6">
       {/* Photo de profil section */}
