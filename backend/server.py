@@ -867,28 +867,59 @@ async def register_user_verified(user_data: UserWithPayment):
 
 @api_router.post("/auth/register")
 async def register_user(user_data: UserRegister):
-    # Check if user exists
-    existing_user = await db.users.find_one({"email": user_data.email})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    try:
+        # Check if user exists
+        existing_user = await db.users.find_one({"email": user_data.email})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Create new user
+        hashed_password = hash_password(user_data.password)
+        user = User(
+            **user_data.dict(exclude={"password"}),
+            password_hash=hashed_password
+        )
+        
+        await db.users.insert_one(user.dict())
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": user.id, "email": user.email})
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user.dict(exclude={"password_hash"})
+        }
     
-    # Create new user
-    hashed_password = hash_password(user_data.password)
-    user = User(
-        **user_data.dict(exclude={"password"}),
-        password_hash=hashed_password
-    )
+    except ValidationError as e:
+        logger.warning(f"❌ Erreur validation utilisateur: {e}")
+        # Extraire le premier message d'erreur de validation
+        first_error = e.errors()[0]
+        field = first_error['loc'][0] if first_error['loc'] else 'field'
+        
+        if field == 'first_name':
+            error_msg = "Le prénom doit contenir au moins 2 caractères"
+        elif field == 'last_name':
+            error_msg = "Le nom doit contenir au moins 2 caractères"
+        elif field in ['first_name', 'last_name']:
+            if 'pattern' in first_error['type']:
+                error_msg = f"Le {field} contient des caractères non autorisés"
+            else:
+                error_msg = f"Le {field} n'est pas au bon format"
+        elif field == 'email':
+            error_msg = "L'adresse email n'est pas valide"
+        elif field == 'phone':
+            error_msg = "Le numéro de téléphone n'est pas au bon format"
+        else:
+            error_msg = f"Erreur de validation: {first_error['msg']}"
+        
+        log_and_raise_http_exception(422, f"Erreur de validation: {error_msg}")
     
-    await db.users.insert_one(user.dict())
-    
-    # Create access token
-    access_token = create_access_token(data={"sub": user.id, "email": user.email})
-    
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": user.dict(exclude={"password_hash"})
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur inattendue lors de l'inscription: {str(e)}")
+        log_and_raise_http_exception(500, "Une erreur inattendue s'est produite lors de l'inscription. Veuillez réessayer.")
 
 @api_router.post("/auth/login")
 async def login_user(credentials: UserLogin):
