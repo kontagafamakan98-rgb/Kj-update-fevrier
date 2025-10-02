@@ -171,7 +171,7 @@ backend:
 
   - task: "Profile Photo Management API"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 1
     priority: "high"
