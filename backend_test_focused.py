@@ -258,7 +258,7 @@ class KojoBackendAuditFocused:
         # Client Registration with Payment Verification
         unique_id = str(uuid.uuid4())[:8]
         client_payment_data = {
-            "email": f"client_payment_{unique_id}@kojo.test",
+            "email": f"client_payment_{unique_id}@example.com",
             "password": "KojoTest2024!",
             "first_name": "Fatoumata",
             "last_name": "Keita",
