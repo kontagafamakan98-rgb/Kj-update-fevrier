@@ -333,7 +333,7 @@ class KojoBackendAuditFocused:
         
         for country, prefix in wave_countries:
             test_data = {
-                "email": f"wave_{country}_{unique_id}@kojo.test",
+                "email": f"wave_{country}_{unique_id}@example.com",
                 "password": "KojoTest2024!",
                 "first_name": "Test",
                 "last_name": f"Wave{country.title()}",
