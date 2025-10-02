@@ -249,9 +249,40 @@ const translations = {
     applyJob: 'Apply',
     
     // Home page
-    heroTitle: 'Connect Workers and Clients in Mali & Senegal',
-    heroSubtitle: 'Find quality services or offer your skills in your area',
-    getStarted: 'Get Started',
+    heroTitle: 'Connect Workers and Clients in West Africa',
+    heroSubtitle: 'Find quality services or offer your skills in Mali, Senegal, Burkina Faso and Ivory Coast',
+    getStarted: 'Get Started Now',
+    viewJobs: 'View Jobs',
+    myDashboard: 'My Dashboard',
+    
+    // Countries section
+    availableIn4Countries: 'Available in 4 countries',
+    kojoConnectsDescription: 'Kojo connects workers and clients across West Africa',
+    servicesAvailable: 'Services available',
+    
+    // Services section  
+    popularServices: 'Popular Services',
+    findServiceYouNeed: 'Find the service you need',
+    
+    // Features section
+    findWork: 'Find Work',
+    findWorkDescription: 'Discover opportunities in your area and grow your business',
+    connect: 'Connect',
+    connectDescription: 'Chat directly with clients and workers through our messaging system',
+    securePayments: 'Secure Payments',
+    securePaymentsDescription: 'Orange Money, Wave and other integrated payment methods',
+    
+    // Call to action
+    joinThousands: 'Join thousands of users',
+    startConnectingToday: 'Start connecting with qualified clients or workers today',
+    lookingForServices: 'I am looking for services',
+    offerServices: 'I offer my services',
+    
+    // Stats section
+    activeWorkers: 'Active Workers',
+    completedProjects: 'Completed Projects', 
+    countriesCovered: 'Countries Covered',
+    customerSupport: 'Customer Support',
     
     // Categories
     plumbing: 'Plumbing',
