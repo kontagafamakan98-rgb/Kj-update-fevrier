@@ -203,8 +203,8 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         </div>
       </div>
 
-      {/* Upload Area - Only show for current user */}
-      {isCurrentUser && (
+      {/* Upload Area - Show for current user OR if no target specified */}
+      {(isCurrentUser || !targetUserId) && (
         <div
           className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
             dragOver 
