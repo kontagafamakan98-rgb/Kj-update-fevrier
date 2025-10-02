@@ -744,8 +744,11 @@ async def register_user_verified(user_data: UserWithPayment):
     """Inscription avec vérification obligatoire des comptes de paiement"""
     
     try:
+        # Sanitize email input to prevent injection
+        clean_email = sanitize_email(user_data.email)
+        
         # Check if email already exists
-        existing_user = await db.users.find_one({"email": user_data.email})
+        existing_user = await db.users.find_one({"email": clean_email})
         if existing_user:
             log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
         
