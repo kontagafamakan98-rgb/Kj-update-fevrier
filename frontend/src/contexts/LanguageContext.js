@@ -122,6 +122,7 @@ const translations = {
     phone: 'Téléphone',
     preferredLanguage: 'Langue préférée',
     verified: 'Vérifié',
+    no: 'Non',
     
     // Jobs page
     allCategories: 'Toutes les catégories',
