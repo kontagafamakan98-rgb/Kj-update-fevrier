@@ -238,7 +238,7 @@ function ProfileView({ profile }) {
         <p className="mt-1 text-gray-900">{profile.preferred_language}</p>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700">Vérifié</label>
+        <label className="block text-sm font-medium text-gray-700">{t('verified')}</label>
         <p className="mt-1">
           <span className={`px-2 py-1 text-xs rounded-full ${
             profile.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
