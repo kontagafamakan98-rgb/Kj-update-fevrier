@@ -909,6 +909,8 @@ const translations = {
     profilePhotoHelps: 'Profil ja bɛ dɛmɛ ka i ka ko kɛcogo ɲɛ Kojo kan',
     professionalPhotoHelps: 'Profil ja ɲuman bɛ kiliyanw ka dannaya yiriwa ani i ka sugandi cogoya ɲɛ',
     addProfilePhoto: 'Profil ja fara a kan',
+    addPhoto: 'Ja fara a kan',
+    changePhoto: 'Ja yɛlɛma',
     clickToChoose: 'Kliki walasa ka fɛɛrɛ dɔ sugandi',
     tipsGoodPhoto: 'Ja ɲuman kɛcogo',
     useRecentPhoto: 'Ja kɔrɔ ani jɛlen baara kɛ',
@@ -994,6 +996,8 @@ const translations = {
     // Profile Photo Upload
     profilePhotoOptional: 'Profil ja (Ka i b\'a fɛ)',
     addProfilePhoto: 'Profil ja fara a kan',
+    addPhoto: 'Ja fara a kan',
+    changePhoto: 'Ja yɛlɛma',
     clickToChooseOption: 'Kliki ka fɛɛrɛ dɔ sugandi',
     chooseFromGallery: 'Ka sugandi galeri kɔnɔ',
     selectExistingPhoto: 'Ja min bɛ yen sugandi',
