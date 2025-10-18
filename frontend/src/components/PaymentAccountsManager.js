@@ -174,7 +174,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       const result = await PaymentAccountService.updatePaymentAccounts(formattedAccounts);
       
       if (result.success) {
-        setSuccess('Comptes de paiement mis à jour avec succès');
+        setSuccess(t('paymentAccountsUpdated'));
         setIsEditing(false);
         if (onSuccess) onSuccess();
         
