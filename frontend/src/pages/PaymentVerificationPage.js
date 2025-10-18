@@ -157,8 +157,8 @@ const PaymentVerificationPage = () => {
               </p>
               <p>
                 {userData.user_type === 'worker' 
-                  ? '🎯 En tant que travailleur, vous devez lier au minimum 2 moyens de paiement pour recevoir vos paiements des clients.'
-                  : '🎯 En tant que client, vous devez lier au moins 1 moyen de paiement pour effectuer vos paiements aux travailleurs.'
+                  ? `🎯 ${t('workerPaymentRequirement')}`
+                  : `🎯 ${t('clientPaymentRequirement')}`
                 }
               </p>
             </div>
