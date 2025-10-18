@@ -739,10 +739,11 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Translation Corrections Verification - Specific Issues"
   stuck_tasks: []
   test_all: false
-  test_priority: "messaging_system_frontend_testing_completed"
+  test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
