@@ -957,7 +957,9 @@ const translations = {
     lastStep: 'Laban laban',
     linkAccountsToComplete: 'Walasa ka i ka tɔgɔsɛbɛnni ban, i ka kan ka saraku jatebɔsɛbɛnw jɛmɛ',
     workerPaymentRequirement: 'I ni baarakɛla ye, i ka kan ka saraku fɛɛrɛ fila jɛmɛ walasa ka saraku sɔrɔ kiliyanw fɛ',
-    clientPaymentRequirement: 'I ni kiliyan ye, i ka kan ka saraku fɛɛrɛ kelen jɛmɛ walasa ka baarakɛlaw sara',
+    clientPaymentRequirement: 'Ci kliyan bi, war nga jëmmal 1 njariñ fey ngir fey liggéeykat yi',
+    paymentAccountsUpdated: 'Konte fey yi ñu leen soppi ak réussite',
+    paymentAccountsLoadError: 'Fii am ci yeb konte fey yi',
     paymentAccountsUpdated: 'Sara konte kura ye ka ɲi',
     paymentAccountsLoadError: 'Sara konte dɔnni cogo la fili',
     
