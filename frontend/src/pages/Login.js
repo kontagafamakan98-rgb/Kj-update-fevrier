@@ -103,7 +103,7 @@ export default function Login() {
 
           <div className="text-center">
             <span className="text-sm text-gray-600">
-              Pas de compte?{' '}
+              {t('noAccount')}{' '}
               <Link to="/register" className="font-medium text-orange-600 hover:text-orange-500">
                 {t('register')}
               </Link>
