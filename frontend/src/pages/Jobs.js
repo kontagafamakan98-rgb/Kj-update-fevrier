@@ -99,7 +99,7 @@ export default function Jobs() {
   ];
 
   const statuses = [
-    { value: '', label: 'Tous les statuts' },
+    { value: '', label: t('allStatuses') },
     { value: 'open', label: 'Ouvert' },
     { value: 'in_progress', label: 'En cours' },
     { value: 'completed', label: 'Complété' },
