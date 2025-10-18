@@ -389,6 +389,8 @@ const translations = {
     profilePhotoHelps: 'A profile photo helps personalize your experience on Kojo',
     professionalPhotoHelps: 'A professional profile photo increases client confidence and improves your chances of being selected',
     addProfilePhoto: 'Add a profile photo',
+    addPhoto: 'Add a photo',
+    changePhoto: 'Change photo',
     clickToChoose: 'Click to choose an option',
     tipsGoodPhoto: 'Tips for a good photo',
     useRecentPhoto: 'Use a recent and clear photo',
