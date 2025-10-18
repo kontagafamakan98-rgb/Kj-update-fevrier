@@ -360,6 +360,7 @@ const translations = {
     phone: 'Phone',
     preferredLanguage: 'Preferred Language',
     verified: 'Verified',
+    no: 'No',
     
     // Jobs page
     allCategories: 'All Categories',
