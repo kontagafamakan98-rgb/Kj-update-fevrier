@@ -331,7 +331,7 @@ const ProfilePhoto = ({
         <button
           onClick={handlePhotoSelect}
           style={editButtonStyle}
-          title={profilePhoto ? "Changer la photo" : "Ajouter une photo"}
+          title={profilePhoto ? t('changePhoto') : t('addPhoto')}
         >
           <Camera size={16} color="white" />
         </button>
