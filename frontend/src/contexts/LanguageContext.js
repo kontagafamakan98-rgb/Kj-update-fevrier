@@ -144,6 +144,13 @@ const translations = {
     // Geolocation messages
     ivoryCoastPreference: 'En Côte d\'Ivoire, la plupart des utilisateurs préfèrent le Français',
     
+    // Payment verification page
+    paymentVerification: 'Vérification des Comptes de Paiement',
+    lastStep: 'Dernière étape',
+    linkAccountsToComplete: 'Pour finaliser votre inscription, vous devez lier vos comptes de paiement',
+    workerPaymentRequirement: 'En tant que travailleur, vous devez lier au minimum 2 moyens de paiement pour recevoir vos paiements des clients',
+    clientPaymentRequirement: 'En tant que client, vous devez lier au moins 1 moyen de paiement pour effectuer vos paiements aux travailleurs',
+    
     // Jobs page
     allCategories: 'Toutes les catégories',
     allStatuses: 'Tous les statuts',
