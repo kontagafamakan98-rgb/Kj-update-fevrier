@@ -115,6 +115,28 @@ const translations = {
     debugPhotos: 'Debug Photos',
     commissionDashboard: 'Commission Dashboard',
     
+    // Login/Register pages
+    noAccount: 'Pas de compte ?',
+    personalInformation: 'Informations personnelles',
+    paymentAccounts: 'Comptes de paiement',
+    phone: 'Téléphone',
+    preferredLanguage: 'Langue préférée',
+    verified: 'Vérifié',
+    
+    // Jobs page
+    allCategories: 'Toutes les catégories',
+    allStatuses: 'Tous les statuts',
+    search: 'Rechercher',
+    reset: 'Réinitialiser',
+    noJobsFound: 'Aucun emploi trouvé',
+    publishFirstJob: 'Commencez par publier votre premier emploi',
+    myJobs: 'Mes emplois',
+    
+    // Messages page
+    noConversations: 'Aucune conversation',
+    startApplyingJobs: 'Commencez à postuler à des emplois',
+    selectConversation: 'Sélectionnez une conversation pour commencer',
+    
     // Categories
     plumbing: 'Plomberie',
     electrical: 'Électricité',
