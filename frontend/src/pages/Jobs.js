@@ -100,10 +100,10 @@ export default function Jobs() {
 
   const statuses = [
     { value: '', label: t('allStatuses') },
-    { value: 'open', label: 'Ouvert' },
-    { value: 'in_progress', label: 'En cours' },
-    { value: 'completed', label: 'Complété' },
-    { value: 'cancelled', label: 'Annulé' }
+    { value: 'open', label: t('open') },
+    { value: 'in_progress', label: t('inProgress') },
+    { value: 'completed', label: t('completed') },
+    { value: 'cancelled', label: t('cancelled') }
   ];
 
   if (loading) {
