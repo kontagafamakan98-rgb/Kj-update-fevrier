@@ -681,6 +681,13 @@ const translations = {
     // Geolocation messages
     ivoryCoastPreference: 'Ci Côte d\'Ivoire, lu bare ci jëfandikukat yi dañu bëgg Farañse',
     
+    // Payment verification page
+    paymentVerification: 'Xalatug konte fey',
+    lastStep: 'Jëru bu mujj',
+    linkAccountsToComplete: 'Ngir jeexal sa tànn, war nga jëmmal sa konte fey yi',
+    workerPaymentRequirement: 'Ci liggéeykat bi, war nga jëmmal 2 njariñ fey ngir àmm sa xaalis ci kliyan yi',
+    clientPaymentRequirement: 'Ci kliyan bi, war nga jëmmal 1 njariñ fey ngir fey liggéeykat yi',
+    
     // Jobs page
     allCategories: 'Wàcc yépp',
     allStatuses: 'Sigida yépp',
