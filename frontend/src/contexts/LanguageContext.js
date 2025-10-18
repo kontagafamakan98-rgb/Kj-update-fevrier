@@ -820,6 +820,7 @@ const translations = {
     phone: 'Telefɔni',
     preferredLanguage: 'Kan dilenna',
     verified: 'A tiɲɛna',
+    no: 'Ayi',
     
     // Jobs page
     allCategories: 'Sugu bɛɛ',
