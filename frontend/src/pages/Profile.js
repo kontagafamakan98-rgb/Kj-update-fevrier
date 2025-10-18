@@ -192,7 +192,7 @@ export default function Profile() {
               t={t}
             />
           ) : (
-            <ProfileView profile={profile} user={user} />
+            <ProfileView profile={profile} user={user} t={t} />
           )}
         </div>
 
