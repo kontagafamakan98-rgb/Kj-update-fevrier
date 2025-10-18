@@ -251,7 +251,7 @@ function ProfileView({ profile }) {
   );
 }
 
-function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUser, loadUser, setPhotoRefreshKey }) {
+function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUser, loadUser, setPhotoRefreshKey, t }) {
   const [formData, setFormData] = useState({
     first_name: profile.first_name || '',
     last_name: profile.last_name || '',
