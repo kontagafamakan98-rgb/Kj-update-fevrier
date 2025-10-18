@@ -138,11 +138,11 @@ export default function Dashboard() {
           <div className="flex items-center mb-4">
             <span className="text-2xl mr-3">👑</span>
             <h2 className="text-xl font-semibold text-orange-900">
-              Accès Famakan Kontaga Master
+              {t('famakanAccess')}
             </h2>
           </div>
           <p className="text-sm text-orange-800 mb-4">
-            Fonctionnalités réservées exclusivement au propriétaire de l'application
+            {t('famakanDescription')}
           </p>
           
           <div className="flex flex-wrap gap-4">
