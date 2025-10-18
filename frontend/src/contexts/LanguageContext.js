@@ -958,6 +958,8 @@ const translations = {
     linkAccountsToComplete: 'Walasa ka i ka tɔgɔsɛbɛnni ban, i ka kan ka saraku jatebɔsɛbɛnw jɛmɛ',
     workerPaymentRequirement: 'I ni baarakɛla ye, i ka kan ka saraku fɛɛrɛ fila jɛmɛ walasa ka saraku sɔrɔ kiliyanw fɛ',
     clientPaymentRequirement: 'I ni kiliyan ye, i ka kan ka saraku fɛɛrɛ kelen jɛmɛ walasa ka baarakɛlaw sara',
+    paymentAccountsUpdated: 'Sara konte kura ye ka ɲi',
+    paymentAccountsLoadError: 'Sara konte dɔnni cogo la fili',
     
     // Jobs page
     allCategories: 'Sugu bɛɛ',
