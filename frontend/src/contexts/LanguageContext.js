@@ -649,6 +649,8 @@ const translations = {
     profilePhotoHelps: 'Nataal bu profil dafa ñu ko def ngir am nataal bu boole ci Kojo',
     professionalPhotoHelps: 'Nataal bu profil bu liggéeykat bi dafa yaqu kliyan yi te yaatu sa tànn',
     addProfilePhoto: 'Yokk nataal bu profil',
+    addPhoto: 'Yokk nataal',
+    changePhoto: 'Soppi nataal',
     clickToChoose: 'Bësal ngir tànn',
     tipsGoodPhoto: 'Làaj yu baax ngir nataal bu baax',
     useRecentPhoto: 'Jëfandikoo nataal bu bees te mu gëna baax',
