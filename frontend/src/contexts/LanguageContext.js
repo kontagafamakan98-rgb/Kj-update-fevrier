@@ -796,11 +796,33 @@ const translations = {
     
     // Famakan section
     famakanAccess: 'Famakan Kontaga Master ka sira',
-    famakanDescription: 'Jëfandikoo ku boole aplikaasio bi moom rekk',
-    testMobileFeatures: 'Seet jëfandikoo telefon',
-    createJobGPS: 'Sos liggéey ak GPS',
-    debugPhotos: 'Xalaat nataal yi',
-    commissionDashboard: 'Wàllu komisio',
+    famakanDescription: 'Fɛɛrɛw minnu bɛ aplikasiyon tigi ye dɔrɔn',
+    testMobileFeatures: 'Telefɔni ka fɛɛrɛw kɔrɔsi',
+    createJobGPS: 'Baara da GPS fɛ',
+    debugPhotos: 'Foto ɲɛnabɔli',
+    commissionDashboard: 'Komiisiyon ka jago',
+    
+    // Login/Register pages
+    noAccount: 'Jatebɔsɛbɛn tɛ?',
+    personalInformation: 'Mɔgɔ yɛrɛ ka kunnafoniw',
+    paymentAccounts: 'Saraku jatebɔsɛbɛnw',
+    phone: 'Telefɔni',
+    preferredLanguage: 'Kan dilenna',
+    verified: 'A tiɲɛna',
+    
+    // Jobs page
+    allCategories: 'Sugu bɛɛ',
+    allStatuses: 'Sigida bɛɛ',
+    search: 'Ɲinini',
+    reset: 'Kɔrɔsi',
+    noJobsFound: 'Baara si tɛ',
+    publishFirstJob: 'I ka baara fɔlɔ labɛn',
+    myJobs: 'N ka baaraw',
+    
+    // Messages page
+    noConversations: 'Kumaɲɔgɔnya tɛ',
+    startApplyingJobs: 'Baara ɲinini daminɛ',
+    selectConversation: 'Kumaɲɔgɔnya dɔ sugandi walasa ka daminɛ',
     
     // Login/Register pages
     noAccount: 'Amul kont?',
