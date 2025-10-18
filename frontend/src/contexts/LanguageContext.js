@@ -796,11 +796,34 @@ const translations = {
     
     // Famakan section
     famakanAccess: 'Famakan Kontaga Master ka sira',
-    famakanDescription: 'Fɛɛrɛw minnu bɛ aplikasiyon tigi ye dɔrɔn',
-    testMobileFeatures: 'Telefɔni ka fɛɛrɛw kɔrɔsi',
-    createJobGPS: 'Baara da GPS fɛ',
-    debugPhotos: 'Foto ɲɛnabɔli',
-    commissionDashboard: 'Komiisiyon ka jago',
+    famakanDescription: 'Jëfandikoo ku boole aplikaasio bi moom rekk',
+    testMobileFeatures: 'Seet jëfandikoo telefon',
+    createJobGPS: 'Sos liggéey ak GPS',
+    debugPhotos: 'Xalaat nataal yi',
+    commissionDashboard: 'Wàllu komisio',
+    
+    // Login/Register pages
+    noAccount: 'Amul kont?',
+    personalInformation: 'Kàddu yu moom',
+    paymentAccounts: 'Àkkont yu fey',
+    phone: 'Telefon',
+    preferredLanguage: 'Làkk bu bëgg',
+    verified: 'Xalaat na',
+    
+    // Jobs page
+    xët: 'Xët',
+    allCategories: 'Xët yépp',
+    allStatuses: 'Yëkku yépp', 
+    search: 'Soxla',
+    reset: 'Dellu',
+    noJobsFound: 'Liggéey amul',
+    publishFirstJob: 'Wax sa liggéey bu njëkk',
+    myJobs: 'Sama liggéey',
+    
+    // Messages page
+    noConversations: 'Waxtaan amul',
+    startApplyingJobs: 'Tàmbal ci liggéey yi',
+    selectConversation: 'Tànn ab waxtaan ngir tambali',
     
     // Categories
     plumbing: 'Ji baara',
