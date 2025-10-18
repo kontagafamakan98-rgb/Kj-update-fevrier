@@ -124,8 +124,8 @@ export default function Jobs() {
           </h1>
           <p className="text-gray-600 mt-1">
             {user.user_type === 'client' 
-              ? 'Gérez vos offres d\'emploi et suivez les candidatures' 
-              : 'Découvrez des opportunités dans votre région'
+              ? t('manageJobOffers') 
+              : t('discoverOpportunities')
             }
           </p>
         </div>
