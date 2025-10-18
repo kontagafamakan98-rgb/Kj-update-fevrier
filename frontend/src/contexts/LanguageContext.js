@@ -601,6 +601,21 @@ const translations = {
     verified: 'Xalaat na',
     no: 'Déédéet',
     
+    // Jobs page
+    allCategories: 'Wàcc yépp',
+    allStatuses: 'Sigida yépp',
+    search: 'Soxla',
+    reset: 'Delloo',
+    noJobsFound: 'Liggéey amul',
+    publishFirstJob: 'Tàmbal ak sa liggéey bu njëkk',
+    myJobs: 'Sama liggéey',
+    availableJobs: 'Liggéey yu am',
+    
+    // Messages page
+    noConversations: 'Waxtaan amul',
+    startApplyingJobs: 'Tàmbal ak dàgg-dàgg ci liggéey yi',
+    selectConversation: 'Tànn waxtaan ngir tàmbal',
+    
     // Categories
     plumbing: 'Ndox',
     electrical: 'Mbër',
