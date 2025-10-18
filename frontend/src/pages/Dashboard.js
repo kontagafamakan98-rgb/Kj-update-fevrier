@@ -198,7 +198,7 @@ export default function Dashboard() {
       {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Actions rapides</h2>
+          <h2 className="text-lg font-medium text-gray-900">{t('quickActions')}</h2>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
