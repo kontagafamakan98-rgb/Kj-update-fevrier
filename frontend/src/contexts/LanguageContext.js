@@ -521,6 +521,29 @@ const translations = {
     countriesCovered: 'Réew yi daję',
     customerSupport: 'Ndimbal kliyan',
     
+    // Dashboard section
+    welcomeUser: 'Dalal ak jamm,',
+    manageProjectsClient: 'Yëgle sa projet yi te soxla liggéeykat yu gëna baax',
+    discoverOpportunitiesWorker: 'Soxla tey yu bees ci liggéey',
+    activeJobs: 'Liggéey yu liggéey',
+    completedJobs: 'Liggéey yi jeex',
+    totalJobs: 'Liggéey yépp',
+    totalEarnings: 'Àrte yépp',
+    quickActions: 'Jëf yu gaaw',
+    searchJobs: 'Soxla',
+    workerProfile: 'Liggéeykat am',
+    languagesPayments: 'Làkk ak fey',
+    publicFeature: 'Jëfandikoo ak këpp',
+    popularCategories: 'Xët yu bari',
+    
+    // Famakan section
+    famakanAccess: 'Moom Famakan Kontaga Master',
+    famakanDescription: 'Jëfandikoo ku boole aplikaasio bi moom rekk',
+    testMobileFeatures: 'Seet jëfandikoo telefon',
+    createJobGPS: 'Sos liggéey ak GPS',
+    debugPhotos: 'Xalaat nataal yi',
+    commissionDashboard: 'Wàllu komisio',
+    
     // Categories
     plumbing: 'Ndox',
     electrical: 'Mbër',
