@@ -49,8 +49,9 @@
 ##
 test_plan:
   current_focus:
-    - "Dashboard Translations Verification - All Languages Working Perfectly"
-  stuck_tasks: []
+    - "Critical Language System Translation Issues"
+  stuck_tasks:
+    - "Critical Language System Translation Issues"
   test_all: false
   test_priority: "high_first"
 ##
