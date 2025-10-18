@@ -170,7 +170,7 @@ export default function Profile() {
         {/* Basic Profile */}
         <div className="px-6 py-6 border-b border-gray-200">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Informations personnelles</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{t('personalInformation')}</h2>
             <button
               onClick={() => setIsEditing(!isEditing)}
               className="text-orange-600 hover:text-orange-700 font-medium"
