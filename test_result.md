@@ -388,6 +388,18 @@ backend:
         comment: "🎉 TEST FINAL - VÉRIFICATION DES CORRECTIONS D'ERREURS CRITIQUES COMPLÈTEMENT RÉUSSIE! Conducted comprehensive verification of all critical error corrections as specifically requested in French review. RÉSULTATS PARFAITS (10/10 tests passed - 100% success rate): (1) ✅ CORRECTION VALIDATIONERROR CONFIRMÉE: /api/auth/register endpoint now correctly returns 422 status with French error messages instead of 500 - tested 'Prénom trop court' (first_name='a') returns 'Le prénom doit contenir au moins 2 caractères', 'Nom trop court' (last_name='b') returns 'Le nom doit contenir au moins 2 caractères', all validation errors properly handled with JSON responses, (2) ✅ SÉCURITÉ EMAIL CONFIRMÉE: All dangerous email patterns correctly rejected - SQL injection 'admin'/**/OR/**/1=1#@test.com' rejected with 500, dangerous characters '*', '/', '#' all rejected, SQL keywords 'INSERT', 'SELECT' patterns rejected, email sanitization working perfectly, (3) ✅ TEST DE RÉGRESSION RÉUSSI: Normal registrations working perfectly - 'jean.dupont.{timestamp}@example.com' with valid data returns 200 with access token, all basic endpoints (health, stats, root) working with <2s performance, (4) ✅ VALIDATION GLOBALE CONFIRMÉE: All endpoints performing <2s as required, health check (0.03s), statistics (0.03s), root endpoint (0.02s), 100% functionality without critical errors confirmed. OBJECTIF ATTEINT: 100% de réussite sur tous les tests critiques! Les deux erreurs identifiées (ValidationError 500→422 et sécurité email) sont complètement résolues. Messages d'erreur appropriés en français confirmés. Performance <2s sur tous endpoints confirmée. Backend prêt pour production avec corrections critiques appliquées avec succès."
 
 frontend:
+  - task: "Translation Corrections Verification - Specific Issues"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/PaymentAccountsManager.js, /app/frontend/src/pages/Jobs.js, /app/frontend/src/contexts/LanguageContext.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "MISSION CRITIQUE: Vérifier les corrections spécifiques des problèmes de traduction signalés par l'utilisateur. TEST PRIORITAIRES: (1) Bouton 'Modifier' sur page comptes de paiement doit changer vers 'Edit' en anglais, (2) Titre page Jobs doit changer de 'Mes emplois'/'Emplois disponibles' vers 'My Jobs'/'Available Jobs', (3) Dropdown statuts jobs doit traduire 'Statut'→'Status', 'Tous les statuts'→'All Statuses', 'Ouvert'→'Open', 'En cours'→'In Progress', 'Complété'→'Completed', 'Annulé'→'Cancelled'. Objectif: 100% correction des 3 problèmes identifiés."
+
   - task: "Critical Language System Translation Issues"
     implemented: false
     working: false
