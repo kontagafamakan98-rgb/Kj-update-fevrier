@@ -243,7 +243,7 @@ function ProfileView({ profile }) {
           <span className={`px-2 py-1 text-xs rounded-full ${
             profile.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
           }`}>
-            {profile.is_verified ? 'Vérifié' : 'Non vérifié'}
+            {profile.is_verified ? t('verified') : `${t('no')} ${t('verified').toLowerCase()}`}
           </span>
         </p>
       </div>
