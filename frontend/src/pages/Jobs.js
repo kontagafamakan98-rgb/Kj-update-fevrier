@@ -145,7 +145,7 @@ export default function Jobs() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rechercher
+              {t('search')}
             </label>
             <input
               type="text"
