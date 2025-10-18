@@ -175,7 +175,7 @@ export default function Profile() {
               onClick={() => setIsEditing(!isEditing)}
               className="text-orange-600 hover:text-orange-700 font-medium"
             >
-              {isEditing ? 'Annuler' : 'Modifier'}
+              {isEditing ? t('cancel') : t('edit')}
             </button>
           </div>
 
