@@ -213,6 +213,8 @@ const translations = {
     // Profile Photo Upload
     profilePhotoOptional: 'Photo de Profil (Optionnel)',
     addProfilePhoto: 'Ajouter une photo de profil',
+    addPhoto: 'Ajouter une photo',
+    changePhoto: 'Changer la photo',
     clickToChooseOption: 'Cliquez pour choisir une option',
     chooseFromGallery: 'Choisir depuis la galerie',
     selectExistingPhoto: 'Sélectionner une photo existante',
