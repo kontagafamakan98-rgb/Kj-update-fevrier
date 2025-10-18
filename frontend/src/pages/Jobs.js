@@ -120,7 +120,7 @@ export default function Jobs() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {user.user_type === 'client' ? 'Mes emplois' : 'Emplois disponibles'}
+            {user.user_type === 'client' ? t('myJobs') : t('availableJobs')}
           </h1>
           <p className="text-gray-600 mt-1">
             {user.user_type === 'client' 
