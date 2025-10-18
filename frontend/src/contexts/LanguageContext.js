@@ -945,8 +945,15 @@ const translations = {
     accountsLinked: 'jatebɔsɛbɛn minnu jɛmalen don',
     modify: 'Yɛlɛma',
     
-    // Geolocation messages
+    // Geolocationments
     ivoryCoastPreference: 'Côte d\'Ivoire, baara kɛla fanba bɛ Faransikan diya',
+    
+    // Payment verification page
+    paymentVerification: 'Saraku jatebɔsɛbɛnw kɔlɔsi',
+    lastStep: 'Laban laban',
+    linkAccountsToComplete: 'Walasa ka i ka tɔgɔsɛbɛnni ban, i ka kan ka saraku jatebɔsɛbɛnw jɛmɛ',
+    workerPaymentRequirement: 'I ni baarakɛla ye, i ka kan ka saraku fɛɛrɛ fila jɛmɛ walasa ka saraku sɔrɔ kiliyanw fɛ',
+    clientPaymentRequirement: 'I ni kiliyan ye, i ka kan ka saraku fɛɛrɛ kelen jɛmɛ walasa ka baarakɛlaw sara',
     
     // Jobs page
     allCategories: 'Sugu bɛɛ',
