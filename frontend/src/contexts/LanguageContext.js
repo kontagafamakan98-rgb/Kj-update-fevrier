@@ -1007,6 +1007,16 @@ const translations = {
     myJobs: 'N ka baaraw',
     availableJobs: 'Baara minnu bɛ yen',
     
+    // Job status translations
+    open: 'Da wuli',
+    inProgress: 'Ka kɛ',
+    completed: 'A ban',
+    cancelled: 'A bɔra',
+    
+    // Job page descriptions
+    manageJobOffers: 'I ka baara dila ɲɛmɔgɔya ani kandidaw nɔfɛ',
+    discoverOpportunities: 'I ka sigida kɔnɔ cogo ɲumanw ɲinini',
+    
     // Messages page
     noConversations: 'Kumaɲɔgɔnya tɛ',
     startApplyingJobs: 'Baara ɲinini daminɛ',
