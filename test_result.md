@@ -49,7 +49,7 @@
 ##
 test_plan:
   current_focus:
-    - "Audit Complet du Frontend Kojo - Détection et Résolution de Toutes les Erreurs"
+    - "Dashboard Translations Verification - All Languages Working Perfectly"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
