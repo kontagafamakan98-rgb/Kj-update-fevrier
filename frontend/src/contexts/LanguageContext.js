@@ -422,6 +422,8 @@ const translations = {
     linkAccountsToComplete: 'To complete your registration, you must link your payment accounts',
     workerPaymentRequirement: 'As a worker, you must link at least 2 payment methods to receive payments from clients',
     clientPaymentRequirement: 'As a client, you must link at least 1 payment method to make payments to workers',
+    paymentAccountsUpdated: 'Payment accounts updated successfully',
+    paymentAccountsLoadError: 'Error loading payment accounts',
     
     // Jobs page
     allCategories: 'All Categories',
