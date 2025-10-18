@@ -153,7 +153,7 @@ const PaymentVerificationPage = () => {
             
             <div className="text-sm text-blue-800 space-y-2">
               <p>
-                <strong>Dernière étape:</strong> Pour finaliser votre inscription, vous devez lier vos comptes de paiement.
+                <strong>{t('lastStep')}:</strong> {t('linkAccountsToComplete')}
               </p>
               <p>
                 {userData.user_type === 'worker' 
