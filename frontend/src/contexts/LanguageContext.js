@@ -639,6 +639,25 @@ const translations = {
     verified: 'Xalaat na',
     no: 'Déédéet',
     
+    // Photo upload section
+    profilePhotoHelps: 'Nataal bu profil dafa ñu ko def ngir am nataal bu boole ci Kojo',
+    addProfilePhoto: 'Yokk nataal bu profil',
+    clickToChoose: 'Bësal ngir tànn',
+    tipsGoodPhoto: 'Làaj yu baax ngir nataal bu baax',
+    useRecentPhoto: 'Jëfandikoo nataal bu bees te mu gëna baax',
+    lookCamera: 'Gis kameraw bi te bës',
+    avoidGroup: 'Ñaanal nataal yu bari wala ak lunettes soleil',
+    neutralBackground: 'Ginaw bu dëgg la gëna baax',
+    
+    // Payment accounts section
+    minimumRequired: 'Minimum yu bëgg',
+    accountRequired: 'konte (ngir fey)',
+    accountsLinked: 'konte yu jëmme',
+    modify: 'Soppi',
+    
+    // Geolocation messages
+    ivoryCoastPreference: 'Ci Côte d\'Ivoire, lu bare ci jëfandikukat yi dañu bëgg Farañse',
+    
     // Jobs page
     allCategories: 'Wàcc yépp',
     allStatuses: 'Sigida yépp',
