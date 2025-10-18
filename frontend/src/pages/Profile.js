@@ -230,7 +230,7 @@ function ProfileView({ profile }) {
         <p className="mt-1 text-gray-900">{profile.email}</p>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700">Téléphone</label>
+        <label className="block text-sm font-medium text-gray-700">{t('phone')}</label>
         <p className="mt-1 text-gray-900">{profile.phone}</p>
       </div>
       <div>
