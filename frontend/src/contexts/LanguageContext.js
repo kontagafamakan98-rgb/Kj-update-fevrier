@@ -161,6 +161,7 @@ const translations = {
     noJobsFound: 'Aucun emploi trouvé',
     publishFirstJob: 'Commencez par publier votre premier emploi',
     myJobs: 'Mes emplois',
+    jobs: 'Emplois',
     availableJobs: 'Emplois disponibles',
     
     // Messages page
