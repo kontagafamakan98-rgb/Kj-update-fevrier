@@ -230,7 +230,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Comptes de Paiement</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{t('paymentAccounts')}</h2>
           <p className="text-sm text-gray-600 mt-1">
             {user?.user_type === 'worker' 
               ? `Minimum requis: ${getRequiredMinimum()} comptes (pour recevoir les paiements)`
