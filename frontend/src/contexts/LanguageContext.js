@@ -590,6 +590,15 @@ const translations = {
     debugPhotos: 'Xalaat nataal yi',
     commissionDashboard: 'Wàllu komisio',
     
+    // Login/Register pages
+    noAccount: 'Amul konte?',
+    personalInformation: 'Xet yu boole',
+    paymentAccounts: 'Konte fey',
+    phone: 'Telefon',
+    preferredLanguage: 'Làkk bu baax',
+    verified: 'Xalaat na',
+    no: 'Déédéet',
+    
     // Categories
     plumbing: 'Ndox',
     electrical: 'Mbër',
