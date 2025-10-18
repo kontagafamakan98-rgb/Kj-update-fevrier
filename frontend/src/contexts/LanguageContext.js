@@ -12,6 +12,17 @@ const translations = {
     // Navigation
     home: 'Accueil',
     jobs: 'Emplois',
+    
+    // Job status translations
+    open: 'Ouvert',
+    inProgress: 'En cours',
+    completed: 'Complété',
+    cancelled: 'Annulé',
+    
+    // Job page descriptions
+    manageJobOffers: 'Gérez vos offres d\'emploi et suivez les candidatures',
+    discoverOpportunities: 'Découvrez des opportunités dans votre région',
+    
     messages: 'Messages',
     profile: 'Profil',
     dashboard: 'Tableau de bord',
