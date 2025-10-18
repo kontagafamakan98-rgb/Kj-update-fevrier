@@ -824,29 +824,6 @@ const translations = {
     startApplyingJobs: 'Baara ɲinini daminɛ',
     selectConversation: 'Kumaɲɔgɔnya dɔ sugandi walasa ka daminɛ',
     
-    // Login/Register pages
-    noAccount: 'Amul kont?',
-    personalInformation: 'Kàddu yu moom',
-    paymentAccounts: 'Àkkont yu fey',
-    phone: 'Telefon',
-    preferredLanguage: 'Làkk bu bëgg',
-    verified: 'Xalaat na',
-    
-    // Jobs page
-    xët: 'Xët',
-    allCategories: 'Xët yépp',
-    allStatuses: 'Yëkku yépp', 
-    search: 'Soxla',
-    reset: 'Dellu',
-    noJobsFound: 'Liggéey amul',
-    publishFirstJob: 'Wax sa liggéey bu njëkk',
-    myJobs: 'Sama liggéey',
-    
-    // Messages page
-    noConversations: 'Waxtaan amul',
-    startApplyingJobs: 'Tàmbal ci liggéey yi',
-    selectConversation: 'Tànn ab waxtaan ngir tambali',
-    
     // Categories
     plumbing: 'Ji baara',
     electrical: 'Kuran baara',
