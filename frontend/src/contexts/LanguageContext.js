@@ -847,6 +847,7 @@ const translations = {
     noJobsFound: 'Baara si tɛ',
     publishFirstJob: 'I ka baara fɔlɔ labɛn',
     myJobs: 'N ka baaraw',
+    availableJobs: 'Baara minnu bɛ yen',
     
     // Messages page
     noConversations: 'Kumaɲɔgɔnya tɛ',
