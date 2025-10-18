@@ -307,6 +307,29 @@ const translations = {
     countriesCovered: 'Countries Covered',
     customerSupport: 'Customer Support',
     
+    // Dashboard section
+    welcomeUser: 'Welcome,',
+    manageProjectsClient: 'Manage your projects and find qualified workers',
+    discoverOpportunitiesWorker: 'Discover new work opportunities',
+    activeJobs: 'Active Jobs',
+    completedJobs: 'Completed Jobs',
+    totalJobs: 'Total Jobs',
+    totalEarnings: 'Total Earnings',
+    quickActions: 'Quick Actions',
+    searchJobs: 'Search',
+    workerProfile: 'Worker Profile',
+    languagesPayments: 'Languages & Payments',
+    publicFeature: 'Public feature',
+    popularCategories: 'Popular Categories',
+    
+    // Famakan section
+    famakanAccess: 'Famakan Kontaga Master Access',
+    famakanDescription: 'Features reserved exclusively for the application owner',
+    testMobileFeatures: 'Test Mobile Features',
+    createJobGPS: 'Create Job with GPS',
+    debugPhotos: 'Debug Photos',
+    commissionDashboard: 'Commission Dashboard',
+    
     // Categories
     plumbing: 'Plumbing',
     electrical: 'Electrical',
