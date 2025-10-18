@@ -446,6 +446,17 @@ const translations = {
     publishFirstJob: 'Start by publishing your first job',
     myJobs: 'My Jobs',
     jobs: 'Jobs',
+    
+    // Job status translations
+    open: 'Open',
+    inProgress: 'In Progress',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+    
+    // Job page descriptions
+    manageJobOffers: 'Manage your job offers and track applications',
+    discoverOpportunities: 'Discover opportunities in your area',
+    
     availableJobs: 'Available Jobs',
     
     // Messages page
