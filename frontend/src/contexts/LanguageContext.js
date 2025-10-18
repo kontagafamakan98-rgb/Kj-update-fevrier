@@ -901,6 +901,7 @@ const translations = {
     
     // Photo upload section
     profilePhotoHelps: 'Profil ja bɛ dɛmɛ ka i ka ko kɛcogo ɲɛ Kojo kan',
+    professionalPhotoHelps: 'Profil ja ɲuman bɛ kiliyanw ka dannaya yiriwa ani i ka sugandi cogoya ɲɛ',
     addProfilePhoto: 'Profil ja fara a kan',
     clickToChoose: 'Kliki walasa ka fɛɛrɛ dɔ sugandi',
     tipsGoodPhoto: 'Ja ɲuman kɛcogo',
