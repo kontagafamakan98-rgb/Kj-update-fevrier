@@ -726,6 +726,16 @@ const translations = {
     myJobs: 'Sama liggéey',
     availableJobs: 'Liggéey yu am',
     
+    // Job status translations
+    open: 'Ubbi',
+    inProgress: 'Ci liggéey',
+    completed: 'Jeex na',
+    cancelled: 'Neebal',
+    
+    // Job page descriptions
+    manageJobOffers: 'Yëgle sa liggéey yi te suqali yeneen',
+    discoverOpportunities: 'Soxla tey yu am ci sa cornur',
+    
     // Messages page
     noConversations: 'Waxtaan amul',
     startApplyingJobs: 'Tàmbal ak dàgg-dàgg ci liggéey yi',
