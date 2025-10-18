@@ -382,6 +382,25 @@ const translations = {
     verified: 'Verified',
     no: 'No',
     
+    // Photo upload section
+    profilePhotoHelps: 'A profile photo helps personalize your experience on Kojo',
+    addProfilePhoto: 'Add a profile photo',
+    clickToChoose: 'Click to choose an option',
+    tipsGoodPhoto: 'Tips for a good photo',
+    useRecentPhoto: 'Use a recent and clear photo',
+    lookCamera: 'Look at the camera and smile naturally',
+    avoidGroup: 'Avoid group photos or sunglasses',
+    neutralBackground: 'A neutral background is preferable',
+    
+    // Payment accounts section
+    minimumRequired: 'Minimum required',
+    accountRequired: 'account (to make payments)',
+    accountsLinked: 'accounts linked',
+    modify: 'Edit',
+    
+    // Geolocation messages
+    ivoryCoastPreference: 'In Ivory Coast, most users prefer French',
+    
     // Jobs page
     allCategories: 'All Categories',
     allStatuses: 'All Statuses',
