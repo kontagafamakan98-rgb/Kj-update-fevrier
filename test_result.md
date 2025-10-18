@@ -49,9 +49,8 @@
 ##
 test_plan:
   current_focus:
-    - "Critical Language System Translation Issues"
-  stuck_tasks:
-    - "Critical Language System Translation Issues"
+    - "Profile Page 't is not defined' Error Correction"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 ##
