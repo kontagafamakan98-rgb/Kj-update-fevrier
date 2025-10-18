@@ -276,8 +276,8 @@ export default function Dashboard() {
                 </svg>
               </div>
               <div>
-                <span className="font-medium text-gray-900">🌍 Langues & Paiements</span>
-                <p className="text-xs text-gray-500 mt-1">Fonctionnalité publique</p>
+                <span className="font-medium text-gray-900">🌍 {t('languagesPayments')}</span>
+                <p className="text-xs text-gray-500 mt-1">{t('publicFeature')}</p>
               </div>
             </Link>
           </div>
