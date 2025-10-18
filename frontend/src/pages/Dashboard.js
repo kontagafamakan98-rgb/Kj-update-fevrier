@@ -287,7 +287,7 @@ export default function Dashboard() {
       {/* Popular Categories */}
       <div className="bg-white rounded-lg shadow mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Catégories populaires</h2>
+          <h2 className="text-lg font-medium text-gray-900">{t('popularCategories')}</h2>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
