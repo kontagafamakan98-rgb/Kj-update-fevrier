@@ -138,7 +138,7 @@ export default function Messages() {
                 </svg>
                 <p className="mt-2 text-sm">{t('noConversations')}</p>
                 <p className="text-xs text-gray-400">
-                  Commencez à postuler à des emplois pour démarrer des conversations
+                  {t('startApplyingJobs')}
                 </p>
               </div>
             )}
