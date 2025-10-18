@@ -735,6 +735,29 @@ const translations = {
     countriesCovered: 'Jamana minnu kɔrɔ',
     customerSupport: 'Kiliyan dɛmɛni',
     
+    // Dashboard section
+    welcomeUser: 'I ni ce,',
+    manageProjectsClient: 'I ka porozɛw ɲɛmɔgɔya ani baarakɛla ɲumanw ɲinini',
+    discoverOpportunitiesWorker: 'Baara kura cogo ɲumanw ɲinini',
+    activeJobs: 'Baara baarakɛlaw',
+    completedJobs: 'Baara dafalen',
+    totalJobs: 'Baara bɛɛ',
+    totalEarnings: 'Sara bɛɛ',
+    quickActions: 'Ɲɛmɔgɔya teliya',
+    searchJobs: 'Ɲinini',
+    workerProfile: 'Baarakɛla ka kunnafoni',
+    languagesPayments: 'Kan ni sara',
+    publicFeature: 'Foroba ka fɛɛrɛ',
+    popularCategories: 'Sugu dilennw',
+    
+    // Famakan section
+    famakanAccess: 'Famakan Kontaga Master ka sira',
+    famakanDescription: 'Fɛɛrɛw minnu bɛ aplikasiyon tigi ye dɔrɔn',
+    testMobileFeatures: 'Telefɔni ka fɛɛrɛw kɔrɔsi',
+    createJobGPS: 'Baara da GPS fɛ',
+    debugPhotos: 'Foto ɲɛnabɔli',
+    commissionDashboard: 'Komiisiyon ka jago',
+    
     // Categories
     plumbing: 'Ji baara',
     electrical: 'Kuran baara',
