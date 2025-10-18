@@ -126,6 +126,7 @@ const translations = {
     
     // Photo upload section
     profilePhotoHelps: 'Une photo de profil aide à personnaliser votre expérience sur Kojo',
+    professionalPhotoHelps: 'Une photo de profil professionnelle augmente la confiance des clients et améliore vos chances d\'être sélectionné',
     addProfilePhoto: 'Ajouter une photo de profil',
     clickToChoose: 'Cliquez pour choisir une option',
     tipsGoodPhoto: 'Conseils pour une bonne photo',
