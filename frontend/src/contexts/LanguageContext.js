@@ -150,6 +150,8 @@ const translations = {
     linkAccountsToComplete: 'Pour finaliser votre inscription, vous devez lier vos comptes de paiement',
     workerPaymentRequirement: 'En tant que travailleur, vous devez lier au minimum 2 moyens de paiement pour recevoir vos paiements des clients',
     clientPaymentRequirement: 'En tant que client, vous devez lier au moins 1 moyen de paiement pour effectuer vos paiements aux travailleurs',
+    paymentAccountsUpdated: 'Comptes de paiement mis à jour avec succès',
+    paymentAccountsLoadError: 'Erreur lors du chargement des comptes de paiement',
     
     // Jobs page
     allCategories: 'Toutes les catégories',
