@@ -89,7 +89,7 @@ export default function Jobs() {
   };
 
   const categories = [
-    { value: '', label: 'Toutes les catégories' },
+    { value: '', label: t('allCategories') },
     { value: 'plumbing', label: t('plumbing') },
     { value: 'electrical', label: t('electrical') },
     { value: 'construction', label: t('construction') },
