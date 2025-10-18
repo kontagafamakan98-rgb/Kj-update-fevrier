@@ -211,7 +211,7 @@ export default function Jobs() {
             <h3 className="mt-2 text-sm font-medium text-gray-900">{t('noJobsFound')}</h3>
             <p className="mt-1 text-sm text-gray-500">
               {user.user_type === 'client' 
-                ? 'Commencez par publier votre premier emploi.' 
+                ? t('publishFirstJob') 
                 : 'Essayez de modifier vos critères de recherche.'
               }
             </p>
