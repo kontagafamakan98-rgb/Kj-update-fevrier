@@ -106,7 +106,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total jobs</p>
+              <p className="text-sm font-medium text-gray-600">{t('totalJobs')}</p>
               <p className="text-2xl font-bold text-gray-900">{stats.totalJobs}</p>
             </div>
             <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
