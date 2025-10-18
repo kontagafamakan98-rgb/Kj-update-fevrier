@@ -70,7 +70,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       }
     } catch (error) {
       safeLog.error('Erreur chargement comptes:', error);
-      setError('Erreur lors du chargement des comptes de paiement');
+      setError(t('paymentAccountsLoadError'));
     } finally {
       setLoading(false);
     }
