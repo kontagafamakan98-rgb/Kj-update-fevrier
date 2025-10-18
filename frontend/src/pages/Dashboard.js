@@ -66,10 +66,10 @@ export default function Dashboard() {
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
-          Bienvenue, {user.first_name}!
+          {t('welcomeUser')} {user.first_name}!
         </h1>
         <p className="text-gray-600 mt-1">
-          {user.user_type === 'client' ? 'Gérez vos projets et trouvez des travailleurs qualifiés' : 'Découvrez de nouvelles opportunités de travail'}
+          {user.user_type === 'client' ? t('manageProjectsClient') : t('discoverOpportunitiesWorker')}
         </p>
       </div>
 
