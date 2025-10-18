@@ -105,8 +105,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
       
       <p className="text-sm text-gray-600 mb-4">
         {userType === 'worker' 
-          ? 'Une photo de profil professionnelle augmente la confiance des clients et améliore vos chances d\'être sélectionné.'
-          : 'Une photo de profil aide à personnaliser votre expérience sur Kojo.'
+          ? t('professionalPhotoHelps') || 'Une photo de profil professionnelle augmente la confiance des clients et améliore vos chances d\'être sélectionné.'
+          : t('profilePhotoHelps')
         }
       </p>
 
