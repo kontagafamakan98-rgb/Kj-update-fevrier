@@ -401,7 +401,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUs
 
         <div>
           <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">
-            Langue préférée
+            {t('preferredLanguage')}
           </label>
           <select
             id="preferred_language"
