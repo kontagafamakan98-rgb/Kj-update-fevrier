@@ -896,6 +896,25 @@ const translations = {
     verified: 'A tiɲɛna',
     no: 'Ayi',
     
+    // Photo upload section
+    profilePhotoHelps: 'Profil ja bɛ dɛmɛ ka i ka ko kɛcogo ɲɛ Kojo kan',
+    addProfilePhoto: 'Profil ja fara a kan',
+    clickToChoose: 'Kliki walasa ka fɛɛrɛ dɔ sugandi',
+    tipsGoodPhoto: 'Ja ɲuman kɛcogo',
+    useRecentPhoto: 'Ja kɔrɔ ani jɛlen baara kɛ',
+    lookCamera: 'Kameraw lajɛ ani nisɔndiya ɲuman kɛ',
+    avoidGroup: 'Jama ja walima finitigiw ja tɛmɛ',
+    neutralBackground: 'Kɔfɛ jɛlen ka ɲi',
+    
+    // Payment accounts section
+    minimumRequired: 'Minimum min mako',
+    accountRequired: 'jatebɔsɛbɛn (walasa ka sara kɛ)',
+    accountsLinked: 'jatebɔsɛbɛn minnu jɛmalen don',
+    modify: 'Yɛlɛma',
+    
+    // Geolocation messages
+    ivoryCoastPreference: 'Côte d\'Ivoire, baara kɛla fanba bɛ Faransikan diya',
+    
     // Jobs page
     allCategories: 'Sugu bɛɛ',
     allStatuses: 'Sigida bɛɛ',
