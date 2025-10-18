@@ -352,6 +352,28 @@ const translations = {
     debugPhotos: 'Debug Photos',
     commissionDashboard: 'Commission Dashboard',
     
+    // Login/Register pages
+    noAccount: 'No account?',
+    personalInformation: 'Personal Information',
+    paymentAccounts: 'Payment Accounts',
+    phone: 'Phone',
+    preferredLanguage: 'Preferred Language',
+    verified: 'Verified',
+    
+    // Jobs page
+    allCategories: 'All Categories',
+    allStatuses: 'All Statuses',
+    search: 'Search',
+    reset: 'Reset',
+    noJobsFound: 'No jobs found',
+    publishFirstJob: 'Start by publishing your first job',
+    myJobs: 'My Jobs',
+    
+    // Messages page
+    noConversations: 'No conversations',
+    startApplyingJobs: 'Start applying to jobs',
+    selectConversation: 'Select a conversation to start',
+    
     // Categories
     plumbing: 'Plumbing',
     electrical: 'Electrical',
