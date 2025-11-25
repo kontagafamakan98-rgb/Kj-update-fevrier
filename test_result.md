@@ -49,7 +49,7 @@
 ##
 test_plan:
   current_focus:
-    - "Profile Page 't is not defined' Error Correction"
+    - "AUDIT FINAL OPTIMISATIONS AFRIQUE DE L'OUEST - FRONTEND"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
