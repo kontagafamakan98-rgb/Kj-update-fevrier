@@ -153,7 +153,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       {/* Photo Preview */}
       <div className="mb-4 text-center">
         <div className="relative inline-block">
-          <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden shadow-lg">
+          <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden border-4 border-white shadow-lg">
             {loading ? (
               <div className="w-full h-full bg-gray-100 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
