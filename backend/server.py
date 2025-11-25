@@ -519,30 +519,42 @@ def validate_orange_money_number(number: str) -> bool:
             
         # Nettoyage et validation basique
         clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
+        logger.debug(f"Orange Money validation - Original: {number}, Cleaned: {clean_number}")
         
         if len(clean_number) < 11 or len(clean_number) > 12:
-            logger.info(f"Orange Money number length invalid: {len(clean_number)} digits")
+            logger.info(f"Orange Money number length invalid: {len(clean_number)} digits for {clean_number}")
             return False
         
         country_code = clean_number[:3]
         operator_prefix = clean_number[3:5]
+        logger.debug(f"Orange Money validation - Country: {country_code}, Prefix: {operator_prefix}")
         
         if country_code not in KOJO_PRIORITY_COUNTRIES:
             logger.info(f"Orange Money not supported for country code: {country_code}")
             return False
             
-        valid_prefixes = KOJO_PRIORITY_COUNTRIES[country_code]['orange_prefixes']
+        # Vérification sécurisée des préfixes
+        country_data = KOJO_PRIORITY_COUNTRIES.get(country_code, {})
+        valid_prefixes = country_data.get('orange_prefixes', [])
+        
+        if not valid_prefixes:
+            logger.error(f"No Orange Money prefixes defined for country {country_code}")
+            return False
+            
         is_valid = operator_prefix in valid_prefixes
         
         if not is_valid:
-            logger.info(f"Invalid Orange Money prefix {operator_prefix} for country {country_code}")
+            logger.info(f"Invalid Orange Money prefix {operator_prefix} for country {country_code}. Valid: {valid_prefixes[:5]}...")
         else:
-            logger.info(f"Valid Orange Money number validated for {KOJO_PRIORITY_COUNTRIES[country_code]['country']}")
+            logger.info(f"✅ Valid Orange Money number validated for {country_data.get('country', country_code)}")
             
         return is_valid
         
+    except KeyError as e:
+        logger.error(f"KeyError in Orange Money validation: {e}")
+        return False
     except Exception as e:
-        logger.error(f"Error validating Orange Money number: {e}")
+        logger.error(f"Unexpected error validating Orange Money number: {e}")
         return False
 
 def validate_wave_number(number: str) -> bool:
