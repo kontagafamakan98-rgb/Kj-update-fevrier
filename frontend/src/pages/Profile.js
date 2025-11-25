@@ -138,7 +138,7 @@ export default function Profile() {
               size={80}
               editable={false}
               showEditButton={false}
-              className="border-2 border-white"
+              className=""
             />
             <div className="ml-6">
               <h1 className="text-2xl font-bold text-white">
