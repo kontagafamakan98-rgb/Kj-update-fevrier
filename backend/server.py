@@ -81,6 +81,9 @@ OWNER_USER_ID = 'famakan_kontaga_master_2024'  # ID unique pour Famakan
 # Create the main app without a prefix
 app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & Senegal")
 
+# Middleware pour compression gzip (optimisation réseaux lents Afrique de l'Ouest)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
