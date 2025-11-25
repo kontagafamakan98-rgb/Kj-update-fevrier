@@ -232,16 +232,43 @@ class User(BaseModel):
     
     @validator('phone')
     def validate_phone(cls, v):
-        """Nettoie et valide le numéro de téléphone"""
+        """Nettoie et valide le numéro de téléphone pour l'Afrique de l'Ouest"""
         if not v:
             raise ValueError("Le numéro de téléphone est requis")
         
         # Nettoyer le numéro - supprimer espaces, tirets, parenthèses
         clean_phone = re.sub(r'[\s\-\(\)]', '', v)
         
-        # Vérifier le format international
-        if not re.match(r'^\+\d{1,4}\d{8,12}$', clean_phone):
-            raise ValueError("Le numéro de téléphone doit être au format international (+XXX...)")
+        # Vérifier le format international de base
+        if not clean_phone.startswith('+'):
+            raise ValueError("Le numéro de téléphone doit commencer par +")
+        
+        # Extraire les chiffres seulement
+        digits_only = ''.join(filter(str.isdigit, clean_phone))
+        
+        # Vérifier que c'est un pays ouest-africain supporté
+        west_african_codes = ['221', '223', '225', '226']  # Sénégal, Mali, Côte d'Ivoire, Burkina Faso
+        
+        valid_country = False
+        for code in west_african_codes:
+            if digits_only.startswith(code):
+                valid_country = True
+                # Vérifier la longueur totale (code pays + numéro)
+                if len(digits_only) < 11 or len(digits_only) > 12:
+                    raise ValueError(f"Numéro {code} doit contenir 8-9 chiffres après l'indicatif pays")
+                
+                # Vérifier que le préfixe opérateur est valide (70-99 pour Orange/Wave)
+                if len(digits_only) >= 5:
+                    operator_prefix = digits_only[3:5]
+                    if not (70 <= int(operator_prefix) <= 99):
+                        # Autoriser aussi quelques autres préfixes connus
+                        other_valid = ['65', '66', '67', '68', '58', '59', '48', '49', '51', '52', '33', '75', '76']
+                        if operator_prefix not in other_valid:
+                            raise ValueError(f"Préfixe opérateur {operator_prefix} non supporté pour +{code}")
+                break
+        
+        if not valid_country:
+            raise ValueError("Seuls les numéros du Sénégal (+221), Mali (+223), Côte d'Ivoire (+225) et Burkina Faso (+226) sont supportés")
         
         return clean_phone
     profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
