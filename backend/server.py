@@ -84,6 +84,29 @@ app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & 
 # Middleware pour compression gzip (optimisation réseaux lents Afrique de l'Ouest)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Rate limiting simple pour protection (West Africa specific)
+from collections import defaultdict
+import time
+
+# Stockage simple en mémoire pour rate limiting
+request_counts = defaultdict(list)
+
+def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: int = 1) -> bool:
+    """Vérification simple du rate limiting"""
+    now = time.time()
+    window_start = now - (window_minutes * 60)
+    
+    # Nettoyer les anciennes entrées
+    request_counts[client_ip] = [req_time for req_time in request_counts[client_ip] if req_time > window_start]
+    
+    # Vérifier si la limite est dépassée
+    if len(request_counts[client_ip]) >= max_requests:
+        return False
+    
+    # Ajouter la requête actuelle
+    request_counts[client_ip].append(now)
+    return True
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
