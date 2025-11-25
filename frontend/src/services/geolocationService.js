@@ -10,7 +10,10 @@ export const COUNTRIES = {
     color: '#009639',
     phonePrefix: '+223',
     currency: 'XOF',
-    language: 'fr'
+    language: 'fr',
+    majorCities: ['Bamako', 'Sikasso', 'Mopti', 'Koutiala', 'Kayes', 'Ségou', 'Gao', 'Tombouctou'],
+    timeZone: 'GMT+0',
+    internetPenetration: '23%'
   },
   SENEGAL: {
     code: 'senegal',
@@ -20,7 +23,10 @@ export const COUNTRIES = {
     color: '#00853f',
     phonePrefix: '+221',
     currency: 'XOF',
-    language: 'fr'
+    language: 'fr',
+    majorCities: ['Dakar', 'Thiès', 'Kaolack', 'Saint-Louis', 'Ziguinchor', 'Diourbel', 'Rufisque', 'Mbour'],
+    timeZone: 'GMT+0',
+    internetPenetration: '58%'
   },
   BURKINA_FASO: {
     code: 'burkina_faso',
@@ -30,7 +36,10 @@ export const COUNTRIES = {
     color: '#009639',
     phonePrefix: '+226',
     currency: 'XOF',
-    language: 'fr'
+    language: 'fr',
+    majorCities: ['Ouagadougou', 'Bobo-Dioulasso', 'Koudougou', 'Ouahigouya', 'Banfora', 'Kaya', 'Tenkodogo', 'Fada N\'Gourma'],
+    timeZone: 'GMT+0',
+    internetPenetration: '22%'
   },
   COTE_DIVOIRE: {
     code: 'cote_divoire',
@@ -40,7 +49,10 @@ export const COUNTRIES = {
     color: '#ff8200',
     phonePrefix: '+225',
     currency: 'XOF',
-    language: 'fr'
+    language: 'fr',
+    majorCities: ['Abidjan', 'Bouaké', 'Daloa', 'Yamoussoukro', 'San-Pédro', 'Korhogo', 'Man', 'Divo'], 
+    timeZone: 'GMT+0',
+    internetPenetration: '47%'
   }
 };
 
