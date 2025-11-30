@@ -12,7 +12,7 @@ import jwt
 from datetime import datetime, timedelta
 
 class MobileBackendTester:
-    def __init__(self, base_url="https://kojo-profile.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://local-connect-43.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.client_token = None
         self.worker_token = None

@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timedelta
 
 class MobileIntegrationTester:
-    def __init__(self, base_url="https://kojo-profile.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://local-connect-43.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.test_results = []
         

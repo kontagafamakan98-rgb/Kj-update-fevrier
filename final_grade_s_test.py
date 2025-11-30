@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 
 def test_grade_s_optimizations():
-    base_url = "https://kojo-profile.preview.emergentagent.com/api"
+    base_url = "https://local-connect-43.preview.emergentagent.com/api"
     
     print("🏆 FINAL GRADE S+ TESTING - PERFECTION ABSOLUE")
     print("=" * 60)
