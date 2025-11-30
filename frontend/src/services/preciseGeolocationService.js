@@ -413,6 +413,11 @@ class PreciseGeolocationService {
     } catch (error) {
       safeLog.error('❌ Erreur détection géolocalisation:', error);
       this.isDetecting = false;
+      
+      // Enregistrer l'échec dans le moniteur
+      const detectionTime = Date.now() - startTime;
+      geolocationMonitor.recordDetection(null, detectionTime, false);
+      
       return this.lastKnownLocation || this.getIntelligentFallback();
     }
   }
