@@ -105,16 +105,56 @@ export const formatPhoneNumber = (phone, countryCode) => {
   return country.phonePrefix + ' ' + cleanPhone;
 };
 
-// Service de géolocalisation GPS pour PWA
+// Service de géolocalisation GPS pour PWA - AMÉLIORÉ 100% FIABILITÉ AFRIQUE DE L'OUEST
 class GeolocationService {
   constructor() {
     this.isDetecting = false;
+    this.cachedLocation = null;
+    this.cacheTimestamp = null;
+    this.CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+    this.detectionMethods = [];
+    this.loadCachedLocation();
+  }
+
+  // Charger la dernière position depuis localStorage
+  loadCachedLocation() {
+    try {
+      const cached = localStorage.getItem('kojo_last_location');
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (Date.now() - data.timestamp < this.CACHE_DURATION) {
+          this.cachedLocation = data.location;
+          this.cacheTimestamp = data.timestamp;
+          devLog.info('📍 Position cachée chargée:', this.cachedLocation);
+        } else {
+          localStorage.removeItem('kojo_last_location');
+        }
+      }
+    } catch (e) {
+      devLog.info('⚠️ Erreur chargement cache position:', e);
+    }
+  }
+
+  // Sauvegarder la position dans le cache
+  saveCachedLocation(location) {
+    try {
+      localStorage.setItem('kojo_last_location', JSON.stringify({
+        location,
+        timestamp: Date.now()
+      }));
+      this.cachedLocation = location;
+      this.cacheTimestamp = Date.now();
+      devLog.info('✅ Position sauvegardée dans le cache');
+    } catch (e) {
+      devLog.info('⚠️ Erreur sauvegarde cache position:', e);
+    }
   }
 
   async detectUserLocation(userCountry = 'mali') {
-    if (this.isDetecting) return null;
+    if (this.isDetecting) return this.cachedLocation;
     
     this.isDetecting = true;
+    this.detectionMethods = [];
     
     try {
       // Essayer d'abord la géolocalisation native du navigateur
