@@ -59,6 +59,49 @@ except Exception as e:
     logger.error(f"❌ MongoDB connection failed: {e}")
     raise
 
+# MongoDB Indexes for Performance (West Africa optimization)
+async def create_database_indexes():
+    """Create indexes on frequently queried fields for better performance"""
+    try:
+        # Users collection indexes
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("id", unique=True)
+        await db.users.create_index("user_type")
+        await db.users.create_index("country")
+        await db.users.create_index([("email", 1), ("password_hash", 1)])
+        
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id")
+        await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
+        
+        # Messages collection indexes
+        await db.messages.create_index("id", unique=True)
+        await db.messages.create_index("job_id")
+        await db.messages.create_index([("sender_id", 1), ("receiver_id", 1)])
+        await db.messages.create_index([("created_at", -1)])
+        
+        # Commissions collection indexes
+        await db.commissions.create_index("id", unique=True)
+        await db.commissions.create_index("job_id")
+        await db.commissions.create_index("worker_id")
+        await db.commissions.create_index("status")
+        await db.commissions.create_index([("created_at", -1)])
+        
+        logger.info("✅ MongoDB indexes created successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ Error creating indexes (may already exist): {e}")
+
 # JWT Settings - Enhanced Security
 JWT_SECRET = os.environ.get('JWT_SECRET', 'kojo-prod-secret-2025-afrique-ouest-' + str(uuid.uuid4()))
 JWT_ALGORITHM = "HS256"
