@@ -1,0 +1,22 @@
+# Kojo - Plateforme de Services Afrique de l'Ouest
+# Robots.txt optimized for West African market
+
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /register
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /messages
+Disallow: /jobs
+Disallow: /api/
+Disallow: /photo-test
+Disallow: /photo-debug
+Disallow: /payment-demo
+Disallow: /mobile-test
+
+# Sitemap location
+Sitemap: https://kojo.com/sitemap.xml
+
+# Crawl-delay for slow servers (West Africa optimization)
+Crawl-delay: 2
