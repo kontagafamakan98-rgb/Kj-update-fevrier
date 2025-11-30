@@ -251,6 +251,9 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
             <p className="text-xs text-gray-500 mt-1">
               PNG, JPG, WEBP jusqu'à 5MB
             </p>
+            <p className="text-xs text-orange-600 mt-1">
+              ✨ Optimisation automatique pour connexion rapide
+            </p>
           </div>
 
         </div>
