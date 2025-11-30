@@ -163,10 +163,19 @@ class GeolocationService {
       if (this.cachedLocation && this.cacheTimestamp) {
         const age = Date.now() - this.cacheTimestamp;
         if (age < this.CACHE_DURATION) {
+          const detectionTime = Date.now() - startTime;
           devLog.info('📦 Utilisation position cachée (age: ' + Math.round(age / 1000) + 's)');
           this.isDetecting = false;
           this.detectionMethods.push('cache');
-          return { ...this.cachedLocation, method: 'cache', fromCache: true };
+          
+          const cachedResult = { ...this.cachedLocation, method: 'cache', fromCache: true };
+          
+          // Enregistrer dans le moniteur avec le vrai temps du cache
+          geolocationMonitor.recordDetection(cachedResult, detectionTime, true);
+          
+          devLog.info(`✅ Géolocalisation depuis cache en ${detectionTime}ms`);
+          
+          return cachedResult;
         }
       }
 
