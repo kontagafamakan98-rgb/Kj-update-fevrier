@@ -799,12 +799,20 @@ def sanitize_email(email: str) -> str:
         if char in email:
             raise ValueError(f"Email contains invalid character: {char}")
     
-    # Additional check for SQL-like patterns
-    sql_patterns = ['OR', 'AND', 'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'UNION', '--', '/*', '*/']
+    # Additional check for SQL injection patterns (with word boundaries to avoid false positives)
+    # Check for SQL keywords as complete words, not substrings
+    import re
+    sql_keywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'UNION', 'EXEC', 'EXECUTE']
     email_upper = email.upper()
-    for pattern in sql_patterns:
-        if pattern in email_upper:
-            raise ValueError(f"Email contains prohibited pattern: {pattern}")
+    
+    # Check for SQL keywords as standalone words (not part of other words)
+    for keyword in sql_keywords:
+        if re.search(r'\b' + keyword + r'\b', email_upper):
+            raise ValueError(f"Email contains prohibited SQL keyword: {keyword}")
+    
+    # Check for SQL comment patterns
+    if '--' in email or '/*' in email or '*/' in email:
+        raise ValueError("Email contains prohibited SQL comment pattern")
     
     return email.lower().strip()
 
