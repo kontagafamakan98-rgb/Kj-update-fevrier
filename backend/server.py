@@ -1874,6 +1874,9 @@ async def startup_event():
     # Créer le compte propriétaire s'il n'existe pas
     await ensure_owner_exists()
     
+    # Créer les index MongoDB pour les performances
+    await create_database_indexes()
+    
     # Créer le dossier uploads
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(exist_ok=True)
