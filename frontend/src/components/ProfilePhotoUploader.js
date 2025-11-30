@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
 import profilePhotoService from '../services/ProfilePhotoService';
+import { compressImage, validateImageFile, formatFileSize } from '../utils/imageOptimization';
 
 const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className = '' }) => {
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
