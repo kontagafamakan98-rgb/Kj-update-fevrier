@@ -11,6 +11,7 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
+import PerformanceMonitor from "./components/PerformanceMonitor";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
 // Eager load critical pages (public pages shown immediately)
