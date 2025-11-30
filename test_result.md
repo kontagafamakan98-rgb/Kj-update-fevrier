@@ -140,7 +140,7 @@ agent_communication:
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: Convert existing Kojo PWA into native mobile applications for Android and iOS using React Native/Expo. The mobile app should replicate all PWA functionality including user authentication, job posting/searching, real-time messaging, multi-language support, and payment framework. Current task: Complete KojoMobile_FINAL project by implementing all missing screens and native features, then test integration with existing FastAPI backend. IMMEDIATE ISSUE RESOLVED: Fixed profile photo upload/modification functionality on PWA that was not working - issue was caused by missing backend API endpoints and 502 server errors.
+user_problem_statement: AUDIT COMPLET ET OPTIMISATIONS DE PERFORMANCE - Optimiser l'application Kojo PWA pour les marchés d'Afrique de l'Ouest avec focus sur performance réseaux lents (2G/3G), réduction bundle size, support offline, accessibilité, SEO et sécurité. Optimisations exhaustives demandées incluant lazy loading, Service Worker, cache API, monitoring performance, accessibilité WCAG 2.1, SEO complet, et index MongoDB.
 
 backend:
   - task: "Grade S+ Ultra-Advanced Optimizations"
