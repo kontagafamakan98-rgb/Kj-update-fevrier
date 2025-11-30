@@ -154,6 +154,7 @@ class GeolocationService {
   async detectUserLocation(userCountry = 'mali') {
     if (this.isDetecting) return this.cachedLocation;
     
+    const startTime = Date.now();
     this.isDetecting = true;
     this.detectionMethods = [];
     
