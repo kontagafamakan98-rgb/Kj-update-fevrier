@@ -157,27 +157,66 @@ class GeolocationService {
     this.detectionMethods = [];
     
     try {
-      // Essayer d'abord la géolocalisation native du navigateur
+      // MÉTHODE 1: Position cachée récente (priorité maximale)
+      if (this.cachedLocation && this.cacheTimestamp) {
+        const age = Date.now() - this.cacheTimestamp;
+        if (age < this.CACHE_DURATION) {
+          devLog.info('📦 Utilisation position cachée (age: ' + Math.round(age / 1000) + 's)');
+          this.isDetecting = false;
+          this.detectionMethods.push('cache');
+          return { ...this.cachedLocation, method: 'cache', fromCache: true };
+        }
+      }
+
+      // MÉTHODE 2: Géolocalisation GPS native du navigateur
       if (navigator.geolocation) {
         try {
+          devLog.info('📡 Tentative GPS haute précision...');
           const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
               enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 300000
+              timeout: 8000,
+              maximumAge: 60000
             });
           });
 
-          // Géocodage inverse simulé basé sur les coordonnées
-          const { latitude, longitude } = position.coords;
+          const { latitude, longitude, accuracy } = position.coords;
+          devLog.info(`✅ GPS réussi: ${latitude}, ${longitude} (précision: ${accuracy}m)`);
+          
           const detectedLocation = await this.reverseGeocode(latitude, longitude, userCountry);
           
-          this.isDetecting = false;
-          return detectedLocation;
+          if (detectedLocation) {
+            detectedLocation.gpsAccuracy = accuracy;
+            detectedLocation.confidence = 95;
+            this.saveCachedLocation(detectedLocation);
+            this.detectionMethods.push('gps');
+            this.isDetecting = false;
+            return detectedLocation;
+          }
         } catch (geoError) {
-          devLog.info('Géolocalisation GPS échouée, utilisation simulation:', geoError);
-          // Fallback vers simulation
+          devLog.info('⚠️ GPS échoué:', geoError.message);
+          this.detectionMethods.push('gps_failed');
         }
+      }
+
+      // MÉTHODE 3: Détection par IP avec services multiples
+      const ipLocation = await this.detectByIPServices();
+      if (ipLocation) {
+        devLog.info('✅ Détection IP réussie:', ipLocation.city);
+        this.saveCachedLocation(ipLocation);
+        this.detectionMethods.push('ip');
+        this.isDetecting = false;
+        return ipLocation;
+      }
+
+      // MÉTHODE 4: Détection contextuelle (timezone + langue + network)
+      const contextLocation = await this.detectByContext();
+      if (contextLocation) {
+        devLog.info('✅ Détection contextuelle réussie:', contextLocation.city);
+        this.saveCachedLocation(contextLocation);
+        this.detectionMethods.push('context');
+        this.isDetecting = false;
+        return contextLocation;
       }
       
       // Simulation réaliste pour l'Afrique de l'Ouest
