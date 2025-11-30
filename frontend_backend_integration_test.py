@@ -13,7 +13,7 @@ from datetime import datetime
 from PIL import Image
 
 class FrontendBackendIntegrationTester:
-    def __init__(self, base_url="https://local-connect-43.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://geoloc-boost.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.test_user_token = None
         self.test_user_id = None
@@ -143,7 +143,7 @@ class FrontendBackendIntegrationTester:
                 
                 # Step 6: Create full URL (like frontend does)
                 self.log("Step 6: Creating full URL...")
-                backend_url = "https://local-connect-43.preview.emergentagent.com"
+                backend_url = "https://geoloc-boost.preview.emergentagent.com"
                 full_url = f"{backend_url}{photo_url}?t={int(datetime.now().timestamp())}"
                 self.log(f"Full URL: {full_url}")
                 

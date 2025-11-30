@@ -17,7 +17,7 @@ import io
 from datetime import datetime
 
 class ProfilePhotoSystemTest:
-    def __init__(self, base_url="https://local-connect-43.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://geoloc-boost.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.test_token = None
         self.test_user = None
@@ -193,7 +193,7 @@ class ProfilePhotoSystemTest:
                 
                 if photo_url:
                     # Test direct URL access
-                    full_url = f"https://local-connect-43.preview.emergentagent.com{photo_url}"
+                    full_url = f"https://geoloc-boost.preview.emergentagent.com{photo_url}"
                     
                     try:
                         url_response = requests.get(full_url)

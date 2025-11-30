@@ -10,7 +10,7 @@ import jwt
 from datetime import datetime, timezone
 
 class FocusedUltraTest:
-    def __init__(self, base_url="https://local-connect-43.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://geoloc-boost.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
