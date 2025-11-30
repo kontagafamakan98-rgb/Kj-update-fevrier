@@ -249,6 +249,7 @@ function App() {
     <div className="App">
       <ErrorBoundary>
         <PerformanceMonitor />
+        <AccessibilityHelper />
         <BrowserRouter>
           <LanguageProvider>
             <AuthProvider>
