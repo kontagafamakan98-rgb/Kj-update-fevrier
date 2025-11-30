@@ -313,10 +313,19 @@ class GeolocationService {
       this.detectionMethods.push('fallback');
       this.isDetecting = false;
       
+      // Enregistrer dans le moniteur
+      const detectionTime = Date.now() - startTime;
+      geolocationMonitor.recordDetection(fallbackLocation, detectionTime, true);
+      
+      devLog.info(`✅ Géolocalisation complétée en ${detectionTime}ms par ${fallbackLocation.method}`);
+      
       return fallbackLocation;
       
     } catch (error) {
       this.isDetecting = false;
+      const detectionTime = Date.now() - startTime;
+      geolocationMonitor.recordDetection(null, detectionTime, false);
+      devLog.error('❌ Échec géolocalisation:', error.message);
       throw new Error('Impossible de détecter votre position: ' + error.message);
     }
   }
