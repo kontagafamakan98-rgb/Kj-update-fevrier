@@ -269,6 +269,44 @@ class PreciseGeolocationService {
     this.isDetecting = false;
     this.lastKnownLocation = null;
     this.detectionAccuracy = 0;
+    this.cachedLocation = null;
+    this.cacheTimestamp = null;
+    this.CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+    this.loadCachedLocation();
+  }
+
+  // Charger la dernière position depuis localStorage
+  loadCachedLocation() {
+    try {
+      const cached = localStorage.getItem('kojo_precise_location');
+      if (cached) {
+        const data = JSON.parse(cached);
+        if (Date.now() - data.timestamp < this.CACHE_DURATION) {
+          this.cachedLocation = data.location;
+          this.cacheTimestamp = data.timestamp;
+          devLog.info('📍 Position précise cachée chargée:', this.cachedLocation);
+        } else {
+          localStorage.removeItem('kojo_precise_location');
+        }
+      }
+    } catch (e) {
+      devLog.info('⚠️ Erreur chargement cache position précise:', e);
+    }
+  }
+
+  // Sauvegarder la position dans le cache
+  saveCachedLocation(location) {
+    try {
+      localStorage.setItem('kojo_precise_location', JSON.stringify({
+        location,
+        timestamp: Date.now()
+      }));
+      this.cachedLocation = location;
+      this.cacheTimestamp = Date.now();
+      devLog.info('✅ Position précise sauvegardée dans le cache');
+    } catch (e) {
+      devLog.info('⚠️ Erreur sauvegarde cache position précise:', e);
+    }
   }
 
   /**
