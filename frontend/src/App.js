@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { devLog, safeLog } from './utils/env';
@@ -11,21 +11,27 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
+import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
+
+// Eager load critical pages (public pages shown immediately)
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Jobs from "./pages/Jobs";
-import JobDetails from "./pages/JobDetails";
-import Messages from "./pages/Messages";
-import MobileTest from './pages/MobileTest';
-import CreateJob from './pages/CreateJob';
-import PhotoTest from './pages/PhotoTest';
-import PaymentDemo from './pages/PaymentDemo';
-import PaymentVerificationPage from './pages/PaymentVerificationPage';
-import CommissionDashboard from './pages/CommissionDashboard';
-import Profile from "./pages/Profile";
-import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
+
+// Lazy load protected pages (loaded only when needed after authentication)
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Jobs = lazy(() => import("./pages/Jobs"));
+const JobDetails = lazy(() => import("./pages/JobDetails"));
+const Messages = lazy(() => import("./pages/Messages"));
+const Profile = lazy(() => import("./pages/Profile"));
+const CreateJob = lazy(() => import('./pages/CreateJob'));
+
+// Lazy load test and demo pages (rarely used)
+const MobileTest = lazy(() => import('./pages/MobileTest'));
+const PhotoTest = lazy(() => import('./pages/PhotoTest'));
+const PaymentDemo = lazy(() => import('./pages/PaymentDemo'));
+const PaymentVerificationPage = lazy(() => import('./pages/PaymentVerificationPage'));
+const CommissionDashboard = lazy(() => import('./pages/CommissionDashboard'));
 
 // Note: Axios configuration moved to /services/api.js for centralized management
 
