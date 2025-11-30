@@ -58,15 +58,45 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
     const file = files[0];
     if (!file) return;
 
+    // Valider le fichier avant la compression
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      alert(validation.errors.join('\n'));
+      return;
+    }
+
     setUploading(true);
 
     try {
-      // 1. Generate instant preview for user feedback
-      const preview = profilePhotoService.generatePreviewUrl(file);
+      // 1. Afficher la taille originale dans la console (pour debug)
+      const originalSize = file.size;
+      safeLog.info(`📷 Image originale: ${formatFileSize(originalSize)}`);
+
+      // 2. Compresser l'image avant l'upload (optimisation pour l'Afrique de l'Ouest)
+      const compressedBlob = await compressImage(file, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.7,
+        format: 'image/jpeg'
+      });
+
+      // 3. Créer un File à partir du Blob compressé
+      const compressedFile = new File(
+        [compressedBlob], 
+        file.name.replace(/\.\w+$/, '.jpg'), // Forcer l'extension .jpg
+        { type: 'image/jpeg' }
+      );
+
+      const compressedSize = compressedFile.size;
+      const reduction = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+      safeLog.info(`✅ Image compressée: ${formatFileSize(compressedSize)} (réduction de ${reduction}%)`);
+
+      // 4. Generate instant preview for user feedback
+      const preview = profilePhotoService.generatePreviewUrl(compressedFile);
       setPreviewUrl(preview);
 
-      // 2. Upload to backend using centralized service
-      const result = await profilePhotoService.uploadPhoto(file);
+      // 5. Upload to backend using centralized service avec l'image compressée
+      const result = await profilePhotoService.uploadPhoto(compressedFile);
 
       // 3. Update current photo URL from backend response
       const photoUrl = result.photo_url;
