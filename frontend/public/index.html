@@ -63,7 +63,12 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="msapplication-tap-highlight" content="no">
     
-    <title>Kojo - Mali & Sénégal</title>
+    <!-- Preconnect to API for faster load (West Africa optimization) -->
+    <link rel="preconnect" href="%REACT_APP_BACKEND_URL%" crossorigin />
+    <link rel="dns-prefetch" href="%REACT_APP_BACKEND_URL%" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://kojo.com/" />
   </head>
   <body>
     <noscript>Vous devez activer JavaScript pour utiliser cette application.</noscript>
