@@ -10,7 +10,7 @@ from datetime import datetime
 
 class ComprehensiveGradeTester:
     def __init__(self):
-        self.base_url = "https://kojo-profile.preview.emergentagent.com/api"
+        self.base_url = "https://local-connect-43.preview.emergentagent.com/api"
         self.client_token = None
         self.worker_token = None
         self.tests_passed = 0
