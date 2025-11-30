@@ -1,4 +1,5 @@
 import { devLog, safeLog } from '../utils/env';
+import geolocationMonitor from '../utils/geolocationMonitor';
 
 // Service de géolocalisation pour la PWA
 export const COUNTRIES = {
