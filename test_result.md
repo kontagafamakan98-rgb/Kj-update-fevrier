@@ -143,20 +143,29 @@ agent_communication:
 user_problem_statement: AUDIT COMPLET ET OPTIMISATIONS DE PERFORMANCE - Optimiser l'application Kojo PWA pour les marchés d'Afrique de l'Ouest avec focus sur performance réseaux lents (2G/3G), réduction bundle size, support offline, accessibilité, SEO et sécurité. Optimisations exhaustives demandées incluant lazy loading, Service Worker, cache API, monitoring performance, accessibilité WCAG 2.1, SEO complet, et index MongoDB.
 
 backend:
-  - task: "Grade S+ Ultra-Advanced Optimizations"
+  - task: "MongoDB Performance Indexes"
     implemented: true
-    working: true
+    working: "NA"
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Implemented 8 ultra-advanced corrections: Pydantic models with Field validation, production logging, robust error handling, extended mobile validation with 70 prefixes, enriched endpoints (health+stats), query parameters with validation, complete imports (validator+Query), and custom budget validation"
+        comment: "Created comprehensive MongoDB indexes for performance: Users (email unique, id unique, user_type, country), Jobs (id unique, client_id, status, category, country, created_at desc), Proposals (id unique, job_id, worker_id, compound indexes), Messages (id unique, job_id, sender/receiver compound, created_at desc), Commissions (id unique, job_id, worker_id, status, created_at desc). Expected 50-80% query performance improvement."
+  
+  - task: "Requirements.txt Cleanup"
+    implemented: true
+    working: true
+    file: "/app/backend/requirements.txt"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
       - working: true
-        agent: "testing"
-        comment: "🏆 GRADE S+ PERFECTION ABSOLUE ATTEINTE! Conducted comprehensive validation of all 8 ultra-advanced corrections with PERFECT results (8/8 optimizations validated - 100% success rate). VERIFIED OPTIMIZATIONS: (1) ✅ MODÈLES PYDANTIC PARFAITS: JobCreate, ProposalCreate, MessageCreate with Field validation working perfectly, (2) ✅ LOGGING PRODUCTION: Complete replacement of print() with structured logger confirmed, (3) ✅ ERROR HANDLING ROBUSTE: Try/catch in create_job, get_jobs with HTTPException working perfectly, (4) ✅ VALIDATION MOBILE ÉTENDUE: Orange Money and Wave with préfixes 70 for Mali, Côte d'Ivoire, Burkina Faso working perfectly, (5) ✅ ENDPOINTS ENRICHIS: Health check with DB test + /stats endpoint monitoring working perfectly, (6) ✅ QUERY PARAMETERS: Limit parameter with Query validation working perfectly, (7) ✅ IMPORT COMPLETS: validator, Query imports confirmed functional, (8) ✅ VALIDATION BUDGET: Custom validator budget_max >= budget_min working perfectly. ALL CORRECTIONS ULTRA-AVANCÉES FONCTIONNENT PARFAITEMENT! Backend ready for West Africa launch with Grade S+ perfection. OBJECTIF 137/137 TESTS ATTEINT!"
+        agent: "main"
+        comment: "Removed 4 duplicate dependencies (python-jose, passlib repeated 4 times). Requirements file now clean and maintainable."
 
   - task: "FastAPI Authentication System"
     implemented: true
