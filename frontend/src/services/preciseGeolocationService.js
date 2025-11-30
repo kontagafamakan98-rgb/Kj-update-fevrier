@@ -316,9 +316,29 @@ class PreciseGeolocationService {
   async detectPreciseLocation() {
     devLog.info('🎯 Démarrage détection géolocalisation ultra-précise...');
     
+    const startTime = Date.now();
+    
     if (this.isDetecting) {
       devLog.info('⏳ Détection déjà en cours...');
       return this.lastKnownLocation;
+    }
+
+    // MÉTHODE 0: Position cachée récente (priorité maximale pour performance <500ms)
+    if (this.cachedLocation && this.cacheTimestamp) {
+      const age = Date.now() - this.cacheTimestamp;
+      if (age < this.CACHE_DURATION) {
+        const detectionTime = Date.now() - startTime;
+        devLog.info('📦 Utilisation position précise cachée (age: ' + Math.round(age / 1000) + 's)');
+        
+        const cachedResult = { ...this.cachedLocation, method: 'cache', fromCache: true };
+        
+        // Enregistrer dans le moniteur avec le vrai temps du cache
+        geolocationMonitor.recordDetection(cachedResult, detectionTime, true);
+        
+        devLog.info(`✅ Géolocalisation précise depuis cache en ${detectionTime}ms`);
+        
+        return cachedResult;
+      }
     }
 
     this.isDetecting = true;
