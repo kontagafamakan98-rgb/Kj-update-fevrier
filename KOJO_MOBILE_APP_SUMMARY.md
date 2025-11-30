@@ -168,7 +168,7 @@ return <Text>{t('home')}</Text>; // "Accueil" in French
 
 ### **Environment Variables**
 ```
-EXPO_PUBLIC_API_URL=https://local-connect-43.preview.emergentagent.com/api
+EXPO_PUBLIC_API_URL=https://geoloc-boost.preview.emergentagent.com/api
 EXPO_PUBLIC_APP_NAME=Kojo
 EXPO_PUBLIC_APP_VERSION=1.0.0
 ```

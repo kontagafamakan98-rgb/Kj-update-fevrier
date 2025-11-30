@@ -23,7 +23,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 class UltraKojoAPITester:
-    def __init__(self, base_url="https://local-connect-43.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://geoloc-boost.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.client_token = None
         self.worker_token = None
@@ -557,7 +557,7 @@ class UltraKojoAPITester:
         
         try:
             headers = {
-                'Origin': 'https://local-connect-43.preview.emergentagent.com',
+                'Origin': 'https://geoloc-boost.preview.emergentagent.com',
                 'Access-Control-Request-Method': 'POST',
                 'Access-Control-Request-Headers': 'Content-Type, Authorization'
             }
@@ -568,7 +568,7 @@ class UltraKojoAPITester:
             
             # Check CORS headers
             cors_headers = {
-                'Access-Control-Allow-Origin': 'https://local-connect-43.preview.emergentagent.com',
+                'Access-Control-Allow-Origin': 'https://geoloc-boost.preview.emergentagent.com',
                 'Access-Control-Allow-Methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
                 'Access-Control-Allow-Headers': ['Accept', 'Accept-Language', 'Content-Language', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRFToken', 'Cache-Control'],
                 'Access-Control-Max-Age': '86400'  # 24 hours cache
@@ -624,7 +624,7 @@ class UltraKojoAPITester:
         
         try:
             headers = {
-                'Origin': 'https://local-connect-43.preview.emergentagent.com',
+                'Origin': 'https://geoloc-boost.preview.emergentagent.com',
                 'Content-Type': 'application/json'
             }
             

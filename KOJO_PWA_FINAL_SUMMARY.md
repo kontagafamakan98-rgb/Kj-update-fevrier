@@ -178,7 +178,7 @@ A fully-functional **Progressive Web App (PWA)** that works like a native mobile
 ## 🚀 **DEPLOYMENT STATUS**
 
 ### **✅ PRODUCTION READY**
-- **Live URL**: https://local-connect-43.preview.emergentagent.com
+- **Live URL**: https://geoloc-boost.preview.emergentagent.com
 - **PWA Features**: All implemented and working
 - **Country Support**: All 4 countries operational
 - **Mobile Ready**: Perfect mobile experience
@@ -273,7 +273,7 @@ You now have a **production-ready PWA** that provides:
 ---
 
 ### 🔗 **Try It Now:**
-Visit: https://local-connect-43.preview.emergentagent.com
+Visit: https://geoloc-boost.preview.emergentagent.com
 Install the PWA and experience the native app-like functionality!
 
 **The future of West African services is here - powered by Kojo PWA! 🚀**
