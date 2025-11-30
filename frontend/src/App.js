@@ -108,61 +108,75 @@ function AppRoutes() {
       {/* Main Navigation */}
       <Navbar />
       
-      {/* Main Content */}
+      {/* Main Content with Suspense for lazy loaded routes */}
       <main className="pb-16 md:pb-0">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/jobs" element={
-            <ProtectedRoute>
-              <Jobs />
-            </ProtectedRoute>
-          } />
-          <Route path="/jobs/:id" element={
-            <ProtectedRoute>
-              <JobDetails />
-            </ProtectedRoute>
-          } />
-          <Route path="/messages" element={
-            <ProtectedRoute>
-              <Messages />
-            </ProtectedRoute>
-          } />
-          <Route path="/mobile-test" element={
-            <ProtectedRoute>
-              <MobileTest />
-            </ProtectedRoute>
-          } />
-          <Route path="/create-job" element={
-            <ProtectedRoute>
-              <CreateJob />
-            </ProtectedRoute>
-          } />
-          <Route path="/photo-test" element={
-            <ProtectedRoute>
-              <PhotoTest />
-            </ProtectedRoute>
-          } />
-          <Route path="/photo-debug" element={<PhotoTest />} />
-          <Route path="/payment-demo" element={<PaymentDemo />} />
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="/payment-verification" element={<PaymentVerificationPage />} />
-          <Route path="/commission-dashboard" element={
-            <ProtectedRoute>
-              <CommissionDashboard />
-            </ProtectedRoute>
-          } />
-        </Routes>
+        <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
+              <div className="mt-4 text-orange-600 font-medium">Chargement...</div>
+            </div>
+          </div>
+        }>
+          <Routes>
+            {/* Public routes - eagerly loaded */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            
+            {/* Protected routes - lazy loaded */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/jobs" element={
+              <ProtectedRoute>
+                <Jobs />
+              </ProtectedRoute>
+            } />
+            <Route path="/jobs/:id" element={
+              <ProtectedRoute>
+                <JobDetails />
+              </ProtectedRoute>
+            } />
+            <Route path="/messages" element={
+              <ProtectedRoute>
+                <Messages />
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/create-job" element={
+              <ProtectedRoute>
+                <CreateJob />
+              </ProtectedRoute>
+            } />
+            
+            {/* Test and demo routes - lazy loaded */}
+            <Route path="/mobile-test" element={
+              <ProtectedRoute>
+                <MobileTest />
+              </ProtectedRoute>
+            } />
+            <Route path="/photo-test" element={
+              <ProtectedRoute>
+                <PhotoTest />
+              </ProtectedRoute>
+            } />
+            <Route path="/photo-debug" element={<PhotoTest />} />
+            <Route path="/payment-demo" element={<PaymentDemo />} />
+            <Route path="/payment-verification" element={<PaymentVerificationPage />} />
+            <Route path="/commission-dashboard" element={
+              <ProtectedRoute>
+                <CommissionDashboard />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Suspense>
       </main>
       
       {/* Mobile Bottom Navigation */}
