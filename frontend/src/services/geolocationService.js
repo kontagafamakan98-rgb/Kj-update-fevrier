@@ -385,6 +385,257 @@ class GeolocationService {
     return R * c;
   }
 
+  // NOUVELLE MÉTHODE: Détection par services IP multiples avec validation
+  async detectByIPServices() {
+    devLog.info('🌐 Tentative détection IP multi-services...');
+    
+    const ipServices = [
+      {
+        name: 'ipapi.co',
+        url: 'https://ipapi.co/json/',
+        parse: (data) => ({
+          country: data.country_code?.toLowerCase(),
+          city: data.city,
+          lat: parseFloat(data.latitude),
+          lng: parseFloat(data.longitude)
+        })
+      },
+      {
+        name: 'ip-api.com',
+        url: 'http://ip-api.com/json/',
+        parse: (data) => ({
+          country: data.countryCode?.toLowerCase(),
+          city: data.city,
+          lat: parseFloat(data.lat),
+          lng: parseFloat(data.lon)
+        })
+      },
+      {
+        name: 'ipinfo.io',
+        url: 'https://ipinfo.io/json',
+        parse: (data) => {
+          const [lat, lng] = (data.loc || '0,0').split(',');
+          return {
+            country: data.country?.toLowerCase(),
+            city: data.city,
+            lat: parseFloat(lat),
+            lng: parseFloat(lng)
+          };
+        }
+      }
+    ];
+
+    const results = [];
+    
+    for (const service of ipServices) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        
+        const response = await fetch(service.url, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const parsed = service.parse(data);
+          
+          // Mapper codes pays ISO vers nos codes
+          const countryMap = { 'ml': 'mali', 'sn': 'senegal', 'bf': 'burkina_faso', 'ci': 'cote_divoire' };
+          const countryCode = countryMap[parsed.country] || parsed.country;
+          
+          // Vérifier si c'est un pays supporté
+          if (['mali', 'senegal', 'burkina_faso', 'cote_divoire'].includes(countryCode)) {
+            devLog.info(`✅ ${service.name}: ${countryCode}`);
+            results.push({ ...parsed, countryCode, service: service.name });
+          }
+        }
+      } catch (e) {
+        devLog.info(`⚠️ ${service.name} échoué:`, e.message);
+      }
+    }
+
+    if (results.length === 0) return null;
+
+    // Prendre le résultat le plus fréquent (consensus)
+    const countryVotes = {};
+    results.forEach(r => {
+      countryVotes[r.countryCode] = (countryVotes[r.countryCode] || 0) + 1;
+    });
+
+    const bestCountry = Object.keys(countryVotes).reduce((a, b) => 
+      countryVotes[a] > countryVotes[b] ? a : b
+    );
+
+    const consensus = countryVotes[bestCountry] / results.length;
+    devLog.info(`🎯 Consensus IP: ${bestCountry} (${(consensus * 100).toFixed(0)}%)`);
+
+    // Utiliser les coordonnées du meilleur résultat
+    const bestResult = results.find(r => r.countryCode === bestCountry);
+    const detectedLocation = this.identifyLocationFromCoordinates(
+      bestResult.lat, 
+      bestResult.lng, 
+      bestCountry
+    );
+
+    if (detectedLocation) {
+      detectedLocation.confidence = Math.round(consensus * 90);
+      detectedLocation.ipServices = results.length;
+      return detectedLocation;
+    }
+
+    return null;
+  }
+
+  // NOUVELLE MÉTHODE: Détection contextuelle avancée
+  async detectByContext() {
+    devLog.info('🧠 Analyse contextuelle avancée...');
+    
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const languages = navigator.languages || [navigator.language];
+      const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      
+      devLog.info(`🕐 Timezone: ${timezone}`);
+      devLog.info(`🗣️ Langues:`, languages);
+      
+      // Mapper timezone vers pays
+      const timezoneMap = {
+        'Africa/Bamako': 'mali',
+        'Africa/Dakar': 'senegal',
+        'Africa/Ouagadougou': 'burkina_faso',
+        'Africa/Abidjan': 'cote_divoire'
+      };
+
+      let detectedCountry = timezoneMap[timezone];
+
+      // Si pas de timezone match, analyser les langues
+      if (!detectedCountry) {
+        for (const lang of languages) {
+          const langCode = lang.split('-')[0].toLowerCase();
+          if (langCode === 'wo') detectedCountry = 'senegal';
+          else if (langCode === 'bm') detectedCountry = 'mali';
+          else if (lang.includes('SN')) detectedCountry = 'senegal';
+          else if (lang.includes('ML')) detectedCountry = 'mali';
+          else if (lang.includes('BF')) detectedCountry = 'burkina_faso';
+          else if (lang.includes('CI')) detectedCountry = 'cote_divoire';
+          
+          if (detectedCountry) break;
+        }
+      }
+
+      // Analyser le type de connexion (indice mobile vs wifi)
+      if (connection) {
+        const effectiveType = connection.effectiveType;
+        devLog.info(`📶 Connexion: ${effectiveType}`);
+        
+        // 2G/3G = plus probable mobile = plus probable Afrique de l'Ouest
+        if (['slow-2g', '2g', '3g'].includes(effectiveType)) {
+          devLog.info('📱 Connexion mobile lente détectée (typique Afrique de l\'Ouest)');
+        }
+      }
+
+      if (!detectedCountry) {
+        devLog.info('⚠️ Impossible de déterminer le pays par contexte');
+        return null;
+      }
+
+      const country = getCountryByCode(detectedCountry);
+      const locationMappings = {
+        'mali': { cities: ['Bamako', 'Sikasso', 'Mopti'], districts: ['ACI 2000', 'Hippodrome', 'Plateau'] },
+        'senegal': { cities: ['Dakar', 'Thiès', 'Kaolack'], districts: ['Plateau', 'Médina', 'Parcelles Assainies'] },
+        'burkina_faso': { cities: ['Ouagadougou', 'Bobo-Dioulasso'], districts: ['Zone du Bois', 'Cissin', 'Gounghin'] },
+        'cote_divoire': { cities: ['Abidjan', 'Yamoussoukro', 'Bouaké'], districts: ['Plateau', 'Cocody', 'Marcory'] }
+      };
+
+      const mapping = locationMappings[detectedCountry];
+      const city = mapping.cities[0]; // Capitale
+      const district = mapping.districts[0];
+
+      return {
+        address: `${district}, ${city}`,
+        fullAddress: `${district}, ${city}, ${country.nameFrench}`,
+        city: city,
+        district: district,
+        country: country.nameFrench,
+        countryCode: detectedCountry,
+        coordinates: { lat: 0, lng: 0 }, // Coordonnées génériques
+        accuracy: 75,
+        timestamp: new Date().toISOString(),
+        method: 'contextual',
+        confidence: 75,
+        timezone: timezone,
+        languages: languages
+      };
+
+    } catch (e) {
+      devLog.info('⚠️ Analyse contextuelle échouée:', e.message);
+      return null;
+    }
+  }
+
+  // MÉTHODE AMÉLIORÉE: Identifier localisation depuis coordonnées avec meilleure précision
+  identifyLocationFromCoordinates(lat, lng, preferredCountry) {
+    const countryData = getCountryByCode(preferredCountry);
+    
+    // Base de données simplifiée des principales villes
+    const cities = {
+      'mali': [
+        { name: 'Bamako', lat: 12.6392, lng: -8.0029, districts: ['ACI 2000', 'Hippodrome', 'Plateau', 'Badalabougou'] },
+        { name: 'Sikasso', lat: 11.3176, lng: -5.6670, districts: ['Centre', 'Médina'] },
+        { name: 'Mopti', lat: 14.4843, lng: -4.1960, districts: ['Centre', 'Komoguel', 'Sévaré'] }
+      ],
+      'senegal': [
+        { name: 'Dakar', lat: 14.6928, lng: -17.4467, districts: ['Plateau', 'Médina', 'Parcelles Assainies', 'Liberté 6'] },
+        { name: 'Thiès', lat: 14.7886, lng: -16.9246, districts: ['Centre', 'Randoulène'] },
+        { name: 'Kaolack', lat: 14.1514, lng: -16.0726, districts: ['Médina Baye', 'Dialègne'] }
+      ],
+      'burkina_faso': [
+        { name: 'Ouagadougou', lat: 12.3714, lng: -1.5197, districts: ['Zone du Bois', 'Cissin', 'Gounghin', 'Bogodogo'] },
+        { name: 'Bobo-Dioulasso', lat: 11.1781, lng: -4.2978, districts: ['Secteur 1', 'Secteur 15'] },
+        { name: 'Koudougou', lat: 12.2518, lng: -2.3648, districts: ['Centre', 'Issouka'] }
+      ],
+      'cote_divoire': [
+        { name: 'Abidjan', lat: 5.3600, lng: -4.0083, districts: ['Plateau', 'Cocody', 'Marcory', 'Yopougon'] },
+        { name: 'Yamoussoukro', lat: 6.8276, lng: -5.2893, districts: ['Centre', 'Habitat'] },
+        { name: 'Bouaké', lat: 7.6906, lng: -5.0300, districts: ['Centre', 'Air France 2'] }
+      ]
+    };
+
+    const countryCities = cities[preferredCountry] || cities['senegal'];
+    
+    // Trouver la ville la plus proche
+    let closestCity = countryCities[0];
+    let minDistance = this.calculateDistance(lat, lng, closestCity.lat, closestCity.lng);
+    
+    for (const city of countryCities) {
+      const distance = this.calculateDistance(lat, lng, city.lat, city.lng);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestCity = city;
+      }
+    }
+
+    const district = closestCity.districts[Math.floor(Math.random() * closestCity.districts.length)];
+
+    return {
+      address: `${district}, ${closestCity.name}`,
+      fullAddress: `${district}, ${closestCity.name}, ${countryData.nameFrench}`,
+      city: closestCity.name,
+      district: district,
+      country: countryData.nameFrench,
+      countryCode: preferredCountry,
+      coordinates: { lat, lng },
+      accuracy: 85,
+      timestamp: new Date().toISOString(),
+      method: 'geocoded',
+      distance: minDistance
+    };
+  }
+
   async getLocationSuggestions(countryCode, searchQuery = '') {
     const suggestions = {
       'mali': [
