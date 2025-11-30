@@ -350,7 +350,14 @@ class PreciseGeolocationService {
         devLog.info('✅ Localisation GPS haute précision obtenue:', gpsLocation);
         this.lastKnownLocation = gpsLocation;
         this.detectionAccuracy = gpsLocation.accuracy;
+        this.saveCachedLocation(gpsLocation);
         this.isDetecting = false;
+        
+        // Enregistrer dans le moniteur
+        const detectionTime = Date.now() - startTime;
+        geolocationMonitor.recordDetection(gpsLocation, detectionTime, true);
+        devLog.info(`✅ Géolocalisation GPS complétée en ${detectionTime}ms`);
+        
         return gpsLocation;
       }
 
@@ -360,7 +367,14 @@ class PreciseGeolocationService {
         devLog.info('✅ Localisation IP multi-services obtenue:', ipLocation);
         this.lastKnownLocation = ipLocation;
         this.detectionAccuracy = ipLocation.accuracy;
+        this.saveCachedLocation(ipLocation);
         this.isDetecting = false;
+        
+        // Enregistrer dans le moniteur
+        const detectionTime = Date.now() - startTime;
+        geolocationMonitor.recordDetection(ipLocation, detectionTime, true);
+        devLog.info(`✅ Géolocalisation IP complétée en ${detectionTime}ms`);
+        
         return ipLocation;
       }
 
@@ -370,7 +384,14 @@ class PreciseGeolocationService {
         devLog.info('✅ Localisation contextuelle obtenue:', contextLocation);
         this.lastKnownLocation = contextLocation;
         this.detectionAccuracy = contextLocation.accuracy;
+        this.saveCachedLocation(contextLocation);
         this.isDetecting = false;
+        
+        // Enregistrer dans le moniteur
+        const detectionTime = Date.now() - startTime;
+        geolocationMonitor.recordDetection(contextLocation, detectionTime, true);
+        devLog.info(`✅ Géolocalisation contextuelle complétée en ${detectionTime}ms`);
+        
         return contextLocation;
       }
 
@@ -379,7 +400,14 @@ class PreciseGeolocationService {
       devLog.info('✅ Localisation fallback intelligente:', fallbackLocation);
       this.lastKnownLocation = fallbackLocation;
       this.detectionAccuracy = fallbackLocation.accuracy;
+      this.saveCachedLocation(fallbackLocation);
       this.isDetecting = false;
+      
+      // Enregistrer dans le moniteur
+      const detectionTime = Date.now() - startTime;
+      geolocationMonitor.recordDetection(fallbackLocation, detectionTime, true);
+      devLog.info(`✅ Géolocalisation fallback complétée en ${detectionTime}ms`);
+      
       return fallbackLocation;
 
     } catch (error) {
