@@ -247,6 +247,7 @@ function App() {
   return (
     <div className="App">
       <ErrorBoundary>
+        <PerformanceMonitor />
         <BrowserRouter>
           <LanguageProvider>
             <AuthProvider>
