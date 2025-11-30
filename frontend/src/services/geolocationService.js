@@ -219,7 +219,10 @@ class GeolocationService {
         return contextLocation;
       }
       
-      // Simulation réaliste pour l'Afrique de l'Ouest
+      // MÉTHODE 5: Fallback intelligent basé sur statistiques
+      devLog.info('🎲 Utilisation fallback intelligent...');
+      
+      // Simulation réaliste pour l'Afrique de l'Ouest avec données enrichies
       const locationMappings = {
         'mali': {
           cities: [
