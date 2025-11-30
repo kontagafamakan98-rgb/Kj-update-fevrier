@@ -1,4 +1,5 @@
 import { devLog, safeLog } from '../utils/env';
+import geolocationMonitor from '../utils/geolocationMonitor';
 
 /**
  * SERVICE DE GÉOLOCALISATION ULTRA-PRÉCIS - 100% DE PRÉCISION
