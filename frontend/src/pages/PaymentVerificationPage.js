@@ -67,6 +67,9 @@ const PaymentVerificationPage = () => {
         if (autoLoginResult.success) {
           devLog.info('🎉 Inscription réussie avec connexion automatique!');
           
+          // Toast de succès
+          toast.success(`Bienvenue ${result.data.user.first_name}! Compte vérifié avec succès 🎉`);
+          
           // Sauvegarder le statut de vérification
           PaymentAccountService.storeVerificationStatus({
             is_verified: result.data.user.is_verified,
