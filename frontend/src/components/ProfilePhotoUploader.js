@@ -15,6 +15,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
   
   const { user, updateUser } = useAuth();
   const { t } = useLanguage();
+  const toast = useToast();
   
   // Determine if this is for current user or another user
   const isCurrentUser = !targetUserId || targetUserId === user?.id;
