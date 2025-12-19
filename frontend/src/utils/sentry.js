@@ -1,15 +1,9 @@
 /**
  * Sentry Configuration for Error Tracking
- * 
- * Configuration désactivée par défaut.
- * Pour activer Sentry en production:
- * 1. Installer le package: yarn add @sentry/react
- * 2. Créer un compte sur https://sentry.io
- * 3. Obtenir votre DSN
- * 4. Définir REACT_APP_SENTRY_DSN dans le fichier .env
- * 5. Définir REACT_APP_SENTRY_ENABLED=true dans le fichier .env
+ * Optimisé pour l'Afrique de l'Ouest (filtre les erreurs réseau courantes)
  */
 
+import * as Sentry from '@sentry/react';
 import { devLog } from './env';
 
 // Configuration Sentry
@@ -30,7 +24,8 @@ const SENTRY_CONFIG = {
       if (
         errorMessage.includes('Network request failed') ||
         errorMessage.includes('Failed to fetch') ||
-        errorMessage.includes('timeout')
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('NetworkError')
       ) {
         devLog.info('Sentry: Ignored network error');
         return null;
@@ -45,29 +40,26 @@ const SENTRY_CONFIG = {
     'Non-Error exception captured',
     'Non-Error promise rejection captured',
     'ResizeObserver loop limit exceeded',
-    'SecurityError'
+    'SecurityError',
+    'ChunkLoadError'
   ]
 };
 
 /**
  * Initialiser Sentry
- * Cette fonction doit être appelée dans index.js
  */
-export async function initSentry() {
+export function initSentry() {
   if (!SENTRY_CONFIG.enabled) {
     devLog.info('📊 Sentry désactivé - pour activer, définir REACT_APP_SENTRY_ENABLED=true');
-    return;
+    return false;
   }
 
   if (!SENTRY_CONFIG.dsn) {
     devLog.warn('⚠️ Sentry activé mais DSN manquant - vérifier REACT_APP_SENTRY_DSN');
-    return;
+    return false;
   }
 
   try {
-    // Importer dynamiquement Sentry
-    const Sentry = await import('@sentry/react');
-    
     Sentry.init({
       dsn: SENTRY_CONFIG.dsn,
       environment: SENTRY_CONFIG.environment,
@@ -111,8 +103,16 @@ export async function initSentry() {
         // Ignore
       }
     }
+
+    // Exposer Sentry globalement pour debug
+    if (typeof window !== 'undefined') {
+      window.Sentry = Sentry;
+    }
+
+    return true;
   } catch (error) {
-    devLog.info('ℹ️ Sentry non installé - installer avec: yarn add @sentry/react');
+    devLog.error('❌ Erreur initialisation Sentry:', error);
+    return false;
   }
 }
 
@@ -126,7 +126,6 @@ export function captureError(error, context = {}) {
   }
 
   try {
-    const Sentry = require('@sentry/react');
     Sentry.captureException(error, {
       contexts: { custom: context }
     });
@@ -145,7 +144,6 @@ export function captureMessage(message, level = 'info') {
   }
 
   try {
-    const Sentry = require('@sentry/react');
     Sentry.captureMessage(message, level);
   } catch (e) {
     devLog[level] ? devLog[level](message) : devLog.info(message);
@@ -159,7 +157,6 @@ export function setUser(user) {
   if (!SENTRY_CONFIG.enabled) return;
 
   try {
-    const Sentry = require('@sentry/react');
     Sentry.setUser({
       id: user.id,
       email: user.email,
@@ -178,7 +175,6 @@ export function clearUser() {
   if (!SENTRY_CONFIG.enabled) return;
 
   try {
-    const Sentry = require('@sentry/react');
     Sentry.setUser(null);
   } catch (e) {
     // Ignore
@@ -192,7 +188,6 @@ export function addBreadcrumb(message, category = 'custom', level = 'info', data
   if (!SENTRY_CONFIG.enabled) return;
 
   try {
-    const Sentry = require('@sentry/react');
     Sentry.addBreadcrumb({
       message,
       category,
