@@ -3,9 +3,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCountryFromPhone, detectUserCountry, getPhoneExampleForCountry } from '../services/preciseGeolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
 import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
 import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
+import LoadingButton from '../components/LoadingButton';
 import { devLog, safeLog } from '../utils/env';
 
 export default function Register() {
