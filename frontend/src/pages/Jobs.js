@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import JobCreateModal from '../components/JobCreateModal';
 import MechanicRequirements from '../components/MechanicRequirements';
+import { ListSkeleton } from '../components/SkeletonLoader';
 import { devLog, safeLog } from '../utils/env';
 
 export default function Jobs() {
