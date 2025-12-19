@@ -3,6 +3,8 @@
  * Optimized for slow networks (2G/3G)
  */
 
+import { devLog } from './env';
+
 /**
  * Compress and resize image before upload
  * @param {File} file - Original image file
