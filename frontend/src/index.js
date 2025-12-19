@@ -3,6 +3,10 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+import { initSentry } from './utils/sentry';
+
+// Initialiser Sentry en premier (si activé)
+initSentry();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
