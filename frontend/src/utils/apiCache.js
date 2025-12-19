@@ -52,34 +52,34 @@ class APICache {
         devLog.info('📦 Cache HIT (memory):', url);
         return cached.data;
       }
-      this.memoryCache.delete(key);
     }
 
-    // Try localStorage (persistent across sessions)
+    // Try localStorage if available
     if (this.storageAvailable) {
       try {
-        const cached = localStorage.getItem(key);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (this.isValid(parsed)) {
-            console.log('📦 Cache HIT (storage):', url);
-            // Restore to memory cache
-            this.memoryCache.set(key, parsed);
-            return parsed.data;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const cached = JSON.parse(stored);
+          if (this.isValid(cached)) {
+            // Also store in memory cache for faster access
+            this.memoryCache.set(key, cached);
+            devLog.info('📦 Cache HIT (storage):', url);
+            return cached.data;
+          } else {
+            localStorage.removeItem(key);
           }
-          localStorage.removeItem(key);
         }
       } catch (e) {
-        console.warn('Cache read error:', e);
+        devLog.warn('Cache read error:', e);
       }
     }
 
-    console.log('📭 Cache MISS:', url);
+    devLog.info('📭 Cache MISS:', url);
     return null;
   }
 
   /**
-   * Store data in cache
+   * Set cache data
    * @param {string} url - API endpoint URL
    * @param {any} data - Data to cache
    * @param {Object} params - Request parameters
@@ -93,16 +93,16 @@ class APICache {
       ttl
     };
 
-    // Store in memory cache
+    // Always store in memory cache
     this.memoryCache.set(key, cached);
 
-    // Store in localStorage for persistence
+    // Try to store in localStorage if available
     if (this.storageAvailable) {
       try {
         localStorage.setItem(key, JSON.stringify(cached));
       } catch (e) {
-        console.warn('Cache write error (quota exceeded?):', e);
-        // Clear old cache entries if quota exceeded
+        devLog.warn('Cache write error (quota exceeded?):', e);
+        // If quota exceeded, clear old cache entries
         this.clearOldEntries();
       }
     }
@@ -112,35 +112,29 @@ class APICache {
    * Check if cached data is still valid
    */
   isValid(cached) {
-    if (!cached || !cached.timestamp || !cached.data) {
+    if (!cached || !cached.timestamp || !cached.ttl) {
       return false;
     }
-
     const age = Date.now() - cached.timestamp;
-    const ttl = cached.ttl || DEFAULT_TTL;
-    
-    return age < ttl;
+    return age < cached.ttl;
   }
 
   /**
-   * Invalidate cache for specific URL
+   * Clear specific cache entry
    */
-  invalidate(url, params = {}) {
+  clear(url, params = {}) {
     const key = this.generateKey(url, params);
-    
     this.memoryCache.delete(key);
-    
     if (this.storageAvailable) {
       localStorage.removeItem(key);
     }
   }
 
   /**
-   * Clear all cache
+   * Clear all cache entries
    */
   clearAll() {
     this.memoryCache.clear();
-    
     if (this.storageAvailable) {
       const keys = Object.keys(localStorage);
       keys.forEach(key => {
@@ -152,23 +146,30 @@ class APICache {
   }
 
   /**
-   * Clear old/expired cache entries
+   * Clear old cache entries to free up space
    */
   clearOldEntries() {
     if (!this.storageAvailable) return;
 
     const keys = Object.keys(localStorage);
-    keys.forEach(key => {
-      if (key.startsWith(CACHE_PREFIX)) {
-        try {
-          const cached = JSON.parse(localStorage.getItem(key));
-          if (!this.isValid(cached)) {
-            localStorage.removeItem(key);
-          }
-        } catch (e) {
-          localStorage.removeItem(key);
-        }
+    const cacheKeys = keys.filter(key => key.startsWith(CACHE_PREFIX));
+    
+    // Remove oldest entries first
+    const entries = cacheKeys.map(key => {
+      try {
+        const cached = JSON.parse(localStorage.getItem(key));
+        return { key, timestamp: cached.timestamp || 0 };
+      } catch (e) {
+        return { key, timestamp: 0 };
       }
+    });
+
+    entries.sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Remove oldest 25%
+    const toRemove = Math.ceil(entries.length * 0.25);
+    entries.slice(0, toRemove).forEach(entry => {
+      localStorage.removeItem(entry.key);
     });
   }
 
@@ -185,87 +186,82 @@ class APICache {
     }
 
     return {
-      memoryEntries: memorySize,
-      storageEntries: storageSize,
-      totalEntries: memorySize + storageSize
+      memorySize,
+      storageSize,
+      total: memorySize + storageSize
     };
   }
-}
 
-// Create singleton instance
-const apiCache = new APICache();
+  /**
+   * Wrapper for API calls with caching
+   * @param {string} url - API endpoint
+   * @param {Function} fetchFn - Function that performs the API call
+   * @param {Object} options - Cache options
+   */
+  async fetch(url, fetchFn, options = {}) {
+    const { params = {}, ttl = DEFAULT_TTL, forceRefresh = false, useStaleWhileRevalidate = false } = options;
 
-/**
- * Wrapper function for API calls with automatic caching
- * @param {Function} apiCall - Function that returns a Promise with API data
- * @param {string} cacheKey - Unique cache key for this call
- * @param {Object} options - Caching options
- */
-export async function cachedAPICall(apiCall, cacheKey, options = {}) {
-  const {
-    ttl = DEFAULT_TTL,
-    params = {},
-    forceRefresh = false,
-    cacheFirst = true
-  } = options;
-
-  // Try cache first if not forcing refresh
-  if (!forceRefresh && cacheFirst) {
-    const cached = apiCache.get(cacheKey, params);
-    if (cached !== null) {
-      return cached;
-    }
-  }
-
-  // Make actual API call
-  try {
-    const data = await apiCall();
-    
-    // Cache the result
-    apiCache.set(cacheKey, data, params, ttl);
-    
-    return data;
-  } catch (error) {
-    // On network error, try to return stale cache if available
-    if (!navigator.onLine) {
-      const staleCache = apiCache.get(cacheKey, params);
-      if (staleCache !== null) {
-        console.warn('⚠️ Using stale cache due to offline status');
-        return staleCache;
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = this.get(url, params);
+      if (cached !== null) {
+        // If using stale-while-revalidate, return cached and refresh in background
+        if (useStaleWhileRevalidate) {
+          // Refresh in background
+          fetchFn().then(data => {
+            this.set(url, data, params, ttl);
+          }).catch(() => {
+            // Ignore background refresh errors
+          });
+        }
+        return cached;
       }
     }
-    
-    throw error;
+
+    // Fetch fresh data
+    try {
+      const data = await fetchFn();
+      this.set(url, data, params, ttl);
+      return data;
+    } catch (error) {
+      // On error, try to return stale cache if available
+      const staleCache = this.get(url, params);
+      if (staleCache !== null && options.returnStaleOnError) {
+        devLog.warn('⚠️ Using stale cache due to error:', error.message);
+        return staleCache;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Check if user is offline
+   */
+  isOffline() {
+    return !navigator.onLine;
+  }
+
+  /**
+   * Fetch with offline support
+   * Automatically returns cached data if offline
+   */
+  async fetchWithOfflineSupport(url, fetchFn, options = {}) {
+    if (this.isOffline()) {
+      const cached = this.get(url, options.params);
+      if (cached !== null) {
+        devLog.warn('⚠️ Using stale cache due to offline status');
+        return cached;
+      }
+      throw new Error('Offline and no cached data available');
+    }
+
+    return this.fetch(url, fetchFn, { ...options, returnStaleOnError: true });
   }
 }
 
-/**
- * Invalidate cache for a specific endpoint
- */
-export function invalidateCache(cacheKey, params = {}) {
-  apiCache.invalidate(cacheKey, params);
-}
-
-/**
- * Clear all API cache
- */
-export function clearAllCache() {
-  apiCache.clearAll();
-}
-
-/**
- * Get cache statistics
- */
-export function getCacheStats() {
-  return apiCache.getStats();
-}
-
-// Cache TTL presets for different data types
-export const CACHE_TTL = {
-  STATIC: 60 * 60 * 1000,      // 1 hour - for rarely changing data (countries, categories)
-  MEDIUM: 5 * 60 * 1000,       // 5 minutes - for frequently accessed data (user profile, jobs list)
-  SHORT: 1 * 60 * 1000,        // 1 minute - for real-time data (messages, notifications)
-  LONG: 24 * 60 * 60 * 1000   // 24 hours - for very static data (translations, config)
-};
-
+// Export singleton instance
+const apiCache = new APICache();
 export default apiCache;
+
+// Also export class for testing
+export { APICache };
