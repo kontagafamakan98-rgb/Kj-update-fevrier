@@ -206,10 +206,10 @@ function monitorAccessibility() {
 
     // Log issues
     if (issues.length > 0) {
-      console.warn('♿ Problèmes d\'accessibilité détectés:');
-      issues.forEach(issue => console.warn(`  - ${issue}`));
+      devLog.warn('♿ Problèmes d\'accessibilité détectés:');
+      issues.forEach(issue => devLog.warn(`  - ${issue}`));
     } else {
-      console.log('✅ Aucun problème d\'accessibilité majeur détecté');
+      devLog.info('✅ Aucun problème d\'accessibilité majeur détecté');
     }
   }, 2000); // Wait for page to fully render
 }
@@ -243,7 +243,7 @@ function checkColorContrast() {
   });
 
   if (lowContrastCount > 0) {
-    console.warn(`♿ ${lowContrastCount} éléments avec potentiellement un faible contraste de couleur`);
+    devLog.warn(`♿ ${lowContrastCount} éléments avec potentiellement un faible contraste de couleur`);
   }
 }
 
