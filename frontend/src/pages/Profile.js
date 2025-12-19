@@ -84,8 +84,7 @@ export default function Profile() {
       setIsEditing(false);
       
       // Message de succès
-      setSuccess('Profil mis à jour avec succès');
-      setTimeout(() => setSuccess(''), 3000);
+      toast.success('Profil mis à jour avec succès ! ✅');
       
     } catch (error) {
       safeLog.error('Profile update error:', error);
