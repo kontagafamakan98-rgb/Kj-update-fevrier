@@ -119,6 +119,9 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         onUploadSuccess(photoUrl, fullUrl);
       }
 
+      // Show success toast
+      toast.success('Photo uploadée avec succès ! 📸');
+
       // Photo uploaded - waiting for user to click "Save" to confirm
     } catch (error) {
       safeLog.error('Error uploading photo:', error);
