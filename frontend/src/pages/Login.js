@@ -15,6 +15,7 @@ export default function Login() {
   
   const { login } = useAuth();
   const { t } = useLanguage();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
