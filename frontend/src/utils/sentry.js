@@ -65,9 +65,8 @@ export function initSentry() {
   }
 
   try {
-    // Note: Cette importation échouera si @sentry/react n'est pas installé
-    // C'est normal - Sentry est optionnel
-    const Sentry = require('@sentry/react');
+    // Importer dynamiquement Sentry
+    const Sentry = await import('@sentry/react');
     
     Sentry.init({
       dsn: SENTRY_CONFIG.dsn,
