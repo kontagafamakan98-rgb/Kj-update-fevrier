@@ -113,16 +113,12 @@ function AppRoutes() {
       {/* Main Navigation */}
       <Navbar />
       
+      {/* Toast Notifications */}
+      <ToastContainer />
+
       {/* Main Content with Suspense for lazy loaded routes */}
       <main className="pb-16 md:pb-0">
-        <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
-              <div className="mt-4 text-orange-600 font-medium">Chargement...</div>
-            </div>
-          </div>
-        }>
+        <Suspense fallback={<PageLoader message="Chargement de la page..." />}>
           <Routes>
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
