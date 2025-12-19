@@ -63,7 +63,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
     // Valider le fichier avant la compression
     const validation = validateImageFile(file);
     if (!validation.valid) {
-      alert(validation.errors.join('\n'));
+      validation.errors.forEach(error => toast.error(error));
       return;
     }
 
