@@ -80,13 +80,17 @@ export default function Register() {
 
     // Validation de base
     if (formData.password !== formData.confirmPassword) {
-      setError(t('passwordsDontMatch'));
+      const errorMsg = t('passwordsDontMatch');
+      setError(errorMsg);
+      toast.error(errorMsg);
       setLoading(false);
       return;
     }
 
     if (formData.password.length < 6) {
-      setError(t('passwordTooShort'));
+      const errorMsg = t('passwordTooShort');
+      setError(errorMsg);
+      toast.error(errorMsg);
       setLoading(false);
       return;
     }
@@ -94,13 +98,17 @@ export default function Register() {
     // Validation spécifique aux travailleurs
     if (formData.user_type === 'worker') {
       if (!formData.worker_specialties || formData.worker_specialties.length === 0) {
-        setError(t('workersMustSelectSkills'));
+        const errorMsg = t('workersMustSelectSkills');
+        setError(errorMsg);
+        toast.error(errorMsg);
         setLoading(false);
         return;
       }
 
       if (!formData.worker_experience_years) {
-        setError(t('pleaseIndicateExperience'));
+        const errorMsg = t('pleaseIndicateExperience');
+        setError(errorMsg);
+        toast.error(errorMsg);
         setLoading(false);
         return;
       }
