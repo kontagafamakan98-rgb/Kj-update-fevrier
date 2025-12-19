@@ -94,7 +94,9 @@ const PaymentVerificationPage = () => {
 
     } catch (error) {
       safeLog.error('❌ Erreur inscription avec paiement:', error);
-      setError(error.message || 'Erreur lors de l\'inscription avec vérification paiement');
+      const errorMsg = error.message || 'Erreur lors de l\'inscription avec vérification paiement';
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
