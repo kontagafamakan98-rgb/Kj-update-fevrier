@@ -49,7 +49,7 @@ class APICache {
     if (this.memoryCache.has(key)) {
       const cached = this.memoryCache.get(key);
       if (this.isValid(cached)) {
-        console.log('📦 Cache HIT (memory):', url);
+        devLog.info('📦 Cache HIT (memory):', url);
         return cached.data;
       }
       this.memoryCache.delete(key);
