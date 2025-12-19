@@ -1,5 +1,19 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
+/**
+ * LoadingSpinner Component
+ * Affiche un spinner de chargement animé réutilisable
+ * 
+ * @component
+ * @param {Object} props - Props du composant
+ * @param {('sm'|'md'|'lg'|'xl')} props.size - Taille du spinner (défaut: 'md')
+ * @param {('orange'|'blue'|'green'|'white')} props.color - Couleur du spinner (défaut: 'orange')
+ * @param {string} props.className - Classes CSS additionnelles
+ * 
+ * @example
+ * <LoadingSpinner size="lg" color="orange" />
+ */
 const LoadingSpinner = ({ size = 'md', color = 'orange', className = '' }) => {
   const sizeClasses = {
     sm: 'h-4 w-4',
@@ -26,6 +40,18 @@ const LoadingSpinner = ({ size = 'md', color = 'orange', className = '' }) => {
       </div>
     </div>
   );
+};
+
+LoadingSpinner.propTypes = {
+  size: PropTypes.oneOf(['sm', 'md', 'lg', 'xl']),
+  color: PropTypes.oneOf(['orange', 'blue', 'green', 'white']),
+  className: PropTypes.string
+};
+
+LoadingSpinner.defaultProps = {
+  size: 'md',
+  color: 'orange',
+  className: ''
 };
 
 export default LoadingSpinner;
