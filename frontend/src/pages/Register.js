@@ -38,6 +38,7 @@ export default function Register() {
   
   const { register } = useAuth();
   const { t, currentLanguage } = useLanguage();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const countries = getCountriesList();
