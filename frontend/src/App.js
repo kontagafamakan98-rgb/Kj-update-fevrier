@@ -253,7 +253,9 @@ function App() {
           <LanguageProvider>
             <AuthProvider>
               <PaymentProvider>
-                <AppRoutes />
+                <ToastProvider>
+                  <AppRoutes />
+                </ToastProvider>
               </PaymentProvider>
             </AuthProvider>
           </LanguageProvider>
