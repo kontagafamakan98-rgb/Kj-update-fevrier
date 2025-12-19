@@ -90,8 +90,18 @@ export default function Messages() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-lg shadow overflow-hidden h-[600px] flex">
+          <div className="w-1/3 border-r border-gray-200 p-4">
+            <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
+            <ListSkeleton count={4} type="message" />
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-gray-400 text-center">
+              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mx-auto"></div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
