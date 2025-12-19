@@ -133,7 +133,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       }
       
       const errorMessage = error.message || "Impossible d'envoyer la photo, réessayez.";
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setUploading(false);
     }
