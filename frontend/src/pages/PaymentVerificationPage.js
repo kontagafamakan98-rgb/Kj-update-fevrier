@@ -13,6 +13,7 @@ const PaymentVerificationPage = () => {
   const location = useLocation();
   const { autoLoginAfterRegistration } = useAuth(); // Ajout de la fonction d'auto-login
   const { t } = useLanguage(); // Ajout de la fonction de traduction
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [detectedCountry, setDetectedCountry] = useState(null);
