@@ -53,7 +53,7 @@ const SENTRY_CONFIG = {
  * Initialiser Sentry
  * Cette fonction doit être appelée dans index.js
  */
-export function initSentry() {
+export async function initSentry() {
   if (!SENTRY_CONFIG.enabled) {
     devLog.info('📊 Sentry désactivé - pour activer, définir REACT_APP_SENTRY_ENABLED=true');
     return;
