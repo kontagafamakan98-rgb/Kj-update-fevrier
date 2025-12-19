@@ -88,7 +88,9 @@ export default function Profile() {
       
     } catch (error) {
       safeLog.error('Profile update error:', error);
-      setError(error.response?.data?.detail || error.message || 'Erreur lors de la mise à jour');
+      const errorMsg = error.response?.data?.detail || error.message || 'Erreur lors de la mise à jour';
+      setError(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
