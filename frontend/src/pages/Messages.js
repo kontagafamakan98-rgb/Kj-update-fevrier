@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { messagesAPI, handleApiError } from '../services/api';
+import { ListSkeleton } from '../components/SkeletonLoader';
 import { devLog, safeLog } from '../utils/env';
 
 export default function Messages() {
