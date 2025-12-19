@@ -6,6 +6,7 @@ import { devLog, safeLog } from './utils/env';
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { PaymentProvider } from './contexts/PaymentContext';
+import { ToastProvider } from './contexts/ToastContext';
 import Navbar from "./components/Navbar";
 import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
@@ -13,6 +14,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AccessibilityHelper from "./components/AccessibilityHelper";
+import ToastContainer from "./components/ToastContainer";
+import PageLoader from "./components/PageLoader";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
 // Eager load critical pages (public pages shown immediately)
