@@ -124,7 +124,7 @@ export async function convertToWebP(file) {
   const isWebPSupported = canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
   
   if (!isWebPSupported) {
-    console.log('WebP not supported, using JPEG');
+    devLog.info('WebP not supported, using JPEG');
     return compressImage(file, { format: 'image/jpeg' });
   }
   
