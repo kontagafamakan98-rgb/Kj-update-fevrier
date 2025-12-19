@@ -23,6 +23,7 @@ export default function Profile() {
   
   const { user, loadUser, updateUser } = useAuth();
   const { t, changeLanguage } = useLanguage();
+  const toast = useToast();
 
   useEffect(() => {
     loadProfile();
