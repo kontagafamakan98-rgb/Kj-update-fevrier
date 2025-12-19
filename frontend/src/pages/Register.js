@@ -127,6 +127,9 @@ export default function Register() {
     // Rediriger vers la vérification des comptes de paiement
     devLog.info('📝 Redirection vers vérification des comptes de paiement...');
     
+    // Toast de succès pour la préparation
+    toast.success('Informations enregistrées ! Étape suivante... ✅');
+    
     // Passer les données à la page de vérification
     navigate('/payment-verification', {
       state: {
