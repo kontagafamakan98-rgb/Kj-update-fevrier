@@ -3,6 +3,8 @@
  * Reduces API calls on slow networks by caching responses
  */
 
+import { devLog } from './env';
+
 const CACHE_PREFIX = 'kojo_api_cache_';
 const DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes default
 
