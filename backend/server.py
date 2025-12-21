@@ -435,6 +435,15 @@ class PushToken(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Request/Response Models
+# Pattern pour détecter les tentatives d'injection SQL
+SQL_INJECTION_PATTERN = re.compile(r"['\";#\-\-]|(/\*)|(\*/)|(\bOR\b)|(\bAND\b)|(\bUNION\b)|(\bSELECT\b)|(\bDROP\b)|(\bINSERT\b)|(\bDELETE\b)|(\bUPDATE\b)", re.IGNORECASE)
+
+def validate_no_sql_injection(value: str, field_name: str) -> str:
+    """Valider qu'une chaîne ne contient pas de caractères d'injection SQL"""
+    if SQL_INJECTION_PATTERN.search(value):
+        raise ValueError(f"Le champ {field_name} contient des caractères non autorisés")
+    return value
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6, max_length=100, description="Mot de passe (minimum 6 caractères)")
@@ -449,6 +458,20 @@ class UserRegister(BaseModel):
     def password_must_be_strong(cls, v):
         if not v or len(v.strip()) < 6:
             raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        return v
+    
+    @validator('email')
+    def email_no_injection(cls, v):
+        # Vérifier que l'email ne contient pas de tentatives d'injection
+        email_str = str(v)
+        if SQL_INJECTION_PATTERN.search(email_str):
+            raise ValueError("L'adresse email contient des caractères non autorisés")
+        return v
+    
+    @validator('first_name', 'last_name')
+    def names_no_injection(cls, v):
+        if SQL_INJECTION_PATTERN.search(v):
+            raise ValueError("Le nom contient des caractères non autorisés")
         return v
 
 class PaymentAccount(BaseModel):
