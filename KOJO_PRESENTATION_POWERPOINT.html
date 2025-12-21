@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KOJO - Présentation PowerPoint</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+        }
+        
+        .slide {
+            width: 1280px;
+            height: 720px;
+            margin: 20px auto;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+            page-break-after: always;
+        }
+        
+        /* Slide 1 - Cover */
+        .slide-1 {
+            background: linear-gradient(135deg, #EA580C 0%, #DC2626 100%);
+        }
+        
+        .slide-1 .bg-image {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 60%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.3;
+        }
+        
+        .slide-1 .content {
+            position: relative;
+            z-index: 2;
+            padding: 80px;
+            color: white;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .slide-1 .logo {
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #EA580C;
+            margin-bottom: 40px;
+        }
+        
+        .slide-1 h1 {
+            font-size: 64px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .slide-1 .subtitle {
+            font-size: 28px;
+            opacity: 0.95;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+        
+        .slide-1 .countries {
+            margin-top: 40px;
+            font-size: 24px;
+            display: flex;
+            gap: 20px;
+        }
+        
+        .slide-1 .country {
+            background: rgba(255,255,255,0.2);
+            padding: 10px 20px;
+            border-radius: 30px;
+        }
+        
+        /* Slide 2 - Problem */
+        .slide-2 {
+            background: #FAFAFA;
+        }
+        
+        .slide-2 .header {
+            background: #EA580C;
+            color: white;
+            padding: 30px 80px;
+        }
+        
+        .slide-2 .header h2 {
+            font-size: 36px;
+        }
+        
+        .slide-2 .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            padding: 60px 80px;
+        }
+        
+        .slide-2 .problem-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .slide-2 .problem-card h3 {
+            color: #DC2626;
+            font-size: 24px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .slide-2 .problem-card p {
+            color: #666;
+            font-size: 18px;
+            line-height: 1.6;
+        }
+        
+        .slide-2 .stats {
+            display: flex;
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .slide-2 .stat {
+            text-align: center;
+        }
+        
+        .slide-2 .stat-number {
+            font-size: 48px;
+            font-weight: 800;
+            color: #EA580C;
+        }
+        
+        .slide-2 .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        /* Slide 3 - Solution */
+        .slide-3 {
+            background: linear-gradient(135deg, #111827 0%, #1F2937 100%);
+            color: white;
+        }
+        
+        .slide-3 .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+        }
+        
+        .slide-3 .left {
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .slide-3 .badge {
+            background: #EA580C;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            width: fit-content;
+            margin-bottom: 30px;
+        }
+        
+        .slide-3 h2 {
+            font-size: 48px;
+            margin-bottom: 30px;
+        }
+        
+        .slide-3 .features {
+            list-style: none;
+        }
+        
+        .slide-3 .features li {
+            font-size: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .slide-3 .features li::before {
+            content: "✓";
+            background: #22C55E;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .slide-3 .right {
+            position: relative;
+        }
+        
+        .slide-3 .right img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .slide-3 .phone-mockup {
+            position: absolute;
+            bottom: 40px;
+            left: -60px;
+            width: 280px;
+            height: 500px;
+            background: white;
+            border-radius: 40px;
+            padding: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        
+        .slide-3 .phone-screen {
+            background: #F3F4F6;
+            border-radius: 30px;
+            height: 100%;
+            padding: 20px;
+            overflow: hidden;
+        }
+        
+        .slide-3 .phone-header {
+            background: #EA580C;
+            margin: -20px -20px 20px -20px;
+            padding: 40px 20px 20px;
+            color: white;
+        }
+        
+        .slide-3 .phone-header h4 {
+            font-size: 18px;
+        }
+        
+        .slide-3 .phone-card {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .slide-3 .phone-card-title {
+            font-size: 14px;
+            color: #111;
+            font-weight: 600;
+        }
+        
+        .slide-3 .phone-card-sub {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        /* Slide 4 - Coverage */
+        .slide-4 {
+            background: white;
+        }
+        
+        .slide-4 .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+        }
+        
+        .slide-4 .left {
+            padding: 80px;
+        }
+        
+        .slide-4 h2 {
+            font-size: 42px;
+            color: #111;
+            margin-bottom: 40px;
+        }
+        
+        .slide-4 .country-list {
+            list-style: none;
+        }
+        
+        .slide-4 .country-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 25px;
+            background: #F9FAFB;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        
+        .slide-4 .country-item:hover {
+            background: #FFF7ED;
+            transform: translateX(10px);
+        }
+        
+        .slide-4 .flag {
+            font-size: 40px;
+        }
+        
+        .slide-4 .country-info h4 {
+            font-size: 20px;
+            color: #111;
+        }
+        
+        .slide-4 .country-info p {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .slide-4 .right {
+            background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .slide-4 .map-container {
+            width: 90%;
+            height: 90%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .slide-4 .map-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        /* Slide 5 - Services */
+        .slide-5 {
+            background: #F9FAFB;
+        }
+        
+        .slide-5 .header {
+            text-align: center;
+            padding: 50px;
+        }
+        
+        .slide-5 .header h2 {
+            font-size: 42px;
+            color: #111;
+        }
+        
+        .slide-5 .header p {
+            color: #666;
+            font-size: 20px;
+            margin-top: 10px;
+        }
+        
+        .slide-5 .services-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 25px;
+            padding: 0 60px 60px;
+        }
+        
+        .slide-5 .service-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+        
+        .slide-5 .service-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 40px rgba(234, 88, 12, 0.2);
+        }
+        
+        .slide-5 .service-image {
+            height: 180px;
+            overflow: hidden;
+        }
+        
+        .slide-5 .service-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .slide-5 .service-info {
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .slide-5 .service-icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        
+        .slide-5 .service-info h4 {
+            font-size: 18px;
+            color: #111;
+            margin-bottom: 5px;
+        }
+        
+        .slide-5 .service-info p {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* Slide 6 - Payment */
+        .slide-6 {
+            background: linear-gradient(135deg, #EA580C 0%, #F97316 100%);
+            color: white;
+        }
+        
+        .slide-6 .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+        }
+        
+        .slide-6 .left {
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .slide-6 h2 {
+            font-size: 42px;
+            margin-bottom: 30px;
+        }
+        
+        .slide-6 p {
+            font-size: 20px;
+            opacity: 0.9;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+        
+        .slide-6 .payment-methods {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .slide-6 .payment-method {
+            background: rgba(255,255,255,0.2);
+            padding: 20px 30px;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .slide-6 .payment-method .icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        
+        .slide-6 .payment-method h4 {
+            font-size: 16px;
+        }
+        
+        .slide-6 .right {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        
+        .slide-6 .right img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 20px;
+        }
+        
+        /* Slide 7 - Stats */
+        .slide-7 {
+            background: #111827;
+            color: white;
+        }
+        
+        .slide-7 .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+        }
+        
+        .slide-7 .left {
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .slide-7 h2 {
+            font-size: 42px;
+            margin-bottom: 50px;
+        }
+        
+        .slide-7 .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .slide-7 .stat-card {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+        }
+        
+        .slide-7 .stat-value {
+            font-size: 48px;
+            font-weight: 800;
+            color: #F97316;
+        }
+        
+        .slide-7 .stat-label {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+        
+        .slide-7 .right {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+        
+        .slide-7 .right img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 20px;
+        }
+        
+        /* Slide 8 - Technology */
+        .slide-8 {
+            background: white;
+        }
+        
+        .slide-8 .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            height: 100%;
+        }
+        
+        .slide-8 .left {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            background: #F3F4F6;
+        }
+        
+        .slide-8 .left img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 20px;
+        }
+        
+        .slide-8 .right {
+            padding: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .slide-8 h2 {
+            font-size: 42px;
+            color: #111;
+            margin-bottom: 40px;
+        }
+        
+        .slide-8 .tech-stack {
+            list-style: none;
+        }
+        
+        .slide-8 .tech-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            background: #F9FAFB;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .slide-8 .tech-icon {
+            width: 50px;
+            height: 50px;
+            background: #EA580C;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .slide-8 .tech-info h4 {
+            font-size: 18px;
+            color: #111;
+        }
+        
+        .slide-8 .tech-info p {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* Slide 9 - Roadmap */
+        .slide-9 {
+            background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+            color: white;
+        }
+        
+        .slide-9 .header {
+            text-align: center;
+            padding: 50px;
+        }
+        
+        .slide-9 h2 {
+            font-size: 42px;
+        }
+        
+        .slide-9 .timeline {
+            display: flex;
+            justify-content: center;
+            padding: 0 80px;
+            position: relative;
+        }
+        
+        .slide-9 .timeline::before {
+            content: "";
+            position: absolute;
+            top: 30px;
+            left: 150px;
+            right: 150px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .slide-9 .timeline-item {
+            flex: 1;
+            text-align: center;
+            padding: 0 20px;
+            position: relative;
+        }
+        
+        .slide-9 .timeline-dot {
+            width: 60px;
+            height: 60px;
+            background: #EA580C;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 20px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .slide-9 .timeline-item.completed .timeline-dot {
+            background: #22C55E;
+        }
+        
+        .slide-9 .timeline-item h4 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .slide-9 .timeline-item p {
+            font-size: 14px;
+            opacity: 0.7;
+            line-height: 1.5;
+        }
+        
+        /* Slide 10 - Contact */
+        .slide-10 {
+            background: linear-gradient(135deg, #EA580C 0%, #DC2626 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .slide-10 .content {
+            max-width: 800px;
+        }
+        
+        .slide-10 .logo {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            font-weight: bold;
+            color: #EA580C;
+            margin: 0 auto 40px;
+        }
+        
+        .slide-10 h2 {
+            font-size: 48px;
+            margin-bottom: 30px;
+        }
+        
+        .slide-10 p {
+            font-size: 24px;
+            opacity: 0.9;
+            margin-bottom: 50px;
+        }
+        
+        .slide-10 .contact-info {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+        }
+        
+        .slide-10 .contact-item {
+            background: rgba(255,255,255,0.2);
+            padding: 20px 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .slide-10 .contact-item .icon {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .slide-10 .contact-item span {
+            font-size: 16px;
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+            }
+            .slide {
+                box-shadow: none;
+                margin: 0;
+                page-break-after: always;
+            }
+        }
+        
+        .slide-number {
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            font-size: 14px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+
+<!-- SLIDE 1: Cover -->
+<div class="slide slide-1">
+    <img src="https://images.unsplash.com/photo-1688240817677-d28b8e232dd4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxBZnJpY2FuJTIwd29ya2VycyUyMHByb2Zlc3Npb25hbHN8ZW58MHx8fHwxNzY2MzUxMDI0fDA&ixlib=rb-4.1.0&q=85&w=800" alt="African Workers" class="bg-image">
+    <div class="content">
+        <div class="logo">K</div>
+        <h1>KOJO</h1>
+        <p class="subtitle">Plateforme de mise en relation entre travailleurs qualifiés et clients en Afrique de l'Ouest</p>
+        <div class="countries">
+            <span class="country">🇲🇱 Mali</span>
+            <span class="country">🇸🇳 Sénégal</span>
+            <span class="country">🇧🇫 Burkina Faso</span>
+            <span class="country">🇨🇮 Côte d'Ivoire</span>
+        </div>
+    </div>
+    <div class="slide-number" style="color: white;">1 / 10</div>
+</div>
+
+<!-- SLIDE 2: Problem -->
+<div class="slide slide-2">
+    <div class="header">
+        <h2>❓ Le Problème</h2>
+    </div>
+    <div class="content">
+        <div class="problem-card">
+            <h3>😟 Pour les Clients</h3>
+            <p>Difficulté à trouver des travailleurs qualifiés et fiables. Pas de garantie sur la qualité du travail. Manque de transparence sur les prix.</p>
+        </div>
+        <div class="problem-card">
+            <h3>😰 Pour les Travailleurs</h3>
+            <p>Accès limité aux opportunités d'emploi. Pas de plateforme pour montrer leurs compétences. Revenus instables et imprévisibles.</p>
+        </div>
+        <div class="problem-card">
+            <h3>💰 Économie Informelle</h3>
+            <p>Plus de 85% de l'emploi en Afrique de l'Ouest est informel. Pas de traçabilité des transactions. Manque de confiance entre parties.</p>
+        </div>
+        <div class="problem-card">
+            <h3>📊 Opportunité de Marché</h3>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-number">84M+</div>
+                    <div class="stat-label">Population active</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">$50B+</div>
+                    <div class="stat-label">Marché services</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="slide-number">2 / 10</div>
+</div>
+
+<!-- SLIDE 3: Solution -->
+<div class="slide slide-3">
+    <div class="content">
+        <div class="left">
+            <div class="badge">💡 LA SOLUTION</div>
+            <h2>Kojo connecte travailleurs et clients</h2>
+            <ul class="features">
+                <li>Inscription simplifiée avec géolocalisation automatique</li>
+                <li>Profils vérifiés avec système de notation</li>
+                <li>Messagerie intégrée client-travailleur</li>
+                <li>Paiements sécurisés (Orange Money, Wave)</li>
+                <li>Support multilingue (FR, EN, Wolof, Bambara)</li>
+                <li>Application PWA optimisée pour réseaux 2G/3G</li>
+            </ul>
+        </div>
+        <div class="right">
+            <img src="https://images.unsplash.com/photo-1668243304566-2e78ebd48960?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwzfHxBZnJpY2FuJTIwd29ya2VycyUyMHByb2Zlc3Npb25hbHN8ZW58MHx8fHwxNzY2MzUxMDI0fDA&ixlib=rb-4.1.0&q=85&w=800" alt="Workers">
+            <div class="phone-mockup">
+                <div class="phone-screen">
+                    <div class="phone-header">
+                        <h4>🔧 Emplois disponibles</h4>
+                    </div>
+                    <div class="phone-card">
+                        <div class="phone-card-title">Réparation moto Honda</div>
+                        <div class="phone-card-sub">📍 Dakar • 💰 15,000 FCFA</div>
+                    </div>
+                    <div class="phone-card">
+                        <div class="phone-card-title">Installation solaire</div>
+                        <div class="phone-card-sub">📍 Bamako • 💰 50,000 FCFA</div>
+                    </div>
+                    <div class="phone-card">
+                        <div class="phone-card-title">Couture boubou</div>
+                        <div class="phone-card-sub">📍 Abidjan • 💰 25,000 FCFA</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="slide-number" style="color: white;">3 / 10</div>
+</div>
+
+<!-- SLIDE 4: Coverage -->
+<div class="slide slide-4">
+    <div class="content">
+        <div class="left">
+            <h2>🌍 Couverture Géographique</h2>
+            <ul class="country-list">
+                <li class="country-item">
+                    <span class="flag">🇲🇱</span>
+                    <div class="country-info">
+                        <h4>Mali</h4>
+                        <p>Bamako, Sikasso, Ségou • +223</p>
+                    </div>
+                </li>
+                <li class="country-item">
+                    <span class="flag">🇸🇳</span>
+                    <div class="country-info">
+                        <h4>Sénégal</h4>
+                        <p>Dakar, Thiès, Saint-Louis • +221</p>
+                    </div>
+                </li>
+                <li class="country-item">
+                    <span class="flag">🇧🇫</span>
+                    <div class="country-info">
+                        <h4>Burkina Faso</h4>
+                        <p>Ouagadougou, Bobo-Dioulasso • +226</p>
+                    </div>
+                </li>
+                <li class="country-item">
+                    <span class="flag">🇨🇮</span>
+                    <div class="country-info">
+                        <h4>Côte d'Ivoire</h4>
+                        <p>Abidjan, Bouaké, Yamoussoukro • +225</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <div class="right">
+            <div class="map-container">
+                <img src="https://images.unsplash.com/photo-1753045871205-4f8f0aa3fdf0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwyfHxXZXN0JTIwQWZyaWNhJTIwbWFwfGVufDB8fHx8MTc2NjM1MTA1N3ww&ixlib=rb-4.1.0&q=85&w=800" alt="West Africa Map">
+            </div>
+        </div>
+    </div>
+    <div class="slide-number">4 / 10</div>
+</div>
+
+<!-- SLIDE 5: Services -->
+<div class="slide slide-5">
+    <div class="header">
+        <h2>🔧 Services Proposés</h2>
+        <p>Des métiers adaptés aux besoins locaux</p>
+    </div>
+    <div class="services-grid">
+        <div class="service-card">
+            <div class="service-image">
+                <img src="https://images.unsplash.com/photo-1710918861674-c64a977f9de6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwxfHxBZnJpY2FuJTIwbWVjaGFuaWMlMjBjb25zdHJ1Y3Rpb258ZW58MHx8fHwxNzY2MzUxMDM2fDA&ixlib=rb-4.1.0&q=85&w=400" alt="Mechanic">
+            </div>
+            <div class="service-info">
+                <div class="service-icon">🔧</div>
+                <h4>Mécanique Moto</h4>
+                <p>Réparation & entretien</p>
+            </div>
+        </div>
+        <div class="service-card">
+            <div class="service-image">
+                <img src="https://images.unsplash.com/photo-1688241320695-6ca991df8818?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHw0fHxBZnJpY2FuJTIwbWVjaGFuaWMlMjBjb25zdHJ1Y3Rpb258ZW58MHx8fHwxNzY2MzUxMDM2fDA&ixlib=rb-4.1.0&q=85&w=400" alt="Electrician">
+            </div>
+            <div class="service-info">
+                <div class="service-icon">⚡</div>
+                <h4>Électricité</h4>
+                <p>Installation & dépannage</p>
+            </div>
+        </div>
+        <div class="service-card">
+            <div class="service-image">
+                <img src="https://images.unsplash.com/photo-1688240817677-d28b8e232dd4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwyfHxBZnJpY2FuJTIwd29ya2VycyUyMHByb2Zlc3Npb25hbHN8ZW58MHx8fHwxNzY2MzUxMDI0fDA&ixlib=rb-4.1.0&q=85&w=400" alt="Tailor">
+            </div>
+            <div class="service-info">
+                <div class="service-icon">🪡</div>
+                <h4>Couture</h4>
+                <p>Traditionnelle & moderne</p>
+            </div>
+        </div>
+        <div class="service-card">
+            <div class="service-image">
+                <img src="https://images.unsplash.com/photo-1668243304566-2e78ebd48960?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwzfHxBZnJpY2FuJTIwd29ya2VycyUyMHByb2Zlc3Npb25hbHN8ZW58MHx8fHwxNzY2MzUxMDI0fDA&ixlib=rb-4.1.0&q=85&w=400" alt="Construction">
+            </div>
+            <div class="service-info">
+                <div class="service-icon">🏗️</div>
+                <h4>Construction</h4>
+                <p>Maçonnerie & finition</p>
+            </div>
+        </div>
+    </div>
+    <div class="slide-number">5 / 10</div>
+</div>
+
+<!-- SLIDE 6: Payment -->
+<div class="slide slide-6">
+    <div class="content">
+        <div class="left">
+            <h2>💳 Paiements Sécurisés</h2>
+            <p>Intégration des solutions de paiement mobile les plus populaires en Afrique de l'Ouest. Transactions rapides, sécurisées et traçables.</p>
+            <div class="payment-methods">
+                <div class="payment-method">
+                    <div class="icon">🟠</div>
+                    <h4>Orange Money</h4>
+                </div>
+                <div class="payment-method">
+                    <div class="icon">🔵</div>
+                    <h4>Wave</h4>
+                </div>
+                <div class="payment-method">
+                    <div class="icon">🏦</div>
+                    <h4>Virement</h4>
+                </div>
+            </div>
+        </div>
+        <div class="right">
+            <img src="https://images.unsplash.com/photo-1576814547952-f8531781d7ef?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwyfHxtb2JpbGUlMjBwYXltZW50JTIwQWZyaWNhfGVufDB8fHx8MTc2NjM1MTAzMHww&ixlib=rb-4.1.0&q=85&w=600" alt="Mobile Payment">
+        </div>
+    </div>
+    <div class="slide-number" style="color: white;">6 / 10</div>
+</div>
+
+<!-- SLIDE 7: Statistics -->
+<div class="slide slide-7">
+    <div class="content">
+        <div class="left">
+            <h2>📊 Chiffres Clés</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">500+</div>
+                    <div class="stat-label">Travailleurs actifs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">1,000+</div>
+                    <div class="stat-label">Emplois créés</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">4</div>
+                    <div class="stat-label">Pays couverts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">4.5/5</div>
+                    <div class="stat-label">Note moyenne</div>
+                </div>
+            </div>
+        </div>
+        <div class="right">
+            <img src="https://images.unsplash.com/photo-1730382624761-af8112d26209?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwzfHxidXNpbmVzcyUyMGdyb3d0aCUyMHN1Y2Nlc3N8ZW58MHx8fHwxNzY2MzUxMDUxfDA&ixlib=rb-4.1.0&q=85&w=600" alt="Business Growth">
+        </div>
+    </div>
+    <div class="slide-number" style="color: white;">7 / 10</div>
+</div>
+
+<!-- SLIDE 8: Technology -->
+<div class="slide slide-8">
+    <div class="content">
+        <div class="left">
+            <img src="https://images.unsplash.com/photo-1759256243611-502772ac391b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxzbWFydHBob25lJTIwQWZyaWNhJTIwdGVjaG5vbG9neXxlbnwwfHx8fDE3NjYzNTEwNDR8MA&ixlib=rb-4.1.0&q=85&w=600" alt="Technology">
+        </div>
+        <div class="right">
+            <h2>⚙️ Stack Technologique</h2>
+            <ul class="tech-stack">
+                <li class="tech-item">
+                    <div class="tech-icon">⚛️</div>
+                    <div class="tech-info">
+                        <h4>React + PWA</h4>
+                        <p>Application progressive optimisée mobile</p>
+                    </div>
+                </li>
+                <li class="tech-item">
+                    <div class="tech-icon">🐍</div>
+                    <div class="tech-info">
+                        <h4>FastAPI</h4>
+                        <p>Backend Python haute performance</p>
+                    </div>
+                </li>
+                <li class="tech-item">
+                    <div class="tech-icon">🍃</div>
+                    <div class="tech-info">
+                        <h4>MongoDB</h4>
+                        <p>Base de données NoSQL scalable</p>
+                    </div>
+                </li>
+                <li class="tech-item">
+                    <div class="tech-icon">🔒</div>
+                    <div class="tech-info">
+                        <h4>Sentry</h4>
+                        <p>Monitoring et gestion d'erreurs</p>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="slide-number">8 / 10</div>
+</div>
+
+<!-- SLIDE 9: Roadmap -->
+<div class="slide slide-9">
+    <div class="header">
+        <h2>🗓️ Roadmap</h2>
+    </div>
+    <div class="timeline">
+        <div class="timeline-item completed">
+            <div class="timeline-dot">✓</div>
+            <h4>Q1 2025</h4>
+            <p>MVP lancé<br>4 pays couverts<br>500+ utilisateurs</p>
+        </div>
+        <div class="timeline-item completed">
+            <div class="timeline-dot">✓</div>
+            <h4>Q2 2025</h4>
+            <p>Paiements intégrés<br>Multilingue (4 langues)<br>PWA optimisée</p>
+        </div>
+        <div class="timeline-item">
+            <div class="timeline-dot">3</div>
+            <h4>Q3 2025</h4>
+            <p>App mobile native<br>5,000 utilisateurs<br>Partenariats locaux</p>
+        </div>
+        <div class="timeline-item">
+            <div class="timeline-dot">4</div>
+            <h4>Q4 2025</h4>
+            <p>Expansion régionale<br>20,000 utilisateurs<br>Monétisation</p>
+        </div>
+    </div>
+    <div class="slide-number" style="color: white;">9 / 10</div>
+</div>
+
+<!-- SLIDE 10: Contact -->
+<div class="slide slide-10">
+    <div class="content">
+        <div class="logo">K</div>
+        <h2>Rejoignez l'aventure Kojo</h2>
+        <p>Ensemble, connectons les talents d'Afrique de l'Ouest</p>
+        <div class="contact-info">
+            <div class="contact-item">
+                <div class="icon">🌐</div>
+                <span>kojo.app</span>
+            </div>
+            <div class="contact-item">
+                <div class="icon">📧</div>
+                <span>contact@kojo.app</span>
+            </div>
+            <div class="contact-item">
+                <div class="icon">📱</div>
+                <span>+221 77 XXX XX XX</span>
+            </div>
+        </div>
+    </div>
+    <div class="slide-number" style="color: white;">10 / 10</div>
+</div>
+
+<script>
+    // Instructions pour conversion en PowerPoint
+    console.log(`
+    ═══════════════════════════════════════════════════════════
+    📊 GUIDE DE CONVERSION EN POWERPOINT
+    ═══════════════════════════════════════════════════════════
+    
+    OPTION 1: Capture d'écran + PowerPoint
+    1. Ouvrir ce fichier HTML dans Chrome/Firefox
+    2. Faire une capture d'écran de chaque slide
+    3. Importer les images dans PowerPoint
+    
+    OPTION 2: PDF puis PowerPoint
+    1. Imprimer ce fichier en PDF (Ctrl+P)
+    2. Utiliser Adobe Acrobat pour convertir en PPTX
+    
+    OPTION 3: Outils en ligne
+    1. https://www.ilovepdf.com/html_to_powerpoint
+    2. https://cloudconvert.com/html-to-pptx
+    
+    ═══════════════════════════════════════════════════════════
+    `);
+</script>
+
+</body>
+</html>
