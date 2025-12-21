@@ -1498,6 +1498,17 @@ async def send_message(
     await db.messages.insert_one(message.dict())
     return {"message": "Message sent successfully"}
 
+@api_router.get("/messages")
+async def get_all_messages(current_user: User = Depends(get_current_user)):
+    """Récupérer tous les messages de l'utilisateur connecté"""
+    messages = await db.messages.find({
+        "$or": [
+            {"sender_id": current_user.id},
+            {"receiver_id": current_user.id}
+        ]
+    }, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return messages
+
 @api_router.get("/messages/conversations")
 async def get_conversations(current_user: User = Depends(get_current_user)):
     # Get unique conversation partners
