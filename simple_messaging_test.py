@@ -8,7 +8,7 @@ import json
 import time
 
 def test_messaging_core():
-    base_url = "https://geoloc-boost.preview.emergentagent.com/api"
+    base_url = "https://westafricaboost.preview.emergentagent.com/api"
     
     print("🔍 Testing Messaging System Core Functionality")
     print("="*60)
