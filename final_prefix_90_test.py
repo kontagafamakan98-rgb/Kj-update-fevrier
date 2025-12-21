@@ -9,7 +9,7 @@ import json
 
 def test_prefix_90_final():
     """Test final du préfixe 90 avec données valides"""
-    base_url = "https://geoloc-boost.preview.emergentagent.com/api"
+    base_url = "https://westafricaboost.preview.emergentagent.com/api"
     
     print("🎯 TEST FINAL PRÉFIXE 90 ORANGE MONEY")
     print("=" * 60)

@@ -7,7 +7,7 @@ import requests
 import json
 
 def test_basic_endpoints():
-    base_url = "https://geoloc-boost.preview.emergentagent.com/api"
+    base_url = "https://westafricaboost.preview.emergentagent.com/api"
     
     print("🏆 SIMPLE GRADE S+ TESTING")
     print("=" * 40)

@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 
 def test_job_management():
-    base_url = "https://geoloc-boost.preview.emergentagent.com/api"
+    base_url = "https://westafricaboost.preview.emergentagent.com/api"
     
     print("🔧 TESTING JOB MANAGEMENT WITH MECHANIC REQUIREMENTS")
     print("="*60)
