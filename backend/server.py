@@ -467,14 +467,20 @@ class PaymentAccount(BaseModel):
 
 class UserWithPayment(BaseModel):
     email: EmailStr
-    password: str
-    first_name: str
-    last_name: str
+    password: str = Field(min_length=6, max_length=100, description="Mot de passe (minimum 6 caractères)")
+    first_name: str = Field(min_length=2, max_length=50)
+    last_name: str = Field(min_length=2, max_length=50)
     phone: str
     user_type: UserType
     country: Country
     preferred_language: Language
     payment_accounts: PaymentAccount
+    
+    @validator('password')
+    def password_must_be_strong(cls, v):
+        if not v or len(v.strip()) < 6:
+            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        return v
     # Informations spécifiques aux travailleurs (optionnelles)
     worker_specialties: Optional[List[str]] = None
     worker_experience_years: Optional[int] = None
