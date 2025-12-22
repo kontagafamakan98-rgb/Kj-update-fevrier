@@ -1022,7 +1022,8 @@ export const getOrderedLanguagesForCountry = (detectedCountry) => {
       AVAILABLE_LANGUAGES['fr'],
       AVAILABLE_LANGUAGES['en'], 
       AVAILABLE_LANGUAGES['wo'],
-      AVAILABLE_LANGUAGES['bm']
+      AVAILABLE_LANGUAGES['bm'],
+      AVAILABLE_LANGUAGES['mos']
     ];
   }
 
