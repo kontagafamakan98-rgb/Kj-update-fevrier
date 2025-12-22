@@ -1130,6 +1130,287 @@ const translations = {
     preparing: 'Ka labɛn...',
     alreadyHaveAccount: 'Konte b\'i bolo wa?',
     signIn: 'Don'
+  },
+  mos: {
+    // Navigation (Mooré - Langue du Burkina Faso)
+    home: 'Yiri',
+    jobs: 'Tʋʋmã',
+    messages: 'Koeese',
+    profile: 'M sẽn yaa',
+    dashboard: 'Tʋʋm zĩiga',
+    login: 'Kẽ',
+    register: 'Gʋls f yʋʋre',
+    logout: 'Yi',
+    
+    // Common
+    save: 'Bĩng',
+    cancel: 'Bas',
+    delete: 'Yiis',
+    edit: 'Tek',
+    submit: 'Tʋm',
+    loading: 'A wat n kẽeda...',
+    error: 'Yelle',
+    success: 'A yɩɩ neere',
+    
+    // Auth
+    email: 'E-mail',
+    password: 'Kũum sebre',
+    firstName: 'Yʋʋr pipi',
+    lastName: 'Yʋʋr yaab-rãmba',
+    phone: 'Telefõne',
+    confirmPassword: 'Wilg kũum sebre',
+    
+    // User Types
+    client: 'Daaba',
+    worker: 'Tʋʋm-neda',
+    
+    // Countries with flags
+    mali: '🇲🇱 Mali',
+    senegal: '🇸🇳 Senegaal',
+    burkina_faso: '🇧🇫 Burkĩna Faso',
+    ivory_coast: '🇨🇮 Kodivuaar',
+    
+    // Job related
+    jobTitle: 'Tʋʋmã yʋʋre',
+    jobDescription: 'Tʋʋmã goama',
+    budget: 'Ligdi',
+    location: 'Zĩiga',
+    category: 'Buud',
+    postJob: 'Ning tʋʋmã',
+    applyJob: 'Kos tʋʋmã',
+    
+    // Home page
+    heroTitle: 'Lagem tʋʋm-neba la daab-rãmba Afirik Rɩtgo',
+    heroSubtitle: 'Bao sõma tʋʋma bɩ f kõ f minimã Mali, Senegaal, Burkĩna Faso la Kodivuaar',
+    getStarted: 'Sɩng masã',
+    viewJobs: 'Ges tʋʋmã',
+    myDashboard: 'M tʋʋm zĩiga',
+    
+    // Countries section
+    availableIn4Countries: 'A bee tẽns 4 pʋgẽ',
+    kojoConnectsDescription: 'Kojo lagmda tʋʋm-neba la daab-rãmba Afirik Rɩtgo',
+    servicesAvailable: 'Tʋʋma sẽn beẽ',
+    
+    // Services section
+    popularServices: 'Tʋʋma sẽn yaa sõma',
+    findServiceYouNeed: 'Bao tʋʋm ning f sẽn datẽ',
+    
+    // Features section
+    findWork: 'Bao tʋʋmã',
+    findWorkDescription: 'Bao n bãng tẽed sẽn be f soolmẽ wã la kẽng f tʋʋmã taoor',
+    connect: 'Lagem',
+    connectDescription: 'Gom ne daab-rãmba la tʋʋm-neba ne d koeesa',
+    securePayments: 'Yaool sẽn tar pãnga',
+    securePaymentsDescription: 'Orange Money, Wave la yaool buud-goama',
+    
+    // Call to action
+    joinThousands: 'Naag tusr dãmba',
+    startConnectingToday: 'Sɩng rũnna n lagem ne daab-rãmba bɩ tʋʋm-neba sẽn yaa sõma',
+    lookingForServices: 'Mam baoda tʋʋma',
+    offerServices: 'Mam kõda m minimã',
+    
+    // Stats section
+    activeWorkers: 'Tʋʋm-neba sẽn tʋʋmde',
+    completedProjects: 'Poroze sẽn saame',
+    countriesCovered: 'Tẽns sẽn naagẽ',
+    customerSupport: 'Daab-rãmba sõngre',
+    
+    // Dashboard section
+    welcomeUser: 'Ne y sõnga,',
+    manageProjectsClient: 'Ges f poroze rãmba la bao tʋʋm-neba sẽn yaa sõma',
+    discoverOpportunitiesWorker: 'Bao tẽed paalse tʋʋmã pʋgẽ',
+    activeJobs: 'Tʋʋma sẽn tʋʋmde',
+    completedJobs: 'Tʋʋma sẽn saame',
+    totalJobs: 'Tʋʋma fãa',
+    totalEarnings: 'Yaool fãa',
+    quickActions: 'Manesem zĩ-kãsenga',
+    searchJobs: 'Bao',
+    workerProfile: 'Tʋʋm-ned sẽn yaa',
+    languagesPayments: 'Goama la yaool',
+    publicFeature: 'Bũmb neba fãa yĩnga',
+    popularCategories: 'Buud sẽn yaa sõma',
+    
+    // Famakan section
+    famakanAccess: 'Famakan Kontaga Master zĩiga',
+    famakanDescription: 'Bũmb sẽn bee aplikasõ soab bal yĩnga',
+    testMobileFeatures: 'Mak telefõn bũmba',
+    createJobGPS: 'Maan tʋʋmã ne GPS',
+    debugPhotos: 'Foto debeuge',
+    commissionDashboard: 'Komisõ zĩiga',
+    
+    // Login/Register pages
+    noAccount: 'F pa tar kõnt?',
+    personalInformation: 'F mengã koɛɛga',
+    paymentAccounts: 'Yaool kõnta',
+    phone: 'Telefõne',
+    preferredLanguage: 'Goam f sẽn nong n yɩɩda',
+    verified: 'A wilgame',
+    no: 'Ayo',
+    
+    // Photo upload section
+    profilePhotoHelps: 'Profil foto sõngda f n paam n bãng Kojo neere',
+    professionalPhotoHelps: 'Profil foto sẽn yaa sõma pãagda daab-rãmba bas-yãkre la paagd f sũur sẽn na n paam tʋʋmã',
+    addProfilePhoto: 'Ning profil foto',
+    addPhoto: 'Ning foto',
+    changePhoto: 'Tek foto',
+    clickToChoose: 'Wĩig n yãk',
+    tipsGoodPhoto: 'Sagl-sõma foto yĩnga',
+    useRecentPhoto: 'Tall foto sẽn pa kaoos la sẽn yaa vẽenega',
+    lookCamera: 'Ges kamera la lae f nengẽ ne sũ-noogo',
+    avoidGroup: 'Ra tall foto neba wʋsg bɩ ne lunɛt',
+    neutralBackground: 'Poorẽ sẽn yaa vẽeneg n yɩɩda',
+    
+    // Payment accounts section
+    minimumRequired: 'Sẽn pa segd n yɩɩ',
+    accountRequired: 'kõnt (n yaool yĩnga)',
+    accountsLinked: 'kõnt sẽn lagme',
+    modify: 'Tek',
+    
+    // Geolocation messages
+    ivoryCoastPreference: 'Kodivuaar, neb wʋsg nong Farãnsẽ',
+    
+    // Payment verification page
+    paymentVerification: 'Yaool kõnta wilgre',
+    lastStep: 'Sẽn kẽng taoor',
+    linkAccountsToComplete: 'N saag f gʋlsgo, f segd n lagm f yaool kõntã',
+    workerPaymentRequirement: 'F sã n yaa tʋʋm-neda, f segd n lagm yaool soay 2 n deeg f ligdi daab-rãmba nengẽ',
+    clientPaymentRequirement: 'F sã n yaa daaba, f segd n lagm yaool soa 1 n yaool tʋʋm-neba',
+    paymentAccountsUpdated: 'Yaool kõnta tekame ne yĩir',
+    paymentAccountsLoadError: 'Yell n zĩnd yaool kõnta waoong pʋgẽ',
+    
+    // Jobs page
+    allCategories: 'Buud fãa',
+    allStatuses: 'Yɛl fãa',
+    search: 'Bao',
+    reset: 'Lebg sɩngr',
+    noJobsFound: 'Tʋʋmã ka be ye',
+    publishFirstJob: 'Sɩng ne f tʋʋm pipi',
+    myJobs: 'M tʋʋma',
+    jobs: 'Tʋʋma',
+    availableJobs: 'Tʋʋma sẽn beẽ',
+    
+    // Job status translations
+    open: 'A pakame',
+    inProgress: 'A tʋʋmda',
+    completed: 'A saame',
+    cancelled: 'A basame',
+    
+    // Job page descriptions
+    manageJobOffers: 'Ges f tʋʋm tagsgo la f tũ neb sẽn kos-b rãmba',
+    discoverOpportunities: 'Bao tẽed sẽn be f soolmẽ wã',
+    
+    // Messages page
+    noConversations: 'Goam ka be ye',
+    startApplyingJobs: 'Sɩng n kos tʋʋma',
+    selectConversation: 'Yãk goam n sɩng',
+    
+    // Categories
+    plumbing: 'Koom tʋʋmã',
+    electrical: 'Kuurã tʋʋmã',
+    construction: 'Metɛr tʋʋmã',
+    cleaning: 'Pɩɩsg tʋʋmã',
+    gardening: 'Zãng tʋʋmã',
+    tutoring: 'Zãmsg tʋʋmã',
+    mechanics: 'Moto tʋʋmã',
+    computing: 'Ɔrdinatɛɛr tʋʋmã',
+    
+    // Payments
+    payment: 'Yaool',
+    paymentMethods: 'Yaool soaya',
+    bankCard: 'Bãnk kart',
+    orangeMoney: 'Orange Money',
+    wave: 'Wave',
+    selectPayment: 'Yãk yaool soa',
+    
+    // Language Selection
+    choosePreferredLanguage: 'Yãk goam f sẽn nong n yɩɩda',
+    basedOnLocation: 'Ne f zĩigã',
+    languageNote: 'Bãngre:',
+    interfaceWillChange: 'Aplikasõ na n tek ne f sẽn yãk la goam kãng na n zĩnd f profil pʋgẽ.',
+    localLanguage: 'Tẽngã goama',
+    selectedLanguage: 'Goam sẽn yãke',
+    interfaceAndProfileUpdated: 'Aplikasõ la profil tekame',
+    aboutSelection: 'F sẽn yãkã wɛɛngẽ:',
+    interfaceWillChangeNote: 'Kojo aplikasõ na n tek ne f goam sẽn yãke',
+    languageOnProfile: 'F goam na n zĩnd f profil ning neb fãa getẽ wã pʋgẽ',
+    clientsCanSee: 'Daab-rãmba na n tõog n bãng goam ning f sẽn mi sõma',
+    canModifyLater: 'F tõe n tek-a rẽ poor f paramɛtr pʋgẽ',
+    detectingLanguage: 'D baood f goam sẽn nong n yɩɩda...',
+    
+    // Registration
+    createAccount: 'Maan kõnta',
+    joinKojoCommunity: 'Naag Kojo nebã',
+    
+    // Professional Skills
+    professionalInformationWorker: 'Tʋʋm koɛɛga (Tʋʋm-neda)',
+    skillsAndSpecialties: 'Minimã la yam',
+    selectedSkills: 'F minimã f sẽn yãke:',
+    addCustomSkill: 'Paas minim a to',
+    customSkillPlaceholder: 'F minim a to',
+    add: 'Paas',
+    yearsExperience: 'Yʋʋm sẽn tʋʋm',
+    selectExperience: 'Yãk f yʋʋm sẽn tʋʋm',
+    beginner: 'Sɩngda (0-1 yʋʋm)',
+    hourlyRate: 'Wakat yaool (FCFA)',
+    rateExamples: 'Wakat yaool makre:',
+    profileInfoNote: 'Koɛɛg kãng na n zĩnd f profil ning neb fãa getẽ wã pʋgẽ',
+    
+    // Profile Photo Upload
+    profilePhotoOptional: 'Profil foto (F sã n dat)',
+    addProfilePhoto: 'Ning profil foto',
+    clickToChooseOption: 'Wĩig n yãk soa',
+    chooseFromGallery: 'Yãk galri pʋgẽ',
+    selectExistingPhoto: 'Yãk foto sẽn be',
+    takePhoto: 'Rɩk foto',
+    useCamera: 'Tall kamera',
+    back: 'Lebg',
+    changePhoto: 'Tek foto',
+    gallery: 'Galri',
+    camera: 'Kamera',
+    cancel: 'Bas',
+    photoReadyForRegistration: 'Foto seglame gʋlsg yĩnga',
+    remove: 'Yiis',
+    tipsGoodPhoto: 'Sagl-sõma foto neere yĩnga',
+    pleaseSelectImage: 'Yãk foto (JPG, PNG, la a to)',
+    imageTooLarge: 'Foto segd n pa yɩɩg 5MB ye',
+    errorReadingFile: 'Yell n zĩnd foto karmẽ pʋgẽ',
+    photoUploadedSuccessfully: 'Profil foto tekame ne yĩir!',
+    
+    // Network Status
+    networkOffline: 'F pa tar ɛntɛrnɛt ye. Bũmb kẽer tõe n pa tʋʋm ye.',
+    networkPoor: 'Ɛntɛrnɛt wĩnd-wĩndre. Optimizasõ otomatik maana.',
+    networkModerate: 'Ɛntɛrnɛt yaa bɩr-bɩre. Done bĩngr maana.',
+    networkGood: 'Ɛntɛrnɛt sẽn yaa sõma',
+    networkExcellent: 'Ɛntɛrnɛt sẽn yaa sõma wʋsgo',
+    networkUnknown: 'D pa mi ɛntɛrnɛt yɛlã ye',
+    networkTipsOffline: '• Bũmb fãa na n lagm ɛntɛrnɛt sã n wa lebge\n• Done sẽn bĩng beẽ wakat fãa',
+    networkTipsPoor: '• Foto yɩɩ bil n bĩnge\n• Temps-réel bũmba paame\n• Cache yalgame n gil rechargema',
+    networkTipsModerate: '• Foto yɩɩ bila\n• Lagmg pa naag ye\n• Bũmb sẽn yaa tɩlae yɩɩ taoor',
+    userType: 'F sẽn yaa bũmb ning',
+    iAmClient: 'Mam baoda tʋʋma',
+    iAmWorker: 'Mam kõda tʋʋma',
+    country: 'Tẽnga',
+    detectedAutomatically: 'A yãa a toor',
+    positionDetected: 'Zĩig yãame',
+    adjustedAutomatically: 'Makr la koɛɛg tekame a toor',
+    positionNotDetected: 'Zĩig pa yãam ye - D tall sɩngr (Senegaal)',
+    personalInformation: 'F mengã koɛɛga',
+    paymentAccounts: 'Yaool kõnta',
+    nextStepWorker: 'Sẽn kẽnga: F segd n lagm yaool soay 2 (Orange Money, Wave, Bãnk kõnt)',
+    nextStepClient: 'Sẽn kẽnga: F segd n lagm yaool soa 1 (Orange Money, Wave, Bãnk kõnt)',
+    continueToPaymentVerification: 'Kẽng taoor → Kõnta wilgre',
+    detectingLocation: 'D baood f zĩigã...',
+    detectedViaGeolocation: 'Tẽng yãa ne f zĩigã',
+    atLeast6Characters: 'Sẽn pa yɩɩg 6',
+    phoneFormat: 'Manesem',
+    passwordsDontMatch: 'Kũum sebre pa yembre ye',
+    passwordTooShort: 'Kũum sebre segd n tar sẽn pa yɩɩg 6',
+    workersMustSelectSkills: 'Tʋʋm-neba segd n yãk minim a yembr',
+    pleaseIndicateExperience: 'Wilg f yʋʋm sẽn tʋʋm',
+    pleaseIndicateValidRate: 'Wilg wakat yaool sẽn zemse (minimum 500 FCFA)',
+    preparing: 'A segenda...',
+    alreadyHaveAccount: 'F tara kõnt?',
+    signIn: 'Kẽ'
   }
 };
 
