@@ -981,6 +981,12 @@ export const AVAILABLE_LANGUAGES = {
     name: 'Bambara',
     nativeName: 'Bamanankan',
     flag: '🇲🇱'
+  },
+  'mos': {
+    code: 'mos',
+    name: 'Mooré',
+    nativeName: 'Mòoré',
+    flag: '🇧🇫'
   }
 };
 
@@ -989,7 +995,7 @@ export const getLanguagesByCountry = (country) => {
   const languageMapping = {
     'mali': ['fr', 'bm'], // Français officiel + Bambara (langue principale)
     'senegal': ['fr', 'wo'], // Français officiel + Wolof (langue principale) 
-    'burkina_faso': ['fr', 'bm'], // Français officiel + langues locales (Bambara similaire)
+    'burkina_faso': ['fr', 'mos'], // Français officiel + Mooré (langue principale du Burkina)
     'cote_divoire': ['fr', 'en'] // Français officiel + Anglais (commerce)
   };
   
