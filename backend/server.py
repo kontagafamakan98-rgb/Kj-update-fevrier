@@ -279,6 +279,7 @@ class Language(str, Enum):
     ENGLISH = "en"
     WOLOF = "wo"
     BAMBARA = "bm"
+    MOORE = "mos"  # Mooré - Langue principale du Burkina Faso
 
 class Country(str, Enum):
     """4 pays prioritaires pour le lancement de Kojo"""
