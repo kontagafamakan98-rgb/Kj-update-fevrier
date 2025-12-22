@@ -25,6 +25,12 @@ const LANGUAGES = [
     name: 'Bambara',
     flag: '🇲🇱',
     nativeName: 'Bamanankan'
+  },
+  {
+    code: 'mos',
+    name: 'Mooré',
+    flag: '🇧🇫',
+    nativeName: 'Mòoré'
   }
 ];
 
