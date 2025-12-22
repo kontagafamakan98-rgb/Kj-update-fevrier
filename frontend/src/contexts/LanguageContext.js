@@ -1418,7 +1418,7 @@ export function LanguageProvider({ children }) {
   const [currentLanguage, setCurrentLanguage] = useState(() => {
     // Initialize from localStorage or default to French
     const savedLanguage = localStorage.getItem('language');
-    return savedLanguage && ['fr', 'en', 'wo', 'bm'].includes(savedLanguage) ? savedLanguage : 'fr';
+    return savedLanguage && ['fr', 'en', 'wo', 'bm', 'mos'].includes(savedLanguage) ? savedLanguage : 'fr';
   });
 
   const t = (key) => {
