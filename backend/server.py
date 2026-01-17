@@ -599,8 +599,15 @@ def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) 
         "is_verified": True
     }
 
-# Génération des préfixes 70-99 pour Orange Money et Wave
+# Préfixes mobiles pour validation Orange Money et Wave
 ALL_PREFIXES_70_99 = [str(i) for i in range(70, 100)]
+
+# Côte d'Ivoire a des préfixes spécifiques (01, 05, 07, 08, 09 + 40-59 pour MTN + 70-99 pour Orange)
+COTE_DIVOIRE_ALL_MOBILE_PREFIXES = (
+    ['01', '05', '07', '08', '09'] +  # Nouveaux préfixes 10 chiffres
+    [str(i).zfill(2) for i in range(40, 60)] +  # MTN 40-59
+    [str(i) for i in range(70, 100)]  # Orange 70-99
+)
 
 # Mobile Number Validation - 4 PAYS PRIORITAIRES KOJO
 KOJO_PRIORITY_COUNTRIES = {
@@ -622,11 +629,11 @@ KOJO_PRIORITY_COUNTRIES = {
         'currency': 'FCFA',
         'primary_language': 'français'
     },
-    # Côte d'Ivoire (+225) - Pays prioritaire
+    # Côte d'Ivoire (+225) - Pays prioritaire avec tous les préfixes mobiles
     '225': {
         'country': "Côte d'Ivoire", 
-        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Côte d'Ivoire - tous préfixes 70-99
-        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Côte d'Ivoire - tous préfixes 70-99
+        'orange_prefixes': COTE_DIVOIRE_ALL_MOBILE_PREFIXES,  # Orange + tous préfixes mobiles CI
+        'wave_prefixes': COTE_DIVOIRE_ALL_MOBILE_PREFIXES,  # Wave + tous préfixes mobiles CI
         'other_operators': ['58', '59', '48', '49'],  # MTN
         'currency': 'FCFA',
         'primary_language': 'français'
