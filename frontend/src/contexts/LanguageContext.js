@@ -142,6 +142,13 @@ const translations = {
     lookCamera: 'Regardez l\'objectif et souriez naturellement',
     avoidGroup: 'Évitez les photos de groupe ou avec des lunettes de soleil',
     neutralBackground: 'Un arrière-plan neutre est préférable',
+    professionalOutfit: 'Une tenue professionnelle inspire confiance aux clients',
+    
+    // Country language preference messages
+    maliLanguagePreference: 'Au Mali, la plupart des utilisateurs préfèrent le Français ou le Bambara',
+    senegalLanguagePreference: 'Au Sénégal, la plupart des utilisateurs préfèrent le Français ou le Wolof',
+    burkinaLanguagePreference: 'Au Burkina Faso, la plupart des utilisateurs préfèrent le Français ou le Mooré',
+    ivoryCoastLanguagePreference: 'En Côte d\'Ivoire, la plupart des utilisateurs préfèrent le Français',
     
     // Payment accounts section
     minimumRequired: 'Minimum requis',
