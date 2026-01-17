@@ -29,7 +29,7 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const jobsResponse = await axios.get('/jobs');
+      const jobsResponse = await axios.get('/api/jobs');
       const jobs = jobsResponse.data;
       
       // Calculate stats based on user type
