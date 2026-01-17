@@ -216,7 +216,7 @@ class AuditCompletKojoTester:
         
         # Test validation mot de passe faible
         weak_password_user = self.test_data["client"].copy()
-        weak_password_user["email"] = "test_weak@test.com"
+        weak_password_user["email"] = f"test_weak_{timestamp}@test.com"
         weak_password_user["password"] = "123"  # Mot de passe trop court
         
         success, response = self.make_request('POST', 'auth/register', weak_password_user, expected_status=422)
@@ -227,7 +227,7 @@ class AuditCompletKojoTester:
         
         # Test protection injection SQL
         sql_injection_user = self.test_data["client"].copy()
-        sql_injection_user["email"] = "test'; DROP TABLE users; --@test.com"
+        sql_injection_user["email"] = f"test_sql_{timestamp}@test.com"
         sql_injection_user["first_name"] = "Test'; DROP TABLE users; --"
         
         success, response = self.make_request('POST', 'auth/register', sql_injection_user, expected_status=422)
