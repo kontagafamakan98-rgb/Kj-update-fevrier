@@ -442,6 +442,7 @@ class AuditCompletKojoTester:
         
         # Test validation Orange Money pour les 4 pays
         print("\n📱 Tests Orange Money:")
+        timestamp = int(time.time())
         for country, phone in [
             ("senegal", self.payment_data["orange_money_senegal"]),
             ("mali", self.payment_data["orange_money_mali"]),
@@ -450,7 +451,7 @@ class AuditCompletKojoTester:
         ]:
             # Test via inscription avec compte Orange Money
             test_user = {
-                "email": f"orange_{country}@test.com",
+                "email": f"orange_{country}_{timestamp}@test.com",
                 "password": "TestOrange123!",
                 "first_name": "Test",
                 "last_name": "Orange",
@@ -488,7 +489,7 @@ class AuditCompletKojoTester:
         ]:
             # Test via inscription avec compte Wave
             test_user = {
-                "email": f"wave_{country}@test.com",
+                "email": f"wave_{country}_{timestamp}@test.com",
                 "password": "TestWave123!",
                 "first_name": "Test",
                 "last_name": "Wave",
