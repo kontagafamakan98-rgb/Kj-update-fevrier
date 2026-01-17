@@ -131,7 +131,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
                   <p>{t('clickToChooseOption')}</p>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  JPG, PNG jusqu'à 5MB
+                  JPG, PNG {t('upTo') || 'jusqu\'à'} 5MB
                 </div>
               </div>
             </div>
