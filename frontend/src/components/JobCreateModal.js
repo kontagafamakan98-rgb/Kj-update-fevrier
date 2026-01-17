@@ -51,7 +51,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
         deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
       };
 
-      await axios.post('/api/jobs', jobData);
+      await jobsAPI.create(jobData);
       onJobCreated();
       onClose();
     } catch (error) {
