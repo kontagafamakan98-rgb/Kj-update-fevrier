@@ -39,7 +39,7 @@ export default function Jobs() {
 
   const loadJobs = async () => {
     try {
-      const response = await axios.get('/api/jobs');
+      const response = await jobsAPI.getAll();
       const jobsData = response.data;
       
       // If user is a client, show only their jobs
