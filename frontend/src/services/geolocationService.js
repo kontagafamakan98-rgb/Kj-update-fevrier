@@ -444,10 +444,10 @@ class GeolocationService {
           const countryKey = countryKeyMapping[mappedCountry];
           const country = countryKey ? COUNTRIES[countryKey] : null;
           
-          if (countryInfo) {
-            devLog.info(`✅ Pays détecté via backend Kojo: ${countryInfo.nameFrench}`);
+          if (country) {
+            devLog.info(`✅ Pays détecté via backend Kojo: ${country.nameFrench}`);
             return {
-              country: countryInfo,
+              country: country,
               method: 'backend_api',
               confidence: data.detected ? 95 : 80
             };
@@ -461,7 +461,7 @@ class GeolocationService {
     // Fallback: utiliser le pays par défaut (Sénégal)
     devLog.info('📍 Utilisation du pays par défaut: Sénégal');
     return {
-      country: KOJO_SUPPORTED_COUNTRIES.senegal,
+      country: COUNTRIES.SENEGAL,
       method: 'default',
       confidence: 50
     };
