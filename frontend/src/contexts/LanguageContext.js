@@ -416,6 +416,13 @@ const translations = {
     lookCamera: 'Look at the camera and smile naturally',
     avoidGroup: 'Avoid group photos or sunglasses',
     neutralBackground: 'A neutral background is preferable',
+    professionalOutfit: 'Professional attire inspires client confidence',
+    
+    // Country language preference messages
+    maliLanguagePreference: 'In Mali, most users prefer French or Bambara',
+    senegalLanguagePreference: 'In Senegal, most users prefer French or Wolof',
+    burkinaLanguagePreference: 'In Burkina Faso, most users prefer French or Mooré',
+    ivoryCoastLanguagePreference: 'In Ivory Coast, most users prefer French',
     
     // Payment accounts section
     minimumRequired: 'Minimum required',
