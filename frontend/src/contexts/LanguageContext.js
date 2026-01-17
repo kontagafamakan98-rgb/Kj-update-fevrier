@@ -1252,6 +1252,13 @@ const translations = {
     lookCamera: 'Ges kamera la lae f nengẽ ne sũ-noogo',
     avoidGroup: 'Ra tall foto neba wʋsg bɩ ne lunɛt',
     neutralBackground: 'Poorẽ sẽn yaa vẽeneg n yɩɩda',
+    professionalOutfit: 'Tʋʋm fuugu sẽn yaa sõma kõta daab-rãmba bas-yãkre',
+    
+    // Country language preference messages
+    maliLanguagePreference: 'Mali pʋgẽ, neb wʋsg nong Farãnsẽ bɩ Bambara',
+    senegalLanguagePreference: 'Senegaal pʋgẽ, neb wʋsg nong Farãnsẽ bɩ Wolof',
+    burkinaLanguagePreference: 'Burkĩna Faso pʋgẽ, neb wʋsg nong Farãnsẽ bɩ Mòoré',
+    ivoryCoastLanguagePreference: 'Kodivuaar pʋgẽ, neb wʋsg nong Farãnsẽ',
     
     // Payment accounts section
     minimumRequired: 'Sẽn pa segd n yɩɩ',
