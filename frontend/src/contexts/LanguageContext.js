@@ -1257,6 +1257,7 @@ const translations = {
     avoidGroup: 'Ra tall foto neba wʋsg bɩ ne lunɛt',
     neutralBackground: 'Poorẽ sẽn yaa vẽeneg n yɩɩda',
     professionalOutfit: 'Tʋʋm fuugu sẽn yaa sõma kõta daab-rãmba bas-yãkre',
+    upTo: 'sẽn pa yɩɩg',
     
     // Country language preference messages
     maliLanguagePreference: 'Mali pʋgẽ, neb wʋsg nong Farãnsẽ bɩ Bambara',
