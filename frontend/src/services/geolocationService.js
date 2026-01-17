@@ -458,24 +458,42 @@ class GeolocationService {
   }
 
   /**
-   * Détection via géolocalisation GPS (HTML5 Geolocation API)    const consensus = countryVotes[bestCountry] / results.length;
-    devLog.info(`🎯 Consensus IP: ${bestCountry} (${(consensus * 100).toFixed(0)}%)`);
+   * Détection via géolocalisation GPS (HTML5 Geolocation API)
+   */
+  async detectByGPS() {
+    devLog.info('📍 Tentative détection GPS...');
+    
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        devLog.info('❌ Géolocalisation non supportée');
+        resolve(null);
+        return;
+      }
 
-    // Utiliser les coordonnées du meilleur résultat
-    const bestResult = results.find(r => r.countryCode === bestCountry);
-    const detectedLocation = this.identifyLocationFromCoordinates(
-      bestResult.lat, 
-      bestResult.lng, 
-      bestCountry
-    );
-
-    if (detectedLocation) {
-      detectedLocation.confidence = Math.round(consensus * 90);
-      detectedLocation.ipServices = results.length;
-      return detectedLocation;
-    }
-
-    return null;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          devLog.info(`✅ Position GPS: ${latitude}, ${longitude}`);
+          
+          // Identifier le pays à partir des coordonnées
+          const location = this.identifyLocationFromCoordinates(latitude, longitude);
+          if (location) {
+            location.confidence = 100;
+            location.method = 'gps';
+          }
+          resolve(location);
+        },
+        (error) => {
+          devLog.info(`⚠️ Erreur GPS: ${error.message}`);
+          resolve(null);
+        },
+        { 
+          enableHighAccuracy: true, 
+          timeout: 8000,
+          maximumAge: 300000 // 5 minutes cache
+        }
+      );
+    });
   }
 
   // NOUVELLE MÉTHODE: Détection contextuelle avancée
