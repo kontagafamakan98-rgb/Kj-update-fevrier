@@ -456,59 +456,9 @@ class GeolocationService {
       confidence: 50
     };
   }
-            lat: parseFloat(lat),
-            lng: parseFloat(lng)
-          };
-        }
-      }
-    ];
 
-    const results = [];
-    
-    for (const service of ipServices) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
-        
-        const response = await fetch(service.url, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          const data = await response.json();
-          const parsed = service.parse(data);
-          
-          // Mapper codes pays ISO vers nos codes
-          const countryMap = { 'ml': 'mali', 'sn': 'senegal', 'bf': 'burkina_faso', 'ci': 'cote_divoire' };
-          const countryCode = countryMap[parsed.country] || parsed.country;
-          
-          // Vérifier si c'est un pays supporté
-          if (['mali', 'senegal', 'burkina_faso', 'cote_divoire'].includes(countryCode)) {
-            devLog.info(`✅ ${service.name}: ${countryCode}`);
-            results.push({ ...parsed, countryCode, service: service.name });
-          }
-        }
-      } catch (e) {
-        devLog.info(`⚠️ ${service.name} échoué:`, e.message);
-      }
-    }
-
-    if (results.length === 0) return null;
-
-    // Prendre le résultat le plus fréquent (consensus)
-    const countryVotes = {};
-    results.forEach(r => {
-      countryVotes[r.countryCode] = (countryVotes[r.countryCode] || 0) + 1;
-    });
-
-    const bestCountry = Object.keys(countryVotes).reduce((a, b) => 
-      countryVotes[a] > countryVotes[b] ? a : b
-    );
-
-    const consensus = countryVotes[bestCountry] / results.length;
+  /**
+   * Détection via géolocalisation GPS (HTML5 Geolocation API)    const consensus = countryVotes[bestCountry] / results.length;
     devLog.info(`🎯 Consensus IP: ${bestCountry} (${(consensus * 100).toFixed(0)}%)`);
 
     // Utiliser les coordonnées du meilleur résultat
