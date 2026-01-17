@@ -696,6 +696,13 @@ const translations = {
     lookCamera: 'Gis kameraw bi te bës',
     avoidGroup: 'Ñaanal nataal yu bari wala ak lunettes soleil',
     neutralBackground: 'Ginaw bu dëgg la gëna baax',
+    professionalOutfit: 'Yéré bu baax jox kliyan yi cofeel',
+    
+    // Country language preference messages
+    maliLanguagePreference: 'Ci Mali, nit ñu bari gëna bëgg Français wala Bambara',
+    senegalLanguagePreference: 'Ci Senegaal, nit ñu bari gëna bëgg Français wala Wolof',
+    burkinaLanguagePreference: 'Ci Burkina Faso, nit ñu bari gëna bëgg Français wala Mooré',
+    ivoryCoastLanguagePreference: 'Ci Côte d\'Ivoire, nit ñu bari gëna bëgg Français',
     
     // Payment accounts section
     minimumRequired: 'Minimum yu bëgg',
