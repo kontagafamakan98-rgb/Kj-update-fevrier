@@ -289,12 +289,12 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
         <h4 className="font-medium text-yellow-800 mb-1">💡 {t('tipsGoodPhoto')}</h4>
         <ul className="text-xs text-yellow-700 space-y-1">
-          <li>• Utilisez une photo récente et claire</li>
-          <li>• Regardez l'objectif et souriez naturellement</li>
-          <li>• Évitez les photos de groupe ou avec des lunettes de soleil</li>
-          <li>• Un arrière-plan neutre est préférable</li>
+          <li>• {t('useRecentPhoto')}</li>
+          <li>• {t('lookCamera')}</li>
+          <li>• {t('avoidGroup')}</li>
+          <li>• {t('neutralBackground')}</li>
           {userType === 'worker' && (
-            <li>• Une tenue professionnelle inspire confiance aux clients</li>
+            <li>• {t('professionalOutfit') || 'Une tenue professionnelle inspire confiance aux clients'}</li>
           )}
         </ul>
       </div>
