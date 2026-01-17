@@ -973,6 +973,13 @@ const translations = {
     lookCamera: 'Kameraw lajɛ ani nisɔndiya ɲuman kɛ',
     avoidGroup: 'Jama ja walima finitigiw ja tɛmɛ',
     neutralBackground: 'Kɔfɛ jɛlen ka ɲi',
+    professionalOutfit: 'Baara fini ɲuman bɛ kiliyanw la danaya sabati',
+    
+    // Country language preference messages
+    maliLanguagePreference: 'Mali kɔnɔ, mɔgɔ caman ka Faransikan walima Bamanankan fɛ',
+    senegalLanguagePreference: 'Senegali kɔnɔ, mɔgɔ caman ka Faransikan walima Wolof fɛ',
+    burkinaLanguagePreference: 'Burkina Faso kɔnɔ, mɔgɔ caman ka Faransikan walima Mooré fɛ',
+    ivoryCoastLanguagePreference: 'Côte d\'Ivoire kɔnɔ, mɔgɔ caman ka Faransikan fɛ',
     
     // Payment accounts section
     minimumRequired: 'Minimum min mako',
