@@ -233,9 +233,7 @@ const translations = {
     
     // Profile Photo Upload
     profilePhotoOptional: 'Photo de Profil (Optionnel)',
-    addProfilePhoto: 'Ajouter une photo de profil',
     addPhoto: 'Ajouter une photo',
-    changePhoto: 'Changer la photo',
     clickToChooseOption: 'Cliquez pour choisir une option',
     chooseFromGallery: 'Choisir depuis la galerie',
     selectExistingPhoto: 'Sélectionner une photo existante',
@@ -245,10 +243,8 @@ const translations = {
     changePhoto: 'Changer la photo',
     gallery: 'Galerie',
     camera: 'Caméra',
-    cancel: 'Annuler',
     photoReadyForRegistration: 'Photo prête pour l\'inscription',
     remove: 'Supprimer',
-    tipsGoodPhoto: 'Conseils pour une bonne photo',
     pleaseSelectImage: 'Veuillez sélectionner une image (JPG, PNG, etc.)',
     imageTooLarge: 'L\'image doit faire moins de 5MB',
     errorReadingFile: 'Erreur lors de la lecture du fichier',
