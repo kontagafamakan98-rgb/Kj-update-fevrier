@@ -699,6 +699,7 @@ const translations = {
     avoidGroup: 'Ñaanal nataal yu bari wala ak lunettes soleil',
     neutralBackground: 'Ginaw bu dëgg la gëna baax',
     professionalOutfit: 'Yéré bu baax jox kliyan yi cofeel',
+    upTo: 'ba',
     
     // Country language preference messages
     maliLanguagePreference: 'Ci Mali, nit ñu bari gëna bëgg Français wala Bambara',
