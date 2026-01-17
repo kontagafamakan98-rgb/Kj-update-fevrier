@@ -215,50 +215,26 @@ const PRECISE_GEOGRAPHIC_DATABASE = {
   }
 };
 
-// Services de géolocalisation IP multiples pour redondance
+// Services de géolocalisation IP - Utilisation du backend Kojo en priorité
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
+
 const IP_GEOLOCATION_SERVICES = [
+  // Service Kojo Backend (priorité maximale - pas d'erreurs CORS)
   {
-    name: 'IPApi',
-    url: process.env.REACT_APP_IPAPI_CO_URL || "https://ipapi.co",
-    parser: (data) => ({
-      country: data.country_code,
-      countryName: data.country_name,
-      city: data.city,
-      region: data.region,
-      latitude: parseFloat(data.latitude),
-      longitude: parseFloat(data.longitude),
-      accuracy: data.accuracy || 100,
-      timezone: data.timezone
-    })
-  },
-  {
-    name: 'IP-API',
-    url: 'https://ip-api.com/json/',
-    parser: (data) => ({
-      country: data.countryCode,
-      countryName: data.country,
-      city: data.city,
-      region: data.regionName,
-      latitude: parseFloat(data.lat),
-      longitude: parseFloat(data.lon),
-      accuracy: 100,
-      timezone: data.timezone
-    })
-  },
-  {
-    name: 'IPInfo',
-    url: process.env.REACT_APP_IPINFO_URL || "https://ipinfo.io",
+    name: 'KojoBackend',
+    url: `${BACKEND_URL}/api/geolocation/detect`,
+    isBackend: true,
     parser: (data) => {
-      const [lat, lng] = (data.loc || '0,0').split(',');
+      if (!data.country) return null;
       return {
-        country: data.country,
-        countryName: data.country,
-        city: data.city,
-        region: data.region,
-        latitude: parseFloat(lat),
-        longitude: parseFloat(lng),
-        accuracy: 100,
-        timezone: data.timezone
+        country: data.country.code?.toUpperCase() || 'SN',
+        countryName: data.country.name,
+        city: data.country.capital || '',
+        region: '',
+        latitude: data.country.coordinates?.lat || 14.6928,
+        longitude: data.country.coordinates?.lng || -17.4467,
+        accuracy: data.detected ? 95 : 80,
+        timezone: data.country.timezone
       };
     }
   }
