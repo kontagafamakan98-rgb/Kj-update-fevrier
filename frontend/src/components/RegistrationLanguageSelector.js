@@ -77,16 +77,19 @@ const RegistrationLanguageSelector = ({
       </div>
 
       {/* Message de suggestion basé sur la géolocalisation */}
-      {detectedCountry && suggestionMessage && (
+      {detectedCountry && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start">
             <span className="text-blue-500 text-lg mr-2">💡</span>
             <div className="flex-1">
               <p className="text-sm text-blue-800 font-medium">
-                📍 {t('basedOnLocation') || 'Basé sur votre position'} ({detectedCountry.flag} {detectedCountry.nameFrench})
+                📍 {t('basedOnLocation')} ({detectedCountry.flag} {t(detectedCountry.code === 'mali' ? 'mali' : detectedCountry.code === 'senegal' ? 'senegal' : detectedCountry.code === 'burkina_faso' ? 'burkina_faso' : 'ivory_coast')})
               </p>
               <p className="text-xs text-blue-700 mt-1">
-                {suggestionMessage.message}
+                {detectedCountry.code === 'mali' && t('maliLanguagePreference')}
+                {detectedCountry.code === 'senegal' && t('senegalLanguagePreference')}
+                {detectedCountry.code === 'burkina_faso' && t('burkinaLanguagePreference')}
+                {detectedCountry.code === 'cote_divoire' && t('ivoryCoastLanguagePreference')}
               </p>
             </div>
           </div>
