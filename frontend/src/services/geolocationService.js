@@ -407,37 +407,55 @@ class GeolocationService {
 
   // NOUVELLE MÉTHODE: Détection par services IP multiples avec validation
   async detectByIPServices() {
-    devLog.info('🌐 Tentative détection IP multi-services...');
+    devLog.info('🌐 Tentative détection IP via backend Kojo...');
     
-    const ipServices = [
-      {
-        name: 'ipapi.co',
-        url: 'https://ipapi.co/json/',
-        parse: (data) => ({
-          country: data.country_code?.toLowerCase(),
-          city: data.city,
-          lat: parseFloat(data.latitude),
-          lng: parseFloat(data.longitude)
-        })
-      },
-      {
-        name: 'ip-api.com',
-        url: 'http://ip-api.com/json/',
-        parse: (data) => ({
-          country: data.countryCode?.toLowerCase(),
-          city: data.city,
-          lat: parseFloat(data.lat),
-          lng: parseFloat(data.lon)
-        })
-      },
-      {
-        name: 'ipinfo.io',
-        url: 'https://ipinfo.io/json',
-        parse: (data) => {
-          const [lat, lng] = (data.loc || '0,0').split(',');
-          return {
-            country: data.country?.toLowerCase(),
-            city: data.city,
+    const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+    
+    // Utiliser uniquement le backend Kojo pour éviter les erreurs CORS/403
+    try {
+      const response = await fetch(`${backendUrl}/api/geolocation/detect`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.country && data.country.code) {
+          const countryCode = data.country.code.toLowerCase().replace('_', '-');
+          const countryMapping = {
+            'senegal': 'senegal',
+            'mali': 'mali',
+            'burkina-faso': 'burkina_faso',
+            'burkina_faso': 'burkina_faso',
+            'cote-divoire': 'cote_divoire',
+            'cote_divoire': 'cote_divoire'
+          };
+          
+          const mappedCountry = countryMapping[countryCode] || countryCode;
+          const countryInfo = KOJO_SUPPORTED_COUNTRIES[mappedCountry];
+          
+          if (countryInfo) {
+            devLog.info(`✅ Pays détecté via backend Kojo: ${countryInfo.nameFrench}`);
+            return {
+              country: countryInfo,
+              method: 'backend_api',
+              confidence: data.detected ? 95 : 80
+            };
+          }
+        }
+      }
+    } catch (error) {
+      devLog.info('⚠️ Backend Kojo géolocalisation échoué:', error.message);
+    }
+    
+    // Fallback: utiliser le pays par défaut (Sénégal)
+    devLog.info('📍 Utilisation du pays par défaut: Sénégal');
+    return {
+      country: KOJO_SUPPORTED_COUNTRIES.senegal,
+      method: 'default',
+      confidence: 50
+    };
+  }
             lat: parseFloat(lat),
             lng: parseFloat(lng)
           };
