@@ -128,9 +128,6 @@ const translations = {
     
     // Login/Register pages
     noAccount: 'Pas de compte ?',
-    personalInformation: 'Informations personnelles',
-    paymentAccounts: 'Comptes de paiement',
-    phone: 'Téléphone',
     preferredLanguage: 'Langue préférée',
     verified: 'Vérifié',
     no: 'Non',
