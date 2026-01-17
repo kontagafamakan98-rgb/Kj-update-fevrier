@@ -21,9 +21,10 @@ class AuditCompletKojoTester:
         self.test_job_id = None
         
         # Données de test réalistes pour l'Afrique de l'Ouest
+        timestamp = int(time.time())
         self.test_data = {
             "client": {
-                "email": "amadou.diallo@gmail.com",
+                "email": f"amadou.diallo.{timestamp}@gmail.com",
                 "password": "AmadouKojo2024!",
                 "first_name": "Amadou",
                 "last_name": "Diallo",
@@ -33,7 +34,7 @@ class AuditCompletKojoTester:
                 "preferred_language": "fr"
             },
             "worker": {
-                "email": "fatou.traore@gmail.com", 
+                "email": f"fatou.traore.{timestamp}@gmail.com", 
                 "password": "FatouWorker2024!",
                 "first_name": "Fatou",
                 "last_name": "Traoré",
