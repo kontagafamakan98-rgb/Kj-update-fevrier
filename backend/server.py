@@ -1141,6 +1141,16 @@ async def login_user(credentials: UserLogin):
         "user": User(**user).dict(exclude={"password_hash"})
     }
 
+@api_router.post("/auth/logout")
+async def logout_user(current_user: User = Depends(get_current_user)):
+    """
+    Déconnexion de l'utilisateur.
+    Note: Avec JWT, la déconnexion est gérée côté client en supprimant le token.
+    Cet endpoint est fourni pour la compatibilité et pour loguer les déconnexions.
+    """
+    logger.info(f"User {current_user.email} logged out")
+    return {"message": "Logout successful", "status": "success"}
+
 # User Routes
 @api_router.get("/users/profile")
 async def get_profile(current_user: User = Depends(get_current_user)):
