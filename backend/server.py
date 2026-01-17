@@ -1785,8 +1785,12 @@ async def get_supported_countries():
         "default_country": "senegal"
     }
 
+class PhoneValidationRequest(BaseModel):
+    phone: str = Field(..., description="Numéro de téléphone à valider")
+    country: Optional[str] = Field(None, description="Code du pays à vérifier (optionnel)")
+
 @api_router.post("/geolocation/validate-phone")
-async def validate_phone_for_country(phone: str, country: Optional[str] = None):
+async def validate_phone_for_country(request: PhoneValidationRequest):
     """
     Valider un numéro de téléphone et détecter/vérifier le pays.
     
@@ -1800,6 +1804,9 @@ async def validate_phone_for_country(phone: str, country: Optional[str] = None):
         - matches_country: bool - Si le numéro correspond au pays spécifié
         - formatted: str - Numéro formaté
     """
+    phone = request.phone
+    country = request.country
+    
     if not phone:
         raise HTTPException(status_code=400, detail="Numéro de téléphone requis")
     
@@ -1809,12 +1816,16 @@ async def validate_phone_for_country(phone: str, country: Optional[str] = None):
     # Validation du format
     is_valid = False
     if detected:
-        # Vérifier la longueur (préfixe + 8-9 chiffres)
+        # Vérifier la longueur (préfixe + 8-10 chiffres selon le pays)
         country_info = WEST_AFRICA_COUNTRIES.get(detected)
         if country_info:
             prefix = country_info["phonePrefix"]
             local_number = phone[len(prefix):]
-            is_valid = len(local_number) >= 8 and len(local_number) <= 9 and local_number.isdigit()
+            # Côte d'Ivoire a 10 chiffres, autres pays 8-9
+            if detected == "cote_divoire":
+                is_valid = len(local_number) >= 8 and len(local_number) <= 10 and local_number.isdigit()
+            else:
+                is_valid = len(local_number) >= 8 and len(local_number) <= 9 and local_number.isdigit()
     
     matches = True
     if country and detected:
