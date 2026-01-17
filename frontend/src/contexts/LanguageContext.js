@@ -977,6 +977,7 @@ const translations = {
     avoidGroup: 'Jama ja walima finitigiw ja tɛmɛ',
     neutralBackground: 'Kɔfɛ jɛlen ka ɲi',
     professionalOutfit: 'Baara fini ɲuman bɛ kiliyanw la danaya sabati',
+    upTo: 'fo ka se',
     
     // Country language preference messages
     maliLanguagePreference: 'Mali kɔnɔ, mɔgɔ caman ka Faransikan walima Bamanankan fɛ',
