@@ -432,7 +432,17 @@ class GeolocationService {
           };
           
           const mappedCountry = countryMapping[countryCode] || countryCode;
-          const countryInfo = KOJO_SUPPORTED_COUNTRIES[mappedCountry];
+          const countryInfo = COUNTRIES[mappedCountry.toUpperCase().replace('_', '_')];
+          
+          // Mapper les codes vers les clés de COUNTRIES
+          const countryKeyMapping = {
+            'senegal': 'SENEGAL',
+            'mali': 'MALI',
+            'burkina_faso': 'BURKINA_FASO',
+            'cote_divoire': 'COTE_DIVOIRE'
+          };
+          const countryKey = countryKeyMapping[mappedCountry];
+          const country = countryKey ? COUNTRIES[countryKey] : null;
           
           if (countryInfo) {
             devLog.info(`✅ Pays détecté via backend Kojo: ${countryInfo.nameFrench}`);
