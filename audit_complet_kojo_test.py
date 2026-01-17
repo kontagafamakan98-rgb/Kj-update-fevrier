@@ -441,20 +441,20 @@ class AuditCompletKojoTester:
         # Test validation Orange Money pour les 4 pays
         print("\n📱 Tests Orange Money:")
         for country, phone in [
-            ("Sénégal", self.payment_data["orange_money_senegal"]),
-            ("Mali", self.payment_data["orange_money_mali"]),
-            ("Burkina Faso", self.payment_data["orange_money_burkina"]),
-            ("Côte d'Ivoire", self.payment_data["orange_money_cote_ivoire"])
+            ("senegal", self.payment_data["orange_money_senegal"]),
+            ("mali", self.payment_data["orange_money_mali"]),
+            ("burkina_faso", self.payment_data["orange_money_burkina"]),
+            ("ivory_coast", self.payment_data["orange_money_cote_ivoire"])
         ]:
             # Test via inscription avec compte Orange Money
             test_user = {
-                "email": f"orange_{country.lower()}@test.com",
+                "email": f"orange_{country}@test.com",
                 "password": "TestOrange123!",
                 "first_name": "Test",
                 "last_name": "Orange",
                 "phone": phone,
                 "user_type": "client",
-                "country": country.lower().replace(' ', '_').replace("'", ""),
+                "country": country,
                 "preferred_language": "fr",
                 "payment_accounts": {
                     "orange_money": phone
@@ -479,20 +479,20 @@ class AuditCompletKojoTester:
         # Test validation Wave pour les 4 pays
         print("\n🌊 Tests Wave:")
         for country, phone in [
-            ("Sénégal", self.payment_data["wave_senegal"]),
-            ("Mali", self.payment_data["wave_mali"]),
-            ("Burkina Faso", self.payment_data["wave_burkina"]),
-            ("Côte d'Ivoire", self.payment_data["wave_cote_ivoire"])
+            ("senegal", self.payment_data["wave_senegal"]),
+            ("mali", self.payment_data["wave_mali"]),
+            ("burkina_faso", self.payment_data["wave_burkina"]),
+            ("ivory_coast", self.payment_data["wave_cote_ivoire"])
         ]:
             # Test via inscription avec compte Wave
             test_user = {
-                "email": f"wave_{country.lower()}@test.com",
+                "email": f"wave_{country}@test.com",
                 "password": "TestWave123!",
                 "first_name": "Test",
                 "last_name": "Wave",
                 "phone": phone,
                 "user_type": "client",
-                "country": country.lower().replace(' ', '_').replace("'", ""),
+                "country": country,
                 "preferred_language": "fr",
                 "payment_accounts": {
                     "wave": phone
