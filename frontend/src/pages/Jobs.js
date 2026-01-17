@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import JobCreateModal from '../components/JobCreateModal';
 import MechanicRequirements from '../components/MechanicRequirements';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { devLog, safeLog } from '../utils/env';
+import { jobsAPI } from '../services/api';
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
