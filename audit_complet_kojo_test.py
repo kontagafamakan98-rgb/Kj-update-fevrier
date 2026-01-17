@@ -112,22 +112,22 @@ class AuditCompletKojoTester:
         
         # Test détection automatique des pays via validation téléphone
         countries_phones = {
-            "Mali": "+223701234567",
-            "Sénégal": "+221771234567", 
-            "Burkina Faso": "+226701234567",
-            "Côte d'Ivoire": "+225701234567"
+            "mali": "+223701234567",
+            "senegal": "+221771234567", 
+            "burkina_faso": "+226701234567",
+            "ivory_coast": "+225701234567"
         }
         
         for country, phone in countries_phones.items():
             # Test via inscription avec numéro du pays
             test_user = {
-                "email": f"test_{country.lower().replace(' ', '_')}@test.com",
+                "email": f"test_{country}@test.com",
                 "password": "TestPass123!",
                 "first_name": "Test",
-                "last_name": country,
+                "last_name": "User",
                 "phone": phone,
                 "user_type": "client",
-                "country": country.lower().replace(' ', '_').replace("'", ""),
+                "country": country,
                 "preferred_language": "fr"
             }
             
