@@ -143,6 +143,7 @@ const translations = {
     avoidGroup: 'Évitez les photos de groupe ou avec des lunettes de soleil',
     neutralBackground: 'Un arrière-plan neutre est préférable',
     professionalOutfit: 'Une tenue professionnelle inspire confiance aux clients',
+    upTo: 'jusqu\'à',
     
     // Country language preference messages
     maliLanguagePreference: 'Au Mali, la plupart des utilisateurs préfèrent le Français ou le Bambara',
