@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
+import { jobsAPI } from '../services/api';
 
 export default function JobCreateModal({ onClose, onJobCreated }) {
   const [formData, setFormData] = useState({
