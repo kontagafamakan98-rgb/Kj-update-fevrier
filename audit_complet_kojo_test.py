@@ -152,6 +152,8 @@ class AuditCompletKojoTester:
         """3. VÉRIFICATION AUTHENTIFICATION"""
         print("\n🔐 === 2. TESTS AUTHENTIFICATION ===")
         
+        timestamp = int(time.time())
+        
         # Test inscription client
         success, response = self.make_request('POST', 'auth/register', self.test_data["client"])
         if success and isinstance(response, requests.Response):
