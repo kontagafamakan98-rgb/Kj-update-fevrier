@@ -112,6 +112,7 @@ class AuditCompletKojoTester:
             self.log_test("Endpoint géolocalisation", False, f"Erreur réseau: {response}")
         
         # Test détection automatique des pays via validation téléphone
+        timestamp = int(time.time())
         countries_phones = {
             "mali": "+223701234567",
             "senegal": "+221771234567", 
@@ -122,7 +123,7 @@ class AuditCompletKojoTester:
         for country, phone in countries_phones.items():
             # Test via inscription avec numéro du pays
             test_user = {
-                "email": f"test_{country}@test.com",
+                "email": f"test_{country}_{timestamp}@test.com",
                 "password": "TestPass123!",
                 "first_name": "Test",
                 "last_name": "User",
