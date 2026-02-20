@@ -337,21 +337,27 @@ class GeolocationService {
       ]
     };
 
-    const cities = cityMappings[userCountry] || cityMappings['mali'];
-    
-    // Trouver la ville la plus proche
-    let closestCity = cities[0];
-    let minDistance = this.calculateDistance(lat, lng, closestCity.lat, closestCity.lng);
-    
-    for (const city of cities) {
-      const distance = this.calculateDistance(lat, lng, city.lat, city.lng);
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestCity = city;
+    // Chercher dans TOUS les pays, pas seulement le pays du profil
+    let closestCity = null;
+    let closestCountryCode = userCountry;
+    let minDistance = Infinity;
+
+    for (const [countryCode, cities] of Object.entries(cityMappings)) {
+      for (const city of cities) {
+        const distance = this.calculateDistance(lat, lng, city.lat, city.lng);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestCity = city;
+          closestCountryCode = countryCode;
+        }
       }
     }
+
+    if (!closestCity) return null;
+
+    const country = getCountryByCode(closestCountryCode);
     
-    // Trouver le quartier le plus proche (pas aléatoire!)
+    // Trouver le quartier le plus proche
     let closestDistrict = closestCity.districts[0];
     let minDistrictDistance = this.calculateDistance(lat, lng, closestDistrict.lat, closestDistrict.lng);
     
@@ -369,9 +375,9 @@ class GeolocationService {
       city: closestCity.name,
       district: closestDistrict.name,
       country: country.nameFrench,
-      countryCode: userCountry,
+      countryCode: closestCountryCode,
       coordinates: { lat, lng },
-      accuracy: Math.round(minDistrictDistance * 1000), // Distance en mètres
+      accuracy: Math.round(minDistrictDistance * 1000),
       timestamp: new Date().toISOString(),
       method: 'gps'
     };
