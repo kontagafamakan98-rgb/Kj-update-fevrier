@@ -280,8 +280,7 @@ class GeolocationService {
   }
 
   async reverseGeocode(lat, lng, userCountry) {
-    // Géocodage inverse réel pour l'Afrique de l'Ouest basé sur les coordonnées GPS
-    const country = getCountryByCode(userCountry);
+    // Géocodage inverse réel - cherche dans TOUS les pays
     
     // Base de données des villes avec coordonnées
     const cityMappings = {
