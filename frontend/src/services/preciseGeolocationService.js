@@ -237,6 +237,64 @@ const IP_GEOLOCATION_SERVICES = [
         timezone: data.country.timezone
       };
     }
+  },
+  // Service ipapi.co (fallback fiable)
+  {
+    name: 'ipapi.co',
+    url: 'https://ipapi.co/json/',
+    isBackend: false,
+    parser: (data) => {
+      if (!data.country_code) return null;
+      return {
+        country: data.country_code,
+        countryName: data.country_name || '',
+        city: data.city || '',
+        region: data.region || '',
+        latitude: data.latitude || 0,
+        longitude: data.longitude || 0,
+        accuracy: 85,
+        timezone: data.timezone || ''
+      };
+    }
+  },
+  // Service ip-api.com (fallback supplémentaire)
+  {
+    name: 'ip-api.com',
+    url: 'http://ip-api.com/json/',
+    isBackend: false,
+    parser: (data) => {
+      if (!data.countryCode) return null;
+      return {
+        country: data.countryCode,
+        countryName: data.country || '',
+        city: data.city || '',
+        region: data.regionName || '',
+        latitude: data.lat || 0,
+        longitude: data.lon || 0,
+        accuracy: 80,
+        timezone: data.timezone || ''
+      };
+    }
+  },
+  // Service ipinfo.io (fallback tertiaire)
+  {
+    name: 'ipinfo.io',
+    url: 'https://ipinfo.io/json',
+    isBackend: false,
+    parser: (data) => {
+      if (!data.country) return null;
+      const [lat, lng] = (data.loc || '0,0').split(',').map(Number);
+      return {
+        country: data.country,
+        countryName: '',
+        city: data.city || '',
+        region: data.region || '',
+        latitude: lat,
+        longitude: lng,
+        accuracy: 75,
+        timezone: data.timezone || ''
+      };
+    }
   }
 ];
 
