@@ -1307,6 +1307,10 @@ const translations = {
     noJobsFound: 'Tʋʋmã ka be ye',
     publishFirstJob: 'Sɩng ne f tʋʋm pipi',
     myJobs: 'M tʋʋma',
+    myRecentJobs: 'M tʋʋm-paalã',
+    noJobsPosted: 'Tʋʋmd ka be ye',
+    noJobsAvailable: 'Tʋʋma ka be ye',
+    loadingPage: 'Sebr n wat n kẽeda...',
     availableJobs: 'Tʋʋma sẽn beẽ',
     
     // Job status translations
