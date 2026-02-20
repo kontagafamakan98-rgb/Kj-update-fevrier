@@ -29,22 +29,21 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const jobsResponse = await jobsAPI.getAll();
-      const jobs = jobsResponse.data;
+      const jobs = await jobsAPI.getAll();
+      const jobsList = Array.isArray(jobs) ? jobs : (jobs?.data || []);
       
       // Calculate stats based on user type
       if (user.user_type === 'client') {
-        const clientJobs = jobs.filter(job => job.client_id === user.id);
+        const clientJobs = jobsList.filter(job => job.client_id === user.id);
         setStats({
           totalJobs: clientJobs.length,
           activeJobs: clientJobs.filter(job => job.status === 'open' || job.status === 'in_progress').length,
           completedJobs: clientJobs.filter(job => job.status === 'completed').length,
-          totalEarnings: 0 // Will be calculated with payment data
+          totalEarnings: 0
         });
         setRecentJobs(clientJobs.slice(0, 5));
       } else {
-        // For workers, we need to get jobs they've applied to or are assigned to
-        setRecentJobs(jobs.slice(0, 5));
+        setRecentJobs(jobsList.slice(0, 5));
       }
     } catch (error) {
       safeLog.error('Error loading dashboard data:', error);
