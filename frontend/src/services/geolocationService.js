@@ -340,27 +340,60 @@ class GeolocationService {
   }
 
   async reverseGeocode(lat, lng, userCountry) {
-    // Simulation de géocodage inverse pour l'Afrique de l'Ouest
+    // Géocodage inverse réel pour l'Afrique de l'Ouest basé sur les coordonnées GPS
     const country = getCountryByCode(userCountry);
     
-    // Déterminer la ville la plus proche basée sur les coordonnées
+    // Base de données des villes avec coordonnées
     const cityMappings = {
       'mali': [
-        { name: 'Bamako', lat: 12.6392, lng: -8.0029, districts: ['ACI 2000', 'Hippodrome', 'Plateau'] },
-        { name: 'Sikasso', lat: 11.3176, lng: -5.6670, districts: ['Centre', 'Médina'] },
-        { name: 'Mopti', lat: 14.4843, lng: -4.1960, districts: ['Centre', 'Komoguel'] }
+        { name: 'Bamako', lat: 12.6392, lng: -8.0029, districts: [
+          { name: 'ACI 2000', lat: 12.6158, lng: -7.9922 },
+          { name: 'Hippodrome', lat: 12.6347, lng: -8.0183 },
+          { name: 'Plateau', lat: 12.6465, lng: -8.0038 },
+          { name: 'Badalabougou', lat: 12.6528, lng: -7.9881 },
+          { name: 'Lafiabougou', lat: 12.6245, lng: -7.9532 }
+        ]},
+        { name: 'Sikasso', lat: 11.3176, lng: -5.6670, districts: [
+          { name: 'Centre', lat: 11.3198, lng: -5.6692 },
+          { name: 'Médina', lat: 11.3234, lng: -5.6578 }
+        ]},
+        { name: 'Mopti', lat: 14.4843, lng: -4.1960, districts: [
+          { name: 'Centre', lat: 14.4843, lng: -4.1960 },
+          { name: 'Komoguel', lat: 14.4900, lng: -4.1880 }
+        ]}
       ],
       'senegal': [
-        { name: 'Dakar', lat: 14.6928, lng: -17.4467, districts: ['Plateau', 'Médina', 'Parcelles Assainies'] },
-        { name: 'Thiès', lat: 14.7886, lng: -16.9246, districts: ['Centre', 'Randoulène'] }
+        { name: 'Dakar', lat: 14.6928, lng: -17.4467, districts: [
+          { name: 'Plateau', lat: 14.6694, lng: -17.4380 },
+          { name: 'Médina', lat: 14.6840, lng: -17.4490 },
+          { name: 'Parcelles Assainies', lat: 14.7630, lng: -17.4180 },
+          { name: 'Grand Dakar', lat: 14.6920, lng: -17.4560 }
+        ]},
+        { name: 'Thiès', lat: 14.7886, lng: -16.9246, districts: [
+          { name: 'Centre', lat: 14.7886, lng: -16.9246 },
+          { name: 'Randoulène', lat: 14.7950, lng: -16.9300 }
+        ]}
       ],
       'burkina_faso': [
-        { name: 'Ouagadougou', lat: 12.3714, lng: -1.5197, districts: ['Zone du Bois', 'Cissin', 'Gounghin'] },
-        { name: 'Bobo-Dioulasso', lat: 11.1781, lng: -4.2978, districts: ['Secteur 1', 'Secteur 15'] }
+        { name: 'Ouagadougou', lat: 12.3714, lng: -1.5197, districts: [
+          { name: 'Zone du Bois', lat: 12.3730, lng: -1.5150 },
+          { name: 'Cissin', lat: 12.3540, lng: -1.5080 },
+          { name: 'Gounghin', lat: 12.3680, lng: -1.5350 }
+        ]},
+        { name: 'Bobo-Dioulasso', lat: 11.1781, lng: -4.2978, districts: [
+          { name: 'Secteur 1', lat: 11.1781, lng: -4.2978 },
+          { name: 'Secteur 15', lat: 11.1850, lng: -4.3050 }
+        ]}
       ],
       'cote_divoire': [
-        { name: 'Abidjan', lat: 5.3600, lng: -4.0083, districts: ['Plateau', 'Cocody', 'Marcory'] },
-        { name: 'Yamoussoukro', lat: 6.8276, lng: -5.2893, districts: ['Centre', 'Habitat'] }
+        { name: 'Abidjan', lat: 5.3600, lng: -4.0083, districts: [
+          { name: 'Plateau', lat: 5.3200, lng: -4.0200 },
+          { name: 'Cocody', lat: 5.3500, lng: -3.9800 },
+          { name: 'Marcory', lat: 5.3100, lng: -4.0000 }
+        ]},
+        { name: 'Yamoussoukro', lat: 6.8276, lng: -5.2893, districts: [
+          { name: 'Centre', lat: 6.8276, lng: -5.2893 }
+        ]}
       ]
     };
 
@@ -378,17 +411,27 @@ class GeolocationService {
       }
     }
     
-    const randomDistrict = closestCity.districts[Math.floor(Math.random() * closestCity.districts.length)];
+    // Trouver le quartier le plus proche (pas aléatoire!)
+    let closestDistrict = closestCity.districts[0];
+    let minDistrictDistance = this.calculateDistance(lat, lng, closestDistrict.lat, closestDistrict.lng);
+    
+    for (const district of closestCity.districts) {
+      const distance = this.calculateDistance(lat, lng, district.lat, district.lng);
+      if (distance < minDistrictDistance) {
+        minDistrictDistance = distance;
+        closestDistrict = district;
+      }
+    }
     
     return {
-      address: `${randomDistrict}, ${closestCity.name}`,
-      fullAddress: `${randomDistrict}, ${closestCity.name}, ${country.nameFrench}`,
+      address: `${closestDistrict.name}, ${closestCity.name}`,
+      fullAddress: `${closestDistrict.name}, ${closestCity.name}, ${country.nameFrench}`,
       city: closestCity.name,
-      district: randomDistrict,
+      district: closestDistrict.name,
       country: country.nameFrench,
       countryCode: userCountry,
       coordinates: { lat, lng },
-      accuracy: Math.floor(10 + Math.random() * 50),
+      accuracy: Math.round(minDistrictDistance * 1000), // Distance en mètres
       timestamp: new Date().toISOString(),
       method: 'gps'
     };
