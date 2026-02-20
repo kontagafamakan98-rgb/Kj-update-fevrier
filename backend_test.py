@@ -507,10 +507,9 @@ class KojoBackendTester:
                 "country": test_case["country"],
                 "preferred_language": "fr",
                 "payment_accounts": {
-                    "orange_money": {
-                        "phone": test_case["phone"],
-                        "account_name": "Test User"
-                    }
+                    "orange_money": test_case["phone"],
+                    "wave": None,
+                    "bank_account": None
                 }
             }
             
@@ -520,18 +519,27 @@ class KojoBackendTester:
                 
                 success = response.status_code in [200, 201]
                 details = f"Orange Money {test_case['name']}: {'✅' if success else '❌'} HTTP {response.status_code}"
+                if not success:
+                    details += f" - {response.text[:200]}"
                 self.log_result(f"Orange Money {test_case['name']}", success, details)
                 
             except Exception as e:
                 self.log_result(f"Orange Money {test_case['name']}", False, f"Exception: {str(e)}")
             
             # Test Wave validation
-            wave_data = orange_data.copy()
-            wave_data["email"] = f"wave{int(time.time())}@kojo.com"
-            wave_data["payment_accounts"] = {
-                "wave": {
-                    "phone": test_case["phone"],
-                    "account_name": "Test User"
+            wave_data = {
+                "email": f"wave{int(time.time())}@kojo.com",
+                "password": "TestPass2024!",
+                "first_name": "Test",
+                "last_name": "User",
+                "phone": test_case["phone"],
+                "user_type": "client",
+                "country": test_case["country"],
+                "preferred_language": "fr",
+                "payment_accounts": {
+                    "orange_money": None,
+                    "wave": test_case["phone"],
+                    "bank_account": None
                 }
             }
             
@@ -541,6 +549,8 @@ class KojoBackendTester:
                 
                 success = response.status_code in [200, 201]
                 details = f"Wave {test_case['name']}: {'✅' if success else '❌'} HTTP {response.status_code}"
+                if not success:
+                    details += f" - {response.text[:200]}"
                 self.log_result(f"Wave {test_case['name']}", success, details)
                 
             except Exception as e:
