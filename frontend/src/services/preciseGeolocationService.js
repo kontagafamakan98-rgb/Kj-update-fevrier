@@ -305,7 +305,7 @@ class PreciseGeolocationService {
     this.detectionAccuracy = 0;
     this.cachedLocation = null;
     this.cacheTimestamp = null;
-    this.CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+    this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes (réduit pour plus de précision)
     this.loadCachedLocation();
   }
 
