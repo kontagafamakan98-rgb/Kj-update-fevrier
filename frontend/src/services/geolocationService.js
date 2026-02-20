@@ -388,66 +388,85 @@ class GeolocationService {
     return R * c;
   }
 
-  // NOUVELLE MÉTHODE: Détection par services IP multiples avec validation
+  // Détection par services IP - appels DIRECTS depuis le navigateur de l'utilisateur
   async detectByIPServices() {
-    devLog.info('🌐 Tentative détection IP via backend Kojo...');
+    devLog.info('🌐 Tentative détection IP directe depuis le navigateur...');
     
-    const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-    
-    // Utiliser uniquement le backend Kojo pour éviter les erreurs CORS/403
-    try {
-      const response = await fetch(`${backendUrl}/api/geolocation/detect`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.country && data.country.code) {
-          const countryCode = data.country.code.toLowerCase().replace('_', '-');
-          const countryMapping = {
-            'senegal': 'senegal',
-            'mali': 'mali',
-            'burkina-faso': 'burkina_faso',
-            'burkina_faso': 'burkina_faso',
-            'cote-divoire': 'cote_divoire',
-            'cote_divoire': 'cote_divoire'
-          };
-          
-          const mappedCountry = countryMapping[countryCode] || countryCode;
-          const countryInfo = COUNTRIES[mappedCountry.toUpperCase().replace('_', '_')];
-          
-          // Mapper les codes vers les clés de COUNTRIES
-          const countryKeyMapping = {
-            'senegal': 'SENEGAL',
-            'mali': 'MALI',
-            'burkina_faso': 'BURKINA_FASO',
-            'cote_divoire': 'COTE_DIVOIRE'
-          };
-          const countryKey = countryKeyMapping[mappedCountry];
-          const country = countryKey ? COUNTRIES[countryKey] : null;
-          
-          if (country) {
-            devLog.info(`✅ Pays détecté via backend Kojo: ${country.nameFrench}`);
-            return {
-              country: country,
-              method: 'backend_api',
-              confidence: data.detected ? 95 : 80
-            };
-          }
+    // Services IP appelés DIRECTEMENT depuis le navigateur (pas via le backend)
+    const ipServices = [
+      {
+        name: 'ipapi.co',
+        url: 'https://ipapi.co/json/',
+        parse: (d) => ({ code: d.country_code, city: d.city, region: d.region, lat: d.latitude, lng: d.longitude, country_name: d.country_name })
+      },
+      {
+        name: 'ip-api.com',
+        url: 'http://ip-api.com/json/',
+        parse: (d) => ({ code: d.countryCode, city: d.city, region: d.regionName, lat: d.lat, lng: d.lon, country_name: d.country })
+      },
+      {
+        name: 'ipinfo.io',
+        url: 'https://ipinfo.io/json',
+        parse: (d) => {
+          const [lat, lng] = (d.loc || '0,0').split(',').map(Number);
+          return { code: d.country, city: d.city, region: d.region, lat, lng, country_name: '' };
         }
       }
-    } catch (error) {
-      devLog.info('⚠️ Backend Kojo géolocalisation échoué:', error.message);
+    ];
+
+    for (const service of ipServices) {
+      try {
+        devLog.info(`📡 Test service IP: ${service.name}...`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const response = await fetch(service.url, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          const parsed = service.parse(data);
+          
+          if (parsed.code && parsed.lat && parsed.lng) {
+            devLog.info(`✅ ${service.name}: ${parsed.city}, ${parsed.country_name} (${parsed.code})`);
+            
+            // Mapper vers les pays supportés par Kojo
+            const countryCodeMapping = {
+              'ML': 'MALI', 'SN': 'SENEGAL', 'BF': 'BURKINA_FASO', 'CI': 'COTE_DIVOIRE'
+            };
+            
+            const countryKey = countryCodeMapping[parsed.code];
+            const country = countryKey ? COUNTRIES[countryKey] : null;
+            
+            // Construire la localisation réelle basée sur l'IP
+            const locationResult = {
+              address: `${parsed.city || ''}, ${parsed.country_name || parsed.code}`,
+              fullAddress: `${parsed.city || ''}${parsed.region ? ', ' + parsed.region : ''}, ${parsed.country_name || parsed.code}`,
+              city: parsed.city || '',
+              district: parsed.region || '',
+              country: parsed.country_name || parsed.code,
+              countryCode: country ? countryKey.toLowerCase() : parsed.code.toLowerCase(),
+              coordinates: { lat: parsed.lat, lng: parsed.lng },
+              accuracy: 0,
+              timestamp: new Date().toISOString(),
+              method: 'ip',
+              confidence: 80
+            };
+            
+            return locationResult;
+          }
+        }
+      } catch (error) {
+        devLog.info(`⚠️ Service ${service.name} échoué: ${error.message}`);
+      }
     }
     
-    // Fallback: utiliser le pays par défaut (Sénégal)
-    devLog.info('📍 Utilisation du pays par défaut: Sénégal');
-    return {
-      country: COUNTRIES.SENEGAL,
-      method: 'default',
-      confidence: 50
-    };
+    devLog.info('❌ Aucun service IP disponible');
+    return null;
   }
 
   /**
