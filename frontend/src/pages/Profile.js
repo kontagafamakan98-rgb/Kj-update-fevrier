@@ -84,7 +84,7 @@ export default function Profile() {
       setIsEditing(false);
       
       // Message de succès
-      toast.success('Profil mis à jour avec succès ! ✅');
+      toast.success(t('profileUpdated') + ' ✅');
       
     } catch (error) {
       safeLog.error('Profile update error:', error);
