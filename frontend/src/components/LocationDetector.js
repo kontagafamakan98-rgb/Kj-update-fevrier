@@ -30,6 +30,13 @@ const LocationDetector = ({
     setDetecting(true);
     
     try {
+      // Vider le cache pour forcer une nouvelle détection réelle
+      localStorage.removeItem('kojo_last_location');
+      localStorage.removeItem('kojo_precise_location');
+      localStorage.removeItem('kojo_detected_country');
+      GeolocationService.cachedLocation = null;
+      GeolocationService.cacheTimestamp = null;
+      
       const location = await GeolocationService.detectUserLocation(userCountry);
       setCurrentLocation(location);
       
