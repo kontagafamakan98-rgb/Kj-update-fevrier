@@ -1023,6 +1023,10 @@ const translations = {
     noJobsFound: 'Baara si tɛ',
     publishFirstJob: 'I ka baara fɔlɔ labɛn',
     myJobs: 'N ka baaraw',
+    myRecentJobs: 'N ka baara kɔrɔw',
+    noJobsPosted: 'Baara si tɛ bɔ',
+    noJobsAvailable: 'Baara si tɛ yen',
+    loadingPage: 'Ɲɛ bɛ doni...',
     availableJobs: 'Baara minnu bɛ yen',
     
     // Job status translations
