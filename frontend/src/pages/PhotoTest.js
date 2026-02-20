@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import ProfilePhoto from '../components/ProfilePhoto';
 import { devLog, safeLog } from '../utils/env';
 
 export default function PhotoTest() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [testResults, setTestResults] = useState([]);
 
   // Utilisateur de test pour le mode debug sans auth
