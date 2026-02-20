@@ -588,16 +588,38 @@ class PreciseGeolocationService {
       validatedResult.longitude
     );
 
-    if (!locationData) {
-      devLog.info('❌ Localisation IP hors zone supportée');
-      return null;
-    }
-
     const detectionAccuracy = this.calculateDetectionAccuracy(100, 'ip', results.length);
 
+    if (locationData) {
+      return {
+        ...locationData,
+        coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
+        accuracy: detectionAccuracy,
+        method: 'ip',
+        ipServices: results.length,
+        consensus: validatedResult.consensus,
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    // Hors Afrique de l'Ouest - retourner les vraies données IP
+    devLog.info('📍 IP hors zone Afrique de l\'Ouest - position réelle retournée');
+    const firstResult = results[0];
     return {
-      ...locationData,
+      country: firstResult.countryName || firstResult.country || 'Détecté par IP',
+      countryCode: (firstResult.country || '').toLowerCase(),
+      city: firstResult.city || '',
+      district: firstResult.region || '',
+      fullAddress: `${firstResult.city || ''}${firstResult.region ? ', ' + firstResult.region : ''}, ${firstResult.countryName || firstResult.country || ''}`,
+      phonePrefix: '',
+      flag: '🌍',
       coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
+      accuracy: detectionAccuracy,
+      method: 'ip',
+      ipServices: results.length,
+      consensus: validatedResult.consensus,
+      timestamp: new Date().toISOString()
+    };
       accuracy: detectionAccuracy,
       method: 'ip',
       ipServices: results.length,
