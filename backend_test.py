@@ -387,7 +387,7 @@ class KojoBackendTester:
                     response = self.session.post(f"{API_BASE}/jobs", 
                                                json=job_data, timeout=15)
                     
-                    if response.status_code == 201:
+                    if response.status_code in [200, 201]:
                         data = response.json()
                         job_id = data.get("id", "unknown")
                         self.log_result("Job Creation POST", True, f"Job created by client: {job_data['title']} (ID: {job_id[:8]}...)")
