@@ -486,16 +486,30 @@ class PreciseGeolocationService {
       // Identifier le pays et la ville avec la base de données précise
       const locationData = this.identifyLocationFromCoordinates(latitude, longitude);
       
-      if (!locationData) {
-        devLog.info('⚠️ Coordonnées GPS hors zone Afrique de l\'Ouest');
-        return null;
-      }
-
       // Calculer la précision de la détection
       const detectionAccuracy = this.calculateDetectionAccuracy(accuracy, 'gps');
 
+      if (locationData) {
+        return {
+          ...locationData,
+          coordinates: { lat: latitude, lng: longitude },
+          accuracy: detectionAccuracy,
+          method: 'gps',
+          gpsAccuracy: accuracy,
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // GPS hors Afrique de l'Ouest - retourner les coordonnées réelles quand même
+      devLog.info('📍 GPS hors zone Afrique de l\'Ouest - position réelle retournée');
       return {
-        ...locationData,
+        country: 'Position GPS',
+        countryCode: 'gps',
+        city: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        district: '',
+        fullAddress: `GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+        phonePrefix: '',
+        flag: '📍',
         coordinates: { lat: latitude, lng: longitude },
         accuracy: detectionAccuracy,
         method: 'gps',
