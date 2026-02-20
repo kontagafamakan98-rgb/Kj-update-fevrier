@@ -540,8 +540,8 @@ class PreciseGeolocationService {
         
         devLog.info(`✅ ${service.name} réponse:`, parsed);
         
-        // Valider que c'est en Afrique de l'Ouest
-        if (this.isWestAfricaCoordinates(parsed.latitude, parsed.longitude)) {
+        // Accepter toute localisation valide (pas seulement Afrique de l'Ouest)
+        if (parsed && parsed.latitude && parsed.longitude) {
           results.push({
             service: service.name,
             ...parsed
