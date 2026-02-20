@@ -471,6 +471,17 @@ const translations = {
     noJobsPosted: 'No jobs posted',
     noJobsAvailable: 'No jobs available',
     loadingPage: 'Loading page...',
+    languageLabel: 'Language',
+    preciseGeolocation: 'Ultra-Precise Geolocation',
+    multiMethodSystem: 'Multi-method system for 100% accuracy',
+    detectMyLocation: 'Detect my precise location',
+    detecting: 'Detecting...',
+    detectionMethods: 'Detection methods',
+    gpsHighPrecision: 'High precision GPS (90-100%)',
+    multiIPGeolocation: 'Multi-IP geolocation (80-90%)',
+    contextualAnalysis: 'Contextual analysis (70-80%)',
+    intelligentFallback: 'Intelligent fallback (60-70%)',
+    noLogsYet: 'No logs yet. Test the features above.',
     
     // Job status translations
     open: 'Open',
