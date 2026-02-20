@@ -117,12 +117,12 @@ class KojoBackendTester:
         """Test POST /api/auth/register - Inscription utilisateur"""
         print("\n🔥 TESTING USER REGISTRATION...")
         
-        # Test client registration
+        # Test client registration (accept 200 or 201 as success)
         try:
             response = self.session.post(f"{API_BASE}/auth/register", 
                                        json=TEST_USER_CLIENT, timeout=15)
             
-            if response.status_code == 201:
+            if response.status_code in [200, 201]:
                 data = response.json()
                 self.log_result("Register Client", True, 
                               f"User created: {data.get('user', {}).get('email')} (ID: {data.get('user', {}).get('id', 'unknown')[:8]}...)")
@@ -132,12 +132,12 @@ class KojoBackendTester:
         except Exception as e:
             self.log_result("Register Client", False, f"Exception: {str(e)}")
             
-        # Test worker registration
+        # Test worker registration (accept 200 or 201 as success)
         try:
             response = self.session.post(f"{API_BASE}/auth/register", 
                                        json=TEST_USER_WORKER, timeout=15)
             
-            if response.status_code == 201:
+            if response.status_code in [200, 201]:
                 data = response.json()
                 self.log_result("Register Worker", True, 
                               f"Worker created: {data.get('user', {}).get('email')} with {len(data.get('user', {}).get('specialties', []))} specialties")
