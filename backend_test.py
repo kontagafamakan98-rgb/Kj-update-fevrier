@@ -534,7 +534,7 @@ class KojoBackendTester:
             {"country": "senegal", "phone": "+221771234567", "name": "Sénégal"},
             {"country": "mali", "phone": "+223701234567", "name": "Mali"}, 
             {"country": "burkina_faso", "phone": "+226701234567", "name": "Burkina Faso"},
-            {"country": "ivory_coast", "phone": "+225071234567", "name": "Côte d'Ivoire"}
+            {"country": "ivory_coast", "phone": "+225751234567", "name": "Côte d'Ivoire"}  # Changed prefix to 75 which should be supported
         ]
         
         for i, test_case in enumerate(test_cases):
