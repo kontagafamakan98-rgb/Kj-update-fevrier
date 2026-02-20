@@ -119,7 +119,7 @@ const PreciseLocationDemo = () => {
             transition: 'all 0.2s'
           }}
         >
-          {isDetecting ? '🔍 Détection en cours...' : '📍 Détecter ma localisation précise'}
+          {isDetecting ? `🔍 ${t('detecting')}` : `📍 ${t('detectMyLocation')}`}
         </button>
       </div>
 
