@@ -343,7 +343,7 @@ class User(BaseModel):
         return clean_phone
     profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
     is_verified: bool = False
-    payment_accounts: Optional[dict] = Field(None, max_items=10)  # Limit payment methods
+    payment_accounts: Optional[dict] = Field(None)  # Payment methods dict
     payment_accounts_count: int = Field(default=0, ge=0, le=10)  # Non-negative, max 10
     rating: float = Field(default=0.0, ge=0.0, le=5.0)  # Rating between 0-5
     total_reviews: int = Field(default=0, ge=0)  # Non-negative
