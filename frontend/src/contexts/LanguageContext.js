@@ -456,6 +456,10 @@ const translations = {
     noJobsFound: 'No jobs found',
     publishFirstJob: 'Start by publishing your first job',
     myJobs: 'My Jobs',
+    myRecentJobs: 'My recent jobs',
+    noJobsPosted: 'No jobs posted',
+    noJobsAvailable: 'No jobs available',
+    loadingPage: 'Loading page...',
     
     // Job status translations
     open: 'Open',
