@@ -135,7 +135,7 @@ export default function Navbar() {
           <div className="px-2 pt-2 pb-3 space-y-1">
             {/* Language selector mobile */}
             <div className="px-3 py-2">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Langue</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('languageLabel')}</label>
               <select 
                 value={currentLanguage}
                 onChange={(e) => changeLanguage(e.target.value)}
