@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import preciseGeolocationService from '../services/preciseGeolocationService';
+import { useLanguage } from '../contexts/LanguageContext';
 import { devLog } from '../utils/env';
 
 const PreciseLocationDemo = () => {
@@ -8,6 +9,7 @@ const PreciseLocationDemo = () => {
   const [accuracy, setAccuracy] = useState(0);
   const [detectionMethod, setDetectionMethod] = useState('');
   const [detectionTime, setDetectionTime] = useState(0);
+  const { t } = useLanguage();
 
   const detectLocation = async () => {
     setIsDetecting(true);
