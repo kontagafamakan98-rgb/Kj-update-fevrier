@@ -765,6 +765,17 @@ const translations = {
     noJobsPosted: 'Dara liggéey binduwul',
     noJobsAvailable: 'Dara liggéey amul',
     loadingPage: 'Xët bi yàgg nañu ko...',
+    languageLabel: 'Làkk',
+    preciseGeolocation: 'Seet-taxawaay bu jëm',
+    multiMethodSystem: 'Yoon yu bari ngir jëm 100%',
+    detectMyLocation: 'Seet sama taxawaay bu jëm',
+    detecting: 'Yàgg nañu ko seet...',
+    detectionMethods: 'Yoon yu seet',
+    gpsHighPrecision: 'GPS bu baax (90-100%)',
+    multiIPGeolocation: 'Multi-IP (80-90%)',
+    contextualAnalysis: 'Xam-xam (70-80%)',
+    intelligentFallback: 'Fallback bu xel (60-70%)',
+    noLogsYet: 'Dara amul fi. Jéemël yi ci kaw.',
     availableJobs: 'Liggéey yu am',
     
     // Job status translations
