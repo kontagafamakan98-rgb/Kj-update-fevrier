@@ -1355,6 +1355,17 @@ const translations = {
     noJobsPosted: 'Tʋʋmd ka be ye',
     noJobsAvailable: 'Tʋʋma ka be ye',
     loadingPage: 'Sebr n wat n kẽeda...',
+    languageLabel: 'Goama',
+    preciseGeolocation: 'Zĩig bãngr sẽn yaa takɩ',
+    multiMethodSystem: 'Sor-toɛɛ wʋsg n paam 100%',
+    detectMyLocation: 'Bãng m zĩiga',
+    detecting: 'A wat n bãngda...',
+    detectionMethods: 'Bãngr sorã',
+    gpsHighPrecision: 'GPS sẽn yaa neer (90-100%)',
+    multiIPGeolocation: 'Multi-IP (80-90%)',
+    contextualAnalysis: 'Vaeesg (70-80%)',
+    intelligentFallback: 'Fallback yam (60-70%)',
+    noLogsYet: 'Bũmb ka be ye. Mak-y bũmb nins sẽn be yĩngri.',
     availableJobs: 'Tʋʋma sẽn beẽ',
     
     // Job status translations
