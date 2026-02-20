@@ -1060,6 +1060,17 @@ const translations = {
     noJobsPosted: 'Baara si tɛ bɔ',
     noJobsAvailable: 'Baara si tɛ yen',
     loadingPage: 'Ɲɛ bɛ doni...',
+    languageLabel: 'Kan',
+    preciseGeolocation: 'Yɔrɔ dɔnni tiɲɛnen',
+    multiMethodSystem: 'Fɛɛrɛ caman ye 100% tiɲɛ',
+    detectMyLocation: 'N ka yɔrɔ dɔn',
+    detecting: 'A bɛ dɔnni...',
+    detectionMethods: 'Dɔnni fɛɛrɛw',
+    gpsHighPrecision: 'GPS ɲuman (90-100%)',
+    multiIPGeolocation: 'Multi-IP (80-90%)',
+    contextualAnalysis: 'Kunnafoni (70-80%)',
+    intelligentFallback: 'Fallback hakili (60-70%)',
+    noLogsYet: 'Fɛn si tɛ yan. Fɛɛrɛw kɔrɔ jɛ.',
     availableJobs: 'Baara minnu bɛ yen',
     
     // Job status translations
