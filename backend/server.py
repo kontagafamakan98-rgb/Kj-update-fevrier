@@ -1097,14 +1097,15 @@ async def register_user(user_data: UserRegister):
         field = first_error['loc'][0] if first_error['loc'] else 'field'
         
         if field == 'first_name':
-            error_msg = "Le prénom doit contenir au moins 2 caractères"
-        elif field == 'last_name':
-            error_msg = "Le nom doit contenir au moins 2 caractères"
-        elif field in ['first_name', 'last_name']:
-            if 'pattern' in first_error['type']:
-                error_msg = f"Le {field} contient des caractères non autorisés"
+            if 'pattern' in first_error.get('type', ''):
+                error_msg = "Le prénom contient des caractères non autorisés"
             else:
-                error_msg = f"Le {field} n'est pas au bon format"
+                error_msg = "Le prénom doit contenir au moins 2 caractères"
+        elif field == 'last_name':
+            if 'pattern' in first_error.get('type', ''):
+                error_msg = "Le nom de famille contient des caractères non autorisés"
+            else:
+                error_msg = "Le nom doit contenir au moins 2 caractères"
         elif field == 'email':
             error_msg = "L'adresse email n'est pas valide"
         elif field == 'phone':
