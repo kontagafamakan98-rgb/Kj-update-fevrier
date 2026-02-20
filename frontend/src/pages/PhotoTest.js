@@ -163,7 +163,7 @@ export default function PhotoTest() {
           <div className="max-h-96 overflow-y-auto">
             {testResults.length === 0 ? (
               <p className="text-gray-500 text-center py-8">
-                Aucun log pour le moment. Testez les fonctionnalités ci-dessus.
+                {t('noLogsYet')}
               </p>
             ) : (
               <div className="space-y-2">
