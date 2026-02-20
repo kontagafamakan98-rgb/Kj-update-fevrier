@@ -537,10 +537,10 @@ class KojoBackendTester:
             {"country": "ivory_coast", "phone": "+225071234567", "name": "Côte d'Ivoire"}
         ]
         
-        for test_case in test_cases:
+        for i, test_case in enumerate(test_cases):
             # Test Orange Money validation
             orange_data = {
-                "email": f"test{int(time.time())}@kojo.com",
+                "email": f"orangetest{int(time.time())}{i}@kojo.com",
                 "password": "TestPass2024!",
                 "first_name": "Test",
                 "last_name": "User",
@@ -570,7 +570,7 @@ class KojoBackendTester:
             
             # Test Wave validation
             wave_data = {
-                "email": f"wave{int(time.time())}@kojo.com",
+                "email": f"wavetest{int(time.time())}{i}@kojo.com",
                 "password": "TestPass2024!",
                 "first_name": "Test",
                 "last_name": "User",
