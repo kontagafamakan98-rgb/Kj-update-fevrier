@@ -620,12 +620,6 @@ class PreciseGeolocationService {
       consensus: validatedResult.consensus,
       timestamp: new Date().toISOString()
     };
-      accuracy: detectionAccuracy,
-      method: 'ip',
-      ipServices: results.length,
-      consensus: validatedResult.consensus,
-      timestamp: new Date().toISOString()
-    };
   }
 
   /**
