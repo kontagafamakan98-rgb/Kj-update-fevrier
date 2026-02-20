@@ -181,6 +181,17 @@ const translations = {
     noJobsPosted: 'Aucun emploi publié',
     noJobsAvailable: 'Aucun emploi disponible',
     loadingPage: 'Chargement de la page...',
+    languageLabel: 'Langue',
+    preciseGeolocation: 'Géolocalisation Ultra-Précise',
+    multiMethodSystem: 'Système multi-méthodes pour une précision de 100%',
+    detectMyLocation: 'Détecter ma localisation précise',
+    detecting: 'Détection en cours...',
+    detectionMethods: 'Méthodes de détection',
+    gpsHighPrecision: 'GPS haute précision (90-100%)',
+    multiIPGeolocation: 'Multi-IP géolocalisation (80-90%)',
+    contextualAnalysis: 'Analyse contextuelle (70-80%)',
+    intelligentFallback: 'Fallback intelligent (60-70%)',
+    noLogsYet: 'Aucun log pour le moment. Testez les fonctionnalités ci-dessus.',
     availableJobs: 'Emplois disponibles',
     
     // Messages page
