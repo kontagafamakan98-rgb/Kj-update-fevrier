@@ -352,7 +352,7 @@ class User(BaseModel):
 
 class WorkerProfile(BaseModel):
     user_id: str
-    specialties: List[str] = Field(default=[], min_items=1, max_items=10)  # At least 1, max 10 specialties
+    specialties: List[str] = Field(default=[], max_items=10)  # Max 10 specialties
     experience_years: int = Field(default=0, ge=0, le=50)  # 0-50 years experience
 
     cv_file: Optional[str] = Field(None, max_length=500)  # File path length limit
