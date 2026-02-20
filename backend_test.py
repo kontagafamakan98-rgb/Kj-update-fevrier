@@ -331,32 +331,74 @@ class KojoBackendTester:
         except Exception as e:
             self.log_result("Jobs List GET", False, f"Exception: {str(e)}")
             
-        # Test POST /api/jobs - Créer un emploi (avec token, user type client)
+    def test_jobs_endpoints(self):
+        """Test jobs endpoints"""
+        print("\n💼 TESTING JOBS ENDPOINTS...")
+        
+        # Test GET /api/jobs - Liste des emplois
+        try:
+            response = self.session.get(f"{API_BASE}/jobs", timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                jobs_count = len(data) if isinstance(data, list) else len(data.get("jobs", []))
+                self.log_result("Jobs List GET", True, f"Retrieved {jobs_count} jobs")
+            else:
+                self.log_result("Jobs List GET", False, f"HTTP {response.status_code}: {response.text[:200]}")
+                
+        except Exception as e:
+            self.log_result("Jobs List GET", False, f"Exception: {str(e)}")
+            
+        # Test POST /api/jobs - Need to create a client user first
         if self.token:
-            job_data = {
-                "title": "Réparation moto Yamaha",
-                "description": "Réparation d'une moto Yamaha 125cc qui ne démarre plus",
-                "category": "mécanique_moto",
-                "budget_min": 40000,  # Added required field
-                "budget_max": 60000,  # Added required field
-                "location": {  # Changed to dict as expected
-                    "address": "Dakar, Sénégal",
-                    "country": "senegal",
-                    "city": "Dakar"
-                },
-                "required_skills": ["Expérience motos japonaises", "Outils de diagnostic"]
-            }
+            # First, create a client user to test job creation
+            client_user = TEST_USER_CLIENT.copy()
+            client_user["email"] = f"jobcreator{int(time.time())}@kojo.com"
             
             try:
-                response = self.session.post(f"{API_BASE}/jobs", 
-                                           json=job_data, timeout=15)
+                # Register client
+                reg_response = self.session.post(f"{API_BASE}/auth/register", 
+                                               json=client_user, timeout=15)
                 
-                if response.status_code == 201:
-                    data = response.json()
-                    job_id = data.get("id", "unknown")
-                    self.log_result("Job Creation POST", True, f"Job created: {job_data['title']} (ID: {job_id[:8]}...)")
+                if reg_response.status_code in [200, 201]:
+                    reg_data = reg_response.json()
+                    client_token = reg_data.get("access_token")
+                    
+                    # Use client token for job creation
+                    temp_headers = self.session.headers.copy()
+                    self.session.headers.update({
+                        'Authorization': f'Bearer {client_token}'
+                    })
+                    
+                    job_data = {
+                        "title": "Réparation moto Yamaha",
+                        "description": "Réparation d'une moto Yamaha 125cc qui ne démarre plus",
+                        "category": "mécanique_moto",
+                        "budget_min": 40000,
+                        "budget_max": 60000,
+                        "location": {
+                            "address": "Dakar, Sénégal",
+                            "country": "senegal",
+                            "city": "Dakar"
+                        },
+                        "required_skills": ["Expérience motos japonaises", "Outils de diagnostic"]
+                    }
+                    
+                    response = self.session.post(f"{API_BASE}/jobs", 
+                                               json=job_data, timeout=15)
+                    
+                    if response.status_code == 201:
+                        data = response.json()
+                        job_id = data.get("id", "unknown")
+                        self.log_result("Job Creation POST", True, f"Job created by client: {job_data['title']} (ID: {job_id[:8]}...)")
+                    else:
+                        self.log_result("Job Creation POST", False, f"HTTP {response.status_code}: {response.text[:300]}")
+                    
+                    # Restore original headers
+                    self.session.headers.update(temp_headers)
+                    
                 else:
-                    self.log_result("Job Creation POST", False, f"HTTP {response.status_code}: {response.text[:300]}")
+                    self.log_result("Job Creation POST", False, f"Failed to create client user: HTTP {reg_response.status_code}")
                     
             except Exception as e:
                 self.log_result("Job Creation POST", False, f"Exception: {str(e)}")
