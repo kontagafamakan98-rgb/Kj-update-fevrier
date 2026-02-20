@@ -62,12 +62,12 @@ const PreciseLocationDemo = () => {
 
   const getMethodName = (method) => {
     const names = {
-      'gps': 'GPS Haute Précision',
-      'ip': 'Multi-IP Géolocalisation',
-      'contextual': 'Analyse Contextuelle',
-      'intelligent_fallback': 'Fallback Intelligent'
+      'gps': t('gpsHighPrecision'),
+      'ip': t('multiIPGeolocation'),
+      'contextual': t('contextualAnalysis'),
+      'intelligent_fallback': t('intelligentFallback')
     };
-    return names[method] || 'Inconnu';
+    return names[method] || method;
   };
 
   return (
