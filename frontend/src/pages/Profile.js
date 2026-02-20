@@ -112,7 +112,7 @@ export default function Profile() {
         throw new Error(errorData.detail || 'Erreur lors de la création');
       }
       
-      setSuccess('Profil travailleur créé avec succès');
+      setSuccess(t('profileCreated'));
       await loadProfile();
       
       setTimeout(() => setSuccess(''), 3000);
