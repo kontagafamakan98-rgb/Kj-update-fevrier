@@ -120,7 +120,7 @@ function AppRoutes() {
 
       {/* Main Content with Suspense for lazy loaded routes */}
       <main className="pb-16 md:pb-0">
-        <Suspense fallback={<PageLoader message="Chargement de la page..." />}>
+        <Suspense fallback={<PageLoader message={t('loadingPage')} />}>
           <Routes>
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
