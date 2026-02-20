@@ -306,7 +306,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUs
     devLog.info('Profile page received photo change result:', result);
     
     if (result.success) {
-      setSuccess('Photo de profil mise à jour avec succès !');
+      setSuccess(t('photoUpdated'));
       setTimeout(() => setSuccess(''), 3000);
     } else if (result.deleted) {
       setSuccess('Photo de profil supprimée !');
