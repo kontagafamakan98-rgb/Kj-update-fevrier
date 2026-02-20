@@ -337,11 +337,14 @@ class KojoBackendTester:
                 "title": "Réparation moto Yamaha",
                 "description": "Réparation d'une moto Yamaha 125cc qui ne démarre plus",
                 "category": "mécanique_moto",
-                "budget": 50000,
-                "currency": "XOF",
-                "location": "Dakar, Sénégal",
-                "country": "senegal",
-                "requirements": ["Expérience motos japonaises", "Outils de diagnostic"]
+                "budget_min": 40000,  # Added required field
+                "budget_max": 60000,  # Added required field
+                "location": {  # Changed to dict as expected
+                    "address": "Dakar, Sénégal",
+                    "country": "senegal",
+                    "city": "Dakar"
+                },
+                "required_skills": ["Expérience motos japonaises", "Outils de diagnostic"]
             }
             
             try:
