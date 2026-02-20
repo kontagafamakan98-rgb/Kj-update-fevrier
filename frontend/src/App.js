@@ -85,6 +85,7 @@ function MobileLoader() {
 function AppRoutes() {
   const [pwaReady, setPwaReady] = useState(false);
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   useEffect(() => {
     // Initialize PWA features
