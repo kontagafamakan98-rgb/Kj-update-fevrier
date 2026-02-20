@@ -217,7 +217,7 @@ export default function Jobs() {
             <p className="mt-1 text-sm text-gray-500">
               {user.user_type === 'client' 
                 ? t('publishFirstJob') 
-                : 'Essayez de modifier vos critères de recherche.'
+                : t('modifySearchCriteria')
               }
             </p>
             {user.user_type === 'client' && (
