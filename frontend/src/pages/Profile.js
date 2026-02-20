@@ -400,7 +400,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUs
             />
           </div>
           <p className="mt-1 text-sm text-gray-500">
-            Format: {getPhonePrefixByCountry(formData.country.toLowerCase())} XX XXX XX XX
+            {t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} XX XXX XX XX
           </p>
         </div>
 
