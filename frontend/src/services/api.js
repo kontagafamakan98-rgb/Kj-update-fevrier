@@ -285,8 +285,8 @@ export const usersAPI = {
 export const messagesAPI = {
   getConversations: () => api.get('/messages/conversations'),
   getMessages: (conversationId) => api.get(`/messages/${conversationId}`),
-  sendMessage: (conversationId, messageData) => api.post(`/messages/${conversationId}`, messageData),
-  createConversation: (data) => api.post('/messages/conversations', data),
+  getAllMessages: () => api.get('/messages'),
+  sendMessage: (messageData) => api.post('/messages', messageData),
 };
 
 /**
