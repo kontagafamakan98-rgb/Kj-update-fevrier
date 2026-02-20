@@ -522,7 +522,7 @@ class JobCreate(BaseModel):
     category: str = Field(min_length=3, max_length=50)
     budget_min: float = Field(ge=0.0, le=10000000.0)
     budget_max: float = Field(ge=0.0, le=10000000.0)
-    location: dict = Field(min_items=1, max_items=10)
+    location: dict = Field(...)
     required_skills: List[str] = Field(default=[], max_items=20)
     estimated_duration: Optional[str] = Field(None, max_length=100)
     deadline: Optional[datetime] = None
