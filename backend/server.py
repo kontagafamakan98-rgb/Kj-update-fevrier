@@ -730,8 +730,6 @@ def validate_wave_number(number: str) -> bool:
     except Exception as e:
         logger.error(f"Error validating Wave number: {e}")
         return False
-    
-    return False
 
 def validate_bank_card(card_number: str) -> bool:
     """Valide basiquement un numéro de carte bancaire"""
