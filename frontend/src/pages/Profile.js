@@ -528,7 +528,7 @@ function WorkerProfileView({ profile }) {
             <span className={`px-2 py-1 text-xs rounded-full ${
               profile.availability ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
             }`}>
-              {profile.availability ? 'Disponible' : 'Non disponible'}
+              {profile.availability ? t('availableStatus') : t('unavailableStatus')}
             </span>
           </p>
         </div>
