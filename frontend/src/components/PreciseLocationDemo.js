@@ -20,6 +20,13 @@ const PreciseLocationDemo = () => {
     const startTime = Date.now();
     
     try {
+      // Vider le cache pour forcer une détection fraîche
+      localStorage.removeItem('kojo_precise_location');
+      localStorage.removeItem('kojo_last_location');
+      localStorage.removeItem('kojo_detected_country');
+      preciseGeolocationService.cachedLocation = null;
+      preciseGeolocationService.cacheTimestamp = null;
+      
       devLog.info('🎯 Démarrage détection géolocalisation ultra-précise...');
       
       const detectedLocation = await preciseGeolocationService.detectPreciseLocation();
