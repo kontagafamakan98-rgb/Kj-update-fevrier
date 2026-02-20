@@ -230,103 +230,43 @@ class GeolocationService {
         return contextLocation;
       }
       
-      // MÉTHODE 5: Fallback intelligent basé sur statistiques
-      devLog.info('🎲 Utilisation fallback intelligent...');
+      // MÉTHODE 5: Fallback basé sur le pays de l'utilisateur (pas de simulation)
+      devLog.info('📍 Utilisation position par défaut du pays...');
       
-      // Simulation réaliste pour l'Afrique de l'Ouest avec données enrichies
-      const locationMappings = {
-        'mali': {
-          cities: [
-            { name: 'Bamako', districts: ['ACI 2000', 'Hippodrome', 'Plateau', 'Badalabougou', 'Heremakono'] },
-            { name: 'Sikasso', districts: ['Centre', 'Médina', 'Lafiabougou'] },
-            { name: 'Mopti', districts: ['Centre', 'Komoguel', 'Sévaré'] }
-          ],
-          coordinates: { lat: 12.6392, lng: -8.0029 }
-        },
-        'senegal': {
-          cities: [
-            { name: 'Dakar', districts: ['Plateau', 'Médina', 'Grand Dakar', 'Parcelles Assainies', 'Liberté 6'] },
-            { name: 'Thiès', districts: ['Centre', 'Randoulène', 'Hersent'] },
-            { name: 'Kaolack', districts: ['Médina Baye', 'Dialègne', 'Ndangane'] }
-          ],
-          coordinates: { lat: 14.6928, lng: -17.4467 }
-        },
-        'burkina_faso': {
-          cities: [
-            { name: 'Ouagadougou', districts: ['Zone du Bois', 'Cissin', 'Gounghin', 'Kamsaoghin', 'Bogodogo'] },
-            { name: 'Bobo-Dioulasso', districts: ['Secteur 1', 'Secteur 15', 'Koko'] },
-            { name: 'Koudougou', districts: ['Centre', 'Issouka', 'Dapoya'] }
-          ],
-          coordinates: { lat: 12.3714, lng: -1.5197 }
-        },
-        'cote_divoire': {
-          cities: [
-            { name: 'Abidjan', districts: ['Plateau', 'Cocody', 'Marcory', 'Treichville', 'Yopougon'] },
-            { name: 'Yamoussoukro', districts: ['Centre', 'Habitat', 'Millionnaire'] },
-            { name: 'Bouaké', districts: ['Centre', 'Air France 2', 'Koko'] }
-          ],
-          coordinates: { lat: 5.3600, lng: -4.0083 }
-        }
+      const countryDefaults = {
+        'mali': { city: 'Bamako', lat: 12.6392, lng: -8.0029 },
+        'senegal': { city: 'Dakar', lat: 14.6928, lng: -17.4467 },
+        'burkina_faso': { city: 'Ouagadougou', lat: 12.3714, lng: -1.5197 },
+        'cote_divoire': { city: 'Abidjan', lat: 5.3600, lng: -4.0083 }
       };
 
-      // Utiliser statistiques pour choisir le pays le plus probable
-      const countryProbabilities = {
-        'senegal': 0.40,    // 40% - Meilleure pénétration internet (58%)
-        'cote_divoire': 0.25, // 25% - Économie forte (47%)
-        'mali': 0.20,       // 20% - Population importante (23%)
-        'burkina_faso': 0.15 // 15% - Moins connecté (22%)
-      };
-
-      let selectedCountry = userCountry;
-      if (!userCountry || !locationMappings[userCountry]) {
-        // Sélection pondérée si pas de pays fourni
-        const random = Math.random();
-        let cumulative = 0;
-        for (const [country, probability] of Object.entries(countryProbabilities)) {
-          cumulative += probability;
-          if (random <= cumulative) {
-            selectedCountry = country;
-            break;
-          }
-        }
-      }
-
-      const countryData = locationMappings[selectedCountry] || locationMappings['senegal'];
-      const randomCity = countryData.cities[Math.floor(Math.random() * countryData.cities.length)];
-      const randomDistrict = randomCity.districts[Math.floor(Math.random() * randomCity.districts.length)];
+      const selectedCountry = userCountry && countryDefaults[userCountry] ? userCountry : 'senegal';
+      const defaults = countryDefaults[selectedCountry];
       const country = getCountryByCode(selectedCountry);
 
-      // Simuler temps de détection réaliste
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
-      
       const fallbackLocation = {
-        address: `${randomDistrict}, ${randomCity.name}`,
-        fullAddress: `${randomDistrict}, ${randomCity.name}, ${country.nameFrench}`,
-        city: randomCity.name,
-        district: randomDistrict,
+        address: `${defaults.city}, ${country.nameFrench}`,
+        fullAddress: `${defaults.city}, ${country.nameFrench}`,
+        city: defaults.city,
+        district: '',
         country: country.nameFrench,
         countryCode: selectedCountry,
-        coordinates: {
-          ...countryData.coordinates,
-          lat: countryData.coordinates.lat + (Math.random() - 0.5) * 0.05,
-          lng: countryData.coordinates.lng + (Math.random() - 0.5) * 0.05
-        },
-        accuracy: Math.floor(60 + Math.random() * 30),
+        coordinates: { lat: defaults.lat, lng: defaults.lng },
+        accuracy: 0,
         timestamp: new Date().toISOString(),
-        method: 'intelligent_fallback',
-        confidence: 70,
+        method: 'default',
+        confidence: 50,
         detectionMethods: this.detectionMethods.join(' → ')
       };
 
       this.saveCachedLocation(fallbackLocation);
-      this.detectionMethods.push('fallback');
+      this.detectionMethods.push('default');
       this.isDetecting = false;
       
-      // Enregistrer dans le moniteur
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(fallbackLocation, detectionTime, true);
       
-      devLog.info(`✅ Géolocalisation complétée en ${detectionTime}ms par ${fallbackLocation.method}`);
+      devLog.info(`📍 Position par défaut: ${defaults.city}, ${country.nameFrench}`);
       
       return fallbackLocation;
       
