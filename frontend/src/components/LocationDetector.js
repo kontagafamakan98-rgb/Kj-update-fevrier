@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MapPin, Loader2, Navigation } from 'lucide-react';
 import GeolocationService from '../services/geolocationService';
+import { useLanguage } from '../contexts/LanguageContext';
 import { devLog, safeLog } from '../utils/env';
 
 const LocationDetector = ({ 
@@ -11,7 +12,20 @@ const LocationDetector = ({
 }) => {
   const [detecting, setDetecting] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const { t } = useLanguage();
   
+  const getMethodLabel = (method) => {
+    const labels = {
+      'gps': 'GPS',
+      'ip': 'IP',
+      'cache': 'Cache',
+      'backend_api': 'API',
+      'context': 'Auto',
+      'default': t('locationNotSpecified')
+    };
+    return labels[method] || method;
+  };
+
   const handleDetectLocation = async () => {
     setDetecting(true);
     
@@ -23,12 +37,8 @@ const LocationDetector = ({
         onLocationDetected(location);
       }
       
-      // Afficher le résultat à l'utilisateur
-      alert(`📍 Localisation détectée: ${location.fullAddress}`);
-      
     } catch (error) {
       safeLog.error('Erreur détection:', error);
-      alert('Impossible de détecter votre position automatiquement. Veuillez entrer votre localisation manuellement.');
     } finally {
       setDetecting(false);
     }
@@ -69,17 +79,17 @@ const LocationDetector = ({
           transition-colors duration-200
           ${detecting ? 'cursor-not-allowed' : 'cursor-pointer'}
         `}
-        title={detecting ? 'Détection en cours...' : 'Détecter ma position GPS'}
+        title={detecting ? t('detecting') : t('detectMyLocation')}
       >
         {detecting ? (
           <>
             <Loader2 size={getIconSize()} className="animate-spin mr-2" />
-            Détection...
+            {t('detecting')}
           </>
         ) : (
           <>
             <Navigation size={getIconSize()} className="mr-2" />
-            Détecter ma position
+            {t('detectMyLocation')}
           </>
         )}
       </button>
@@ -89,10 +99,10 @@ const LocationDetector = ({
           <div className="flex items-start">
             <MapPin size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
             <div className="text-sm">
-              <p className="text-green-800 font-medium">Position détectée</p>
+              <p className="text-green-800 font-medium">{t('detectMyLocation')}</p>
               <p className="text-green-700">{currentLocation.fullAddress}</p>
               <p className="text-green-600 text-xs mt-1">
-                Précision: ±{currentLocation.accuracy}m • {currentLocation.method === 'gps' ? 'GPS' : 'Simulation'}
+                {currentLocation.accuracy > 0 ? `±${currentLocation.accuracy}m • ` : ''}{getMethodLabel(currentLocation.method)}
               </p>
             </div>
           </div>
