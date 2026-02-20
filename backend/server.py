@@ -2173,7 +2173,7 @@ app.add_middleware(
     max_age=86400,  # 24 hours cache for preflight
 )
 
-# CORS Configuration optimized for West Africa
+# Trusted Host Middleware for security
 app.add_middleware(
     TrustedHostMiddleware, 
     allowed_hosts=["*"]  # In production, specify exact domains
