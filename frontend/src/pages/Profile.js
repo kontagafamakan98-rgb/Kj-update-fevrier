@@ -118,7 +118,7 @@ export default function Profile() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
       safeLog.error('Worker profile creation error:', error);
-      setError(error.message || 'Erreur lors de la création');
+      setError(error.message || t('profileCreateError'));
     }
   };
 
