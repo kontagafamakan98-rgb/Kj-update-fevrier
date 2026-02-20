@@ -177,6 +177,10 @@ const translations = {
     noJobsFound: 'Aucun emploi trouvé',
     publishFirstJob: 'Commencez par publier votre premier emploi',
     myJobs: 'Mes emplois',
+    myRecentJobs: 'Mes emplois récents',
+    noJobsPosted: 'Aucun emploi publié',
+    noJobsAvailable: 'Aucun emploi disponible',
+    loadingPage: 'Chargement de la page...',
     availableJobs: 'Emplois disponibles',
     
     // Messages page
