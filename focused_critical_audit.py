@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 class FocusedCriticalAuditor:
-    def __init__(self, base_url="https://westafricaboost.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-work.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.critical_errors = []
         self.tests_run = 0

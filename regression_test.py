@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 import base64
 
 class KojoRegressionTester:
-    def __init__(self, base_url="https://westafricaboost.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-work.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.client_token = None
         self.worker_token = None
