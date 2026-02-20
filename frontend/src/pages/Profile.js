@@ -309,7 +309,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUs
       setSuccess(t('photoUpdated'));
       setTimeout(() => setSuccess(''), 3000);
     } else if (result.deleted) {
-      setSuccess('Photo de profil supprimée !');
+      setSuccess(t('photoDeleted'));
       setTimeout(() => setSuccess(''), 3000);
     } else if (result.error) {
       safeLog.error('Photo change error:', result.error);
