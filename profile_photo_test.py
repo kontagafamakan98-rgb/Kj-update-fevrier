@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 
 class ProfilePhotoTester:
-    def __init__(self, base_url="https://westafricaboost.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-work.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.test_user_token = None
         self.test_user_id = None

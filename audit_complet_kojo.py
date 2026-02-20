@@ -10,7 +10,7 @@ Tests:
 4. TESTS FONCTIONNELS - Create client user, worker user, job, send message
 5. IDENTIFIER TOUTES LES ERREURS - 500 errors, validation errors, data problems, security leaks
 
-Backend URL: https://westafricaboost.preview.emergentagent.com
+Backend URL: https://kojo-work.preview.emergentagent.com
 """
 
 import requests
@@ -20,7 +20,7 @@ import time
 from datetime import datetime
 
 class KojoAuditComplet:
-    def __init__(self, base_url="https://westafricaboost.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://kojo-work.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
