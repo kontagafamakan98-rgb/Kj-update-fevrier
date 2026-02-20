@@ -299,11 +299,11 @@ const PreciseLocationDemo = () => {
         fontSize: '12px',
         color: '#0c4a6e'
       }}>
-        <strong>🔬 Méthodes de détection :</strong><br />
-        1. GPS haute précision (90-100%)<br />
-        2. Multi-IP géolocalisation (80-90%)<br />
-        3. Analyse contextuelle (70-80%)<br />
-        4. Fallback intelligent (60-70%)
+        <strong>🔬 {t('detectionMethods')} :</strong><br />
+        1. {t('gpsHighPrecision')}<br />
+        2. {t('multiIPGeolocation')}<br />
+        3. {t('contextualAnalysis')}<br />
+        4. {t('intelligentFallback')}
       </div>
     </div>
   );
