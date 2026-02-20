@@ -26,7 +26,7 @@ export default function Login() {
     const result = await login(formData.email, formData.password);
     
     if (result.success) {
-      toast.success('Connexion réussie ! 🎉');
+      toast.success(t('loginSuccess') + ' 🎉');
       navigate('/dashboard');
     } else {
       setError(result.error);
