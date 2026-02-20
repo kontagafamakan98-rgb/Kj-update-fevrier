@@ -1033,6 +1033,18 @@ export const detectUserCountry = async () => {
   if (!location) return null;
 
   const countryData = PRECISE_GEOGRAPHIC_DATABASE[location.countryCode];
+  if (!countryData) {
+    // Pays hors base de données - retourner les infos disponibles
+    return {
+      code: location.countryCode || 'senegal',
+      name: location.country || 'Senegal',
+      nameFrench: location.country || 'Sénégal',
+      flag: location.flag || '🇸🇳',
+      phonePrefix: location.phonePrefix || '+221',
+      currency: 'XOF',
+      language: 'fr'
+    };
+  }
   return {
     code: location.countryCode,
     name: countryData.country,
