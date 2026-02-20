@@ -739,6 +739,10 @@ const translations = {
     noJobsFound: 'Liggéey amul',
     publishFirstJob: 'Tàmbal ak sa liggéey bu njëkk',
     myJobs: 'Sama liggéey',
+    myRecentJobs: 'Sama liggéey yu mujj',
+    noJobsPosted: 'Dara liggéey binduwul',
+    noJobsAvailable: 'Dara liggéey amul',
+    loadingPage: 'Xët bi yàgg nañu ko...',
     availableJobs: 'Liggéey yu am',
     
     // Job status translations
