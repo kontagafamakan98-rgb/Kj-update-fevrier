@@ -90,13 +90,13 @@ const PreciseLocationDemo = () => {
           color: '#1f2937',
           marginBottom: '8px'
         }}>
-          🎯 Géolocalisation Ultra-Précise
+          🎯 {t('preciseGeolocation')}
         </h2>
         <p style={{
           color: '#6b7280',
           fontSize: '14px'
         }}>
-          Système multi-méthodes pour une précision de 100%
+          {t('multiMethodSystem')}
         </p>
       </div>
 
