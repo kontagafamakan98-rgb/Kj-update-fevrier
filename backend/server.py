@@ -370,7 +370,7 @@ class Job(BaseModel):
     category: str = Field(min_length=3, max_length=50)  # Category constraints
     budget_min: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
     budget_max: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
-    location: dict = Field(min_items=1, max_items=10)  # Location structure
+    location: dict = Field(...)  # Location structure
     status: JobStatus = JobStatus.OPEN
     required_skills: List[str] = Field(default=[], max_items=20)  # Max 20 skills
     estimated_duration: Optional[str] = Field(None, max_length=100)  # Duration string limit
