@@ -45,7 +45,7 @@ export default function Profile() {
       }
     } catch (error) {
       safeLog.error('Error loading profile:', error);
-      setError('Erreur lors du chargement du profil');
+      setError(t('profileLoadError'));
     } finally {
       setLoading(false);
     }
