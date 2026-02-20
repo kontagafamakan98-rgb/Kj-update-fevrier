@@ -413,7 +413,7 @@ export default function Dashboard() {
             ))
           ) : (
             <div className="p-6 text-center text-gray-500">
-              {user.user_type === 'client' ? 'Aucun emploi publié' : 'Aucun emploi disponible'}
+              {user.user_type === 'client' ? t('noJobsPosted') : t('noJobsAvailable')}
             </div>
           )}
         </div>
