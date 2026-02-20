@@ -343,7 +343,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, setProfile, updateUs
             setFormData(prev => ({...prev, profile_photo: photoUrl}));
             
             // Montrer un message temporaire que la photo est prête
-            setSuccess('Photo prête - cliquez "Enregistrer" pour confirmer');
+            setSuccess(t('photoReadySave'));
             setTimeout(() => setSuccess(''), 3000);
           }}
         />
