@@ -56,7 +56,7 @@ export default function Messages() {
       const ids = activeConversation.split('_');
       const receiverId = ids.find(id => id !== user.id);
 
-      await messagesAPI.sendMessage(activeConversation, {
+      await messagesAPI.sendMessage({
         receiver_id: receiverId,
         content: newMessage
       });
