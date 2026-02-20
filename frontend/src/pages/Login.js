@@ -30,7 +30,7 @@ export default function Login() {
       navigate('/dashboard');
     } else {
       setError(result.error);
-      toast.error(result.error || 'Échec de la connexion');
+      toast.error(result.error || t('loginFailed'));
     }
     
     setLoading(false);
