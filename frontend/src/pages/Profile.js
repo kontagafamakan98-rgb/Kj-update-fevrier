@@ -217,7 +217,7 @@ export default function Profile() {
         <div className="px-6 py-6">
           <PaymentAccountsManager 
             onSuccess={() => {
-              setSuccess('Comptes de paiement mis à jour avec succès');
+              setSuccess(t('paymentAccountsUpdated'));
               setTimeout(() => setSuccess(''), 3000);
             }}
           />
