@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { devLog, safeLog } from './utils/env';
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { LanguageProvider } from "./contexts/LanguageContext";
+import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { PaymentProvider } from './contexts/PaymentContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Navbar from "./components/Navbar";
