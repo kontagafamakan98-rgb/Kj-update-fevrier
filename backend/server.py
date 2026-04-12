@@ -2152,17 +2152,29 @@ WEST_AFRICA_ORIGINS = [
 ]
 
 # Get additional origins from environment
-env_origins = os.environ.get('CORS_ORIGINS', '').split(',')
-allowed_origins = WEST_AFRICA_ORIGINS + [origin.strip() for origin in env_origins if origin.strip()]
+env_origins = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', '').split(',') if origin.strip()]
+allowed_origins = WEST_AFRICA_ORIGINS + env_origins
+
+# Support public Vercel deployments and common development/private network origins.
+# Exact origins from CORS_ORIGINS remain supported via allow_origins.
+allowed_origin_regex = (
+    r"^https://.*\.vercel\.app$"
+    r"|^http://localhost(:\d+)?$"
+    r"|^https://localhost(:\d+)?$"
+    r"|^http://127\.0\.0\.1(:\d+)?$"
+    r"|^http://192\.168\.\d+\.\d+(:\d+)?$"
+    r"|^http://10\.\d+\.\d+\.\d+(:\d+)?$"
+)
 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=allowed_origins if env_origins != [''] else ["*"],  # Fallback to all in dev
+    allow_origins=allowed_origins,
+    allow_origin_regex=allowed_origin_regex,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
         "Accept",
-        "Accept-Language", 
+        "Accept-Language",
         "Content-Language",
         "Content-Type",
         "Authorization",
@@ -2171,7 +2183,7 @@ app.add_middleware(
         "Cache-Control"
     ],
     expose_headers=["Content-Range", "X-Content-Range"],
-    max_age=86400,  # 24 hours cache for preflight
+    max_age=86400,
 )
 
 # Trusted Host Middleware for security
