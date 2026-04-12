@@ -11,6 +11,23 @@ import logging
 import logging.handlers
 import sys
 import re
+import io
+import uuid
+import cloudinary
+
+cloudinary.config(secure=True)
+
+def upload_profile_photo_to_cloudinary(file_obj, user_identifier: str):
+    result = cloudinary.uploader.upload(
+        file_obj,
+        folder="kojo/profile_photos",
+        public_id=f"profile_{user_identifier}_{uuid.uuid4().hex}",
+        resource_type="image"
+    )
+    return {
+        "photo_url": result.get("secure_url") or result.get("url"),
+        "public_id": result.get("public_id")
+    }
 
 # Configure logging for West Africa production
 logging.basicConfig(
@@ -919,39 +936,27 @@ async def register_user_verified(user_data: UserWithPayment):
         profile_photo_path = None
         user_id = str(uuid.uuid4())  # Generate user ID first
         
-        if user_data.profile_photo_base64:
+                if user_data.profile_photo_base64:
             try:
-                # Décoder et sauvegarder la photo de profil
+                image_data = base64.b64decode(
+                    user_data.profile_photo_base64.split(',')[1]
+                    if ',' in user_data.profile_photo_base64
+                    else user_data.profile_photo_base64
+                )
                 
-                # Créer le dossier profile_photos s'il n'existe pas
-                profile_photos_dir = Path("uploads/profile_photos")
-                profile_photos_dir.mkdir(parents=True, exist_ok=True)
+                upload_result = cloudinary.uploader.upload(
+                    io.BytesIO(image_data),
+                    folder="kojo/profile_photos",
+                    public_id=f"register_{user_id}_{uuid.uuid4().hex}",
+                    resource_type="image"
+                )
                 
-                # Décoder l'image base64
-                image_data = base64.b64decode(user_data.profile_photo_base64.split(',')[1] if ',' in user_data.profile_photo_base64 else user_data.profile_photo_base64)
-                
-                # Générer un nom de fichier unique
-                file_extension = "jpg"  # Par défaut
-                if user_data.profile_photo_base64.startswith('data:image/png'):
-                    file_extension = "png"
-                elif user_data.profile_photo_base64.startswith('data:image/jpeg'):
-                    file_extension = "jpg"
-                elif user_data.profile_photo_base64.startswith('data:image/webp'):
-                    file_extension = "webp"
-                    
-                filename = f"profile_{user_id}_{int(datetime.now(timezone.utc).timestamp())}.{file_extension}"
-                profile_photo_path = f"/api/uploads/profile_photos/{filename}"  # Absolute path for URL with proper routing
-                
-                # Sauvegarder l'image (utiliser path relatif pour filesystem)
-                filesystem_path = f"uploads/profile_photos/{filename}"
-                with open(filesystem_path, "wb") as f:
-                    f.write(image_data)
-                    
-                logger.info(f"✅ Photo de profil sauvegardée: {filesystem_path} -> URL: {profile_photo_path}")
+                profile_photo_path = upload_result.get("secure_url") or upload_result.get("url")
+                logger.info(f"✅ Photo de profil Cloudinary sauvegardée: {profile_photo_path}")
                 
             except Exception as e:
-                logger.warning(f"⚠️ Erreur sauvegarde photo profil: {e}")
-                # Continuer sans photo si erreur
+                logger.warning(f"⚠️ Erreur sauvegarde photo profil Cloudinary: {e}")
+
 
         # Create user with payment verification - avec gestion d'erreur complète
         try:
@@ -1178,33 +1183,22 @@ async def upload_profile_photo(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    # Validate file type
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
     
-    # Validate file size (5MB max)
-    file_size = 0
     file_content = await file.read()
     file_size = len(file_content)
     
-    if file_size > 5 * 1024 * 1024:  # 5MB
+    if file_size > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
     
-    # Create uploads directory if it doesn't exist
-    uploads_dir = Path("uploads/profile_photos")
-    uploads_dir.mkdir(parents=True, exist_ok=True)
+    upload_result = upload_profile_photo_to_cloudinary(
+        io.BytesIO(file_content),
+        str(current_user.id)
+    )
     
-    # Generate unique filename
-    file_extension = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
-    filename = f"{current_user.id}_{int(datetime.now(timezone.utc).timestamp())}.{file_extension}"
-    file_path = uploads_dir / filename
+    photo_url = upload_result["photo_url"]
     
-    # Save file
-    with open(file_path, "wb") as buffer:
-        buffer.write(file_content)
-    
-    # Update user profile with photo URL (using /api prefix for proper routing)
-    photo_url = f"/api/uploads/profile_photos/{filename}"
     await db.users.update_one(
         {"id": current_user.id},
         {"$set": {"profile_photo": photo_url, "updated_at": datetime.now(timezone.utc)}}
@@ -1212,9 +1206,9 @@ async def upload_profile_photo(
     
     return {
         "message": "Profile photo uploaded successfully",
-        "photo_url": photo_url,
-        "filename": filename
+        "photo_url": photo_url
     }
+
 
 @api_router.get("/users/profile-photo")
 async def get_current_user_profile_photo(current_user: User = Depends(get_current_user)):
@@ -1251,15 +1245,6 @@ async def delete_profile_photo(current_user: User = Depends(get_current_user)):
     if not current_user.profile_photo:
         raise HTTPException(status_code=404, detail="No profile photo to delete")
     
-    # Try to delete the physical file
-    try:
-        file_path = Path(f".{current_user.profile_photo}")
-        if file_path.exists():
-            file_path.unlink()
-    except Exception as e:
-        logging.warning(f"Could not delete photo file: {e}")
-    
-    # Update user profile
     await db.users.update_one(
         {"id": current_user.id},
         {"$set": {"profile_photo": None, "updated_at": datetime.now(timezone.utc)}}
