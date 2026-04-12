@@ -933,29 +933,30 @@ async def register_user_verified(user_data: UserWithPayment):
             raise e
         
         # Gérer la photo de profil si fournie
-        profile_photo_path = None
+                profile_photo_path = None
         user_id = str(uuid.uuid4())  # Generate user ID first
-        
-                if user_data.profile_photo_base64:
+
+        if user_data.profile_photo_base64:
             try:
                 image_data = base64.b64decode(
                     user_data.profile_photo_base64.split(',')[1]
                     if ',' in user_data.profile_photo_base64
                     else user_data.profile_photo_base64
                 )
-                
+
                 upload_result = cloudinary.uploader.upload(
                     io.BytesIO(image_data),
                     folder="kojo/profile_photos",
                     public_id=f"register_{user_id}_{uuid.uuid4().hex}",
                     resource_type="image"
                 )
-                
+
                 profile_photo_path = upload_result.get("secure_url") or upload_result.get("url")
                 logger.info(f"✅ Photo de profil Cloudinary sauvegardée: {profile_photo_path}")
-                
+
             except Exception as e:
                 logger.warning(f"⚠️ Erreur sauvegarde photo profil Cloudinary: {e}")
+
 
 
         # Create user with payment verification - avec gestion d'erreur complète
