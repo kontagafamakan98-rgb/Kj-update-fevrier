@@ -932,8 +932,8 @@ async def register_user_verified(user_data: UserWithPayment):
         except HTTPException as e:
             raise e
         
-        # Gérer la photo de profil si fournie
-                profile_photo_path = None
+                # Gérer la photo de profil si fournie
+        profile_photo_path = None
         user_id = str(uuid.uuid4())  # Generate user ID first
 
         if user_data.profile_photo_base64:
@@ -956,8 +956,6 @@ async def register_user_verified(user_data: UserWithPayment):
 
             except Exception as e:
                 logger.warning(f"⚠️ Erreur sauvegarde photo profil Cloudinary: {e}")
-
-
 
         # Create user with payment verification - avec gestion d'erreur complète
         try:
