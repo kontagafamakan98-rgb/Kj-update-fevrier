@@ -1184,30 +1184,34 @@ async def upload_profile_photo(
 ):
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
-    
+
     file_content = await file.read()
     file_size = len(file_content)
-    
+
     if file_size > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
-    
-    upload_result = upload_profile_photo_to_cloudinary(
-        io.BytesIO(file_content),
-        str(current_user.id)
-    )
-    
-    photo_url = upload_result["photo_url"]
-    
-    await db.users.update_one(
-        {"id": current_user.id},
-        {"$set": {"profile_photo": photo_url, "updated_at": datetime.now(timezone.utc)}}
-    )
-    
-    return {
-        "message": "Profile photo uploaded successfully",
-        "photo_url": photo_url
-    }
 
+    try:
+        upload_result = upload_profile_photo_to_cloudinary(
+            io.BytesIO(file_content),
+            str(current_user.id)
+        )
+
+        photo_url = upload_result["photo_url"]
+
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"profile_photo": photo_url, "updated_at": datetime.now(timezone.utc)}}
+        )
+
+        return {
+            "message": "Profile photo uploaded successfully",
+            "photo_url": photo_url
+        }
+
+    except Exception as e:
+        logger.error(f"Erreur upload photo Cloudinary: {e}")
+        raise HTTPException(status_code=500, detail=f"Cloudinary upload failed: {str(e)}")
 
 @api_router.get("/users/profile-photo")
 async def get_current_user_profile_photo(current_user: User = Depends(get_current_user)):
