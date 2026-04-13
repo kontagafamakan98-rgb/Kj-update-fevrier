@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
+import FlagIcon from '../components/FlagIcon';
 
 export default function Home() {
   const { t } = useLanguage();
@@ -88,7 +89,7 @@ export default function Home() {
                 className={`${country.color} rounded-2xl p-6 text-center transform transition hover:scale-105 cursor-pointer shadow-md hover:shadow-lg`}
               >
                 <div className="flex justify-center mb-3">
-                  <div className="text-6xl md:text-8xl">{country.flag}</div>
+                  <FlagIcon country={country.code} className="w-16 h-10 md:w-24 md:h-16" showEmoji={false} />
                 </div>
                 <h3 className="font-semibold text-gray-900 text-sm md:text-base">{country.name}</h3>
                 <p className="text-xs text-gray-600 mt-1">{t('servicesAvailable')}</p>
