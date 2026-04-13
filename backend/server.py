@@ -11,38 +11,6 @@ import logging
 import logging.handlers
 import sys
 import re
-import io
-import uuid
-import cloudinary
-
-cloudinary.config(secure=True)
-
-def upload_profile_photo_to_cloudinary(file_obj, user_identifier: str):
-    result = cloudinary.uploader.upload(
-        file_obj,
-        folder="kojo/profile_photos",
-        public_id=f"profile_{user_identifier}_{uuid.uuid4().hex}",
-        resource_type="image"
-    )
-    return {
-        "photo_url": result.get("secure_url") or result.get("url"),
-        "public_id": result.get("public_id")
-    }
-
-# Configure logging for West Africa production
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.handlers.RotatingFileHandler(
-            'kojo_backend.log', 
-            maxBytes=10*1024*1024,  # 10MB
-            backupCount=5
-        )
-    ]
-)
-logger = logging.getLogger("kojo_backend")
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, validator, ValidationError
 from typing import List, Optional
@@ -53,9 +21,28 @@ import bcrypt
 from enum import Enum
 import shutil
 import base64
+import io
+import cloudinary
+from cloudinary import uploader as cloudinary_uploader
+
+# Configure logging for West Africa production
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.handlers.RotatingFileHandler(
+            'kojo_backend.log',
+            maxBytes=10*1024*1024,
+            backupCount=5
+        )
+    ]
+)
+logger = logging.getLogger("kojo_backend")
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+cloudinary.config(secure=True)
 
 # MongoDB connection - Enhanced error handling
 try:
@@ -944,7 +931,7 @@ async def register_user_verified(user_data: UserWithPayment):
                     else user_data.profile_photo_base64
                 )
 
-                upload_result = cloudinary.uploader.upload(
+                upload_result = cloudinary_uploader.upload(
                     io.BytesIO(image_data),
                     folder="kojo/profile_photos",
                     public_id=f"register_{user_id}_{uuid.uuid4().hex}",
