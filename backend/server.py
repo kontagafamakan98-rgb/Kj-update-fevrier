@@ -43,6 +43,17 @@ logger = logging.getLogger("kojo_backend")
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 cloudinary.config(secure=True)
+def upload_profile_photo_to_cloudinary(file_obj, user_identifier: str):
+    result = cloudinary_uploader.upload(
+        file_obj,
+        folder="kojo/profile_photos",
+        public_id=f"profile_{user_identifier}_{uuid.uuid4().hex}",
+        resource_type="image"
+    )
+    return {
+        "photo_url": result.get("secure_url") or result.get("url"),
+        "public_id": result.get("public_id")
+    }
 
 # MongoDB connection - Enhanced error handling
 try:
