@@ -9,8 +9,6 @@ root.render(
   <App />,
 );
 
-// Register service worker for offline support
-serviceWorkerRegistration.register({
-  onSuccess: () => console.log("Service Worker: App is cached for offline use"),
-  onUpdate: () => console.log("Service Worker: New content available"),
-});
+// Disable service worker for now to avoid production cache/runtime issues
+serviceWorkerRegistration.unregister();
+
