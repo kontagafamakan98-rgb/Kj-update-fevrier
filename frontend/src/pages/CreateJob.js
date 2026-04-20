@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { MapPin } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import LocationDetector from '../components/LocationDetector';
 import { getCountryByCode } from '../services/geolocationService';
-import { devLog, safeLog } from '../utils/env';
+import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
 
 export default function CreateJob() {
   const { user } = useAuth();
-  
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'createJob');
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -18,7 +21,6 @@ export default function CreateJob() {
     requirements: '',
     deadline: '',
     urgency: 'normal',
-    // Nouvelles informations pour mécaniciens
     mechanic_must_bring_parts: false,
     mechanic_must_bring_tools: false,
     parts_and_tools_notes: ''
@@ -27,38 +29,63 @@ export default function CreateJob() {
   const [errors, setErrors] = useState(() => ({}));
   const [loading, setLoading] = useState(false);
 
+  const categories = [
+    { value: 'general', label: pageT('categoryGeneral') },
+    { value: 'plumbing', label: pageT('categoryPlumbing') },
+    { value: 'electrical', label: pageT('categoryElectrical') },
+    { value: 'painting', label: pageT('categoryPainting') },
+    { value: 'cleaning', label: pageT('categoryCleaning') },
+    { value: 'construction', label: pageT('categoryConstruction') },
+    { value: 'gardening', label: pageT('categoryGardening') },
+    { value: 'mechanics', label: pageT('categoryMechanics') }
+  ];
+
+  const urgencyOptions = [
+    { value: 'low', label: pageT('urgencyLow'), emoji: '😊', color: 'bg-green-50 border-green-200 text-green-700' },
+    { value: 'normal', label: pageT('urgencyNormal'), emoji: '🕐', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
+    { value: 'high', label: pageT('urgencyHigh'), emoji: '⚡', color: 'bg-red-50 border-red-200 text-red-700' }
+  ];
+
   const handleLocationDetected = (location) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       location: location.fullAddress
     }));
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleBooleanChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
-      // Validation
       const newErrors = {};
-      if (!formData.title.trim()) newErrors.title = 'Le titre est requis';
-      if (!formData.description.trim()) newErrors.description = 'La description est requise';
-      if (!formData.location.trim()) newErrors.location = 'La localisation est requise';
-      if (!formData.budget_min) newErrors.budget_min = 'Budget minimum requis';
-      if (!formData.budget_max) newErrors.budget_max = 'Budget maximum requis';
-      
+      if (!formData.title.trim()) newErrors.title = pageT('titleRequired');
+      if (!formData.description.trim()) newErrors.description = pageT('descriptionRequired');
+      if (!formData.location.trim()) newErrors.location = pageT('locationRequired');
+      if (!formData.budget_min) newErrors.budget_min = pageT('budgetMinRequired');
+      if (!formData.budget_max) newErrors.budget_max = pageT('budgetMaxRequired');
+
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         setLoading(false);
         return;
       }
 
-      // En vrai, on ferait un appel API
-      // const response = await api.post('/jobs', formData);
-      
-      alert('Job créé avec succès !');
-      
-      // Réinitialiser le formulaire
+      alert(pageT('successCreated'));
+
       setFormData({
         title: '',
         description: '',
@@ -68,49 +95,37 @@ export default function CreateJob() {
         budget_max: '',
         requirements: '',
         deadline: '',
-        urgency: 'normal'
+        urgency: 'normal',
+        mechanic_must_bring_parts: false,
+        mechanic_must_bring_tools: false,
+        parts_and_tools_notes: ''
       });
-      
     } catch (error) {
       safeLog.error('Erreur création job:', error);
-      alert('Erreur lors de la création du job');
+      alert(pageT('errorCreated'));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
   const userCountry = getCountryByCode(user?.country);
+  const showMechanicBlock = ['general', 'plumbing', 'electrical', 'mechanics'].includes(formData.category);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-2xl mx-auto px-4">
-        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Créer un nouveau job
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{pageT('pageTitle')}</h1>
           <p className="text-gray-600">
-            Trouvez le travailleur parfait pour votre projet au {userCountry?.nameFrench || 'Mali'}
+            {pageT('pageSubtitle', { country: userCountry?.nameFrench || 'Mali' })}
           </p>
         </div>
 
-        {/* Form */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title */}
             <div>
               <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                Titre du job *
+                {pageT('titleLabel')}
               </label>
               <input
                 type="text"
@@ -118,7 +133,7 @@ export default function CreateJob() {
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
-                placeholder="Ex: Réparation plomberie urgente"
+                placeholder={pageT('titlePlaceholder')}
                 className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                   errors.title ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-orange-500'
                 }`}
@@ -126,10 +141,9 @@ export default function CreateJob() {
               {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
             </div>
 
-            {/* Description */}
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                Description *
+                {pageT('descriptionLabel')}
               </label>
               <textarea
                 id="description"
@@ -137,7 +151,7 @@ export default function CreateJob() {
                 rows={4}
                 value={formData.description}
                 onChange={handleChange}
-                placeholder="Décrivez en détail le travail à effectuer..."
+                placeholder={pageT('descriptionPlaceholder')}
                 className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                   errors.description ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-orange-500'
                 }`}
@@ -145,10 +159,9 @@ export default function CreateJob() {
               {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
             </div>
 
-            {/* Category */}
             <div>
               <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
-                Catégorie
+                {pageT('categoryLabel')}
               </label>
               <select
                 id="category"
@@ -157,21 +170,17 @@ export default function CreateJob() {
                 onChange={handleChange}
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
-                <option value="general">🔧 Général</option>
-                <option value="plumbing">🚿 Plomberie</option>
-                <option value="electrical">⚡ Électricité</option>
-                <option value="painting">🎨 Peinture</option>
-                <option value="cleaning">🧹 Ménage</option>
-                <option value="construction">🏗️ Construction</option>
-                <option value="gardening">🌿 Jardinage</option>
-                <option value="mechanics">🔩 Mécanique</option>
+                {categories.map((category) => (
+                  <option key={category.value} value={category.value}>
+                    {category.label}
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Location with GPS detection */}
             <div>
               <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
-                Localisation *
+                {pageT('locationLabel')}
               </label>
               <div className="space-y-3">
                 <input
@@ -180,32 +189,26 @@ export default function CreateJob() {
                   name="location"
                   value={formData.location}
                   onChange={handleChange}
-                  placeholder="Ex: Plateau, Dakar, Sénégal"
+                  placeholder={pageT('locationPlaceholder')}
                   className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                     errors.location ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-orange-500'
                   }`}
                 />
-                
-                {/* GPS Detection Button */}
-                <div className="flex items-center justify-between">
-                  <LocationDetector 
+
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <LocationDetector
                     onLocationDetected={handleLocationDetected}
                     userCountry={user?.country?.toLowerCase() || 'senegal'}
                     size="medium"
                   />
-                  <p className="text-sm text-gray-500">
-                    ou utilisez le bouton GPS pour détecter automatiquement
-                  </p>
+                  <p className="text-sm text-gray-500">{pageT('locationHelp')}</p>
                 </div>
               </div>
               {errors.location && <p className="mt-1 text-sm text-red-600">{errors.location}</p>}
             </div>
 
-            {/* Budget */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Budget (XOF) *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('budgetLabel')}</label>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <input
@@ -213,7 +216,7 @@ export default function CreateJob() {
                     name="budget_min"
                     value={formData.budget_min}
                     onChange={handleChange}
-                    placeholder="Min (ex: 10000)"
+                    placeholder={pageT('budgetMinPlaceholder')}
                     className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                       errors.budget_min ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-orange-500'
                     }`}
@@ -226,7 +229,7 @@ export default function CreateJob() {
                     name="budget_max"
                     value={formData.budget_max}
                     onChange={handleChange}
-                    placeholder="Max (ex: 25000)"
+                    placeholder={pageT('budgetMaxPlaceholder')}
                     className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                       errors.budget_max ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-orange-500'
                     }`}
@@ -236,10 +239,9 @@ export default function CreateJob() {
               </div>
             </div>
 
-            {/* Requirements */}
             <div>
               <label htmlFor="requirements" className="block text-sm font-medium text-gray-700 mb-2">
-                Exigences particulières
+                {pageT('requirementsLabel')}
               </label>
               <textarea
                 id="requirements"
@@ -247,15 +249,14 @@ export default function CreateJob() {
                 rows={3}
                 value={formData.requirements}
                 onChange={handleChange}
-                placeholder="Ex: Expérience minimum 3 ans, outils fournis..."
+                placeholder={pageT('requirementsPlaceholder')}
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               />
             </div>
 
-            {/* Deadline */}
             <div>
               <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-2">
-                Date limite souhaitée
+                {pageT('deadlineLabel')}
               </label>
               <input
                 type="date"
@@ -267,22 +268,15 @@ export default function CreateJob() {
               />
             </div>
 
-            {/* Urgency */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Niveau d'urgence
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('urgencyLabel')}</label>
               <div className="grid grid-cols-3 gap-3">
-                {[
-                  { value: 'low', label: 'Pas urgent', emoji: '😊', color: 'bg-green-50 border-green-200 text-green-700' },
-                  { value: 'normal', label: 'Normal', emoji: '🕐', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
-                  { value: 'high', label: 'Urgent', emoji: '⚡', color: 'bg-red-50 border-red-200 text-red-700' }
-                ].map(urgency => (
+                {urgencyOptions.map((urgency) => (
                   <label
                     key={urgency.value}
                     className={`relative flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all ${
-                      formData.urgency === urgency.value 
-                        ? urgency.color + ' ring-2 ring-orange-500' 
+                      formData.urgency === urgency.value
+                        ? `${urgency.color} ring-2 ring-orange-500`
                         : 'bg-white border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -303,104 +297,37 @@ export default function CreateJob() {
               </div>
             </div>
 
-            {/* Section Pièces et Outils - Spécial Mécaniciens */}
-            {(formData.category === 'mecanique' || formData.category === 'plomberie' || 
-              formData.category === 'electricite' || formData.category === 'general') && (
+            {showMechanicBlock && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                 <div className="flex items-center mb-4">
                   <span className="text-2xl mr-3">🔧</span>
-                  <h3 className="text-lg font-semibold text-blue-900">
-                    Informations Importantes pour le Mécanicien
-                  </h3>
+                  <h3 className="text-lg font-semibold text-blue-900">{pageT('mechanicInfoTitle')}</h3>
                 </div>
-                
+
                 <div className="space-y-4">
-                  {/* Pièces */}
-                  <div className="flex items-center justify-between p-4 bg-white border border-blue-200 rounded-lg">
-                    <div className="flex items-center">
-                      <span className="text-xl mr-3">🔩</span>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Le mécanicien doit-il apporter les pièces ?</h4>
-                        <p className="text-sm text-gray-600">Pièces de rechange, composants, etc.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="mechanic_must_bring_parts"
-                          value="true"
-                          checked={formData.mechanic_must_bring_parts === true}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            mechanic_must_bring_parts: e.target.value === 'true'
-                          }))}
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="ml-2 text-sm font-medium text-green-700">✅ Oui</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="mechanic_must_bring_parts"
-                          value="false"
-                          checked={formData.mechanic_must_bring_parts === false}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            mechanic_must_bring_parts: e.target.value === 'true'
-                          }))}
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="ml-2 text-sm font-medium text-red-700">❌ Non</span>
-                      </label>
-                    </div>
-                  </div>
+                  <BooleanQuestion
+                    emoji="🔩"
+                    title={pageT('partsQuestion')}
+                    description={pageT('partsDescription')}
+                    value={formData.mechanic_must_bring_parts}
+                    onChange={(value) => handleBooleanChange('mechanic_must_bring_parts', value)}
+                    yesLabel={pageT('yes')}
+                    noLabel={pageT('no')}
+                  />
 
-                  {/* Outils */}
-                  <div className="flex items-center justify-between p-4 bg-white border border-blue-200 rounded-lg">
-                    <div className="flex items-center">
-                      <span className="text-xl mr-3">🛠️</span>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Le mécanicien doit-il apporter les outils ?</h4>
-                        <p className="text-sm text-gray-600">Outils spécialisés, équipements, etc.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="mechanic_must_bring_tools"
-                          value="true"
-                          checked={formData.mechanic_must_bring_tools === true}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            mechanic_must_bring_tools: e.target.value === 'true'
-                          }))}
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="ml-2 text-sm font-medium text-green-700">✅ Oui</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="mechanic_must_bring_tools"
-                          value="false"
-                          checked={formData.mechanic_must_bring_tools === false}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            mechanic_must_bring_tools: e.target.value === 'true'
-                          }))}
-                          className="w-4 h-4 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="ml-2 text-sm font-medium text-red-700">❌ Non</span>
-                      </label>
-                    </div>
-                  </div>
+                  <BooleanQuestion
+                    emoji="🛠️"
+                    title={pageT('toolsQuestion')}
+                    description={pageT('toolsDescription')}
+                    value={formData.mechanic_must_bring_tools}
+                    onChange={(value) => handleBooleanChange('mechanic_must_bring_tools', value)}
+                    yesLabel={pageT('yes')}
+                    noLabel={pageT('no')}
+                  />
 
-                  {/* Notes supplémentaires */}
                   <div>
                     <label htmlFor="parts_and_tools_notes" className="block text-sm font-medium text-blue-900 mb-2">
-                      📝 Notes supplémentaires (optionnel)
+                      {pageT('extraNotes')}
                     </label>
                     <textarea
                       id="parts_and_tools_notes"
@@ -408,32 +335,31 @@ export default function CreateJob() {
                       rows={3}
                       value={formData.parts_and_tools_notes}
                       onChange={handleChange}
-                      placeholder="Ex: Pièces spécifiques nécessaires, modèle du véhicule, marque des outils requis..."
+                      placeholder={pageT('extraNotesPlaceholder')}
                       className="block w-full px-4 py-3 border border-blue-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                     />
-                    <p className="mt-1 text-xs text-blue-600">
-                      💡 Ces informations aideront le mécanicien à mieux se préparer pour votre intervention
-                    </p>
+                    <p className="mt-1 text-xs text-blue-600">{pageT('extraNotesHelp')}</p>
                   </div>
 
-                  {/* Résumé */}
                   <div className="mt-4 p-3 bg-blue-100 border border-blue-300 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">📋 Résumé pour le mécanicien :</h4>
+                    <h4 className="font-medium text-blue-900 mb-2">{pageT('mechanicSummary')}</h4>
                     <div className="text-sm text-blue-800 space-y-1">
                       <p>
-                        🔩 <strong>Pièces :</strong> 
+                        🔩 <strong>{pageT('partsSummary')} :</strong>{' '}
                         <span className={formData.mechanic_must_bring_parts ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
-                          {formData.mechanic_must_bring_parts ? ' À apporter par le mécanicien' : ' Fournies par le client'}
+                          {formData.mechanic_must_bring_parts ? pageT('byMechanic') : pageT('byClient')}
                         </span>
                       </p>
                       <p>
-                        🛠️ <strong>Outils :</strong> 
+                        🛠️ <strong>{pageT('toolsSummary')} :</strong>{' '}
                         <span className={formData.mechanic_must_bring_tools ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
-                          {formData.mechanic_must_bring_tools ? ' À apporter par le mécanicien' : ' Fournis par le client'}
+                          {formData.mechanic_must_bring_tools ? pageT('byMechanic') : pageT('byClient')}
                         </span>
                       </p>
                       {formData.parts_and_tools_notes && (
-                        <p>📝 <strong>Notes :</strong> {formData.parts_and_tools_notes}</p>
+                        <p>
+                          📝 <strong>{pageT('notesSummary')} :</strong> {formData.parts_and_tools_notes}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -441,42 +367,72 @@ export default function CreateJob() {
               </div>
             )}
 
-            {/* Submit Button */}
             <div className="pt-6">
               <button
                 type="submit"
                 disabled={loading}
                 className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white ${
-                  loading 
-                    ? 'bg-orange-400 cursor-not-allowed' 
+                  loading
+                    ? 'bg-orange-400 cursor-not-allowed'
                     : 'bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500'
                 } transition-colors`}
               >
                 {loading ? (
                   <div className="flex items-center">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Création en cours...
+                    {pageT('creating')}
                   </div>
                 ) : (
-                  '🚀 Publier le job'
+                  pageT('publishButton')
                 )}
               </button>
             </div>
           </form>
         </div>
 
-        {/* Tips */}
         <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-blue-900 mb-3">
-            💡 Conseils pour un bon job
-          </h3>
+          <h3 className="text-lg font-medium text-blue-900 mb-3">{pageT('tipsTitle')}</h3>
           <ul className="text-blue-800 space-y-2 text-sm">
-            <li>• Soyez précis dans la description du travail</li>
-            <li>• Proposez un budget réaliste pour attirer des candidats qualifiés</li>
-            <li>• Mentionnez si vous fournissez les outils ou matériaux</li>
-            <li>• Répondez rapidement aux candidatures</li>
+            <li>{pageT('tip1')}</li>
+            <li>{pageT('tip2')}</li>
+            <li>{pageT('tip3')}</li>
+            <li>{pageT('tip4')}</li>
           </ul>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function BooleanQuestion({ emoji, title, description, value, onChange, yesLabel, noLabel }) {
+  return (
+    <div className="flex items-center justify-between p-4 bg-white border border-blue-200 rounded-lg gap-4 flex-wrap">
+      <div className="flex items-center">
+        <span className="text-xl mr-3">{emoji}</span>
+        <div>
+          <h4 className="font-medium text-gray-900">{title}</h4>
+          <p className="text-sm text-gray-600">{description}</p>
+        </div>
+      </div>
+      <div className="flex items-center space-x-3">
+        <label className="flex items-center">
+          <input
+            type="radio"
+            checked={value === true}
+            onChange={() => onChange(true)}
+            className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+          />
+          <span className="ml-2 text-sm font-medium text-green-700">{yesLabel}</span>
+        </label>
+        <label className="flex items-center">
+          <input
+            type="radio"
+            checked={value === false}
+            onChange={() => onChange(false)}
+            className="w-4 h-4 text-orange-600 focus:ring-orange-500"
+          />
+          <span className="ml-2 text-sm font-medium text-red-700">{noLabel}</span>
+        </label>
       </div>
     </div>
   );
