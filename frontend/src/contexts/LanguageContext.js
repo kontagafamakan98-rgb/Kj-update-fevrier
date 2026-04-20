@@ -178,7 +178,6 @@ const translations = {
     linkAccountsToComplete: 'Pour finaliser votre inscription, vous devez lier vos comptes de paiement',
     workerPaymentRequirement: 'En tant que travailleur, vous devez lier au minimum 2 moyens de paiement pour recevoir vos paiements des clients',
     clientPaymentRequirement: 'En tant que client, vous devez lier au moins 1 moyen de paiement pour effectuer vos paiements aux travailleurs',
-    paymentAccountsUpdated: 'Comptes de paiement mis à jour avec succès',
     paymentAccountsLoadError: 'Erreur lors du chargement des comptes de paiement',
     
     // Jobs page
@@ -376,8 +375,6 @@ const translations = {
     skillsHelpClientsFindYou: 'Vos compétences aideront les clients à vous trouver',
     experienceReassuresClients: 'Votre expérience rassure sur vos qualifications',
     canEditProfileLater: 'Vous pourrez modifier ces informations dans votre profil',
-    limitedAccess: 'Accès limité',
-    connectionRestored: 'Connexion rétablie',
     refreshPage: 'Rafraîchir la page',
     unexpectedErrorTitle: "Oups ! Quelque chose s'est mal passé",
     unexpectedErrorText: "Une erreur inattendue s'est produite. Veuillez rafraîchir la page.",
@@ -589,7 +586,6 @@ const translations = {
     linkAccountsToComplete: 'To complete your registration, you must link your payment accounts',
     workerPaymentRequirement: 'As a worker, you must link at least 2 payment methods to receive payments from clients',
     clientPaymentRequirement: 'As a client, you must link at least 1 payment method to make payments to workers',
-    paymentAccountsUpdated: 'Payment accounts updated successfully',
     paymentAccountsLoadError: 'Error loading payment accounts',
     
     // Jobs page
@@ -1418,7 +1414,6 @@ const translations = {
     linkAccountsToComplete: 'Walasa ka i ka tɔgɔsɛbɛnni ban, i ka kan ka saraku jatebɔsɛbɛnw jɛmɛ',
     workerPaymentRequirement: 'I ni baarakɛla ye, i ka kan ka saraku fɛɛrɛ fila jɛmɛ walasa ka saraku sɔrɔ kiliyanw fɛ',
     clientPaymentRequirement: 'Ci kliyan bi, war nga jëmmal 1 njariñ fey ngir fey liggéeykat yi',
-    paymentAccountsUpdated: 'Konte fey yi ñu leen soppi ak réussite',
     paymentAccountsLoadError: 'Fii am ci yeb konte fey yi',
     
     // Jobs page
@@ -1833,7 +1828,6 @@ const translations = {
     linkAccountsToComplete: 'N saag f gʋlsgo, f segd n lagm f yaool kõntã',
     workerPaymentRequirement: 'F sã n yaa tʋʋm-neda, f segd n lagm yaool soay 2 n deeg f ligdi daab-rãmba nengẽ',
     clientPaymentRequirement: 'F sã n yaa daaba, f segd n lagm yaool soa 1 n yaool tʋʋm-neba',
-    paymentAccountsUpdated: 'Yaool kõnta tekame ne yĩir',
     paymentAccountsLoadError: 'Yell n zĩnd yaool kõnta waoong pʋgẽ',
     
     // Jobs page
