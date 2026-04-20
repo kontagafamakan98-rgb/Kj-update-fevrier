@@ -1,10 +1,16 @@
 import React, { createContext, useContext, useState } from 'react';
 import { devLog, safeLog } from '../utils/env';
 
-const LanguageContext = createContext();
+const LanguageContext = createContext(null);
+
+const fallbackLanguageApi = {
+  currentLanguage: 'fr',
+  changeLanguage: () => {},
+  t: (key) => translations?.fr?.[key] || key
+};
 
 export function useLanguage() {
-  return useContext(LanguageContext);
+  return useContext(LanguageContext) || fallbackLanguageApi;
 }
 
 const translations = {
