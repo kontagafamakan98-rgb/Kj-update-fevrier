@@ -437,7 +437,7 @@ export default function Register() {
                 type="password"
                 required
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                placeholder="••••••••"
+                placeholder={t('passwordMasked')}
                 value={formData.password}
                 onChange={handleChange}
               />
@@ -454,7 +454,7 @@ export default function Register() {
                 type="password"
                 required
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                placeholder="••••••••"
+                placeholder={t('passwordMasked')}
                 value={formData.confirmPassword}
                 onChange={handleChange}
               />
