@@ -233,8 +233,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           <h2 className="text-2xl font-bold text-gray-900">{t('paymentAccounts')}</h2>
           <p className="text-sm text-gray-600 mt-1">
             {user?.user_type === 'worker' 
-              ? `Minimum requis: ${getRequiredMinimum()} comptes (pour recevoir les paiements)`
-              : `Minimum requis: ${getRequiredMinimum()} compte (pour effectuer les paiements)`
+              ? `${t('minimumRequired')}: ${getRequiredMinimum()} ${t('accountsLinked').toLowerCase()} (${t('workerPaymentRequirement').toLowerCase()})`
+              : `${t('minimumRequired')}: ${getRequiredMinimum()} ${t('accountRequired')}`
             }
           </p>
         </div>
@@ -246,7 +246,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               ? 'bg-green-100 text-green-800'
               : 'bg-yellow-100 text-yellow-800'
           }`}>
-            {getLinkedAccountsCount()}/{getRequiredMinimum()} comptes liés
+            {getLinkedAccountsCount()}/{getRequiredMinimum()} {t('accountsLinked').toLowerCase()}
           </div>
           
           {!isEditing && (
@@ -297,7 +297,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 <p className="text-red-500 text-sm mt-1">{validationErrors.orange_money}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                Disponible: Mali, Sénégal, Burkina Faso, Côte d'Ivoire
+                {t('mali')}, {t('senegal')}, {t('burkina_faso')}, {t('ivory_coast')}
               </p>
             </div>
           ) : (
@@ -335,7 +335,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 <p className="text-red-500 text-sm mt-1">{validationErrors.wave}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                Disponible dans toute l'Afrique de l'Ouest
+                {t('kojoConnectsDescription')}
               </p>
             </div>
           ) : (
@@ -484,7 +484,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             disabled={saving}
             className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
           >
-            Annuler
+            {t('cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -494,10 +494,10 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             {saving ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Enregistrement...
+                {t('loading')}
               </>
             ) : (
-              'Enregistrer'
+              t('save')
             )}
           </button>
         </div>

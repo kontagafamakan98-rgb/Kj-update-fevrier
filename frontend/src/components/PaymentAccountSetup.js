@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { detectUserCountry, getPhoneExampleForCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { devLog, safeLog } from '../utils/env';
 
 const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration = false }) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [accounts, setAccounts] = useState({
     orange_money: '',
     wave: '',
@@ -131,19 +133,19 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     const errors = {};
 
     if (accounts.orange_money && !validateOrangeMoneyNumber(accounts.orange_money)) {
-      errors.orange_money = 'Numéro Orange Money invalide (format: +223XXXXXXXX)';
+      errors.orange_money = `${t('orangeMoney')} ${t('error').toLowerCase()}`;
     }
 
     if (accounts.wave && !validateWaveNumber(accounts.wave)) {
-      errors.wave = 'Numéro Wave invalide (disponible partout en Afrique de l\'Ouest)';
+      errors.wave = `${t('wave')} ${t('error').toLowerCase()}`;
     }
 
     if (accounts.bank_account && accounts.bank_account.account_number && !validateBankAccount(accounts.bank_account)) {
-      errors.bank_account = 'Informations de compte bancaire incomplètes ou invalides';
+      errors.bank_account = t('paymentAccountsLoadError');
     }
 
     if (linkedAccountsCount < requiredMinimum) {
-      errors.general = `${userType === 'worker' ? 'Les travailleurs' : 'Les clients'} doivent lier au moins ${requiredMinimum} moyen${requiredMinimum > 1 ? 's' : ''} de paiement`;
+      errors.general = userType === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement');
     }
 
     setValidationErrors(errors);
@@ -182,7 +184,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.detail || 'Erreur lors de la mise à jour');
+          throw new Error(errorData.detail || t('error'));
         }
 
         const result = await response.json();
@@ -201,20 +203,17 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          🏦 Vérification des Comptes de Paiement
+          🏦 {t('paymentVerification')}
         </h2>
         <p className="text-gray-600">
-          {userType === 'worker' 
-            ? 'Les travailleurs doivent lier au minimum 2 moyens de paiement pour recevoir leurs paiements'
-            : 'Les clients doivent lier au moins 1 moyen de paiement pour effectuer des paiements'
-          }
+          {userType === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
         </p>
         
         {detectedCountry && (
           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <span className="font-medium">📍 Pays détecté:</span> {detectedCountry.flag} {detectedCountry.nameFrench}
-              <span className="text-xs text-blue-600 ml-2">(Exemples ajustés automatiquement)</span>
+              <span className="font-medium">{t('position')}:</span> {detectedCountry.flag} {detectedCountry.nameFrench}
+              <span className="text-xs text-blue-600 ml-2">({t('examplesAdjusted')})</span>
             </p>
           </div>
         )}
@@ -222,14 +221,14 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-blue-900">
-              Comptes liés: {linkedAccountsCount}/{requiredMinimum} minimum requis
+              {t('accountsLinked')}: {linkedAccountsCount}/{requiredMinimum} {t('minimumRequired').toLowerCase()}
             </span>
             <div className={`px-3 py-1 rounded-full text-xs font-medium ${
               linkedAccountsCount >= requiredMinimum 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-red-100 text-red-800'
             }`}>
-              {linkedAccountsCount >= requiredMinimum ? '✅ Valide' : '❌ Insuffisant'}
+              {linkedAccountsCount >= requiredMinimum ? `✅ ${t('validStatus')}` : `❌ ${t('insufficientStatus')}`}
             </div>
           </div>
         </div>
@@ -392,7 +391,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 : 'bg-orange-600 text-white hover:bg-orange-700'
             }`}
           >
-            {loading ? 'Validation...' : (isRegistration ? 'Continuer' : 'Mettre à jour')}
+            {loading ? t('loading') : (isRegistration ? t('submit') : t('save'))}
           </button>
         </div>
       </form>
