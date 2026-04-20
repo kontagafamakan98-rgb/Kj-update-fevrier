@@ -1,8 +1,7 @@
 import React from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
 
-class ErrorBoundaryInner extends React.Component {
+class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -17,35 +16,28 @@ class ErrorBoundaryInner extends React.Component {
   }
 
   render() {
-    const fallbackT = (key) => {
-      const fallbackStrings = {
-        unexpectedErrorTitle: 'Une erreur inattendue est survenue',
-        unexpectedErrorText: 'Merci de recharger la page.',
-        refreshPage: 'Rafraîchir la page'
-      };
-      return this.props.t?.(key) || fallbackStrings[key] || key;
-    };
-
-    const t = fallbackT;
-
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
             <div className="text-6xl mb-4">😵</div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">{t('unexpectedErrorTitle')}</h2>
-            <p className="text-gray-600 mb-4">{t('unexpectedErrorText')}</p>
-            <button onClick={() => window.location.reload()} className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">{t('refreshPage')}</button>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Oops! Quelque chose s'est mal passé</h2>
+            <p className="text-gray-600 mb-4">
+              Une erreur inattendue s'est produite. Veuillez rafraîchir la page.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              Rafraîchir la page
+            </button>
           </div>
         </div>
       );
     }
+
     return this.props.children;
   }
 }
 
-export default function ErrorBoundary(props) {
-  const language = typeof useLanguage === 'function' ? useLanguage() : undefined;
-  const t = language?.t;
-  return <ErrorBoundaryInner {...props} t={t} />;
-}
+export default ErrorBoundary;
