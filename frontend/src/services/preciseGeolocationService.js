@@ -215,6 +215,17 @@ const PRECISE_GEOGRAPHIC_DATABASE = {
   }
 };
 
+const COUNTRY_CODE_ALIASES = {
+  ivory_coast: 'cote_divoire',
+  cote_divoire: 'cote_divoire',
+  ci: 'cote_divoire'
+};
+
+const normalizeCountryCode = (code = '') => {
+  const value = String(code).toLowerCase().trim();
+  return COUNTRY_CODE_ALIASES[value] || value;
+};
+
 // Services de géolocalisation IP - Utilisation du backend Kojo en priorité
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -1012,7 +1023,7 @@ class PreciseGeolocationService {
    */
   getSupportedCountries() {
     return Object.entries(PRECISE_GEOGRAPHIC_DATABASE).map(([code, data]) => ({
-      code,
+      code: normalizedCode,
       name: data.country,
       nameFrench: data.nameFrench,
       flag: data.flag,
@@ -1082,7 +1093,8 @@ export const getCountriesList = () => {
 };
 
 export const getCountryByCode = (code) => {
-  const countryData = PRECISE_GEOGRAPHIC_DATABASE[code?.toLowerCase()];
+  const normalizedCode = normalizeCountryCode(code);
+  const countryData = PRECISE_GEOGRAPHIC_DATABASE[normalizedCode];
   if (!countryData) {
     // Fallback vers Sénégal
     return {

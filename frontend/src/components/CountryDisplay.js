@@ -30,11 +30,21 @@ export const COUNTRIES = {
     flag: '🇨🇮',
     fullName: '🇨🇮 Côte d\'Ivoire',
     iso: 'CI'
+  },
+  cote_divoire: {
+    code: 'cote_divoire',
+    name: 'Côte d\'Ivoire',
+    flag: '🇨🇮',
+    fullName: '🇨🇮 Côte d\'Ivoire',
+    iso: 'CI'
   }
 };
 
 export const getCountry = (countryCode) => {
-  return COUNTRIES[countryCode] || null;
+  if (!countryCode) return null;
+  const normalized = String(countryCode).toLowerCase();
+  const alias = normalized === 'cote_divoire' ? 'ivory_coast' : normalized;
+  return COUNTRIES[alias] || COUNTRIES[normalized] || null;
 };
 
 export const getAllCountries = () => {
