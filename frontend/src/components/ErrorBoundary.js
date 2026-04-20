@@ -17,7 +17,17 @@ class ErrorBoundaryInner extends React.Component {
   }
 
   render() {
-    const { t } = this.props;
+    const fallbackT = (key) => {
+      const fallbackStrings = {
+        unexpectedErrorTitle: 'Une erreur inattendue est survenue',
+        unexpectedErrorText: 'Merci de recharger la page.',
+        refreshPage: 'Rafraîchir la page'
+      };
+      return this.props.t?.(key) || fallbackStrings[key] || key;
+    };
+
+    const t = fallbackT;
+
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -35,6 +45,7 @@ class ErrorBoundaryInner extends React.Component {
 }
 
 export default function ErrorBoundary(props) {
-  const { t } = useLanguage();
+  const language = typeof useLanguage === 'function' ? useLanguage() : undefined;
+  const t = language?.t;
   return <ErrorBoundaryInner {...props} t={t} />;
 }
