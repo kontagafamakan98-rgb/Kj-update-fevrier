@@ -132,7 +132,7 @@ export default function Profile() {
               </p>
               <div className="flex items-center mt-2">
                 <span className="text-yellow-300">★★★★☆</span>
-                <span className="text-orange-100 ml-2">{user.rating || 0}/5 ({user.total_reviews || 0} avis)</span>
+                <span className="text-orange-100 ml-2">{user.rating || 0}/5 ({user.total_reviews || 0})</span>
               </div>
             </div>
           </div>
@@ -191,7 +191,7 @@ function ProfileView({ profile, t }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
-        <label className="block text-sm font-medium text-gray-700">Email</label>
+        <label className="block text-sm font-medium text-gray-700">{t('email')}</label>
         <p className="mt-1 text-gray-900">{profile.email}</p>
       </div>
       <div>
@@ -302,7 +302,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
                 const prefix = getPhonePrefixByCountry(formData.country.toLowerCase());
                 updateFormData('phone', `${prefix} ${e.target.value.replace(/[^\d\s]/g, '')}`);
               }}
-              placeholder="77 123 45 67"
+              placeholder={pageT('description').includes('') ? '77 123 45 67' : '77 123 45 67'}
               className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
@@ -324,7 +324,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
           <label htmlFor="country" className="block text-sm font-medium text-gray-700">{pageT('country')}</label>
           <select id="country" name="country" value={formData.country} onChange={(e) => updateFormData('country', e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
             {getCountriesList().map((country) => (
-              <option key={country.code} value={country.name}>{country.flag} {country.nameFrench}</option>
+              <option key={country.code} value={country.name}>{t(country.code)}</option>
             ))}
           </select>
         </div>

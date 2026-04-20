@@ -11,7 +11,7 @@ export const COUNTRIES = {
     iso: 'ML'
   },
   senegal: {
-    code: 'senegal', 
+    code: 'senegal',
     name: 'Sénégal',
     flag: '🇸🇳',
     fullName: '🇸🇳 Sénégal',
@@ -19,7 +19,7 @@ export const COUNTRIES = {
   },
   burkina_faso: {
     code: 'burkina_faso',
-    name: 'Burkina Faso', 
+    name: 'Burkina Faso',
     flag: '🇧🇫',
     fullName: '🇧🇫 Burkina Faso',
     iso: 'BF'
@@ -27,57 +27,60 @@ export const COUNTRIES = {
   ivory_coast: {
     code: 'ivory_coast',
     name: 'Côte d\'Ivoire',
-    flag: '🇨🇮', 
+    flag: '🇨🇮',
     fullName: '🇨🇮 Côte d\'Ivoire',
     iso: 'CI'
   }
 };
 
-// Get country by code
 export const getCountry = (countryCode) => {
   return COUNTRIES[countryCode] || null;
 };
 
-// Get all countries as array
 export const getAllCountries = () => {
   return Object.values(COUNTRIES);
 };
 
-// Component to display country with flag
-export default function CountryDisplay({ 
-  countryCode, 
-  showFlag = true, 
+const getTranslatedCountryLabel = (country, t) => {
+  const translated = t(country.code);
+  return typeof translated === 'string' ? translated : country.fullName;
+};
+
+export default function CountryDisplay({
+  countryCode,
+  showFlag = true,
   showName = true,
-  className = "",
-  flagSize = "text-base"
+  className = '',
+  flagSize = 'text-base'
 }) {
+  const { t } = useLanguage();
   const country = getCountry(countryCode);
-  
+
   if (!country) {
-    return <span className={className}>Pays inconnu</span>;
+    return <span className={className}>{t('unknownCountry')}</span>;
   }
+
+  const translatedLabel = getTranslatedCountryLabel(country, t);
+  const translatedName = translatedLabel.replace(/^\S+\s+/, '').trim() || country.name;
 
   return (
     <span className={`flex items-center space-x-2 ${className}`}>
-      {showFlag && (
-        <span className={flagSize}>{country.flag}</span>
-      )}
-      {showName && (
-        <span>{country.name}</span>
-      )}
+      {showFlag && <span className={flagSize}>{country.flag}</span>}
+      {showName && <span>{translatedName}</span>}
     </span>
   );
 }
 
-// Component for country selection in forms
-export function CountrySelect({ 
-  value, 
-  onChange, 
-  name = "country",
-  id = "country",
-  className = "",
-  required = false 
+export function CountrySelect({
+  value,
+  onChange,
+  name = 'country',
+  id = 'country',
+  className = '',
+  required = false
 }) {
+  const { t } = useLanguage();
+
   return (
     <select
       id={id}
@@ -87,9 +90,9 @@ export function CountrySelect({
       required={required}
       className={`appearance-none block w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 ${className}`}
     >
-      {getAllCountries().map(country => (
+      {getAllCountries().map((country) => (
         <option key={country.code} value={country.code}>
-          {country.fullName}
+          {getTranslatedCountryLabel(country, t)}
         </option>
       ))}
     </select>

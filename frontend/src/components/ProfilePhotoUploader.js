@@ -53,7 +53,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
 
   const handleFiles = async (files) => {
     if (!isCurrentUser && targetUserId) {
-      alert('Vous ne pouvez modifier que votre propre photo de profil');
+      alert(t('photoVisibleAllUsers'));
       return;
     }
 
@@ -120,7 +120,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       }
 
       // Show success toast
-      toast.success('Photo uploadée avec succès ! 📸');
+      toast.success(t('photoUploadedSuccessfully'));
 
       // Photo uploaded - waiting for user to click "Save" to confirm
     } catch (error) {
@@ -132,7 +132,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         setPreviewUrl(null);
       }
       
-      const errorMessage = error.message || "Impossible d'envoyer la photo, réessayez.";
+      const errorMessage = error.message || t('error');
       toast.error(errorMessage);
     } finally {
       setUploading(false);
@@ -197,7 +197,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
             ) : currentPhoto ? (
               <img
                 src={currentPhoto}
-                alt={isCurrentUser ? "Votre photo de profil" : "Photo de profil"}
+                alt={isCurrentUser ? t('yourProfilePhoto') : t('profilePhotoOptional')}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   // Fallback to default avatar on error
@@ -250,14 +250,14 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
           <div className="text-gray-600">
             <p className="text-sm">
               <span className="font-medium text-orange-600 hover:text-orange-500 cursor-pointer" onClick={triggerFileSelect}>
-                Cliquez pour choisir
-              </span> ou glissez une image ici
+                {t('clickToChooseSimple')}
+              </span> {t('or')} {t('dragImageHere').toLowerCase()}
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              PNG, JPG, WEBP jusqu'à 5MB
+              {t('imageFormatsLimit')}
             </p>
             <p className="text-xs text-orange-600 mt-1">
-              ✨ Optimisation automatique pour connexion rapide
+              ✨ {t('autoOptimizedFastConnection')}
             </p>
           </div>
 
@@ -269,7 +269,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
           disabled={uploading || loading}
           className="mt-4 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {uploading ? 'Upload en cours...' : 'Choisir une photo'}
+          {uploading ? t('uploadInProgress') : t('choosePhoto')}
         </button>
         </div>
       )}
@@ -278,7 +278,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       {(isCurrentUser || !targetUserId) && (
         <div className="mt-4 text-center">
           <p className="text-xs text-gray-500">
-            Votre photo de profil sera visible par tous les utilisateurs de Kojo
+            {t('photoVisibleAllUsers')}
           </p>
         </div>
       )}
