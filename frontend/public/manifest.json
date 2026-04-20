@@ -91,22 +91,6 @@
       ]
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/mobile-home.png",
-      "sizes": "640x1136",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Page d'accueil mobile"
-    },
-    {
-      "src": "/screenshots/desktop-home.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Page d'accueil desktop"
-    }
-  ],
   "related_applications": [],
   "iarc_rating_id": "",
   "edge_side_panel": {
