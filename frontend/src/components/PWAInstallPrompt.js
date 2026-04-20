@@ -72,23 +72,23 @@ export default function PWAInstallPrompt() {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-medium text-gray-900">
-            Installer Kojo
+            {t('installKojo')}
           </h3>
           <p className="text-xs text-gray-500 mt-1">
-            Ajoutez Kojo à votre écran d'accueil pour un accès rapide
+            {t('addKojoHome')}
           </p>
           <div className="flex space-x-2 mt-3">
             <button
               onClick={handleInstallClick}
               className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-2 rounded-md font-medium"
             >
-              Installer
+              {t('install')}
             </button>
             <button
               onClick={handleDismiss}
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-3 py-2 rounded-md"
             >
-              Plus tard
+              {t('later')}
             </button>
           </div>
         </div>

@@ -105,14 +105,14 @@ const NetworkStatus = ({ showDetails = false, className = '' }) => {
           <div className="text-2xl">{networkStatus.emoji}</div>
           <div className="flex-1">
             <h3 className={`font-medium ${getTextColor()}`}>
-              État du réseau : {networkStatus.text}
+              {t('networkStatusLabel')} : {networkStatus.text}
             </h3>
             <p className={`text-sm mt-1 ${getTextColor()}`}>
               {getNetworkMessage()}
             </p>
             {getNetworkTips() && (
               <div className={`text-xs mt-2 ${getTextColor()} bg-white bg-opacity-50 rounded p-2`}>
-                <strong>Optimisations actives :</strong>
+                <strong>{t('activeOptimizations')} :</strong>
                 <pre className="whitespace-pre-wrap mt-1">{getNetworkTips()}</pre>
               </div>
             )}
