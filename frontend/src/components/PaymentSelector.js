@@ -41,6 +41,17 @@ const PaymentSelector = ({
     }
   };
 
+  const getMethodDescription = (method) => {
+    switch (method.id) {
+      case 'bank_card': return t('visaMastercard');
+      case 'orange_money': return t('orangeMobileMoney');
+      case 'wave': return t('waveFreeTransfers');
+      default: return method.description;
+    }
+  };
+
+  const getMethodProcessingTime = () => t('instantLabel');
+
   return (
     <div className={`payment-selector ${className}`}>
       {showTitle && (
@@ -70,31 +81,31 @@ const PaymentSelector = ({
                     {getMethodName(method)}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {method.description}
+                    {getMethodDescription(method)}
                   </div>
                 </div>
               </div>
               
               <div className="text-right">
                 <div className="text-sm font-medium text-green-600">
-                  {method.fees === '0%' ? 'Gratuit' : `Frais: ${method.fees}`}
+                  {method.fees === '0%' ? t('free') : `${t('feesLabel')}: ${method.fees}`}
                 </div>
                 <div className="text-xs text-gray-500">
-                  {method.processingTime}
+                  {getMethodProcessingTime()}
                 </div>
               </div>
             </div>
             
             {method.phonePrefix && (
               <div className="mt-2 text-xs text-gray-600">
-                Code USSD: {method.phonePrefix}
+                {t('ussdCode')}: {method.phonePrefix}
               </div>
             )}
             
             {selectedMethod?.id === method.id && (
               <div className="mt-2 flex items-center text-sm text-orange-600">
                 <span className="w-2 h-2 bg-orange-500 rounded-full mr-2"></span>
-                Méthode sélectionnée
+                {t('methodSelected')}
               </div>
             )}
           </div>
@@ -104,7 +115,7 @@ const PaymentSelector = ({
       {availableMethods.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           <span className="text-2xl">💳</span>
-          <p className="mt-2">Aucune méthode de paiement disponible pour votre région</p>
+          <p className="mt-2">{t('noPaymentMethodsRegion')}</p>
         </div>
       )}
       
@@ -112,7 +123,7 @@ const PaymentSelector = ({
         <div className="mt-4 p-3 bg-blue-50 rounded-lg">
           <div className="flex items-center text-sm text-blue-800">
             <span className="mr-2">ℹ️</span>
-            Vous avez sélectionné {getMethodName(selectedMethod)}
+            {t('youSelected') } {getMethodName(selectedMethod)}
           </div>
         </div>
       )}
@@ -133,33 +144,33 @@ export const PaymentSummary = ({ amount, currency = 'XOF' }) => {
 
   return (
     <div className="payment-summary bg-gray-50 p-4 rounded-lg">
-      <h4 className="font-medium text-gray-900 mb-3">Résumé du paiement</h4>
+      <h4 className="font-medium text-gray-900 mb-3">{t('paymentSummary')}</h4>
       
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span>Montant du service:</span>
+          <span>{t('serviceAmountLabel')}:</span>
           <span>{amount.toLocaleString()} {currency}</span>
         </div>
         
         <div className="flex justify-between">
-          <span>Frais de transaction ({selectedMethod.fees}):</span>
+          <span>{t('transactionFees')} ({selectedMethod.fees}):</span>
           <span>{fees.toLocaleString()} {currency}</span>
         </div>
         
         <div className="border-t pt-2 flex justify-between font-medium">
-          <span>Total à payer:</span>
+          <span>{t('totalToPay')}:</span>
           <span>{total.toLocaleString()} {currency}</span>
         </div>
         
         <div className="bg-blue-50 p-3 rounded-lg mt-3">
-          <p className="text-xs text-blue-800 font-medium mb-2">💰 Répartition automatique:</p>
+          <p className="text-xs text-blue-800 font-medium mb-2">💰 {t('automaticDistribution')}:</p>
           <div className="space-y-1 text-xs text-blue-700">
             <div className="flex justify-between">
-              <span>• Travailleur (86%):</span>
+              <span>• {t('workerLabel')} (86%):</span>
               <span className="font-medium">{commissionData.workerAmount.toLocaleString()} {currency}</span>
             </div>
             <div className="flex justify-between">
-              <span>• Commission plateforme (14%):</span>
+              <span>• {t('platformCommission')} (14%):</span>
               <span className="font-medium">{commissionData.ownerCommission.toLocaleString()} {currency}</span>
             </div>
           </div>
@@ -167,7 +178,7 @@ export const PaymentSummary = ({ amount, currency = 'XOF' }) => {
         
         <div className="mt-3 flex items-center text-xs text-gray-600">
           <span className="mr-1">{selectedMethod.icon}</span>
-          Via {selectedMethod.name} - Transfert automatique
+          {t('viaMethodAutomaticTransfer', { method: getMethodName(selectedMethod) })}
         </div>
       </div>
     </div>
@@ -189,7 +200,7 @@ export const PaymentProcess = ({
 
   const handlePayment = async () => {
     if (!selectedMethod) {
-      alert('Veuillez sélectionner une méthode de paiement');
+      alert(t('selectPaymentMethodPrompt'));
       return;
     }
 
@@ -237,10 +248,10 @@ export const PaymentProcess = ({
         {isProcessing ? (
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-            Traitement + Distribution...
+            {t('processingDistribution')}
           </div>
         ) : (
-          `💰 Payer ${amount?.toLocaleString()} ${currency}`
+          `💰 ${t('payAmount')} ${amount?.toLocaleString()} ${currency}`
         )}
       </button>
 
@@ -254,7 +265,7 @@ export const PaymentProcess = ({
             <span className="mr-2">{result.success ? '✅' : '❌'}</span>
             <div className="w-full">
               <p className="font-medium">
-                {result.success ? 'Paiement réussi avec distribution!' : 'Paiement échoué'}
+                {result.success ? t('paymentSucceededDistribution') : t('paymentFailed')}
               </p>
               <p className="text-sm mt-1">
                 {result.success ? result.message : result.error}
@@ -268,8 +279,8 @@ export const PaymentProcess = ({
                 <div className="mt-2 text-xs space-y-1">
                   <div className="bg-white bg-opacity-50 p-2 rounded">
                     <p className="font-medium">💰 Distribution effectuée:</p>
-                    <p>• Propriétaire: {result.commission.ownerCommission.toLocaleString()} {currency} (14%)</p>
-                    <p>• Travailleur: {result.commission.workerAmount.toLocaleString()} {currency} (86%)</p>
+                    <p>• {t('ownerLabel')}: {result.commission.ownerCommission.toLocaleString()} {currency} (14%)</p>
+                    <p>• {t('workerLabel')}: {result.commission.workerAmount.toLocaleString()} {currency} (86%)</p>
                   </div>
                 </div>
               )}

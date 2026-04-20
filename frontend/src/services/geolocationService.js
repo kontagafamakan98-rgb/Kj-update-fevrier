@@ -57,14 +57,26 @@ export const COUNTRIES = {
   }
 };
 
+const COUNTRY_CODE_ALIASES = {
+  ivory_coast: 'cote_divoire',
+  cote_divoire: 'cote_divoire',
+  ci: 'cote_divoire'
+};
+
+const normalizeCountryCode = (code = '') => {
+  const value = String(code).toLowerCase().trim();
+  return COUNTRY_CODE_ALIASES[value] || value;
+};
+
 export const getCountriesList = () => {
   return Object.values(COUNTRIES);
 };
 
 export const getCountryByCode = (code) => {
-  const upperCode = code?.toUpperCase();
+  const normalizedCode = normalizeCountryCode(code);
+  const upperCode = String(code || '').toUpperCase();
   return Object.values(COUNTRIES).find(country => 
-    country.code === code || country.code === upperCode
+    country.code === normalizedCode || country.code === code || country.code === upperCode
   ) || COUNTRIES.MALI;
 };
 
@@ -920,7 +932,8 @@ export const getPhoneExampleForCountry = (country) => {
     'cote_divoire': '+225 07 12 34 56'
   };
   
-  return examples[country?.code] || examples['senegal'];
+  const countryCode = normalizeCountryCode(country?.code || country);
+  return examples[countryCode] || examples['senegal'];
 };
 
 // Obtenir les banques populaires par pays
@@ -956,7 +969,8 @@ export const getPopularBanksByCountry = (country) => {
     ]
   };
   
-  return banks[country?.code] || banks['senegal'];
+  const countryCode = normalizeCountryCode(country?.code || country);
+  return banks[countryCode] || banks['senegal'];
 };
 
 // Langues disponibles dans l'application

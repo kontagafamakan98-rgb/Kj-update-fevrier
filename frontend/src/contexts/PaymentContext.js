@@ -4,6 +4,12 @@ import { devLog, safeLog } from '../utils/env';
 
 const PaymentContext = createContext();
 
+const normalizePaymentCountry = (country = '') => {
+  const value = String(country).toLowerCase().trim();
+  if (value === 'cote_divoire') return 'ivory_coast';
+  return value;
+};
+
 export function usePayment() {
   return useContext(PaymentContext);
 }
@@ -57,8 +63,9 @@ export function PaymentProvider({ children }) {
 
   // Obtenir les méthodes disponibles pour un pays
   const getAvailableMethodsForCountry = (country) => {
+    const normalizedCountry = normalizePaymentCountry(country);
     return Object.values(PAYMENT_METHODS).filter(method => 
-      method.countries.includes(country)
+      method.countries.includes(normalizedCountry)
     );
   };
 
