@@ -310,13 +310,13 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
         </div>
 
         <div>
-          <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
+          <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('selectLanguageLabel')}</label>
           <select id="preferred_language" name="preferred_language" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
-            <option value="fr">Français</option>
-            <option value="en">English</option>
-            <option value="wo">Wolof</option>
-            <option value="bm">Bambara</option>
-            <option value="mos">Mooré</option>
+            <option value="fr">{t('french')}</option>
+            <option value="en">{t('english')}</option>
+            <option value="wo">{t('wolof')}</option>
+            <option value="bm">{t('bambara')}</option>
+            <option value="mos">{t('moore')}</option>
           </select>
         </div>
 
