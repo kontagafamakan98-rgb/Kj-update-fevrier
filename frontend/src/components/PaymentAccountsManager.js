@@ -134,18 +134,18 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     
     // Validate Orange Money
     if (accounts.orange_money && !validateOrangeMoneyNumber(accounts.orange_money)) {
-      errors.orange_money = 'Numéro Orange Money invalide';
+      errors.orange_money = t('invalidOrangeMoneyNumber');
     }
     
     // Validate Wave
     if (accounts.wave && !validateWaveNumber(accounts.wave)) {
-      errors.wave = 'Numéro Wave invalide';
+      errors.wave = t('invalidWaveNumber');
     }
     
     // Validate Bank Account
     if (!validateBankAccount(accounts.bank_account)) {
       if (accounts.bank_account.account_number || accounts.bank_account.bank_name || accounts.bank_account.account_holder) {
-        errors.bank_account = 'Veuillez remplir tous les champs obligatoires du compte bancaire';
+        errors.bank_account = t('completeRequiredBankFields');
       }
     }
 
@@ -155,7 +155,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
 
   const handleSave = async () => {
     if (!validateForm()) {
-      setError('Veuillez corriger les erreurs de validation');
+      setError(t('correctValidationErrors'));
       return;
     }
 
@@ -184,11 +184,11 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           setSuccess('');
         }, 2000);
       } else {
-        setError(result.error || 'Erreur lors de la mise à jour');
+        setError(result.error || t('updateError'));
       }
     } catch (error) {
       safeLog.error('Erreur sauvegarde comptes:', error);
-      setError('Erreur lors de la sauvegarde');
+      setError(t('saveError'));
     } finally {
       setSaving(false);
     }
@@ -279,7 +279,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">OM</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Orange Money</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('orangeMoney')}</h3>
           </div>
           
           {isEditing ? (
@@ -288,7 +288,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 type="tel"
                 value={accounts.orange_money}
                 onChange={(e) => setAccounts({...accounts, orange_money: e.target.value})}
-                placeholder={`Ex: ${phoneExample}`}
+                placeholder={`${t('examplePrefix')} ${phoneExample}`}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                   validationErrors.orange_money ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -305,7 +305,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               {accounts.orange_money ? (
                 <p className="text-gray-700 font-mono">{accounts.orange_money}</p>
               ) : (
-                <p className="text-gray-500 italic">Non configuré</p>
+                <p className="text-gray-500 italic">{t('notConfigured')}</p>
               )}
             </div>
           )}
@@ -317,7 +317,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">W</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Wave</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
           </div>
           
           {isEditing ? (
@@ -326,7 +326,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 type="tel"
                 value={accounts.wave}
                 onChange={(e) => setAccounts({...accounts, wave: e.target.value})}
-                placeholder={`Ex: ${phoneExample}`}
+                placeholder={`${t('examplePrefix')} ${phoneExample}`}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   validationErrors.wave ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -343,7 +343,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               {accounts.wave ? (
                 <p className="text-gray-700 font-mono">{accounts.wave}</p>
               ) : (
-                <p className="text-gray-500 italic">Non configuré</p>
+                <p className="text-gray-500 italic">{t('notConfigured')}</p>
               )}
             </div>
           )}
@@ -355,14 +355,14 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-3">
               <span className="text-white text-sm font-bold">🏦</span>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Compte Bancaire</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('bankAccount')}</h3>
           </div>
           
           {isEditing ? (
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Numéro de compte *
+                  {t('accountNumberLabel')} *
                 </label>
                 <input
                   type="text"
@@ -378,7 +378,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom de la banque *
+                  {t('bankNameLabel')} *
                 </label>
                 <select
                   value={accounts.bank_account.bank_name}
@@ -388,17 +388,17 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                   })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
                 >
-                  <option value="">Sélectionner une banque</option>
+                  <option value="">{t('selectBank')}</option>
                   {popularBanks.map((bank, index) => (
                     <option key={index} value={bank}>{bank}</option>
                   ))}
-                  <option value="Autre">Autre banque</option>
+                  <option value="Autre">{t('otherBank')}</option>
                 </select>
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom du titulaire *
+                  {t('accountHolderLabel')} *
                 </label>
                 <input
                   type="text"
@@ -407,7 +407,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     ...accounts, 
                     bank_account: {...accounts.bank_account, account_holder: e.target.value}
                   })}
-                  placeholder="Nom complet du titulaire"
+                  placeholder={t('fullHolderName')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
                 />
               </div>
@@ -415,7 +415,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Code banque (optionnel)
+                    {t('bankCodeOptional')}
                   </label>
                   <input
                     type="text"
@@ -431,7 +431,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Agence (optionnel)
+                    {t('branchOptional')}
                   </label>
                   <input
                     type="text"
@@ -440,7 +440,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                       ...accounts, 
                       bank_account: {...accounts.bank_account, branch: e.target.value}
                     })}
-                    placeholder="Nom de l'agence"
+                    placeholder={t('branchLabel')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
@@ -455,22 +455,22 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               {accounts.bank_account?.account_number ? (
                 <div className="space-y-2">
                   <p className="text-gray-700">
-                    <span className="text-sm text-gray-500">Compte:</span> {maskAccountNumber(accounts.bank_account.account_number)}
+                    <span className="text-sm text-gray-500">{t('accountLabel')}:</span> {maskAccountNumber(accounts.bank_account.account_number)}
                   </p>
                   <p className="text-gray-700">
-                    <span className="text-sm text-gray-500">Banque:</span> {accounts.bank_account.bank_name}
+                    <span className="text-sm text-gray-500">{t('bankLabel')}:</span> {accounts.bank_account.bank_name}
                   </p>
                   <p className="text-gray-700">
-                    <span className="text-sm text-gray-500">Titulaire:</span> {accounts.bank_account.account_holder}
+                    <span className="text-sm text-gray-500">{t('holderLabel')}:</span> {accounts.bank_account.account_holder}
                   </p>
                   {accounts.bank_account.branch && (
                     <p className="text-gray-700">
-                      <span className="text-sm text-gray-500">Agence:</span> {accounts.bank_account.branch}
+                      <span className="text-sm text-gray-500">{t('branchLabel')}:</span> {accounts.bank_account.branch}
                     </p>
                   )}
                 </div>
               ) : (
-                <p className="text-gray-500 italic">Non configuré</p>
+                <p className="text-gray-500 italic">{t('notConfigured')}</p>
               )}
             </div>
           )}
