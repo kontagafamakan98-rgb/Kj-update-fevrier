@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Country data with flags and proper names
 export const COUNTRIES = {

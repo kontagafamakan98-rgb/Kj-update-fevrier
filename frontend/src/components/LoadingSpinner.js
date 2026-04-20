@@ -1,20 +1,11 @@
 import React from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import PropTypes from 'prop-types';
 
-/**
- * LoadingSpinner Component
- * Affiche un spinner de chargement animé réutilisable
- * 
- * @component
- * @param {Object} props - Props du composant
- * @param {('sm'|'md'|'lg'|'xl')} props.size - Taille du spinner (défaut: 'md')
- * @param {('orange'|'blue'|'green'|'white')} props.color - Couleur du spinner (défaut: 'orange')
- * @param {string} props.className - Classes CSS additionnelles
- * 
- * @example
- * <LoadingSpinner size="lg" color="orange" />
- */
 const LoadingSpinner = ({ size = 'md', color = 'orange', className = '' }) => {
+  const { t } = useLanguage();
+  const label = t('loadingLabel');
+
   const sizeClasses = {
     sm: 'h-4 w-4',
     md: 'h-8 w-8',
@@ -31,12 +22,8 @@ const LoadingSpinner = ({ size = 'md', color = 'orange', className = '' }) => {
 
   return (
     <div className={`flex items-center justify-center ${className}`}>
-      <div
-        className={`animate-spin rounded-full border-b-2 ${sizeClasses[size]} ${colorClasses[color]}`}
-        role="status"
-        aria-label="Chargement"
-      >
-        <span className="sr-only">Chargement...</span>
+      <div className={`animate-spin rounded-full border-b-2 ${sizeClasses[size]} ${colorClasses[color]}`} role="status" aria-label={label}>
+        <span className="sr-only">{label}</span>
       </div>
     </div>
   );
