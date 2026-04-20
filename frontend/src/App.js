@@ -248,21 +248,21 @@ function App() {
 
   return (
     <div className="App">
-      <ErrorBoundary>
-        <PerformanceMonitor />
-        <AccessibilityHelper />
-        <BrowserRouter>
-          <LanguageProvider>
-            <AuthProvider>
-              <PaymentProvider>
-                <ToastProvider>
+      <BrowserRouter>
+        <LanguageProvider>
+          <AuthProvider>
+            <PaymentProvider>
+              <ToastProvider>
+                <ErrorBoundary>
+                  <PerformanceMonitor />
+                  <AccessibilityHelper />
                   <AppRoutes />
-                </ToastProvider>
-              </PaymentProvider>
-            </AuthProvider>
-          </LanguageProvider>
-        </BrowserRouter>
-      </ErrorBoundary>
+                </ErrorBoundary>
+              </ToastProvider>
+            </PaymentProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </BrowserRouter>
     </div>
   );
 }
