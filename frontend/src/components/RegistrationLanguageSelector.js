@@ -18,6 +18,16 @@ const COUNTRY_PREFERENCE_KEYS = {
   cote_divoire: 'ivoryCoastLanguagePreference'
 };
 
+const stripLeadingFlag = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+};
+
+const getTranslatedCountryName = (countryCode, t) => {
+  const translationKey = COUNTRY_PREFERENCE_KEYS[countryCode] === 'ivoryCoastLanguagePreference' ? 'ivory_coast' : countryCode;
+  return stripLeadingFlag(t(translationKey));
+};
+
 const RegistrationLanguageSelector = ({ 
   detectedCountry, 
   selectedLanguage, 
@@ -93,7 +103,7 @@ const RegistrationLanguageSelector = ({
             <span className="text-blue-500 text-lg mr-2">💡</span>
             <div className="flex-1">
               <p className="text-sm text-blue-800 font-medium">
-                📍 {t('basedOnLocation')} ({detectedCountry.flag} {t(COUNTRY_PREFERENCE_KEYS[normalizedCountryCode] === 'ivoryCoastLanguagePreference' ? 'ivory_coast' : normalizedCountryCode)})
+                📍 {t('basedOnLocation')} ({detectedCountry.flag} {getTranslatedCountryName(normalizedCountryCode, t) || stripLeadingFlag(detectedCountry.nameFrench || detectedCountry.name || '')})
               </p>
               <p className="text-xs text-blue-700 mt-1">
                 {COUNTRY_PREFERENCE_KEYS[normalizedCountryCode]
