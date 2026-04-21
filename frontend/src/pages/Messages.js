@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { messagesAPI, handleApiError } from '../services/api';
 import { ListSkeleton } from '../components/SkeletonLoader';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
 
 export default function Messages() {
@@ -68,7 +68,7 @@ export default function Messages() {
   };
 
   const formatMessageTime = (timestamp) =>
-    new Date(timestamp).toLocaleTimeString(currentLanguage === 'en' ? 'en-US' : 'fr-FR', {
+    new Date(timestamp).toLocaleTimeString(getLocaleForLanguage(currentLanguage), {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -169,7 +169,7 @@ export default function Messages() {
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"
                   />
                   <button
-                    aria-label={t('actionButton')}
+                    aria-label={pageT('sendMessageAria')}
                     type="submit"
                     disabled={!newMessage.trim()}
                     className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md disabled:opacity-50"

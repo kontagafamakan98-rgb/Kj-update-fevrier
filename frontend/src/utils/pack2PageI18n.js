@@ -218,7 +218,8 @@ const pages = {
       status_cancelled: 'Annulé',
       status_pending: 'En attente',
       status_accepted: 'Acceptée',
-      status_rejected: 'Refusée'
+      status_rejected: 'Refusée',
+      backButtonAria: 'Revenir à la page précédente'
     },
     en: {
       loadError: 'Error while loading the job',
@@ -247,7 +248,8 @@ const pages = {
       status_cancelled: 'Cancelled',
       status_pending: 'Pending',
       status_accepted: 'Accepted',
-      status_rejected: 'Rejected'
+      status_rejected: 'Rejected',
+      backButtonAria: 'Go back to the previous page'
     }
   },
   jobs: {
@@ -269,11 +271,13 @@ const pages = {
   messages: {
     fr: {
       otherUser: 'Utilisateur',
-      placeholder: 'Tapez votre message...'
+      placeholder: 'Tapez votre message...',
+      sendMessageAria: 'Envoyer le message'
     },
     en: {
       otherUser: 'User',
-      placeholder: 'Type your message...'
+      placeholder: 'Type your message...',
+      sendMessageAria: 'Send message'
     }
   },
   commissionDashboard: {
@@ -559,15 +563,18 @@ pages.jobs.mos = withBase(pages.jobs.fr, {
 
 pages.messages.wo = withBase(pages.messages.fr, {
   otherUser: 'Jëfandikookat',
-  placeholder: 'Bind sa bataaxal...'
+  placeholder: 'Bind sa bataaxal...',
+  sendMessageAria: 'Yónnee bataaxal bi'
 });
 pages.messages.bm = withBase(pages.messages.fr, {
   otherUser: 'Baarakɛla',
-  placeholder: 'I ka cikan sɛbɛn...'
+  placeholder: 'I ka cikan sɛbɛn...',
+  sendMessageAria: 'Cikan ci'
 });
 pages.messages.mos = withBase(pages.messages.fr, {
   otherUser: 'Ned',
-  placeholder: 'Gʋls f koeesã...'
+  placeholder: 'Gʋls f koeesã...',
+  sendMessageAria: 'Tu koeesã'
 });
 
 pages.commissionDashboard.wo = withBase(pages.commissionDashboard.fr, {
@@ -783,6 +790,14 @@ pages.paymentDemo = {
     automaticCommission: 'Commission automatique',
     note: 'Note',
     noteText: 'Ceci est une démonstration - les paiements sont simulés',
+    exampleHomeKey: 'Clé home',
+    exampleJobsKey: 'Clé jobs',
+    examplePaymentKey: 'Clé payment',
+    exampleBankCardKey: 'Clé bankCard',
+    supportedLanguagesValue: '{french}, {english}, {wolof}, {bambara}, {moore}',
+    supportedMethodsValue: '{bankCard} (2.5%), {orangeMoney} (1%), {wave} (gratuit)',
+    currencyValue: 'Franc CFA (XOF)',
+    automaticCommissionValue: '14% propriétaire, 86% travailleur',
     paymentAlertSuccess: 'Paiement réussi ! Transaction : {id}',
     paymentAlertError: 'Erreur de paiement : {error}'
   },
@@ -830,6 +845,14 @@ pages.paymentDemo = {
     automaticCommission: 'Automatic commission',
     note: 'Note',
     noteText: 'This is a demo - payments are simulated',
+    exampleHomeKey: 'Home key',
+    exampleJobsKey: 'Jobs key',
+    examplePaymentKey: 'Payment key',
+    exampleBankCardKey: 'Bank card key',
+    supportedLanguagesValue: '{french}, {english}, {wolof}, {bambara}, {moore}',
+    supportedMethodsValue: '{bankCard} (2.5%), {orangeMoney} (1%), {wave} (free)',
+    currencyValue: 'CFA franc (XOF)',
+    automaticCommissionValue: '14% owner, 86% worker',
     paymentAlertSuccess: 'Payment successful! Transaction: {id}',
     paymentAlertError: 'Payment error: {error}'
   }

@@ -211,10 +211,10 @@ const PaymentDemo = () => {
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="font-medium text-gray-900 mb-2">{pageT('translationExamples')}:</h4>
                 <div className="text-sm space-y-1">
-                  <div><strong>home:</strong> {t('home')}</div>
-                  <div><strong>jobs:</strong> {t('jobs')}</div>
-                  <div><strong>payment:</strong> {t('payment')}</div>
-                  <div><strong>bankCard:</strong> {t('bankCard')}</div>
+                  <div><strong>{pageT('exampleHomeKey')}:</strong> {t('home')}</div>
+                  <div><strong>{pageT('exampleJobsKey')}:</strong> {t('jobs')}</div>
+                  <div><strong>{pageT('examplePaymentKey')}:</strong> {t('payment')}</div>
+                  <div><strong>{pageT('exampleBankCardKey')}:</strong> {t('bankCard')}</div>
                 </div>
               </div>
             </div>
@@ -284,11 +284,11 @@ const PaymentDemo = () => {
         <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h2 className="text-lg font-semibold text-yellow-800 mb-3">{pageT('technicalInfo')}</h2>
           <div className="text-sm text-yellow-700 space-y-2">
-            <p><strong>{pageT('supportedLanguages')}:</strong> Français, English, Wolof, Bambara, Mooré</p>
-            <p><strong>{pageT('supportedMethods')}:</strong> {t('bankCard')} (2.5%), {t('orangeMoney')} (1%), {t('wave')} (gratuit)</p>
+            <p><strong>{pageT('supportedLanguages')}:</strong> {pageT('supportedLanguagesValue', { french: t('french'), english: t('english'), wolof: t('wolof'), bambara: t('bambara'), moore: t('moore') })}</p>
+            <p><strong>{pageT('supportedMethods')}:</strong> {pageT('supportedMethodsValue', { bankCard: t('bankCard'), orangeMoney: t('orangeMoney'), wave: t('wave') })}</p>
             <p><strong>{pageT('supportedCountries')}:</strong> {supportedCountries.map(getCountryLabel).join(', ')}</p>
-            <p><strong>{pageT('currency')}:</strong> Franc CFA (XOF)</p>
-            <p><strong>{pageT('automaticCommission')}:</strong> 14% propriétaire, 86% travailleur</p>
+            <p><strong>{pageT('currency')}:</strong> {pageT('currencyValue')}</p>
+            <p><strong>{pageT('automaticCommission')}:</strong> {pageT('automaticCommissionValue')}</p>
             <p><strong>{pageT('note')}:</strong> {pageT('noteText')}</p>
           </div>
         </div>
