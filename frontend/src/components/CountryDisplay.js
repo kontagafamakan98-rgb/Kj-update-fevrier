@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/countryAliases';
+import FlagIcon from './FlagIcon';
 
 // Country data with flags and proper names
 export const COUNTRIES = {
@@ -8,28 +9,28 @@ export const COUNTRIES = {
     code: 'mali',
     name: 'Mali',
     flag: '🇲🇱',
-    fullName: '🇲🇱 Mali',
+    fullName: 'Mali',
     iso: 'ML'
   },
   senegal: {
     code: 'senegal',
     name: 'Sénégal',
     flag: '🇸🇳',
-    fullName: '🇸🇳 Sénégal',
+    fullName: 'Sénégal',
     iso: 'SN'
   },
   burkina_faso: {
     code: 'burkina_faso',
     name: 'Burkina Faso',
     flag: '🇧🇫',
-    fullName: '🇧🇫 Burkina Faso',
+    fullName: 'Burkina Faso',
     iso: 'BF'
   },
   ivory_coast: {
     code: 'ivory_coast',
     name: 'Côte d\'Ivoire',
     flag: '🇨🇮',
-    fullName: '🇨🇮 Côte d\'Ivoire',
+    fullName: 'Côte d\'Ivoire',
     iso: 'CI'
   }
 };
@@ -64,7 +65,10 @@ const COUNTRY_TRANSLATION_KEYS = {
 
 const stripLeadingFlag = (value) => {
   if (typeof value !== 'string') return '';
-  return value.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+  return value
+    .replace(/^(?:[\u{1F1E6}-\u{1F1FF}]{2}|\p{Extended_Pictographic})(?:\uFE0F)?\s*/u, '')
+    .replace(/^(ML|SN|BF|CI)\s+/i, '')
+    .trim();
 };
 
 const getTranslatedCountryName = (country, t) => {
@@ -94,7 +98,7 @@ export default function CountryDisplay({
 
   return (
     <span className={`flex items-center space-x-2 ${className}`}>
-      {showFlag && <span className={flagSize}>{country.flag}</span>}
+      {showFlag && <FlagIcon country={country.code} className="w-5 h-4" showEmoji={false} />}
       {showName && <span>{translatedName}</span>}
     </span>
   );
@@ -206,7 +210,7 @@ export function CountrySelect({
         aria-required={required}
       >
         <span className="flex items-center gap-3 min-w-0">
-          <span className="text-lg leading-none">{activeCountry?.flag || '🌍'}</span>
+          {activeCountry ? <FlagIcon country={activeCountry.code} className="w-6 h-4" showEmoji={false} /> : <span className="text-lg leading-none">🌍</span>}
           <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-400'}`}>
             {activeCountry ? getTranslatedCountryName(activeCountry, t) : resolvedPlaceholder}
           </span>
@@ -247,7 +251,7 @@ export function CountrySelect({
                   }`}
                 >
                   <span className="flex items-center gap-3 min-w-0">
-                    <span className="text-lg leading-none">{country.flag}</span>
+                    <FlagIcon country={country.code} className="w-6 h-4" showEmoji={false} />
                     <span className="truncate">{getTranslatedCountryName(country, t)}</span>
                   </span>
                   {isSelected && <span className="text-sm font-semibold">✓</span>}

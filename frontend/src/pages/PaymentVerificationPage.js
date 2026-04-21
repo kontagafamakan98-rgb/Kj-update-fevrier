@@ -4,9 +4,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import PaymentAccountSetup from '../components/PaymentAccountSetup';
+import CountryDisplay from '../components/CountryDisplay';
 import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry } from '../services/geolocationService';
-import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 
 const PaymentVerificationPage = () => {
@@ -16,18 +17,6 @@ const PaymentVerificationPage = () => {
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'paymentVerification');
   const toast = useToast();
-
-  const stripLeadingFlag = (value) => {
-    if (typeof value !== 'string') return '';
-    return value.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
-  };
-
-  const getCountryLabel = (country) => {
-    const countryKey = normalizeCountryCode(country?.code || country?.countryCode || country);
-    const translated = t(countryKey);
-    if (typeof translated === 'string' && translated !== countryKey) return stripLeadingFlag(translated);
-    return stripLeadingFlag(country?.nameFrench || country?.nameEnglish || countryKey);
-  };
 
   const getUserTypeLabel = (userType) => t(userType) || userType;
 
@@ -145,7 +134,7 @@ const PaymentVerificationPage = () => {
             ) : detectedCountry ? (
               <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded text-center">
                 <p className="text-sm text-green-800">
-                  <span className="font-medium">{pageT('position')}:</span> {detectedCountry.flag} {getCountryLabel(detectedCountry)}
+                  <span className="font-medium">{pageT('position')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
                 </p>
                 <p className="text-xs text-green-600 mt-1">{pageT('examplesAdjusted')}</p>
               </div>

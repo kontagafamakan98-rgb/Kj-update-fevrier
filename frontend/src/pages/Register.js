@@ -8,7 +8,7 @@ import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
 import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
 import LoadingButton from '../components/LoadingButton';
-import { CountrySelect } from '../components/CountryDisplay';
+import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 
@@ -246,7 +246,7 @@ export default function Register() {
             ) : detectedCountry ? (
               <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-center">
                 <p className="text-sm text-green-800">
-                  <span className="font-medium">📍 {pageT('positionDetected')}:</span> {detectedCountry.flag} {getCountryDisplayName(detectedCountry)}
+                  <span className="font-medium">📍 {pageT('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
                 </p>
                 <p className="text-xs text-green-600 mt-1">
                   {pageT('adjustedAutomatically')}
@@ -358,8 +358,7 @@ export default function Register() {
                   <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium whitespace-nowrap ${
                     detectedCountry ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-700'
                   }`}>
-                    <span className="text-base leading-none">{activeCountry.flag || '🌍'}</span>
-                    <span>{getCountryDisplayName(activeCountry)}</span>
+                    <CountryDisplay countryCode={activeCountry.code} className="inline-flex align-middle" />
                   </span>
                 )}
               </div>

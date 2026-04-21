@@ -9,6 +9,7 @@ import {
 } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/pack2PageI18n';
+import FlagIcon from './FlagIcon';
 
 const COUNTRY_PREFERENCE_KEYS = {
   mali: 'maliLanguagePreference',
@@ -20,7 +21,10 @@ const COUNTRY_PREFERENCE_KEYS = {
 
 const stripLeadingFlag = (value) => {
   if (typeof value !== 'string') return '';
-  return value.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+  return value
+    .replace(/^(?:[\u{1F1E6}-\u{1F1FF}]{2}|\p{Extended_Pictographic})(?:\uFE0F)?\s*/u, '')
+    .replace(/^(ML|SN|BF|CI)\s+/i, '')
+    .trim();
 };
 
 const getTranslatedCountryName = (countryCode, t) => {
@@ -103,7 +107,7 @@ const RegistrationLanguageSelector = ({
             <span className="text-blue-500 text-lg mr-2">💡</span>
             <div className="flex-1">
               <p className="text-sm text-blue-800 font-medium">
-                📍 {t('basedOnLocation')} ({detectedCountry.flag} {getTranslatedCountryName(normalizedCountryCode, t) || stripLeadingFlag(detectedCountry.nameFrench || detectedCountry.name || '')})
+                📍 {t('basedOnLocation')} (<span className="inline-flex items-center gap-2"><FlagIcon country={normalizedCountryCode || detectedCountry.code} className="w-5 h-4" showEmoji={false} /><span>{getTranslatedCountryName(normalizedCountryCode, t) || stripLeadingFlag(detectedCountry.nameFrench || detectedCountry.name || '')}</span></span>)
               </p>
               <p className="text-xs text-blue-700 mt-1">
                 {COUNTRY_PREFERENCE_KEYS[normalizedCountryCode]
@@ -154,7 +158,7 @@ const RegistrationLanguageSelector = ({
                 )}
 
                 <div className="text-center">
-                  <div className="text-2xl mb-2">{language.flag}</div>
+                  <div className="flex justify-center mb-2"><FlagIcon country={language.code} className="w-8 h-6" showEmoji={false} /></div>
                   <div className="font-medium text-gray-900 text-sm">
                     {language.name}
                   </div>
@@ -182,7 +186,7 @@ const RegistrationLanguageSelector = ({
             <span className="text-green-500 text-lg mr-2">✓</span>
             <div>
               <p className="text-sm font-medium text-green-800">
-                {t('selectedLanguage') || 'Langue sélectionnée'} : {AVAILABLE_LANGUAGES[selectedLanguage]?.flag} {AVAILABLE_LANGUAGES[selectedLanguage]?.name}
+                {t('selectedLanguage') || 'Langue sélectionnée'} : <span className="inline-flex items-center gap-2"><FlagIcon country={selectedLanguage} className="w-5 h-4" showEmoji={false} /><span>{AVAILABLE_LANGUAGES[selectedLanguage]?.name}</span></span>
               </p>
               <p className="text-xs text-green-700">
                 {t('interfaceAndProfileUpdated') || 'Interface et profil mis à jour'}

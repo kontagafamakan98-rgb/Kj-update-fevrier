@@ -1,35 +1,31 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import FlagIcon from './FlagIcon';
 
 const LANGUAGES = [
   {
     code: 'fr',
     name: 'Français',
-    flag: '🇫🇷',
     nativeName: 'Français'
   },
   {
     code: 'en',
     name: 'English',
-    flag: '🇬🇧',
     nativeName: 'English'
   },
   {
     code: 'wo',
     name: 'Wolof',
-    flag: '🇸🇳',
     nativeName: 'Wolof'
   },
   {
     code: 'bm',
     name: 'Bambara',
-    flag: '🇲🇱',
     nativeName: 'Bamanankan'
   },
   {
     code: 'mos',
     name: 'Mooré',
-    flag: '🇧🇫',
     nativeName: 'Mòoré'
   }
 ];
@@ -61,7 +57,7 @@ const LanguageSelector = ({
             bg-white hover:bg-gray-50 transition-colors ${buttonClassName}
           `}
         >
-          {showFlags && <span>{currentLang.flag}</span>}
+          {showFlags && <FlagIcon country={currentLang.code} className="w-5 h-4" showEmoji={false} />}
           <span className="text-sm font-medium">{currentLang.nativeName}</span>
           <svg 
             className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -95,7 +91,7 @@ const LanguageSelector = ({
                       ${currentLanguage === lang.code ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}
                     `}
                   >
-                    {showFlags && <span>{lang.flag}</span>}
+                    {showFlags && <FlagIcon country={lang.code} className="w-5 h-4" showEmoji={false} />}
                     <div>
                       <div className="font-medium">{lang.nativeName}</div>
                       <div className="text-xs text-gray-500">{lang.name}</div>
@@ -128,7 +124,10 @@ const LanguageSelector = ({
             }
           `}
         >
-          {showFlags ? `${lang.flag} ${lang.code.toUpperCase()}` : lang.code.toUpperCase()}
+          <span className="inline-flex items-center gap-2">
+            {showFlags && <FlagIcon country={lang.code} className="w-5 h-4" showEmoji={false} />}
+            <span>{lang.code.toUpperCase()}</span>
+          </span>
         </button>
       ))}
     </div>

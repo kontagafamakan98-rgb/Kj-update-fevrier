@@ -71,11 +71,11 @@ const translations = {
     worker: 'Travailleur',
     
     // Countries with flags
-    mali: '🇲🇱 Mali',
-    senegal: '🇸🇳 Sénégal',
-    burkina_faso: '🇧🇫 Burkina Faso',
-    ivory_coast: '🇨🇮 Côte d\'Ivoire',
-    cote_divoire: '🇨🇮 Côte d\'Ivoire',
+    mali: 'Mali',
+    senegal: 'Sénégal',
+    burkina_faso: 'Burkina Faso',
+    ivory_coast: 'Côte d\'Ivoire',
+    cote_divoire: 'Côte d\'Ivoire',
     
     // Job related
     jobTitle: 'Titre du travail',
@@ -501,11 +501,11 @@ const translations = {
     worker: 'Worker',
     
     // Countries with flags
-    mali: '🇲🇱 Mali',
-    senegal: '🇸🇳 Senegal',
-    burkina_faso: '🇧🇫 Burkina Faso',
-    ivory_coast: '🇨🇮 Ivory Coast',
-    cote_divoire: '🇨🇮 Ivory Coast',
+    mali: 'Mali',
+    senegal: 'Senegal',
+    burkina_faso: 'Burkina Faso',
+    ivory_coast: 'Ivory Coast',
+    cote_divoire: 'Ivory Coast',
     
     // Job related
     jobTitle: 'Job Title',
@@ -941,11 +941,11 @@ const translations = {
     worker: 'Liggéeykat',
     
     // Countries with flags  
-    mali: '🇲🇱 Mali',
-    senegal: '🇸🇳 Senegaal',
-    burkina_faso: '🇧🇫 Burkina Faso',
-    ivory_coast: '🇨🇮 Côte d\'Ivoire',
-    cote_divoire: '🇨🇮 Côte d\'Ivoire',
+    mali: 'Mali',
+    senegal: 'Senegaal',
+    burkina_faso: 'Burkina Faso',
+    ivory_coast: 'Côte d\'Ivoire',
+    cote_divoire: 'Côte d\'Ivoire',
     
     // Job related
     jobTitle: 'Tur liggéey',
@@ -1381,11 +1381,11 @@ const translations = {
     worker: 'Baarakɛla',
     
     // Countries with flags
-    mali: '🇲🇱 Mali', 
-    senegal: '🇸🇳 Senegali',
-    burkina_faso: '🇧🇫 Burkina Faso',
-    ivory_coast: '🇨🇮 Côte d\'Ivoire',
-    cote_divoire: '🇨🇮 Côte d\'Ivoire',
+    mali: 'Mali', 
+    senegal: 'Senegali',
+    burkina_faso: 'Burkina Faso',
+    ivory_coast: 'Côte d\'Ivoire',
+    cote_divoire: 'Côte d\'Ivoire',
     
     // Job related
     jobTitle: 'Baara tɔgɔ',
@@ -1821,11 +1821,11 @@ const translations = {
     worker: 'Tʋʋm-neda',
     
     // Countries with flags
-    mali: '🇲🇱 Mali',
-    senegal: '🇸🇳 Senegaal',
-    burkina_faso: '🇧🇫 Burkĩna Faso',
-    ivory_coast: '🇨🇮 Kodivuaar',
-    cote_divoire: '🇨🇮 Kodivuaar',
+    mali: 'Mali',
+    senegal: 'Senegaal',
+    burkina_faso: 'Burkĩna Faso',
+    ivory_coast: 'Kodivuaar',
+    cote_divoire: 'Kodivuaar',
     
     // Job related
     jobTitle: 'Tʋʋmã yʋʋre',
