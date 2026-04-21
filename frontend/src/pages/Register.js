@@ -358,7 +358,7 @@ export default function Register() {
                 <option value="" disabled>-- {t('country')} --</option>
                 {countries.map(country => (
                   <option key={country.code} value={country.code}>
-                    {country.flag} {getCountryDisplayName(country)}
+                    {getCountryDisplayName(country)}
                   </option>
                 ))}
               </select>
