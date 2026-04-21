@@ -21,9 +21,9 @@ export default function Register() {
     confirmPassword: '',
     first_name: '',
     last_name: '',
-    phone: '+221 ', // Sera mis à jour par la géolocalisation
+    phone: '', // Défini après détection ou choix manuel
     user_type: initialUserType,
-    country: 'senegal', // Sera mis à jour par la géolocalisation
+    country: '', // Défini après détection ou choix manuel
     preferred_language: 'fr', // Français par défaut, mais sera mis à jour par le choix utilisateur
     // Champs spécifiques aux travailleurs
     worker_specialties: [],
@@ -34,6 +34,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(true);
   const [detectedCountry, setDetectedCountry] = useState(null);
+  const [manualCountrySelection, setManualCountrySelection] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [userSelectedLanguage, setUserSelectedLanguage] = useState('fr'); // Choix utilisateur pour profil
   
@@ -169,30 +170,19 @@ export default function Register() {
   const updateFormData = (key, value) => {
     setFormData(prev => {
       const newData = { ...prev, [key]: value };
-      
-      // Auto-update phone prefix when country changes
+
       if (key === 'country') {
         const countryData = findCountryData(value);
-        const phonePrefix = countryData ? countryData.phonePrefix : '+221';
-        
-        // If phone field is empty or only has old prefix, set new prefix
+        const phonePrefix = countryData ? countryData.phonePrefix : '';
+
         if (!newData.phone || newData.phone.match(/^\+\d{3}\s*$/)) {
-          newData.phone = phonePrefix + ' ';
+          newData.phone = phonePrefix ? phonePrefix + ' ' : '';
         } else {
-          // Format existing phone number with new country prefix
           const cleanPhone = newData.phone.replace(/^\+\d{3}\s*/, '');
-          newData.phone = phonePrefix + ' ' + cleanPhone;
+          newData.phone = phonePrefix ? phonePrefix + ' ' + cleanPhone : cleanPhone;
         }
       }
-      
-      // Auto-detect country when phone number changes
-      if (key === 'phone') {
-        const detectedCountry = detectCountryFromPhone(value);
-        if (detectedCountry && detectedCountry.name.toLowerCase() !== newData.country.toLowerCase()) {
-          newData.country = normalizeCountryCode(detectedCountry.code || detectedCountry.name?.toLowerCase());
-        }
-      }
-      
+
       return newData;
     });
   };
@@ -332,12 +322,17 @@ export default function Register() {
                 id="country"
                 name="country"
                 value={formData.country}
-                onChange={(e) => updateFormData('country', e.target.value)}
+                onChange={(e) => {
+                  setManualCountrySelection(true);
+                  setDetectedCountry(null);
+                  updateFormData('country', e.target.value);
+                }}
                 required
                 className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent ${
                   detectedCountry ? 'border-green-300 bg-green-50' : 'border-gray-300'
                 }`}
               >
+                <option value="" disabled>-- {t('country')} --</option>
                 {countries.map(country => (
                   <option key={country.code} value={country.code}>
                     {country.flag} {getCountryDisplayName(country)}
@@ -411,7 +406,7 @@ export default function Register() {
               </label>
               <div className="flex rounded-lg shadow-sm">
                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                  {findCountryData(formData.country)?.phonePrefix || '+221'}
+                  {findCountryData(formData.country)?.phonePrefix || '—'}
                 </span>
                 <input
                   id="phone"
@@ -427,14 +422,14 @@ export default function Register() {
                   value={formData.phone.replace(/^\+\d{3}\s*/, '')}
                   onChange={(e) => {
                     const currentCountry = findCountryData(formData.country);
-                    const prefix = currentCountry ? currentCountry.phonePrefix : '+221';
+                    const prefix = currentCountry ? currentCountry.phonePrefix : '';
                     const cleanValue = e.target.value.replace(/[^\d\s]/g, '');
-                    updateFormData('phone', prefix + ' ' + cleanValue);
+                    updateFormData('phone', prefix ? prefix + ' ' + cleanValue : cleanValue);
                   }}
                 />
               </div>
               <p className="mt-1 text-sm text-gray-500">
-                {pageT('phoneFormatHint')}: {findCountryData(formData.country)?.phonePrefix || '+221'} XX XXX XX XX
+                {pageT('phoneFormatHint')}: {findCountryData(formData.country)?.phonePrefix || '---'} XX XXX XX XX
               </p>
             </div>
             
