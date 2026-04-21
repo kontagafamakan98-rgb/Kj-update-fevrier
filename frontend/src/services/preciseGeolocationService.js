@@ -1,5 +1,6 @@
 import { devLog, safeLog } from '../utils/env';
 import geolocationMonitor from '../utils/geolocationMonitor';
+import { buildApiUrl } from '../utils/backendUrl';
 
 /**
  * SERVICE DE GÉOLOCALISATION ULTRA-PRÉCIS - 100% DE PRÉCISION
@@ -227,13 +228,11 @@ const normalizeCountryCode = (code = '') => {
 };
 
 // Services de géolocalisation IP - Utilisation du backend Kojo en priorité
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-
 const IP_GEOLOCATION_SERVICES = [
   // Service Kojo Backend (priorité maximale - pas d'erreurs CORS)
   {
     name: 'KojoBackend',
-    url: `${BACKEND_URL}/api/geolocation/detect`,
+    url: buildApiUrl('/geolocation/detect'),
     isBackend: true,
     parser: (data) => {
       if (!data.country) return null;

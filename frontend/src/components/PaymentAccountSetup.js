@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { detectUserCountry, getPhoneExampleForCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { devLog, safeLog } from '../utils/env';
+import { buildApiUrl } from '../utils/backendUrl';
 
 const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration = false }) => {
   const { user } = useAuth();
@@ -173,7 +174,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         onComplete && onComplete(paymentData);
       } else {
         // Pour la mise à jour, appeler l'API
-        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/payment-accounts`, {
+        const response = await fetch(buildApiUrl('/users/payment-accounts'), {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -239,9 +240,9 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         <div className="border border-orange-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
             <span className="text-2xl mr-3">🧡</span>
-            <h3 className="text-lg font-semibold text-gray-900">{t('orangeMoney')}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Orange Money</h3>
             <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
-              {t('mali')}, {t('senegal')}, {t('burkina_faso')}, {t('ivory_coast')}
+              Mali, Sénégal, Burkina Faso, Côte d'Ivoire
             </span>
           </div>
           
@@ -263,9 +264,9 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         <div className="border border-blue-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
             <span className="text-2xl mr-3">🌊</span>
-            <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Wave</h3>
             <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-              {t('availableAcrossWestAfrica')}
+              Disponible partout en Afrique de l'Ouest
             </span>
           </div>
           
@@ -287,9 +288,9 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         <div className="border border-green-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
             <span className="text-2xl mr-3">🏦</span>
-            <h3 className="text-lg font-semibold text-gray-900">{t('bankAccount')}</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Compte Bancaire</h3>
             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-              {t('forBankTransfers')}
+              Pour transferts bancaires
             </span>
           </div>
           
@@ -298,7 +299,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               type="text"
               value={accounts.bank_account.account_number}
               onChange={(e) => handleInputChange('bank_account.account_number', e.target.value)}
-              placeholder={t('bankAccountNumber')}
+              placeholder="Numéro de compte bancaire"
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
                 validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
               }`}
@@ -309,7 +310,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 type="text"
                 value={accounts.bank_account.account_holder}
                 onChange={(e) => handleInputChange('bank_account.account_holder', e.target.value)}
-                placeholder={t('accountHolderName')}
+                placeholder="Nom du titulaire du compte"
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
                   validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -322,11 +323,11 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                   validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
                 }`}
               >
-                <option value="">{t('selectBank')}</option>
+                <option value="">Sélectionner une banque</option>
                 {popularBanks.map((bank, index) => (
                   <option key={index} value={bank}>{bank}</option>
                 ))}
-                <option value="autre">{t('otherBank')}...</option>
+                <option value="autre">Autre banque...</option>
               </select>
             </div>
             
@@ -334,7 +335,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               <input
                 type="text"
                 onChange={(e) => handleInputChange('bank_account.bank_name', e.target.value)}
-                placeholder={t('yourBankName')}
+                placeholder="Nom de votre banque"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
             )}
@@ -344,7 +345,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 type="text"
                 value={accounts.bank_account.bank_code}
                 onChange={(e) => handleInputChange('bank_account.bank_code', e.target.value)}
-                placeholder={t('bankCodeOptional')}
+                placeholder="Code banque (optionnel)"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
               
@@ -352,7 +353,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 type="text"
                 value={accounts.bank_account.branch}
                 onChange={(e) => handleInputChange('bank_account.branch', e.target.value)}
-                placeholder={t('branchOptional')}
+                placeholder="Agence (optionnel)"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
             </div>
@@ -363,10 +364,10 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           )}
           
           <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded text-xs text-green-800">
-            <p><strong>💡 {t('whyTheseInfo')}</strong></p>
-            <p>• {t('bankRequiredFieldsInfo')}</p>
-            <p>• {t('bankOptionalFieldsInfo')}</p>
-            <p>• {t('bankTransferDirectInfo')}</p>
+            <p><strong>💡 Pourquoi ces informations ?</strong></p>
+            <p>• Numéro de compte, nom du titulaire et banque sont <strong>obligatoires</strong></p>
+            <p>• Code banque et agence sont optionnels mais recommandés</p>
+            <p>• Ces informations permettront les transferts bancaires directs</p>
           </div>
         </div>
 
@@ -378,8 +379,8 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
 
         <div className="flex justify-between items-center pt-6">
           <div className="text-sm text-gray-600">
-            <p>🔐 {t('paymentInfoSecure')}</p>
-            <p>📱 {userType === 'worker' ? t('requiredToReceivePayments') : t('requiredToMakePayments')}</p>
+            <p>🔐 Vos informations de paiement sont sécurisées</p>
+            <p>📱 Nécessaire pour {userType === 'worker' ? 'recevoir' : 'effectuer'} les paiements</p>
           </div>
           
           <button
