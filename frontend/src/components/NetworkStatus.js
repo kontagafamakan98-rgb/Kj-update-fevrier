@@ -37,28 +37,28 @@ const NetworkStatus = ({ showDetails = false, className = '' }) => {
   const getNetworkMessage = () => {
     switch (networkStatus.quality) {
       case 'offline':
-        return t('networkOffline') || 'Vous êtes hors ligne. Certaines fonctionnalités peuvent être limitées.';
+        return t('networkOffline');
       case 'poor':
-        return t('networkPoor') || 'Connexion lente détectée. Optimisation automatique activée.';
+        return t('networkPoor');
       case 'moderate':
-        return t('networkModerate') || 'Connexion modérée. Économie de données activée.';
+        return t('networkModerate');
       case 'good':
-        return t('networkGood') || 'Bonne connexion';
+        return t('networkGood');
       case 'excellent':
-        return t('networkExcellent') || 'Excellente connexion';
+        return t('networkExcellent');
       default:
-        return t('networkUnknown') || 'État du réseau inconnu';
+        return t('networkUnknown');
     }
   };
 
   const getNetworkTips = () => {
     switch (networkStatus.quality) {
       case 'offline':
-        return t('networkTipsOffline') || '• Les actions seront synchronisées au retour de la connexion\n• Les données en cache restent disponibles';
+        return t('networkTipsOffline');
       case 'poor':
-        return t('networkTipsPoor') || '• Images optimisées pour économiser la bande passante\n• Fonctionnalités temps-réel désactivées\n• Cache étendu pour éviter les rechargements';
+        return t('networkTipsPoor');
       case 'moderate':
-        return t('networkTipsModerate') || '• Qualité des images réduite\n• Synchronisation moins fréquente\n• Priorité aux fonctionnalités essentielles';
+        return t('networkTipsModerate');
       default:
         return '';
     }
