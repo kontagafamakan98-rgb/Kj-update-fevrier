@@ -124,7 +124,7 @@ class GeolocationService {
     this.isDetecting = false;
     this.cachedLocation = null;
     this.cacheTimestamp = null;
-    this.CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+    this.CACHE_DURATION = 2 * 60 * 1000; // 2 minutes pour limiter les localisations obsolètes
     this.detectionMethods = [];
     this.loadCachedLocation();
   }
@@ -150,6 +150,11 @@ class GeolocationService {
 
   // Sauvegarder la position dans le cache
   saveCachedLocation(location) {
+    if (!location || location.isApproximate || location.method === 'default') {
+      devLog.info('ℹ️ Position approximative non sauvegardée dans le cache');
+      return;
+    }
+
     try {
       localStorage.setItem('kojo_last_location', JSON.stringify({
         location,
@@ -163,7 +168,7 @@ class GeolocationService {
     }
   }
 
-  async detectUserLocation(userCountry = 'mali') {
+  async detectUserLocation(userCountry = 'mali', options = {}) {
     if (this.isDetecting) return this.cachedLocation;
     
     const startTime = Date.now();
@@ -172,7 +177,7 @@ class GeolocationService {
     
     try {
       // MÉTHODE 1: Position cachée récente (priorité maximale)
-      if (this.cachedLocation && this.cacheTimestamp) {
+      if (!options.forceRefresh && this.cachedLocation && this.cacheTimestamp) {
         const age = Date.now() - this.cacheTimestamp;
         if (age < this.CACHE_DURATION) {
           const detectionTime = Date.now() - startTime;
@@ -235,51 +240,45 @@ class GeolocationService {
       // MÉTHODE 4: Détection contextuelle (timezone + langue + network)
       const contextLocation = await this.detectByContext();
       if (contextLocation) {
-        devLog.info('✅ Détection contextuelle réussie:', contextLocation.city);
-        this.saveCachedLocation(contextLocation);
+        devLog.info('ℹ️ Détection contextuelle approximative:', contextLocation.country);
         this.detectionMethods.push('context');
         this.isDetecting = false;
         return contextLocation;
       }
-      
-      // MÉTHODE 5: Fallback basé sur le pays de l'utilisateur (pas de simulation)
-      devLog.info('📍 Utilisation position par défaut du pays...');
-      
-      const countryDefaults = {
-        'mali': { city: 'Bamako', lat: 12.6392, lng: -8.0029 },
-        'senegal': { city: 'Dakar', lat: 14.6928, lng: -17.4467 },
-        'burkina_faso': { city: 'Ouagadougou', lat: 12.3714, lng: -1.5197 },
-        'cote_divoire': { city: 'Abidjan', lat: 5.3600, lng: -4.0083 }
-      };
 
-      const selectedCountry = userCountry && countryDefaults[userCountry] ? userCountry : 'senegal';
-      const defaults = countryDefaults[selectedCountry];
-      const country = getCountryByCode(selectedCountry);
+      // MÉTHODE 5: Fallback pays uniquement, sans inventer une ville précise
+      devLog.info('📍 Aucun signal précis disponible, fallback au pays du profil uniquement...');
+
+      const selectedCountry = userCountry && getCountryByCode(userCountry) ? userCountry : null;
+      const country = selectedCountry ? getCountryByCode(selectedCountry) : null;
+
+      this.detectionMethods.push('default');
+      this.isDetecting = false;
+
+      if (!country) {
+        const detectionTime = Date.now() - startTime;
+        geolocationMonitor.recordDetection(null, detectionTime, false);
+        return null;
+      }
 
       const fallbackLocation = {
-        address: `${defaults.city}, ${country.nameFrench}`,
-        fullAddress: `${defaults.city}, ${country.nameFrench}`,
-        city: defaults.city,
+        address: country.nameFrench,
+        fullAddress: country.nameFrench,
+        city: '',
         district: '',
         country: country.nameFrench,
         countryCode: selectedCountry,
-        coordinates: { lat: defaults.lat, lng: defaults.lng },
+        coordinates: null,
         accuracy: 0,
         timestamp: new Date().toISOString(),
-        method: 'default',
-        confidence: 50,
+        method: 'country_fallback',
+        confidence: 15,
+        isApproximate: true,
         detectionMethods: this.detectionMethods.join(' → ')
       };
 
-      this.saveCachedLocation(fallbackLocation);
-      this.detectionMethods.push('default');
-      this.isDetecting = false;
-      
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(fallbackLocation, detectionTime, true);
-      
-      devLog.info(`📍 Position par défaut: ${defaults.city}, ${country.nameFrench}`);
-      
       return fallbackLocation;
       
     } catch (error) {
@@ -523,16 +522,15 @@ class GeolocationService {
   // NOUVELLE MÉTHODE: Détection contextuelle avancée
   async detectByContext() {
     devLog.info('🧠 Analyse contextuelle avancée...');
-    
+
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const languages = navigator.languages || [navigator.language];
       const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-      
+
       devLog.info(`🕐 Timezone: ${timezone}`);
       devLog.info(`🗣️ Langues:`, languages);
-      
-      // Mapper timezone vers pays
+
       const timezoneMap = {
         'Africa/Bamako': 'mali',
         'Africa/Dakar': 'senegal',
@@ -542,30 +540,19 @@ class GeolocationService {
 
       let detectedCountry = timezoneMap[timezone];
 
-      // Si pas de timezone match, analyser les langues
       if (!detectedCountry) {
         for (const lang of languages) {
           const langCode = lang.split('-')[0].toLowerCase();
           if (langCode === 'wo') detectedCountry = 'senegal';
           else if (langCode === 'bm') detectedCountry = 'mali';
-          else if (lang.includes('SN')) detectedCountry = 'senegal';
-          else if (lang.includes('ML')) detectedCountry = 'mali';
-          else if (lang.includes('BF')) detectedCountry = 'burkina_faso';
-          else if (lang.includes('CI')) detectedCountry = 'cote_divoire';
-          
+
           if (detectedCountry) break;
         }
       }
 
-      // Analyser le type de connexion (indice mobile vs wifi)
       if (connection) {
         const effectiveType = connection.effectiveType;
         devLog.info(`📶 Connexion: ${effectiveType}`);
-        
-        // 2G/3G = plus probable mobile = plus probable Afrique de l'Ouest
-        if (['slow-2g', '2g', '3g'].includes(effectiveType)) {
-          devLog.info('📱 Connexion mobile lente détectée (typique Afrique de l\'Ouest)');
-        }
       }
 
       if (!detectedCountry) {
@@ -575,28 +562,27 @@ class GeolocationService {
 
       const country = getCountryByCode(detectedCountry);
       const locationMappings = {
-        'mali': { cities: ['Bamako', 'Sikasso', 'Mopti'], districts: ['ACI 2000', 'Hippodrome', 'Plateau'] },
-        'senegal': { cities: ['Dakar', 'Thiès', 'Kaolack'], districts: ['Plateau', 'Médina', 'Parcelles Assainies'] },
-        'burkina_faso': { cities: ['Ouagadougou', 'Bobo-Dioulasso'], districts: ['Zone du Bois', 'Cissin', 'Gounghin'] },
-        'cote_divoire': { cities: ['Abidjan', 'Yamoussoukro', 'Bouaké'], districts: ['Plateau', 'Cocody', 'Marcory'] }
+        'mali': { city: 'Bamako' },
+        'senegal': { city: 'Dakar' },
+        'burkina_faso': { city: 'Ouagadougou' },
+        'cote_divoire': { city: 'Abidjan' }
       };
 
       const mapping = locationMappings[detectedCountry];
-      const city = mapping.cities[0]; // Capitale
-      const district = mapping.districts[0];
 
       return {
-        address: `${district}, ${city}`,
-        fullAddress: `${district}, ${city}, ${country.nameFrench}`,
-        city: city,
-        district: district,
+        address: `${mapping.city}, ${country.nameFrench}`,
+        fullAddress: `${mapping.city}, ${country.nameFrench}`,
+        city: mapping.city,
+        district: '',
         country: country.nameFrench,
         countryCode: detectedCountry,
-        coordinates: { lat: 0, lng: 0 }, // Coordonnées génériques
-        accuracy: 75,
+        coordinates: null,
+        accuracy: 35,
         timestamp: new Date().toISOString(),
         method: 'contextual',
-        confidence: 75,
+        confidence: 35,
+        isApproximate: true,
         timezone: timezone,
         languages: languages
       };
@@ -649,19 +635,18 @@ class GeolocationService {
       }
     }
 
-    const district = closestCity.districts[Math.floor(Math.random() * closestCity.districts.length)];
-
     return {
-      address: `${district}, ${closestCity.name}`,
-      fullAddress: `${district}, ${closestCity.name}, ${countryData.nameFrench}`,
+      address: `${closestCity.name}, ${countryData.nameFrench}`,
+      fullAddress: `${closestCity.name}, ${countryData.nameFrench}`,
       city: closestCity.name,
-      district: district,
+      district: '',
       country: countryData.nameFrench,
       countryCode: preferredCountry,
       coordinates: { lat, lng },
-      accuracy: 85,
+      accuracy: 80,
       timestamp: new Date().toISOString(),
       method: 'geocoded',
+      isApproximate: true,
       distance: minDistance
     };
   }
@@ -718,7 +703,7 @@ export const detectUserCountry = async () => {
     if (cached) {
       const data = JSON.parse(cached);
       const age = Date.now() - data.timestamp;
-      if (age < 24 * 60 * 60 * 1000) { // 24 heures
+      if (age < 10 * 60 * 1000) { // 10 minutes
         devLog.info('📦 Pays depuis cache:', data.country.nameFrench);
         return data.country;
       }
@@ -872,7 +857,7 @@ export const detectUserCountry = async () => {
     
     // Analyser les langues
     for (const lang of languages) {
-      if (lang.includes('wo') || lang.includes('SN')) {
+      if (lang.includes('wo')) {
         devLog.info('🎯 Wolof détecté → Sénégal');
         localStorage.setItem('kojo_detected_country', JSON.stringify({
           country: COUNTRIES.SENEGAL,
@@ -881,7 +866,7 @@ export const detectUserCountry = async () => {
         }));
         return COUNTRIES.SENEGAL;
       }
-      if (lang.includes('bm') || lang.includes('ML')) {
+      if (lang.includes('bm')) {
         devLog.info('🎯 Bambara détecté → Mali');
         localStorage.setItem('kojo_detected_country', JSON.stringify({
           country: COUNTRIES.MALI,

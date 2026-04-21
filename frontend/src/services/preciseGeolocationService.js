@@ -296,7 +296,7 @@ class PreciseGeolocationService {
     this.detectionAccuracy = 0;
     this.cachedLocation = null;
     this.cacheTimestamp = null;
-    this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes (réduit pour plus de précision)
+    this.CACHE_DURATION = 60 * 1000; // 60 secondes pour éviter les localisations obsolètes
     this.loadCachedLocation();
   }
 
@@ -321,6 +321,11 @@ class PreciseGeolocationService {
 
   // Sauvegarder la position dans le cache
   saveCachedLocation(location) {
+    if (!location || location.isApproximate) {
+      devLog.info('ℹ️ Position approximative non sauvegardée dans le cache');
+      return;
+    }
+
     try {
       localStorage.setItem('kojo_precise_location', JSON.stringify({
         location,
@@ -338,7 +343,7 @@ class PreciseGeolocationService {
    * DÉTECTION ULTRA-PRÉCISE DE LA LOCALISATION
    * Utilise multiple méthodes pour une précision de 100%
    */
-  async detectPreciseLocation() {
+  async detectPreciseLocation(options = {}) {
     devLog.info('🎯 Démarrage détection géolocalisation ultra-précise...');
     
     const startTime = Date.now();
@@ -349,7 +354,7 @@ class PreciseGeolocationService {
     }
 
     // MÉTHODE 0: Position cachée récente (priorité maximale pour performance <500ms)
-    if (this.cachedLocation && this.cacheTimestamp) {
+    if (!options.forceRefresh && this.cachedLocation && this.cacheTimestamp) {
       const age = Date.now() - this.cacheTimestamp;
       if (age < this.CACHE_DURATION) {
         const detectionTime = Date.now() - startTime;
@@ -406,34 +411,24 @@ class PreciseGeolocationService {
       // MÉTHODE 3: Analyse de fuseau horaire + langue navigateur
       const contextLocation = await this.getContextualLocation();
       if (contextLocation) {
-        devLog.info('✅ Localisation contextuelle obtenue:', contextLocation);
+        devLog.info('ℹ️ Localisation contextuelle approximative obtenue:', contextLocation);
         this.lastKnownLocation = contextLocation;
         this.detectionAccuracy = contextLocation.accuracy;
-        this.saveCachedLocation(contextLocation);
         this.isDetecting = false;
-        
-        // Enregistrer dans le moniteur
+
         const detectionTime = Date.now() - startTime;
         geolocationMonitor.recordDetection(contextLocation, detectionTime, true);
-        devLog.info(`✅ Géolocalisation contextuelle complétée en ${detectionTime}ms`);
-        
+        devLog.info(`ℹ️ Géolocalisation contextuelle complétée en ${detectionTime}ms`);
+
         return contextLocation;
       }
 
-      // MÉTHODE 4: Fallback intelligent basé sur les statistiques utilisateur
-      const fallbackLocation = this.getIntelligentFallback();
-      devLog.info('✅ Localisation fallback intelligente:', fallbackLocation);
-      this.lastKnownLocation = fallbackLocation;
-      this.detectionAccuracy = fallbackLocation.accuracy;
-      this.saveCachedLocation(fallbackLocation);
+      // MÉTHODE 4: Aucun fallback inventé
       this.isDetecting = false;
-      
-      // Enregistrer dans le moniteur
       const detectionTime = Date.now() - startTime;
-      geolocationMonitor.recordDetection(fallbackLocation, detectionTime, true);
-      devLog.info(`✅ Géolocalisation fallback complétée en ${detectionTime}ms`);
-      
-      return fallbackLocation;
+      geolocationMonitor.recordDetection(null, detectionTime, false);
+      devLog.info('⚠️ Aucune localisation suffisamment fiable trouvée');
+      return null;
 
     } catch (error) {
       safeLog.error('❌ Erreur détection géolocalisation:', error);
@@ -443,7 +438,7 @@ class PreciseGeolocationService {
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(null, detectionTime, false);
       
-      return this.lastKnownLocation || this.getIntelligentFallback();
+      return this.lastKnownLocation && !this.lastKnownLocation.isApproximate ? this.lastKnownLocation : null;
     }
   }
 
@@ -620,34 +615,26 @@ class PreciseGeolocationService {
     devLog.info('🧠 Analyse contextuelle (fuseau horaire + langue)...');
 
     try {
-      // Analyser le fuseau horaire
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const userLanguages = navigator.languages || [navigator.language];
-      
+
       devLog.info(`🕐 Fuseau horaire: ${timezone}`);
       devLog.info(`🗣️ Langues navigateur:`, userLanguages);
 
-      // Mapper fuseau horaire vers pays ouest-africains
       const timezoneMapping = {
         'Africa/Bamako': 'mali',
-        'Africa/Dakar': 'senegal', 
+        'Africa/Dakar': 'senegal',
         'Africa/Ouagadougou': 'burkina_faso',
-        'Africa/Abidjan': 'cote_divoire',
-        'GMT': 'senegal', // Fallback GMT vers Sénégal
-        'UTC': 'senegal'
+        'Africa/Abidjan': 'cote_divoire'
       };
 
-      // Analyser les langues pour indices géographiques
       const languageHints = {
-        'fr': ['senegal', 'mali', 'burkina_faso', 'cote_divoire'], // Français = tous les pays
-        'wo': ['senegal'], // Wolof = Sénégal
-        'bm': ['mali'], // Bambara = Mali
-        'en': ['cote_divoire'] // Anglais commercial = Côte d'Ivoire
+        'wo': ['senegal'],
+        'bm': ['mali']
       };
 
       let bestCountryGuess = timezoneMapping[timezone];
-      
-      // Affiner avec les langues
+
       if (!bestCountryGuess) {
         for (const lang of userLanguages) {
           const langCode = lang.split('-')[0].toLowerCase();
@@ -668,27 +655,23 @@ class PreciseGeolocationService {
         return null;
       }
 
-      // Sélectionner la ville principale
       const mainCity = countryData.majorCities[0];
-      const randomDistrict = mainCity.districts[
-        Math.floor(Math.random() * mainCity.districts.length)
-      ];
-
-      const detectionAccuracy = this.calculateDetectionAccuracy(70, 'contextual');
+      const detectionAccuracy = this.calculateDetectionAccuracy(50, 'contextual');
 
       return {
-        address: `${randomDistrict.name}, ${mainCity.name}`,
-        fullAddress: `${randomDistrict.name}, ${mainCity.name}, ${countryData.nameFrench}`,
+        address: `${mainCity.name}, ${countryData.nameFrench}`,
+        fullAddress: `${mainCity.name}, ${countryData.nameFrench}`,
         city: mainCity.name,
-        district: randomDistrict.name,
+        district: '',
         country: countryData.nameFrench,
         countryCode: bestCountryGuess,
         phonePrefix: countryData.phonePrefix,
-        coordinates: randomDistrict.coords,
-        accuracy: detectionAccuracy,
+        coordinates: mainCity.coordinates,
+        accuracy: Math.min(detectionAccuracy, 45),
         method: 'contextual',
         timezone: timezone,
         languages: userLanguages,
+        isApproximate: true,
         timestamp: new Date().toISOString()
       };
 
@@ -824,54 +807,10 @@ class PreciseGeolocationService {
   }
 
   /**
-   * FALLBACK INTELLIGENT BASÉ SUR LES STATISTIQUES
+   * FALLBACK DÉSACTIVÉ POUR ÉVITER LES LOCALISATIONS FAUSSES
    */
   getIntelligentFallback() {
-    devLog.info('🎲 Fallback intelligent basé sur les statistiques...');
-
-    // Statistiques réelles d'utilisation internet en Afrique de l'Ouest
-    const countryProbabilities = {
-      'senegal': 0.40,    // 40% - Meilleure connexion internet
-      'cote_divoire': 0.25, // 25% - Économie forte
-      'mali': 0.20,       // 20% - Population importante
-      'burkina_faso': 0.15 // 15% - Moins connecté
-    };
-
-    // Sélection pondérée
-    const random = Math.random();
-    let cumulative = 0;
-    let selectedCountry = 'senegal';
-
-    for (const [country, probability] of Object.entries(countryProbabilities)) {
-      cumulative += probability;
-      if (random <= cumulative) {
-        selectedCountry = country;
-        break;
-      }
-    }
-
-    const countryData = PRECISE_GEOGRAPHIC_DATABASE[selectedCountry];
-    const mainCity = countryData.majorCities[0]; // Capitale
-    const randomDistrict = mainCity.districts[
-      Math.floor(Math.random() * mainCity.districts.length)
-    ];
-
-    devLog.info(`🎯 Fallback sélectionné: ${countryData.nameFrench} - ${mainCity.name}`);
-
-    return {
-      address: `${randomDistrict.name}, ${mainCity.name}`,
-      fullAddress: `${randomDistrict.name}, ${mainCity.name}, ${countryData.nameFrench}`,
-      city: mainCity.name,
-      district: randomDistrict.name,
-      country: countryData.nameFrench,
-      countryCode: selectedCountry,
-      phonePrefix: countryData.phonePrefix,
-      coordinates: randomDistrict.coords,
-      accuracy: 60, // Fallback = précision réduite
-      method: 'intelligent_fallback',
-      probability: countryProbabilities[selectedCountry],
-      timestamp: new Date().toISOString()
-    };
+    return null;
   }
 
   /**
@@ -1019,9 +958,10 @@ const preciseGeolocationService = new PreciseGeolocationService();
 export default preciseGeolocationService;
 
 // Export des fonctions utilitaires pour compatibilité
-export const detectUserCountry = async () => {
-  const location = await preciseGeolocationService.detectPreciseLocation();
+export const detectUserCountry = async (options = {}) => {
+  const location = await preciseGeolocationService.detectPreciseLocation(options);
   if (!location) return null;
+  if (location.isApproximate && !options.allowApproximate) return null;
 
   const countryData = PRECISE_GEOGRAPHIC_DATABASE[location.countryCode];
   if (!countryData) {
