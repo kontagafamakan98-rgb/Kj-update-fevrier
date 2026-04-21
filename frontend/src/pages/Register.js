@@ -332,14 +332,24 @@ export default function Register() {
 
             {/* Country Selection */}
             <div>
-              <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
-                {t('country')}
-                {detectedCountry && (
-                  <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    📍 {t('detectedAutomatically')}
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <label htmlFor="country" className="block text-sm font-medium text-gray-700">
+                  {t('country')}
+                  {detectedCountry && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                      📍 {t('detectedAutomatically')}
+                    </span>
+                  )}
+                </label>
+                {activeCountry && (
+                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium whitespace-nowrap ${
+                    detectedCountry ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-700'
+                  }`}>
+                    <span className="text-base leading-none">{activeCountry.flag || '🌍'}</span>
+                    <span>{getCountryDisplayName(activeCountry)}</span>
                   </span>
                 )}
-              </label>
+              </div>
               <select
                 id="country"
                 name="country"
