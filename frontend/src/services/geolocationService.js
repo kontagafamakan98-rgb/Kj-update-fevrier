@@ -983,55 +983,70 @@ export const AVAILABLE_LANGUAGES = {
   }
 };
 
-// Obtenir les langues principales par pays (langue officielle + langue locale)
-export const getLanguagesByCountry = (country) => {
-  const languageMapping = {
-    'mali': ['fr', 'bm'], // Français officiel + Bambara (langue principale)
-    'senegal': ['fr', 'wo'], // Français officiel + Wolof (langue principale) 
-    'burkina_faso': ['fr', 'mos'], // Français officiel + Mooré (langue principale du Burkina)
-    'cote_divoire': ['fr', 'en'] // Français officiel + Anglais (commerce)
+const getLanguageConfigByCountry = (country) => {
+  const countryCode = normalizeCountryCode(country?.code || country);
+
+  const languageConfig = {
+    mali: {
+      ordered: ['fr', 'bm'],
+      primary: 'fr',
+      local: ['bm']
+    },
+    senegal: {
+      ordered: ['fr', 'wo'],
+      primary: 'fr',
+      local: ['wo']
+    },
+    burkina_faso: {
+      ordered: ['fr', 'mos'],
+      primary: 'fr',
+      local: ['mos']
+    },
+    cote_divoire: {
+      ordered: ['fr', 'en'],
+      primary: 'fr',
+      local: []
+    }
   };
-  
-  return languageMapping[country?.code] || ['fr', 'en']; // Par défaut: Français + Anglais
+
+  return languageConfig[countryCode] || {
+    ordered: ['fr', 'en'],
+    primary: 'fr',
+    local: []
+  };
+};
+
+// Obtenir les langues principales par pays (langues recommandées en priorité)
+export const getLanguagesByCountry = (country) => {
+  return getLanguageConfigByCountry(country).ordered;
 };
 
 // Obtenir la langue principale (première) d'un pays
 export const getPrimaryLanguageForCountry = (country) => {
-  const languages = getLanguagesByCountry(country);
-  return languages[0]; // Toujours le français comme langue officielle
+  return getLanguageConfigByCountry(country).primary;
 };
 
-// Obtenir la langue locale (seconde) d'un pays  
+// Obtenir la langue locale réellement supportée par l'application
 export const getLocalLanguageForCountry = (country) => {
-  const languages = getLanguagesByCountry(country);
-  return languages[1]; // Langue locale spécifique au pays
+  return getLanguageConfigByCountry(country).local[0] || null;
 };
 
-// Organiser les langues selon le pays détecté (langues du pays en premier, puis les autres)
+// Organiser les langues selon le pays détecté (langues recommandées en premier, puis les autres)
 export const getOrderedLanguagesForCountry = (detectedCountry) => {
-  if (!detectedCountry) {
-    // Ordre par défaut si pas de pays détecté
-    return [
-      AVAILABLE_LANGUAGES['fr'],
-      AVAILABLE_LANGUAGES['en'], 
-      AVAILABLE_LANGUAGES['wo'],
-      AVAILABLE_LANGUAGES['bm'],
-      AVAILABLE_LANGUAGES['mos']
-    ];
-  }
+  const countryConfig = getLanguageConfigByCountry(detectedCountry);
+  const recommendedLanguages = countryConfig.ordered;
 
-  const countryLanguages = getLanguagesByCountry(detectedCountry);
   const otherLanguages = Object.keys(AVAILABLE_LANGUAGES).filter(
-    lang => !countryLanguages.includes(lang)
+    lang => !recommendedLanguages.includes(lang)
   );
 
-  // Créer l'ordre: langues du pays en premier, puis les autres
-  const orderedLanguageCodes = [...countryLanguages, ...otherLanguages];
-  
+  const orderedLanguageCodes = [...recommendedLanguages, ...otherLanguages];
+
   return orderedLanguageCodes.map(code => ({
     ...AVAILABLE_LANGUAGES[code],
-    isPrimary: countryLanguages.includes(code),
-    isCountryLanguage: countryLanguages.includes(code)
+    isPrimary: code === countryConfig.primary,
+    isCountryLanguage: countryConfig.local.includes(code),
+    isRecommended: recommendedLanguages.includes(code)
   }));
 };
 
@@ -1039,30 +1054,32 @@ export const getOrderedLanguagesForCountry = (detectedCountry) => {
 export const getLanguageSuggestionMessage = (detectedCountry) => {
   if (!detectedCountry) return null;
 
+  const countryCode = normalizeCountryCode(detectedCountry.code || detectedCountry);
+
   const suggestions = {
-    'mali': {
+    mali: {
       message: 'Au Mali, la plupart des utilisateurs préfèrent le Français ou le Bambara',
       primaryLang: 'Français',
       localLang: 'Bambara'
     },
-    'senegal': {
-      message: 'Au Sénégal, la plupart des utilisateurs préfèrent le Français ou le Wolof', 
+    senegal: {
+      message: 'Au Sénégal, la plupart des utilisateurs préfèrent le Français ou le Wolof',
       primaryLang: 'Français',
       localLang: 'Wolof'
     },
-    'burkina_faso': {
-      message: 'Au Burkina Faso, la plupart des utilisateurs préfèrent le Français',
+    burkina_faso: {
+      message: 'Au Burkina Faso, la plupart des utilisateurs préfèrent le Français ou le Mooré',
       primaryLang: 'Français',
-      localLang: 'Langues locales'
+      localLang: 'Mooré'
     },
-    'cote_divoire': {
-      message: 'En Côte d\'Ivoire, la plupart des utilisateurs préfèrent le Français',
-      primaryLang: 'Français', 
-      localLang: 'Français'
+    cote_divoire: {
+      message: 'En Côte d'Ivoire, la plupart des utilisateurs préfèrent le Français. L'anglais reste disponible si besoin.',
+      primaryLang: 'Français',
+      localLang: null
     }
   };
 
-  return suggestions[detectedCountry.code] || null;
+  return suggestions[countryCode] || null;
 };
 
 export default new GeolocationService();
