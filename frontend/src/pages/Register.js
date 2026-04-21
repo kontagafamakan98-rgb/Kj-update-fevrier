@@ -45,6 +45,13 @@ export default function Register() {
 
   const countries = getCountriesList();
 
+  const findCountryData = (value) => countries.find((country) => {
+    const normalizedValue = normalizeCountryCode((value || '').toLowerCase());
+    const normalizedCode = normalizeCountryCode((country.code || '').toLowerCase());
+    const normalizedName = normalizeCountryCode((country.name || '').toLowerCase());
+    return normalizedCode === normalizedValue || normalizedName === normalizedValue;
+  });
+
   const getCountryDisplayName = (country) => {
     if (!country) return '';
     const normalizedCode = normalizeCountryCode(country.code || country.name?.toLowerCase());
@@ -165,7 +172,7 @@ export default function Register() {
       
       // Auto-update phone prefix when country changes
       if (key === 'country') {
-        const countryData = countries.find(c => c.name.toLowerCase() === value.toLowerCase());
+        const countryData = findCountryData(value);
         const phonePrefix = countryData ? countryData.phonePrefix : '+221';
         
         // If phone field is empty or only has old prefix, set new prefix
@@ -182,7 +189,7 @@ export default function Register() {
       if (key === 'phone') {
         const detectedCountry = detectCountryFromPhone(value);
         if (detectedCountry && detectedCountry.name.toLowerCase() !== newData.country.toLowerCase()) {
-          newData.country = detectedCountry.name.toLowerCase();
+          newData.country = normalizeCountryCode(detectedCountry.code || detectedCountry.name?.toLowerCase());
         }
       }
       
@@ -332,7 +339,7 @@ export default function Register() {
                 }`}
               >
                 {countries.map(country => (
-                  <option key={country.code} value={country.name.toLowerCase()}>
+                  <option key={country.code} value={country.code}>
                     {country.flag} {getCountryDisplayName(country)}
                   </option>
                 ))}
@@ -401,7 +408,7 @@ export default function Register() {
               </label>
               <div className="flex rounded-lg shadow-sm">
                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                  {countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase())?.phonePrefix || '+221'}
+                  {findCountryData(formData.country)?.phonePrefix || '+221'}
                 </span>
                 <input
                   id="phone"
@@ -415,7 +422,7 @@ export default function Register() {
                   }
                   value={formData.phone.replace(/^\+\d{3}\s*/, '')}
                   onChange={(e) => {
-                    const currentCountry = countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase());
+                    const currentCountry = findCountryData(formData.country);
                     const prefix = currentCountry ? currentCountry.phonePrefix : '+221';
                     const cleanValue = e.target.value.replace(/[^\d\s]/g, '');
                     updateFormData('phone', prefix + ' ' + cleanValue);
@@ -423,7 +430,7 @@ export default function Register() {
                 />
               </div>
               <p className="mt-1 text-sm text-gray-500">
-                {pageT('phoneFormatHint')}: {countries.find(c => c.name.toLowerCase() === formData.country.toLowerCase())?.phonePrefix || '+221'} XX XXX XX XX
+                {pageT('phoneFormatHint')}: {findCountryData(formData.country)?.phonePrefix || '+221'} XX XXX XX XX
               </p>
             </div>
             

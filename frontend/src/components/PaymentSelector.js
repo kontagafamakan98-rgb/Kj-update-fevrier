@@ -195,6 +195,7 @@ export const PaymentProcess = ({
   onError = null 
 }) => {
   const { selectedMethod } = usePayment();
+  const { t } = useLanguage();
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState(null);
 
@@ -272,13 +273,13 @@ export const PaymentProcess = ({
               </p>
               {result.transactionId && (
                 <p className="text-xs mt-1 font-mono">
-                  ID: {result.transactionId}
+                  {t('transactionIdLabel')}: {result.transactionId}
                 </p>
               )}
               {result.commission && (
                 <div className="mt-2 text-xs space-y-1">
                   <div className="bg-white bg-opacity-50 p-2 rounded">
-                    <p className="font-medium">💰 Distribution effectuée:</p>
+                    <p className="font-medium">💰 {t('automaticDistribution')}:</p>
                     <p>• {t('ownerLabel')}: {result.commission.ownerCommission.toLocaleString()} {currency} (14%)</p>
                     <p>• {t('workerLabel')}: {result.commission.workerAmount.toLocaleString()} {currency} (86%)</p>
                   </div>

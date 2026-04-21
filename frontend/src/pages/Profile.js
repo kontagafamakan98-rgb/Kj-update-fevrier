@@ -18,6 +18,18 @@ import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
 
+const getLanguageLabel = (languageCode, t) => {
+  const languageMap = {
+    fr: t('french'),
+    en: t('english'),
+    wo: t('wolof'),
+    bm: t('bambara'),
+    mos: t('moore')
+  };
+
+  return languageMap[languageCode] || languageCode;
+};
+
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [workerProfile, setWorkerProfile] = useState(null);
@@ -201,7 +213,7 @@ function ProfileView({ profile, t }) {
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-        <p className="mt-1 text-gray-900">{profile.preferred_language}</p>
+        <p className="mt-1 text-gray-900">{getLanguageLabel(profile.preferred_language, t)}</p>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700">{t('verified')}</label>
@@ -244,7 +256,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
       if (key === 'phone') {
         const detectedCountry = detectCountryFromPhone(value);
         if (detectedCountry && detectedCountry.code !== newData.country.toLowerCase()) {
-          newData.country = detectedCountry.name;
+          newData.country = detectedCountry.code;
         }
       }
 
@@ -303,7 +315,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
                 const prefix = getPhonePrefixByCountry(formData.country.toLowerCase());
                 updateFormData('phone', `${prefix} ${e.target.value.replace(/[^\d\s]/g, '')}`);
               }}
-              placeholder={pageT('description').includes('') ? '77 123 45 67' : '77 123 45 67'}
+              placeholder={pageT('phonePlaceholder')}
               className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
@@ -313,11 +325,11 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
         <div>
           <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
           <select id="preferred_language" name="preferred_language" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
-            <option value="fr">Français</option>
-            <option value="en">English</option>
-            <option value="wo">Wolof</option>
-            <option value="bm">Bambara</option>
-            <option value="mos">Mooré</option>
+            <option value="fr">{t('french')}</option>
+            <option value="en">{t('english')}</option>
+            <option value="wo">{t('wolof')}</option>
+            <option value="bm">{t('bambara')}</option>
+            <option value="mos">{t('moore')}</option>
           </select>
         </div>
 
@@ -325,7 +337,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
           <label htmlFor="country" className="block text-sm font-medium text-gray-700">{pageT('country')}</label>
           <select id="country" name="country" value={formData.country} onChange={(e) => updateFormData('country', e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
             {getCountriesList().map((country) => (
-              <option key={country.code} value={country.name}>{t(country.code)}</option>
+              <option key={country.code} value={country.code}>{t(country.code)}</option>
             ))}
           </select>
         </div>

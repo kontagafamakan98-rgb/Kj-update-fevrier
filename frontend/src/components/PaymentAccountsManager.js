@@ -30,6 +30,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [phoneExample, setPhoneExample] = useState('+221 70 12 34 56');
   const [popularBanks, setPopularBanks] = useState([]);
+  const supportedOrangeMoneyCountries = [t('mali'), t('senegal'), t('burkina_faso'), t('ivory_coast')].join(', ');
 
   useEffect(() => {
     loadPaymentAccounts();
@@ -297,7 +298,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 <p className="text-red-500 text-sm mt-1">{validationErrors.orange_money}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                {t('mali')}, {t('senegal')}, {t('burkina_faso')}, {t('ivory_coast')}
+                {supportedOrangeMoneyCountries}
               </p>
             </div>
           ) : (
@@ -335,7 +336,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 <p className="text-red-500 text-sm mt-1">{validationErrors.wave}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                {t('kojoConnectsDescription')}
+                {t('availableAcrossWestAfrica')}
               </p>
             </div>
           ) : (
@@ -392,7 +393,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                   {popularBanks.map((bank, index) => (
                     <option key={index} value={bank}>{bank}</option>
                   ))}
-                  <option value="Autre">{t('otherBank')}</option>
+                  <option value="other">{t('otherBank')}</option>
                 </select>
               </div>
               
@@ -424,7 +425,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                       ...accounts, 
                       bank_account: {...accounts.bank_account, bank_code: e.target.value}
                     })}
-                    placeholder="Code"
+                    placeholder={t('bankCodeOptional')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
