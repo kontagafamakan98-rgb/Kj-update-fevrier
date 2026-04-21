@@ -417,11 +417,6 @@ class GeolocationService {
         parse: (d) => ({ code: d.country_code, city: d.city, region: d.region, lat: d.latitude, lng: d.longitude, country_name: d.country_name })
       },
       {
-        name: 'ip-api.com',
-        url: 'http://ip-api.com/json/',
-        parse: (d) => ({ code: d.countryCode, city: d.city, region: d.regionName, lat: d.lat, lng: d.lon, country_name: d.country })
-      },
-      {
         name: 'ipinfo.io',
         url: 'https://ipinfo.io/json',
         parse: (d) => {
@@ -799,10 +794,6 @@ export const detectUserCountry = async () => {
     {
       url: 'https://ipapi.co/json/',
       parse: (d) => d.country_code
-    },
-    {
-      url: 'http://ip-api.com/json/',
-      parse: (d) => d.countryCode
     },
     {
       url: 'https://ipinfo.io/json',
