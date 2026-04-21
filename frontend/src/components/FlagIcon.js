@@ -2,6 +2,26 @@ import React from 'react';
 import { normalizeCountryCode } from '../utils/countryAliases';
 
 // SVG Flag Components
+
+const FranceFlag = ({ className = "w-12 h-8" }) => (
+  <svg className={className} viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="600" fill="#0055A4"/>
+    <rect x="300" width="300" height="600" fill="#FFFFFF"/>
+    <rect x="600" width="300" height="600" fill="#EF4135"/>
+  </svg>
+);
+
+const UKFlag = ({ className = "w-12 h-8" }) => (
+  <svg className={className} viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg">
+    <clipPath id="uk-clip"><path d="M0,0 v30 h60 v-30 z"/></clipPath>
+    <path d="M0,0 v30 h60 v-30 z" fill="#012169"/>
+    <path d="M0,0 60,30 M60,0 0,30" stroke="#FFF" strokeWidth="6" clipPath="url(#uk-clip)"/>
+    <path d="M0,0 60,30 M60,0 0,30" stroke="#C8102E" strokeWidth="4" clipPath="url(#uk-clip)"/>
+    <path d="M30,0 v30 M0,15 h60" stroke="#FFF" strokeWidth="10"/>
+    <path d="M30,0 v30 M0,15 h60" stroke="#C8102E" strokeWidth="6"/>
+  </svg>
+);
+
 const MaliFlag = ({ className = "w-12 h-8" }) => (
   <svg className={className} viewBox="0 0 900 600" xmlns="http://www.w3.org/2000/svg">
     <rect width="300" height="600" fill="#14B53A"/>
@@ -51,7 +71,13 @@ export default function FlagIcon({ country, className = "w-12 h-8", showEmoji = 
       ml: '🇲🇱',
       sn: '🇸🇳',
       bf: '🇧🇫',
-      ci: '🇨🇮'
+      ci: '🇨🇮',
+      fr: '🇫🇷',
+      en: '🇬🇧',
+      gb: '🇬🇧',
+      wo: '🇸🇳',
+      bm: '🇲🇱',
+      mos: '🇧🇫'
     };
 
     return (
@@ -69,7 +95,13 @@ export default function FlagIcon({ country, className = "w-12 h-8", showEmoji = 
     ml: MaliFlag,
     sn: SenegalFlag,
     bf: BurkinaFasoFlag,
-    ci: IvoryCoastFlag
+    ci: IvoryCoastFlag,
+    fr: FranceFlag,
+    en: UKFlag,
+    gb: UKFlag,
+    wo: SenegalFlag,
+    bm: MaliFlag,
+    mos: BurkinaFasoFlag
   };
 
   const FlagComponent = flagComponents[normalizedCountry] || flagComponents[String(country || '').toLowerCase()];
@@ -85,4 +117,4 @@ export default function FlagIcon({ country, className = "w-12 h-8", showEmoji = 
   return <FlagComponent className={`${className} rounded shadow-sm`} />;
 }
 
-export { MaliFlag, SenegalFlag, BurkinaFasoFlag, IvoryCoastFlag };
+export { MaliFlag, SenegalFlag, BurkinaFasoFlag, IvoryCoastFlag, FranceFlag, UKFlag };

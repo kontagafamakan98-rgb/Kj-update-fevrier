@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { detectUserCountry, getPhoneExampleForCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
+import CountryDisplay from './CountryDisplay';
 
 const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration = false }) => {
   const { user } = useAuth();
@@ -214,7 +215,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         {detectedCountry && (
           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <span className="font-medium">{t('positionDetected')}:</span> {detectedCountry.flag} {detectedCountry.nameFrench}
+              <span className="font-medium">{t('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
               <span className="text-xs text-blue-600 ml-2">({t('adjustedAutomatically')})</span>
             </p>
           </div>

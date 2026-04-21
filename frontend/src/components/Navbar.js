@@ -141,10 +141,10 @@ export default function Navbar() {
                 onChange={(e) => changeLanguage(e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded-md px-2 py-2 bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
-                <option value="fr">🇫🇷 Français</option>
-                <option value="en">🇬🇧 English</option>
-                <option value="wo">🇸🇳 Wolof</option>
-                <option value="bm">🇲🇱 Bambara</option>
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+                <option value="wo">Wolof</option>
+                <option value="bm">Bambara</option>
               </select>
             </div>
 
