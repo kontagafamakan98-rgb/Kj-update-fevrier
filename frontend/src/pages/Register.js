@@ -24,7 +24,7 @@ export default function Register() {
     phone: '', // Défini après détection ou choix manuel
     user_type: initialUserType,
     country: '', // Défini après détection ou choix manuel
-    preferred_language: 'fr', // Français par défaut, mais sera mis à jour par le choix utilisateur
+    preferred_language: currentLanguage || 'fr', // Langue courante par défaut, peut être modifiée
     // Champs spécifiques aux travailleurs
     worker_specialties: [],
     worker_experience_years: null,
@@ -36,7 +36,7 @@ export default function Register() {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [manualCountrySelection, setManualCountrySelection] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
-  const [userSelectedLanguage, setUserSelectedLanguage] = useState('fr'); // Choix utilisateur pour profil
+  const [userSelectedLanguage, setUserSelectedLanguage] = useState(currentLanguage || 'fr'); // Choix utilisateur pour profil
   
   const { register } = useAuth();
   const { t, currentLanguage } = useLanguage();
@@ -56,13 +56,14 @@ export default function Register() {
   const getCountryDisplayName = (country) => {
     if (!country) return '';
     const normalizedCode = normalizeCountryCode(country.code || country.name?.toLowerCase());
-    const translated = t(normalizedCode);
+    const translationKey = normalizedCode === 'cote_divoire' ? 'ivory_coast' : normalizedCode;
+    const translated = t(translationKey);
 
-    if (typeof translated === 'string' && translated.includes(' ')) {
-      return translated.substring(translated.indexOf(' ') + 1);
+    if (typeof translated === 'string' && translated.trim() && translated !== translationKey) {
+      return translated.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
     }
 
-    return country.nameFrench || country.name || translated || '';
+    return country.nameFrench || country.name || '';
   };
 
   // Géolocalisation automatique au chargement

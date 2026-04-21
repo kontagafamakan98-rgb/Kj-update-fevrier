@@ -1110,11 +1110,16 @@ pages.mobileTest.mos = withBase(pages.mobileTest.fr, {
 
 export const makeScopedTranslator = (currentLanguage, fallbackT, scope) => {
   const section = pages[scope] || {};
-  const primary = section[currentLanguage] || section.fr || {};
-  const fallback = section.fr || {};
+  const primary = section[currentLanguage] || {};
+  const englishFallback = section.en || {};
+  const frenchFallback = section.fr || {};
 
   return (key, vars = {}) => {
-    let value = primary[key] ?? fallback[key] ?? (typeof fallbackT === 'function' ? fallbackT(key) : key);
+    let value =
+      primary[key] ??
+      englishFallback[key] ??
+      frenchFallback[key] ??
+      (typeof fallbackT === 'function' ? fallbackT(key) : key);
 
     if (typeof value !== 'string') {
       return value ?? key;
