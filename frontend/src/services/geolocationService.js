@@ -1073,7 +1073,7 @@ export const getLanguageSuggestionMessage = (detectedCountry) => {
       localLang: 'Mooré'
     },
     cote_divoire: {
-      message: 'En Côte d'Ivoire, la plupart des utilisateurs préfèrent le Français. L'anglais reste disponible si besoin.',
+      message: "En Côte d'Ivoire, la plupart des utilisateurs préfèrent le Français. L'anglais reste disponible si besoin.",
       primaryLang: 'Français',
       localLang: null
     }
