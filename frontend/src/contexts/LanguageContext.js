@@ -3,10 +3,22 @@ import { devLog, safeLog } from '../utils/env';
 
 const LanguageContext = createContext(null);
 
+const getStoredOrFallbackLanguage = () => {
+  try {
+    const savedLanguage = localStorage.getItem('language');
+    return savedLanguage && ['fr', 'en', 'wo', 'bm', 'mos'].includes(savedLanguage) ? savedLanguage : 'fr';
+  } catch (error) {
+    return 'fr';
+  }
+};
+
 const fallbackLanguageApi = {
-  currentLanguage: 'fr',
+  currentLanguage: getStoredOrFallbackLanguage(),
   changeLanguage: () => {},
-  t: (key) => translations?.fr?.[key] || key
+  t: (key) => {
+    const language = getStoredOrFallbackLanguage();
+    return translations?.[language]?.[key] || translations?.en?.[key] || translations?.fr?.[key] || key;
+  }
 };
 
 export function useLanguage() {
@@ -2225,7 +2237,7 @@ export function LanguageProvider({ children }) {
   });
 
   const t = (key) => {
-    return translations[currentLanguage]?.[key] || translations.fr?.[key] || key;
+    return translations[currentLanguage]?.[key] || translations.en?.[key] || translations.fr?.[key] || key;
   };
 
   const changeLanguage = (lang) => {

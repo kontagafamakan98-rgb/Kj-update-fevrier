@@ -14,6 +14,8 @@ import { devLog, safeLog } from '../utils/env';
 export default function Register() {
   const [searchParams] = useSearchParams();
   const initialUserType = searchParams.get('type') || 'client';
+  const { t, currentLanguage } = useLanguage();
+  const defaultLanguage = currentLanguage || 'fr';
   
   const [formData, setFormData] = useState({
     email: '',
@@ -24,7 +26,7 @@ export default function Register() {
     phone: '', // Défini après détection ou choix manuel
     user_type: initialUserType,
     country: '', // Défini après détection ou choix manuel
-    preferred_language: currentLanguage || 'fr', // Langue courante par défaut, peut être modifiée
+    preferred_language: defaultLanguage, // Langue courante par défaut, peut être modifiée
     // Champs spécifiques aux travailleurs
     worker_specialties: [],
     worker_experience_years: null,
@@ -36,10 +38,9 @@ export default function Register() {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [manualCountrySelection, setManualCountrySelection] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
-  const [userSelectedLanguage, setUserSelectedLanguage] = useState(currentLanguage || 'fr'); // Choix utilisateur pour profil
+  const [userSelectedLanguage, setUserSelectedLanguage] = useState(defaultLanguage); // Choix utilisateur pour profil
   
   const { register } = useAuth();
-  const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'register');
   const toast = useToast();
   const navigate = useNavigate();
