@@ -16,6 +16,7 @@ import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
+import { buildApiUrl } from '../utils/backendUrl';
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
@@ -81,7 +82,7 @@ export default function Profile() {
   const handleWorkerProfileCreate = async (workerData) => {
     try {
       setError('');
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/workers/profile`, {
+      const response = await fetch(buildApiUrl('/workers/profile'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -310,13 +311,13 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
         </div>
 
         <div>
-          <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('selectLanguageLabel')}</label>
+          <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
           <select id="preferred_language" name="preferred_language" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
-            <option value="fr">{t('french')}</option>
-            <option value="en">{t('english')}</option>
-            <option value="wo">{t('wolof')}</option>
-            <option value="bm">{t('bambara')}</option>
-            <option value="mos">{t('moore')}</option>
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+            <option value="wo">Wolof</option>
+            <option value="bm">Bambara</option>
+            <option value="mos">Mooré</option>
           </select>
         </div>
 

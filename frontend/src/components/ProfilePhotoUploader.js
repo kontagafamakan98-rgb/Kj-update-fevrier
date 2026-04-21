@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { safeLog } from '../utils/env';
+import { buildBackendUrl } from '../utils/backendUrl';
 import profilePhotoService from '../services/ProfilePhotoService';
 import { compressImage, validateImageFile, formatFileSize } from '../utils/imageOptimization';
 
@@ -104,7 +105,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       const photoUrl = result.photo_url;
       const fullUrl = photoUrl.startsWith('http') 
         ? photoUrl 
-        : `${process.env.REACT_APP_BACKEND_URL}${photoUrl}`;
+        : buildBackendUrl(photoUrl);
       
       setCurrentPhotoUrl(`${fullUrl}?t=${Date.now()}`);
 
