@@ -8,6 +8,7 @@ import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
 import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
 import LoadingButton from '../components/LoadingButton';
+import { CountrySelect } from '../components/CountryDisplay';
 import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 
@@ -40,10 +41,6 @@ export default function Register() {
   const manualCountrySelectionRef = useRef(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [userSelectedLanguage, setUserSelectedLanguage] = useState(defaultLanguage); // Choix utilisateur pour profil
-  const [countryDropdownOpen, setCountryDropdownOpen] = useState(false);
-  const [countrySearchTerm, setCountrySearchTerm] = useState('');
-  const [highlightedCountryIndex, setHighlightedCountryIndex] = useState(-1);
-  const countryDropdownRef = useRef(null);
   
   const { register } = useAuth();
   const pageT = makeScopedTranslator(currentLanguage, t, 'register');
@@ -84,48 +81,12 @@ export default function Register() {
   const activeCountry = findCountryData(formData.country) || detectedCountry;
   const activePhonePrefix = activeCountry?.phonePrefix || '';
   const activePhoneExample = activeCountry ? stripPhonePrefix(getPhoneExampleForCountry(activeCountry), activePhonePrefix) : pageT('phonePlaceholder');
-  const filteredCountries = countries.filter((country) => {
-    const search = countrySearchTerm.trim().toLowerCase();
-    if (!search) return true;
-
-    const displayName = getCountryDisplayName(country).toLowerCase();
-    const code = String(country.code || '').toLowerCase();
-    const phonePrefix = String(country.phonePrefix || '').toLowerCase();
-
-    return displayName.includes(search) || code.includes(search) || phonePrefix.includes(search);
-  });
 
   // Géolocalisation automatique au chargement
   useEffect(() => {
     detectUserLocationAndSetDefaults();
   }, []);
 
-  useEffect(() => {
-    const handleOutsideClick = (event) => {
-      if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target)) {
-        setCountryDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    document.addEventListener('touchstart', handleOutsideClick);
-
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-      document.removeEventListener('touchstart', handleOutsideClick);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!countryDropdownOpen) {
-      setCountrySearchTerm('');
-      setHighlightedCountryIndex(-1);
-      return;
-    }
-
-    const selectedIndex = filteredCountries.findIndex((country) => country.code === formData.country);
-    setHighlightedCountryIndex(selectedIndex >= 0 ? selectedIndex : (filteredCountries.length ? 0 : -1));
-  }, [countryDropdownOpen, formData.country, filteredCountries]);
 
   const detectUserLocationAndSetDefaults = async () => {
     try {
@@ -255,51 +216,10 @@ export default function Register() {
     manualCountrySelectionRef.current = true;
     setDetectedCountry(null);
     updateFormData('country', countryCode);
-    setCountryDropdownOpen(false);
   };
 
-  const openCountryDropdown = () => {
-    setCountryDropdownOpen(true);
-  };
-
-  const handleCountryTriggerKeyDown = (event) => {
-    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      openCountryDropdown();
-    }
-  };
-
-  const handleCountrySearchKeyDown = (event) => {
-    if (!filteredCountries.length && event.key === 'Escape') {
-      setCountryDropdownOpen(false);
-      return;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setHighlightedCountryIndex((prev) => {
-        const next = prev < filteredCountries.length - 1 ? prev + 1 : 0;
-        return next;
-      });
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setHighlightedCountryIndex((prev) => {
-        const next = prev > 0 ? prev - 1 : filteredCountries.length - 1;
-        return next;
-      });
-    }
-
-    if (event.key === 'Enter' && highlightedCountryIndex >= 0 && filteredCountries[highlightedCountryIndex]) {
-      event.preventDefault();
-      handleCountrySelect(filteredCountries[highlightedCountryIndex].code);
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setCountryDropdownOpen(false);
-    }
+  const handleCountryChange = (event) => {
+    handleCountrySelect(event.target.value);
   };
 
   return (
@@ -443,83 +363,14 @@ export default function Register() {
                   </span>
                 )}
               </div>
-              <div ref={countryDropdownRef} className="relative">
-                <button
-                  type="button"
-                  id="country"
-                  onClick={() => setCountryDropdownOpen((prev) => !prev)}
-                  onKeyDown={handleCountryTriggerKeyDown}
-                  className={`w-full flex items-center justify-between px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-left ${
-                    detectedCountry ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-white'
-                  }`}
-                  aria-haspopup="listbox"
-                  aria-expanded={countryDropdownOpen}
-                >
-                  <span className="flex items-center gap-3 min-w-0">
-                    <span className="text-lg leading-none">{activeCountry?.flag || '🌍'}</span>
-                    <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-400'}`}>
-                      {activeCountry ? getCountryDisplayName(activeCountry) : `-- ${t('country')} --`}
-                    </span>
-                  </span>
-                  <span className={`text-xs text-gray-500 transition-transform ${countryDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
-                </button>
-                <input type="hidden" name="country" value={formData.country} />
-
-                {countryDropdownOpen && (
-                  <div className="absolute z-30 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden">
-                    <div className="p-3 border-b border-gray-100 bg-gray-50">
-                      <input
-                        type="text"
-                        value={countrySearchTerm}
-                        onChange={(e) => setCountrySearchTerm(e.target.value)}
-                        onKeyDown={handleCountrySearchKeyDown}
-                        placeholder="Rechercher un pays..."
-                        autoFocus
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      />
-                    </div>
-
-                    <div className="max-h-64 overflow-y-auto" role="listbox" aria-labelledby="country">
-                      {filteredCountries.length > 0 ? filteredCountries.map((country, index) => {
-                        const isSelected = formData.country === country.code;
-                        const isAutoDetected = detectedCountry?.code === country.code;
-                        const isHighlighted = index === highlightedCountryIndex;
-
-                        return (
-                          <button
-                            key={country.code}
-                            type="button"
-                            onClick={() => handleCountrySelect(country.code)}
-                            onMouseEnter={() => setHighlightedCountryIndex(index)}
-                            className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
-                              isSelected
-                                ? 'bg-orange-50 text-orange-700'
-                                : isHighlighted
-                                ? 'bg-gray-100 text-gray-900'
-                                : 'hover:bg-gray-50 text-gray-800'
-                            }`}
-                          >
-                            <span className="flex items-center gap-3 min-w-0">
-                              <span className="text-lg leading-none">{country.flag || '🌍'}</span>
-                              <span className="truncate">{getCountryDisplayName(country)}</span>
-                            </span>
-                            <span className="flex items-center gap-2 shrink-0">
-                              {isAutoDetected && (
-                                <span className="text-[10px] px-2 py-1 rounded-full bg-green-100 text-green-700">
-                                  📍 Auto
-                                </span>
-                              )}
-                              {isSelected && <span className="text-sm font-semibold">✓</span>}
-                            </span>
-                          </button>
-                        );
-                      }) : (
-                        <div className="px-4 py-3 text-sm text-gray-500">Aucun pays trouvé</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <CountrySelect
+                id="country"
+                name="country"
+                value={formData.country}
+                onChange={handleCountryChange}
+                required
+                className="mt-1"
+              />
               {detectedCountry && (
                 <p className="mt-1 text-xs text-green-600">
                   🌍 {t('detectedViaGeolocation')}
