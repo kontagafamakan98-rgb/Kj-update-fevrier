@@ -11,7 +11,7 @@ import {
 } from '../services/geolocationService';
 import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
-import { CountrySelect, getCountry } from '../components/CountryDisplay';
+import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
@@ -141,7 +141,7 @@ export default function Profile() {
             <div className="ml-6">
               <h1 className="text-2xl font-bold text-white">{user.first_name} {user.last_name}</h1>
               <p className="text-orange-100">
-                {user.user_type === 'client' ? t('client') : t('worker')} • {getCountry(user.country)?.fullName || user.country}
+                {user.user_type === 'client' ? t('client') : t('worker')} • <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
               </p>
               <div className="flex items-center mt-2">
                 <span className="text-yellow-300">★★★★☆</span>
