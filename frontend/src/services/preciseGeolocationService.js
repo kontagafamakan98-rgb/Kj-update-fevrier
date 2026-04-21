@@ -267,25 +267,6 @@ const IP_GEOLOCATION_SERVICES = [
       };
     }
   },
-  // Service ip-api.com (fallback supplémentaire)
-  {
-    name: 'ip-api.com',
-    url: 'http://ip-api.com/json/',
-    isBackend: false,
-    parser: (data) => {
-      if (!data.countryCode) return null;
-      return {
-        country: data.countryCode,
-        countryName: data.country || '',
-        city: data.city || '',
-        region: data.regionName || '',
-        latitude: data.lat || 0,
-        longitude: data.lon || 0,
-        accuracy: 80,
-        timezone: data.timezone || ''
-      };
-    }
-  },
   // Service ipinfo.io (fallback tertiaire)
   {
     name: 'ipinfo.io',

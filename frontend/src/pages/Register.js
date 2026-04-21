@@ -361,6 +361,7 @@ export default function Register() {
                   id="first_name"
                   name="first_name"
                   type="text"
+                  autoComplete="given-name"
                   required
                   className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={`${t('firstName')}...`}
@@ -377,6 +378,7 @@ export default function Register() {
                   id="last_name"
                   name="last_name"
                   type="text"
+                  autoComplete="family-name"
                   required
                   className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={`${t('lastName')}...`}
@@ -394,6 +396,7 @@ export default function Register() {
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
                 required
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 placeholder={pageT('emailPlaceholder')}
@@ -414,6 +417,7 @@ export default function Register() {
                   id="phone"
                   name="phone"
                   type="tel"
+                  autoComplete="tel"
                   required
                   className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={detectedCountry ? 
@@ -442,6 +446,7 @@ export default function Register() {
                 id="password"
                 name="password"
                 type="password"
+                autoComplete="new-password"
                 required
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 placeholder={t('passwordMasked')}
@@ -459,6 +464,7 @@ export default function Register() {
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
+                autoComplete="new-password"
                 required
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 placeholder={t('passwordMasked')}
