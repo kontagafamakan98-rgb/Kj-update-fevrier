@@ -219,7 +219,13 @@ const PRECISE_GEOGRAPHIC_DATABASE = {
 const COUNTRY_CODE_ALIASES = {
   ivory_coast: 'cote_divoire',
   cote_divoire: 'cote_divoire',
-  ci: 'cote_divoire'
+  ci: 'cote_divoire',
+  mali: 'mali',
+  ml: 'mali',
+  senegal: 'senegal',
+  sn: 'senegal',
+  burkina_faso: 'burkina_faso',
+  bf: 'burkina_faso'
 };
 
 const normalizeCountryCode = (code = '') => {
@@ -965,13 +971,13 @@ export const detectUserCountry = async (options = {}) => {
 
   const countryData = PRECISE_GEOGRAPHIC_DATABASE[location.countryCode];
   if (!countryData) {
-    // Pays hors base de données - retourner les infos disponibles
+    // Pays hors base de données - retourner des infos neutres sans biais Sénégal
     return {
-      code: location.countryCode || 'senegal',
-      name: location.country || 'Senegal',
-      nameFrench: location.country || 'Sénégal',
-      flag: location.flag || '🇸🇳',
-      phonePrefix: location.phonePrefix || '+221',
+      code: normalizeCountryCode(location.countryCode || ''),
+      name: location.country || 'Detected country',
+      nameFrench: location.country || 'Pays détecté',
+      flag: location.flag || '🌍',
+      phonePrefix: location.phonePrefix || '',
       currency: 'XOF',
       language: 'fr'
     };
@@ -1016,20 +1022,11 @@ export const getCountryByCode = (code) => {
   const normalizedCode = normalizeCountryCode(code);
   const countryData = PRECISE_GEOGRAPHIC_DATABASE[normalizedCode];
   if (!countryData) {
-    // Fallback vers Sénégal
-    return {
-      code: 'senegal',
-      name: 'Senegal',
-      nameFrench: 'Sénégal',
-      flag: '🇸🇳',
-      phonePrefix: '+221',
-      currency: 'XOF',
-      language: 'fr'
-    };
+    return null;
   }
   
   return {
-    code,
+    code: normalizedCode,
     name: countryData.country,
     nameFrench: countryData.nameFrench,
     flag: countryData.flag,
@@ -1041,7 +1038,7 @@ export const getCountryByCode = (code) => {
 
 export const getPhonePrefixByCountry = (countryCode) => {
   const country = getCountryByCode(countryCode);
-  return country.phonePrefix;
+  return country?.phonePrefix || '';
 };
 
 export const detectCountryFromPhone = (phoneNumber) => {
@@ -1070,19 +1067,24 @@ export const formatPhoneNumber = (phone, countryCode) => {
   
   const country = getCountryByCode(countryCode);
   const cleanPhone = phone.replace(/[^\d]/g, '');
+  const prefix = country?.phonePrefix || '';
+
+  if (!prefix) {
+    return phone.trim();
+  }
   
   // Si le numéro commence déjà par le préfixe, on le retourne tel quel
-  if (phone.startsWith(country.phonePrefix)) {
+  if (phone.startsWith(prefix)) {
     return phone;
   }
   
   // Si le numéro commence par 0, on le remplace par le préfixe
   if (cleanPhone.startsWith('0')) {
-    return country.phonePrefix + ' ' + cleanPhone.substring(1);
+    return prefix + ' ' + cleanPhone.substring(1);
   }
   
   // Sinon on ajoute juste le préfixe
-  return country.phonePrefix + ' ' + cleanPhone;
+  return prefix + ' ' + cleanPhone;
 };
 
 export const getPhoneExampleForCountry = (country) => {
@@ -1093,5 +1095,5 @@ export const getPhoneExampleForCountry = (country) => {
     'cote_divoire': '+225 07 12 34 56'
   };
   
-  return examples[country?.code] || examples['senegal'];
+  return examples[normalizeCountryCode(country?.code || country)] || '+000 XX XXX XX XX';
 };
