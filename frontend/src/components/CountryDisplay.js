@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { normalizeCountryCode } from '../utils/countryAliases';
 
 // Country data with flags and proper names
 export const COUNTRIES = {
@@ -30,21 +31,13 @@ export const COUNTRIES = {
     flag: '🇨🇮',
     fullName: '🇨🇮 Côte d\'Ivoire',
     iso: 'CI'
-  },
-  cote_divoire: {
-    code: 'cote_divoire',
-    name: 'Côte d\'Ivoire',
-    flag: '🇨🇮',
-    fullName: '🇨🇮 Côte d\'Ivoire',
-    iso: 'CI'
   }
 };
 
 export const getCountry = (countryCode) => {
   if (!countryCode) return null;
-  const normalized = String(countryCode).toLowerCase();
-  const alias = normalized === 'cote_divoire' ? 'ivory_coast' : normalized;
-  return COUNTRIES[alias] || COUNTRIES[normalized] || null;
+  const normalized = normalizeCountryCode(countryCode);
+  return COUNTRIES[normalized] || null;
 };
 
 export const getAllCountries = () => {

@@ -1,3 +1,5 @@
+import { normalizeCountryCode as normalizeCountryAlias } from './countryAliases';
+
 export const getLocaleForLanguage = (language) => {
   switch (language) {
     case 'en':
@@ -414,11 +416,7 @@ const pages = {
 
 const withBase = (base, overrides) => ({ ...base, ...overrides });
 
-export const normalizeCountryCode = (code = '') => {
-  const value = String(code).toLowerCase();
-  if (value === 'cote_divoire') return 'ivory_coast';
-  return value;
-};
+export const normalizeCountryCode = (code = '') => normalizeCountryAlias(code);
 
 pages.createJob.wo = withBase(pages.createJob.fr, {
   pageTitle: 'Sos liggéey bu bees',
