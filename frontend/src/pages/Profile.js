@@ -11,7 +11,7 @@ import {
 } from '../services/geolocationService';
 import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
-import { getCountry } from '../components/CountryDisplay';
+import { CountrySelect, getCountry } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
@@ -335,11 +335,14 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
         <div>
           <label htmlFor="country" className="block text-sm font-medium text-gray-700">{pageT('country')}</label>
-          <select id="country" name="country" value={formData.country} onChange={(e) => updateFormData('country', e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
-            {getCountriesList().map((country) => (
-              <option key={country.code} value={country.code}>{t(country.code)}</option>
-            ))}
-          </select>
+          <div className="mt-1">
+            <CountrySelect
+              id="country"
+              name="country"
+              value={formData.country}
+              onChange={(e) => updateFormData('country', e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
