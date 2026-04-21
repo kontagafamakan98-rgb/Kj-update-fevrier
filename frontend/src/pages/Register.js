@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCountryFromPhone, detectUserCountry, getPhoneExampleForCountry } from '../services/preciseGeolocationService';
@@ -37,6 +37,7 @@ export default function Register() {
   const [geoLoading, setGeoLoading] = useState(true);
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [manualCountrySelection, setManualCountrySelection] = useState(false);
+  const manualCountrySelectionRef = useRef(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [userSelectedLanguage, setUserSelectedLanguage] = useState(defaultLanguage); // Choix utilisateur pour profil
   
@@ -67,6 +68,15 @@ export default function Register() {
     return country.nameFrench || country.name || '';
   };
 
+  const stripPhonePrefix = (phoneValue, prefix = '') => {
+    const value = String(phoneValue || '');
+    if (!value) return '';
+    if (prefix && value.startsWith(prefix)) {
+      return value.slice(prefix.length).trimStart();
+    }
+    return value.replace(/^\+\d+\s*/, '').trimStart();
+  };
+
   // Géolocalisation automatique au chargement
   useEffect(() => {
     detectUserLocationAndSetDefaults();
@@ -78,6 +88,11 @@ export default function Register() {
       const country = await detectUserCountry();
       
       if (country) {
+        if (manualCountrySelectionRef.current) {
+          devLog.info('🛑 Sélection manuelle détectée, la géolocalisation ne remplace pas le pays choisi');
+          return;
+        }
+
         setDetectedCountry(country);
         devLog.info(`📍 Pays détecté: ${country.nameFrench} ${country.flag}`);
         
@@ -85,7 +100,7 @@ export default function Register() {
         setFormData(prev => ({
           ...prev,
           country: country.code,
-          phone: country.phonePrefix + ' '
+          phone: country.phonePrefix ? country.phonePrefix + ' ' : prev.phone
         }));
         
         devLog.info(`📱 Préfixe ajusté: ${country.phonePrefix}`);
@@ -176,12 +191,13 @@ export default function Register() {
       if (key === 'country') {
         const countryData = findCountryData(value);
         const phonePrefix = countryData ? countryData.phonePrefix : '';
+        const previousPrefix = findCountryData(prev.country)?.phonePrefix || '';
+        const localNumber = stripPhonePrefix(newData.phone, previousPrefix);
 
-        if (!newData.phone || newData.phone.match(/^\+\d{3}\s*$/)) {
+        if (!localNumber) {
           newData.phone = phonePrefix ? phonePrefix + ' ' : '';
         } else {
-          const cleanPhone = newData.phone.replace(/^\+\d{3}\s*/, '');
-          newData.phone = phonePrefix ? phonePrefix + ' ' + cleanPhone : cleanPhone;
+          newData.phone = phonePrefix ? phonePrefix + ' ' + localNumber : localNumber;
         }
       }
 
@@ -326,6 +342,7 @@ export default function Register() {
                 value={formData.country}
                 onChange={(e) => {
                   setManualCountrySelection(true);
+                  manualCountrySelectionRef.current = true;
                   setDetectedCountry(null);
                   updateFormData('country', e.target.value);
                 }}
@@ -418,10 +435,10 @@ export default function Register() {
                   required
                   className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   placeholder={detectedCountry ? 
-                    getPhoneExampleForCountry(detectedCountry).replace(/^\+\d{3}\s*/, '') : 
+                    stripPhonePrefix(getPhoneExampleForCountry(detectedCountry), findCountryData(formData.country)?.phonePrefix || detectedCountry.phonePrefix || '') : 
                     pageT('phonePlaceholder')
                   }
-                  value={formData.phone.replace(/^\+\d{3}\s*/, '')}
+                  value={stripPhonePrefix(formData.phone, findCountryData(formData.country)?.phonePrefix || '')}
                   onChange={(e) => {
                     const currentCountry = findCountryData(formData.country);
                     const prefix = currentCountry ? currentCountry.phonePrefix : '';
