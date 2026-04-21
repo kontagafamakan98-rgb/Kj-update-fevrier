@@ -17,11 +17,16 @@ const PaymentVerificationPage = () => {
   const pageT = makeScopedTranslator(currentLanguage, t, 'paymentVerification');
   const toast = useToast();
 
+  const stripLeadingFlag = (value) => {
+    if (typeof value !== 'string') return '';
+    return value.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+  };
+
   const getCountryLabel = (country) => {
     const countryKey = normalizeCountryCode(country?.code || country?.countryCode || country);
     const translated = t(countryKey);
-    if (typeof translated === 'string' && translated !== countryKey) return translated;
-    return country?.nameFrench || country?.nameEnglish || countryKey;
+    if (typeof translated === 'string' && translated !== countryKey) return stripLeadingFlag(translated);
+    return stripLeadingFlag(country?.nameFrench || country?.nameEnglish || countryKey);
   };
 
   const getUserTypeLabel = (userType) => t(userType) || userType;
