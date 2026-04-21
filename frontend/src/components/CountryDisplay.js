@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/countryAliases';
 
@@ -106,24 +106,159 @@ export function CountrySelect({
   name = 'country',
   id = 'country',
   className = '',
-  required = false
+  required = false,
+  placeholder,
+  searchable = true
 }) {
   const { t } = useLanguage();
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const containerRef = useRef(null);
+
+  const countries = useMemo(() => getAllCountries(), []);
+  const activeCountry = getCountry(value);
+  const resolvedPlaceholder = placeholder || `-- ${t('country')} --`;
+
+  const filteredCountries = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return countries;
+
+    return countries.filter((country) => {
+      const label = getTranslatedCountryName(country, t).toLowerCase();
+      const code = String(country.code || '').toLowerCase();
+      const iso = String(country.iso || '').toLowerCase();
+      return label.includes(query) || code.includes(query) || iso.includes(query);
+    });
+  }, [countries, searchTerm, t]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchTerm('');
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    const selectedIndex = filteredCountries.findIndex((country) => country.code === value);
+    setHighlightedIndex(selectedIndex >= 0 ? selectedIndex : (filteredCountries.length ? 0 : -1));
+  }, [isOpen, value, filteredCountries]);
+
+  const emitChange = (countryCode) => {
+    onChange?.({ target: { name, value: countryCode } });
+    setIsOpen(false);
+  };
+
+  const handleTriggerKeyDown = (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setIsOpen(true);
+    }
+  };
+
+  const handleSearchKeyDown = (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev < filteredCountries.length - 1 ? prev + 1 : 0));
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredCountries.length - 1));
+    }
+
+    if (event.key === 'Enter' && highlightedIndex >= 0 && filteredCountries[highlightedIndex]) {
+      event.preventDefault();
+      emitChange(filteredCountries[highlightedIndex].code);
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setIsOpen(false);
+    }
+  };
 
   return (
-    <select
-      id={id}
-      name={name}
-      value={value}
-      onChange={onChange}
-      required={required}
-      className={`appearance-none block w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900 ${className}`}
-    >
-      {getAllCountries().map((country) => (
-        <option key={country.code} value={country.code}>
-          {getTranslatedCountryName(country, t)}
-        </option>
-      ))}
-    </select>
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        id={id}
+        onClick={() => setIsOpen((prev) => !prev)}
+        onKeyDown={handleTriggerKeyDown}
+        className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-left"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-required={required}
+      >
+        <span className="flex items-center gap-3 min-w-0">
+          <span className="text-lg leading-none">{activeCountry?.flag || '🌍'}</span>
+          <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-400'}`}>
+            {activeCountry ? getTranslatedCountryName(activeCountry, t) : resolvedPlaceholder}
+          </span>
+        </span>
+        <span className={`text-xs text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+
+      <input type="hidden" name={name} value={value || ''} required={required} />
+
+      {isOpen && (
+        <div className="absolute z-30 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden">
+          {searchable && (
+            <div className="p-3 border-b border-gray-100 bg-gray-50">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Rechercher un pays..."
+                autoFocus
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
+            </div>
+          )}
+
+          <div className="max-h-64 overflow-y-auto" role="listbox" aria-labelledby={id}>
+            {filteredCountries.length > 0 ? filteredCountries.map((country, index) => {
+              const isSelected = value === country.code;
+              const isHighlighted = index === highlightedIndex;
+              return (
+                <button
+                  key={country.code}
+                  type="button"
+                  onClick={() => emitChange(country.code)}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+                    isSelected ? 'bg-orange-50 text-orange-700' : isHighlighted ? 'bg-gray-100 text-gray-900' : 'hover:bg-gray-50 text-gray-800'
+                  }`}
+                >
+                  <span className="flex items-center gap-3 min-w-0">
+                    <span className="text-lg leading-none">{country.flag}</span>
+                    <span className="truncate">{getTranslatedCountryName(country, t)}</span>
+                  </span>
+                  {isSelected && <span className="text-sm font-semibold">✓</span>}
+                </button>
+              );
+            }) : (
+              <div className="px-4 py-3 text-sm text-gray-500">Aucun pays trouvé</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
