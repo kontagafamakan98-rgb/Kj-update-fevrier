@@ -48,7 +48,18 @@ export const getCountry = (countryCode) => {
 };
 
 export const getAllCountries = () => {
-  return Object.values(COUNTRIES);
+  const canonicalCodes = new Set();
+
+  return Object.values(COUNTRIES).filter((country) => {
+    const canonicalCode = getCountry(country.code)?.code || country.code;
+
+    if (canonicalCodes.has(canonicalCode)) {
+      return false;
+    }
+
+    canonicalCodes.add(canonicalCode);
+    return true;
+  });
 };
 
 const getTranslatedCountryLabel = (country, t) => {
