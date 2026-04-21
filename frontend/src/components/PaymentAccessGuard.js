@@ -61,19 +61,19 @@ const PaymentAccessGuard = ({ children, showSetupIfNeeded = true }) => {
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
               <div className="flex items-start"><span className="text-yellow-500 text-2xl mr-3">💳</span><div><h3 className="text-lg font-semibold text-yellow-800 mb-2">{t('limitedAccess')}</h3><p className="text-yellow-700">{accessStatus.message}</p></div></div>
               <div className="text-sm text-yellow-800 space-y-1 mt-4">
-                <p>• {t('accountType')}: <span className="font-medium capitalize">{accessStatus.user_type}</span></p>
+                <p>• {t('accountType')}: <span className="font-medium">{t(accessStatus.user_type) || accessStatus.user_type}</span></p>
                 <p>• {t('currentlyLinkedAccounts')}: <span className="font-medium">{accessStatus.current_count}</span></p>
                 <p>• {t('minimumRequired')}: <span className="font-medium">{accessStatus.required_minimum}</span></p>
               </div>
             </div>
             <PaymentAccountSetup userType={accessStatus.user_type} isRegistration={false} onComplete={handleSetupComplete} />
-            <div className="mt-8 text-center"><button onClick={() => navigate('/dashboard')} className="text-orange-600 hover:text-orange-700 text-sm font-medium">← {t('returnToDashboard')}</button></div>
+            <div className="mt-8 text-center"><button onClick={() => navigate('/dashboard')} className="text-orange-600 hover:text-orange-700 text-sm font-medium">{t('returnToDashboard')}</button></div>
           </div>
         </div>
       );
     }
     return (
-      <div className="min-h-screen bg-gray-50 py-8"><div className="max-w-2xl mx-auto px-4 text-center"><div className="bg-red-50 border border-red-200 rounded-lg p-8"><div className="text-6xl mb-4">🚫</div><h1 className="text-2xl font-bold text-red-800 mb-4">{t('paymentAccountsRequiredTitle')}</h1><p className="text-red-700 mb-6">{accessStatus.message}</p><div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6"><div className="text-sm text-red-800 space-y-1"><p>• {t('accountType')}: <span className="font-medium capitalize">{accessStatus.user_type}</span></p><p>• {t('currentlyLinkedAccounts')}: <span className="font-medium">{accessStatus.current_count}</span></p><p>• {t('minimumRequired')}: <span className="font-medium">{accessStatus.required_minimum}</span></p></div></div><div className="space-y-4"><button onClick={() => navigate('/profile')} className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">{t('configureMyPaymentAccounts')}</button><button onClick={() => navigate('/dashboard')} className="w-full px-6 py-3 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors">{t('returnToDashboard')}</button></div></div></div></div>
+      <div className="min-h-screen bg-gray-50 py-8"><div className="max-w-2xl mx-auto px-4 text-center"><div className="bg-red-50 border border-red-200 rounded-lg p-8"><div className="text-6xl mb-4">🚫</div><h1 className="text-2xl font-bold text-red-800 mb-4">{t('paymentAccountsRequiredTitle')}</h1><p className="text-red-700 mb-6">{accessStatus.message}</p><div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6"><div className="text-sm text-red-800 space-y-1"><p>• {t('accountType')}: <span className="font-medium">{t(accessStatus.user_type) || accessStatus.user_type}</span></p><p>• {t('currentlyLinkedAccounts')}: <span className="font-medium">{accessStatus.current_count}</span></p><p>• {t('minimumRequired')}: <span className="font-medium">{accessStatus.required_minimum}</span></p></div></div><div className="space-y-4"><button onClick={() => navigate('/profile')} className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">{t('configureMyPaymentAccounts')}</button><button onClick={() => navigate('/dashboard')} className="w-full px-6 py-3 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors">{t('returnToDashboard')}</button></div></div></div></div>
     );
   }
   return children;

@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import PaymentAccountSetup from '../components/PaymentAccountSetup';
 import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry } from '../services/geolocationService';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 
 const PaymentVerificationPage = () => {
@@ -16,6 +16,15 @@ const PaymentVerificationPage = () => {
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'paymentVerification');
   const toast = useToast();
+
+  const getCountryLabel = (country) => {
+    const countryKey = normalizeCountryCode(country?.code || country?.countryCode || country);
+    const translated = t(countryKey);
+    if (typeof translated === 'string' && translated !== countryKey) return translated;
+    return country?.nameFrench || country?.nameEnglish || countryKey;
+  };
+
+  const getUserTypeLabel = (userType) => t(userType) || userType;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -116,7 +125,7 @@ const PaymentVerificationPage = () => {
                   {pageT('welcome', { firstName: userData.first_name, lastName: userData.last_name })}
                 </p>
                 <p className="text-blue-700">
-                  {pageT('accountType')}: <span className="font-medium capitalize">{userData.user_type}</span>
+                  {pageT('accountType')}: <span className="font-medium">{getUserTypeLabel(userData.user_type)}</span>
                 </p>
               </div>
             </div>
@@ -131,7 +140,7 @@ const PaymentVerificationPage = () => {
             ) : detectedCountry ? (
               <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded text-center">
                 <p className="text-sm text-green-800">
-                  <span className="font-medium">{pageT('position')}:</span> {detectedCountry.flag} {detectedCountry.nameFrench}
+                  <span className="font-medium">{pageT('position')}:</span> {detectedCountry.flag} {getCountryLabel(detectedCountry)}
                 </p>
                 <p className="text-xs text-green-600 mt-1">{pageT('examplesAdjusted')}</p>
               </div>
