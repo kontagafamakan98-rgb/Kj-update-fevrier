@@ -62,17 +62,18 @@ const COUNTRY_TRANSLATION_KEYS = {
   ivory_coast: 'ivory_coast'
 };
 
+const stripLeadingFlag = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+};
+
 const getTranslatedCountryName = (country, t) => {
   const translationKey = COUNTRY_TRANSLATION_KEYS[country.code] || country.code;
   const translated = t(translationKey);
   if (typeof translated === 'string' && translated.trim() && translated !== translationKey) {
-    return translated.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+    return stripLeadingFlag(translated);
   }
   return country.name;
-};
-
-const getTranslatedCountryLabel = (country, t) => {
-  return `${country.flag} ${getTranslatedCountryName(country, t)}`;
 };
 
 export default function CountryDisplay({
@@ -120,7 +121,7 @@ export function CountrySelect({
     >
       {getAllCountries().map((country) => (
         <option key={country.code} value={country.code}>
-          {getTranslatedCountryLabel(country, t)}
+          {getTranslatedCountryName(country, t)}
         </option>
       ))}
     </select>
