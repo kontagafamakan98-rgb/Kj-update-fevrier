@@ -1,4 +1,5 @@
 import React from 'react';
+import { normalizeCountryCode } from '../utils/countryAliases';
 
 // SVG Flag Components
 const MaliFlag = ({ className = "w-12 h-8" }) => (
@@ -39,7 +40,7 @@ const IvoryCoastFlag = ({ className = "w-12 h-8" }) => (
 );
 
 export default function FlagIcon({ country, className = "w-12 h-8", showEmoji = false }) {
-  const normalizedCountry = country?.toLowerCase?.();
+  const normalizedCountry = normalizeCountryCode(country);
 
   if (showEmoji) {
     const flagEmojis = {
@@ -47,7 +48,6 @@ export default function FlagIcon({ country, className = "w-12 h-8", showEmoji = 
       senegal: '🇸🇳',
       burkina_faso: '🇧🇫',
       ivory_coast: '🇨🇮',
-      cote_divoire: '🇨🇮',
       ml: '🇲🇱',
       sn: '🇸🇳',
       bf: '🇧🇫',
@@ -66,14 +66,13 @@ export default function FlagIcon({ country, className = "w-12 h-8", showEmoji = 
     senegal: SenegalFlag,
     burkina_faso: BurkinaFasoFlag,
     ivory_coast: IvoryCoastFlag,
-    cote_divoire: IvoryCoastFlag,
     ml: MaliFlag,
     sn: SenegalFlag,
     bf: BurkinaFasoFlag,
     ci: IvoryCoastFlag
   };
 
-  const FlagComponent = flagComponents[normalizedCountry] || flagComponents[country];
+  const FlagComponent = flagComponents[normalizedCountry] || flagComponents[String(country || '').toLowerCase()];
 
   if (!FlagComponent) {
     return (

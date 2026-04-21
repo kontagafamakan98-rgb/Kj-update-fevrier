@@ -1,14 +1,11 @@
 import {  createContext, useContext, useState , useMemo } from 'react';
 import CommissionService from '../services/commissionService';
 import { devLog, safeLog } from '../utils/env';
+import { normalizeCountryCode } from '../utils/countryAliases';
 
 const PaymentContext = createContext();
 
-const normalizePaymentCountry = (country = '') => {
-  const value = String(country).toLowerCase().trim();
-  if (value === 'cote_divoire') return 'ivory_coast';
-  return value;
-};
+const normalizePaymentCountry = (country = '') => normalizeCountryCode(country);
 
 export function usePayment() {
   return useContext(PaymentContext);
