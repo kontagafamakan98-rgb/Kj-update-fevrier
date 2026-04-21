@@ -8,6 +8,15 @@ import {
   getLocalLanguageForCountry 
 } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { normalizeCountryCode } from '../utils/pack2PageI18n';
+
+const COUNTRY_PREFERENCE_KEYS = {
+  mali: 'maliLanguagePreference',
+  senegal: 'senegalLanguagePreference',
+  burkina_faso: 'burkinaLanguagePreference',
+  ivory_coast: 'ivoryCoastLanguagePreference',
+  cote_divoire: 'ivoryCoastLanguagePreference'
+};
 
 const RegistrationLanguageSelector = ({ 
   detectedCountry, 
@@ -18,6 +27,7 @@ const RegistrationLanguageSelector = ({
   const [orderedLanguages, setOrderedLanguages] = useState([]);
   const [suggestionMessage, setSuggestionMessage] = useState(null);
   const { changeLanguage, t } = useLanguage(); // Utiliser le contexte de langue
+  const normalizedCountryCode = normalizeCountryCode(detectedCountry?.code || '');
 
   useEffect(() => {
     if (detectedCountry) {
@@ -83,13 +93,12 @@ const RegistrationLanguageSelector = ({
             <span className="text-blue-500 text-lg mr-2">💡</span>
             <div className="flex-1">
               <p className="text-sm text-blue-800 font-medium">
-                📍 {t('basedOnLocation')} ({detectedCountry.flag} {t(detectedCountry.code === 'mali' ? 'mali' : detectedCountry.code === 'senegal' ? 'senegal' : detectedCountry.code === 'burkina_faso' ? 'burkina_faso' : 'ivory_coast')})
+                📍 {t('basedOnLocation')} ({detectedCountry.flag} {t(COUNTRY_PREFERENCE_KEYS[normalizedCountryCode] === 'ivoryCoastLanguagePreference' ? 'ivory_coast' : normalizedCountryCode)})
               </p>
               <p className="text-xs text-blue-700 mt-1">
-                {detectedCountry.code === 'mali' && t('maliLanguagePreference')}
-                {detectedCountry.code === 'senegal' && t('senegalLanguagePreference')}
-                {detectedCountry.code === 'burkina_faso' && t('burkinaLanguagePreference')}
-                {detectedCountry.code === 'cote_divoire' && t('ivoryCoastLanguagePreference')}
+                {COUNTRY_PREFERENCE_KEYS[normalizedCountryCode]
+                  ? t(COUNTRY_PREFERENCE_KEYS[normalizedCountryCode])
+                  : suggestionMessage || t('choosePreferredLanguage')}
               </p>
             </div>
           </div>

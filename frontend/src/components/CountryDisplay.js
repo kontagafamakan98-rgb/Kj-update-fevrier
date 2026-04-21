@@ -55,9 +55,24 @@ export const getAllCountries = () => {
   });
 };
 
+const COUNTRY_TRANSLATION_KEYS = {
+  mali: 'mali',
+  senegal: 'senegal',
+  burkina_faso: 'burkina_faso',
+  ivory_coast: 'ivory_coast'
+};
+
+const getTranslatedCountryName = (country, t) => {
+  const translationKey = COUNTRY_TRANSLATION_KEYS[country.code] || country.code;
+  const translated = t(translationKey);
+  if (typeof translated === 'string' && translated.trim() && translated !== translationKey) {
+    return translated.replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+  }
+  return country.name;
+};
+
 const getTranslatedCountryLabel = (country, t) => {
-  const translated = t(country.code);
-  return typeof translated === 'string' ? translated : country.fullName;
+  return `${country.flag} ${getTranslatedCountryName(country, t)}`;
 };
 
 export default function CountryDisplay({
@@ -74,8 +89,7 @@ export default function CountryDisplay({
     return <span className={className}>{t('unknownCountry')}</span>;
   }
 
-  const translatedLabel = getTranslatedCountryLabel(country, t);
-  const translatedName = translatedLabel.replace(/^\S+\s+/, '').trim() || country.name;
+  const translatedName = getTranslatedCountryName(country, t);
 
   return (
     <span className={`flex items-center space-x-2 ${className}`}>
