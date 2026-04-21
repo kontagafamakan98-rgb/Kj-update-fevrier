@@ -77,6 +77,10 @@ export default function Register() {
     return value.replace(/^\+\d+\s*/, '').trimStart();
   };
 
+  const activeCountry = findCountryData(formData.country) || detectedCountry;
+  const activePhonePrefix = activeCountry?.phonePrefix || '';
+  const activePhoneExample = activeCountry ? stripPhonePrefix(getPhoneExampleForCountry(activeCountry), activePhonePrefix) : pageT('phonePlaceholder');
+
   // Géolocalisation automatique au chargement
   useEffect(() => {
     detectUserLocationAndSetDefaults();
@@ -425,7 +429,7 @@ export default function Register() {
               </label>
               <div className="flex rounded-lg shadow-sm">
                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                  {findCountryData(formData.country)?.phonePrefix || '—'}
+                  {activePhonePrefix || '—'}
                 </span>
                 <input
                   id="phone"
@@ -434,13 +438,10 @@ export default function Register() {
                   autoComplete="tel"
                   required
                   className="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder={detectedCountry ? 
-                    stripPhonePrefix(getPhoneExampleForCountry(detectedCountry), findCountryData(formData.country)?.phonePrefix || detectedCountry.phonePrefix || '') : 
-                    pageT('phonePlaceholder')
-                  }
-                  value={stripPhonePrefix(formData.phone, findCountryData(formData.country)?.phonePrefix || '')}
+                  placeholder={activePhoneExample}
+                  value={stripPhonePrefix(formData.phone, activePhonePrefix)}
                   onChange={(e) => {
-                    const currentCountry = findCountryData(formData.country);
+                    const currentCountry = activeCountry;
                     const prefix = currentCountry ? currentCountry.phonePrefix : '';
                     const cleanValue = e.target.value.replace(/[^\d\s]/g, '');
                     updateFormData('phone', prefix ? prefix + ' ' + cleanValue : cleanValue);
@@ -448,7 +449,7 @@ export default function Register() {
                 />
               </div>
               <p className="mt-1 text-sm text-gray-500">
-                {pageT('phoneFormatHint')}: {findCountryData(formData.country)?.phonePrefix || '---'} XX XXX XX XX
+                {pageT('phoneFormatHint')}: {activePhonePrefix || '---'} XX XXX XX XX
               </p>
             </div>
             
