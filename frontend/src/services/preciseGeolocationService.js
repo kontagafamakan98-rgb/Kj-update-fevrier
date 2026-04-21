@@ -948,7 +948,7 @@ class PreciseGeolocationService {
    */
   getSupportedCountries() {
     return Object.entries(PRECISE_GEOGRAPHIC_DATABASE).map(([code, data]) => ({
-      code: normalizedCode,
+      code,
       name: data.country,
       nameFrench: data.nameFrench,
       flag: data.flag,
@@ -969,11 +969,12 @@ export const detectUserCountry = async (options = {}) => {
   if (!location) return null;
   if (location.isApproximate && !options.allowApproximate) return null;
 
-  const countryData = PRECISE_GEOGRAPHIC_DATABASE[location.countryCode];
+  const normalizedCountryCode = normalizeCountryCode(location.countryCode || '');
+  const countryData = PRECISE_GEOGRAPHIC_DATABASE[normalizedCountryCode];
   if (!countryData) {
     // Pays hors base de données - retourner des infos neutres sans biais Sénégal
     return {
-      code: normalizeCountryCode(location.countryCode || ''),
+      code: normalizedCountryCode,
       name: location.country || 'Detected country',
       nameFrench: location.country || 'Pays détecté',
       flag: location.flag || '🌍',
@@ -983,7 +984,7 @@ export const detectUserCountry = async (options = {}) => {
     };
   }
   return {
-    code: location.countryCode,
+    code: normalizedCountryCode,
     name: countryData.country,
     nameFrench: countryData.nameFrench,
     flag: countryData.flag,
