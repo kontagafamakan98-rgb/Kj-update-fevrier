@@ -1,7 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { devLog, safeLog } from './utils/env';
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
@@ -220,24 +219,6 @@ function App() {
 
     addMobileOptimizations();
 
-    // Handle online/offline status
-    const handleOnline = () => {};
-    
-    const handleOffline = () => {};
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // Handle PWA app installed event
-    const handleAppInstalled = () => {};
-
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
   }, []);
 
   return (
