@@ -23,6 +23,7 @@ const EmailVerificationPage = () => {
 
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState('');
   const [maskedEmail, setMaskedEmail] = useState('');
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [expiresInSeconds, setExpiresInSeconds] = useState(0);
@@ -81,6 +82,7 @@ const EmailVerificationPage = () => {
 
   const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
   const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
+  const displayedError = errorKey ? pageT(errorKey) : error;
 
   const handleSendCode = async (mode = 'send') => {
     if (!userData?.email) {
@@ -89,6 +91,7 @@ const EmailVerificationPage = () => {
 
     setSendingCode(true);
     setError('');
+    setErrorKey('');
 
     try {
       const payload = {
@@ -110,7 +113,9 @@ const EmailVerificationPage = () => {
     } catch (apiError) {
       const rawMessage = extractErrorMessage(apiError, pageT('genericError'));
       const message = translateApiMessage(rawMessage);
+      const nextErrorKey = isEmailAlreadyUsedMessage(rawMessage) ? 'duplicateEmailError' : '';
       setError(message);
+      setErrorKey(nextErrorKey);
       toast.error(message);
       safeLog.error('❌ Erreur envoi OTP Gmail:', apiError);
 
@@ -130,12 +135,14 @@ const EmailVerificationPage = () => {
     if (otp.length !== OTP_LENGTH) {
       const message = pageT('invalidOtpLength');
       setError(message);
+      setErrorKey('invalidOtpLength');
       toast.error(message);
       return;
     }
 
     setVerifying(true);
     setError('');
+    setErrorKey('');
 
     try {
       const verificationResult = await authAPI.verifyEmailOtp({
@@ -161,8 +168,11 @@ const EmailVerificationPage = () => {
         }
       });
     } catch (apiError) {
-      const message = extractErrorMessage(apiError, pageT('genericError'));
+      const rawMessage = extractErrorMessage(apiError, pageT('genericError'));
+      const message = translateApiMessage(rawMessage);
+      const nextErrorKey = isEmailAlreadyUsedMessage(rawMessage) ? 'duplicateEmailError' : '';
       setError(message);
+      setErrorKey(nextErrorKey);
       toast.error(message);
       safeLog.error('❌ Erreur vérification email Gmail:', apiError);
     } finally {
@@ -205,9 +215,9 @@ const EmailVerificationPage = () => {
           </div>
 
           <div className="p-6 md:p-8">
-            {error && (
+            {displayedError && (
               <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
+                {displayedError}
               </div>
             )}
 
