@@ -225,6 +225,8 @@ export function CountrySelect({
           {searchable && (
             <div className="p-3 border-b border-gray-100 bg-gray-50">
               <input
+                id={`${id}-search`}
+                name={`${name || 'country'}_search`}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

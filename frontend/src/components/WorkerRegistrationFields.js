@@ -100,6 +100,8 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
             {showSkillInput ? (
               <div className="flex gap-2">
                 <input
+                  id="worker_custom_skill"
+                  name="worker_custom_skill"
                   type="text"
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}

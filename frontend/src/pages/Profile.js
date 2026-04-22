@@ -445,9 +445,9 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('specialties')}</label>
+          <label htmlFor="profile_specialty_input" className="block text-sm font-medium text-gray-700 mb-2">{pageT('specialties')}</label>
           <div className="flex space-x-2">
-            <input type="text" value={specialtyInput} onChange={(e) => setSpecialtyInput(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('specialtyPlaceholder')} />
+            <input id="profile_specialty_input" name="profile_specialty_input" type="text" value={specialtyInput} onChange={(e) => setSpecialtyInput(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('specialtyPlaceholder')} />
             <button type="button" onClick={addSpecialty} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md">{pageT('add')}</button>
           </div>
           {formData.specialties.length > 0 && (
