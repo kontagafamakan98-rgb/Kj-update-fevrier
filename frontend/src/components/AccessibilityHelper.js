@@ -18,17 +18,46 @@ const AccessibilityHelper = () => {
     addLiveRegions();
     
     // Monitor and fix common accessibility issues
-    monitorAccessibility();
+    const cleanupAccessibilityMonitor = monitorAccessibility();
     
     return () => {
       // Cleanup
       const skipLink = document.getElementById('skip-to-main');
       if (skipLink) skipLink.remove();
+      if (typeof cleanupAccessibilityMonitor === 'function') {
+        cleanupAccessibilityMonitor();
+      }
     };
   }, []);
 
   return null;
 };
+
+function scheduleDeferredTask(task, delay = 2000) {
+  let timeoutId = null;
+  let idleId = null;
+
+  const runTask = () => {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(() => task(), { timeout: 1500 });
+      return;
+    }
+
+    timeoutId = window.setTimeout(task, delay);
+  };
+
+  runTask();
+
+  return () => {
+    if (idleId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+      window.cancelIdleCallback(idleId);
+    }
+
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+  };
+}
 
 /**
  * Add "Skip to main content" link for keyboard users
@@ -155,50 +184,63 @@ function addLiveRegions() {
  */
 function monitorAccessibility() {
   // Only run in development
-  if (process.env.NODE_ENV !== 'development') return;
+  if (process.env.NODE_ENV !== 'development') return () => {};
 
-  setTimeout(() => {
+  return scheduleDeferredTask(() => {
     const issues = [];
 
     // Check for images without alt text
-    const imagesWithoutAlt = document.querySelectorAll('img:not([alt])');
-    if (imagesWithoutAlt.length > 0) {
-      issues.push(`${imagesWithoutAlt.length} images sans attribut alt`);
+    const imagesWithoutAltCount = document.querySelectorAll('img:not([alt])').length;
+    if (imagesWithoutAltCount > 0) {
+      issues.push(`${imagesWithoutAltCount} images sans attribut alt`);
     }
 
     // Check for buttons without accessible text
-    const buttonsWithoutText = Array.from(document.querySelectorAll('button')).filter(btn => {
+    const buttons = document.querySelectorAll('button');
+    let buttonsWithoutTextCount = 0;
+    buttons.forEach((btn) => {
       const hasText = btn.textContent.trim().length > 0;
       const hasAriaLabel = btn.hasAttribute('aria-label');
       const hasAriaLabelledby = btn.hasAttribute('aria-labelledby');
-      return !hasText && !hasAriaLabel && !hasAriaLabelledby;
+      if (!hasText && !hasAriaLabel && !hasAriaLabelledby) {
+        buttonsWithoutTextCount += 1;
+      }
     });
-    if (buttonsWithoutText.length > 0) {
-      issues.push(`${buttonsWithoutText.length} boutons sans texte accessible`);
+    if (buttonsWithoutTextCount > 0) {
+      issues.push(`${buttonsWithoutTextCount} boutons sans texte accessible`);
     }
 
     // Check for links without accessible text
-    const linksWithoutText = Array.from(document.querySelectorAll('a')).filter(link => {
+    const links = document.querySelectorAll('a');
+    let linksWithoutTextCount = 0;
+    links.forEach((link) => {
       const hasText = link.textContent.trim().length > 0;
       const hasAriaLabel = link.hasAttribute('aria-label');
-      return !hasText && !hasAriaLabel;
+      if (!hasText && !hasAriaLabel) {
+        linksWithoutTextCount += 1;
+      }
     });
-    if (linksWithoutText.length > 0) {
-      issues.push(`${linksWithoutText.length} liens sans texte accessible`);
+    if (linksWithoutTextCount > 0) {
+      issues.push(`${linksWithoutTextCount} liens sans texte accessible`);
     }
 
     // Check for form inputs without labels
-    const inputsWithoutLabels = Array.from(document.querySelectorAll('input, textarea, select')).filter(input => {
-      if (input.type === 'hidden' || input.type === 'submit') return false;
-      
-      const hasLabel = document.querySelector(`label[for="${input.id}"]`);
+    const formFields = document.querySelectorAll('input, textarea, select');
+    let inputsWithoutLabelsCount = 0;
+    formFields.forEach((input) => {
+      if (input.type === 'hidden' || input.type === 'submit') return;
+
+      const hasId = Boolean(input.id);
+      const hasLabel = hasId ? document.querySelector(`label[for="${input.id}"]`) : input.closest('label');
       const hasAriaLabel = input.hasAttribute('aria-label');
       const hasAriaLabelledby = input.hasAttribute('aria-labelledby');
-      
-      return !hasLabel && !hasAriaLabel && !hasAriaLabelledby;
+
+      if (!hasLabel && !hasAriaLabel && !hasAriaLabelledby) {
+        inputsWithoutLabelsCount += 1;
+      }
     });
-    if (inputsWithoutLabels.length > 0) {
-      issues.push(`${inputsWithoutLabels.length} champs de formulaire sans label`);
+    if (inputsWithoutLabelsCount > 0) {
+      issues.push(`${inputsWithoutLabelsCount} champs de formulaire sans label`);
     }
 
     // Check color contrast (basic check)
@@ -211,7 +253,7 @@ function monitorAccessibility() {
     } else {
       devLog.info('✅ Aucun problème d\'accessibilité majeur détecté');
     }
-  }, 2000); // Wait for page to fully render
+  }, 2000);
 }
 
 /**
@@ -219,7 +261,8 @@ function monitorAccessibility() {
  */
 function checkColorContrast() {
   // This is a simplified check - full contrast checking requires more complex algorithms
-  const textElements = document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, a, button, span, div');
+  // Sample a limited number of visible text elements to avoid heavy page-wide scans
+  const textElements = Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, a, button, span, div')).slice(0, 120);
   let lowContrastCount = 0;
 
   textElements.forEach(el => {
@@ -227,15 +270,25 @@ function checkColorContrast() {
     const color = style.color;
     const backgroundColor = style.backgroundColor;
     
-    // Skip if transparent or inherited
-    if (backgroundColor === 'rgba(0, 0, 0, 0)' || backgroundColor === 'transparent') {
+    // Skip if transparent, inherited or hidden
+    if (
+      backgroundColor === 'rgba(0, 0, 0, 0)' ||
+      backgroundColor === 'transparent' ||
+      style.display === 'none' ||
+      style.visibility === 'hidden'
+    ) {
       return;
     }
     
     // Simple luminosity check (very basic)
     const colorLum = getLuminosity(color);
     const bgLum = getLuminosity(backgroundColor);
-    const contrast = Math.max(colorLum, bgLum) / Math.min(colorLum, bgLum);
+    const minLum = Math.min(colorLum, bgLum);
+    if (minLum === 0) {
+      return;
+    }
+
+    const contrast = Math.max(colorLum, bgLum) / minLum;
     
     if (contrast < 4.5) { // WCAG AA standard for normal text
       lowContrastCount++;
