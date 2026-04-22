@@ -147,17 +147,28 @@ GMAIL_SENDER_EMAIL = os.environ.get('GMAIL_SENDER_EMAIL', '').strip()
 GMAIL_SENDER_NAME = os.environ.get('GMAIL_SENDER_NAME', 'KOJO').strip() or 'KOJO'
 
 # Security Headers for West Africa
-SECURITY_HEADERS = {
+DEFAULT_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "X-XSS-Protection": "1; mode=block",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'strict-dynamic' 'nonce-kojo2025'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 }
 
+DOCS_SECURITY_HEADERS = {
+    **DEFAULT_SECURITY_HEADERS,
+    "Content-Security-Policy": "default-src 'self' https://cdn.jsdelivr.net https://fastapi.tiangolo.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com https://cdn.jsdelivr.net; connect-src 'self'; font-src 'self' https://cdn.jsdelivr.net data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+}
+
+def get_security_headers_for_path(path: str) -> dict:
+    if path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/openapi.json"):
+        return DOCS_SECURITY_HEADERS
+    return DEFAULT_SECURITY_HEADERS
+
 # Owner/Admin configuration - SEUL FAMAKAN KONTAGA MASTER A ACCÈS
-OWNER_EMAIL = os.environ.get('OWNER_EMAIL', 'kontagamakan@gmail.com')  # Email de Famakan Kontaga Master
-OWNER_USER_ID = 'famakan_kontaga_master_2024'  # ID unique pour Famakan
+OWNER_EMAIL = os.environ.get('OWNER_EMAIL', '').strip()
+OWNER_USER_ID = os.environ.get('OWNER_USER_ID', 'famakan_kontaga_master_2024').strip() or 'famakan_kontaga_master_2024'
+OWNER_INITIAL_PASSWORD = os.environ.get('OWNER_INITIAL_PASSWORD', '').strip()
 
 # Create the main app without a prefix
 app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & Senegal")
@@ -197,21 +208,19 @@ security = HTTPBearer()
 # Custom Security Middleware for West Africa
 class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Add security headers
         response = await call_next(request)
-        
-        # Security headers optimized for West Africa
-        for header, value in SECURITY_HEADERS.items():
+
+        for header, value in get_security_headers_for_path(request.url.path).items():
             response.headers[header] = value
-        
-        # Add server identification
+
         response.headers["X-Kojo-Region"] = "west-africa"
         response.headers["X-Kojo-Version"] = "1.0.0"
-        
-        # Performance headers for slow networks
-        if request.url.path.startswith("/api"):
+
+        if request.url.path.startswith("/docs") or request.url.path.startswith("/redoc"):
+            response.headers["Cache-Control"] = "no-store"
+        elif request.url.path.startswith("/api"):
             response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes cache
-        
+
         return response
 
 # Fonction pour vérifier si l'utilisateur est le propriétaire
@@ -253,47 +262,56 @@ async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depend
 
 # Fonction pour créer le compte propriétaire s'il n'existe pas
 async def ensure_owner_exists():
-    """Crée le compte de Famakan Kontaga Master s'il n'existe pas déjà"""
+    """Crée le compte propriétaire s'il n'existe pas déjà et si les secrets requis sont fournis."""
+    if not OWNER_EMAIL:
+        logger.warning("⚠️ OWNER_EMAIL non défini: création automatique du compte owner désactivée.")
+        return
+
     existing_owner = await db.users.find_one({"id": OWNER_USER_ID})
-    
-    if not existing_owner:
-        # Hasher un mot de passe sécurisé pour Famakan
-        default_password = "FamakanKojo2024@Master!"
-        hashed_password = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
-        
-        owner_data = {
-            "id": OWNER_USER_ID,
-            "email": OWNER_EMAIL,
-            "password_hash": hashed_password.decode('utf-8'),
-            "first_name": "Famakan",
-            "last_name": "Kontaga Master",
-            "user_type": "owner",  # Type spécial pour le propriétaire
-            "phone": "+223701234567",  # Mali
-            "country": "mali",
-            "preferred_language": "fr",
-            "profile_photo": None,
-            "is_verified": True,
-            "rating": 0.0,
-            "total_reviews": 0,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "is_owner": True,
-            "permissions": [
-                "commission_access",
-                "debug_access", 
-                "admin_access",
-                "full_dashboard_access",
-                "mobile_test_access",
-                "photo_debug_access"
-            ]
-        }
-        
-        await db.users.insert_one(owner_data)
-        logger.info(f"✅ Compte Famakan Kontaga Master créé: {OWNER_EMAIL}")
-        logger.info(f"🔐 Mot de passe: {default_password}")
-        logger.warning("⚠️  SEUL FAMAKAN KONTAGA MASTER PEUT ACCÉDER AUX FONCTIONNALITÉS SENSIBLES!")
-    else:
-        logger.info(f"✅ Compte Famakan Kontaga Master existe déjà: {OWNER_EMAIL}")
+    if existing_owner:
+        logger.info(f"✅ Compte owner existe déjà: {OWNER_EMAIL}")
+        return
+
+    if not OWNER_INITIAL_PASSWORD:
+        logger.warning("⚠️ Compte owner absent et OWNER_INITIAL_PASSWORD non défini: aucune création automatique effectuée.")
+        return
+
+    if len(OWNER_INITIAL_PASSWORD) < 12:
+        logger.warning("⚠️ OWNER_INITIAL_PASSWORD trop court (minimum 12 caractères): création automatique du compte owner refusée.")
+        return
+
+    hashed_password = bcrypt.hashpw(OWNER_INITIAL_PASSWORD.encode('utf-8'), bcrypt.gensalt())
+
+    owner_data = {
+        "id": OWNER_USER_ID,
+        "email": OWNER_EMAIL,
+        "password_hash": hashed_password.decode('utf-8'),
+        "first_name": "Famakan",
+        "last_name": "Kontaga Master",
+        "user_type": "owner",
+        "phone": "+223701234567",
+        "country": "mali",
+        "preferred_language": "fr",
+        "profile_photo": None,
+        "is_verified": True,
+        "rating": 0.0,
+        "total_reviews": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "is_owner": True,
+        "permissions": [
+            "commission_access",
+            "debug_access",
+            "admin_access",
+            "full_dashboard_access",
+            "mobile_test_access",
+            "photo_debug_access"
+        ]
+    }
+
+    await db.users.insert_one(owner_data)
+    logger.info(f"✅ Compte owner créé: {OWNER_EMAIL}")
+    logger.warning("⚠️ Changez OWNER_INITIAL_PASSWORD après la première connexion et retirez-le ensuite du fichier .env.")
 
 # Enums
 class UserType(str, Enum):
@@ -1090,8 +1108,12 @@ async def issue_email_otp(email: str, purpose: str = "signup") -> dict:
 
         elapsed = (now - last_sent_at).total_seconds()
         if elapsed < EMAIL_OTP_RESEND_COOLDOWN_SECONDS:
-            remaining = int(EMAIL_OTP_RESEND_COOLDOWN_SECONDS - elapsed)
-            raise HTTPException(status_code=429, detail=f"Veuillez patienter {remaining}s avant de renvoyer un autre code.")
+            remaining = max(1, int(EMAIL_OTP_RESEND_COOLDOWN_SECONDS - elapsed + 0.999))
+            raise HTTPException(
+                status_code=429,
+                detail=f"Veuillez patienter {remaining}s avant de renvoyer un autre code.",
+                headers={"Retry-After": str(remaining)}
+            )
 
     otp_code = generate_email_otp_code()
     otp_hash = hash_email_otp(email, purpose, otp_code)
@@ -1184,21 +1206,34 @@ async def verify_signup_email_otp(payload: EmailOtpVerifyRequest):
         raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau code.")
 
     if otp_record.get("attempt_count", 0) >= EMAIL_OTP_MAX_ATTEMPTS:
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": payload.purpose},
+            {
+                "$set": {
+                    "status": "locked",
+                    "updated_at": now
+                }
+            }
+        )
         raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
 
     candidate_hash = hash_email_otp(clean_email, payload.purpose, payload.otp)
     if candidate_hash != otp_record.get("otp_hash"):
         new_attempt_count = otp_record.get("attempt_count", 0) + 1
+        new_status = "locked" if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS else "pending"
         await db.email_otps.update_one(
             {"email": clean_email, "purpose": payload.purpose},
             {
                 "$set": {
                     "attempt_count": new_attempt_count,
                     "updated_at": now,
-                    "last_attempt_at": now
+                    "last_attempt_at": now,
+                    "status": new_status
                 }
             }
         )
+        if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
         remaining = max(0, EMAIL_OTP_MAX_ATTEMPTS - new_attempt_count)
         raise HTTPException(status_code=400, detail=f"Code invalide. Tentatives restantes: {remaining}.")
 
