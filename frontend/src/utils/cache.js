@@ -307,8 +307,27 @@ class KojoCache {
 // Create singleton instance
 const kojoCache = new KojoCache();
 
-// Auto cleanup on app start
-setTimeout(() => kojoCache.cleanup(), 1000);
+const scheduleCacheCleanup = () => {
+  if (typeof window === 'undefined') return;
+
+  const runCleanup = () => {
+    try {
+      kojoCache.cleanup();
+    } catch (error) {
+      safeLog.warn('Deferred cache cleanup failed:', error);
+    }
+  };
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(runCleanup, { timeout: 10000 });
+    return;
+  }
+
+  window.setTimeout(runCleanup, 8000);
+};
+
+// Auto cleanup on app start, deferred to idle time to avoid startup warnings
+scheduleCacheCleanup();
 
 // Predefined cache keys for consistency
 export const CACHE_KEYS = {
