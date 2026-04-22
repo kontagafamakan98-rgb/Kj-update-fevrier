@@ -8,6 +8,7 @@ import CountryDisplay from '../components/CountryDisplay';
 import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry } from '../services/geolocationService';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
 
 const PaymentVerificationPage = () => {
@@ -25,9 +26,10 @@ const PaymentVerificationPage = () => {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [geoLoading, setGeoLoading] = useState(true);
 
-  const userData = location.state?.userData;
-  const prefilledPaymentAccounts = location.state?.paymentAccounts || null;
-  const emailVerificationToken = location.state?.emailVerificationToken || null;
+  const persistedFlow = loadRegistrationFlow();
+  const userData = location.state?.userData || persistedFlow?.userData || null;
+  const prefilledPaymentAccounts = location.state?.paymentAccounts || persistedFlow?.paymentAccounts || null;
+  const emailVerificationToken = location.state?.emailVerificationToken || persistedFlow?.emailVerificationToken || null;
 
   useEffect(() => {
     if (!userData) {
@@ -44,6 +46,13 @@ const PaymentVerificationPage = () => {
       });
       return;
     }
+
+    mergeRegistrationFlow({
+      userData,
+      paymentAccounts: prefilledPaymentAccounts,
+      emailVerificationToken,
+      currentStep: 'payment-verification'
+    });
 
     detectUserLocationForPayments();
   }, [emailVerificationToken, navigate, prefilledPaymentAccounts, userData]);
@@ -69,6 +78,13 @@ const PaymentVerificationPage = () => {
     try {
       devLog.info('🏦 Finalisation du compte après email vérifié...');
 
+      mergeRegistrationFlow({
+        userData,
+        paymentAccounts,
+        emailVerificationToken,
+        currentStep: 'payment-verification'
+      });
+
       const result = await PaymentAccountService.registerWithPaymentVerification(
         userData,
         paymentAccounts,
@@ -83,6 +99,8 @@ const PaymentVerificationPage = () => {
       if (!autoLoginResult.success) {
         throw new Error(pageT('autoLoginError'));
       }
+
+      clearRegistrationFlow();
 
       PaymentAccountService.storeVerificationStatus({
         is_verified: result.data.user.is_verified,

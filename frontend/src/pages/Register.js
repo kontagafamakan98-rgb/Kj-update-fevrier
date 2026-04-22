@@ -10,6 +10,7 @@ import RegistrationLanguageSelector from '../components/RegistrationLanguageSele
 import LoadingButton from '../components/LoadingButton';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
+import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
 
 export default function Register() {
@@ -173,6 +174,14 @@ export default function Register() {
     devLog.info('📝 Redirection vers la vérification email...');
 
     toast.success(t('registerStepSuccess') + ' ✅');
+
+    clearRegistrationFlow();
+    saveRegistrationFlow({
+      userData,
+      paymentAccounts: null,
+      emailVerificationToken: null,
+      currentStep: 'email-verification'
+    });
 
     navigate('/email-verification', {
       state: {
