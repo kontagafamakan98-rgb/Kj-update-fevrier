@@ -35,6 +35,7 @@ const CreateJob = lazy(() => import('./pages/CreateJob'));
 const MobileTest = lazy(() => import('./pages/MobileTest'));
 const PhotoTest = lazy(() => import('./pages/PhotoTest'));
 const PaymentDemo = lazy(() => import('./pages/PaymentDemo'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const EmailVerificationPage = lazy(() => import('./pages/EmailVerificationPage'));
 const PaymentVerificationPage = lazy(() => import('./pages/PaymentVerificationPage'));
 const CommissionDashboard = lazy(() => import('./pages/CommissionDashboard'));
@@ -126,6 +127,7 @@ function AppRoutes() {
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />
             
             {/* Protected routes - lazy loaded */}

@@ -16,7 +16,8 @@ const isPublicAuthEndpoint = (url = '') => {
   return normalizedUrl.includes('/auth/login')
     || normalizedUrl.includes('/auth/register')
     || normalizedUrl.includes('/auth/register-verified')
-    || normalizedUrl.includes('/auth/email/');
+    || normalizedUrl.includes('/auth/email/')
+    || normalizedUrl.includes('/auth/password/');
 };
 
 /**
@@ -247,6 +248,10 @@ export const authAPI = {
   sendEmailOtp: (payload) => api.post('/auth/email/send-otp', payload),
   verifyEmailOtp: (payload) => api.post('/auth/email/verify-otp', payload),
   resendEmailOtp: (payload) => api.post('/auth/email/resend-otp', payload),
+  requestPasswordResetOtp: (payload) => api.post('/auth/password/forgot/request', payload),
+  resendPasswordResetOtp: (payload) => api.post('/auth/password/forgot/resend', payload),
+  verifyPasswordResetOtp: (payload) => api.post('/auth/password/forgot/verify', payload),
+  resetPassword: (payload) => api.post('/auth/password/reset', payload),
   logout: () => {
     // Clear all cache on logout
     kojoCache.clear();

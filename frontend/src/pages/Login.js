@@ -15,9 +15,17 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   
   const { login } = useAuth();
-  const { t } = useLanguage();
+  const { t, currentLanguage } = useLanguage();
   const toast = useToast();
   const navigate = useNavigate();
+  const forgotPasswordLabelMap = {
+    fr: 'Mot de passe oublié ?',
+    en: 'Forgot password?',
+    wo: 'Fàtte nga sa baatu jàll ?',
+    bm: 'I ye mot de passe ɲinɛna wa ?',
+    mos: 'Fo ye mot de passe wã yɩɩda ye?'
+  };
+  const forgotPasswordLabel = forgotPasswordLabelMap[currentLanguage] || forgotPasswordLabelMap.fr;
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
 
   const handleSubmit = async (e) => {
@@ -94,9 +102,14 @@ export default function Login() {
             </div>
             
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                {t('password')}
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  {t('password')}
+                </label>
+                <Link to="/forgot-password" className="text-sm font-medium text-orange-600 hover:text-orange-500">
+                  {forgotPasswordLabel}
+                </Link>
+              </div>
               <input
                 id="password"
                 name="password"
