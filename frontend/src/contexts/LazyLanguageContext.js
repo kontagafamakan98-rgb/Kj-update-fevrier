@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { devLog } from '../utils/env';
 
 const LazyLanguageContext = createContext();
 
@@ -42,7 +43,7 @@ const loadLanguageTranslations = async (languageCode) => {
     translationCache[languageCode] = module.default;
     return module.default;
   } catch (error) {
-    console.warn(`Impossible de charger les traductions pour ${languageCode}:`, error);
+    devLog.warn(`Impossible de charger les traductions pour ${languageCode}:`, error);
     // Fallback vers les traductions de base
     return baseTranslations[languageCode] || baseTranslations.fr;
   }
@@ -69,7 +70,7 @@ export const LazyLanguageProvider = ({ children }) => {
       // Sauvegarder dans localStorage
       localStorage.setItem('language', newLanguage);
     } catch (error) {
-      console.error('Erreur lors du changement de langue:', error);
+      devLog.error('Erreur lors du changement de langue:', error);
       // En cas d'erreur, utiliser les traductions de base
       setTranslations(baseTranslations[newLanguage] || baseTranslations.fr);
     } finally {
