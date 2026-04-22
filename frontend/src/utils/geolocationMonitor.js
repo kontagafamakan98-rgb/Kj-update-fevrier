@@ -3,7 +3,7 @@
  * Suit la qualité et la fiabilité de la détection de position
  */
 
-import { devLog } from './env';
+import { devLog, isDevelopment } from './env';
 
 class GeolocationMonitor {
   constructor() {
@@ -145,29 +145,13 @@ class GeolocationMonitor {
    * Afficher le rapport dans la console
    */
   logReport() {
+    if (!isDevelopment) {
+      return this.getReport();
+    }
+
     const report = this.getReport();
-    
-    console.group('📊 RAPPORT GÉOLOCALISATION KOJO');
-    console.log(`Total détections: ${report.totalDetections}`);
-    console.log(`Taux de succès: ${report.successRate}`);
-    console.log(`Précision moyenne: ${report.averageAccuracy}`);
-    console.log(`Temps moyen: ${report.averageDetectionTime}`);
-    
-    console.group('📈 Statistiques par méthode');
-    report.methodStats.forEach(stat => {
-      console.log(`\n${stat.method}:`);
-      console.log(`  Utilisation: ${stat.usage}`);
-      console.log(`  Succès: ${stat.successRate}`);
-      console.log(`  Précision: ${stat.avgAccuracy}`);
-      console.log(`  Temps: ${stat.avgTime}`);
-    });
-    console.groupEnd();
-    
-    console.group('🕐 10 Dernières détections');
-    console.table(report.recentDetections);
-    console.groupEnd();
-    
-    console.groupEnd();
+    devLog.info('📊 RAPPORT GÉOLOCALISATION KOJO', report);
+    return report;
   }
 
   /**
@@ -226,8 +210,8 @@ class GeolocationMonitor {
 // Singleton
 const geolocationMonitor = new GeolocationMonitor();
 
-// Exposer pour debug en console
-if (typeof window !== 'undefined') {
+// Exposer pour debug en console uniquement en développement
+if (typeof window !== 'undefined' && isDevelopment) {
   window.kojoGeoMonitor = geolocationMonitor;
 }
 

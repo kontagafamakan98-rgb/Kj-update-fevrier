@@ -12,8 +12,6 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
-import PerformanceMonitor from "./components/PerformanceMonitor";
-import AccessibilityHelper from "./components/AccessibilityHelper";
 import ToastContainer from "./components/ToastContainer";
 import PageLoader from "./components/PageLoader";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
@@ -195,8 +193,6 @@ function AppRoutes() {
 }
 
 function App() {
-  const runtimeDiagnosticsEnabled = false;
-
   useEffect(() => {
     // Add mobile viewport optimizations
     const addMobileOptimizations = () => {
@@ -225,24 +221,15 @@ function App() {
     addMobileOptimizations();
 
     // Handle online/offline status
-    const handleOnline = () => {
-      devLog.info('App is online');
-      // Could trigger data sync here
-    };
+    const handleOnline = () => {};
     
-    const handleOffline = () => {
-      devLog.info('App is offline');
-      // Could save pending actions for later sync
-    };
+    const handleOffline = () => {};
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     // Handle PWA app installed event
-    const handleAppInstalled = () => {
-      devLog.info('PWA was installed');
-      // Could track analytics or show welcome message
-    };
+    const handleAppInstalled = () => {};
 
     window.addEventListener('appinstalled', handleAppInstalled);
 
@@ -261,8 +248,6 @@ function App() {
             <PaymentProvider>
               <ToastProvider>
                 <ErrorBoundary>
-                  {runtimeDiagnosticsEnabled && <PerformanceMonitor />}
-                  {runtimeDiagnosticsEnabled && <AccessibilityHelper />}
                   <AppRoutes />
                 </ErrorBoundary>
               </ToastProvider>
