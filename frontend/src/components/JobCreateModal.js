@@ -99,17 +99,17 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">{t('jobTitle')}</label>
-            <input type="text" id="title" name="title" required value={formData.title} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('titlePlaceholder')} />
+            <input type="text" id="title" name="title" autoComplete="off" required value={formData.title} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('titlePlaceholder')} />
           </div>
 
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">{t('jobDescription')}</label>
-            <textarea id="description" name="description" required rows={4} value={formData.description} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('descriptionPlaceholder')} />
+            <textarea id="description" name="description" autoComplete="off" required rows={4} value={formData.description} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('descriptionPlaceholder')} />
           </div>
 
           <div>
             <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">{t('category')}</label>
-            <select id="category" name="category" value={formData.category} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+            <select id="category" name="category" autoComplete="off" value={formData.category} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500">
               {categories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
             </select>
           </div>
@@ -117,23 +117,23 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="budget_min" className="block text-sm font-medium text-gray-700 mb-2">{t('budgetMinLabel')}</label>
-              <input type="number" id="budget_min" name="budget_min" required min="0" value={formData.budget_min} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+              <input type="number" id="budget_min" name="budget_min" autoComplete="off" required min="0" value={formData.budget_min} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
             </div>
             <div>
               <label htmlFor="budget_max" className="block text-sm font-medium text-gray-700 mb-2">{t('budgetMaxLabel')}</label>
-              <input type="number" id="budget_max" name="budget_max" required min="0" value={formData.budget_max} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+              <input type="number" id="budget_max" name="budget_max" autoComplete="off" required min="0" value={formData.budget_max} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
             </div>
           </div>
 
           <div>
             <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">{t('location')}</label>
-            <input type="text" id="address" name="address" required value={formData.location.address} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('addressPlaceholder')} />
+            <input type="text" id="address" name="address" autoComplete="street-address" required value={formData.location.address} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('addressPlaceholder')} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('requiredSkills')}</label>
+            <label htmlFor="job_skill_input" className="block text-sm font-medium text-gray-700 mb-2">{t('requiredSkills')}</label>
             <div className="flex space-x-2">
-              <input id="job_skill_input" name="job_skill_input" type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={handleSkillKeyPress} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('requiredSkillsPlaceholder')} />
+              <input id="job_skill_input" name="job_skill_input" type="text" autoComplete="off" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={handleSkillKeyPress} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('requiredSkillsPlaceholder')} />
               <button type="button" onClick={addSkill} className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700">{t('add')}</button>
             </div>
             {formData.required_skills.length > 0 && (
@@ -143,12 +143,12 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
           <div>
             <label htmlFor="estimated_duration" className="block text-sm font-medium text-gray-700 mb-2">{t('estimatedDuration')}</label>
-            <input type="text" id="estimated_duration" name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('durationPlaceholder')} />
+            <input type="text" id="estimated_duration" name="estimated_duration" autoComplete="off" value={formData.estimated_duration} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('durationPlaceholder')} />
           </div>
 
           <div>
             <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-2">{t('deadlineOptional')}</label>
-            <input type="datetime-local" id="deadline" name="deadline" value={formData.deadline} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+            <input type="datetime-local" id="deadline" name="deadline" autoComplete="off" value={formData.deadline} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
           </div>
 
           <div className="flex justify-end space-x-4 pt-4">

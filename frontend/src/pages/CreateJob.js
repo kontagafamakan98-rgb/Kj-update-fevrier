@@ -131,6 +131,7 @@ export default function CreateJob() {
                 type="text"
                 id="title"
                 name="title"
+                autoComplete="off"
                 value={formData.title}
                 onChange={handleChange}
                 placeholder={pageT('titlePlaceholder')}
@@ -148,6 +149,7 @@ export default function CreateJob() {
               <textarea
                 id="description"
                 name="description"
+                autoComplete="off"
                 rows={4}
                 value={formData.description}
                 onChange={handleChange}
@@ -166,6 +168,7 @@ export default function CreateJob() {
               <select
                 id="category"
                 name="category"
+                autoComplete="off"
                 value={formData.category}
                 onChange={handleChange}
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -187,6 +190,7 @@ export default function CreateJob() {
                   type="text"
                   id="location"
                   name="location"
+                  autoComplete="street-address"
                   value={formData.location}
                   onChange={handleChange}
                   placeholder={pageT('locationPlaceholder')}
@@ -208,12 +212,14 @@ export default function CreateJob() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('budgetLabel')}</label>
+              <p className="block text-sm font-medium text-gray-700 mb-2">{pageT('budgetLabel')}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <input
                     type="number"
+                    id="budget_min"
                     name="budget_min"
+                    autoComplete="off"
                     value={formData.budget_min}
                     onChange={handleChange}
                     placeholder={pageT('budgetMinPlaceholder')}
@@ -226,7 +232,9 @@ export default function CreateJob() {
                 <div>
                   <input
                     type="number"
+                    id="budget_max"
                     name="budget_max"
+                    autoComplete="off"
                     value={formData.budget_max}
                     onChange={handleChange}
                     placeholder={pageT('budgetMaxPlaceholder')}
@@ -246,6 +254,7 @@ export default function CreateJob() {
               <textarea
                 id="requirements"
                 name="requirements"
+                autoComplete="off"
                 rows={3}
                 value={formData.requirements}
                 onChange={handleChange}
@@ -262,6 +271,7 @@ export default function CreateJob() {
                 type="date"
                 id="deadline"
                 name="deadline"
+                autoComplete="off"
                 value={formData.deadline}
                 onChange={handleChange}
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -269,7 +279,7 @@ export default function CreateJob() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('urgencyLabel')}</label>
+              <p className="block text-sm font-medium text-gray-700 mb-2">{pageT('urgencyLabel')}</p>
               <div className="grid grid-cols-3 gap-3">
                 {urgencyOptions.map((urgency) => (
                   <label
@@ -282,7 +292,9 @@ export default function CreateJob() {
                   >
                     <input
                       type="radio"
+                      id={`urgency_${urgency.value}`}
                       name="urgency"
+                      autoComplete="off"
                       value={urgency.value}
                       checked={formData.urgency === urgency.value}
                       onChange={handleChange}
@@ -334,6 +346,7 @@ export default function CreateJob() {
                     <textarea
                       id="parts_and_tools_notes"
                       name="parts_and_tools_notes"
+                      autoComplete="off"
                       rows={3}
                       value={formData.parts_and_tools_notes}
                       onChange={handleChange}
@@ -422,6 +435,7 @@ function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange,
             id={`${fieldKey}_yes`}
             name={fieldKey}
             type="radio"
+            autoComplete="off"
             checked={value === true}
             onChange={() => onChange(true)}
             className="w-4 h-4 text-orange-600 focus:ring-orange-500"
@@ -433,6 +447,7 @@ function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange,
             id={`${fieldKey}_no`}
             name={fieldKey}
             type="radio"
+            autoComplete="off"
             checked={value === false}
             onChange={() => onChange(false)}
             className="w-4 h-4 text-orange-600 focus:ring-orange-500"
