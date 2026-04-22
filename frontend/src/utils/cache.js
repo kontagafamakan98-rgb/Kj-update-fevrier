@@ -279,8 +279,21 @@ class KojoCache {
           throw error;
         }
         
-        // Wait before retry (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        // Yield before retry without scheduling another timeout callback on the main thread.
+        const retryDelay = Math.min(Math.pow(2, attempt) * 1000, 4000);
+        await new Promise(resolve => {
+          if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+            window.requestIdleCallback(() => resolve(), { timeout: retryDelay });
+            return;
+          }
+
+          if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
+            window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+            return;
+          }
+
+          resolve();
+        });
       }
     }
   }
