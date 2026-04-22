@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Briefcase,
+  CircleDollarSign,
+  ClipboardList,
+  GraduationCap,
+  Hammer,
+  Leaf,
+  MessageSquare,
+  Monitor,
+  PlusCircle,
+  Sparkles,
+  Wrench,
+  Zap
+} from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import OwnerService from '../services/ownerService';
@@ -60,6 +74,52 @@ export default function Dashboard() {
 
   const translateCategory = (category) => t(category) || category;
 
+  const statCards = [
+    { label: t('activeJobs'), value: stats.activeJobs, icon: ClipboardList },
+    { label: t('completedJobs'), value: stats.completedJobs, icon: Sparkles },
+    { label: t('totalJobs'), value: stats.totalJobs, icon: Briefcase },
+    { label: t('totalEarnings'), value: `${stats.totalEarnings.toLocaleString(locale)} XOF`, icon: CircleDollarSign }
+  ];
+
+  const quickActions = user.user_type === 'client'
+    ? [
+        { to: '/jobs/create', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
+        { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-blue-600 bg-blue-100' },
+        { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' },
+        {
+          to: '/payment-demo',
+          label: t('languagesPayments'),
+          subtitle: t('publicFeature'),
+          icon: Monitor,
+          iconClass: 'text-amber-600 bg-amber-100',
+          cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
+        }
+      ]
+    : [
+        { to: '/jobs', label: `${t('searchJobs')} ${t('jobs')}`, icon: Briefcase, iconClass: 'text-orange-600 bg-orange-100' },
+        { to: '/profile', label: t('workerProfile'), icon: Wrench, iconClass: 'text-blue-600 bg-blue-100' },
+        { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' },
+        {
+          to: '/payment-demo',
+          label: t('languagesPayments'),
+          subtitle: t('publicFeature'),
+          icon: Monitor,
+          iconClass: 'text-amber-600 bg-amber-100',
+          cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
+        }
+      ];
+
+  const popularCategories = [
+    { key: 'plumbing', icon: Wrench },
+    { key: 'electrical', icon: Zap },
+    { key: 'mechanics', icon: Briefcase },
+    { key: 'construction', icon: Hammer },
+    { key: 'cleaning', icon: Sparkles },
+    { key: 'gardening', icon: Leaf },
+    { key: 'tutoring', icon: GraduationCap },
+    { key: 'computing', icon: Monitor }
+  ];
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -83,17 +143,22 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {[
-          { label: t('activeJobs'), value: stats.activeJobs, color: 'blue' },
-          { label: t('completedJobs'), value: stats.completedJobs, color: 'green' },
-          { label: t('totalJobs'), value: stats.totalJobs, color: 'purple' },
-          { label: t('totalEarnings'), value: `${stats.totalEarnings.toLocaleString(locale)} XOF`, color: 'yellow' }
-        ].map((item) => (
-          <div key={item.label} className="bg-white rounded-lg shadow-md p-6">
-            <p className="text-sm font-medium text-gray-600">{item.label}</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">{item.value}</p>
-          </div>
-        ))}
+        {statCards.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.label} className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{item.label}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{item.value}</p>
+                </div>
+                <div className="rounded-xl bg-orange-50 p-3 text-orange-600">
+                  <Icon className="w-6 h-6" />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {isFamakan && (
@@ -131,34 +196,24 @@ export default function Dashboard() {
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {user.user_type === 'client' ? (
-              <>
-                <Link to="/jobs/create" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <span className="font-medium text-gray-900">{t('postJob')}</span>
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={action.to + action.label}
+                  to={action.to}
+                  className={`flex items-center gap-4 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors ${action.cardClass || ''}`}
+                >
+                  <div className={`shrink-0 rounded-xl p-3 ${action.iconClass}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-900 block">{action.label}</span>
+                    {action.subtitle ? <p className="text-xs text-gray-500 mt-1">{action.subtitle}</p> : null}
+                  </div>
                 </Link>
-                <Link to="/jobs" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <span className="font-medium text-gray-900">{t('myJobs')}</span>
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link to="/jobs" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <span className="font-medium text-gray-900">{t('searchJobs')} {t('jobs')}</span>
-                </Link>
-                <Link to="/profile" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <span className="font-medium text-gray-900">{t('workerProfile')}</span>
-                </Link>
-              </>
-            )}
-            <Link to="/messages" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <span className="font-medium text-gray-900">{t('messages')}</span>
-            </Link>
-            <Link to="/payment-demo" className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors bg-gradient-to-r from-orange-50 to-yellow-50">
-              <div>
-                <span className="font-medium text-gray-900">🌍 {t('languagesPayments')}</span>
-                <p className="text-xs text-gray-500 mt-1">{t('publicFeature')}</p>
-              </div>
-            </Link>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -169,11 +224,17 @@ export default function Dashboard() {
         </div>
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-            {['plumbing', 'electrical', 'mechanics', 'construction', 'cleaning', 'gardening', 'tutoring', 'computing'].map((category) => (
-              <Link key={category} to={`/jobs?category=${category}`} className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group">
-                <span className="text-sm font-medium text-gray-900 text-center">{t(category)}</span>
-              </Link>
-            ))}
+            {popularCategories.map((category) => {
+              const Icon = category.icon;
+              return (
+                <Link key={category.key} to={`/jobs?category=${category.key}`} className="flex flex-col items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group">
+                  <div className="mb-3 rounded-xl bg-orange-50 p-3 text-orange-600 group-hover:bg-orange-100">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 text-center">{t(category.key)}</span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
