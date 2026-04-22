@@ -7,10 +7,9 @@ import axios from 'axios';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
+import { buildApiUrl } from '../utils/backendUrl';
 
-// Get backend URL from environment
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API_BASE_URL = `${BACKEND_URL}/api`;
+const API_BASE_URL = buildApiUrl('');
 
 /**
  * Create axios instance with dynamic configuration based on network quality

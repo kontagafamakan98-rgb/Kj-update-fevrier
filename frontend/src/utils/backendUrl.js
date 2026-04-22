@@ -10,8 +10,15 @@ export const getBackendBaseUrl = () => {
     return envUrl;
   }
 
-  if (typeof window !== 'undefined' && window.location?.origin) {
-    return trimTrailingSlashes(window.location.origin);
+  if (typeof window !== 'undefined' && window.location) {
+    const { protocol, hostname, origin, port } = window.location;
+    const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    if (isLocalHost && port && port !== '8000') {
+      return `${protocol}//${hostname}:8000`;
+    }
+
+    return trimTrailingSlashes(origin);
   }
 
   return '';

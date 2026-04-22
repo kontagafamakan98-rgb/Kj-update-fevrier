@@ -1,9 +1,10 @@
 import { devLog, safeLog } from '../utils/env';
+import { buildApiUrl } from '../utils/backendUrl';
 
 // Service de gestion des comptes de paiement pour la vérification
 class PaymentAccountService {
   constructor() {
-    this.API_BASE = process.env.REACT_APP_BACKEND_URL + '/api';
+    this.API_BASE = buildApiUrl('');
   }
 
   // Obtenir les headers d'autorisation
