@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import PaymentAccountSetup from '../components/PaymentAccountSetup';
 import CountryDisplay from '../components/CountryDisplay';
+import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry } from '../services/geolocationService';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
@@ -11,6 +13,7 @@ import { devLog, safeLog } from '../utils/env';
 const PaymentVerificationPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { autoLoginAfterRegistration } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'paymentVerification');
   const toast = useToast();
@@ -24,6 +27,7 @@ const PaymentVerificationPage = () => {
 
   const userData = location.state?.userData;
   const prefilledPaymentAccounts = location.state?.paymentAccounts || null;
+  const emailVerificationToken = location.state?.emailVerificationToken || null;
 
   useEffect(() => {
     if (!userData) {
@@ -31,8 +35,18 @@ const PaymentVerificationPage = () => {
       return;
     }
 
+    if (!emailVerificationToken) {
+      navigate('/email-verification', {
+        state: {
+          userData,
+          paymentAccounts: prefilledPaymentAccounts
+        }
+      });
+      return;
+    }
+
     detectUserLocationForPayments();
-  }, [userData, navigate]);
+  }, [emailVerificationToken, navigate, prefilledPaymentAccounts, userData]);
 
   const detectUserLocationForPayments = async () => {
     try {
@@ -53,16 +67,43 @@ const PaymentVerificationPage = () => {
     setError(null);
 
     try {
-      devLog.info('📧 Passage à la vérification email après validation des comptes de paiement...');
+      devLog.info('🏦 Finalisation du compte après email vérifié...');
 
-      navigate('/email-verification', {
+      const result = await PaymentAccountService.registerWithPaymentVerification(
+        userData,
+        paymentAccounts,
+        emailVerificationToken
+      );
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      const autoLoginResult = autoLoginAfterRegistration(result.data.user, result.data.access_token);
+      if (!autoLoginResult.success) {
+        throw new Error(pageT('autoLoginError'));
+      }
+
+      PaymentAccountService.storeVerificationStatus({
+        is_verified: result.data.user.is_verified,
+        payment_accounts_count: result.data.user.payment_accounts_count,
+        user_type: result.data.user.user_type,
+        email_verified: result.data.user.email_verified
+      });
+
+      toast.success(pageT('welcomeToast', { firstName: result.data.user.first_name }));
+
+      navigate('/dashboard', {
         state: {
-          userData,
-          paymentAccounts
+          message: pageT('dashboardMessage', {
+            firstName: result.data.user.first_name,
+            count: result.data.payment_verification?.linked_accounts || 0
+          }),
+          type: 'success'
         }
       });
     } catch (registrationError) {
-      safeLog.error('❌ Erreur de transition vers la vérification email:', registrationError);
+      safeLog.error('❌ Erreur de finalisation du compte:', registrationError);
       const errorMsg = registrationError.message || pageT('genericError');
       setError(errorMsg);
       toast.error(errorMsg);
@@ -137,10 +178,10 @@ const PaymentVerificationPage = () => {
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
             <StepDot number="✓" label={pageT('stepPersonal')} bg="bg-green-500" text="text-green-600" />
+            <div className="w-16 h-1 bg-green-200"></div>
+            <StepDot number="✓" label={pageT('stepAccess')} bg="bg-green-500" text="text-green-600" />
             <div className="w-16 h-1 bg-orange-200"></div>
-            <StepDot number="2" label={pageT('stepPayments')} bg="bg-orange-500" text="text-orange-600" />
-            <div className="w-16 h-1 bg-gray-200"></div>
-            <StepDot number="3" label={pageT('stepAccess')} bg="bg-gray-300" text="text-gray-500" textColor="text-gray-600" />
+            <StepDot number="3" label={pageT('stepPayments')} bg="bg-orange-500" text="text-orange-600" />
           </div>
         </div>
 
@@ -175,7 +216,7 @@ const PaymentVerificationPage = () => {
 
         <div className="mt-8 text-center">
           <button
-            onClick={() => navigate('/register')}
+            onClick={() => navigate('/email-verification', { state: { userData, paymentAccounts: prefilledPaymentAccounts, emailVerificationToken } })}
             disabled={loading}
             className="text-orange-600 hover:text-orange-700 text-sm font-medium disabled:opacity-50"
           >

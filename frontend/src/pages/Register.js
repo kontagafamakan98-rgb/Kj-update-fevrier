@@ -169,16 +169,14 @@ export default function Register() {
     };
     delete userData.confirmPassword;
 
-    // Rediriger vers la vérification des comptes de paiement
-    devLog.info('📝 Redirection vers vérification des comptes de paiement...');
-    
-    // Toast de succès pour la préparation
+    // Rediriger d'abord vers la vérification email
+    devLog.info('📝 Redirection vers la vérification email...');
+
     toast.success(t('registerStepSuccess') + ' ✅');
-    
-    // Passer les données à la page de vérification
-    navigate('/payment-verification', {
+
+    navigate('/email-verification', {
       state: {
-        userData: userData
+        userData
       }
     });
     
