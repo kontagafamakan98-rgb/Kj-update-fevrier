@@ -24,6 +24,12 @@ import base64
 import io
 import cloudinary
 from cloudinary import uploader as cloudinary_uploader
+import requests
+import secrets
+import hashlib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 
 # Configure logging for West Africa production
 logging.basicConfig(
@@ -112,6 +118,11 @@ async def create_database_indexes():
         await db.commissions.create_index("worker_id")
         await db.commissions.create_index("status")
         await db.commissions.create_index([("created_at", -1)])
+
+        # Email OTP collection indexes
+        await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)
+        await db.email_otps.create_index("expires_at", expireAfterSeconds=0)
+        await db.email_otps.create_index([("created_at", -1)])
         
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:
@@ -122,6 +133,18 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'kojo-prod-secret-2025-afrique-ouest-'
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 JWT_REFRESH_EXPIRATION_DAYS = 7
+
+# Gmail OTP settings
+EMAIL_OTP_SECRET = os.environ.get('EMAIL_OTP_SECRET', JWT_SECRET)
+EMAIL_OTP_EXPIRY_MINUTES = int(os.environ.get('EMAIL_OTP_EXPIRY_MINUTES', '10'))
+EMAIL_OTP_MAX_ATTEMPTS = int(os.environ.get('EMAIL_OTP_MAX_ATTEMPTS', '5'))
+EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('EMAIL_OTP_RESEND_COOLDOWN_SECONDS', '60'))
+EMAIL_VERIFICATION_TOKEN_MINUTES = int(os.environ.get('EMAIL_VERIFICATION_TOKEN_MINUTES', '30'))
+GMAIL_CLIENT_ID = os.environ.get('GMAIL_CLIENT_ID', '').strip()
+GMAIL_CLIENT_SECRET = os.environ.get('GMAIL_CLIENT_SECRET', '').strip()
+GMAIL_REFRESH_TOKEN = os.environ.get('GMAIL_REFRESH_TOKEN', '').strip()
+GMAIL_SENDER_EMAIL = os.environ.get('GMAIL_SENDER_EMAIL', '').strip()
+GMAIL_SENDER_NAME = os.environ.get('GMAIL_SENDER_NAME', 'KOJO').strip() or 'KOJO'
 
 # Security Headers for West Africa
 SECURITY_HEADERS = {
@@ -358,6 +381,8 @@ class User(BaseModel):
         return clean_phone
     profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
     is_verified: bool = False
+    email_verified: bool = False
+    email_verified_at: Optional[datetime] = None
     payment_accounts: Optional[dict] = Field(None)  # Payment methods dict
     payment_accounts_count: int = Field(default=0, ge=0, le=10)  # Non-negative, max 10
     rating: float = Field(default=0.0, ge=0.0, le=5.0)  # Rating between 0-5
@@ -514,6 +539,7 @@ class UserWithPayment(BaseModel):
     country: Country
     preferred_language: Language
     payment_accounts: PaymentAccount
+    email_verification_token: str = Field(min_length=20, description="Jeton de vérification email")
     
     @validator('password')
     def password_must_be_strong(cls, v):
@@ -530,6 +556,19 @@ class UserWithPayment(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+
+class EmailOtpRequest(BaseModel):
+    email: EmailStr
+    purpose: str = Field(default="signup", pattern=r'^(signup)$')
+
+class EmailOtpVerifyRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=4, max_length=8, pattern=r'^\d{4,8}$')
+    purpose: str = Field(default="signup", pattern=r'^(signup)$')
+
+class EmailOtpResendRequest(BaseModel):
+    email: EmailStr
+    purpose: str = Field(default="signup", pattern=r'^(signup)$')
 
 class JobCreate(BaseModel):
     title: str = Field(min_length=5, max_length=200)
@@ -893,6 +932,202 @@ def create_access_token(data: dict):
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
+def gmail_is_configured() -> bool:
+    return all([
+        GMAIL_CLIENT_ID,
+        GMAIL_CLIENT_SECRET,
+        GMAIL_REFRESH_TOKEN,
+        GMAIL_SENDER_EMAIL
+    ])
+
+def get_missing_gmail_env_vars() -> List[str]:
+    missing = []
+    if not GMAIL_CLIENT_ID:
+        missing.append("GMAIL_CLIENT_ID")
+    if not GMAIL_CLIENT_SECRET:
+        missing.append("GMAIL_CLIENT_SECRET")
+    if not GMAIL_REFRESH_TOKEN:
+        missing.append("GMAIL_REFRESH_TOKEN")
+    if not GMAIL_SENDER_EMAIL:
+        missing.append("GMAIL_SENDER_EMAIL")
+    return missing
+
+def generate_email_otp_code(length: int = 6) -> str:
+    return ''.join(secrets.choice('0123456789') for _ in range(length))
+
+def hash_email_otp(email: str, purpose: str, otp_code: str) -> str:
+    payload = f"{EMAIL_OTP_SECRET}:{purpose}:{email.lower().strip()}:{otp_code}"
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+def mask_email_address(email: str) -> str:
+    if '@' not in email:
+        return email
+    local, domain = email.split('@', 1)
+    masked_local = local[:2] + ('*' * max(1, len(local) - 2)) if len(local) > 2 else local[0] + '*'
+    domain_name, *domain_parts = domain.split('.')
+    masked_domain = domain_name[:1] + ('*' * max(1, len(domain_name) - 1))
+    return f"{masked_local}@{'.'.join([masked_domain] + domain_parts)}"
+
+def create_email_verification_token(email: str, purpose: str = "signup") -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=EMAIL_VERIFICATION_TOKEN_MINUTES)
+    payload = {
+        "sub": email.lower().strip(),
+        "purpose": purpose,
+        "type": "email_verification",
+        "exp": expire
+    }
+    return jwt.encode(payload, EMAIL_OTP_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_email_verification_token(token: str, email: str, purpose: str = "signup") -> dict:
+    try:
+        payload = jwt.decode(token, EMAIL_OTP_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "email_verification":
+            raise HTTPException(status_code=401, detail="Jeton de vérification invalide")
+        if payload.get("sub") != email.lower().strip():
+            raise HTTPException(status_code=401, detail="Jeton de vérification non valide pour cet email")
+        if payload.get("purpose") != purpose:
+            raise HTTPException(status_code=401, detail="Jeton de vérification non valide pour cette opération")
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="La vérification email a expiré. Veuillez demander un nouveau code.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Jeton de vérification email invalide")
+
+def get_gmail_access_token() -> str:
+    token_response = requests.post(
+        "https://oauth2.googleapis.com/token",
+        data={
+            "client_id": GMAIL_CLIENT_ID,
+            "client_secret": GMAIL_CLIENT_SECRET,
+            "refresh_token": GMAIL_REFRESH_TOKEN,
+            "grant_type": "refresh_token"
+        },
+        timeout=15
+    )
+
+    if not token_response.ok:
+        logger.error(f"❌ Gmail token refresh failed: {token_response.text}")
+        raise HTTPException(status_code=502, detail="Impossible d'obtenir un accès Gmail. Vérifiez la configuration OAuth Google.")
+
+    access_token = token_response.json().get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=502, detail="Réponse OAuth Gmail invalide: access_token manquant")
+    return access_token
+
+def send_email_via_gmail_api(to_email: str, subject: str, text_body: str, html_body: Optional[str] = None):
+    if not gmail_is_configured():
+        missing = ', '.join(get_missing_gmail_env_vars())
+        raise HTTPException(status_code=503, detail=f"Configuration Gmail incomplète: {missing}")
+
+    if html_body:
+        message = MIMEMultipart('alternative')
+        message.attach(MIMEText(text_body, 'plain', 'utf-8'))
+        message.attach(MIMEText(html_body, 'html', 'utf-8'))
+    else:
+        message = MIMEText(text_body, 'plain', 'utf-8')
+
+    message['to'] = to_email
+    message['from'] = formataddr((GMAIL_SENDER_NAME, GMAIL_SENDER_EMAIL))
+    message['subject'] = subject
+
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+    access_token = get_gmail_access_token()
+    gmail_response = requests.post(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+        },
+        json={"raw": raw_message},
+        timeout=20
+    )
+
+    if not gmail_response.ok:
+        logger.error(f"❌ Gmail send failed: {gmail_response.text}")
+        raise HTTPException(status_code=502, detail="Échec d'envoi Gmail. Vérifiez le compte expéditeur, les scopes OAuth et le refresh token.")
+
+    return gmail_response.json()
+
+def build_signup_otp_email(otp_code: str) -> dict:
+    subject = "Votre code de vérification KOJO"
+    text_body = (
+        f"Bonjour,\n\n"
+        f"Voici votre code de vérification KOJO : {otp_code}\n\n"
+        f"Ce code expire dans {EMAIL_OTP_EXPIRY_MINUTES} minutes.\n"
+        f"Ne partagez jamais ce code avec qui que ce soit.\n\n"
+        f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.\n\n"
+        f"Équipe KOJO"
+    )
+    html_body = f"""
+    <div style=\"font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#fff7ed;border:1px solid #fdba74;border-radius:16px;\">
+      <div style=\"text-align:center;margin-bottom:24px;\">
+        <div style=\"display:inline-block;background:#ea580c;color:#ffffff;border-radius:999px;padding:14px 18px;font-weight:700;font-size:20px;\">KOJO</div>
+      </div>
+      <h2 style=\"color:#9a3412;margin-bottom:8px;\">Vérification de votre email</h2>
+      <p style=\"color:#7c2d12;font-size:15px;line-height:1.6;\">Voici votre code de vérification KOJO.</p>
+      <div style=\"margin:24px 0;padding:20px;background:#ffffff;border:1px dashed #fb923c;border-radius:12px;text-align:center;\">
+        <div style=\"font-size:34px;letter-spacing:8px;font-weight:700;color:#ea580c;\">{otp_code}</div>
+      </div>
+      <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ce code expire dans <strong>{EMAIL_OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+      <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ne partagez jamais ce code. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>
+      <p style=\"color:#9a3412;font-size:13px;margin-top:24px;\">Équipe KOJO</p>
+    </div>
+    """
+    return {
+        "subject": subject,
+        "text_body": text_body,
+        "html_body": html_body
+    }
+
+async def issue_email_otp(email: str, purpose: str = "signup") -> dict:
+    now = datetime.now(timezone.utc)
+    existing_otp = await db.email_otps.find_one({"email": email, "purpose": purpose})
+
+    if existing_otp and existing_otp.get("last_sent_at"):
+        last_sent_at = existing_otp["last_sent_at"]
+        if last_sent_at.tzinfo is None:
+            last_sent_at = last_sent_at.replace(tzinfo=timezone.utc)
+
+        elapsed = (now - last_sent_at).total_seconds()
+        if elapsed < EMAIL_OTP_RESEND_COOLDOWN_SECONDS:
+            remaining = int(EMAIL_OTP_RESEND_COOLDOWN_SECONDS - elapsed)
+            raise HTTPException(status_code=429, detail=f"Veuillez patienter {remaining}s avant de renvoyer un autre code.")
+
+    otp_code = generate_email_otp_code()
+    otp_hash = hash_email_otp(email, purpose, otp_code)
+    expires_at = now + timedelta(minutes=EMAIL_OTP_EXPIRY_MINUTES)
+    email_content = build_signup_otp_email(otp_code)
+    send_email_via_gmail_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
+
+    await db.email_otps.update_one(
+        {"email": email, "purpose": purpose},
+        {
+            "$set": {
+                "otp_hash": otp_hash,
+                "attempt_count": 0,
+                "verified_at": None,
+                "last_sent_at": now,
+                "expires_at": expires_at,
+                "updated_at": now,
+                "status": "pending"
+            },
+            "$setOnInsert": {
+                "created_at": now
+            },
+            "$inc": {
+                "send_count": 1
+            }
+        },
+        upsert=True
+    )
+
+    return {
+        "message": "Code de vérification envoyé par email.",
+        "masked_email": mask_email_address(email),
+        "expires_in_seconds": EMAIL_OTP_EXPIRY_MINUTES * 60,
+        "cooldown_seconds": EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+    }
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -911,6 +1146,81 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # Authentication Routes
 # Authentication Routes
+@api_router.post("/auth/email/send-otp")
+async def send_signup_email_otp(payload: EmailOtpRequest):
+    clean_email = sanitize_email(payload.email)
+
+    existing_user = await db.users.find_one({"email": clean_email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Cette adresse email est déjà utilisée")
+
+    return await issue_email_otp(clean_email, payload.purpose)
+
+@api_router.post("/auth/email/resend-otp")
+async def resend_signup_email_otp(payload: EmailOtpResendRequest):
+    clean_email = sanitize_email(payload.email)
+
+    existing_user = await db.users.find_one({"email": clean_email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Cette adresse email est déjà utilisée")
+
+    return await issue_email_otp(clean_email, payload.purpose)
+
+@api_router.post("/auth/email/verify-otp")
+async def verify_signup_email_otp(payload: EmailOtpVerifyRequest):
+    clean_email = sanitize_email(payload.email)
+    now = datetime.now(timezone.utc)
+
+    otp_record = await db.email_otps.find_one({"email": clean_email, "purpose": payload.purpose})
+    if not otp_record:
+        raise HTTPException(status_code=404, detail="Aucun code OTP actif pour cet email. Demandez un nouveau code.")
+
+    expires_at = otp_record.get("expires_at")
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if not expires_at or expires_at <= now:
+        await db.email_otps.delete_one({"email": clean_email, "purpose": payload.purpose})
+        raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau code.")
+
+    if otp_record.get("attempt_count", 0) >= EMAIL_OTP_MAX_ATTEMPTS:
+        raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
+
+    candidate_hash = hash_email_otp(clean_email, payload.purpose, payload.otp)
+    if candidate_hash != otp_record.get("otp_hash"):
+        new_attempt_count = otp_record.get("attempt_count", 0) + 1
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": payload.purpose},
+            {
+                "$set": {
+                    "attempt_count": new_attempt_count,
+                    "updated_at": now,
+                    "last_attempt_at": now
+                }
+            }
+        )
+        remaining = max(0, EMAIL_OTP_MAX_ATTEMPTS - new_attempt_count)
+        raise HTTPException(status_code=400, detail=f"Code invalide. Tentatives restantes: {remaining}.")
+
+    verification_token = create_email_verification_token(clean_email, payload.purpose)
+    await db.email_otps.update_one(
+        {"email": clean_email, "purpose": payload.purpose},
+        {
+            "$set": {
+                "verified_at": now,
+                "updated_at": now,
+                "status": "verified"
+            }
+        }
+    )
+
+    return {
+        "message": "Email vérifié avec succès.",
+        "verification_token": verification_token,
+        "masked_email": mask_email_address(clean_email),
+        "verified": True
+    }
+
 @api_router.post("/auth/register-verified")
 async def register_user_verified(user_data: UserWithPayment):
     """Inscription avec vérification obligatoire des comptes de paiement"""
@@ -918,6 +1228,7 @@ async def register_user_verified(user_data: UserWithPayment):
     try:
         # Sanitize email input to prevent injection
         clean_email = sanitize_email(user_data.email)
+        verify_email_verification_token(user_data.email_verification_token, clean_email, "signup")
         
         # Check if email already exists
         existing_user = await db.users.find_one({"email": clean_email})
@@ -959,7 +1270,7 @@ async def register_user_verified(user_data: UserWithPayment):
         try:
             user = User(
                 id=user_id,
-                email=user_data.email,
+                email=clean_email,
                 password_hash=hash_password(user_data.password),
                 first_name=user_data.first_name,
                 last_name=user_data.last_name,
@@ -969,6 +1280,8 @@ async def register_user_verified(user_data: UserWithPayment):
                 preferred_language=user_data.preferred_language,
                 profile_photo=profile_photo_path,  # Ajouter le chemin de la photo
                 is_verified=payment_validation["is_verified"],
+                email_verified=True,
+                email_verified_at=datetime.now(timezone.utc),
                 payment_accounts=payment_validation["account_details"],
                 payment_accounts_count=payment_validation["linked_accounts_count"],
                 created_at=datetime.now(timezone.utc).isoformat(),
@@ -1008,6 +1321,7 @@ async def register_user_verified(user_data: UserWithPayment):
             log_and_raise_http_exception(500, "Erreur lors de la création du compte utilisateur")
         
         await db.users.insert_one(user.dict())
+        await db.email_otps.delete_one({"email": clean_email, "purpose": "signup"})
         
         # Créer le profil travailleur si c'est un travailleur avec des informations supplémentaires
         worker_profile_created = False
