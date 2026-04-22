@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2, Navigation } from 'lucide-react';
 import GeolocationService from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -8,10 +8,12 @@ const LocationDetector = ({
   onLocationDetected, 
   userCountry = 'senegal',
   size = 'medium',
-  className = '' 
+  className = '',
+  autoDetect = false
 }) => {
   const [detecting, setDetecting] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const autoDetectTriggeredRef = useRef(false);
   const { t } = useLanguage();
   
   const getMethodLabel = (method) => {
@@ -26,18 +28,19 @@ const LocationDetector = ({
     return labels[method] || method;
   };
 
-  const handleDetectLocation = async () => {
+  const handleDetectLocation = async ({ forceRefresh = true } = {}) => {
     setDetecting(true);
     
     try {
-      // Vider le cache pour forcer une nouvelle détection réelle
-      localStorage.removeItem('kojo_last_location');
-      localStorage.removeItem('kojo_precise_location');
-      localStorage.removeItem('kojo_detected_country');
-      GeolocationService.cachedLocation = null;
-      GeolocationService.cacheTimestamp = null;
+      if (forceRefresh) {
+        localStorage.removeItem('kojo_last_location');
+        localStorage.removeItem('kojo_precise_location');
+        localStorage.removeItem('kojo_detected_country');
+        GeolocationService.cachedLocation = null;
+        GeolocationService.cacheTimestamp = null;
+      }
       
-      const location = await GeolocationService.detectUserLocation(userCountry);
+      const location = await GeolocationService.detectUserLocation(userCountry, { forceRefresh });
       setCurrentLocation(location);
       
       if (onLocationDetected) {
@@ -69,6 +72,13 @@ const LocationDetector = ({
       default: return 20;
     }
   };
+
+  useEffect(() => {
+    if (!autoDetect || autoDetectTriggeredRef.current) return;
+
+    autoDetectTriggeredRef.current = true;
+    handleDetectLocation({ forceRefresh: false });
+  }, [autoDetect, userCountry]);
 
   return (
     <div className={`location-detector ${className}`}>

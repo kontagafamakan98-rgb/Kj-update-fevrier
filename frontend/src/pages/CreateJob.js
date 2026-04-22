@@ -47,11 +47,19 @@ export default function CreateJob() {
   ];
 
   const handleLocationDetected = (location) => {
+    if (!location?.fullAddress) return;
+
     setFormData((prev) => ({
       ...prev,
       location: location.fullAddress
     }));
+
+    setErrors((prev) => ({
+      ...prev,
+      location: ''
+    }));
   };
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -204,6 +212,7 @@ export default function CreateJob() {
                     onLocationDetected={handleLocationDetected}
                     userCountry={user?.country?.toLowerCase() || 'senegal'}
                     size="medium"
+                    autoDetect
                   />
                   <p className="text-sm text-gray-500">{pageT('locationHelp')}</p>
                 </div>
