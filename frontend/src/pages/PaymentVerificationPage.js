@@ -21,6 +21,7 @@ const PaymentVerificationPage = () => {
 
   const getUserTypeLabel = (userType) => t(userType) || userType;
   const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
+  const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -123,9 +124,10 @@ const PaymentVerificationPage = () => {
       });
     } catch (registrationError) {
       safeLog.error('❌ Erreur de finalisation du compte:', registrationError);
-      const errorMsg = registrationError.message || pageT('genericError');
+      const rawErrorMsg = registrationError.message || pageT('genericError');
+      const errorMsg = translateApiMessage(rawErrorMsg);
 
-      if (isEmailAlreadyUsedMessage(errorMsg)) {
+      if (isEmailAlreadyUsedMessage(rawErrorMsg)) {
         clearRegistrationFlow();
         toast.error(errorMsg);
         navigate('/register', { replace: true });

@@ -162,7 +162,8 @@ const pages = {
       genericError: 'Erreur lors de la finalisation du compte',
       emailStepNotice: 'Votre email est déjà vérifié. Il ne reste plus qu’à lier vos moyens de paiement pour finaliser le compte.',
       welcomeToast: 'Bienvenue {firstName}! Compte vérifié avec succès 🎉',
-      dashboardMessage: 'Bienvenue {firstName}! Votre compte est vérifié avec {count} moyen(s) de paiement.'
+      dashboardMessage: 'Bienvenue {firstName}! Votre compte est vérifié avec {count} moyen(s) de paiement.',
+      duplicateEmailError: 'Cette adresse email est déjà utilisée'
     },
     en: {
       redirecting: 'Redirecting...',
@@ -189,7 +190,8 @@ const pages = {
       genericError: 'Error while finalizing the account',
       emailStepNotice: 'Your email is already verified. Only payment linking remains to finalize the account.',
       welcomeToast: 'Welcome {firstName}! Account verified successfully 🎉',
-      dashboardMessage: 'Welcome {firstName}! Your account is verified with {count} payment method(s).'
+      dashboardMessage: 'Welcome {firstName}! Your account is verified with {count} payment method(s).',
+      duplicateEmailError: 'This email address is already in use'
     }
   },
   emailVerification: {
@@ -221,7 +223,8 @@ const pages = {
       dashboardMessage: 'Bienvenue {firstName}! Email confirmé et {count} moyen(s) de paiement validé(s).',
       stepPersonal: 'Informations personnelles',
       stepPayments: 'Comptes de paiement',
-      stepEmail: 'Vérification email'
+      stepEmail: 'Vérification email',
+      duplicateEmailError: 'Cette adresse email est déjà utilisée'
     },
     en: {
       redirecting: 'Preparing email verification...',
@@ -251,7 +254,8 @@ const pages = {
       dashboardMessage: 'Welcome {firstName}! Email confirmed and {count} payment method(s) validated.',
       stepPersonal: 'Personal information',
       stepPayments: 'Payment accounts',
-      stepEmail: 'Email verification'
+      stepEmail: 'Email verification',
+      duplicateEmailError: 'This email address is already in use'
     }
   },
   jobDetails: {
@@ -544,7 +548,8 @@ pages.paymentVerification.wo = withBase(pages.paymentVerification.fr, {
   finalizing: 'Mi ngi jeexal bind bi...',
   checkingAccounts: 'Mi ngi saytu kontu fey yi',
   backToRegister: '← Dellu ci bind bi',
-  securityTitle: 'Kaaraange ak sutura'
+  securityTitle: 'Kaaraange ak sutura',
+  duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi'
 });
 pages.paymentVerification.bm = withBase(pages.paymentVerification.fr, {
   redirecting: 'Bɛ taa ka tɛmɛn...',
@@ -555,7 +560,8 @@ pages.paymentVerification.bm = withBase(pages.paymentVerification.fr, {
   finalizing: 'Bɛ sɛbɛnni laban...',
   checkingAccounts: 'Bɛ sara kontow lakɔlɔsi',
   backToRegister: '← Segin ka taa inscrire',
-  securityTitle: 'Lakanali ni dogoya'
+  securityTitle: 'Lakanali ni dogoya',
+  duplicateEmailError: 'Email adɛrɛsi nin bɛ baara kɛ ka bɔyen'
 });
 pages.paymentVerification.mos = withBase(pages.paymentVerification.fr, {
   redirecting: 'A wa n tɛed n kẽ...',
@@ -566,7 +572,8 @@ pages.paymentVerification.mos = withBase(pages.paymentVerification.fr, {
   finalizing: 'A ket n segl email wã panga...',
   checkingAccounts: 'A gese yaool konto-rãmba',
   backToRegister: '← Lebg n kẽ bindgre',
-  securityTitle: 'Pãnga la sutura'
+  securityTitle: 'Pãnga la sutura',
+  duplicateEmailError: 'Email adres-kãngã yaa n beoogame'
 });
 
 pages.emailVerification.wo = withBase(pages.emailVerification.fr, {
@@ -576,7 +583,8 @@ pages.emailVerification.wo = withBase(pages.emailVerification.fr, {
   verifyButton: 'Saytu te sos sama konto',
   verifying: 'Mi ngi saytu code bi te sos konto bi...',
   backToPayments: '← Dellu ci kontu pey yi',
-  stepEmail: 'Saytu email'
+  stepEmail: 'Saytu email',
+  duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi'
 });
 pages.emailVerification.bm = withBase(pages.emailVerification.fr, {
   title: 'Gmail lakɔlɔsili i ka konto ye',
@@ -585,7 +593,8 @@ pages.emailVerification.bm = withBase(pages.emailVerification.fr, {
   verifyButton: "A y'a lakɔlɔsi k'a ka konto da",
   verifying: 'Bɛ code lakɔlɔsi ni konto dafalen...',
   backToPayments: '← Segin ka taa sara kontow la',
-  stepEmail: 'Email lakɔlɔsili'
+  stepEmail: 'Email lakɔlɔsili',
+  duplicateEmailError: 'Email adɛrɛsi nin bɛ baara kɛ ka bɔyen'
 });
 pages.emailVerification.mos = withBase(pages.emailVerification.fr, {
   title: 'Gmail pʋgẽ konto wã gesgo',
@@ -594,7 +603,8 @@ pages.emailVerification.mos = withBase(pages.emailVerification.fr, {
   verifyButton: 'Gesgo n na ninge m konto',
   verifying: 'A gese code wã la a ninge konto wã...',
   backToPayments: '← Lebg n kẽ yaool konto-rãmba',
-  stepEmail: 'Email gesgo'
+  stepEmail: 'Email gesgo',
+  duplicateEmailError: 'Email adres-kãngã yaa n beoogame'
 });
 
 pages.jobDetails.wo = withBase(pages.jobDetails.fr, {
@@ -781,7 +791,10 @@ pages.register = {
     continueButton: 'Continuer vers la vérification email',
     stepEmail: 'Vérification email',
     stepPayments: 'Paiement',
-    signInPrompt: 'Vous avez déjà un compte ?'
+    signInPrompt: 'Vous avez déjà un compte ?',
+    duplicateEmailError: 'Cette adresse email est déjà utilisée',
+    emailAvailable: 'Adresse email disponible',
+    checkingEmail: 'Vérification de cette adresse email...'
   },
   en: {
     title: 'Create an account',
@@ -798,7 +811,10 @@ pages.register = {
     continueButton: 'Continue to email verification',
     stepEmail: 'Email verification',
     stepPayments: 'Payment',
-    signInPrompt: 'Already have an account?'
+    signInPrompt: 'Already have an account?',
+    duplicateEmailError: 'This email address is already in use',
+    emailAvailable: 'Email address available',
+    checkingEmail: 'Checking this email address...'
   }
 };
 pages.register.wo = withBase(pages.register.fr, {
@@ -814,7 +830,10 @@ pages.register.wo = withBase(pages.register.fr, {
   continueButton: 'Doxal ba ci vérification email',
   stepEmail: 'Vérification email',
   stepPayments: 'Paiement',
-  signInPrompt: 'Am nga konto ba noppi?'
+  signInPrompt: 'Am nga konto ba noppi?',
+  duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi',
+  emailAvailable: 'Adresse email bii japp na',
+  checkingEmail: 'Mi ngi saytu adresse email bii...'
 });
 pages.register.bm = withBase(pages.register.fr, {
   title: 'Konto da',
@@ -829,7 +848,10 @@ pages.register.bm = withBase(pages.register.fr, {
   continueButton: 'Tɛmɛn ka taa email verification la',
   stepEmail: 'Vérification email',
   stepPayments: 'Paiement',
-  signInPrompt: 'I bɛ konto sɔrɔ kelen kɛ?'
+  signInPrompt: 'I bɛ konto sɔrɔ kelen kɛ?',
+  duplicateEmailError: 'Email adɛrɛsi nin bɛ baara kɛ ka bɔyen',
+  emailAvailable: 'Email adɛrɛsi nin bɛ se ka kɛ',
+  checkingEmail: 'An bɛ email adɛrɛsi nin lajɛ...'
 });
 pages.register.mos = withBase(pages.register.fr, {
   title: 'Ning konto',
@@ -844,7 +866,10 @@ pages.register.mos = withBase(pages.register.fr, {
   continueButton: 'Kẽ n tɛed email verification',
   stepEmail: 'Vérification email',
   stepPayments: 'Paiement',
-  signInPrompt: 'F tara konto n yaa?'
+  signInPrompt: 'F tara konto n yaa?',
+  duplicateEmailError: 'Email adres-kãngã yaa n beoogame',
+  emailAvailable: 'Email adres-kãngã yaa yɩɩda',
+  checkingEmail: 'B sɩngda n ges email adres-kãngã...'
 });
 
 pages.paymentDemo = {

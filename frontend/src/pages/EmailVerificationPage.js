@@ -80,6 +80,7 @@ const EmailVerificationPage = () => {
   };
 
   const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
+  const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
 
   const handleSendCode = async (mode = 'send') => {
     if (!userData?.email) {
@@ -107,12 +108,13 @@ const EmailVerificationPage = () => {
       toast.success(mode === 'resend' ? pageT('codeResentToast') : pageT('codeSentToast'));
       devLog.info(`📧 Code Gmail ${mode === 'resend' ? 'renvoyé' : 'envoyé'} avec succès`);
     } catch (apiError) {
-      const message = extractErrorMessage(apiError, pageT('genericError'));
+      const rawMessage = extractErrorMessage(apiError, pageT('genericError'));
+      const message = translateApiMessage(rawMessage);
       setError(message);
       toast.error(message);
       safeLog.error('❌ Erreur envoi OTP Gmail:', apiError);
 
-      if (isEmailAlreadyUsedMessage(message)) {
+      if (isEmailAlreadyUsedMessage(rawMessage)) {
         clearRegistrationFlow();
         navigate('/register', { replace: true });
         return;

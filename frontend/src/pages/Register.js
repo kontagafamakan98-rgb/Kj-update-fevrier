@@ -54,6 +54,7 @@ export default function Register() {
   const countries = getCountriesList();
 
   const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
+  const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
 
   const checkEmailAvailability = async (rawEmail, { silent = false } = {}) => {
     const emailToCheck = String(rawEmail || '').trim().toLowerCase();
@@ -71,21 +72,23 @@ export default function Register() {
         purpose: 'signup'
       });
 
-      setEmailAvailability(result);
-
       if (!result.available) {
-        setError(result.message || 'Cette adresse email est déjà utilisée');
+        const translatedMessage = pageT('duplicateEmailError');
+        setEmailAvailability({ ...result, message: translatedMessage });
+        setError(translatedMessage);
         if (!silent) {
-          toast.error(result.message || 'Cette adresse email est déjà utilisée');
+          toast.error(translatedMessage);
         }
         return false;
       }
 
+      setEmailAvailability({ ...result, message: pageT('emailAvailable') });
       return true;
     } catch (apiError) {
-      const message = apiError?.response?.data?.detail || apiError?.message || 'Impossible de vérifier cette adresse email';
+      const rawMessage = apiError?.response?.data?.detail || apiError?.message || 'Impossible de vérifier cette adresse email';
+      const message = translateApiMessage(rawMessage);
 
-      if (isEmailAlreadyUsedMessage(message)) {
+      if (isEmailAlreadyUsedMessage(rawMessage)) {
         setEmailAvailability({ available: false, message });
         setError(message);
         if (!silent) {
@@ -520,13 +523,13 @@ export default function Register() {
                 }}
               />
               {emailChecking && (
-                <p className="mt-1 text-sm text-blue-600">Vérification de cette adresse email...</p>
+                <p className="mt-1 text-sm text-blue-600">{pageT('checkingEmail')}</p>
               )}
               {!emailChecking && emailAvailability?.available === false && (
-                <p className="mt-1 text-sm text-red-600">{emailAvailability.message || 'Cette adresse email est déjà utilisée'}</p>
+                <p className="mt-1 text-sm text-red-600">{emailAvailability.message || pageT('duplicateEmailError')}</p>
               )}
               {!emailChecking && emailAvailability?.available === true && formData.email?.trim() && (
-                <p className="mt-1 text-sm text-green-600">Adresse email disponible</p>
+                <p className="mt-1 text-sm text-green-600">{pageT('emailAvailable')}</p>
               )}
             </div>
 
