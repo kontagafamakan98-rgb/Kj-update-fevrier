@@ -75,6 +75,7 @@ class NetworkOptimizer {
     this.connectionSpeed = null;
     this.lastSpeedTest = null;
     this.listeners = new Set();
+    this.connectionChangeHandler = null;
     
     this.initializeMonitoring();
   }
@@ -90,15 +91,13 @@ class NetworkOptimizer {
     // Connection API if available (limited support)
     if ('connection' in navigator) {
       const connection = navigator.connection;
-      connection.addEventListener('change', this.handleConnectionChange.bind(this));
+      this.connectionChangeHandler = this.handleConnectionChange.bind(this);
+      connection.addEventListener('change', this.connectionChangeHandler);
       this.updateQualityFromConnection(connection);
+      return;
     }
-    
-    // Initial quality assessment
+
     this.assessNetworkQuality();
-    
-    // Periodic quality assessment
-    setInterval(() => this.assessNetworkQuality(), 30000); // Every 30 seconds
   }
 
   /**
@@ -164,35 +163,19 @@ class NetworkOptimizer {
   /**
    * Assess network quality with speed test
    */
-  async assessNetworkQuality() {
-    if (!this.isOnline) return;
-    
-    // Don't test too frequently
-    const now = Date.now();
-    if (this.lastSpeedTest && (now - this.lastSpeedTest) < 60000) return;
-    
-    try {
-      const startTime = performance.now();
-      
-      // Small request to assess speed (backend health check)
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/health`, {
-        method: 'GET',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-      
-      if (response.ok) {
-        this.lastSpeedTest = now;
-        this.analyzeResponseTime(duration);
-        devLog.info(`⚡ Network speed test: ${duration.toFixed(2)}ms`);
-      }
-    } catch (error) {
-      devLog.warn('Network speed test failed:', error);
-      // Assume poor quality on failure
-      this.currentQuality = NETWORK_QUALITY.POOR;
+  assessNetworkQuality() {
+    if (!this.isOnline) {
+      this.currentQuality = NETWORK_QUALITY.OFFLINE;
+      return;
     }
+
+    if ('connection' in navigator && navigator.connection) {
+      this.updateQualityFromConnection(navigator.connection);
+      return;
+    }
+
+    // Fallback without timer-based speed tests to keep the main thread quiet.
+    this.currentQuality = NETWORK_QUALITY.GOOD;
   }
 
   /**
