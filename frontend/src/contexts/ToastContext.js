@@ -2,6 +2,23 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const ToastContext = createContext();
 
+const normalizeToastInput = (input, fallbackType, fallbackDuration) => {
+  if (input && typeof input === 'object' && !Array.isArray(input)) {
+    const { type, duration, ...rest } = input;
+    return {
+      type: type || fallbackType,
+      duration: duration ?? fallbackDuration,
+      ...rest
+    };
+  }
+
+  return {
+    message: input,
+    type: fallbackType,
+    duration: fallbackDuration
+  };
+};
+
 export const useToast = () => {
   const context = useContext(ToastContext);
   if (!context) {
@@ -13,25 +30,25 @@ export const useToast = () => {
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((message, type = 'info', duration = 4000) => {
-    const id = Date.now() + Math.random();
-    const toast = { id, message, type, duration };
-    
-    setToasts(prev => [...prev, toast]);
-
-    // Auto-remove after duration
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
-    }
-
-    return id;
-  }, []);
-
   const removeToast = useCallback((id) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
+
+  const addToast = useCallback((input, type = 'info', duration = 4000) => {
+    const id = Date.now() + Math.random();
+    const normalizedToast = normalizeToastInput(input, type, duration);
+    const toast = { id, ...normalizedToast };
+
+    setToasts(prev => [...prev, toast]);
+
+    if (toast.duration > 0) {
+      setTimeout(() => {
+        removeToast(id);
+      }, toast.duration);
+    }
+
+    return id;
+  }, [removeToast]);
 
   const success = useCallback((message, duration) => {
     return addToast(message, 'success', duration);

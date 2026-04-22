@@ -135,7 +135,7 @@ const PaymentVerificationPage = () => {
         clearRegistrationFlow();
         setError(errorMsg);
         setErrorKey(nextErrorKey);
-        toast.error(errorMsg);
+        toast.error({ messageKey: 'duplicateEmailError', scope: 'paymentVerification' });
         navigate('/register', { replace: true });
         return;
       }

@@ -81,7 +81,7 @@ export default function Register() {
         setError(translatedMessage);
         setErrorKey('duplicateEmailError');
         if (!silent) {
-          toast.error(translatedMessage);
+          toast.error({ messageKey: 'duplicateEmailError', scope: 'register' });
         }
         return false;
       }
@@ -99,7 +99,7 @@ export default function Register() {
         setError(message);
         setErrorKey('duplicateEmailError');
         if (!silent) {
-          toast.error(message);
+          toast.error({ messageKey: 'duplicateEmailError', scope: 'register' });
         }
         return false;
       }
