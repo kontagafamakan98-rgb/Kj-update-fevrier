@@ -31,6 +31,9 @@ const EmailVerificationPage = () => {
   const [verifying, setVerifying] = useState(false);
 
   const initialSendTriggeredRef = useRef(false);
+  const cooldownDeadlineRef = useRef(0);
+  const expiryDeadlineRef = useRef(0);
+  const countdownFrameRef = useRef(null);
 
   const formatTime = (totalSeconds) => {
     const safeSeconds = Math.max(0, Number(totalSeconds) || 0);
@@ -64,17 +67,33 @@ const EmailVerificationPage = () => {
   }, [emailVerificationToken, navigate, paymentAccounts, userData]);
 
   useEffect(() => {
-    if (!cooldownSeconds && !expiresInSeconds) {
+    const hasActiveCountdown = cooldownSeconds > 0 || expiresInSeconds > 0;
+    if (!hasActiveCountdown) {
       return undefined;
     }
 
-    const timer = window.setInterval(() => {
-      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
-      setExpiresInSeconds((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
+    const updateCountdowns = () => {
+      const now = Date.now();
+      const nextCooldown = cooldownDeadlineRef.current ? Math.max(0, Math.ceil((cooldownDeadlineRef.current - now) / 1000)) : 0;
+      const nextExpiry = expiryDeadlineRef.current ? Math.max(0, Math.ceil((expiryDeadlineRef.current - now) / 1000)) : 0;
 
-    return () => window.clearInterval(timer);
-  }, [cooldownSeconds, expiresInSeconds]);
+      setCooldownSeconds((prev) => (prev === nextCooldown ? prev : nextCooldown));
+      setExpiresInSeconds((prev) => (prev === nextExpiry ? prev : nextExpiry));
+
+      if (nextCooldown > 0 || nextExpiry > 0) {
+        countdownFrameRef.current = window.requestAnimationFrame(updateCountdowns);
+      }
+    };
+
+    countdownFrameRef.current = window.requestAnimationFrame(updateCountdowns);
+
+    return () => {
+      if (countdownFrameRef.current !== null) {
+        window.cancelAnimationFrame(countdownFrameRef.current);
+        countdownFrameRef.current = null;
+      }
+    };
+  }, [cooldownSeconds > 0, expiresInSeconds > 0]);
 
   const extractErrorMessage = (apiError, fallbackMessage) => {
     return apiError?.response?.data?.detail || apiError?.message || fallbackMessage;
@@ -103,9 +122,14 @@ const EmailVerificationPage = () => {
         ? await authAPI.resendEmailOtp(payload)
         : await authAPI.sendEmailOtp(payload);
 
+      const nextCooldownSeconds = response.cooldown_seconds || 0;
+      const nextExpiresInSeconds = response.expires_in_seconds || 0;
+
       setMaskedEmail(response.masked_email || userData.email);
-      setCooldownSeconds(response.cooldown_seconds || 0);
-      setExpiresInSeconds(response.expires_in_seconds || 0);
+      cooldownDeadlineRef.current = nextCooldownSeconds > 0 ? Date.now() + (nextCooldownSeconds * 1000) : 0;
+      expiryDeadlineRef.current = nextExpiresInSeconds > 0 ? Date.now() + (nextExpiresInSeconds * 1000) : 0;
+      setCooldownSeconds(nextCooldownSeconds);
+      setExpiresInSeconds(nextExpiresInSeconds);
       setOtp('');
 
       toast.success(mode === 'resend' ? pageT('codeResentToast') : pageT('codeSentToast'));

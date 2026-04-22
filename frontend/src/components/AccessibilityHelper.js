@@ -33,36 +33,17 @@ const AccessibilityHelper = () => {
   return null;
 };
 
-function scheduleDeferredTask(task, delay = 2000) {
-  let idleId = null;
-  let animationFrameId = null;
+function scheduleDeferredTask(task) {
+  let cancelled = false;
 
-  const runTask = () => {
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      idleId = window.requestIdleCallback(() => task(), { timeout: delay });
-      return;
+  Promise.resolve().then(() => {
+    if (!cancelled) {
+      task();
     }
-
-    if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
-      animationFrameId = window.requestAnimationFrame(() => {
-        animationFrameId = window.requestAnimationFrame(() => task());
-      });
-      return;
-    }
-
-    task();
-  };
-
-  runTask();
+  });
 
   return () => {
-    if (idleId !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
-      window.cancelIdleCallback(idleId);
-    }
-
-    if (animationFrameId !== null && typeof window !== 'undefined' && 'cancelAnimationFrame' in window) {
-      window.cancelAnimationFrame(animationFrameId);
-    }
+    cancelled = true;
   };
 }
 
@@ -302,14 +283,6 @@ export function announceToScreenReader(message, priority = 'polite') {
   };
 
   region.textContent = '';
-
-  if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(applyMessage);
-    });
-    return;
-  }
-
   applyMessage();
 }
 
