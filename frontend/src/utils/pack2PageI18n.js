@@ -776,9 +776,11 @@ pages.register = {
     emailPlaceholder: 'exemple@email.com',
     phonePlaceholder: '77 123 45 67',
     phoneFormatHint: 'Format téléphone',
-    workerStepNotice: 'En tant que travailleur, vous ajouterez ensuite vos comptes de paiement pour recevoir vos gains.',
-    clientStepNotice: 'En tant que client, vous ajouterez ensuite un moyen de paiement pour régler vos jobs.',
-    continueButton: 'Continuer vers la vérification paiement',
+    workerStepNotice: 'Étape suivante : vérifie d’abord ton email, puis tu ajouteras tes comptes de paiement pour recevoir tes gains.',
+    clientStepNotice: 'Étape suivante : vérifie d’abord ton email, puis tu ajouteras ton moyen de paiement pour régler tes jobs.',
+    continueButton: 'Continuer vers la vérification email',
+    stepEmail: 'Vérification email',
+    stepPayments: 'Paiement',
     signInPrompt: 'Vous avez déjà un compte ?'
   },
   en: {
@@ -791,9 +793,11 @@ pages.register = {
     emailPlaceholder: 'example@email.com',
     phonePlaceholder: '77 123 45 67',
     phoneFormatHint: 'Phone format',
-    workerStepNotice: 'As a worker, you will add your payment accounts next to receive your earnings.',
-    clientStepNotice: 'As a client, you will add a payment method next to pay for your jobs.',
-    continueButton: 'Continue to payment verification',
+    workerStepNotice: 'Next step: verify your email first, then add your payment accounts to receive your earnings.',
+    clientStepNotice: 'Next step: verify your email first, then add your payment method to pay for your jobs.',
+    continueButton: 'Continue to email verification',
+    stepEmail: 'Email verification',
+    stepPayments: 'Payment',
     signInPrompt: 'Already have an account?'
   }
 };
@@ -805,9 +809,11 @@ pages.register.wo = withBase(pages.register.fr, {
   adjustedAutomatically: 'Réew mi ak prefixu telefon bi ñu ko réglé otomatik',
   positionNotDetected: 'Gisuñu bér bi',
   phoneFormatHint: 'Formatu telefon',
-  workerStepNotice: 'Boo nekkee liggéeykat, nga topp ca yapale sa kontu fey ngir jot sa xaalis.',
-  clientStepNotice: 'Boo nekkee kliyan, nga topp ca yapale beneen yoon wu fey ngir fey sa jobs yi.',
-  continueButton: 'Doxal ba ci vérification paiement',
+  workerStepNotice: 'Topp ci vérification email bi, te gannaaw ga nga yokk sa kontu fey ngir jot sa xaalis.',
+  clientStepNotice: 'Topp ci vérification email bi, te gannaaw ga nga yokk yoonu fey bi ngir fey sa jobs yi.',
+  continueButton: 'Doxal ba ci vérification email',
+  stepEmail: 'Vérification email',
+  stepPayments: 'Paiement',
   signInPrompt: 'Am nga konto ba noppi?'
 });
 pages.register.bm = withBase(pages.register.fr, {
@@ -818,9 +824,11 @@ pages.register.bm = withBase(pages.register.fr, {
   adjustedAutomatically: 'Jamana ni telefɔni prefix ladilanlen don',
   positionNotDetected: 'Yɔrɔ ma dɔn',
   phoneFormatHint: 'Telefɔni fɔrɔma',
-  workerStepNotice: 'Ni i ye baarakɛla ye, i bɛ sara konto fara a kan walasa i ka wari sɔrɔ.',
-  clientStepNotice: 'Ni i ye kliyan ye, i bɛ sara fɛɛrɛ dɔ fara a kan walasa i ka baaraw sara.',
-  continueButton: 'Tɛmɛn ka taa paiement verification la',
+  workerStepNotice: 'Taga email verification fɔlɔ, o kɔ i bɛ sara konto fara a kan walasa i ka wari sɔrɔ.',
+  clientStepNotice: 'Taga email verification fɔlɔ, o kɔ i bɛ sara fɛɛrɛ dɔ fara a kan walasa i ka baaraw sara.',
+  continueButton: 'Tɛmɛn ka taa email verification la',
+  stepEmail: 'Vérification email',
+  stepPayments: 'Paiement',
   signInPrompt: 'I bɛ konto sɔrɔ kelen kɛ?'
 });
 pages.register.mos = withBase(pages.register.fr, {
@@ -831,9 +839,11 @@ pages.register.mos = withBase(pages.register.fr, {
   adjustedAutomatically: 'Tẽng la telefõne prefix manegame otomatik',
   positionNotDetected: 'Zĩiga ka bãng',
   phoneFormatHint: 'Telefõne format',
-  workerStepNotice: 'F yɩɩ tʋʋm-neda, bɩ n paam yaool yĩnga f n deeg f ligdi.',
-  clientStepNotice: 'F yɩɩ daaba, bɩ n paam yaool sira n yaool f tʋʋma.',
-  continueButton: 'Kẽ n tɛed paiement verification',
+  workerStepNotice: 'Gãad email verification yãnga, bɩ n paam yaool yĩnga f n deeg f ligdi.',
+  clientStepNotice: 'Gãad email verification yãnga, bɩ n paam yaool sira n yaool f tʋʋma.',
+  continueButton: 'Kẽ n tɛed email verification',
+  stepEmail: 'Vérification email',
+  stepPayments: 'Paiement',
   signInPrompt: 'F tara konto n yaa?'
 });
 

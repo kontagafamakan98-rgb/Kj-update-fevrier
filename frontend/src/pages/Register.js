@@ -265,14 +265,23 @@ export default function Register() {
                 </div>
                 <span className="ml-2 text-orange-600 font-medium">{t('personalInformation')}</span>
               </div>
-              
+
               <div className="w-12 h-1 bg-gray-200"></div>
-              
+
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
                   2
                 </div>
-                <span className="ml-2 text-gray-500 font-medium">{t('paymentAccounts')}</span>
+                <span className="ml-2 text-gray-500 font-medium">{pageT('stepEmail')}</span>
+              </div>
+
+              <div className="w-12 h-1 bg-gray-200"></div>
+
+              <div className="flex items-center">
+                <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
+                  3
+                </div>
+                <span className="ml-2 text-gray-500 font-medium">{pageT('stepPayments')}</span>
               </div>
             </div>
             
