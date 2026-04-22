@@ -83,7 +83,7 @@ export default function Dashboard() {
 
   const quickActions = user.user_type === 'client'
     ? [
-        { to: '/jobs/create', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
+        { to: '/create-job', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
         { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-blue-600 bg-blue-100' },
         { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' },
         {

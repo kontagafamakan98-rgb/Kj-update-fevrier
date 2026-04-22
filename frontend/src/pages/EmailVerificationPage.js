@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { authAPI } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
 
 const OTP_LENGTH = 6;
@@ -15,9 +16,10 @@ const EmailVerificationPage = () => {
   const pageT = makeScopedTranslator(currentLanguage, t, 'emailVerification');
   const toast = useToast();
 
-  const userData = location.state?.userData;
-  const paymentAccounts = location.state?.paymentAccounts || null;
-  const emailVerificationToken = location.state?.emailVerificationToken || null;
+  const persistedFlow = loadRegistrationFlow();
+  const userData = location.state?.userData || persistedFlow?.userData || null;
+  const paymentAccounts = location.state?.paymentAccounts || persistedFlow?.paymentAccounts || null;
+  const emailVerificationToken = location.state?.emailVerificationToken || persistedFlow?.emailVerificationToken || null;
 
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
@@ -47,11 +49,18 @@ const EmailVerificationPage = () => {
       return;
     }
 
+    mergeRegistrationFlow({
+      userData,
+      paymentAccounts,
+      emailVerificationToken,
+      currentStep: 'email-verification'
+    });
+
     if (!emailVerificationToken && !initialSendTriggeredRef.current) {
       initialSendTriggeredRef.current = true;
       handleSendCode('send');
     }
-  }, [emailVerificationToken, navigate, userData]);
+  }, [emailVerificationToken, navigate, paymentAccounts, userData]);
 
   useEffect(() => {
     if (!cooldownSeconds && !expiresInSeconds) {
@@ -126,6 +135,13 @@ const EmailVerificationPage = () => {
       });
 
       toast.success(pageT('emailVerified'));
+
+      mergeRegistrationFlow({
+        userData,
+        paymentAccounts,
+        emailVerificationToken: verificationResult.verification_token,
+        currentStep: 'payment-verification'
+      });
 
       navigate('/payment-verification', {
         state: {
@@ -234,7 +250,10 @@ const EmailVerificationPage = () => {
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               <button
                 type="button"
-                onClick={() => navigate('/register')}
+                onClick={() => {
+                  clearRegistrationFlow();
+                  navigate('/register');
+                }}
                 className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 {pageT('backToRegister')}

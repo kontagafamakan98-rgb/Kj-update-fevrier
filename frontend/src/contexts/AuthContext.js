@@ -3,6 +3,7 @@ import { authAPI, handleApiError } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
+import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 
 const AuthContext = createContext();
 
@@ -141,6 +142,7 @@ export function AuthProvider({ children }) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       kojoCache.clear(); // Clear all cached data
+      clearRegistrationFlow();
       setUser(null);
       
       devLog.info('✅ User logged out and cache cleared');

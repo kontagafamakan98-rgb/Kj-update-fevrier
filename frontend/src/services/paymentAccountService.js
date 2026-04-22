@@ -1,3 +1,4 @@
+import { authAPI } from './api';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
 
@@ -27,24 +28,7 @@ class PaymentAccountService {
         email_verification_token: emailVerificationToken
       };
 
-      const response = await fetch(`${this.API_BASE}/auth/register-verified`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(registrationData)
-      });
-
-      let responseData = null;
-      try {
-        responseData = await response.json();
-      } catch (parseError) {
-        responseData = null;
-      }
-
-      if (!response.ok) {
-        throw new Error(responseData?.detail || 'Erreur lors de la finalisation de l\'inscription');
-      }
+      const responseData = await authAPI.registerVerified(registrationData);
 
       devLog.info('✅ Inscription avec paiement + email réussie:', responseData);
       
