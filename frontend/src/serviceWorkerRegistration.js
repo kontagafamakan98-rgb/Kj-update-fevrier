@@ -1,5 +1,6 @@
 // Service Worker Registration for Kojo PWA
 // Optimized for West African networks with offline support
+import { devLog } from './utils/env';
 
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
@@ -28,7 +29,7 @@ function registerValidSW(swUrl, config) {
   navigator.serviceWorker
     .register(swUrl)
     .then((registration) => {
-      console.log('Service Worker registered successfully:', registration);
+      devLog.info('Service Worker registered successfully:', registration);
 
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
@@ -40,7 +41,7 @@ function registerValidSW(swUrl, config) {
           if (installingWorker.state === 'installed') {
             if (navigator.serviceWorker.controller) {
               // New content available
-              console.log('New content is available; please refresh.');
+              devLog.info('New content is available; please refresh.');
 
               if (config && config.onUpdate) {
                 config.onUpdate(registration);
@@ -50,7 +51,7 @@ function registerValidSW(swUrl, config) {
               showUpdateNotification();
             } else {
               // Content cached for offline use
-              console.log('Content is cached for offline use.');
+              devLog.info('Content is cached for offline use.');
 
               if (config && config.onSuccess) {
                 config.onSuccess(registration);
@@ -61,7 +62,7 @@ function registerValidSW(swUrl, config) {
       };
     })
     .catch((error) => {
-      console.error('Error during service worker registration:', error);
+      devLog.error('Error during service worker registration:', error);
     });
 }
 
@@ -88,7 +89,7 @@ function checkValidServiceWorker(swUrl, config) {
       }
     })
     .catch(() => {
-      console.log('No internet connection found. App is running in offline mode.');
+      devLog.info('No internet connection found. App is running in offline mode.');
     });
 }
 
@@ -99,7 +100,7 @@ export function unregister() {
         registration.unregister();
       })
       .catch((error) => {
-        console.error(error.message);
+        devLog.error(error.message);
       });
   }
 }
