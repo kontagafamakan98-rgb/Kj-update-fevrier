@@ -137,7 +137,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
               <button type="button" onClick={addSkill} className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700">{t('add')}</button>
             </div>
             {formData.required_skills.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">{formData.required_skills.map((skill) => <span key={skill} className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">{skill}<button type="button" onClick={() => removeSkill(skill)} className="ml-2 text-orange-600 hover:text-orange-800">×</button></span>)}</div>
+              <div className="mt-2 flex flex-wrap gap-2">{formData.required_skills.map((skill) => <span key={skill} className="inline-flex items-center px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">{skill}<button type="button" aria-label={`${t('remove')} ${skill}`} onClick={() => removeSkill(skill)} className="ml-2 text-orange-600 hover:text-orange-800">×</button></span>)}</div>
             )}
           </div>
 

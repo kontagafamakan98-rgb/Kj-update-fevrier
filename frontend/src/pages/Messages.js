@@ -161,10 +161,13 @@ export default function Messages() {
 
               <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
                 <div className="flex space-x-2">
+                  <label htmlFor="message_input" className="sr-only">{pageT('placeholder')}</label>
                   <input
                     id="message_input"
                     name="message_input"
                     type="text"
+                    autoComplete="off"
+                    aria-label={pageT('placeholder')}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder={pageT('placeholder')}

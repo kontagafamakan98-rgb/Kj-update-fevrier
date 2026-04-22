@@ -454,7 +454,7 @@ function WorkerProfileCreate({ onCreate, pageT }) {
               {formData.specialties.map((specialty, index) => (
                 <span key={index} className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm flex items-center">
                   {specialty}
-                  <button type="button" onClick={() => removeSpecialty(specialty)} className="ml-2 text-orange-600 hover:text-orange-800">×</button>
+                  <button type="button" aria-label={`${pageT('remove')} ${specialty}`} onClick={() => removeSpecialty(specialty)} className="ml-2 text-orange-600 hover:text-orange-800">×</button>
                 </span>
               ))}
             </div>
@@ -472,7 +472,7 @@ function WorkerProfileCreate({ onCreate, pageT }) {
         </div>
 
         <div className="flex items-center">
-          <input type="checkbox" id="availability" name="availability" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
+          <input type="checkbox" id="availability" name="availability" autoComplete="off" checked={formData.availability} onChange={handleChange} className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded" />
           <label htmlFor="availability" className="ml-2 text-sm text-gray-700">{pageT('availableForProjects')}</label>
         </div>
 

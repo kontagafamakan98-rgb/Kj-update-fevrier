@@ -228,6 +228,8 @@ export function CountrySelect({
                 id={`${id}-search`}
                 name={`${name || 'country'}_search`}
                 type="text"
+                autoComplete="off"
+                aria-label="Rechercher un pays"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={handleSearchKeyDown}

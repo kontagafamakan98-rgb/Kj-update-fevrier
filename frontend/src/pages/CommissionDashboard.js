@@ -296,7 +296,7 @@ function AccountCard({ title, emoji, editing, primaryLabel, secondaryLabel, prim
         <div>
           <label htmlFor={primaryName} className="block text-sm font-medium text-gray-700 mb-1">{primaryLabel}</label>
           {editing ? (
-            <input id={primaryName} name={primaryName} type="text" value={primaryValue} onChange={(e) => onPrimaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={primaryPlaceholder} />
+            <input id={primaryName} name={primaryName} type="text" autoComplete="off" value={primaryValue} onChange={(e) => onPrimaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={primaryPlaceholder} />
           ) : (
             <p className="font-mono text-sm bg-gray-50 p-2 rounded">{primaryValue || notConfigured}</p>
           )}
@@ -304,7 +304,7 @@ function AccountCard({ title, emoji, editing, primaryLabel, secondaryLabel, prim
         <div>
           <label htmlFor={secondaryName} className="block text-sm font-medium text-gray-700 mb-1">{secondaryLabel}</label>
           {editing ? (
-            <input id={secondaryName} name={secondaryName} type="text" value={secondaryValue} onChange={(e) => onSecondaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={secondaryPlaceholder} />
+            <input id={secondaryName} name={secondaryName} type="text" autoComplete="off" value={secondaryValue} onChange={(e) => onSecondaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={secondaryPlaceholder} />
           ) : (
             <p className="text-sm bg-gray-50 p-2 rounded">{secondaryValue || notConfigured}</p>
           )}
