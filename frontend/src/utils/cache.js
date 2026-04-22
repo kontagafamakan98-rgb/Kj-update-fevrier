@@ -308,25 +308,12 @@ class KojoCache {
 const kojoCache = new KojoCache();
 
 const scheduleCacheCleanup = () => {
-  if (typeof window === 'undefined') return;
-
-  const runCleanup = () => {
-    try {
-      kojoCache.cleanup();
-    } catch (error) {
-      safeLog.warn('Deferred cache cleanup failed:', error);
-    }
-  };
-
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(runCleanup, { timeout: 10000 });
-    return;
-  }
-
-  window.setTimeout(runCleanup, 8000);
+  // Intentionally disabled during normal app startup to keep the console and main thread quiet.
+  // Cleanup can still happen explicitly when cache writes fail or maintenance actions are triggered.
+  return null;
 };
 
-// Auto cleanup on app start, deferred to idle time to avoid startup warnings
+// Startup cleanup intentionally disabled to avoid global timeout warnings on every page load.
 scheduleCacheCleanup();
 
 // Predefined cache keys for consistency
