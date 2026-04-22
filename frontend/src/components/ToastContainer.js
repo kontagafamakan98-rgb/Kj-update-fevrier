@@ -1,8 +1,11 @@
 import React from 'react';
 import { useToast } from '../contexts/ToastContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { makeScopedTranslator } from '../utils/pack2PageI18n';
 
 const ToastContainer = () => {
   const { toasts, removeToast } = useToast();
+  const { t, currentLanguage } = useLanguage();
 
   const getToastStyles = (type) => {
     const baseStyles = 'flex items-center gap-3 p-4 rounded-lg shadow-lg backdrop-blur-sm transition-all duration-300 ease-in-out transform';
@@ -50,6 +53,19 @@ const ToastContainer = () => {
     }
   };
 
+  const getToastMessage = (toast) => {
+    if (toast?.messageKey && toast?.scope) {
+      const scopedT = makeScopedTranslator(currentLanguage, t, toast.scope);
+      return scopedT(toast.messageKey, toast.params || {});
+    }
+
+    if (toast?.messageKey && typeof t === 'function') {
+      return t(toast.messageKey);
+    }
+
+    return toast?.message || '';
+  };
+
   return (
     <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
       {toasts.map((toast, index) => (
@@ -68,7 +84,7 @@ const ToastContainer = () => {
           
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium break-words">
-              {toast.message}
+              {getToastMessage(toast)}
             </p>
           </div>
 

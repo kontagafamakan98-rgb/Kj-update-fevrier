@@ -116,7 +116,11 @@ const EmailVerificationPage = () => {
       const nextErrorKey = isEmailAlreadyUsedMessage(rawMessage) ? 'duplicateEmailError' : '';
       setError(message);
       setErrorKey(nextErrorKey);
-      toast.error(message);
+      if (isEmailAlreadyUsedMessage(rawMessage)) {
+        toast.error({ messageKey: 'duplicateEmailError', scope: 'emailVerification' });
+      } else {
+        toast.error(message);
+      }
       safeLog.error('❌ Erreur envoi OTP Gmail:', apiError);
 
       if (isEmailAlreadyUsedMessage(rawMessage)) {
@@ -173,7 +177,11 @@ const EmailVerificationPage = () => {
       const nextErrorKey = isEmailAlreadyUsedMessage(rawMessage) ? 'duplicateEmailError' : '';
       setError(message);
       setErrorKey(nextErrorKey);
-      toast.error(message);
+      if (isEmailAlreadyUsedMessage(rawMessage)) {
+        toast.error({ messageKey: 'duplicateEmailError', scope: 'emailVerification' });
+      } else {
+        toast.error(message);
+      }
       safeLog.error('❌ Erreur vérification email Gmail:', apiError);
     } finally {
       setVerifying(false);
