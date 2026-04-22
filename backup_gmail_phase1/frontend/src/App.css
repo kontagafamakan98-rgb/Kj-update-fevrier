@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PWA and Mobile Optimizations */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+    position: relative;
+    min-height: 100vh;
+    background-color: #f9fafb;
+  }
+
+  /* iOS Standalone app styles */
+  body.ios-standalone {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* PWA Standalone styles */
+  body.pwa-standalone {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Safe area support for iOS */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-padding-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pt-safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .h-safe-area-inset-bottom {
+    height: env(safe-area-inset-bottom);
+  }
+
+  /* Input optimizations for mobile */
+  input, textarea, select {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Touch-friendly buttons */
+  button, .btn {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Remove iOS input shadows */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  textarea {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+}
+
+/* App-specific styles */
+.App {
+  text-align: center;
+}
+
+.App-header {
+  background-color: #f9fafb;
+  padding: 20px;
+  color: #374151;
+  min-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.App-link {
+  color: #ea580c;
+  text-decoration: none;
+}
+
+.App-link:hover {
+  color: #c2410c;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 768px) {
+  /* Larger touch targets on mobile */
+  .mobile-touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* Mobile-optimized spacing */
+  .mobile-padding {
+    padding: 1rem;
+  }
+
+  /* Full-width mobile cards */
+  .mobile-card {
+    border-radius: 0;
+    margin-left: -1rem;
+    margin-right: -1rem;
+  }
+
+  /* Mobile navigation optimizations */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* PWA Loading animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+/* PWA Install prompt animations */
+.pwa-install-prompt {
+  animation: slideUp 0.5s ease-out;
+}
+
+/* Offline indicator */
+.offline-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #f59e0b;
+  color: white;
+  text-align: center;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  z-index: 9999;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ea580c;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c2410c;
+}
+
+/* Focus styles for accessibility */
+button:focus,
+input:focus,
+textarea:focus,
+select:focus,
+a:focus {
+  outline: 2px solid #ea580c;
+  outline-offset: 2px;
+}
+
+/* Loading states */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Message bubbles for chat */
+.message-bubble {
+  max-width: 80%;
+  word-wrap: break-word;
+  border-radius: 18px;
+  padding: 8px 12px;
+  margin: 4px 0;
+}
+
+.message-sent {
+  background: #ea580c;
+  color: white;
+  margin-left: auto;
+  border-bottom-right-radius: 4px;
+}
+
+.message-received {
+  background: #f3f4f6;
+  color: #374151;
+  margin-right: auto;
+  border-bottom-left-radius: 4px;
+}
+
+/* Job cards mobile optimization */
+.job-card-mobile {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+}
+
+.job-card-mobile:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+/* Category icons */
+.category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 12px;
+  background: #fff7ed;
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Rating stars */
+.rating-stars {
+  color: #fbbf24;
+  font-size: 1.25rem;
+}
+
+/* Utility classes for mobile */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Dark mode support (future enhancement) */
+@media (prefers-color-scheme: dark) {
+  /* Will be implemented later if needed */
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .bg-orange-600 {
+    background-color: #000;
+  }
+  
+  .text-orange-600 {
+    color: #000;
+  }
+  
+  .border-orange-600 {
+    border-color: #000;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none;
+  }
+}
