@@ -259,6 +259,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           <input
             id="payment_setup_orange_money"
             name="payment_setup_orange_money"
+            autoComplete="tel"
             type="text"
             value={accounts.orange_money}
             onChange={(e) => handleInputChange('orange_money', e.target.value)}
@@ -285,6 +286,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           <input
             id="payment_setup_wave"
             name="payment_setup_wave"
+            autoComplete="tel"
             type="text"
             value={accounts.wave}
             onChange={(e) => handleInputChange('wave', e.target.value)}
@@ -312,6 +314,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             <input
               id="payment_setup_bank_account_number"
               name="payment_setup_bank_account_number"
+              autoComplete="off"
               type="text"
               value={accounts.bank_account.account_number}
               onChange={(e) => handleInputChange('bank_account.account_number', e.target.value)}
@@ -325,6 +328,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               <input
                 id="payment_setup_bank_account_holder"
                 name="payment_setup_bank_account_holder"
+                autoComplete="name"
                 type="text"
                 value={accounts.bank_account.account_holder}
                 onChange={(e) => handleInputChange('bank_account.account_holder', e.target.value)}
@@ -337,6 +341,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               <select
                 id="payment_setup_bank_name"
                 name="payment_setup_bank_name"
+                autoComplete="organization"
                 value={accounts.bank_account.bank_name}
                 onChange={(e) => handleInputChange('bank_account.bank_name', e.target.value)}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 ${
@@ -355,6 +360,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               <input
                 id="payment_setup_other_bank_name"
                 name="payment_setup_other_bank_name"
+                autoComplete="organization"
                 type="text"
                 onChange={(e) => handleInputChange('bank_account.bank_name', e.target.value)}
                 placeholder={t('yourBankName')}
@@ -366,6 +372,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               <input
                 id="payment_setup_bank_code"
                 name="payment_setup_bank_code"
+                autoComplete="off"
                 type="text"
                 value={accounts.bank_account.bank_code}
                 onChange={(e) => handleInputChange('bank_account.bank_code', e.target.value)}
@@ -376,6 +383,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
               <input
                 id="payment_setup_bank_branch"
                 name="payment_setup_bank_branch"
+                autoComplete="off"
                 type="text"
                 value={accounts.bank_account.branch}
                 onChange={(e) => handleInputChange('bank_account.branch', e.target.value)}

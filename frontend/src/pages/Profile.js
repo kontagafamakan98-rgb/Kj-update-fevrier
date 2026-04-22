@@ -80,7 +80,7 @@ export default function Profile() {
 
       setPhotoRefreshKey((prev) => prev + 1);
       await loadUser();
-      setTimeout(() => setPhotoRefreshKey((prev) => prev + 1), 500);
+      requestAnimationFrame(() => setPhotoRefreshKey((prev) => prev + 1));
       setIsEditing(false);
       toast.success(`${t('profileUpdated')} ✅`);
     } catch (updateError) {
@@ -110,7 +110,6 @@ export default function Profile() {
 
       setSuccess(t('profileCreated'));
       await loadProfile();
-      setTimeout(() => setSuccess(''), 3000);
     } catch (createError) {
       safeLog.error('Worker profile creation error:', createError);
       setError(createError.message || t('profileCreateError'));
@@ -191,7 +190,6 @@ export default function Profile() {
           <PaymentAccountsManager
             onSuccess={() => {
               setSuccess(t('paymentAccountsUpdated'));
-              setTimeout(() => setSuccess(''), 3000);
             }}
           />
         </div>
@@ -284,7 +282,6 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
           onUploadSuccess={(photoUrl) => {
             setFormData((prev) => ({ ...prev, profile_photo: photoUrl }));
             setSuccess(t('photoReadySave'));
-            setTimeout(() => setSuccess(''), 3000);
           }}
         />
       </div>
@@ -292,12 +289,12 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">{pageT('firstName')}</label>
-          <input type="text" id="first_name" name="first_name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">{pageT('lastName')}</label>
-          <input type="text" id="last_name" name="last_name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
@@ -310,6 +307,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
               type="tel"
               id="phone"
               name="phone"
+              autoComplete="tel-national"
               value={formData.phone.replace(getPhonePrefixByCountry(formData.country.toLowerCase()), '').trim()}
               onChange={(e) => {
                 const prefix = getPhonePrefixByCountry(formData.country.toLowerCase());
@@ -324,7 +322,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
         <div>
           <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-          <select id="preferred_language" name="preferred_language" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
             <option value="fr">{t('french')}</option>
             <option value="en">{t('english')}</option>
             <option value="wo">{t('wolof')}</option>
@@ -339,6 +337,7 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
             <CountrySelect
               id="country"
               name="country"
+              autoComplete="country-name"
               value={formData.country}
               onChange={(e) => updateFormData('country', e.target.value)}
             />
@@ -351,13 +350,13 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
           <h3 className="text-lg font-medium text-gray-900">{pageT('professionalInfo')}</h3>
           <div>
             <label htmlFor="bio" className="block text-sm font-medium text-gray-700">{pageT('bio')}</label>
-            <textarea id="bio" name="bio" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
             <p className="mt-1 text-sm text-gray-500">{pageT('bioHelp')}</p>
           </div>
 
           <div>
             <label htmlFor="skills" className="block text-sm font-medium text-gray-700">{pageT('skills')}</label>
-            <input id="skills" name="skills" value={formData.skills} onChange={handleChange} placeholder={pageT('skillsPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+            <input id="skills" name="skills" autoComplete="off" value={formData.skills} onChange={handleChange} placeholder={pageT('skillsPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
             <p className="mt-1 text-sm text-gray-500">{pageT('skillsHelp')}</p>
           </div>
         </div>
@@ -447,7 +446,7 @@ function WorkerProfileCreate({ onCreate, pageT }) {
         <div>
           <label htmlFor="profile_specialty_input" className="block text-sm font-medium text-gray-700 mb-2">{pageT('specialties')}</label>
           <div className="flex space-x-2">
-            <input id="profile_specialty_input" name="profile_specialty_input" type="text" value={specialtyInput} onChange={(e) => setSpecialtyInput(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('specialtyPlaceholder')} />
+            <input id="profile_specialty_input" name="profile_specialty_input" type="text" autoComplete="off" value={specialtyInput} onChange={(e) => setSpecialtyInput(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('specialtyPlaceholder')} />
             <button type="button" onClick={addSpecialty} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md">{pageT('add')}</button>
           </div>
           {formData.specialties.length > 0 && (
@@ -464,12 +463,12 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
         <div>
           <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700">{pageT('yearsExperience')}</label>
-          <input type="number" id="experience_years" name="experience_years" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">{pageT('descriptionOptional')}</label>
-          <textarea id="description" name="description" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
+          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
         </div>
 
         <div className="flex items-center">
