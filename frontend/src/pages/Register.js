@@ -394,17 +394,21 @@ export default function Register() {
           
           <div className="space-y-6">
             {/* User Type */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+            <fieldset>
+              <legend className="block text-sm font-medium text-gray-700 mb-3">
                 {t('userType')}
-              </label>
+              </legend>
               <div className="grid grid-cols-2 gap-4">
-                <label className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  formData.user_type === 'client' 
-                    ? 'border-orange-500 bg-orange-50' 
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}>
+                <label
+                  htmlFor="user_type_client"
+                  className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    formData.user_type === 'client' 
+                      ? 'border-orange-500 bg-orange-50' 
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
                   <input
+                    id="user_type_client"
                     type="radio"
                     name="user_type"
                     value="client"
@@ -419,12 +423,16 @@ export default function Register() {
                   </div>
                 </label>
                 
-                <label className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  formData.user_type === 'worker' 
-                    ? 'border-orange-500 bg-orange-50' 
-                    : 'border-gray-300 hover:border-gray-400'
-                }`}>
+                <label
+                  htmlFor="user_type_worker"
+                  className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    formData.user_type === 'worker' 
+                      ? 'border-orange-500 bg-orange-50' 
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
                   <input
+                    id="user_type_worker"
                     type="radio"
                     name="user_type"
                     value="worker"
@@ -439,7 +447,7 @@ export default function Register() {
                   </div>
                 </label>
               </div>
-            </div>
+            </fieldset>
 
             {/* Country Selection */}
             <div>

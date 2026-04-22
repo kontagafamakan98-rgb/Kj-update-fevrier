@@ -243,8 +243,8 @@ function monitorAccessibility() {
       issues.push(`${inputsWithoutLabelsCount} champs de formulaire sans label`);
     }
 
-    // Check color contrast (basic check)
-    checkColorContrast();
+    // Contrast audit is intentionally disabled during normal page usage
+    // because repeated getComputedStyle scans can trigger forced reflow warnings.
 
     // Log issues
     if (issues.length > 0) {
@@ -260,44 +260,7 @@ function monitorAccessibility() {
  * Basic color contrast checker
  */
 function checkColorContrast() {
-  // This is a simplified check - full contrast checking requires more complex algorithms
-  // Sample a limited number of visible text elements to avoid heavy page-wide scans
-  const textElements = Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, a, button, span, div')).slice(0, 120);
-  let lowContrastCount = 0;
-
-  textElements.forEach(el => {
-    const style = window.getComputedStyle(el);
-    const color = style.color;
-    const backgroundColor = style.backgroundColor;
-    
-    // Skip if transparent, inherited or hidden
-    if (
-      backgroundColor === 'rgba(0, 0, 0, 0)' ||
-      backgroundColor === 'transparent' ||
-      style.display === 'none' ||
-      style.visibility === 'hidden'
-    ) {
-      return;
-    }
-    
-    // Simple luminosity check (very basic)
-    const colorLum = getLuminosity(color);
-    const bgLum = getLuminosity(backgroundColor);
-    const minLum = Math.min(colorLum, bgLum);
-    if (minLum === 0) {
-      return;
-    }
-
-    const contrast = Math.max(colorLum, bgLum) / minLum;
-    
-    if (contrast < 4.5) { // WCAG AA standard for normal text
-      lowContrastCount++;
-    }
-  });
-
-  if (lowContrastCount > 0) {
-    devLog.warn(`♿ ${lowContrastCount} éléments avec potentiellement un faible contraste de couleur`);
-  }
+  return 0;
 }
 
 /**
