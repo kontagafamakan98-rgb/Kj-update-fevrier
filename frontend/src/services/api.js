@@ -235,6 +235,7 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   registerVerified: (userData) => api.post('/auth/register-verified', userData),
+  checkEmailAvailability: (payload) => api.post('/auth/email/check-availability', payload),
   sendEmailOtp: (payload) => api.post('/auth/email/send-otp', payload),
   verifyEmailOtp: (payload) => api.post('/auth/email/verify-otp', payload),
   resendEmailOtp: (payload) => api.post('/auth/email/resend-otp', payload),

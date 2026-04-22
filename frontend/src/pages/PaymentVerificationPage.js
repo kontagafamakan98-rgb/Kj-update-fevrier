@@ -20,6 +20,7 @@ const PaymentVerificationPage = () => {
   const toast = useToast();
 
   const getUserTypeLabel = (userType) => t(userType) || userType;
+  const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -123,6 +124,14 @@ const PaymentVerificationPage = () => {
     } catch (registrationError) {
       safeLog.error('❌ Erreur de finalisation du compte:', registrationError);
       const errorMsg = registrationError.message || pageT('genericError');
+
+      if (isEmailAlreadyUsedMessage(errorMsg)) {
+        clearRegistrationFlow();
+        toast.error(errorMsg);
+        navigate('/register', { replace: true });
+        return;
+      }
+
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {

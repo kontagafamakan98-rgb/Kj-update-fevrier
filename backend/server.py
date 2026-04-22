@@ -1168,6 +1168,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 # Authentication Routes
 # Authentication Routes
+@api_router.post("/auth/email/check-availability")
+async def check_signup_email_availability(payload: EmailOtpRequest):
+    clean_email = sanitize_email(payload.email)
+    existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
+
+    return {
+        "email": clean_email,
+        "available": existing_user is None,
+        "message": "Adresse email disponible" if not existing_user else "Cette adresse email est déjà utilisée"
+    }
+
 @api_router.post("/auth/email/send-otp")
 async def send_signup_email_otp(payload: EmailOtpRequest):
     clean_email = sanitize_email(payload.email)

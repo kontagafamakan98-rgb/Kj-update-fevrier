@@ -41,7 +41,7 @@ class PaymentAccountService {
       safeLog.error('❌ Erreur inscription finale:', error);
       return {
         success: false,
-        error: error.message
+        error: error?.response?.data?.detail || error.message
       };
     }
   }
