@@ -577,16 +577,27 @@ class UserLogin(BaseModel):
 
 class EmailOtpRequest(BaseModel):
     email: EmailStr
-    purpose: str = Field(default="signup", pattern=r'^(signup)$')
+    purpose: str = Field(default="signup", pattern=r'^(signup|password_reset)$')
 
 class EmailOtpVerifyRequest(BaseModel):
     email: EmailStr
     otp: str = Field(min_length=4, max_length=8, pattern=r'^\d{4,8}$')
-    purpose: str = Field(default="signup", pattern=r'^(signup)$')
+    purpose: str = Field(default="signup", pattern=r'^(signup|password_reset)$')
 
 class EmailOtpResendRequest(BaseModel):
     email: EmailStr
-    purpose: str = Field(default="signup", pattern=r'^(signup)$')
+    purpose: str = Field(default="signup", pattern=r'^(signup|password_reset)$')
+
+class PasswordResetConfirmRequest(BaseModel):
+    email: EmailStr
+    verification_token: str = Field(min_length=20)
+    new_password: str = Field(min_length=6, max_length=128)
+
+    @validator('new_password')
+    def password_must_be_strong(cls, v):
+        if not v or len(v.strip()) < 6:
+            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        return v
 
 class JobCreate(BaseModel):
     title: str = Field(min_length=5, max_length=200)
@@ -1066,31 +1077,58 @@ def send_email_via_gmail_api(to_email: str, subject: str, text_body: str, html_b
 
     return gmail_response.json()
 
-def build_signup_otp_email(otp_code: str) -> dict:
-    subject = "Votre code de vérification KOJO"
-    text_body = (
-        f"Bonjour,\n\n"
-        f"Voici votre code de vérification KOJO : {otp_code}\n\n"
-        f"Ce code expire dans {EMAIL_OTP_EXPIRY_MINUTES} minutes.\n"
-        f"Ne partagez jamais ce code avec qui que ce soit.\n\n"
-        f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.\n\n"
-        f"Équipe KOJO"
-    )
-    html_body = f"""
-    <div style=\"font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#fff7ed;border:1px solid #fdba74;border-radius:16px;\">
-      <div style=\"text-align:center;margin-bottom:24px;\">
-        <div style=\"display:inline-block;background:#ea580c;color:#ffffff;border-radius:999px;padding:14px 18px;font-weight:700;font-size:20px;\">KOJO</div>
-      </div>
-      <h2 style=\"color:#9a3412;margin-bottom:8px;\">Vérification de votre email</h2>
-      <p style=\"color:#7c2d12;font-size:15px;line-height:1.6;\">Voici votre code de vérification KOJO.</p>
-      <div style=\"margin:24px 0;padding:20px;background:#ffffff;border:1px dashed #fb923c;border-radius:12px;text-align:center;\">
-        <div style=\"font-size:34px;letter-spacing:8px;font-weight:700;color:#ea580c;\">{otp_code}</div>
-      </div>
-      <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ce code expire dans <strong>{EMAIL_OTP_EXPIRY_MINUTES} minutes</strong>.</p>
-      <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ne partagez jamais ce code. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>
-      <p style=\"color:#9a3412;font-size:13px;margin-top:24px;\">Équipe KOJO</p>
-    </div>
-    """
+def build_email_otp_email(purpose: str, otp_code: str) -> dict:
+    if purpose == "password_reset":
+        subject = "Réinitialisation du mot de passe KOJO"
+        text_body = (
+            f"Bonjour,\n\n"
+            f"Voici votre code KOJO pour réinitialiser votre mot de passe : {otp_code}\n\n"
+            f"Ce code expire dans {EMAIL_OTP_EXPIRY_MINUTES} minutes.\n"
+            f"Ne partagez jamais ce code avec qui que ce soit.\n\n"
+            f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.\n\n"
+            f"Équipe KOJO"
+        )
+        html_body = f"""
+        <div style=\"font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#eff6ff;border:1px solid #93c5fd;border-radius:16px;\">
+          <div style=\"text-align:center;margin-bottom:24px;\">
+            <div style=\"display:inline-block;background:#2563eb;color:#ffffff;border-radius:999px;padding:14px 18px;font-weight:700;font-size:20px;\">KOJO</div>
+          </div>
+          <h2 style=\"color:#1d4ed8;margin-bottom:8px;\">Réinitialisation de votre mot de passe</h2>
+          <p style=\"color:#1e3a8a;font-size:15px;line-height:1.6;\">Utilisez ce code pour définir un nouveau mot de passe KOJO.</p>
+          <div style=\"margin:24px 0;padding:20px;background:#ffffff;border:1px dashed #60a5fa;border-radius:12px;text-align:center;\">
+            <div style=\"font-size:34px;letter-spacing:8px;font-weight:700;color:#2563eb;\">{otp_code}</div>
+          </div>
+          <p style=\"color:#1e3a8a;font-size:14px;line-height:1.6;\">Ce code expire dans <strong>{EMAIL_OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+          <p style=\"color:#1e3a8a;font-size:14px;line-height:1.6;\">Ne partagez jamais ce code. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>
+          <p style=\"color:#1d4ed8;font-size:13px;margin-top:24px;\">Équipe KOJO</p>
+        </div>
+        """
+    else:
+        subject = "Votre code de vérification KOJO"
+        text_body = (
+            f"Bonjour,\n\n"
+            f"Voici votre code de vérification KOJO : {otp_code}\n\n"
+            f"Ce code expire dans {EMAIL_OTP_EXPIRY_MINUTES} minutes.\n"
+            f"Ne partagez jamais ce code avec qui que ce soit.\n\n"
+            f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.\n\n"
+            f"Équipe KOJO"
+        )
+        html_body = f"""
+        <div style=\"font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#fff7ed;border:1px solid #fdba74;border-radius:16px;\">
+          <div style=\"text-align:center;margin-bottom:24px;\">
+            <div style=\"display:inline-block;background:#ea580c;color:#ffffff;border-radius:999px;padding:14px 18px;font-weight:700;font-size:20px;\">KOJO</div>
+          </div>
+          <h2 style=\"color:#9a3412;margin-bottom:8px;\">Vérification de votre email</h2>
+          <p style=\"color:#7c2d12;font-size:15px;line-height:1.6;\">Voici votre code de vérification KOJO.</p>
+          <div style=\"margin:24px 0;padding:20px;background:#ffffff;border:1px dashed #fb923c;border-radius:12px;text-align:center;\">
+            <div style=\"font-size:34px;letter-spacing:8px;font-weight:700;color:#ea580c;\">{otp_code}</div>
+          </div>
+          <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ce code expire dans <strong>{EMAIL_OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+          <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ne partagez jamais ce code. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>
+          <p style=\"color:#9a3412;font-size:13px;margin-top:24px;\">Équipe KOJO</p>
+        </div>
+        """
+
     return {
         "subject": subject,
         "text_body": text_body,
@@ -1118,7 +1156,7 @@ async def issue_email_otp(email: str, purpose: str = "signup") -> dict:
     otp_code = generate_email_otp_code()
     otp_hash = hash_email_otp(email, purpose, otp_code)
     expires_at = now + timedelta(minutes=EMAIL_OTP_EXPIRY_MINUTES)
-    email_content = build_signup_otp_email(otp_code)
+    email_content = build_email_otp_email(purpose, otp_code)
     send_email_via_gmail_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
 
     await db.email_otps.update_one(
@@ -1265,6 +1303,130 @@ async def verify_signup_email_otp(payload: EmailOtpVerifyRequest):
         "verification_token": verification_token,
         "masked_email": mask_email_address(clean_email),
         "verified": True
+    }
+
+@api_router.post("/auth/password/forgot/request")
+async def request_password_reset_otp(payload: EmailOtpRequest):
+    clean_email = sanitize_email(payload.email)
+    existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
+
+    if not existing_user:
+        return {
+            "message": "Si cette adresse email existe, un code de réinitialisation a été envoyé.",
+            "masked_email": mask_email_address(clean_email),
+            "expires_in_seconds": EMAIL_OTP_EXPIRY_MINUTES * 60,
+            "cooldown_seconds": EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+        }
+
+    otp_result = await issue_email_otp(clean_email, "password_reset")
+    otp_result["message"] = "Si cette adresse email existe, un code de réinitialisation a été envoyé."
+    return otp_result
+
+@api_router.post("/auth/password/forgot/resend")
+async def resend_password_reset_otp(payload: EmailOtpResendRequest):
+    clean_email = sanitize_email(payload.email)
+    existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
+
+    if not existing_user:
+        return {
+            "message": "Si cette adresse email existe, un code de réinitialisation a été envoyé.",
+            "masked_email": mask_email_address(clean_email),
+            "expires_in_seconds": EMAIL_OTP_EXPIRY_MINUTES * 60,
+            "cooldown_seconds": EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+        }
+
+    otp_result = await issue_email_otp(clean_email, "password_reset")
+    otp_result["message"] = "Si cette adresse email existe, un code de réinitialisation a été envoyé."
+    return otp_result
+
+@api_router.post("/auth/password/forgot/verify")
+async def verify_password_reset_otp(payload: EmailOtpVerifyRequest):
+    clean_email = sanitize_email(payload.email)
+    now = datetime.now(timezone.utc)
+
+    otp_record = await db.email_otps.find_one({"email": clean_email, "purpose": "password_reset"})
+    if not otp_record:
+        raise HTTPException(status_code=404, detail="Aucun code actif pour cette adresse email. Demandez un nouveau code.")
+
+    expires_at = otp_record.get("expires_at")
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if not expires_at or expires_at <= now:
+        await db.email_otps.delete_one({"email": clean_email, "purpose": "password_reset"})
+        raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau code.")
+
+    if otp_record.get("attempt_count", 0) >= EMAIL_OTP_MAX_ATTEMPTS:
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": "password_reset"},
+            {"$set": {"status": "locked", "updated_at": now}}
+        )
+        raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
+
+    candidate_hash = hash_email_otp(clean_email, "password_reset", payload.otp)
+    if candidate_hash != otp_record.get("otp_hash"):
+        new_attempt_count = otp_record.get("attempt_count", 0) + 1
+        new_status = "locked" if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS else "pending"
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": "password_reset"},
+            {
+                "$set": {
+                    "attempt_count": new_attempt_count,
+                    "updated_at": now,
+                    "last_attempt_at": now,
+                    "status": new_status
+                }
+            }
+        )
+        if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
+        remaining = max(0, EMAIL_OTP_MAX_ATTEMPTS - new_attempt_count)
+        raise HTTPException(status_code=400, detail=f"Code invalide. Tentatives restantes: {remaining}.")
+
+    verification_token = create_email_verification_token(clean_email, "password_reset")
+    await db.email_otps.update_one(
+        {"email": clean_email, "purpose": "password_reset"},
+        {
+            "$set": {
+                "verified_at": now,
+                "updated_at": now,
+                "status": "verified"
+            }
+        }
+    )
+
+    return {
+        "message": "Code vérifié avec succès.",
+        "verification_token": verification_token,
+        "masked_email": mask_email_address(clean_email),
+        "verified": True
+    }
+
+@api_router.post("/auth/password/reset")
+async def reset_password_with_verified_token(payload: PasswordResetConfirmRequest):
+    clean_email = sanitize_email(payload.email)
+    verify_email_verification_token(payload.verification_token, clean_email, purpose="password_reset")
+
+    user = await db.users.find_one({"email": clean_email})
+    if not user:
+        raise HTTPException(status_code=404, detail="Adresse email introuvable.")
+
+    now = datetime.now(timezone.utc)
+    await db.users.update_one(
+        {"email": clean_email},
+        {
+            "$set": {
+                "password_hash": hash_password(payload.new_password),
+                "updated_at": now
+            }
+        }
+    )
+    await db.email_otps.delete_one({"email": clean_email, "purpose": "password_reset"})
+
+    return {
+        "message": "Mot de passe réinitialisé avec succès.",
+        "email": clean_email,
+        "password_reset": True
     }
 
 @api_router.post("/auth/register-verified")
