@@ -6,74 +6,28 @@
 export const isDevelopment = process.env.NODE_ENV === 'development';
 export const isProduction = process.env.NODE_ENV === 'production';
 
-const isConsoleDebugEnabled = () => {
-  if (typeof window === 'undefined') return false;
+const noop = () => {};
 
-  try {
-    return window.localStorage.getItem('kojo_console_debug') === '1';
-  } catch {
-    return false;
-  }
-};
-
-const shouldLogToConsole = () => isDevelopment && isConsoleDebugEnabled();
+const shouldLogToConsole = () => false;
 
 /**
- * Development-only console logger
- * Only logs in development environment
+ * Console logger intentionally silenced for clean production-like usage
  */
 export const devLog = {
-  log: (...args) => {
-    if (shouldLogToConsole()) {
-      console.log(...args);
-    }
-  },
-  
-  error: (...args) => {
-    if (shouldLogToConsole()) {
-      console.error(...args);
-    }
-  },
-  
-  warn: (...args) => {
-    if (shouldLogToConsole()) {
-      console.warn(...args);
-    }
-  },
-  
-  info: (...args) => {
-    if (shouldLogToConsole()) {
-      console.info(...args);
-    }
-  },
-  
-  debug: (...args) => {
-    if (shouldLogToConsole()) {
-      console.debug(...args);
-    }
-  }
+  log: noop,
+  error: noop,
+  warn: noop,
+  info: noop,
+  debug: noop
 };
 
 /**
- * Production-safe logger
- * Always logs errors, warnings only in development
+ * Safe logger also silenced to keep the app console clean
  */
 export const safeLog = {
-  error: (...args) => {
-    if (shouldLogToConsole()) {
-      console.error(...args);
-    }
-  },
-  
-  warn: (...args) => {
-    if (shouldLogToConsole()) {
-      console.warn(...args);
-    }
-  },
-  
-  info: (...args) => {
-    if (shouldLogToConsole()) {
-      console.info(...args);
-    }
-  }
+  error: noop,
+  warn: noop,
+  info: noop
 };
+
+export { shouldLogToConsole };
