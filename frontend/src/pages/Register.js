@@ -36,6 +36,7 @@ export default function Register() {
 
   });
   const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [emailChecking, setEmailChecking] = useState(false);
   const [emailAvailability, setEmailAvailability] = useState(null);
@@ -55,6 +56,8 @@ export default function Register() {
 
   const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
   const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
+  const displayedError = errorKey ? pageT(errorKey) : error;
+  const displayedEmailAvailabilityMessage = emailAvailability?.messageKey ? pageT(emailAvailability.messageKey) : emailAvailability?.message;
 
   const checkEmailAvailability = async (rawEmail, { silent = false } = {}) => {
     const emailToCheck = String(rawEmail || '').trim().toLowerCase();
@@ -74,23 +77,27 @@ export default function Register() {
 
       if (!result.available) {
         const translatedMessage = pageT('duplicateEmailError');
-        setEmailAvailability({ ...result, message: translatedMessage });
+        setEmailAvailability({ ...result, messageKey: 'duplicateEmailError' });
         setError(translatedMessage);
+        setErrorKey('duplicateEmailError');
         if (!silent) {
           toast.error(translatedMessage);
         }
         return false;
       }
 
-      setEmailAvailability({ ...result, message: pageT('emailAvailable') });
+      setEmailAvailability({ ...result, messageKey: 'emailAvailable' });
+      setError('');
+      setErrorKey('');
       return true;
     } catch (apiError) {
       const rawMessage = apiError?.response?.data?.detail || apiError?.message || 'Impossible de vérifier cette adresse email';
       const message = translateApiMessage(rawMessage);
 
       if (isEmailAlreadyUsedMessage(rawMessage)) {
-        setEmailAvailability({ available: false, message });
+        setEmailAvailability({ available: false, messageKey: 'duplicateEmailError' });
         setError(message);
+        setErrorKey('duplicateEmailError');
         if (!silent) {
           toast.error(message);
         }
@@ -99,6 +106,7 @@ export default function Register() {
 
       safeLog.error('❌ Erreur vérification disponibilité email:', apiError);
       setEmailAvailability(null);
+      setErrorKey('');
       if (!silent) {
         toast.error(message);
       }
@@ -181,6 +189,7 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setErrorKey('');
 
     // Validation de base
     if (formData.password !== formData.confirmPassword) {
@@ -261,8 +270,9 @@ export default function Register() {
 
     if (name === 'email') {
       setEmailAvailability(null);
-      if (error && isEmailAlreadyUsedMessage(error)) {
+      if (errorKey === 'duplicateEmailError' || (error && isEmailAlreadyUsedMessage(error))) {
         setError('');
+        setErrorKey('');
       }
     }
 
@@ -376,9 +386,9 @@ export default function Register() {
         </div>
         
         <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-md" onSubmit={handleSubmit}>
-          {error && (
+          {displayedError && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-              {error}
+              {displayedError}
             </div>
           )}
           
@@ -526,7 +536,7 @@ export default function Register() {
                 <p className="mt-1 text-sm text-blue-600">{pageT('checkingEmail')}</p>
               )}
               {!emailChecking && emailAvailability?.available === false && (
-                <p className="mt-1 text-sm text-red-600">{emailAvailability.message || pageT('duplicateEmailError')}</p>
+                <p className="mt-1 text-sm text-red-600">{displayedEmailAvailabilityMessage || pageT('duplicateEmailError')}</p>
               )}
               {!emailChecking && emailAvailability?.available === true && formData.email?.trim() && (
                 <p className="mt-1 text-sm text-green-600">{pageT('emailAvailable')}</p>

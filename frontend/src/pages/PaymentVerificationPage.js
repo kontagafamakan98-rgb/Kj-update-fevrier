@@ -25,6 +25,8 @@ const PaymentVerificationPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [errorKey, setErrorKey] = useState('');
+  const displayedError = errorKey ? pageT(errorKey) : error;
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [geoLoading, setGeoLoading] = useState(true);
 
@@ -76,6 +78,7 @@ const PaymentVerificationPage = () => {
   const handlePaymentAccountsComplete = async (paymentAccounts) => {
     setLoading(true);
     setError(null);
+    setErrorKey('');
 
     try {
       devLog.info('🏦 Finalisation du compte après email vérifié...');
@@ -126,15 +129,19 @@ const PaymentVerificationPage = () => {
       safeLog.error('❌ Erreur de finalisation du compte:', registrationError);
       const rawErrorMsg = registrationError.message || pageT('genericError');
       const errorMsg = translateApiMessage(rawErrorMsg);
+      const nextErrorKey = isEmailAlreadyUsedMessage(rawErrorMsg) ? 'duplicateEmailError' : '';
 
       if (isEmailAlreadyUsedMessage(rawErrorMsg)) {
         clearRegistrationFlow();
+        setError(errorMsg);
+        setErrorKey(nextErrorKey);
         toast.error(errorMsg);
         navigate('/register', { replace: true });
         return;
       }
 
       setError(errorMsg);
+      setErrorKey(nextErrorKey);
       toast.error(errorMsg);
     } finally {
       setLoading(false);
@@ -214,13 +221,13 @@ const PaymentVerificationPage = () => {
           </div>
         </div>
 
-        {error && (
+        {displayedError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center">
               <span className="text-red-500 text-xl mr-3">❌</span>
               <div>
                 <h3 className="font-semibold text-red-800">{pageT('registrationErrorTitle')}</h3>
-                <p className="text-red-700 text-sm">{error}</p>
+                <p className="text-red-700 text-sm">{displayedError}</p>
               </div>
             </div>
           </div>
