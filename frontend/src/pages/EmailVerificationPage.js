@@ -79,6 +79,8 @@ const EmailVerificationPage = () => {
     return apiError?.response?.data?.detail || apiError?.message || fallbackMessage;
   };
 
+  const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
+
   const handleSendCode = async (mode = 'send') => {
     if (!userData?.email) {
       return;
@@ -109,6 +111,12 @@ const EmailVerificationPage = () => {
       setError(message);
       toast.error(message);
       safeLog.error('❌ Erreur envoi OTP Gmail:', apiError);
+
+      if (isEmailAlreadyUsedMessage(message)) {
+        clearRegistrationFlow();
+        navigate('/register', { replace: true });
+        return;
+      }
     } finally {
       setSendingCode(false);
     }

@@ -12,6 +12,7 @@ import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
 import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
+import { authAPI } from '../services/api';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -36,6 +37,8 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailChecking, setEmailChecking] = useState(false);
+  const [emailAvailability, setEmailAvailability] = useState(null);
   const [geoLoading, setGeoLoading] = useState(true);
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [manualCountrySelection, setManualCountrySelection] = useState(false);
@@ -49,6 +52,58 @@ export default function Register() {
   const navigate = useNavigate();
 
   const countries = getCountriesList();
+
+  const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
+
+  const checkEmailAvailability = async (rawEmail, { silent = false } = {}) => {
+    const emailToCheck = String(rawEmail || '').trim().toLowerCase();
+
+    if (!emailToCheck) {
+      setEmailAvailability(null);
+      return true;
+    }
+
+    setEmailChecking(true);
+
+    try {
+      const result = await authAPI.checkEmailAvailability({
+        email: emailToCheck,
+        purpose: 'signup'
+      });
+
+      setEmailAvailability(result);
+
+      if (!result.available) {
+        setError(result.message || 'Cette adresse email est déjà utilisée');
+        if (!silent) {
+          toast.error(result.message || 'Cette adresse email est déjà utilisée');
+        }
+        return false;
+      }
+
+      return true;
+    } catch (apiError) {
+      const message = apiError?.response?.data?.detail || apiError?.message || 'Impossible de vérifier cette adresse email';
+
+      if (isEmailAlreadyUsedMessage(message)) {
+        setEmailAvailability({ available: false, message });
+        setError(message);
+        if (!silent) {
+          toast.error(message);
+        }
+        return false;
+      }
+
+      safeLog.error('❌ Erreur vérification disponibilité email:', apiError);
+      setEmailAvailability(null);
+      if (!silent) {
+        toast.error(message);
+      }
+      return false;
+    } finally {
+      setEmailChecking(false);
+    }
+  };
 
   const findCountryData = (value) => countries.find((country) => {
     const normalizedValue = normalizeCountryCode((value || '').toLowerCase());
@@ -161,6 +216,12 @@ export default function Register() {
 
     }
 
+    const emailAvailable = await checkEmailAvailability(formData.email);
+    if (!emailAvailable) {
+      setLoading(false);
+      return;
+    }
+
     // Préparer les données utilisateur
     const userData = {
       ...formData,
@@ -194,6 +255,14 @@ export default function Register() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'email') {
+      setEmailAvailability(null);
+      if (error && isEmailAlreadyUsedMessage(error)) {
+        setError('');
+      }
+    }
+
     updateFormData(name, value);
   };
 
@@ -444,7 +513,21 @@ export default function Register() {
                 placeholder={pageT('emailPlaceholder')}
                 value={formData.email}
                 onChange={handleChange}
+                onBlur={() => {
+                  if (formData.email?.trim()) {
+                    checkEmailAvailability(formData.email, { silent: true });
+                  }
+                }}
               />
+              {emailChecking && (
+                <p className="mt-1 text-sm text-blue-600">Vérification de cette adresse email...</p>
+              )}
+              {!emailChecking && emailAvailability?.available === false && (
+                <p className="mt-1 text-sm text-red-600">{emailAvailability.message || 'Cette adresse email est déjà utilisée'}</p>
+              )}
+              {!emailChecking && emailAvailability?.available === true && formData.email?.trim() && (
+                <p className="mt-1 text-sm text-green-600">Adresse email disponible</p>
+              )}
             </div>
 
             <div>
