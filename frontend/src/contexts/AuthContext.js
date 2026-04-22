@@ -81,7 +81,8 @@ export function AuthProvider({ children }) {
       
       return { 
         success: false, 
-        error: errorInfo.message
+        error: errorInfo.message,
+        errorKey: errorInfo.messageKey || ''
       };
     }
   };
