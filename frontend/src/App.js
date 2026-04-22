@@ -18,6 +18,16 @@ import ToastContainer from "./components/ToastContainer";
 import PageLoader from "./components/PageLoader";
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
+const shouldEnableRuntimeDiagnostics = () => {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    return window.localStorage.getItem('kojo_runtime_diagnostics') === '1';
+  } catch {
+    return false;
+  }
+};
+
 // Eager load critical pages (public pages shown immediately)
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -194,6 +204,8 @@ function AppRoutes() {
 }
 
 function App() {
+  const runtimeDiagnosticsEnabled = shouldEnableRuntimeDiagnostics();
+
   useEffect(() => {
     // Add mobile viewport optimizations
     const addMobileOptimizations = () => {
@@ -258,8 +270,8 @@ function App() {
             <PaymentProvider>
               <ToastProvider>
                 <ErrorBoundary>
-                  <PerformanceMonitor />
-                  <AccessibilityHelper />
+                  {runtimeDiagnosticsEnabled && <PerformanceMonitor />}
+                  {runtimeDiagnosticsEnabled && <AccessibilityHelper />}
                   <AppRoutes />
                 </ErrorBoundary>
               </ToastProvider>
