@@ -132,8 +132,10 @@ export default function Jobs() {
       <div className="bg-white rounded-lg shadow mb-6 p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('search')}</label>
+            <label htmlFor="jobs_search" className="block text-sm font-medium text-gray-700 mb-2">{t('search')}</label>
             <input
+              id="jobs_search"
+              name="jobs_search"
               type="text"
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
@@ -143,8 +145,10 @@ export default function Jobs() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('categoryLabel')}</label>
+            <label htmlFor="jobs_category_filter" className="block text-sm font-medium text-gray-700 mb-2">{pageT('categoryLabel')}</label>
             <select
+              id="jobs_category_filter"
+              name="jobs_category_filter"
               value={filters.category}
               onChange={(e) => handleFilterChange('category', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"
@@ -158,8 +162,10 @@ export default function Jobs() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('statusLabel')}</label>
+            <label htmlFor="jobs_status_filter" className="block text-sm font-medium text-gray-700 mb-2">{pageT('statusLabel')}</label>
             <select
+              id="jobs_status_filter"
+              name="jobs_status_filter"
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"

@@ -133,7 +133,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('requiredSkills')}</label>
             <div className="flex space-x-2">
-              <input type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={handleSkillKeyPress} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('requiredSkillsPlaceholder')} />
+              <input id="job_skill_input" name="job_skill_input" type="text" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={handleSkillKeyPress} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('requiredSkillsPlaceholder')} />
               <button type="button" onClick={addSkill} className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700">{t('add')}</button>
             </div>
             {formData.required_skills.length > 0 && (

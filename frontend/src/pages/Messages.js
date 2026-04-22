@@ -162,6 +162,8 @@ export default function Messages() {
               <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
                 <div className="flex space-x-2">
                   <input
+                    id="message_input"
+                    name="message_input"
                     type="text"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}

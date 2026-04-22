@@ -286,6 +286,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           {isEditing ? (
             <div>
               <input
+                id="payment_accounts_orange_money"
+                name="payment_accounts_orange_money"
                 type="tel"
                 value={accounts.orange_money}
                 onChange={(e) => setAccounts({...accounts, orange_money: e.target.value})}
@@ -324,6 +326,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           {isEditing ? (
             <div>
               <input
+                id="payment_accounts_wave"
+                name="payment_accounts_wave"
                 type="tel"
                 value={accounts.wave}
                 onChange={(e) => setAccounts({...accounts, wave: e.target.value})}
@@ -366,6 +370,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                   {t('accountNumberLabel')} *
                 </label>
                 <input
+                  id="payment_accounts_bank_account_number"
+                  name="payment_accounts_bank_account_number"
                   type="text"
                   value={accounts.bank_account.account_number}
                   onChange={(e) => setAccounts({
@@ -382,6 +388,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                   {t('bankNameLabel')} *
                 </label>
                 <select
+                  id="payment_accounts_bank_name"
+                  name="payment_accounts_bank_name"
                   value={accounts.bank_account.bank_name}
                   onChange={(e) => setAccounts({
                     ...accounts, 
@@ -402,6 +410,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                   {t('accountHolderLabel')} *
                 </label>
                 <input
+                  id="payment_accounts_bank_account_holder"
+                  name="payment_accounts_bank_account_holder"
                   type="text"
                   value={accounts.bank_account.account_holder}
                   onChange={(e) => setAccounts({
@@ -419,6 +429,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     {t('bankCodeOptional')}
                   </label>
                   <input
+                    id="payment_accounts_bank_code"
+                    name="payment_accounts_bank_code"
                     type="text"
                     value={accounts.bank_account.bank_code}
                     onChange={(e) => setAccounts({
@@ -435,6 +447,8 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                     {t('branchOptional')}
                   </label>
                   <input
+                    id="payment_accounts_bank_branch"
+                    name="payment_accounts_bank_branch"
                     type="text"
                     value={accounts.bank_account.branch}
                     onChange={(e) => setAccounts({

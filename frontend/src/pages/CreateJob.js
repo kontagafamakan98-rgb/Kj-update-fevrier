@@ -306,6 +306,7 @@ export default function CreateJob() {
 
                 <div className="space-y-4">
                   <BooleanQuestion
+                    fieldKey="mechanic_must_bring_parts"
                     emoji="🔩"
                     title={pageT('partsQuestion')}
                     description={pageT('partsDescription')}
@@ -316,6 +317,7 @@ export default function CreateJob() {
                   />
 
                   <BooleanQuestion
+                    fieldKey="mechanic_must_bring_tools"
                     emoji="🛠️"
                     title={pageT('toolsQuestion')}
                     description={pageT('toolsDescription')}
@@ -404,7 +406,7 @@ export default function CreateJob() {
   );
 }
 
-function BooleanQuestion({ emoji, title, description, value, onChange, yesLabel, noLabel }) {
+function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange, yesLabel, noLabel }) {
   return (
     <div className="flex items-center justify-between p-4 bg-white border border-blue-200 rounded-lg gap-4 flex-wrap">
       <div className="flex items-center">
@@ -417,6 +419,8 @@ function BooleanQuestion({ emoji, title, description, value, onChange, yesLabel,
       <div className="flex items-center space-x-3">
         <label className="flex items-center">
           <input
+            id={`${fieldKey}_yes`}
+            name={fieldKey}
             type="radio"
             checked={value === true}
             onChange={() => onChange(true)}
@@ -426,6 +430,8 @@ function BooleanQuestion({ emoji, title, description, value, onChange, yesLabel,
         </label>
         <label className="flex items-center">
           <input
+            id={`${fieldKey}_no`}
+            name={fieldKey}
             type="radio"
             checked={value === false}
             onChange={() => onChange(false)}

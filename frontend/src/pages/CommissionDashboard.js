@@ -45,6 +45,16 @@ const CommissionDashboard = () => {
       try {
         const serverData = await OwnerService.getCommissionStats();
         setServerStats(serverData.stats);
+        if ((serverData.stats?.recent_transactions || []).length > 0) {
+          setTransactions(serverData.stats.recent_transactions.map((tx) => ({
+            id: tx.id,
+            totalAmount: tx.amount,
+            ownerCommission: tx.commission,
+            workerAmount: tx.worker_amount,
+            paymentMethod: tx.paymentMethod || tx.method,
+            timestamp: tx.timestamp || tx.date
+          })));
+        }
         devLog.info('📊 Vraies stats serveur chargées:', serverData.stats);
       } catch {
         devLog.info('📊 Utilisation des stats locales (serveur indisponible)');
@@ -171,6 +181,8 @@ const CommissionDashboard = () => {
               notConfigured={pageT('notConfigured')}
               onPrimaryChange={(value) => handleAccountUpdate('orange_money', 'phoneNumber', value)}
               onSecondaryChange={(value) => handleAccountUpdate('orange_money', 'accountName', value)}
+              primaryName="commission_orange_money_phone"
+              secondaryName="commission_orange_money_account_name"
             />
 
             <AccountCard
@@ -186,6 +198,8 @@ const CommissionDashboard = () => {
               notConfigured={pageT('notConfigured')}
               onPrimaryChange={(value) => handleAccountUpdate('wave', 'phoneNumber', value)}
               onSecondaryChange={(value) => handleAccountUpdate('wave', 'accountName', value)}
+              primaryName="commission_wave_phone"
+              secondaryName="commission_wave_account_name"
             />
 
             <AccountCard
@@ -201,6 +215,8 @@ const CommissionDashboard = () => {
               notConfigured={pageT('notConfigured')}
               onPrimaryChange={(value) => handleAccountUpdate('bank_card', 'accountNumber', value)}
               onSecondaryChange={(value) => handleAccountUpdate('bank_card', 'bank', value)}
+              primaryName="commission_bank_card_number"
+              secondaryName="commission_bank_card_bank"
             />
           </div>
         </div>
@@ -269,7 +285,7 @@ function StatCard({ icon, bg, title, value, valueColor }) {
   );
 }
 
-function AccountCard({ title, emoji, editing, primaryLabel, secondaryLabel, primaryValue, secondaryValue, primaryPlaceholder, secondaryPlaceholder, notConfigured, onPrimaryChange, onSecondaryChange }) {
+function AccountCard({ title, emoji, editing, primaryLabel, secondaryLabel, primaryValue, secondaryValue, primaryPlaceholder, secondaryPlaceholder, notConfigured, onPrimaryChange, onSecondaryChange, primaryName, secondaryName }) {
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-center mb-3">
@@ -278,17 +294,17 @@ function AccountCard({ title, emoji, editing, primaryLabel, secondaryLabel, prim
       </div>
       <div className="space-y-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{primaryLabel}</label>
+          <label htmlFor={primaryName} className="block text-sm font-medium text-gray-700 mb-1">{primaryLabel}</label>
           {editing ? (
-            <input type="text" value={primaryValue} onChange={(e) => onPrimaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={primaryPlaceholder} />
+            <input id={primaryName} name={primaryName} type="text" value={primaryValue} onChange={(e) => onPrimaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={primaryPlaceholder} />
           ) : (
             <p className="font-mono text-sm bg-gray-50 p-2 rounded">{primaryValue || notConfigured}</p>
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{secondaryLabel}</label>
+          <label htmlFor={secondaryName} className="block text-sm font-medium text-gray-700 mb-1">{secondaryLabel}</label>
           {editing ? (
-            <input type="text" value={secondaryValue} onChange={(e) => onSecondaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={secondaryPlaceholder} />
+            <input id={secondaryName} name={secondaryName} type="text" value={secondaryValue} onChange={(e) => onSecondaryChange(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder={secondaryPlaceholder} />
           ) : (
             <p className="text-sm bg-gray-50 p-2 rounded">{secondaryValue || notConfigured}</p>
           )}

@@ -173,6 +173,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
 
               {/* Inputs cachés */}
               <input
+                id="profile_photo_file_picker_mobile"
+                name="profile_photo_file_picker_mobile"
                 ref={inputRef}
                 type="file"
                 className="hidden"
@@ -181,6 +183,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
               />
               
               <input
+                id="profile_photo_camera_picker_mobile"
+                name="profile_photo_camera_picker_mobile"
                 ref={cameraInputRef}
                 type="file"
                 className="hidden"
@@ -267,6 +271,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
           
           {/* Inputs cachés */}
           <input
+            id="profile_photo_file_picker"
+            name="profile_photo_file_picker"
             ref={inputRef}
             type="file"
             className="hidden"
@@ -275,6 +281,8 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
           />
           
           <input
+            id="profile_photo_camera_picker"
+            name="profile_photo_camera_picker"
             ref={cameraInputRef}
             type="file"
             className="hidden"
