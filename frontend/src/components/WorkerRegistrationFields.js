@@ -57,7 +57,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-blue-900 mb-3">🔧 {t('skillsAndSpecialties')} *</label>
+          <p className="block text-sm font-medium text-blue-900 mb-3">🔧 {t('skillsAndSpecialties')} *</p>
 
           {formData.worker_specialties && formData.worker_specialties.length > 0 && (
             <div className="mb-3">
