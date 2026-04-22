@@ -136,6 +136,7 @@ export default function Jobs() {
             <input
               id="jobs_search"
               name="jobs_search"
+              autoComplete="off"
               type="text"
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
@@ -149,6 +150,7 @@ export default function Jobs() {
             <select
               id="jobs_category_filter"
               name="jobs_category_filter"
+              autoComplete="off"
               value={filters.category}
               onChange={(e) => handleFilterChange('category', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"
@@ -166,6 +168,7 @@ export default function Jobs() {
             <select
               id="jobs_status_filter"
               name="jobs_status_filter"
+              autoComplete="off"
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"
