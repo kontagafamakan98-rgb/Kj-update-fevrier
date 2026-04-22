@@ -36,7 +36,8 @@ export default function Jobs() {
   const loadJobs = async () => {
     try {
       const response = await jobsAPI.getAll();
-      const jobsData = response.data;
+      const jobsData = Array.isArray(response) ? response : response?.data || [];
+
       if (user.user_type === 'client') {
         setJobs(jobsData.filter((job) => job.client_id === user.id));
       } else {
@@ -44,6 +45,7 @@ export default function Jobs() {
       }
     } catch (error) {
       safeLog.error('Error loading jobs:', error);
+      setJobs([]);
     } finally {
       setLoading(false);
     }
