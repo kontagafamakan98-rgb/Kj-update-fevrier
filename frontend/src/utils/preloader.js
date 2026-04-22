@@ -346,10 +346,8 @@ class KojoPreloader {
    * Schedule preloading based on user activity
    */
   schedulePreloading(context) {
-    // Delay preloading to avoid interfering with user actions
-    setTimeout(() => {
-      this.startPreloading(context);
-    }, 2000);
+    // Run directly to avoid helper-driven idle callbacks across pages.
+    this.startPreloading(context);
   }
 
   /**
