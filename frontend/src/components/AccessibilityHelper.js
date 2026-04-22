@@ -34,16 +34,23 @@ const AccessibilityHelper = () => {
 };
 
 function scheduleDeferredTask(task, delay = 2000) {
-  let timeoutId = null;
   let idleId = null;
+  let animationFrameId = null;
 
   const runTask = () => {
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      idleId = window.requestIdleCallback(() => task(), { timeout: 1500 });
+      idleId = window.requestIdleCallback(() => task(), { timeout: delay });
       return;
     }
 
-    timeoutId = window.setTimeout(task, delay);
+    if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = window.requestAnimationFrame(() => task());
+      });
+      return;
+    }
+
+    task();
   };
 
   runTask();
@@ -53,8 +60,8 @@ function scheduleDeferredTask(task, delay = 2000) {
       window.cancelIdleCallback(idleId);
     }
 
-    if (timeoutId !== null) {
-      window.clearTimeout(timeoutId);
+    if (animationFrameId !== null && typeof window !== 'undefined' && 'cancelAnimationFrame' in window) {
+      window.cancelAnimationFrame(animationFrameId);
     }
   };
 }
@@ -286,14 +293,24 @@ export function announceToScreenReader(message, priority = 'polite') {
   const regionId = priority === 'assertive' ? 'aria-live-assertive' : 'aria-live-polite';
   const region = document.getElementById(regionId);
   
-  if (region) {
-    region.textContent = message;
-    
-    // Clear after announcement
-    setTimeout(() => {
-      region.textContent = '';
-    }, 1000);
+  if (!region) {
+    return;
   }
+
+  const applyMessage = () => {
+    region.textContent = message;
+  };
+
+  region.textContent = '';
+
+  if (typeof window !== 'undefined' && 'requestAnimationFrame' in window) {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(applyMessage);
+    });
+    return;
+  }
+
+  applyMessage();
 }
 
 /**
