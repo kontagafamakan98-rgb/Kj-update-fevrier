@@ -66,7 +66,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
                 {formData.worker_specialties.map((skill, index) => (
                   <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                     {skill}
-                    <button type="button" onClick={() => handleSpecialtyRemove(skill)} className="ml-2 text-green-600 hover:text-green-800">×</button>
+                    <button type="button" aria-label={`${t('remove')} ${skill}`} onClick={() => handleSpecialtyRemove(skill)} className="ml-2 text-green-600 hover:text-green-800">×</button>
                   </span>
                 ))}
               </div>
@@ -99,10 +99,12 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
           <div className="mt-3">
             {showSkillInput ? (
               <div className="flex gap-2">
+                <label htmlFor="worker_custom_skill" className="sr-only">{t('addCustomSkill')}</label>
                 <input
                   id="worker_custom_skill"
                   name="worker_custom_skill"
                   type="text"
+                  autoComplete="off"
                   value={newSkill}
                   onChange={(e) => setNewSkill(e.target.value)}
                   placeholder={t('customSkillPlaceholder')}
@@ -133,6 +135,8 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
           <label htmlFor="worker_experience_years" className="block text-sm font-medium text-blue-900 mb-2">📅 {t('yearsExperience')} *</label>
           <select
             id="worker_experience_years"
+            name="worker_experience_years"
+            autoComplete="off"
             value={formData.worker_experience_years || ''}
             onChange={(e) => setFormData((prev) => ({ ...prev, worker_experience_years: parseInt(e.target.value, 10) || 0 }))}
             className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.worker_experience_years ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'}`}

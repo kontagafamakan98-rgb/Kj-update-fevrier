@@ -256,6 +256,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             </span>
           </div>
           
+          <label htmlFor="payment_setup_orange_money" className="sr-only">{t('orangeMoney')}</label>
           <input
             id="payment_setup_orange_money"
             name="payment_setup_orange_money"
@@ -283,6 +284,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             </span>
           </div>
           
+          <label htmlFor="payment_setup_wave" className="sr-only">{t('wave')}</label>
           <input
             id="payment_setup_wave"
             name="payment_setup_wave"
@@ -311,6 +313,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           </div>
           
           <div className="space-y-3">
+            <label htmlFor="payment_setup_bank_account_number" className="sr-only">{t('bankAccountNumber')}</label>
             <input
               id="payment_setup_bank_account_number"
               name="payment_setup_bank_account_number"
@@ -325,7 +328,9 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
             />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <input
+              <div>
+                <label htmlFor="payment_setup_bank_account_holder" className="sr-only">{t('accountHolderName')}</label>
+                <input
                 id="payment_setup_bank_account_holder"
                 name="payment_setup_bank_account_holder"
                 autoComplete="name"
@@ -337,7 +342,10 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                   validationErrors.bank_account ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
+              </div>
               
+              <div>
+                <label htmlFor="payment_setup_bank_name" className="sr-only">{t('selectBank')}</label>
               <select
                 id="payment_setup_bank_name"
                 name="payment_setup_bank_name"
@@ -354,9 +362,12 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 ))}
                 <option value="other">{t('otherBank')}</option>
               </select>
+              </div>
             </div>
             
             {accounts.bank_account.bank_name === 'other' && (
+              <>
+              <label htmlFor="payment_setup_other_bank_name" className="sr-only">{t('yourBankName')}</label>
               <input
                 id="payment_setup_other_bank_name"
                 name="payment_setup_other_bank_name"
@@ -366,9 +377,12 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 placeholder={t('yourBankName')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
+              </>
             )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="payment_setup_bank_code" className="sr-only">{t('bankCodeOptional')}</label>
               <input
                 id="payment_setup_bank_code"
                 name="payment_setup_bank_code"
@@ -379,7 +393,10 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 placeholder={t('bankCodeOptional')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
+              </div>
               
+              <div>
+                <label htmlFor="payment_setup_bank_branch" className="sr-only">{t('branchOptional')}</label>
               <input
                 id="payment_setup_bank_branch"
                 name="payment_setup_bank_branch"
@@ -390,6 +407,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 placeholder={t('branchOptional')}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
+              </div>
             </div>
           </div>
           

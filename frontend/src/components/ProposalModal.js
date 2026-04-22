@@ -57,17 +57,17 @@ export default function ProposalModal({ jobId, onClose, onProposalSubmitted }) {
 
           <div>
             <label htmlFor="proposed_amount" className="block text-sm font-medium text-gray-700 mb-2">{t('proposedAmount')}</label>
-            <input type="number" id="proposed_amount" name="proposed_amount" required min="0" value={formData.proposed_amount} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="10000" />
+            <input type="number" id="proposed_amount" name="proposed_amount" autoComplete="off" required min="0" value={formData.proposed_amount} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="10000" />
           </div>
 
           <div>
             <label htmlFor="estimated_completion_time" className="block text-sm font-medium text-gray-700 mb-2">{t('estimatedCompletionTime')}</label>
-            <input type="text" id="estimated_completion_time" name="estimated_completion_time" required value={formData.estimated_completion_time} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('proposalTimePlaceholder')} />
+            <input type="text" id="estimated_completion_time" name="estimated_completion_time" autoComplete="off" required value={formData.estimated_completion_time} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('proposalTimePlaceholder')} />
           </div>
 
           <div>
             <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">{t('messageToClient')}</label>
-            <textarea id="message" name="message" required rows={4} value={formData.message} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('proposalMessagePlaceholder')} />
+            <textarea id="message" name="message" autoComplete="off" required rows={4} value={formData.message} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('proposalMessagePlaceholder')} />
           </div>
 
           <div className="flex justify-end space-x-4 pt-4">

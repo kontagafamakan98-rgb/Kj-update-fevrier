@@ -368,25 +368,27 @@ const PaymentDemo = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">{copy.amount}</span>
+              <div className="block">
+                <label htmlFor="payment_demo_amount" className="text-sm font-medium text-gray-700">{copy.amount}</label>
                 <input
                   id="payment_demo_amount"
                   name="payment_demo_amount"
                   type="number"
+                  autoComplete="off"
                   min="500"
                   step="500"
                   value={form.amount}
                   onChange={(e) => setForm((prev) => ({ ...prev, amount: Number(e.target.value) || 0 }))}
                   className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
-              </label>
+              </div>
 
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">{copy.country}</span>
+              <div className="block">
+                <label htmlFor="payment_demo_country" className="text-sm font-medium text-gray-700">{copy.country}</label>
                 <select
                   id="payment_demo_country"
                   name="payment_demo_country"
+                  autoComplete="off"
                   value={form.country}
                   onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value }))}
                   className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -395,13 +397,14 @@ const PaymentDemo = () => {
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
-              </label>
+              </div>
 
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">{copy.method}</span>
+              <div className="block">
+                <label htmlFor="payment_demo_method" className="text-sm font-medium text-gray-700">{copy.method}</label>
                 <select
                   id="payment_demo_method"
                   name="payment_demo_method"
+                  autoComplete="off"
                   value={form.method}
                   onChange={(e) => setForm((prev) => ({ ...prev, method: e.target.value }))}
                   className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -410,7 +413,7 @@ const PaymentDemo = () => {
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
-              </label>
+              </div>
             </div>
 
             {quote && (

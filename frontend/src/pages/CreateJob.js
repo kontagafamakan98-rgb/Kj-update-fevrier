@@ -215,6 +215,7 @@ export default function CreateJob() {
               <p className="block text-sm font-medium text-gray-700 mb-2">{pageT('budgetLabel')}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label htmlFor="budget_min" className="sr-only">{pageT('budgetMinPlaceholder')}</label>
                   <input
                     type="number"
                     id="budget_min"
@@ -230,6 +231,7 @@ export default function CreateJob() {
                   {errors.budget_min && <p className="mt-1 text-sm text-red-600">{errors.budget_min}</p>}
                 </div>
                 <div>
+                  <label htmlFor="budget_max" className="sr-only">{pageT('budgetMaxPlaceholder')}</label>
                   <input
                     type="number"
                     id="budget_max"

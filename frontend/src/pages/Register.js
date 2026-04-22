@@ -411,6 +411,7 @@ export default function Register() {
                     id="user_type_client"
                     type="radio"
                     name="user_type"
+                    autoComplete="off"
                     value="client"
                     checked={formData.user_type === 'client'}
                     onChange={handleChange}
@@ -435,6 +436,7 @@ export default function Register() {
                     id="user_type_worker"
                     type="radio"
                     name="user_type"
+                    autoComplete="off"
                     value="worker"
                     checked={formData.user_type === 'worker'}
                     onChange={handleChange}

@@ -282,6 +282,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           
           {isEditing ? (
             <div>
+              <label htmlFor="payment_accounts_orange_money" className="sr-only">{t('orangeMoney')}</label>
               <input
                 id="payment_accounts_orange_money"
                 name="payment_accounts_orange_money"
@@ -323,6 +324,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           
           {isEditing ? (
             <div>
+              <label htmlFor="payment_accounts_wave" className="sr-only">{t('wave')}</label>
               <input
                 id="payment_accounts_wave"
                 name="payment_accounts_wave"
@@ -365,7 +367,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
           {isEditing ? (
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="payment_accounts_bank_account_number" className="block text-sm font-medium text-gray-700 mb-1">
                   {t('accountNumberLabel')} *
                 </label>
                 <input
@@ -384,7 +386,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="payment_accounts_bank_name" className="block text-sm font-medium text-gray-700 mb-1">
                   {t('bankNameLabel')} *
                 </label>
                 <select
@@ -407,7 +409,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="payment_accounts_bank_account_holder" className="block text-sm font-medium text-gray-700 mb-1">
                   {t('accountHolderLabel')} *
                 </label>
                 <input
@@ -427,7 +429,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="payment_accounts_bank_code" className="block text-sm font-medium text-gray-700 mb-1">
                     {t('bankCodeOptional')}
                   </label>
                   <input
@@ -446,7 +448,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="payment_accounts_bank_branch" className="block text-sm font-medium text-gray-700 mb-1">
                     {t('branchOptional')}
                   </label>
                   <input

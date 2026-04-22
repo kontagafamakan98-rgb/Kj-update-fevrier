@@ -113,7 +113,7 @@ export default function Navbar() {
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center">
-            <button aria-label="Bouton action"
+            <button aria-label={isMobileMenuOpen ? t('closeMenu') : t('openMenu')}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="text-gray-700 hover:text-orange-600 p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
@@ -139,6 +139,7 @@ export default function Navbar() {
               <select 
                 id="mobile_language_selector"
                 name="mobile_language_selector"
+                autoComplete="off"
                 value={currentLanguage}
                 onChange={(e) => changeLanguage(e.target.value)}
                 className="w-full text-sm border border-gray-300 rounded-md px-2 py-2 bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"

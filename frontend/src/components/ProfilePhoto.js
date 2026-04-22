@@ -329,6 +329,7 @@ const ProfilePhoto = ({
       {/* Bouton d'édition - Only for current user */}
       {editable && isCurrentUser && showEditButton && !loading && (
         <button
+          aria-label={profilePhoto ? t('changePhoto') : t('addPhoto')}
           onClick={handlePhotoSelect}
           style={editButtonStyle}
           title={profilePhoto ? t('changePhoto') : t('addPhoto')}
@@ -340,6 +341,7 @@ const ProfilePhoto = ({
       {/* Bouton de suppression - Only for current user */}
       {editable && isCurrentUser && showDeleteButton && profilePhoto && !loading && (
         <button
+          aria-label="Supprimer la photo"
           onClick={handlePhotoDelete}
           style={deleteButtonStyle}
           title="Supprimer la photo"
