@@ -2,6 +2,15 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 
 const ToastContext = createContext();
 
+const deferToastRemoval = (callback) => {
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(callback, { timeout: 1500 });
+    return;
+  }
+
+  callback();
+};
+
 const normalizeToastInput = (input, fallbackType, fallbackDuration) => {
   if (input && typeof input === 'object' && !Array.isArray(input)) {
     const { type, duration, ...rest } = input;
@@ -43,7 +52,7 @@ export const ToastProvider = ({ children }) => {
 
     if (toast.duration > 0) {
       setTimeout(() => {
-        removeToast(id);
+        deferToastRemoval(() => removeToast(id));
       }, toast.duration);
     }
 
