@@ -11,6 +11,14 @@ import { buildApiUrl } from '../utils/backendUrl';
 
 const API_BASE_URL = buildApiUrl('');
 
+const isPublicAuthEndpoint = (url = '') => {
+  const normalizedUrl = String(url || '');
+  return normalizedUrl.includes('/auth/login')
+    || normalizedUrl.includes('/auth/register')
+    || normalizedUrl.includes('/auth/register-verified')
+    || normalizedUrl.includes('/auth/email/');
+};
+
 /**
  * Create axios instance with dynamic configuration based on network quality
  */
@@ -101,8 +109,8 @@ apiClient.interceptors.response.use(
       message: errorMessage
     });
     
-    // Handle 401 Unauthorized - logout user
-    if (response?.status === 401) {
+    // Handle 401 Unauthorized - logout user only for protected endpoints
+    if (response?.status === 401 && !isPublicAuthEndpoint(config?.url)) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
@@ -316,11 +324,15 @@ export const handleApiError = (error) => {
   if (!error.response) {
     return {
       message: 'Erreur de connexion. Vérifiez votre connexion internet.',
-      type: 'network_error'
+      type: 'network_error',
+      messageKey: 'networkConnectionError'
     };
   }
 
   const { status, data } = error.response;
+  const requestUrl = error.config?.url || '';
+  const detail = String(data?.detail || '').trim();
+  const normalizedDetail = detail.toLowerCase();
 
   switch (status) {
     case 400:
@@ -329,9 +341,18 @@ export const handleApiError = (error) => {
         type: 'validation_error'
       };
     case 401:
+      if (requestUrl.includes('/auth/login') && (normalizedDetail.includes('invalid credentials') || normalizedDetail.includes('invalid password') || normalizedDetail.includes('incorrect password'))) {
+        return {
+          message: 'Mot de passe incorrect.',
+          type: 'invalid_credentials',
+          messageKey: 'incorrectPassword'
+        };
+      }
+
       return {
-        message: 'Session expirée. Veuillez vous reconnecter.',
-        type: 'auth_error'
+        message: detail || 'Session expirée. Veuillez vous reconnecter.',
+        type: 'auth_error',
+        messageKey: 'sessionExpiredReconnect'
       };
     case 403:
       return {

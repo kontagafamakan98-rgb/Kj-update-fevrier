@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -11,17 +11,20 @@ export default function Login() {
     password: ''
   });
   const [error, setError] = useState('');
+  const [errorKey, setErrorKey] = useState('');
   const [loading, setLoading] = useState(false);
   
   const { login } = useAuth();
   const { t } = useLanguage();
   const toast = useToast();
   const navigate = useNavigate();
+  const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setErrorKey('');
 
     const result = await login(formData.email, formData.password);
     
@@ -29,14 +32,25 @@ export default function Login() {
       toast.success(t('loginSuccess') + ' 🎉');
       navigate('/dashboard');
     } else {
-      setError(result.error);
-      toast.error(result.error || t('loginFailed'));
+      setError(result.error || t('loginFailed'));
+      setErrorKey(result.errorKey || '');
+
+      if (result.errorKey) {
+        toast.error({ messageKey: result.errorKey });
+      } else {
+        toast.error(result.error || t('loginFailed'));
+      }
     }
     
     setLoading(false);
   };
 
   const handleChange = (e) => {
+    if (error) {
+      setError('');
+      setErrorKey('');
+    }
+
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
@@ -56,9 +70,9 @@ export default function Login() {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
+          {displayedError && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
-              {error}
+              {displayedError}
             </div>
           )}
           
