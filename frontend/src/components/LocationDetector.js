@@ -1,9 +1,12 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MapPin, Loader2, Navigation } from 'lucide-react';
 import preciseGeolocationService from '../services/preciseGeolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
 import { normalizeLocationPayload } from '../utils/locationMaps';
+
+const AUTO_RETRY_MAX_ATTEMPTS = 2;
+const AUTO_RETRY_DELAY_MS = 1500;
 
 const LocationDetector = ({
   onLocationDetected,
@@ -15,6 +18,8 @@ const LocationDetector = ({
   const [detecting, setDetecting] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const autoDetectTriggeredRef = useRef(false);
+  const autoRetryTimeoutRef = useRef(null);
+  const autoRetryCountRef = useRef(0);
   const { t } = useLanguage();
 
   const getMethodLabel = (method) => {
@@ -42,23 +47,36 @@ const LocationDetector = ({
   };
 
   const getPrecisionLabel = (location) => {
+    if (!location) {
+      return t('locationNotSpecified');
+    }
+
+    if (location.method === 'ip' || location.method === 'contextual' || location.method === 'context') {
+      return 'Localisation auto';
+    }
+
     const gpsAccuracy = Number(location?.gpsAccuracy ?? location?.accuracy);
 
     if (!Number.isFinite(gpsAccuracy) || gpsAccuracy <= 0) {
       return getMethodLabel(location?.method);
     }
 
-    if (gpsAccuracy <= 10) return 'GPS ultra précis';
+    if (gpsAccuracy <= 10) return 'GPS validé';
     if (gpsAccuracy <= 25) return 'GPS très précis';
     if (gpsAccuracy <= 50) return 'GPS précis';
     if (gpsAccuracy <= 100) return 'GPS moyen';
-    return 'GPS faible';
+    return 'GPS approximatif';
   };
 
-  const handleDetectLocation = async ({ forceRefresh = true } = {}) => {
+  const handleDetectLocation = useCallback(async ({ forceRefresh = true, attempt = 0 } = {}) => {
     setDetecting(true);
 
     try {
+      if (autoRetryTimeoutRef.current) {
+        clearTimeout(autoRetryTimeoutRef.current);
+        autoRetryTimeoutRef.current = null;
+      }
+
       if (forceRefresh) {
         localStorage.removeItem('kojo_last_location');
         localStorage.removeItem('kojo_precise_location');
@@ -71,17 +89,24 @@ const LocationDetector = ({
       const normalizedLocation = location ? normalizeLocationPayload(location) : null;
       setCurrentLocation(normalizedLocation);
 
-      const shouldAutoPopulate = forceRefresh || isPreciseLocation(normalizedLocation);
-
-      if (normalizedLocation && shouldAutoPopulate && onLocationDetected) {
+      if (normalizedLocation && onLocationDetected) {
         onLocationDetected(normalizedLocation);
+      }
+
+      const shouldRetryForPrecision = autoDetect && attempt < AUTO_RETRY_MAX_ATTEMPTS && (!normalizedLocation || !isPreciseLocation(normalizedLocation));
+
+      if (shouldRetryForPrecision) {
+        autoRetryCountRef.current = attempt + 1;
+        autoRetryTimeoutRef.current = setTimeout(() => {
+          handleDetectLocation({ forceRefresh: true, attempt: attempt + 1 });
+        }, AUTO_RETRY_DELAY_MS);
       }
     } catch (error) {
       safeLog.error('Erreur détection:', error);
     } finally {
       setDetecting(false);
     }
-  };
+  }, [autoDetect, onLocationDetected, userCountry]);
 
   const getSizeClasses = () => {
     switch (size) {
@@ -109,8 +134,16 @@ const LocationDetector = ({
     if (!autoDetect || autoDetectTriggeredRef.current) return;
 
     autoDetectTriggeredRef.current = true;
-    handleDetectLocation({ forceRefresh: false });
-  }, [autoDetect, userCountry]);
+    autoRetryCountRef.current = 0;
+    handleDetectLocation({ forceRefresh: false, attempt: 0 });
+
+    return () => {
+      if (autoRetryTimeoutRef.current) {
+        clearTimeout(autoRetryTimeoutRef.current);
+        autoRetryTimeoutRef.current = null;
+      }
+    };
+  }, [autoDetect, handleDetectLocation]);
 
   return (
     <div className={`location-detector ${className}`}>
@@ -158,6 +191,9 @@ const LocationDetector = ({
                 {getMethodLabel(currentLocation.method)}
                 {currentLocation.confidence ? ` • ${currentLocation.confidence}%` : ''}
               </p>
+              {!isPreciseLocation(currentLocation) && autoRetryCountRef.current < AUTO_RETRY_MAX_ATTEMPTS && (
+                <p className="text-xs text-amber-700 mt-1">Amélioration GPS automatique en cours...</p>
+              )}
             </div>
           </div>
         </div>
