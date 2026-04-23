@@ -428,15 +428,12 @@ class GeolocationService {
     for (const service of ipServices) {
       try {
         devLog.info(`📡 Test service IP: ${service.name}...`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch(service.url, {
-          signal: controller.signal,
+          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+            ? AbortSignal.timeout(5000)
+            : undefined,
           headers: { 'Accept': 'application/json' }
         });
-        
-        clearTimeout(timeoutId);
         
         if (response.ok) {
           const data = await response.json();
@@ -719,16 +716,9 @@ export const detectUserCountry = async () => {
     if (navigator.geolocation) {
       devLog.info('📡 Tentative détection GPS...');
       const position = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            clearTimeout(timeout);
-            resolve(pos);
-          },
-          (err) => {
-            clearTimeout(timeout);
-            reject(err);
-          },
+          resolve,
+          reject,
           { timeout: 5000, enableHighAccuracy: false }
         );
       });
@@ -789,15 +779,12 @@ export const detectUserCountry = async () => {
   for (const service of ipServices) {
     try {
       devLog.info(`🌐 Test service IP: ${service.url}`);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      
       const response = await fetch(service.url, {
-        signal: controller.signal,
+        signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+          ? AbortSignal.timeout(3000)
+          : undefined,
         headers: { 'Accept': 'application/json' }
       });
-      
-      clearTimeout(timeoutId);
       
       if (response.ok) {
         const data = await response.json();
