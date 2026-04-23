@@ -1766,10 +1766,12 @@ async def upload_profile_photo(
 @api_router.get("/users/profile-photo")
 async def get_current_user_profile_photo(current_user: User = Depends(get_current_user)):
     """Get current user's profile photo"""
+    if not current_user.profile_photo:
+        raise HTTPException(status_code=404, detail="No profile photo found")
+    
     return {
         "photo_url": current_user.profile_photo,
-        "user_id": current_user.id,
-        "has_photo": bool(current_user.profile_photo)
+        "user_id": current_user.id
     }
 
 @api_router.get("/users/{user_id}/profile-photo")
@@ -1779,14 +1781,14 @@ async def get_user_profile_photo(user_id: str):
         user = await db.users.find_one({"id": user_id})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-
+        
+        if not user.get("profile_photo"):
+            raise HTTPException(status_code=404, detail="No profile photo found for this user")
+        
         return {
-            "photo_url": user.get("profile_photo"),
-            "user_id": user_id,
-            "has_photo": bool(user.get("profile_photo"))
+            "photo_url": user["profile_photo"],
+            "user_id": user_id
         }
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Error fetching profile photo for user {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
