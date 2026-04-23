@@ -6,6 +6,16 @@ import { useLanguage } from '../contexts/LanguageContext';
 import ProposalModal from '../components/ProposalModal';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
+import {
+  buildAppleMapsDirectionsUrl,
+  buildGoogleMapsDirectionsUrl,
+  buildGoogleMapsPlaceUrl,
+  buildOpenStreetMapEmbedUrl,
+  buildOpenStreetMapPageUrl,
+  getLocationAddress,
+  getLocationCoordinates,
+  normalizeLocationPayload
+} from '../utils/locationMaps';
 
 export default function JobDetails() {
   const [job, setJob] = useState(null);
@@ -92,6 +102,15 @@ export default function JobDetails() {
 
   const isJobOwner = user.user_type === 'client' && job.client_id === user.id;
   const canApply = user.user_type === 'worker' && job.status === 'open';
+  const normalizedLocation = normalizeLocationPayload(job.location || {});
+  const locationLabel = getLocationAddress(normalizedLocation) || t('locationNotSpecified');
+  const locationCoordinates = getLocationCoordinates(normalizedLocation);
+  const googleDirectionsUrl = buildGoogleMapsDirectionsUrl(normalizedLocation);
+  const appleDirectionsUrl = buildAppleMapsDirectionsUrl(normalizedLocation);
+  const mapViewUrl = locationCoordinates
+    ? buildOpenStreetMapPageUrl(normalizedLocation)
+    : buildGoogleMapsPlaceUrl(normalizedLocation);
+  const embeddedMapUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(normalizedLocation) : '';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -187,7 +206,7 @@ export default function JobDetails() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
-                <span className="text-gray-700">{job.location?.address || t('locationNotSpecified')}</span>
+                <span className="text-gray-700">{locationLabel || t('locationNotSpecified')}</span>
               </div>
 
               {job.deadline && (
@@ -198,6 +217,60 @@ export default function JobDetails() {
                   <span className="text-gray-700">{pageT('deadline', { date: formatDate(job.deadline) })}</span>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-1">{pageT('mapTitle')}</h3>
+                <p className="text-sm text-gray-600">
+                  {locationCoordinates ? pageT('mapSubtitlePrecise') : pageT('mapSubtitleApproximate')}
+                </p>
+              </div>
+              {locationCoordinates && (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
+                  GPS
+                </span>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm font-medium text-gray-900">{locationLabel || t('locationNotSpecified')}</p>
+              {locationCoordinates ? (
+                <p className="mt-1 text-xs text-gray-500">
+                  {pageT('coordinatesValue', {
+                    lat: locationCoordinates.lat.toFixed(6),
+                    lng: locationCoordinates.lng.toFixed(6)
+                  })}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500">{pageT('mapFallbackHelp')}</p>
+              )}
+            </div>
+
+            {locationCoordinates && embeddedMapUrl && (
+              <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 h-64">
+                <iframe
+                  title={pageT('mapPreviewTitle')}
+                  src={embeddedMapUrl}
+                  className="w-full h-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+              <a href={googleDirectionsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-lg bg-orange-600 px-4 py-3 text-sm font-medium text-white hover:bg-orange-700">
+                {pageT('openGoogleMaps')}
+              </a>
+              <a href={appleDirectionsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                {pageT('openAppleMaps')}
+              </a>
+              <a href={mapViewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                {pageT('viewMap')}
+              </a>
             </div>
           </div>
 

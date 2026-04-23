@@ -1,8 +1,16 @@
 import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import LocationDetector from './LocationDetector';
 import { jobsAPI } from '../services/api';
+import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, normalizeLocationPayload } from '../utils/locationMaps';
 
 export default function JobCreateModal({ onClose, onJobCreated }) {
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'createJob');
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -11,8 +19,14 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
     budget_max: '',
     location: {
       address: '',
+      fullAddress: '',
       latitude: null,
-      longitude: null
+      longitude: null,
+      coordinates: null,
+      city: '',
+      district: '',
+      country: '',
+      countryCode: ''
     },
     required_skills: [],
     estimated_duration: '',
@@ -22,31 +36,34 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   const [error, setError] = useState('');
   const [skillInput, setSkillInput] = useState('');
 
-  const { t } = useLanguage();
-
   const categories = [
     { value: 'plumbing', label: t('plumbing') },
     { value: 'electrical', label: t('electrical') },
     { value: 'construction', label: t('construction') },
     { value: 'cleaning', label: t('cleaning') },
     { value: 'gardening', label: t('gardening') },
-    { value: 'tutoring', label: t('tutoring') }
+    { value: 'tutoring', label: t('tutoring') },
+    { value: 'mechanics', label: t('mechanics') }
   ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
       if (parseFloat(formData.budget_min) >= parseFloat(formData.budget_max)) {
         throw new Error(t('jobBudgetRangeError'));
       }
+
       const jobData = {
         ...formData,
+        location: normalizeLocationPayload(formData.location),
         budget_min: parseFloat(formData.budget_min),
         budget_max: parseFloat(formData.budget_max),
         deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
       };
+
       await jobsAPI.create(jobData);
       onJobCreated();
       onClose();
@@ -60,10 +77,34 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'address') {
-      setFormData((prev) => ({ ...prev, location: { ...prev.location, address: value } }));
+      setFormData((prev) => ({
+        ...prev,
+        location: {
+          ...prev.location,
+          address: value,
+          fullAddress: value
+        }
+      }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
+  };
+
+  const handleLocationDetected = (location) => {
+    const normalizedLocation = normalizeLocationPayload(location);
+    const detectedAddress = normalizedLocation.fullAddress || normalizedLocation.address;
+    if (!detectedAddress) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      location: {
+        ...prev.location,
+        ...normalizedLocation,
+        address: detectedAddress,
+        fullAddress: detectedAddress,
+        countryCode: normalizedLocation.countryCode || user?.country?.toLowerCase() || ''
+      }
+    }));
   };
 
   const addSkill = () => {
@@ -83,6 +124,9 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
       addSkill();
     }
   };
+
+  const locationCoordinates = getLocationCoordinates(formData.location);
+  const locationPreviewUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(formData.location) : '';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -125,9 +169,48 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">{t('location')}</label>
-            <input type="text" id="address" name="address" autoComplete="street-address" required value={formData.location.address} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('addressPlaceholder')} />
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">{t('location')}</label>
+              <input type="text" id="address" name="address" autoComplete="street-address" required value={formData.location.address} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('addressPlaceholder')} />
+            </div>
+
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <LocationDetector
+                onLocationDetected={handleLocationDetected}
+                userCountry={user?.country?.toLowerCase() || 'senegal'}
+                size="small"
+                autoDetect
+              />
+              <p className="text-sm text-gray-500">{pageT('locationHelp')}</p>
+            </div>
+
+            {locationCoordinates && locationPreviewUrl && (
+              <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-sm font-semibold text-green-900">{pageT('preciseLocationReady')}</p>
+                    <p className="text-xs text-green-700">{pageT('preciseLocationHelp')}</p>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">GPS</span>
+                </div>
+                <div className="mt-3 overflow-hidden rounded-lg border border-green-200 bg-white h-56">
+                  <iframe
+                    title={pageT('mapPreviewTitle')}
+                    src={locationPreviewUrl}
+                    className="w-full h-full border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-green-700">
+                  {pageT('coordinatesSaved', {
+                    lat: locationCoordinates.lat.toFixed(6),
+                    lng: locationCoordinates.lng.toFixed(6)
+                  })}
+                </p>
+              </div>
+            )}
           </div>
 
           <div>
