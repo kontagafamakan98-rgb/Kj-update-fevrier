@@ -73,7 +73,7 @@ export function AuthProvider({ children }) {
       kojoCache.set(CACHE_KEYS.USER_PROFILE, user, 24 * 60 * 60 * 1000); // 24 hours
       
       devLog.info('✅ User logged in successfully');
-      return { success: true };
+      return { success: true, user };
       
     } catch (error) {
       const errorInfo = handleApiError(error);

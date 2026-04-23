@@ -59,6 +59,14 @@ function ProtectedRoute({ children }) {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
+
+  const requiredMinimum = user.user_type === 'worker' ? 2 : 1;
+  const paymentAccountsCount = Number(user.payment_accounts_count || 0);
+  const requiresRegistrationCompletion = !user.is_verified || paymentAccountsCount < requiredMinimum;
+
+  if (requiresRegistrationCompletion) {
+    return <Navigate to="/payment-verification" replace state={{ resumeAfterLogin: true, userData: user }} />;
+  }
   
   return children;
 }
