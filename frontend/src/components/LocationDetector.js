@@ -21,13 +21,38 @@ const LocationDetector = ({
     const labels = {
       gps: 'GPS',
       ip: 'IP',
-      cache: 'Cache',
+      cache: 'Cache GPS',
       backend_api: 'API',
       contextual: 'Auto',
       context: 'Auto',
       default: t('locationNotSpecified')
     };
     return labels[method] || method;
+  };
+
+  const isPreciseLocation = (location) => {
+    const gpsAccuracy = Number(location?.gpsAccuracy ?? location?.accuracy);
+    return Boolean(
+      location &&
+      (location.method === 'gps' || location.method === 'cache') &&
+      Number.isFinite(gpsAccuracy) &&
+      gpsAccuracy > 0 &&
+      gpsAccuracy <= 35
+    );
+  };
+
+  const getPrecisionLabel = (location) => {
+    const gpsAccuracy = Number(location?.gpsAccuracy ?? location?.accuracy);
+
+    if (!Number.isFinite(gpsAccuracy) || gpsAccuracy <= 0) {
+      return getMethodLabel(location?.method);
+    }
+
+    if (gpsAccuracy <= 10) return 'GPS ultra précis';
+    if (gpsAccuracy <= 25) return 'GPS très précis';
+    if (gpsAccuracy <= 50) return 'GPS précis';
+    if (gpsAccuracy <= 100) return 'GPS moyen';
+    return 'GPS faible';
   };
 
   const handleDetectLocation = async ({ forceRefresh = true } = {}) => {
@@ -46,7 +71,9 @@ const LocationDetector = ({
       const normalizedLocation = location ? normalizeLocationPayload(location) : null;
       setCurrentLocation(normalizedLocation);
 
-      if (normalizedLocation && onLocationDetected) {
+      const shouldAutoPopulate = forceRefresh || isPreciseLocation(normalizedLocation);
+
+      if (normalizedLocation && shouldAutoPopulate && onLocationDetected) {
         onLocationDetected(normalizedLocation);
       }
     } catch (error) {
@@ -91,6 +118,7 @@ const LocationDetector = ({
         type="button"
         onClick={() => handleDetectLocation({ forceRefresh: true })}
         disabled={detecting}
+        aria-label={detecting ? t('detecting') : t('detectMyLocation')}
         className={`
           inline-flex items-center justify-center
           ${getSizeClasses()}
@@ -117,15 +145,18 @@ const LocationDetector = ({
       </button>
 
       {currentLocation && (
-        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <div className={`mt-3 p-3 border rounded-lg ${isPreciseLocation(currentLocation) ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
           <div className="flex items-start">
-            <MapPin size={16} className="text-green-600 mt-0.5 mr-2 flex-shrink-0" />
+            <MapPin size={16} className={`${isPreciseLocation(currentLocation) ? 'text-green-600' : 'text-amber-600'} mt-0.5 mr-2 flex-shrink-0`} />
             <div className="text-sm">
-              <p className="text-green-800 font-medium">{t('detectMyLocation')}</p>
-              <p className="text-green-700">{currentLocation.fullAddress}</p>
-              <p className="text-green-600 text-xs mt-1">
+              <p className={`font-medium ${isPreciseLocation(currentLocation) ? 'text-green-800' : 'text-amber-800'}`}>
+                {getPrecisionLabel(currentLocation)}
+              </p>
+              <p className={isPreciseLocation(currentLocation) ? 'text-green-700' : 'text-amber-700'}>{currentLocation.fullAddress}</p>
+              <p className={`${isPreciseLocation(currentLocation) ? 'text-green-600' : 'text-amber-600'} text-xs mt-1`}>
                 {currentLocation.accuracy > 0 ? `±${currentLocation.accuracy}m • ` : ''}
                 {getMethodLabel(currentLocation.method)}
+                {currentLocation.confidence ? ` • ${currentLocation.confidence}%` : ''}
               </p>
             </div>
           </div>
