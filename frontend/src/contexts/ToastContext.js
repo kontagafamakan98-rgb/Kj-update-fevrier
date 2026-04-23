@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
 const ToastContext = createContext();
 
@@ -29,9 +29,26 @@ export const useToast = () => {
 
 export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
+  const toastTimersRef = useRef(new Map());
+
+  const clearToastTimer = useCallback((id) => {
+    const timer = toastTimersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      toastTimersRef.current.delete(id);
+    }
+  }, []);
 
   const removeToast = useCallback((id) => {
+    clearToastTimer(id);
     setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, [clearToastTimer]);
+
+  useEffect(() => {
+    return () => {
+      toastTimersRef.current.forEach((timer) => clearTimeout(timer));
+      toastTimersRef.current.clear();
+    };
   }, []);
 
   const addToast = useCallback((input, type = 'info', duration = 4000) => {
@@ -40,6 +57,13 @@ export const ToastProvider = ({ children }) => {
     const toast = { id, ...normalizedToast };
 
     setToasts(prev => [...prev, toast]);
+
+    if (typeof toast.duration === 'number' && toast.duration > 0) {
+      const timer = setTimeout(() => {
+        removeToast(id);
+      }, toast.duration);
+      toastTimersRef.current.set(id, timer);
+    }
 
     return id;
   }, [removeToast]);
