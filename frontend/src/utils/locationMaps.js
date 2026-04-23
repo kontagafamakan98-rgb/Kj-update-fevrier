@@ -128,3 +128,70 @@ export const buildOpenStreetMapPageUrl = (location = {}, zoom = 17) => {
 
   return `https://www.openstreetmap.org/?mlat=${coordinates.lat}&mlon=${coordinates.lng}#map=${zoom}/${coordinates.lat}/${coordinates.lng}`;
 };
+
+
+const LOCATION_PRECISION_LABELS = {
+  fr: {
+    gpsValidated: 'GPS validé',
+    gpsVeryPrecise: 'GPS très précis',
+    gpsPrecise: 'GPS précis',
+    gpsApproximate: 'GPS approximatif',
+    autoLocation: 'Localisation auto',
+    mapCoordinates: 'Position carte',
+    manualLocation: 'Adresse manuelle',
+    unconfirmed: 'Position non confirmée'
+  },
+  en: {
+    gpsValidated: 'GPS validated',
+    gpsVeryPrecise: 'Very precise GPS',
+    gpsPrecise: 'Precise GPS',
+    gpsApproximate: 'Approximate GPS',
+    autoLocation: 'Auto location',
+    mapCoordinates: 'Map position',
+    manualLocation: 'Manual address',
+    unconfirmed: 'Unconfirmed location'
+  }
+};
+
+const getPrecisionLanguage = (language = 'fr') => {
+  const value = String(language || 'fr').toLowerCase();
+  return value.startsWith('en') ? 'en' : 'fr';
+};
+
+export const getLocationPrecisionMeta = (location = {}, language = 'fr') => {
+  const normalizedLocation = normalizeLocationPayload(location);
+  const labels = LOCATION_PRECISION_LABELS[getPrecisionLanguage(language)];
+  const method = String(normalizedLocation?.method || '').toLowerCase();
+  const gpsAccuracy = toFiniteNumber(normalizedLocation?.gpsAccuracy ?? normalizedLocation?.accuracy);
+  const hasCoordinates = Boolean(normalizedLocation?.coordinates);
+
+  if ((method === 'gps' || method === 'cache') && Number.isFinite(gpsAccuracy) && gpsAccuracy > 0) {
+    if (gpsAccuracy <= 10) {
+      return { label: labels.gpsValidated, tone: 'green', isPrecise: true, hasCoordinates, isGpsBased: true };
+    }
+
+    if (gpsAccuracy <= 25) {
+      return { label: labels.gpsVeryPrecise, tone: 'green', isPrecise: true, hasCoordinates, isGpsBased: true };
+    }
+
+    if (gpsAccuracy <= 50) {
+      return { label: labels.gpsPrecise, tone: 'green', isPrecise: true, hasCoordinates, isGpsBased: true };
+    }
+
+    return { label: labels.gpsApproximate, tone: 'amber', isPrecise: false, hasCoordinates, isGpsBased: true };
+  }
+
+  if (method === 'ip' || method === 'contextual' || method === 'context' || method === 'backend_api') {
+    return { label: labels.autoLocation, tone: 'amber', isPrecise: false, hasCoordinates, isGpsBased: false };
+  }
+
+  if (hasCoordinates) {
+    return { label: labels.mapCoordinates, tone: 'blue', isPrecise: false, hasCoordinates, isGpsBased: false };
+  }
+
+  if (normalizedLocation?.fullAddress || normalizedLocation?.address) {
+    return { label: labels.manualLocation, tone: 'gray', isPrecise: false, hasCoordinates: false, isGpsBased: false };
+  }
+
+  return { label: labels.unconfirmed, tone: 'gray', isPrecise: false, hasCoordinates: false, isGpsBased: false };
+};
