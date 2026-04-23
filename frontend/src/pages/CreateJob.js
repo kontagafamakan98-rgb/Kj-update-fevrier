@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import LocationDetector from '../components/LocationDetector';
+import { jobsAPI } from '../services/api';
 import { getCountryByCode } from '../services/geolocationService';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
+import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, normalizeLocationPayload } from '../utils/locationMaps';
 
 export default function CreateJob() {
   const { user } = useAuth();
@@ -28,6 +30,7 @@ export default function CreateJob() {
 
   const [errors, setErrors] = useState(() => ({}));
   const [loading, setLoading] = useState(false);
+  const [locationDetails, setLocationDetails] = useState(null);
 
   const categories = [
     { value: 'general', label: pageT('categoryGeneral') },
@@ -47,11 +50,14 @@ export default function CreateJob() {
   ];
 
   const handleLocationDetected = (location) => {
-    if (!location?.fullAddress) return;
+    const detectedAddress = location?.fullAddress || location?.address;
+    if (!detectedAddress) return;
 
+    const normalizedLocation = normalizeLocationPayload(location);
+    setLocationDetails(normalizedLocation);
     setFormData((prev) => ({
       ...prev,
-      location: location.fullAddress
+      location: detectedAddress
     }));
 
     setErrors((prev) => ({
@@ -60,10 +66,20 @@ export default function CreateJob() {
     }));
   };
 
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === 'location') {
+      setLocationDetails((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          address: value,
+          fullAddress: value
+        };
+      });
+    }
 
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
@@ -85,12 +101,38 @@ export default function CreateJob() {
       if (!formData.location.trim()) newErrors.location = pageT('locationRequired');
       if (!formData.budget_min) newErrors.budget_min = pageT('budgetMinRequired');
       if (!formData.budget_max) newErrors.budget_max = pageT('budgetMaxRequired');
+      if (formData.budget_min && formData.budget_max && parseFloat(formData.budget_min) > parseFloat(formData.budget_max)) {
+        newErrors.budget_max = pageT('budgetMaxRequired');
+      }
 
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         setLoading(false);
         return;
       }
+
+      const locationPayload = normalizeLocationPayload({
+        ...locationDetails,
+        address: formData.location.trim(),
+        fullAddress: formData.location.trim(),
+        country: locationDetails?.country ?? userCountry?.nameFrench ?? '',
+        countryCode: locationDetails?.countryCode ?? user?.country?.toLowerCase() ?? ''
+      });
+
+      await jobsAPI.create({
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        budget_min: parseFloat(formData.budget_min),
+        budget_max: parseFloat(formData.budget_max),
+        location: locationPayload,
+        required_skills: [],
+        estimated_duration: null,
+        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+        mechanic_must_bring_parts: formData.mechanic_must_bring_parts,
+        mechanic_must_bring_tools: formData.mechanic_must_bring_tools,
+        parts_and_tools_notes: formData.parts_and_tools_notes?.trim() || null
+      });
 
       alert(pageT('successCreated'));
 
@@ -108,9 +150,11 @@ export default function CreateJob() {
         mechanic_must_bring_tools: false,
         parts_and_tools_notes: ''
       });
+      setLocationDetails(null);
+      setErrors({});
     } catch (error) {
       safeLog.error('Erreur création job:', error);
-      alert(pageT('errorCreated'));
+      alert(error?.response?.data?.detail || pageT('errorCreated'));
     } finally {
       setLoading(false);
     }
@@ -118,6 +162,8 @@ export default function CreateJob() {
 
   const userCountry = getCountryByCode(user?.country);
   const showMechanicBlock = ['general', 'plumbing', 'electrical', 'mechanics'].includes(formData.category);
+  const locationCoordinates = getLocationCoordinates(locationDetails);
+  const locationPreviewUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(locationDetails) : '';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -216,6 +262,35 @@ export default function CreateJob() {
                   />
                   <p className="text-sm text-gray-500">{pageT('locationHelp')}</p>
                 </div>
+
+                {locationCoordinates && locationPreviewUrl && (
+                  <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <p className="text-sm font-semibold text-green-900">{pageT('preciseLocationReady')}</p>
+                        <p className="text-xs text-green-700">{pageT('preciseLocationHelp')}</p>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
+                        GPS
+                      </span>
+                    </div>
+                    <div className="mt-3 overflow-hidden rounded-lg border border-green-200 bg-white h-60">
+                      <iframe
+                        title={pageT('mapPreviewTitle')}
+                        src={locationPreviewUrl}
+                        className="w-full h-full border-0"
+                        loading="lazy"
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-green-700">
+                      {pageT('coordinatesSaved', {
+                        lat: locationCoordinates.lat.toFixed(6),
+                        lng: locationCoordinates.lng.toFixed(6)
+                      })}
+                    </p>
+                  </div>
+                )}
               </div>
               {errors.location && <p className="mt-1 text-sm text-red-600">{errors.location}</p>}
             </div>

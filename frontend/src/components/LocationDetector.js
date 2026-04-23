@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2, Navigation } from 'lucide-react';
-import GeolocationService from '../services/geolocationService';
+import preciseGeolocationService from '../services/preciseGeolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
-import { devLog, safeLog } from '../utils/env';
+import { safeLog } from '../utils/env';
+import { normalizeLocationPayload } from '../utils/locationMaps';
 
-const LocationDetector = ({ 
-  onLocationDetected, 
+const LocationDetector = ({
+  onLocationDetected,
   userCountry = 'senegal',
   size = 'medium',
   className = '',
@@ -15,38 +16,39 @@ const LocationDetector = ({
   const [currentLocation, setCurrentLocation] = useState(null);
   const autoDetectTriggeredRef = useRef(false);
   const { t } = useLanguage();
-  
+
   const getMethodLabel = (method) => {
     const labels = {
-      'gps': 'GPS',
-      'ip': 'IP',
-      'cache': 'Cache',
-      'backend_api': 'API',
-      'context': 'Auto',
-      'default': t('locationNotSpecified')
+      gps: 'GPS',
+      ip: 'IP',
+      cache: 'Cache',
+      backend_api: 'API',
+      contextual: 'Auto',
+      context: 'Auto',
+      default: t('locationNotSpecified')
     };
     return labels[method] || method;
   };
 
   const handleDetectLocation = async ({ forceRefresh = true } = {}) => {
     setDetecting(true);
-    
+
     try {
       if (forceRefresh) {
         localStorage.removeItem('kojo_last_location');
         localStorage.removeItem('kojo_precise_location');
         localStorage.removeItem('kojo_detected_country');
-        GeolocationService.cachedLocation = null;
-        GeolocationService.cacheTimestamp = null;
+        preciseGeolocationService.cachedLocation = null;
+        preciseGeolocationService.cacheTimestamp = null;
       }
-      
-      const location = await GeolocationService.detectUserLocation(userCountry, { forceRefresh });
-      setCurrentLocation(location);
-      
-      if (onLocationDetected) {
-        onLocationDetected(location);
+
+      const location = await preciseGeolocationService.detectPreciseLocation({ forceRefresh, userCountry });
+      const normalizedLocation = location ? normalizeLocationPayload(location) : null;
+      setCurrentLocation(normalizedLocation);
+
+      if (normalizedLocation && onLocationDetected) {
+        onLocationDetected(normalizedLocation);
       }
-      
     } catch (error) {
       safeLog.error('Erreur détection:', error);
     } finally {
@@ -67,9 +69,12 @@ const LocationDetector = ({
 
   const getIconSize = () => {
     switch (size) {
-      case 'small': return 16;
-      case 'large': return 24;
-      default: return 20;
+      case 'small':
+        return 16;
+      case 'large':
+        return 24;
+      default:
+        return 20;
     }
   };
 
@@ -84,7 +89,7 @@ const LocationDetector = ({
     <div className={`location-detector ${className}`}>
       <button
         type="button"
-        onClick={handleDetectLocation}
+        onClick={() => handleDetectLocation({ forceRefresh: true })}
         disabled={detecting}
         className={`
           inline-flex items-center justify-center
@@ -110,7 +115,7 @@ const LocationDetector = ({
           </>
         )}
       </button>
-      
+
       {currentLocation && (
         <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-start">
@@ -119,7 +124,8 @@ const LocationDetector = ({
               <p className="text-green-800 font-medium">{t('detectMyLocation')}</p>
               <p className="text-green-700">{currentLocation.fullAddress}</p>
               <p className="text-green-600 text-xs mt-1">
-                {currentLocation.accuracy > 0 ? `±${currentLocation.accuracy}m • ` : ''}{getMethodLabel(currentLocation.method)}
+                {currentLocation.accuracy > 0 ? `±${currentLocation.accuracy}m • ` : ''}
+                {getMethodLabel(currentLocation.method)}
               </p>
             </div>
           </div>
