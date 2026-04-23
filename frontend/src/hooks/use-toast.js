@@ -26,15 +26,12 @@ const addToRemoveQueue = (toastId) => {
     return
   }
 
-  const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId)
-    dispatch({
-      type: "REMOVE_TOAST",
-      toastId: toastId,
-    })
-  }, TOAST_REMOVE_DELAY)
-
-  toastTimeouts.set(toastId, timeout)
+  toastTimeouts.set(toastId, true)
+  dispatch({
+    type: "REMOVE_TOAST",
+    toastId: toastId,
+  })
+  toastTimeouts.delete(toastId)
 }
 
 export const reducer = (state, action) => {
@@ -77,7 +74,7 @@ export const reducer = (state, action) => {
       };
     }
     case "REMOVE_TOAST":
-      if (action.typeof toastId === "undefined") {
+      if (typeof action.toastId === "undefined") {
         return {
           ...state,
           toasts: [],

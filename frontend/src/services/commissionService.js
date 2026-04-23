@@ -1,227 +1,98 @@
+import { paymentAPI } from './api';
 import { devLog, safeLog } from '../utils/env';
 
-// Service de gestion des commissions et transferts automatiques
 class CommissionService {
   constructor() {
-    this.COMMISSION_RATE = 0.14; // 14% pour le propriétaire
-    this.WORKER_RATE = 0.86; // 86% pour le travailleur
-    
-    // Comptes du propriétaire de l'application (VOUS)
+    this.COMMISSION_RATE = 0.14;
+    this.WORKER_RATE = 0.86;
     this.OWNER_ACCOUNTS = {
       bank_card: {
-        accountNumber: '1234567890123456', // Remplacez par votre vraie carte
+        accountNumber: '1234567890123456',
         accountName: 'PROPRIETAIRE KOJO',
         bank: 'Banque Atlantique'
       },
       orange_money: {
-        phoneNumber: '+221701234567', // Remplacez par votre vrai numéro Orange Money
+        phoneNumber: '+221701234567',
         accountName: 'PROPRIETAIRE KOJO'
       },
       wave: {
-        phoneNumber: '+221701234567', // Remplacez par votre vrai numéro Wave
+        phoneNumber: '+221701234567',
         accountName: 'PROPRIETAIRE KOJO'
       }
     };
   }
 
-  // Calculer les montants de commission
   calculateCommissions(totalAmount) {
     const ownerCommission = Math.round(totalAmount * this.COMMISSION_RATE);
-    const workerAmount = totalAmount - ownerCommission;
-    
+    const workerAmount = Math.round(totalAmount - ownerCommission);
+
     return {
-      totalAmount,
-      ownerCommission, // 14%
-      workerAmount,    // 86%
-      commissionRate: this.COMMISSION_RATE * 100 // 14%
-    };
-  }
-
-  // Traiter le paiement avec distribution automatique
-  async processPaymentWithCommission(paymentData) {
-    const {
-      amount,
-      paymentMethod,
-      workerId,
-      workerAccount,
-      jobId,
-      clientId
-    } = paymentData;
-
-    try {
-      devLog.info('🏦 Début du traitement avec commission...');
-      
-      // 1. Calculer les commissions
-      const commission = this.calculateCommissions(amount);
-      devLog.info('💰 Commission calculée:', commission);
-
-      // 2. Effectuer le paiement principal
-      const paymentResult = await this.processMainPayment(paymentData);
-      
-      if (!paymentResult.success) {
-        throw new Error('Échec du paiement principal');
-      }
-
-      // 3. Distribuer automatiquement les fonds
-      const distributionResult = await this.distributeFunds({
-        ...commission,
-        paymentMethod,
-        workerId,
-        workerAccount,
-        transactionId: paymentResult.transactionId,
-        jobId
-      });
-
-      // 4. Enregistrer la transaction
-      const transactionRecord = await this.recordTransaction({
-        ...commission,
-        paymentMethod,
-        workerId,
-        clientId,
-        jobId,
-        mainTransactionId: paymentResult.transactionId,
-        ownerTransferId: distributionResult.ownerTransferId,
-        workerTransferId: distributionResult.workerTransferId,
-        timestamp: new Date().toISOString()
-      });
-
-      return {
-        success: true,
-        transactionId: paymentResult.transactionId,
-        commission,
-        distribution: distributionResult,
-        message: `Paiement effectué! ${commission.ownerCommission.toLocaleString()} XOF → Propriétaire, ${commission.workerAmount.toLocaleString()} XOF → Travailleur`
-      };
-
-    } catch (error) {
-      safeLog.error('❌ Erreur traitement commission:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  // Traitement du paiement principal (simulation)
-  async processMainPayment(paymentData) {
-    // Simuler le paiement principal
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    return {
-      success: true,
-      transactionId: this.generateTransactionId('MAIN'),
-      amount: paymentData.amount,
-      method: paymentData.paymentMethod
-    };
-  }
-
-  // Distribution automatique des fonds
-  async distributeFunds(data) {
-    const {
+      totalAmount: Math.round(totalAmount),
       ownerCommission,
       workerAmount,
-      paymentMethod,
-      workerId,
-      workerAccount,
-      transactionId
-    } = data;
+      commissionRate: this.COMMISSION_RATE * 100
+    };
+  }
 
-    devLog.info('📤 Distribution des fonds en cours...');
-
+  async getProviderConfig() {
     try {
-      // 1. Transfert vers le propriétaire (14%)
-      const ownerTransfer = await this.transferToOwner({
-        amount: ownerCommission,
-        method: paymentMethod,
-        reference: transactionId
-      });
-
-      // 2. Transfert vers le travailleur (86%)
-      const workerTransfer = await this.transferToWorker({
-        amount: workerAmount,
-        method: paymentMethod,
-        workerId,
-        workerAccount,
-        reference: transactionId
-      });
-
-      return {
-        ownerTransferId: ownerTransfer.transferId,
-        workerTransferId: workerTransfer.transferId,
-        ownerAmount: ownerCommission,
-        workerAmount: workerAmount
-      };
-
+      return await paymentAPI.getConfig();
     } catch (error) {
-      safeLog.error('❌ Erreur distribution:', error);
-      throw new Error('Échec de la distribution des fonds');
+      safeLog.error('❌ Erreur config paiements:', error);
+      return { provider: 'paydunya', configured: false, mode: 'test', commission_rate_percent: 14 };
     }
   }
 
-  // Transfert automatique vers le propriétaire
-  async transferToOwner({ amount, method, reference }) {
-    const ownerAccount = this.OWNER_ACCOUNTS[method];
-    
-    devLog.info(`💼 Transfert de ${amount} XOF vers propriétaire via ${method}`);
-    devLog.info('🏦 Compte propriétaire:', ownerAccount);
-
-    // Simulation du transfert automatique
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const transferId = this.generateTransactionId('OWNER');
-    
-    // Dans un vrai système, ici vous feriez l'appel API vers:
-    // - Orange Money API si method === 'orange_money'
-    // - Wave API si method === 'wave'  
-    // - API bancaire si method === 'bank_card'
-    
-    return {
-      transferId,
-      amount,
-      destinationAccount: ownerAccount,
-      status: 'completed',
-      timestamp: new Date().toISOString()
-    };
+  async getQuote({ amount, paymentMethod, country = 'senegal', workerId = null, jobId = null }) {
+    try {
+      return await paymentAPI.getQuote({
+        amount,
+        payment_method: paymentMethod?.id || paymentMethod,
+        country,
+        worker_id: workerId,
+        job_id: jobId
+      });
+    } catch (error) {
+      safeLog.error('❌ Erreur quote paiement:', error);
+      throw error;
+    }
   }
 
-  // Transfert automatique vers le travailleur
-  async transferToWorker({ amount, method, workerId, workerAccount, reference }) {
-    devLog.info(`👷 Transfert de ${amount} XOF vers travailleur ${workerId} via ${method}`);
-    devLog.info('💳 Compte travailleur:', workerAccount);
-
-    // Simulation du transfert automatique
-    await new Promise(resolve => setTimeout(resolve, 800));
-
-    const transferId = this.generateTransactionId('WORKER');
-    
-    return {
-      transferId,
-      amount,
-      workerId,
-      destinationAccount: workerAccount,
-      status: 'completed',
-      timestamp: new Date().toISOString()
-    };
+  async createCheckout({ amount, paymentMethod, country = 'senegal', workerId = null, jobId = null, returnUrl = null, cancelUrl = null }) {
+    try {
+      return await paymentAPI.createCheckout({
+        amount,
+        payment_method: paymentMethod?.id || paymentMethod,
+        country,
+        worker_id: workerId,
+        job_id: jobId,
+        return_url: returnUrl,
+        cancel_url: cancelUrl
+      });
+    } catch (error) {
+      safeLog.error('❌ Erreur création checkout:', error);
+      throw error;
+    }
   }
 
-  // Enregistrer la transaction complète
-  async recordTransaction(transactionData) {
-    const record = {
-      id: this.generateTransactionId('TXN'),
-      ...transactionData,
-      status: 'completed'
-    };
-
-    // Sauvegarder dans localStorage pour la démo
-    const transactions = this.getStoredTransactions();
-    transactions.unshift(record);
-    localStorage.setItem('kojo_commission_transactions', JSON.stringify(transactions));
-
-    devLog.info('📊 Transaction enregistrée:', record.id);
-    return record;
+  async getPaymentStatus(paymentId) {
+    return paymentAPI.getPaymentStatus(paymentId);
   }
 
-  // Obtenir l'historique des transactions
+  async getPaymentStatusByToken(invoiceToken) {
+    return paymentAPI.getPaymentStatusByToken(invoiceToken);
+  }
+
+  async getMyPayments() {
+    try {
+      const response = await paymentAPI.getMyPayments();
+      return response.payments || [];
+    } catch (error) {
+      safeLog.error('❌ Erreur historique paiements:', error);
+      return [];
+    }
+  }
+
   getStoredTransactions() {
     try {
       const stored = localStorage.getItem('kojo_commission_transactions');
@@ -231,18 +102,25 @@ class CommissionService {
     }
   }
 
-  // Statistiques des commissions
+  setStoredTransactions(transactions) {
+    localStorage.setItem('kojo_commission_transactions', JSON.stringify(transactions || []));
+  }
+
+  appendStoredTransaction(transaction) {
+    const transactions = this.getStoredTransactions();
+    transactions.unshift(transaction);
+    this.setStoredTransactions(transactions.slice(0, 100));
+  }
+
   getCommissionStats() {
     const transactions = this.getStoredTransactions();
-    
+
     const totalCommissions = transactions.reduce((sum, tx) => sum + (tx.ownerCommission || 0), 0);
     const totalWorkerPayments = transactions.reduce((sum, tx) => sum + (tx.workerAmount || 0), 0);
     const totalVolume = transactions.reduce((sum, tx) => sum + (tx.totalAmount || 0), 0);
-    
+
     const today = new Date().toDateString();
-    const todayTransactions = transactions.filter(tx => 
-      new Date(tx.timestamp).toDateString() === today
-    );
+    const todayTransactions = transactions.filter((tx) => new Date(tx.timestamp).toDateString() === today);
     const todayCommissions = todayTransactions.reduce((sum, tx) => sum + (tx.ownerCommission || 0), 0);
 
     return {
@@ -257,19 +135,16 @@ class CommissionService {
     };
   }
 
-  // Obtenir les comptes du propriétaire
   getOwnerAccounts() {
     return this.OWNER_ACCOUNTS;
   }
 
-  // Mettre à jour les comptes du propriétaire
   updateOwnerAccounts(newAccounts) {
     this.OWNER_ACCOUNTS = { ...this.OWNER_ACCOUNTS, ...newAccounts };
     localStorage.setItem('owner_accounts', JSON.stringify(this.OWNER_ACCOUNTS));
     devLog.info('✅ Comptes propriétaire mis à jour');
   }
 
-  // Charger les comptes depuis le stockage
   loadOwnerAccounts() {
     try {
       const stored = localStorage.getItem('owner_accounts');
@@ -281,27 +156,32 @@ class CommissionService {
     }
   }
 
-  // Générer un ID de transaction unique
   generateTransactionId(prefix = 'TXN') {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7).toUpperCase()}`;
   }
 
-  // Simuler paiement complet avec commission (méthode principale)
-  async simulateFullPayment(amount, paymentMethod, workerId, jobId = null) {
-    const mockWorkerAccount = {
-      orange_money: { phoneNumber: '+221777123456', name: 'Jean Travailleur' },
-      wave: { phoneNumber: '+221777123456', name: 'Jean Travailleur' },
-      bank_card: { accountNumber: '9876543210987654', name: 'Jean Travailleur' }
-    };
-
-    return await this.processPaymentWithCommission({
+  async simulateFullPayment(amount, paymentMethod, workerId, jobId = null, country = 'senegal') {
+    const checkout = await this.createCheckout({
       amount,
-      paymentMethod: paymentMethod.id || paymentMethod,
+      paymentMethod: paymentMethod?.id || paymentMethod,
       workerId,
-      workerAccount: mockWorkerAccount[paymentMethod.id || paymentMethod],
       jobId,
-      clientId: 'client_123'
+      country,
+      returnUrl: `${window.location.origin}/payment-demo`,
+      cancelUrl: `${window.location.origin}/payment-demo`
     });
+
+    const commission = this.calculateCommissions(amount);
+    return {
+      success: true,
+      transactionId: checkout.payment_id,
+      paymentId: checkout.payment_id,
+      invoiceToken: checkout.invoice_token,
+      redirectUrl: checkout.checkout_url,
+      commission,
+      message: 'Redirection vers la page de paiement réel',
+      mode: 'redirect'
+    };
   }
 }
 

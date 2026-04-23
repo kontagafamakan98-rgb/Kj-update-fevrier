@@ -217,6 +217,11 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
                     lng: locationCoordinates.lng.toFixed(6)
                   })}
                 </p>
+                <p className="mt-2 text-xs text-gray-600">
+                  {currentLanguage === 'en'
+                    ? 'Job publishing stays available even if GPS is not yet validated.'
+                    : 'La publication du job reste autorisée même si le GPS n’est pas encore validé.'}
+                </p>
               </div>
             )}
           </div>

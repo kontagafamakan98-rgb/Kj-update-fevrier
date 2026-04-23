@@ -193,10 +193,4 @@ function showUpdateNotification() {
     notification.remove();
   });
 
-  // Auto-dismiss after 10 seconds
-  setTimeout(() => {
-    if (document.body.contains(notification)) {
-      notification.remove();
-    }
-  }, 10000);
 }

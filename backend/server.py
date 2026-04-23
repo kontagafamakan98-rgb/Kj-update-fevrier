@@ -13,7 +13,7 @@ import sys
 import re
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, validator, ValidationError
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta, timezone
 import jwt
@@ -119,6 +119,15 @@ async def create_database_indexes():
         await db.commissions.create_index("status")
         await db.commissions.create_index([("created_at", -1)])
 
+        # Payments collection indexes
+        await db.payments.create_index("id", unique=True)
+        await db.payments.create_index("job_id")
+        await db.payments.create_index("payer_id")
+        await db.payments.create_index("receiver_id")
+        await db.payments.create_index("status")
+        await db.payments.create_index("invoice_token", sparse=True)
+        await db.payments.create_index([("created_at", -1)])
+
         # Email OTP collection indexes
         await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)
         await db.email_otps.create_index("expires_at", expireAfterSeconds=0)
@@ -138,6 +147,16 @@ JWT_REFRESH_EXPIRATION_DAYS = 7
 EMAIL_OTP_SECRET = os.environ.get('EMAIL_OTP_SECRET', JWT_SECRET)
 EMAIL_OTP_EXPIRY_MINUTES = int(os.environ.get('EMAIL_OTP_EXPIRY_MINUTES', '10'))
 EMAIL_OTP_MAX_ATTEMPTS = int(os.environ.get('EMAIL_OTP_MAX_ATTEMPTS', '5'))
+
+# Real payment gateway settings (Pack 2)
+PAYMENT_COMMISSION_RATE = float(os.environ.get('PAYMENT_COMMISSION_RATE', '0.14'))
+PAYDUNYA_MODE = os.environ.get('PAYDUNYA_MODE', 'test').strip().lower()
+PAYDUNYA_MASTER_KEY = os.environ.get('PAYDUNYA_MASTER_KEY', '').strip()
+PAYDUNYA_PRIVATE_KEY = os.environ.get('PAYDUNYA_PRIVATE_KEY', '').strip()
+PAYDUNYA_TOKEN = os.environ.get('PAYDUNYA_TOKEN', '').strip()
+PAYDUNYA_STORE_NAME = os.environ.get('PAYDUNYA_STORE_NAME', 'KOJO')
+FRONTEND_APP_URL = os.environ.get('FRONTEND_APP_URL', '').rstrip('/')
+BACKEND_PUBLIC_URL = os.environ.get('BACKEND_PUBLIC_URL', '').rstrip('/')
 EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('EMAIL_OTP_RESEND_COOLDOWN_SECONDS', '60'))
 EMAIL_VERIFICATION_TOKEN_MINUTES = int(os.environ.get('EMAIL_VERIFICATION_TOKEN_MINUTES', '30'))
 GMAIL_CLIENT_ID = os.environ.get('GMAIL_CLIENT_ID', '').strip()
@@ -482,6 +501,17 @@ class Payment(BaseModel):
     transaction_id: Optional[str] = Field(None, max_length=200)  # Transaction ID limit
     status: PaymentStatus = PaymentStatus.PENDING  # Use enum for better validation
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PaymentQuoteRequest(BaseModel):
+    amount: float = Field(gt=0.0, le=10000000.0)
+    payment_method: PaymentMethod
+    country: Optional[str] = Field(default='senegal', max_length=50)
+    worker_id: Optional[str] = Field(default=None, max_length=100)
+    job_id: Optional[str] = Field(default=None, max_length=100)
+
+class PaymentCheckoutRequest(PaymentQuoteRequest):
+    return_url: Optional[str] = Field(default=None, max_length=500)
+    cancel_url: Optional[str] = Field(default=None, max_length=500)
 
 class PushToken(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -2390,41 +2420,423 @@ async def get_system_stats():
 # ENDPOINTS PROTÉGÉS PROPRIÉTAIRE - ACCÈS RESTREINT
 # ============================================================================
 
+
+# ============================================================================
+# REAL PAYMENTS - PAYDUNYA FOUNDATION (PACK 2)
+# ============================================================================
+
+PAYDUNYA_CHANNELS = {
+    "orange_money": {
+        "senegal": "orange-money-senegal",
+        "mali": "orange-money-mali",
+        "burkina_faso": "orange-money-burkina",
+        "ivory_coast": "orange-money-ci"
+    },
+    "wave": {
+        "senegal": "wave-senegal",
+        "ivory_coast": "wave-ci"
+    },
+    "bank_card": {
+        "default": "card"
+    }
+}
+
+def normalize_payment_country(country: Optional[str]) -> str:
+    value = (country or 'senegal').strip().lower()
+    aliases = {
+        'senegal': 'senegal',
+        'sénégal': 'senegal',
+        'mali': 'mali',
+        'burkina': 'burkina_faso',
+        'burkina-faso': 'burkina_faso',
+        'burkina faso': 'burkina_faso',
+        'burkina_faso': 'burkina_faso',
+        'ivory coast': 'ivory_coast',
+        'cote divoire': 'ivory_coast',
+        "côte d'ivoire": 'ivory_coast',
+        "cote d'ivoire": 'ivory_coast',
+        'cote_d_ivoire': 'ivory_coast',
+        'ivory_coast': 'ivory_coast'
+    }
+    return aliases.get(value, value.replace('-', '_').replace(' ', '_'))
+
+def is_paydunya_configured() -> bool:
+    return bool(PAYDUNYA_MASTER_KEY and PAYDUNYA_PRIVATE_KEY and PAYDUNYA_TOKEN)
+
+def get_paydunya_base_url() -> str:
+    if PAYDUNYA_MODE == 'live':
+        return 'https://app.paydunya.com/api/v1'
+    return 'https://app.paydunya.com/sandbox-api/v1'
+
+def get_paydunya_headers() -> Dict[str, str]:
+    return {
+        'Content-Type': 'application/json',
+        'PAYDUNYA-MASTER-KEY': PAYDUNYA_MASTER_KEY,
+        'PAYDUNYA-PRIVATE-KEY': PAYDUNYA_PRIVATE_KEY,
+        'PAYDUNYA-TOKEN': PAYDUNYA_TOKEN,
+    }
+
+def calculate_payment_breakdown(amount: float) -> Dict[str, Any]:
+    commission_amount = round(amount * PAYMENT_COMMISSION_RATE)
+    worker_amount = round(amount - commission_amount)
+    return {
+        'total_amount': round(amount),
+        'commission_amount': commission_amount,
+        'worker_amount': worker_amount,
+        'commission_rate': round(PAYMENT_COMMISSION_RATE * 100, 2)
+    }
+
+def get_paydunya_channel(payment_method: str, country: Optional[str]) -> str:
+    payment_method = str(payment_method)
+    normalized_country = normalize_payment_country(country)
+    country_map = PAYDUNYA_CHANNELS.get(payment_method, {})
+
+    if payment_method == 'bank_card':
+        return country_map.get('default', 'card')
+
+    channel = country_map.get(normalized_country)
+    if channel:
+        return channel
+
+    supported = ', '.join(sorted(country_map.keys())) or 'none'
+    raise HTTPException(
+        status_code=400,
+        detail=f"Méthode {payment_method} non disponible pour {normalized_country}. Pays supportés: {supported}"
+    )
+
+def build_checkout_redirect_url(fallback_path: str, explicit_url: Optional[str] = None) -> str:
+    if explicit_url and explicit_url.strip():
+        return explicit_url.strip()
+    if FRONTEND_APP_URL:
+        return f"{FRONTEND_APP_URL}{fallback_path}"
+    return fallback_path
+
+def build_payment_callback_url() -> str:
+    if BACKEND_PUBLIC_URL:
+        return f"{BACKEND_PUBLIC_URL}/api/payments/ipn/paydunya"
+    return '/api/payments/ipn/paydunya'
+
+def serialize_payment_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    serialized = dict(record)
+    serialized.pop('_id', None)
+    return serialized
+
+def create_paydunya_invoice(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    endpoint = f"{get_paydunya_base_url()}/checkout-invoice/create"
+    try:
+        response = requests.post(endpoint, headers=get_paydunya_headers(), json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya create invoice error: {exc}")
+        raise HTTPException(status_code=502, detail='Impossible de créer la session de paiement PayDunya')
+
+    if str(data.get('response_code')) != '00':
+        logger.error(f"PayDunya create invoice failed: {data}")
+        raise HTTPException(status_code=502, detail=data.get('response_text') or 'Création de paiement refusée par PayDunya')
+
+    return data
+
+def confirm_paydunya_invoice(invoice_token: str) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    endpoint = f"{get_paydunya_base_url()}/checkout-invoice/confirm/{invoice_token}"
+    try:
+        response = requests.get(endpoint, headers=get_paydunya_headers(), timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya confirm invoice error: {exc}")
+        raise HTTPException(status_code=502, detail='Impossible de vérifier le statut du paiement PayDunya')
+
+def map_paydunya_status(raw_status: Optional[str]) -> str:
+    normalized = str(raw_status or '').strip().lower()
+    mapping = {
+        'pending': 'pending',
+        'created': 'pending',
+        'completed': 'completed',
+        'success': 'completed',
+        'cancelled': 'cancelled',
+        'canceled': 'cancelled',
+        'failed': 'failed'
+    }
+    return mapping.get(normalized, 'pending')
+
+async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> Dict[str, Any]:
+    invoice_token = payment_record.get('invoice_token')
+    if not invoice_token or not is_paydunya_configured():
+        return payment_record
+
+    payload = confirm_paydunya_invoice(invoice_token)
+    invoice_data = payload.get('invoice', {}) if isinstance(payload, dict) else {}
+    provider_status = invoice_data.get('status') or payload.get('status')
+    local_status = map_paydunya_status(provider_status)
+
+    update_fields = {
+        'status': local_status,
+        'provider_status': provider_status,
+        'provider_confirm_payload': payload,
+        'updated_at': datetime.now(timezone.utc).isoformat()
+    }
+
+    if local_status == 'completed' and not payment_record.get('completed_at'):
+        update_fields['completed_at'] = datetime.now(timezone.utc).isoformat()
+
+    await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
+    latest = await db.payments.find_one({'id': payment_record['id']})
+    return latest or payment_record
+
+@api_router.get('/payments/config')
+async def get_real_payments_config():
+    return {
+        'provider': 'paydunya',
+        'configured': is_paydunya_configured(),
+        'mode': PAYDUNYA_MODE,
+        'commission_rate_percent': round(PAYMENT_COMMISSION_RATE * 100, 2),
+        'supported_channels': {
+            'orange_money': list(PAYDUNYA_CHANNELS['orange_money'].keys()),
+            'wave': list(PAYDUNYA_CHANNELS['wave'].keys()),
+            'bank_card': ['all']
+        }
+    }
+
+@api_router.post('/payments/quote')
+async def get_payment_quote(request: PaymentQuoteRequest):
+    channel = get_paydunya_channel(request.payment_method.value, request.country)
+    breakdown = calculate_payment_breakdown(request.amount)
+    return {
+        'provider': 'paydunya',
+        'configured': is_paydunya_configured(),
+        'channel': channel,
+        'country': normalize_payment_country(request.country),
+        'payment_method': request.payment_method.value,
+        **breakdown
+    }
+
+@api_router.post('/payments/checkout')
+async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_user: User = Depends(get_current_user)):
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas encore configuré en production")
+
+    normalized_country = normalize_payment_country(request.country or current_user.country)
+    channel = get_paydunya_channel(request.payment_method.value, normalized_country)
+    breakdown = calculate_payment_breakdown(request.amount)
+
+    payment_record = {
+        'id': str(uuid.uuid4()),
+        'job_id': request.job_id or '',
+        'payer_id': current_user.id,
+        'receiver_id': request.worker_id or '',
+        'amount': round(request.amount),
+        'payment_method': request.payment_method.value,
+        'status': 'pending',
+        'country': normalized_country,
+        'provider': 'paydunya',
+        'provider_channel': channel,
+        'commission_amount': breakdown['commission_amount'],
+        'worker_amount': breakdown['worker_amount'],
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+    await db.payments.insert_one(payment_record)
+
+    return_url = build_checkout_redirect_url(f"/payment-demo?payment_id={payment_record['id']}", request.return_url)
+    cancel_url = build_checkout_redirect_url(f"/payment-demo?payment_id={payment_record['id']}&cancelled=1", request.cancel_url)
+    callback_url = build_payment_callback_url()
+
+    payload = {
+        'invoice': {
+            'total_amount': payment_record['amount'],
+            'description': f"Paiement KOJO {payment_record['id']}",
+            'channels': [channel],
+            'customer': {
+                'name': f"{current_user.first_name} {current_user.last_name}".strip(),
+                'email': current_user.email,
+                'phone': current_user.phone
+            }
+        },
+        'store': {
+            'name': PAYDUNYA_STORE_NAME
+        },
+        'actions': {
+            'cancel_url': cancel_url,
+            'return_url': return_url,
+            'callback_url': callback_url
+        },
+        'custom_data': {
+            'payment_id': payment_record['id'],
+            'job_id': payment_record['job_id'],
+            'worker_id': payment_record['receiver_id'],
+            'payer_id': payment_record['payer_id'],
+            'selected_method': payment_record['payment_method']
+        }
+    }
+
+    invoice_data = create_paydunya_invoice(payload)
+    invoice_token = invoice_data.get('token')
+    checkout_url = invoice_data.get('response_text')
+
+    await db.payments.update_one(
+        {'id': payment_record['id']},
+        {'$set': {
+            'invoice_token': invoice_token,
+            'checkout_url': checkout_url,
+            'provider_response_code': invoice_data.get('response_code'),
+            'provider_response_text': invoice_data.get('response_text'),
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    return {
+        'status': 'success',
+        'provider': 'paydunya',
+        'payment_id': payment_record['id'],
+        'invoice_token': invoice_token,
+        'checkout_url': checkout_url,
+        'payment_method': payment_record['payment_method'],
+        'channel': channel,
+        **breakdown
+    }
+
+@api_router.get('/payments/status/{payment_id}')
+async def get_payment_status(payment_id: str, current_user: User = Depends(get_current_user)):
+    payment_record = await db.payments.find_one({'id': payment_id})
+    if not payment_record:
+        raise HTTPException(status_code=404, detail='Paiement introuvable')
+
+    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip():
+        raise HTTPException(status_code=403, detail='Accès interdit à ce paiement')
+
+    payment_record = await sync_payment_status_with_paydunya(payment_record)
+    return serialize_payment_record(payment_record)
+
+@api_router.get('/payments/status/token/{invoice_token}')
+async def get_payment_status_by_token(invoice_token: str, current_user: User = Depends(get_current_user)):
+    payment_record = await db.payments.find_one({'invoice_token': invoice_token})
+    if not payment_record:
+        raise HTTPException(status_code=404, detail='Paiement introuvable')
+
+    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip():
+        raise HTTPException(status_code=403, detail='Accès interdit à ce paiement')
+
+    payment_record = await sync_payment_status_with_paydunya(payment_record)
+    return serialize_payment_record(payment_record)
+
+@api_router.get('/payments/my')
+async def get_my_payments(current_user: User = Depends(get_current_user)):
+    cursor = db.payments.find({'$or': [{'payer_id': current_user.id}, {'receiver_id': current_user.id}]}).sort('created_at', -1).limit(50)
+    payments = [serialize_payment_record(item) async for item in cursor]
+    return {'payments': payments}
+
+@api_router.post('/payments/ipn/paydunya')
+async def paydunya_payment_ipn(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    invoice_data = payload.get('invoice', {}) if isinstance(payload, dict) else {}
+    custom_data = payload.get('custom_data', {}) if isinstance(payload, dict) else {}
+    payment_id = custom_data.get('payment_id') or payload.get('payment_id')
+    invoice_token = invoice_data.get('token') or payload.get('token')
+    provider_status = invoice_data.get('status') or payload.get('status')
+
+    query = {'id': payment_id} if payment_id else {'invoice_token': invoice_token}
+    payment_record = await db.payments.find_one(query) if query else None
+    if not payment_record:
+        return {'status': 'ignored'}
+
+    local_status = map_paydunya_status(provider_status)
+    update_fields = {
+        'status': local_status,
+        'provider_status': provider_status,
+        'provider_callback_payload': payload,
+        'updated_at': datetime.now(timezone.utc).isoformat()
+    }
+    if invoice_token:
+        update_fields['invoice_token'] = invoice_token
+    if local_status == 'completed':
+        update_fields['completed_at'] = datetime.now(timezone.utc).isoformat()
+
+    await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
+    return {'status': 'ok'}
+
+async def compute_real_commission_stats() -> Dict[str, Any]:
+    completed_payments = [item async for item in db.payments.find({'status': 'completed'}).sort('created_at', -1)]
+    now = datetime.now(timezone.utc)
+    today = now.date()
+
+    total_transactions = len(completed_payments)
+    total_commission_earned = sum(int(item.get('commission_amount', 0) or 0) for item in completed_payments)
+    total_volume = sum(int(item.get('amount', 0) or 0) for item in completed_payments)
+
+    daily_commission = 0
+    monthly_commission = 0
+    method_totals: Dict[str, Dict[str, int]] = {}
+    recent_transactions = []
+
+    for item in completed_payments:
+        created_raw = item.get('completed_at') or item.get('updated_at') or item.get('created_at')
+        try:
+            created_dt = datetime.fromisoformat(str(created_raw).replace('Z', '+00:00'))
+            if created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            created_dt = now
+
+        if created_dt.date() == today:
+            daily_commission += int(item.get('commission_amount', 0) or 0)
+        if created_dt.year == now.year and created_dt.month == now.month:
+            monthly_commission += int(item.get('commission_amount', 0) or 0)
+
+        method = item.get('payment_method', 'unknown')
+        bucket = method_totals.setdefault(method, {'volume': 0, 'commission': 0})
+        bucket['volume'] += int(item.get('amount', 0) or 0)
+        bucket['commission'] += int(item.get('commission_amount', 0) or 0)
+
+        if len(recent_transactions) < 10:
+            recent_transactions.append({
+                'id': item.get('id'),
+                'amount': int(item.get('amount', 0) or 0),
+                'commission': int(item.get('commission_amount', 0) or 0),
+                'worker_amount': int(item.get('worker_amount', 0) or 0),
+                'method': method,
+                'paymentMethod': method,
+                'date': created_dt.isoformat(),
+                'timestamp': created_dt.isoformat()
+            })
+
+    top_payment_methods = [
+        {'method': method, 'volume': data['volume'], 'commission': data['commission']}
+        for method, data in sorted(method_totals.items(), key=lambda item: item[1]['volume'], reverse=True)
+    ]
+
+    return {
+        'total_transactions': total_transactions,
+        'total_commission_earned': total_commission_earned,
+        'commission_rate': round(PAYMENT_COMMISSION_RATE * 100),
+        'total_volume': total_volume,
+        'daily_commission': daily_commission,
+        'monthly_commission': monthly_commission,
+        'top_payment_methods': top_payment_methods,
+        'recent_transactions': recent_transactions
+    }
+
 @api_router.get("/owner/commission-stats")
 async def get_commission_stats(owner_user = Depends(verify_owner_access)):
     """Statistiques des commissions - PROPRIÉTAIRE UNIQUEMENT"""
     try:
-        # Simuler des statistiques de commission (remplacez par vraies données)
-        stats = {
-            "total_transactions": 156,
-            "total_commission_earned": 2450000,  # En XOF
-            "commission_rate": 14,  # 14%
-            "total_volume": 17500000,  # Volume total des paiements
-            "daily_commission": 35000,
-            "monthly_commission": 875000,
-            "top_payment_methods": [
-                {"method": "orange_money", "volume": 8500000, "commission": 1190000},
-                {"method": "wave", "volume": 5200000, "commission": 728000},
-                {"method": "bank_card", "volume": 3800000, "commission": 532000}
-            ],
-            "recent_transactions": [
-                {
-                    "id": "TXN_001",
-                    "amount": 50000,
-                    "commission": 7000,
-                    "worker_amount": 43000,
-                    "method": "orange_money",
-                    "date": datetime.now(timezone.utc).isoformat()
-                }
-            ]
-        }
-        
+        stats = await compute_real_commission_stats()
         return {
             "status": "success",
             "owner_email": owner_user["email"],
             "stats": stats
         }
-        
     except Exception as e:
         logging.error(f"Error getting commission stats: {e}")
         raise HTTPException(status_code=500, detail="Erreur serveur")
