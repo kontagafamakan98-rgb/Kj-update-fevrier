@@ -218,14 +218,6 @@ export default function Register() {
         return;
       }
 
-      if (!formData.worker_experience_years) {
-        const errorMsg = t('pleaseIndicateExperience');
-        setError(errorMsg);
-        toast.error(errorMsg);
-        setLoading(false);
-        return;
-      }
-
     }
 
     const emailAvailable = await checkEmailAvailability(formData.email);
