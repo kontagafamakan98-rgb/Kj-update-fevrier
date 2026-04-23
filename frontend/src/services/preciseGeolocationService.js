@@ -303,6 +303,9 @@ class PreciseGeolocationService {
     this.cachedLocation = null;
     this.cacheTimestamp = null;
     this.CACHE_DURATION = 60 * 1000; // 60 secondes pour éviter les localisations obsolètes
+    this.TARGET_GPS_ACCURACY = 12;
+    this.MIN_CACHEABLE_GPS_ACCURACY = 35;
+    this.MAX_ACCEPTABLE_GPS_ACCURACY = 120;
     this.loadCachedLocation();
   }
 
@@ -327,8 +330,17 @@ class PreciseGeolocationService {
 
   // Sauvegarder la position dans le cache
   saveCachedLocation(location) {
-    if (!location || location.isApproximate) {
-      devLog.info('ℹ️ Position approximative non sauvegardée dans le cache');
+    const gpsAccuracy = Number(location?.gpsAccuracy ?? location?.accuracy);
+    const isCacheableGps = Boolean(
+      location?.coordinates &&
+      Number.isFinite(gpsAccuracy) &&
+      gpsAccuracy > 0 &&
+      gpsAccuracy <= this.MIN_CACHEABLE_GPS_ACCURACY &&
+      !location?.isApproximate
+    );
+
+    if (!isCacheableGps) {
+      devLog.info('ℹ️ Position non assez précise pour le cache persistant');
       return;
     }
 
@@ -351,28 +363,41 @@ class PreciseGeolocationService {
    */
   async detectPreciseLocation(options = {}) {
     devLog.info('🎯 Démarrage détection géolocalisation ultra-précise...');
-    
+
     const startTime = Date.now();
-    
+
     if (this.isDetecting) {
       devLog.info('⏳ Détection déjà en cours...');
       return this.lastKnownLocation;
     }
 
-    // MÉTHODE 0: Position cachée récente (priorité maximale pour performance <500ms)
     if (!options.forceRefresh && this.cachedLocation && this.cacheTimestamp) {
       const age = Date.now() - this.cacheTimestamp;
-      if (age < this.CACHE_DURATION) {
+      const cachedGpsAccuracy = Number(this.cachedLocation?.gpsAccuracy ?? this.cachedLocation?.accuracy);
+      const canReuseCache = (
+        age < this.CACHE_DURATION &&
+        this.cachedLocation?.coordinates &&
+        Number.isFinite(cachedGpsAccuracy) &&
+        cachedGpsAccuracy > 0 &&
+        cachedGpsAccuracy <= this.MIN_CACHEABLE_GPS_ACCURACY
+      );
+
+      if (canReuseCache) {
         const detectionTime = Date.now() - startTime;
         devLog.info('📦 Utilisation position précise cachée (age: ' + Math.round(age / 1000) + 's)');
-        
-        const cachedResult = { ...this.cachedLocation, method: 'cache', fromCache: true };
-        
-        // Enregistrer dans le moniteur avec le vrai temps du cache
+
+        const cachedResult = {
+          ...this.cachedLocation,
+          method: 'cache',
+          fromCache: true,
+          isPrecise: true,
+          isApproximate: false,
+          confidence: this.calculateDetectionAccuracy(cachedGpsAccuracy, 'gps')
+        };
+
         geolocationMonitor.recordDetection(cachedResult, detectionTime, true);
-        
         devLog.info(`✅ Géolocalisation précise depuis cache en ${detectionTime}ms`);
-        
+
         return cachedResult;
       }
     }
@@ -380,46 +405,40 @@ class PreciseGeolocationService {
     this.isDetecting = true;
 
     try {
-      // MÉTHODE 1: Géolocalisation HTML5 haute précision
       const gpsLocation = await this.getHighPrecisionGPSLocation();
-      if (gpsLocation && gpsLocation.accuracy >= 90) {
-        devLog.info('✅ Localisation GPS haute précision obtenue:', gpsLocation);
+      if (gpsLocation && gpsLocation.coordinates) {
+        devLog.info('✅ Localisation GPS obtenue:', gpsLocation);
         this.lastKnownLocation = gpsLocation;
-        this.detectionAccuracy = gpsLocation.accuracy;
+        this.detectionAccuracy = gpsLocation.confidence || 0;
         this.saveCachedLocation(gpsLocation);
         this.isDetecting = false;
-        
-        // Enregistrer dans le moniteur
+
         const detectionTime = Date.now() - startTime;
         geolocationMonitor.recordDetection(gpsLocation, detectionTime, true);
         devLog.info(`✅ Géolocalisation GPS complétée en ${detectionTime}ms`);
-        
+
         return gpsLocation;
       }
 
-      // MÉTHODE 2: Multi-IP géolocalisation avec validation croisée
       const ipLocation = await this.getMultiIPGeolocation();
-      if (ipLocation && ipLocation.accuracy >= 80) {
-        devLog.info('✅ Localisation IP multi-services obtenue:', ipLocation);
+      if (ipLocation) {
+        devLog.info('⚠️ Fallback localisation IP utilisé:', ipLocation);
         this.lastKnownLocation = ipLocation;
-        this.detectionAccuracy = ipLocation.accuracy;
-        this.saveCachedLocation(ipLocation);
+        this.detectionAccuracy = ipLocation.confidence || 0;
         this.isDetecting = false;
-        
-        // Enregistrer dans le moniteur
+
         const detectionTime = Date.now() - startTime;
         geolocationMonitor.recordDetection(ipLocation, detectionTime, true);
-        devLog.info(`✅ Géolocalisation IP complétée en ${detectionTime}ms`);
-        
+        devLog.info(`ℹ️ Géolocalisation IP complétée en ${detectionTime}ms`);
+
         return ipLocation;
       }
 
-      // MÉTHODE 3: Analyse de fuseau horaire + langue navigateur
       const contextLocation = await this.getContextualLocation();
       if (contextLocation) {
         devLog.info('ℹ️ Localisation contextuelle approximative obtenue:', contextLocation);
         this.lastKnownLocation = contextLocation;
-        this.detectionAccuracy = contextLocation.accuracy;
+        this.detectionAccuracy = contextLocation.confidence || 0;
         this.isDetecting = false;
 
         const detectionTime = Date.now() - startTime;
@@ -429,7 +448,6 @@ class PreciseGeolocationService {
         return contextLocation;
       }
 
-      // MÉTHODE 4: Aucun fallback inventé
       this.isDetecting = false;
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(null, detectionTime, false);
@@ -439,11 +457,10 @@ class PreciseGeolocationService {
     } catch (error) {
       safeLog.error('❌ Erreur détection géolocalisation:', error);
       this.isDetecting = false;
-      
-      // Enregistrer l'échec dans le moniteur
+
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(null, detectionTime, false);
-      
+
       return this.lastKnownLocation && !this.lastKnownLocation.isApproximate ? this.lastKnownLocation : null;
     }
   }
@@ -451,6 +468,167 @@ class PreciseGeolocationService {
   /**
    * GÉOLOCALISATION GPS HAUTE PRÉCISION
    */
+  async getGeolocationPermissionState() {
+    try {
+      if (!navigator.permissions || !navigator.permissions.query) {
+        return 'unknown';
+      }
+
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      return permissionStatus?.state || 'unknown';
+    } catch (error) {
+      devLog.info('⚠️ Permissions API indisponible:', error.message);
+      return 'unknown';
+    }
+  }
+
+  async getCurrentPositionWithOptions(options = {}) {
+    return await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+  }
+
+  async getBestAvailableGpsPosition() {
+    const permissionState = await this.getGeolocationPermissionState();
+    devLog.info(`🔐 Permission géolocalisation: ${permissionState}`);
+
+    const baseOptions = {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 0
+    };
+
+    const firstPosition = await this.getCurrentPositionWithOptions(baseOptions);
+    const firstAccuracy = firstPosition?.coords?.accuracy ?? Number.POSITIVE_INFINITY;
+
+    if (!navigator.geolocation?.watchPosition || firstAccuracy <= this.TARGET_GPS_ACCURACY) {
+      return firstPosition;
+    }
+
+    devLog.info(`📡 Premier fix GPS à ${Math.round(firstAccuracy)}m, lancement d'un warm-up précision...`);
+
+    const watchDurationMs = firstAccuracy <= 25 ? 6000 : 10000;
+
+    return await new Promise((resolve) => {
+      let bestPosition = firstPosition;
+      let settled = false;
+      let watchId = null;
+      let timerId = null;
+
+      const finalize = () => {
+        if (settled) return;
+        settled = true;
+
+        if (timerId) {
+          clearTimeout(timerId);
+        }
+
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+
+        resolve(bestPosition);
+      };
+
+      const evaluatePosition = (position) => {
+        if (!position?.coords) return;
+
+        const candidateAccuracy = position.coords.accuracy ?? Number.POSITIVE_INFINITY;
+        const currentBestAccuracy = bestPosition?.coords?.accuracy ?? Number.POSITIVE_INFINITY;
+
+        if (candidateAccuracy < currentBestAccuracy) {
+          bestPosition = position;
+        }
+
+        if (candidateAccuracy <= this.TARGET_GPS_ACCURACY) {
+          finalize();
+        }
+      };
+
+      timerId = setTimeout(finalize, watchDurationMs);
+
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            evaluatePosition(position);
+          },
+          (error) => {
+            devLog.info('⚠️ Warm-up GPS interrompu:', error.message);
+            finalize();
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: watchDurationMs,
+            maximumAge: 0
+          }
+        );
+      } catch (error) {
+        devLog.info('⚠️ watchPosition indisponible:', error.message);
+        finalize();
+        return;
+      }
+
+      evaluatePosition(firstPosition);
+    });
+  }
+
+  async reverseGeocodePrecise(latitude, longitude) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=1`;
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller ? controller.signal : undefined,
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Language': 'fr,en'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      devLog.info('⚠️ Reverse geocoding Nominatim échoué:', error.message);
+      return null;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
+  buildPreciseAddressFromReverseData(reverseData, fallbackLocationData, latitude, longitude) {
+    const address = reverseData?.address || {};
+    const countryCode = normalizeCountryCode(address.country_code || fallbackLocationData?.countryCode || '');
+    const countryData = PRECISE_GEOGRAPHIC_DATABASE[countryCode];
+
+    const streetName = address.road || address.pedestrian || address.footway || address.street || address.path || '';
+    const houseNumber = address.house_number || '';
+    const streetLine = [houseNumber, streetName].filter(Boolean).join(' ').trim();
+    const district = address.suburb || address.neighbourhood || address.city_district || address.quarter || address.hamlet || fallbackLocationData?.district || '';
+    const city = address.city || address.town || address.village || address.municipality || address.county || fallbackLocationData?.city || '';
+    const state = address.state || address.region || '';
+    const country = address.country || fallbackLocationData?.country || countryData?.nameFrench || '';
+
+    const shortAddress = [streetLine, district || city].filter(Boolean).join(', ') || [district, city].filter(Boolean).join(', ') || fallbackLocationData?.address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    const fullAddress = reverseData?.display_name || [streetLine, district, city, state, country].filter(Boolean).join(', ') || shortAddress;
+
+    return {
+      address: shortAddress,
+      fullAddress,
+      city,
+      district,
+      country,
+      countryCode: countryCode || fallbackLocationData?.countryCode || '',
+      postalCode: address.postcode || '',
+      phonePrefix: countryData?.phonePrefix || fallbackLocationData?.phonePrefix || '',
+      flag: countryData?.flag || fallbackLocationData?.flag || '📍'
+    };
+  }
+
   async getHighPrecisionGPSLocation() {
     if (!navigator.geolocation) {
       devLog.info('⚠️ Géolocalisation non supportée par le navigateur');
@@ -459,54 +637,39 @@ class PreciseGeolocationService {
 
     try {
       devLog.info('📡 Tentative géolocalisation GPS haute précision...');
-      
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 60000 // 1 minute de cache maximum
-          }
-        );
-      });
 
+      const position = await this.getBestAvailableGpsPosition();
       const { latitude, longitude, accuracy } = position.coords;
-      devLog.info(`📍 Position GPS détectée: ${latitude}, ${longitude} (précision: ${accuracy}m)`);
+      const roundedAccuracy = Math.round(accuracy || 0);
+      devLog.info(`📍 Position GPS détectée: ${latitude}, ${longitude} (précision: ${roundedAccuracy}m)`);
 
-      // Identifier le pays et la ville avec la base de données précise
-      const locationData = this.identifyLocationFromCoordinates(latitude, longitude);
-      
-      // Calculer la précision de la détection
-      const detectionAccuracy = this.calculateDetectionAccuracy(accuracy, 'gps');
+      const fallbackLocationData = this.identifyLocationFromCoordinates(latitude, longitude) || {};
+      const reverseData = await this.reverseGeocodePrecise(latitude, longitude);
+      const preciseAddressData = this.buildPreciseAddressFromReverseData(reverseData, fallbackLocationData, latitude, longitude);
+      const confidence = this.calculateDetectionAccuracy(roundedAccuracy, 'gps');
 
-      if (locationData) {
-        return {
-          ...locationData,
-          coordinates: { lat: latitude, lng: longitude },
-          accuracy: detectionAccuracy,
-          method: 'gps',
-          gpsAccuracy: accuracy,
-          timestamp: new Date().toISOString()
-        };
-      }
-
-      // GPS hors Afrique de l'Ouest - retourner les coordonnées réelles quand même
-      devLog.info('📍 GPS hors zone Afrique de l\'Ouest - position réelle retournée');
       return {
-        country: 'Position GPS',
-        countryCode: 'gps',
-        city: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-        district: '',
-        fullAddress: `GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-        phonePrefix: '',
-        flag: '📍',
+        ...fallbackLocationData,
+        ...preciseAddressData,
         coordinates: { lat: latitude, lng: longitude },
-        accuracy: detectionAccuracy,
+        latitude,
+        longitude,
+        accuracy: roundedAccuracy,
+        gpsAccuracy: roundedAccuracy,
+        confidence,
         method: 'gps',
-        gpsAccuracy: accuracy,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isApproximate: roundedAccuracy > this.MAX_ACCEPTABLE_GPS_ACCURACY,
+        isPrecise: roundedAccuracy <= this.MIN_CACHEABLE_GPS_ACCURACY,
+        precisionTier: roundedAccuracy <= 10
+          ? 'excellent'
+          : roundedAccuracy <= 25
+            ? 'high'
+            : roundedAccuracy <= 50
+              ? 'good'
+              : roundedAccuracy <= 100
+                ? 'fair'
+                : 'low'
       };
 
     } catch (error) {
@@ -586,7 +749,8 @@ class PreciseGeolocationService {
       return {
         ...locationData,
         coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
-        accuracy: detectionAccuracy,
+        accuracy: 0,
+        confidence: detectionAccuracy,
         method: 'ip',
         ipServices: results.length,
         consensus: validatedResult.consensus,
@@ -606,7 +770,8 @@ class PreciseGeolocationService {
       phonePrefix: '',
       flag: '🌍',
       coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
-      accuracy: detectionAccuracy,
+      accuracy: 0,
+      confidence: detectionAccuracy,
       method: 'ip',
       ipServices: results.length,
       consensus: validatedResult.consensus,
@@ -673,7 +838,8 @@ class PreciseGeolocationService {
         countryCode: bestCountryGuess,
         phonePrefix: countryData.phonePrefix,
         coordinates: mainCity.coordinates,
-        accuracy: Math.min(detectionAccuracy, 45),
+        accuracy: 0,
+        confidence: Math.min(detectionAccuracy, 45),
         method: 'contextual',
         timezone: timezone,
         languages: userLanguages,
@@ -858,17 +1024,32 @@ class PreciseGeolocationService {
    * CALCULER LA PRÉCISION DE DÉTECTION
    */
   calculateDetectionAccuracy(baseAccuracy, method, extraFactor = 1) {
-    const methodMultipliers = {
-      'gps': 1.0,           // GPS = meilleure précision
-      'ip': 0.8,            // IP = bonne précision  
-      'contextual': 0.7,    // Contextuel = précision moyenne
-      'intelligent_fallback': 0.6 // Fallback = précision réduite
-    };
+    if (method === 'gps') {
+      const meters = Number(baseAccuracy);
 
-    const multiplier = methodMultipliers[method] || 0.5;
-    const consensusBonus = Math.min(extraFactor * 0.1, 0.3); // Bonus pour consensus multiple
-    
-    return Math.min(Math.round(baseAccuracy * multiplier + consensusBonus * 100), 100);
+      if (!Number.isFinite(meters) || meters <= 0) {
+        return 0;
+      }
+
+      if (meters <= 5) return 100;
+      if (meters <= 10) return 99;
+      if (meters <= 20) return 96;
+      if (meters <= 35) return 93;
+      if (meters <= 50) return 88;
+      if (meters <= 100) return 78;
+      if (meters <= 200) return 65;
+      return 50;
+    }
+
+    if (method === 'ip') {
+      return Math.min(40 + Math.round(extraFactor * 8), 68);
+    }
+
+    if (method === 'contextual') {
+      return 35;
+    }
+
+    return 0;
   }
 
   /**
