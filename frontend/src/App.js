@@ -13,6 +13,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
 import ToastContainer from "./components/ToastContainer";
 import PageLoader from "./components/PageLoader";
+import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 
 
@@ -59,6 +60,20 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
   
+  return children;
+}
+
+function OwnerOnlyRoute({ children }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (!user || !OwnerService.isFamakanLoggedIn()) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return children;
 }
 
@@ -172,12 +187,20 @@ function AppRoutes() {
               </ProtectedRoute>
             } />
             <Route path="/photo-debug" element={<PhotoTest />} />
-            <Route path="/payment-demo" element={<PaymentDemo />} />
+            <Route path="/payment-demo" element={
+              <ProtectedRoute>
+                <OwnerOnlyRoute>
+                  <PaymentDemo />
+                </OwnerOnlyRoute>
+              </ProtectedRoute>
+            } />
             <Route path="/email-verification" element={<EmailVerificationPage />} />
             <Route path="/payment-verification" element={<PaymentVerificationPage />} />
             <Route path="/commission-dashboard" element={
               <ProtectedRoute>
-                <CommissionDashboard />
+                <OwnerOnlyRoute>
+                  <CommissionDashboard />
+                </OwnerOnlyRoute>
               </ProtectedRoute>
             } />
           </Routes>

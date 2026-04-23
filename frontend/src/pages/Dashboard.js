@@ -81,33 +81,32 @@ export default function Dashboard() {
     { label: t('totalEarnings'), value: `${stats.totalEarnings.toLocaleString(locale)} XOF`, icon: CircleDollarSign }
   ];
 
-  const quickActions = user.user_type === 'client'
-    ? [
-        { to: '/create-job', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
-        { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-blue-600 bg-blue-100' },
-        { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' },
-        {
-          to: '/payment-demo',
-          label: t('languagesPayments'),
-          subtitle: t('publicFeature'),
-          icon: Monitor,
-          iconClass: 'text-amber-600 bg-amber-100',
-          cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
-        }
-      ]
-    : [
-        { to: '/jobs', label: `${t('searchJobs')} ${t('jobs')}`, icon: Briefcase, iconClass: 'text-orange-600 bg-orange-100' },
-        { to: '/profile', label: t('workerProfile'), icon: Wrench, iconClass: 'text-blue-600 bg-blue-100' },
-        { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' },
-        {
-          to: '/payment-demo',
-          label: t('languagesPayments'),
-          subtitle: t('publicFeature'),
-          icon: Monitor,
-          iconClass: 'text-amber-600 bg-amber-100',
-          cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
-        }
-      ];
+  const quickActions = (() => {
+    const baseActions = user.user_type === 'client'
+      ? [
+          { to: '/create-job', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
+          { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-blue-600 bg-blue-100' },
+          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' }
+        ]
+      : [
+          { to: '/jobs', label: `${t('searchJobs')} ${t('jobs')}`, icon: Briefcase, iconClass: 'text-orange-600 bg-orange-100' },
+          { to: '/profile', label: t('workerProfile'), icon: Wrench, iconClass: 'text-blue-600 bg-blue-100' },
+          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' }
+        ];
+
+    if (isFamakan) {
+      baseActions.push({
+        to: '/payment-demo',
+        label: t('languagesPayments'),
+        subtitle: t('publicFeature'),
+        icon: Monitor,
+        iconClass: 'text-amber-600 bg-amber-100',
+        cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
+      });
+    }
+
+    return baseActions;
+  })();
 
   const popularCategories = [
     { key: 'plumbing', icon: Wrench },
