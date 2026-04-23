@@ -132,13 +132,19 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
         </div>
 
         <div>
-          <label htmlFor="worker_experience_years" className="block text-sm font-medium text-blue-900 mb-2">📅 {t('yearsExperience')} *</label>
+          <label htmlFor="worker_experience_years" className="block text-sm font-medium text-blue-900 mb-2">📅 {t('yearsExperience')}</label>
           <select
             id="worker_experience_years"
             name="worker_experience_years"
             autoComplete="off"
-            value={formData.worker_experience_years || ''}
-            onChange={(e) => setFormData((prev) => ({ ...prev, worker_experience_years: parseInt(e.target.value, 10) || 0 }))}
+            value={formData.worker_experience_years ?? ''}
+            onChange={(e) => {
+              const nextValue = e.target.value;
+              setFormData((prev) => ({
+                ...prev,
+                worker_experience_years: nextValue === '' ? null : parseInt(nextValue, 10)
+              }));
+            }}
             className={`block w-full px-4 py-3 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.worker_experience_years ? 'border-red-300 focus:border-red-500' : 'border-blue-300 focus:border-blue-500'}`}
           >
             <option value="">{t('selectExperience')}</option>
@@ -150,6 +156,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
             <option value="16">{t('experience16to20')}</option>
             <option value="21">{t('experience20plus')}</option>
           </select>
+          <p className="text-blue-700 text-xs mt-2">{t('canEditProfileLater')}</p>
           {errors.worker_experience_years && <p className="text-red-500 text-sm mt-1">{errors.worker_experience_years}</p>}
         </div>
 

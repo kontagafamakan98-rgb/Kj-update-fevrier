@@ -133,10 +133,10 @@ export function validateWorkerSpecialties(specialties) {
  */
 export function validateExperienceYears(years) {
   if (years === null || typeof years === "undefined" || years === '') {
-    return { isValid: false, message: 'Années d\'expérience requises' };
+    return { isValid: true };
   }
   
-  const numericYears = parseInt(years);
+  const numericYears = parseInt(years, 10);
   
   if (isNaN(numericYears) || numericYears < 0 || numericYears > 50) {
     return { isValid: false, message: 'Les années d\'expérience doivent être entre 0 et 50' };
