@@ -4,6 +4,47 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
+import { loadRegistrationFlow } from '../utils/registrationFlowStorage';
+
+const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
+
+const getPendingRegistrationRedirect = (email) => {
+  const registrationFlow = loadRegistrationFlow();
+  const flowEmail = normalizeEmail(registrationFlow?.userData?.email);
+  const currentEmail = normalizeEmail(email);
+
+  if (!registrationFlow?.userData || !flowEmail || !currentEmail || flowEmail !== currentEmail) {
+    return null;
+  }
+
+  if (registrationFlow.emailVerificationToken) {
+    return {
+      pathname: '/payment-verification',
+      state: {
+        userData: registrationFlow.userData,
+        paymentAccounts: registrationFlow.paymentAccounts || null,
+        emailVerificationToken: registrationFlow.emailVerificationToken,
+        resumeFromLogin: true
+      }
+    };
+  }
+
+  return {
+    pathname: '/email-verification',
+    state: {
+      userData: registrationFlow.userData,
+      paymentAccounts: registrationFlow.paymentAccounts || null,
+      resumeFromLogin: true
+    }
+  };
+};
+
+const requiresRegistrationCompletion = (user) => {
+  if (!user) return false;
+
+  const minimumRequired = user.user_type === 'worker' ? 2 : 1;
+  return !user.is_verified || Number(user.payment_accounts_count || 0) < minimumRequired;
+};
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -13,7 +54,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [errorKey, setErrorKey] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { login } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const toast = useToast();
@@ -34,11 +75,29 @@ export default function Login() {
     setError('');
     setErrorKey('');
 
+    const pendingRedirect = getPendingRegistrationRedirect(formData.email);
+    if (pendingRedirect) {
+      toast.success('Reprends ton inscription pour finir les étapes restantes.');
+      navigate(pendingRedirect.pathname, { state: pendingRedirect.state });
+      setLoading(false);
+      return;
+    }
+
     const result = await login(formData.email, formData.password);
-    
+
     if (result.success) {
-      toast.success(t('loginSuccess') + ' 🎉');
-      navigate('/dashboard');
+      if (requiresRegistrationCompletion(result.user)) {
+        toast.success('Termine dabord l’étape 3 pour activer complètement ton compte.');
+        navigate('/payment-verification', {
+          state: {
+            userData: result.user,
+            resumeAfterLogin: true
+          }
+        });
+      } else {
+        toast.success(t('loginSuccess') + ' 🎉');
+        navigate('/dashboard');
+      }
     } else {
       setError(result.error || t('loginFailed'));
       setErrorKey(result.errorKey || '');
@@ -49,7 +108,7 @@ export default function Login() {
         toast.error(result.error || t('loginFailed'));
       }
     }
-    
+
     setLoading(false);
   };
 
@@ -76,14 +135,14 @@ export default function Login() {
             {t('login')}
           </h2>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {displayedError && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
               {displayedError}
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -101,7 +160,7 @@ export default function Login() {
                 onChange={handleChange}
               />
             </div>
-            
+
             <div>
               <div className="flex items-center justify-between">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">

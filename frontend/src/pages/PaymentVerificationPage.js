@@ -14,7 +14,7 @@ import { devLog, safeLog } from '../utils/env';
 const PaymentVerificationPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { autoLoginAfterRegistration } = useAuth();
+  const { autoLoginAfterRegistration, loadUser, user: authUser } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'paymentVerification');
   const toast = useToast();
@@ -23,6 +23,14 @@ const PaymentVerificationPage = () => {
   const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
   const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
 
+  const persistedFlow = loadRegistrationFlow();
+  const routedUserData = location.state?.userData || persistedFlow?.userData || null;
+  const emailVerificationToken = location.state?.emailVerificationToken || persistedFlow?.emailVerificationToken || null;
+  const effectiveUser = routedUserData || authUser || null;
+
+  const [prefilledPaymentAccounts, setPrefilledPaymentAccounts] = useState(
+    () => location.state?.paymentAccounts || persistedFlow?.paymentAccounts || null
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [errorKey, setErrorKey] = useState('');
@@ -30,36 +38,57 @@ const PaymentVerificationPage = () => {
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [geoLoading, setGeoLoading] = useState(true);
 
-  const persistedFlow = loadRegistrationFlow();
-  const userData = location.state?.userData || persistedFlow?.userData || null;
-  const prefilledPaymentAccounts = location.state?.paymentAccounts || persistedFlow?.paymentAccounts || null;
-  const emailVerificationToken = location.state?.emailVerificationToken || persistedFlow?.emailVerificationToken || null;
+  const isRegistrationFlow = Boolean(emailVerificationToken);
+  const isAccountCompletionMode = !isRegistrationFlow && Boolean(authUser?.id);
 
   useEffect(() => {
-    if (!userData) {
+    if (!effectiveUser) {
       navigate('/register');
       return;
     }
 
-    if (!emailVerificationToken) {
+    if (!isRegistrationFlow && routedUserData && !authUser?.id) {
       navigate('/email-verification', {
         state: {
-          userData,
+          userData: routedUserData,
           paymentAccounts: prefilledPaymentAccounts
         }
       });
       return;
     }
 
-    mergeRegistrationFlow({
-      userData,
-      paymentAccounts: prefilledPaymentAccounts,
-      emailVerificationToken,
-      currentStep: 'payment-verification'
-    });
+    if (isRegistrationFlow) {
+      mergeRegistrationFlow({
+        userData: routedUserData,
+        paymentAccounts: prefilledPaymentAccounts,
+        emailVerificationToken,
+        currentStep: 'payment-verification'
+      });
+    }
 
     detectUserLocationForPayments();
-  }, [emailVerificationToken, navigate, prefilledPaymentAccounts, userData]);
+  }, [authUser?.id, emailVerificationToken, effectiveUser, isRegistrationFlow, navigate, prefilledPaymentAccounts, routedUserData]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const hydrateExistingAccounts = async () => {
+      if (!isAccountCompletionMode) {
+        return;
+      }
+
+      const result = await PaymentAccountService.getUserPaymentAccounts();
+      if (isMounted && result.success) {
+        setPrefilledPaymentAccounts(result.data?.payment_accounts || null);
+      }
+    };
+
+    hydrateExistingAccounts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAccountCompletionMode]);
 
   const detectUserLocationForPayments = async () => {
     try {
@@ -75,7 +104,7 @@ const PaymentVerificationPage = () => {
     }
   };
 
-  const handlePaymentAccountsComplete = async (paymentAccounts) => {
+  const handleRegistrationCompletion = async (paymentAccounts) => {
     setLoading(true);
     setError(null);
     setErrorKey('');
@@ -84,14 +113,14 @@ const PaymentVerificationPage = () => {
       devLog.info('🏦 Finalisation du compte après email vérifié...');
 
       mergeRegistrationFlow({
-        userData,
+        userData: routedUserData,
         paymentAccounts,
         emailVerificationToken,
         currentStep: 'payment-verification'
       });
 
       const result = await PaymentAccountService.registerWithPaymentVerification(
-        userData,
+        routedUserData,
         paymentAccounts,
         emailVerificationToken
       );
@@ -148,7 +177,40 @@ const PaymentVerificationPage = () => {
     }
   };
 
-  if (!userData) {
+  const handleExistingAccountCompletion = async (result) => {
+    setLoading(true);
+    setError(null);
+    setErrorKey('');
+
+    try {
+      await loadUser();
+      clearRegistrationFlow();
+
+      PaymentAccountService.storeVerificationStatus({
+        is_verified: result?.payment_verification?.is_verified ?? true,
+        payment_accounts_count: result?.payment_verification?.linked_accounts ?? 0,
+        user_type: effectiveUser?.user_type,
+        email_verified: authUser?.email_verified ?? true
+      });
+
+      toast.success('Étape 3 terminée avec succès.');
+      navigate('/dashboard', {
+        state: {
+          message: 'Configuration des paiements terminée. Votre compte est maintenant prêt.',
+          type: 'success'
+        }
+      });
+    } catch (completionError) {
+      safeLog.error('❌ Erreur finalisation étape 3:', completionError);
+      const message = completionError.message || pageT('genericError');
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!effectiveUser) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -169,10 +231,10 @@ const PaymentVerificationPage = () => {
               <span className="text-4xl mr-4">👋</span>
               <div className="text-left">
                 <p className="text-lg font-semibold text-blue-900">
-                  {pageT('welcome', { firstName: userData.first_name, lastName: userData.last_name })}
+                  {pageT('welcome', { firstName: effectiveUser.first_name, lastName: effectiveUser.last_name })}
                 </p>
                 <p className="text-blue-700">
-                  {pageT('accountType')}: <span className="font-medium">{getUserTypeLabel(userData.user_type)}</span>
+                  {pageT('accountType')}: <span className="font-medium">{getUserTypeLabel(effectiveUser.user_type)}</span>
                 </p>
               </div>
             </div>
@@ -199,14 +261,16 @@ const PaymentVerificationPage = () => {
 
             <div className="text-sm text-blue-800 space-y-2">
               <p>
-                <strong>{t('lastStep')}:</strong> {t('linkAccountsToComplete')}
+                <strong>{t('lastStep')}:</strong> {isAccountCompletionMode ? 'termine ta configuration de paiement pour débloquer l’accès complet.' : t('linkAccountsToComplete')}
               </p>
               <p>
-                🎯 {userData.user_type === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
+                🎯 {effectiveUser.user_type === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
               </p>
-              <p>
-                📧 {pageT('emailStepNotice')}
-              </p>
+              {!isAccountCompletionMode && (
+                <p>
+                  📧 {pageT('emailStepNotice')}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -244,21 +308,23 @@ const PaymentVerificationPage = () => {
         )}
 
         <PaymentAccountSetup
-          userType={userData.user_type}
-          isRegistration={true}
+          userType={effectiveUser.user_type}
+          isRegistration={isRegistrationFlow}
           initialAccounts={prefilledPaymentAccounts}
-          onComplete={handlePaymentAccountsComplete}
+          onComplete={isRegistrationFlow ? handleRegistrationCompletion : handleExistingAccountCompletion}
         />
 
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => navigate('/email-verification', { state: { userData, paymentAccounts: prefilledPaymentAccounts, emailVerificationToken } })}
-            disabled={loading}
-            className="text-orange-600 hover:text-orange-700 text-sm font-medium disabled:opacity-50"
-          >
-            {pageT('backToRegister')}
-          </button>
-        </div>
+        {isRegistrationFlow && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => navigate('/email-verification', { state: { userData: routedUserData, paymentAccounts: prefilledPaymentAccounts, emailVerificationToken } })}
+              disabled={loading}
+              className="text-orange-600 hover:text-orange-700 text-sm font-medium disabled:opacity-50"
+            >
+              {pageT('backToRegister')}
+            </button>
+          </div>
+        )}
 
         <div className="mt-12 bg-gray-50 border border-gray-200 rounded-lg p-6">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
