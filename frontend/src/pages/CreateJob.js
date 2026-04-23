@@ -6,7 +6,7 @@ import { jobsAPI } from '../services/api';
 import { getCountryByCode } from '../services/geolocationService';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
-import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, normalizeLocationPayload } from '../utils/locationMaps';
+import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, getLocationPrecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
 
 export default function CreateJob() {
   const { user } = useAuth();
@@ -164,6 +164,14 @@ export default function CreateJob() {
   const showMechanicBlock = ['general', 'plumbing', 'electrical', 'mechanics'].includes(formData.category);
   const locationCoordinates = getLocationCoordinates(locationDetails);
   const locationPreviewUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(locationDetails) : '';
+  const locationPrecisionMeta = getLocationPrecisionMeta(locationDetails, currentLanguage);
+  const locationToneClasses = locationPrecisionMeta.tone === 'green'
+    ? { panel: 'border-green-200 bg-green-50', badge: 'bg-green-100 text-green-800', title: 'text-green-900', text: 'text-green-700' }
+    : locationPrecisionMeta.tone === 'amber'
+      ? { panel: 'border-amber-200 bg-amber-50', badge: 'bg-amber-100 text-amber-800', title: 'text-amber-900', text: 'text-amber-700' }
+      : locationPrecisionMeta.tone === 'blue'
+        ? { panel: 'border-blue-200 bg-blue-50', badge: 'bg-blue-100 text-blue-800', title: 'text-blue-900', text: 'text-blue-700' }
+        : { panel: 'border-gray-200 bg-gray-50', badge: 'bg-gray-200 text-gray-800', title: 'text-gray-900', text: 'text-gray-700' };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -264,14 +272,14 @@ export default function CreateJob() {
                 </div>
 
                 {locationCoordinates && locationPreviewUrl && (
-                  <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                  <div className={`rounded-xl border p-4 ${locationToneClasses.panel}`}>
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div>
-                        <p className="text-sm font-semibold text-green-900">{pageT('preciseLocationReady')}</p>
-                        <p className="text-xs text-green-700">{pageT('preciseLocationHelp')}</p>
+                        <p className={`text-sm font-semibold ${locationToneClasses.title}`}>{pageT('preciseLocationReady')}</p>
+                        <p className={`text-xs ${locationToneClasses.text}`}>{pageT('preciseLocationHelp')}</p>
                       </div>
-                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
-                        GPS
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${locationToneClasses.badge}`}>
+                        {locationPrecisionMeta.label}
                       </span>
                     </div>
                     <div className="mt-3 overflow-hidden rounded-lg border border-green-200 bg-white h-60">
@@ -283,7 +291,7 @@ export default function CreateJob() {
                         referrerPolicy="no-referrer-when-downgrade"
                       />
                     </div>
-                    <p className="mt-2 text-xs text-green-700">
+                    <p className={`mt-2 text-xs ${locationToneClasses.text}`}>
                       {pageT('coordinatesSaved', {
                         lat: locationCoordinates.lat.toFixed(6),
                         lng: locationCoordinates.lng.toFixed(6)

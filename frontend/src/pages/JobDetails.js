@@ -111,6 +111,14 @@ export default function JobDetails() {
     ? buildOpenStreetMapPageUrl(normalizedLocation)
     : buildGoogleMapsPlaceUrl(normalizedLocation);
   const embeddedMapUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(normalizedLocation) : '';
+  const locationPrecisionMeta = getLocationPrecisionMeta(normalizedLocation, currentLanguage);
+  const mapToneClasses = locationPrecisionMeta.tone === 'green'
+    ? { panel: 'border-green-200 bg-green-50', badge: 'bg-green-100 text-green-800', text: 'text-green-700' }
+    : locationPrecisionMeta.tone === 'amber'
+      ? { panel: 'border-amber-200 bg-amber-50', badge: 'bg-amber-100 text-amber-800', text: 'text-amber-700' }
+      : locationPrecisionMeta.tone === 'blue'
+        ? { panel: 'border-blue-200 bg-blue-50', badge: 'bg-blue-100 text-blue-800', text: 'text-blue-700' }
+        : { panel: 'border-gray-200 bg-gray-50', badge: 'bg-gray-200 text-gray-800', text: 'text-gray-700' };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -206,7 +214,10 @@ export default function JobDetails() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
-                <span className="text-gray-700">{locationLabel || t('locationNotSpecified')}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-gray-700">{locationLabel || t('locationNotSpecified')}</span>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${mapToneClasses.badge}`}>{locationPrecisionMeta.label}</span>
+                </div>
               </div>
 
               {job.deadline && (
@@ -225,27 +236,26 @@ export default function JobDetails() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-1">{pageT('mapTitle')}</h3>
                 <p className="text-sm text-gray-600">
-                  {locationCoordinates ? pageT('mapSubtitlePrecise') : pageT('mapSubtitleApproximate')}
+                  {locationPrecisionMeta.isPrecise ? pageT('mapSubtitlePrecise') : pageT('mapSubtitleApproximate')}
                 </p>
               </div>
-              {locationCoordinates && (
-                <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
-                  GPS
-                </span>
-              )}
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${mapToneClasses.badge}`}>
+                {locationPrecisionMeta.label}
+              </span>
             </div>
 
-            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className={`mt-4 rounded-lg border p-4 ${mapToneClasses.panel}`}>
               <p className="text-sm font-medium text-gray-900">{locationLabel || t('locationNotSpecified')}</p>
+              <p className={`mt-1 text-xs font-semibold ${mapToneClasses.text}`}>{locationPrecisionMeta.label}</p>
               {locationCoordinates ? (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className={`mt-1 text-xs ${mapToneClasses.text}`}>
                   {pageT('coordinatesValue', {
                     lat: locationCoordinates.lat.toFixed(6),
                     lng: locationCoordinates.lng.toFixed(6)
                   })}
                 </p>
               ) : (
-                <p className="mt-1 text-xs text-gray-500">{pageT('mapFallbackHelp')}</p>
+                <p className={`mt-1 text-xs ${mapToneClasses.text}`}>{pageT('mapFallbackHelp')}</p>
               )}
             </div>
 
