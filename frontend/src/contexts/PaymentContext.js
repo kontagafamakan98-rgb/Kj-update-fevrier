@@ -157,9 +157,6 @@ export function PaymentProvider({ children }) {
     };
 
     try {
-      // Simuler un délai de traitement
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
       // Simuler succès (90% de chance de succès)
       if (Math.random() > 0.1) {
         paymentData.status = 'success';

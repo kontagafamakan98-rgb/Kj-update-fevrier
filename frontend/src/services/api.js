@@ -296,6 +296,18 @@ export const usersAPI = {
 };
 
 /**
+ * Real payments API endpoints
+ */
+export const paymentAPI = {
+  getConfig: () => api.get('/payments/config'),
+  getQuote: (data) => api.post('/payments/quote', data),
+  createCheckout: (data) => api.post('/payments/checkout', data),
+  getPaymentStatus: (paymentId) => api.get(`/payments/status/${paymentId}`),
+  getPaymentStatusByToken: (invoiceToken) => api.get(`/payments/status/token/${invoiceToken}`),
+  getMyPayments: () => api.get('/payments/my'),
+};
+
+/**
  * Messages API endpoints
  */
 export const messagesAPI = {
