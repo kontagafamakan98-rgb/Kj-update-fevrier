@@ -40,6 +40,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
     { value: 'plumbing', label: t('plumbing') },
     { value: 'electrical', label: t('electrical') },
     { value: 'construction', label: t('construction') },
+    { value: 'carpentry', label: t('carpentry') },
     { value: 'cleaning', label: t('cleaning') },
     { value: 'gardening', label: t('gardening') },
     { value: 'tutoring', label: t('tutoring') },

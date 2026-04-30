@@ -39,6 +39,7 @@ export default function CreateJob() {
     { value: 'painting', label: pageT('categoryPainting') },
     { value: 'cleaning', label: pageT('categoryCleaning') },
     { value: 'construction', label: pageT('categoryConstruction') },
+    { value: 'carpentry', label: pageT('categoryCarpentry') },
     { value: 'gardening', label: pageT('categoryGardening') },
     { value: 'mechanics', label: pageT('categoryMechanics') }
   ];

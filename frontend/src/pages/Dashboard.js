@@ -12,7 +12,8 @@ import {
   PlusCircle,
   Sparkles,
   Wrench,
-  Zap
+  Zap,
+  PanelsTopLeft
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -113,6 +114,7 @@ export default function Dashboard() {
     { key: 'electrical', icon: Zap },
     { key: 'mechanics', icon: Briefcase },
     { key: 'construction', icon: Hammer },
+    { key: 'carpentry', icon: PanelsTopLeft },
     { key: 'cleaning', icon: Sparkles },
     { key: 'gardening', icon: Leaf },
     { key: 'tutoring', icon: GraduationCap },
