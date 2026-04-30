@@ -33,6 +33,8 @@ export default function Register() {
     // Champs spécifiques aux travailleurs
     worker_specialties: [],
     worker_experience_years: null,
+    legal_documents_accepted: false,
+    legal_documents_version: 'privacy-cgu-fusionnees-2026-04-30'
 
   });
   const [error, setError] = useState('');
@@ -51,6 +53,7 @@ export default function Register() {
   const pageT = makeScopedTranslator(currentLanguage, t, 'register');
   const toast = useToast();
   const navigate = useNavigate();
+  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
 
   const countries = getCountriesList();
 
@@ -220,6 +223,15 @@ export default function Register() {
 
     }
 
+    if (!formData.legal_documents_accepted) {
+      const errorMsg = pageT('legalConsentRequired');
+      setError(errorMsg);
+      setErrorKey('');
+      toast.error(errorMsg);
+      setLoading(false);
+      return;
+    }
+
     const emailAvailable = await checkEmailAvailability(formData.email);
     if (!emailAvailable) {
       setLoading(false);
@@ -230,6 +242,7 @@ export default function Register() {
     const userData = {
       ...formData,
       preferred_language: userSelectedLanguage, // Utiliser la langue choisie par l'utilisateur
+      legal_documents_accepted_at: new Date().toISOString(),
       // Ajouter la photo si sélectionnée
       profile_photo_base64: profilePhoto?.base64 || null
     };
@@ -258,7 +271,7 @@ export default function Register() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
 
     if (name === 'email') {
       setEmailAvailability(null);
@@ -268,7 +281,7 @@ export default function Register() {
       }
     }
 
-    updateFormData(name, value);
+    updateFormData(name, type === 'checkbox' ? checked : value);
   };
 
   const updateFormData = (key, value) => {
@@ -635,6 +648,33 @@ export default function Register() {
               setErrors={() => {}}
             />
           )}
+
+          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-orange-900">📜 {pageT('legalNoticeTitle')}</h3>
+              <p className="text-xs text-orange-800 mt-1">{pageT('legalConsentHelp')}</p>
+            </div>
+            <a
+              href={legalDocumentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
+            >
+              {pageT('legalConsentLink')}
+            </a>
+            <label htmlFor="legal_documents_accepted" className="flex items-start gap-3 cursor-pointer">
+              <input
+                id="legal_documents_accepted"
+                name="legal_documents_accepted"
+                type="checkbox"
+                checked={formData.legal_documents_accepted}
+                onChange={handleChange}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <span className="text-sm text-gray-700">{pageT('legalConsentLabel')}</span>
+            </label>
+            <p className="text-xs text-gray-600">{pageT('legalContactLine')}</p>
+          </div>
 
           <div>
             <LoadingButton
