@@ -249,6 +249,7 @@ const translations = {
     gardening: 'Jardinage',
     tutoring: 'Tutorat',
     mechanics: 'Mécanique',
+    carpentry: 'Menuiserie',
     computing: 'Informatique',
     
     // Payments
@@ -697,6 +698,7 @@ const translations = {
     gardening: 'Gardening',
     tutoring: 'Tutoring',
     mechanics: 'Mechanics',
+    carpentry: 'Carpentry',
     computing: 'Computing',
     
     // Payments
@@ -1138,6 +1140,7 @@ const translations = {
     gardening: 'Jàng',
     tutoring: 'Jàngale',
     mechanics: 'Màkina',
+    carpentry: 'Menuiserie',
     computing: 'Ordinatër',
     
     // Payments
@@ -1582,6 +1585,7 @@ const translations = {
     gardening: 'Nakɔ baara',
     tutoring: 'Kalan',
     mechanics: 'Mɔbili baara',
+    carpentry: 'Menuiserie',
     computing: 'Ɔridinatɛri baara',
     
     // Payments
@@ -2025,6 +2029,7 @@ const translations = {
     gardening: 'Zãng tʋʋmã',
     tutoring: 'Zãmsg tʋʋmã',
     mechanics: 'Moto tʋʋmã',
+    carpentry: 'Menuiserie',
     computing: 'Ɔrdinatɛɛr tʋʋmã',
     
     // Payments
