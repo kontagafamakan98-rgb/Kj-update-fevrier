@@ -374,6 +374,9 @@ class User(BaseModel):
     user_type: UserType
     country: Country
     preferred_language: Language
+    legal_documents_accepted: bool = Field(default=False)
+    legal_documents_accepted_at: Optional[datetime] = None
+    legal_documents_version: Optional[str] = Field(default=None, max_length=120)
     
     @validator('phone')
     def validate_phone(cls, v):
@@ -542,6 +545,9 @@ class UserRegister(BaseModel):
     user_type: UserType
     country: Country
     preferred_language: Language
+    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité + CGU fusionnées")
+    legal_documents_accepted_at: Optional[datetime] = None
+    legal_documents_version: str = Field(min_length=5, max_length=120)
     
     @validator('password')
     def password_must_be_strong(cls, v):
@@ -561,6 +567,12 @@ class UserRegister(BaseModel):
     def names_no_injection(cls, v):
         if SQL_INJECTION_PATTERN.search(v):
             raise ValueError("Le nom contient des caractères non autorisés")
+        return v
+
+    @validator('legal_documents_accepted')
+    def legal_documents_must_be_accepted(cls, v):
+        if v is not True:
+            raise ValueError("L'acceptation de la Politique de confidentialité + CGU fusionnées est obligatoire")
         return v
 
 class PaymentAccount(BaseModel):
@@ -586,6 +598,9 @@ class UserWithPayment(BaseModel):
     user_type: UserType
     country: Country
     preferred_language: Language
+    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité + CGU fusionnées")
+    legal_documents_accepted_at: Optional[datetime] = None
+    legal_documents_version: str = Field(min_length=5, max_length=120)
     payment_accounts: PaymentAccount
     email_verification_token: str = Field(min_length=20, description="Jeton de vérification email")
     
@@ -593,6 +608,12 @@ class UserWithPayment(BaseModel):
     def password_must_be_strong(cls, v):
         if not v or len(v.strip()) < 6:
             raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        return v
+
+    @validator('legal_documents_accepted')
+    def legal_documents_must_be_accepted(cls, v):
+        if v is not True:
+            raise ValueError("L'acceptation de la Politique de confidentialité + CGU fusionnées est obligatoire")
         return v
     # Informations spécifiques aux travailleurs (optionnelles)
     worker_specialties: Optional[List[str]] = None
@@ -1516,6 +1537,9 @@ async def register_user_verified(user_data: UserWithPayment):
                 user_type=user_data.user_type,
                 country=user_data.country,
                 preferred_language=user_data.preferred_language,
+                legal_documents_accepted=user_data.legal_documents_accepted,
+                legal_documents_accepted_at=user_data.legal_documents_accepted_at,
+                legal_documents_version=user_data.legal_documents_version,
                 profile_photo=profile_photo_path,  # Ajouter le chemin de la photo
                 is_verified=payment_validation["is_verified"],
                 email_verified=True,
