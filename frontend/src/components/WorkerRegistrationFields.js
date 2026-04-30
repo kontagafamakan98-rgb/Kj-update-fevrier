@@ -12,7 +12,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
     electrical: ['Installation électrique', 'Dépannage électrique', 'Câblage', 'Tableau électrique', 'Éclairage'],
     construction: ['Maçonnerie', 'Carrelage', 'Peinture', 'Toiture', 'Coffrage'],
     carpentry: ['Fabrication de meubles', 'Pose de portes', 'Pose de fenêtres', 'Menuiserie aluminium', 'Menuiserie bois', 'Placards et dressings', 'Cuisine sur mesure', 'Escaliers en bois', 'Finition et vernissage', 'Réparation de meubles'],
-    computing: ['Réparation PC', 'Installation logiciels', 'Réseaux', 'Maintenance', 'Formation'],
+    computing: ['Réparation PC', 'Installation logiciels', 'Réseaux', 'Maintenance', 'Formation', 'Réparation téléphone Android', 'Réparation iPhone', 'Changement écran téléphone', 'Changement batterie téléphone', 'Changement connecteur de charge', 'Changement vitre arrière', 'Changement caméra téléphone', 'Changement haut-parleur téléphone', 'Changement micro téléphone', 'Réparation carte mère téléphone', 'Désoxydation téléphone', 'Déblocage logiciel téléphone', 'Mise à jour logicielle téléphone', 'Flashage téléphone', 'Récupération de données téléphone'],
     gardening: ['Entretien jardin', 'Élagage', 'Plantation', 'Arrosage automatique', 'Paysagisme'],
     tutoring: ['Mathématiques', 'Français', 'Anglais', 'Sciences', 'Histoire-Géographie', 'Physique-Chimie', 'Informatique scolaire', 'Aide aux devoirs', 'Préparation examens', 'Soutien scolaire']
   };
