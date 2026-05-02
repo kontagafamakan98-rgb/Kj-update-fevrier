@@ -826,7 +826,7 @@ pages.register = {
     legalNoticeTitle: 'Documents obligatoires',
     legalConsentHelp: 'L’adhésion à la Politique de confidentialité + CGU fusionnées est obligatoire pour tous les clients et travailleurs.',
     legalConsentLink: 'Lire la Politique de confidentialité',
-    legalConsentLabel: 'J’ai lu et j’accepte la Politique de confidentialité et CGU fusionnées de KOJO avant de créer mon compte.',
+    legalConsentLabel: 'J’ai lu et j’accepte la Politique de confidentialité et les CGU de KOJO avant de créer mon compte.',
     legalConsentRequired: 'Vous devez accepter la Politique de confidentialité + CGU fusionnées pour vous inscrire',
     legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
   },
@@ -852,7 +852,7 @@ pages.register = {
     legalNoticeTitle: 'Required documents',
     legalConsentHelp: 'Acceptance of the merged Privacy Policy + Terms is required for all clients and workers.',
     legalConsentLink: 'Read the Privacy Policy',
-    legalConsentLabel: 'I have read and accept KOJO’s merged Privacy Policy and Terms before creating my account.',
+    legalConsentLabel: 'I have read and accept KOJO’s Privacy Policy and Terms before creating my account.',
     legalConsentRequired: 'You must accept the merged Privacy Policy + Terms to sign up',
     legalContactLine: 'Privacy contact: +18193003507 · Email: Kojoapp98@gmail.com · Address: Hamdallaye Aci 2000 Bamako Mali'
   }
@@ -877,7 +877,7 @@ pages.register.wo = withBase(pages.register.fr, {
   legalNoticeTitle: 'Kaye yu war',
   legalConsentHelp: 'War na klient ak liggéeykat bépp n nangu Politique de confidentialité + CGU fusionnées ngir bindu.',
   legalConsentLink: 'Jàng Politique de confidentialité',
-  legalConsentLabel: 'Jàng naa te nangu naa Politique de confidentialité ak CGU fusionnées bu KOJO bala ma sos sama konto.',
+  legalConsentLabel: 'Jàng naa te nangu naa Politique de confidentialité ak CGU yu KOJO bala ma sos sama konto.',
   legalConsentRequired: 'War nga nangu Politique de confidentialité + CGU fusionnées ngir bindu',
   legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
 });
@@ -901,7 +901,7 @@ pages.register.bm = withBase(pages.register.fr, {
   legalNoticeTitle: 'Sɛbɛnw wajibuw',
   legalConsentHelp: 'Kiliyanw ni baarakɛlaw bɛɛ ka kan ka Politique de confidentialité + CGU fusionnées minnu lajɛ ani k’a sɔn ka konto da.',
   legalConsentLink: 'Politique de confidentialité kalan',
-  legalConsentLabel: 'N b’a kalan k’a sɔn ko KOJO ka Politique de confidentialité ani CGU fusionnées ye sani n ka n konto da.',
+  legalConsentLabel: 'N b’a kalan k’a sɔn ko KOJO ka Politique de confidentialité ani CGU ye sani n ka n konto da.',
   legalConsentRequired: 'I ka kan ka Politique de confidentialité + CGU fusionnées sɔn walasa ka tɔgɔ sɛbɛn',
   legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
 });
@@ -925,7 +925,7 @@ pages.register.mos = withBase(pages.register.fr, {
   legalNoticeTitle: 'Sɛb-rãmba sẽn kɛ',
   legalConsentHelp: 'Daab-rãmba la tʋʋm-neba fãa segd n sak Politique de confidentialité + CGU fusionnées yĩnga f b na n gʋls konto.',
   legalConsentLink: 'Karem Politique de confidentialité',
-  legalConsentLabel: 'M karame la m sakame KOJO Politique de confidentialité ne CGU fusionnées yĩnga bala m maan konto.',
+  legalConsentLabel: 'M karame la m sakame KOJO Politique de confidentialité ne CGU yĩnga bala m maan konto.',
   legalConsentRequired: 'F segd n sak Politique de confidentialité + CGU fusionnées yĩnga f n gʋls konto',
   legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
 });
