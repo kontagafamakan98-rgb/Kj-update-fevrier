@@ -3183,6 +3183,7 @@ allowed_origins = WEST_AFRICA_ORIGINS + env_origins
 # Support public Vercel deployments and common development/private network origins.
 # Exact origins from CORS_ORIGINS remain supported via allow_origins.
 TRUSTED_HOSTS = build_trusted_hosts()
+ENABLE_TRUSTED_HOST_MIDDLEWARE = os.environ.get('ENABLE_TRUSTED_HOST_MIDDLEWARE', '').strip().lower() in {'1', 'true', 'yes', 'on'}
 allowed_origin_regex = (
     r"^https://.*\.vercel\.app$"
     r"|^http://localhost(:\d+)?$"
@@ -3212,11 +3213,13 @@ app.add_middleware(
     max_age=86400,
 )
 
-# Trusted Host Middleware for security
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=TRUSTED_HOSTS
-)
+# Trusted Host Middleware can break Render/Vercel auth flows when platform hostnames rotate.
+# Keep it opt-in via environment flag so production can enable it deliberately.
+if ENABLE_TRUSTED_HOST_MIDDLEWARE:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=TRUSTED_HOSTS
+    )
 
 # Add custom security middleware
 app.add_middleware(WestAfricaSecurityMiddleware)
