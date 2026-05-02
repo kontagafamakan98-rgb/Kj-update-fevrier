@@ -105,6 +105,66 @@ function MobileLoader() {
   );
 }
 
+function LegalFooter() {
+  const { currentLanguage } = useLanguage();
+  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
+  const copy = {
+    fr: {
+      legal: 'Politique de confidentialité + CGU fusionnées',
+      contact: 'Contact confidentialité',
+      addressLabel: 'Adresse'
+    },
+    en: {
+      legal: 'Merged Privacy Policy + Terms',
+      contact: 'Privacy contact',
+      addressLabel: 'Address'
+    },
+    wo: {
+      legal: 'Politique de confidentialité + CGU fusionnées',
+      contact: 'Contact confidentialité',
+      addressLabel: 'Adresse'
+    },
+    bm: {
+      legal: 'Politique de confidentialité + CGU fusionnées',
+      contact: 'Contact confidentialité',
+      addressLabel: 'Adresse'
+    },
+    mos: {
+      legal: 'Politique de confidentialité + CGU fusionnées',
+      contact: 'Contact confidentialité',
+      addressLabel: 'Adresse'
+    }
+  };
+  const labels = copy[currentLanguage] || copy.fr;
+
+  return (
+    <footer className="border-t border-orange-100 bg-white/95 backdrop-blur-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-sm">
+        <div className="text-gray-600 space-y-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-medium text-gray-800">Kojo</span>
+            <span>•</span>
+            <a href="tel:+18193003507" className="hover:text-orange-600">+18193003507</a>
+            <span>•</span>
+            <a href="mailto:Kojoapp98@gmail.com" className="hover:text-orange-600">Kojoapp98@gmail.com</a>
+          </div>
+          <div className="text-xs text-gray-500">
+            {labels.addressLabel} : Hamdallaye Aci 2000 Bamako Mali
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 text-orange-700">
+          <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
+            {labels.legal}
+          </a>
+          <a href="mailto:Kojoapp98@gmail.com?subject=Contact%20confidentialit%C3%A9%20KOJO" className="hover:text-orange-800 underline underline-offset-2">
+            {labels.contact}
+          </a>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 function AppRoutes() {
   const [pwaReady, setPwaReady] = useState(false);
   const { user } = useAuth();
@@ -214,6 +274,8 @@ function AppRoutes() {
           </Routes>
         </Suspense>
       </main>
+
+      <LegalFooter />
       
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav />

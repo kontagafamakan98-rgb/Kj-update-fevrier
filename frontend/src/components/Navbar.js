@@ -1,16 +1,24 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { isPWA } from '../utils/pwa';
 import LanguageSelector from './LanguageSelector';
-import logger from '../utils/logger';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { t, changeLanguage, currentLanguage } = useLanguage();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
+  const legalLabels = {
+    fr: { legal: 'CGU + Confidentialité', contact: 'Contact confidentialité' },
+    en: { legal: 'Privacy + Terms', contact: 'Privacy contact' },
+    wo: { legal: 'CGU + Confidentialité', contact: 'Contact confidentialité' },
+    bm: { legal: 'CGU + Confidentialité', contact: 'Contact confidentialité' },
+    mos: { legal: 'CGU + Confidentialité', contact: 'Contact confidentialité' }
+  };
+  const currentLegalLabels = legalLabels[currentLanguage] || legalLabels.fr;
 
   const handleLogout = () => {
     logout();
@@ -71,6 +79,15 @@ export default function Navbar() {
 
           {/* Right side - Desktop */}
           <div className="hidden md:flex items-center space-x-4">
+            <a
+              href={legalDocumentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-orange-700 hover:text-orange-800 px-3 py-2 rounded-md text-sm font-medium transition-colors underline underline-offset-2"
+            >
+              {currentLegalLabels.legal}
+            </a>
+
             {/* Language Selector */}
             <LanguageSelector 
               showDropdown={true} 
@@ -148,6 +165,7 @@ export default function Navbar() {
                 <option value="en">English</option>
                 <option value="wo">Wolof</option>
                 <option value="bm">Bambara</option>
+                <option value="mos">Mooré</option>
               </select>
             </div>
 
@@ -189,6 +207,22 @@ export default function Navbar() {
                     {t('logout')}
                   </button>
                 </div>
+                <div className="border-t border-gray-200 pt-3 mt-3 px-3 space-y-2">
+                  <a
+                    href={legalDocumentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-sm font-medium text-orange-700 hover:text-orange-800 underline underline-offset-2"
+                  >
+                    {currentLegalLabels.legal}
+                  </a>
+                  <a
+                    href="mailto:Kojoapp98@gmail.com?subject=Contact%20confidentialit%C3%A9%20KOJO"
+                    className="block text-sm text-gray-600 hover:text-orange-700"
+                  >
+                    {currentLegalLabels.contact}
+                  </a>
+                </div>
               </>
             ) : (
               <>
@@ -206,6 +240,22 @@ export default function Navbar() {
                 >
                   {t('register')}
                 </Link>
+                <div className="border-t border-gray-200 pt-3 mt-3 px-3 space-y-2">
+                  <a
+                    href={legalDocumentUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-sm font-medium text-orange-700 hover:text-orange-800 underline underline-offset-2"
+                  >
+                    {currentLegalLabels.legal}
+                  </a>
+                  <a
+                    href="mailto:Kojoapp98@gmail.com?subject=Contact%20confidentialit%C3%A9%20KOJO"
+                    className="block text-sm text-gray-600 hover:text-orange-700"
+                  >
+                    {currentLegalLabels.contact}
+                  </a>
+                </div>
               </>
             )}
           </div>
