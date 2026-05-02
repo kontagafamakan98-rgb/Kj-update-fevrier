@@ -823,12 +823,12 @@ pages.register = {
     duplicateEmailError: 'Cette adresse email est déjà utilisée',
     emailAvailable: 'Adresse email disponible',
     checkingEmail: 'Vérification de cette adresse email...',
-    legalNoticeTitle: 'Documents obligatoires',
-    legalConsentHelp: 'L’adhésion à la Politique de confidentialité et aux conditions d’utilisation est obligatoire pour tous les clients et travailleurs.',
-    legalConsentLink: 'Lire la Politique de confidentialité',
+    legalNoticeTitle: 'Informations légales',
+    legalConsentHelp: 'Pour créer un compte, vous devez accepter la Politique de confidentialité et les conditions d’utilisation.',
+    legalConsentLink: 'Lire la politique de confidentialité',
     legalConsentLabel: 'J’ai lu et j’accepte la Politique de confidentialité et les conditions d’utilisation de KOJO avant de créer mon compte.',
     legalConsentRequired: 'Vous devez accepter la Politique de confidentialité et les conditions d’utilisation pour vous inscrire',
-    legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+    legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
   },
   en: {
     title: 'Create an account',
@@ -849,12 +849,12 @@ pages.register = {
     duplicateEmailError: 'This email address is already in use',
     emailAvailable: 'Email address available',
     checkingEmail: 'Checking this email address...',
-    legalNoticeTitle: 'Required documents',
-    legalConsentHelp: 'Acceptance of the Privacy Policy and Terms is required for all clients and workers.',
-    legalConsentLink: 'Read the Privacy Policy',
+    legalNoticeTitle: 'Legal information',
+    legalConsentHelp: 'To create an account, you must accept the Privacy Policy and Terms.',
+    legalConsentLink: 'Read the privacy policy',
     legalConsentLabel: 'I have read and accept KOJO’s Privacy Policy and Terms before creating my account.',
     legalConsentRequired: 'You must accept the Privacy Policy and Terms to sign up',
-    legalContactLine: 'Privacy contact: +18193003507 · Email: Kojoapp98@gmail.com · Address: Hamdallaye Aci 2000 Bamako Mali'
+    legalContactLine: 'KOJO contact: +18193003507 · Email: Kojoapp98@gmail.com · Address: Hamdallaye Aci 2000 Bamako Mali'
   }
 };
 pages.register.wo = withBase(pages.register.fr, {
@@ -874,12 +874,12 @@ pages.register.wo = withBase(pages.register.fr, {
   duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi',
   emailAvailable: 'Adresse email bii japp na',
   checkingEmail: 'Mi ngi saytu adresse email bii...',
-  legalNoticeTitle: 'Kaye yu war',
-  legalConsentHelp: 'War na klient ak liggéeykat bépp n nangu Politique de confidentialité ak conditions d’utilisation ngir bindu.',
+  legalNoticeTitle: 'Xibaar yu am solo',
+  legalConsentHelp: 'Ngir bindu, war nga nangu Politique de confidentialité ak conditions d’utilisation.',
   legalConsentLink: 'Jàng Politique de confidentialité',
   legalConsentLabel: 'Jàng naa te nangu naa Politique de confidentialité ak conditions d’utilisation yu KOJO bala ma sos sama konto.',
   legalConsentRequired: 'War nga nangu Politique de confidentialité ak conditions d’utilisation ngir bindu',
-  legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
 });
 pages.register.bm = withBase(pages.register.fr, {
   title: 'Konto da',
@@ -898,12 +898,12 @@ pages.register.bm = withBase(pages.register.fr, {
   duplicateEmailError: 'Email adɛrɛsi nin bɛ baara kɛ ka bɔyen',
   emailAvailable: 'Email adɛrɛsi nin bɛ se ka kɛ',
   checkingEmail: 'An bɛ email adɛrɛsi nin lajɛ...',
-  legalNoticeTitle: 'Sɛbɛnw wajibuw',
-  legalConsentHelp: 'Kiliyanw ni baarakɛlaw bɛɛ ka kan ka Politique de confidentialité ani conditions d’utilisation minnu lajɛ ani k’a sɔn ka konto da.',
+  legalNoticeTitle: 'Sariya xibaaruw',
+  legalConsentHelp: 'Konto da kama, i ka kan ka Politique de confidentialité ani conditions d’utilisation sɔn.',
   legalConsentLink: 'Politique de confidentialité kalan',
   legalConsentLabel: 'N b’a kalan k’a sɔn ko KOJO ka Politique de confidentialité ani conditions d’utilisation ye sani n ka n konto da.',
   legalConsentRequired: 'I ka kan ka Politique de confidentialité ani conditions d’utilisation sɔn walasa ka tɔgɔ sɛbɛn',
-  legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
 });
 pages.register.mos = withBase(pages.register.fr, {
   title: 'Ning konto',
@@ -922,12 +922,12 @@ pages.register.mos = withBase(pages.register.fr, {
   duplicateEmailError: 'Email adres-kãngã yaa n beoogame',
   emailAvailable: 'Email adres-kãngã yaa yɩɩda',
   checkingEmail: 'B sɩngda n ges email adres-kãngã...',
-  legalNoticeTitle: 'Sɛb-rãmba sẽn kɛ',
-  legalConsentHelp: 'Daab-rãmba la tʋʋm-neba fãa segd n sak Politique de confidentialité ne conditions d’utilisation yĩnga f b na n gʋls konto.',
+  legalNoticeTitle: 'Sariya kibare',
+  legalConsentHelp: 'Konto sẽn gʋls yĩnga, f segd n sak Politique de confidentialité ne conditions d’utilisation.',
   legalConsentLink: 'Karem Politique de confidentialité',
   legalConsentLabel: 'M karame la m sakame KOJO Politique de confidentialité ne conditions d’utilisation yĩnga bala m maan konto.',
   legalConsentRequired: 'F segd n sak Politique de confidentialité ne conditions d’utilisation yĩnga f n gʋls konto',
-  legalContactLine: 'Contact confidentialité : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
 });
 
 pages.paymentDemo = {
