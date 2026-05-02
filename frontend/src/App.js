@@ -156,7 +156,7 @@ function LegalFooter() {
           <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
             {labels.legal}
           </a>
-          <a href="mailto:Kojoapp98@gmail.com?subject=Contact%20confidentialit%C3%A9%20KOJO" className="hover:text-orange-800 underline underline-offset-2">
+          <a href="mailto:Kojoapp98@gmail.com?subject=Contact%20KOJO" className="hover:text-orange-800 underline underline-offset-2">
             {labels.contact}
           </a>
         </div>
