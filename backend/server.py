@@ -244,10 +244,13 @@ def build_trusted_hosts() -> List[str]:
         "localhost",
         "127.0.0.1",
         "*.vercel.app",
+        "*.onrender.com",
+        "onrender.com",
         "kojo-work.preview.emergentagent.com"
     }
 
-    raw_candidates = [FRONTEND_APP_URL, BACKEND_PUBLIC_URL]
+    render_external_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
+    raw_candidates = [FRONTEND_APP_URL, BACKEND_PUBLIC_URL, render_external_host]
     raw_candidates.extend(origin.strip() for origin in os.environ.get('CORS_ORIGINS', '').split(',') if origin.strip())
     raw_candidates.extend(host.strip() for host in os.environ.get('TRUSTED_HOSTS', '').split(',') if host.strip())
 
