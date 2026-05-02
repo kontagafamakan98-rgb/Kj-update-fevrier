@@ -166,6 +166,10 @@ GMAIL_CLIENT_SECRET = os.environ.get('GMAIL_CLIENT_SECRET', '').strip()
 GMAIL_REFRESH_TOKEN = os.environ.get('GMAIL_REFRESH_TOKEN', '').strip()
 GMAIL_SENDER_EMAIL = os.environ.get('GMAIL_SENDER_EMAIL', '').strip()
 GMAIL_SENDER_NAME = os.environ.get('GMAIL_SENDER_NAME', 'KOJO').strip() or 'KOJO'
+GMAIL_TOKEN_REFRESH_RETRIES = max(1, int(os.environ.get('GMAIL_TOKEN_REFRESH_RETRIES', '3')))
+GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS = max(0.5, float(os.environ.get('GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS', '1')))
+GMAIL_ACCESS_TOKEN_SAFETY_SECONDS = max(30, int(os.environ.get('GMAIL_ACCESS_TOKEN_SAFETY_SECONDS', '60')))
+GMAIL_ACCESS_TOKEN_CACHE: Dict[str, Any] = {"access_token": "", "expires_at": 0.0}
 
 # Security Headers for West Africa
 DEFAULT_SECURITY_HEADERS = {
@@ -1157,26 +1161,62 @@ def verify_email_verification_token(token: str, email: str, purpose: str = "sign
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Jeton de vérification email invalide")
 
-def get_gmail_access_token() -> str:
-    token_response = requests.post(
-        "https://oauth2.googleapis.com/token",
-        data={
-            "client_id": GMAIL_CLIENT_ID,
-            "client_secret": GMAIL_CLIENT_SECRET,
-            "refresh_token": GMAIL_REFRESH_TOKEN,
-            "grant_type": "refresh_token"
-        },
-        timeout=15
-    )
+def invalidate_gmail_access_token_cache():
+    GMAIL_ACCESS_TOKEN_CACHE["access_token"] = ""
+    GMAIL_ACCESS_TOKEN_CACHE["expires_at"] = 0.0
 
-    if not token_response.ok:
-        logger.error(f"❌ Gmail token refresh failed: {token_response.text}")
-        raise HTTPException(status_code=502, detail="Impossible d'obtenir un accès Gmail. Vérifiez la configuration OAuth Google.")
 
-    access_token = token_response.json().get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=502, detail="Réponse OAuth Gmail invalide: access_token manquant")
-    return access_token
+def get_gmail_access_token(force_refresh: bool = False) -> str:
+    now_ts = time.time()
+    cached_token = GMAIL_ACCESS_TOKEN_CACHE.get("access_token", "")
+    cached_expires_at = float(GMAIL_ACCESS_TOKEN_CACHE.get("expires_at", 0.0) or 0.0)
+
+    if cached_token and not force_refresh and now_ts < (cached_expires_at - GMAIL_ACCESS_TOKEN_SAFETY_SECONDS):
+        return cached_token
+
+    last_error = ""
+
+    for attempt in range(1, GMAIL_TOKEN_REFRESH_RETRIES + 1):
+        try:
+            token_response = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": GMAIL_CLIENT_ID,
+                    "client_secret": GMAIL_CLIENT_SECRET,
+                    "refresh_token": GMAIL_REFRESH_TOKEN,
+                    "grant_type": "refresh_token"
+                },
+                timeout=15
+            )
+
+            if token_response.ok:
+                token_payload = token_response.json()
+                access_token = token_payload.get("access_token")
+                expires_in = int(token_payload.get("expires_in") or 3600)
+                if access_token:
+                    GMAIL_ACCESS_TOKEN_CACHE["access_token"] = access_token
+                    GMAIL_ACCESS_TOKEN_CACHE["expires_at"] = time.time() + max(300, expires_in)
+                    return access_token
+                last_error = "Réponse OAuth Gmail invalide: access_token manquant"
+            else:
+                last_error = token_response.text or f"HTTP {token_response.status_code}"
+        except requests.RequestException as exc:
+            last_error = str(exc)
+
+        if attempt < GMAIL_TOKEN_REFRESH_RETRIES:
+            sleep_seconds = GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS * attempt
+            logger.warning(
+                "⚠️ Gmail token refresh attempt %s/%s failed, retrying in %.1fs",
+                attempt,
+                GMAIL_TOKEN_REFRESH_RETRIES,
+                sleep_seconds
+            )
+            time.sleep(sleep_seconds)
+
+    invalidate_gmail_access_token_cache()
+    logger.error("❌ Gmail token refresh failed after %s attempts: %s", GMAIL_TOKEN_REFRESH_RETRIES, last_error)
+    raise HTTPException(status_code=502, detail="Impossible d'obtenir un accès Gmail après plusieurs tentatives. Vérifiez la configuration OAuth Google sur Render.")
+
 
 def send_email_via_gmail_api(to_email: str, subject: str, text_body: str, html_body: Optional[str] = None):
     if not gmail_is_configured():
@@ -1195,20 +1235,36 @@ def send_email_via_gmail_api(to_email: str, subject: str, text_body: str, html_b
     message['subject'] = subject
 
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
-    access_token = get_gmail_access_token()
-    gmail_response = requests.post(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-        },
-        json={"raw": raw_message},
-        timeout=20
-    )
+
+    def perform_send(access_token: str):
+        return requests.post(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            },
+            json={"raw": raw_message},
+            timeout=20
+        )
+
+    try:
+        gmail_response = perform_send(get_gmail_access_token())
+    except requests.RequestException as exc:
+        logger.error("❌ Gmail send transport error: %s", exc)
+        raise HTTPException(status_code=502, detail="Transport Gmail indisponible. Réessayez dans un instant.")
+
+    if gmail_response.status_code in (401, 403):
+        logger.warning("⚠️ Gmail send rejected cached token, forcing refresh")
+        invalidate_gmail_access_token_cache()
+        try:
+            gmail_response = perform_send(get_gmail_access_token(force_refresh=True))
+        except requests.RequestException as exc:
+            logger.error("❌ Gmail retry transport error: %s", exc)
+            raise HTTPException(status_code=502, detail="Transport Gmail indisponible. Réessayez dans un instant.")
 
     if not gmail_response.ok:
         logger.error(f"❌ Gmail send failed: {gmail_response.text}")
-        raise HTTPException(status_code=502, detail="Échec d'envoi Gmail. Vérifiez le compte expéditeur, les scopes OAuth et le refresh token.")
+        raise HTTPException(status_code=502, detail="Échec d'envoi Gmail. Vérifiez le compte expéditeur, les scopes OAuth et le refresh token sur Render.")
 
     return gmail_response.json()
 
