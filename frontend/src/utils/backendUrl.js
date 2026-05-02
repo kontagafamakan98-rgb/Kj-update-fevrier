@@ -1,4 +1,5 @@
 const trimTrailingSlashes = (value = '') => String(value || '').replace(/\/+$/, '');
+const DEFAULT_REMOTE_BACKEND_URL = 'https://kojo-backend-03az.onrender.com';
 const ensureLeadingSlash = (value = '') => {
   if (!value) return '';
   return value.startsWith('/') ? value : `/${value}`;
@@ -11,17 +12,17 @@ export const getBackendBaseUrl = () => {
   }
 
   if (typeof window !== 'undefined' && window.location) {
-    const { protocol, hostname, origin, port } = window.location;
+    const { protocol, hostname, port } = window.location;
     const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
 
     if (isLocalHost && port && port !== '8000') {
       return `${protocol}//${hostname}:8000`;
     }
 
-    return trimTrailingSlashes(origin);
+    return DEFAULT_REMOTE_BACKEND_URL;
   }
 
-  return '';
+  return DEFAULT_REMOTE_BACKEND_URL;
 };
 
 export const buildBackendUrl = (path = '') => {
