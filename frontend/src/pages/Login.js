@@ -4,41 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
-import { loadRegistrationFlow } from '../utils/registrationFlowStorage';
+import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
-
-const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
-
-const getPendingRegistrationRedirect = (email) => {
-  const registrationFlow = loadRegistrationFlow();
-  const flowEmail = normalizeEmail(registrationFlow?.userData?.email);
-  const currentEmail = normalizeEmail(email);
-
-  if (!registrationFlow?.userData || !flowEmail || !currentEmail || flowEmail !== currentEmail) {
-    return null;
-  }
-
-  if (registrationFlow.emailVerificationToken) {
-    return {
-      pathname: '/payment-verification',
-      state: {
-        userData: registrationFlow.userData,
-        paymentAccounts: registrationFlow.paymentAccounts || null,
-        emailVerificationToken: registrationFlow.emailVerificationToken,
-        resumeFromLogin: true
-      }
-    };
-  }
-
-  return {
-    pathname: '/email-verification',
-    state: {
-      userData: registrationFlow.userData,
-      paymentAccounts: registrationFlow.paymentAccounts || null,
-      resumeFromLogin: true
-    }
-  };
-};
 
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
@@ -78,17 +45,10 @@ export default function Login() {
     setError('');
     setErrorKey('');
 
-    const pendingRedirect = getPendingRegistrationRedirect(formData.email);
-    if (pendingRedirect) {
-      toast.success('Reprends ton inscription pour finir les étapes restantes.');
-      navigate(pendingRedirect.pathname, { state: pendingRedirect.state });
-      setLoading(false);
-      return;
-    }
-
     const result = await login(formData.email, formData.password);
 
     if (result.success) {
+      clearRegistrationFlow();
       if (requiresRegistrationCompletion(result.user)) {
         toast.success('Termine dabord l’étape 3 pour activer complètement ton compte.');
         navigate('/payment-verification', {

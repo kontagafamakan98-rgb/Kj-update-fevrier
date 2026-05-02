@@ -1,4 +1,5 @@
 const REGISTRATION_FLOW_KEY = 'kojo_registration_flow';
+const REGISTRATION_FLOW_TTL_MS = 6 * 60 * 60 * 1000;
 
 const isBrowser = () => typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
 
@@ -7,7 +8,19 @@ export const loadRegistrationFlow = () => {
 
   try {
     const rawValue = window.sessionStorage.getItem(REGISTRATION_FLOW_KEY);
-    return rawValue ? JSON.parse(rawValue) : null;
+    const parsedValue = rawValue ? JSON.parse(rawValue) : null;
+
+    if (!parsedValue) {
+      return null;
+    }
+
+    const updatedAt = Number(parsedValue.updated_at || 0);
+    if (updatedAt && (Date.now() - updatedAt) > REGISTRATION_FLOW_TTL_MS) {
+      window.sessionStorage.removeItem(REGISTRATION_FLOW_KEY);
+      return null;
+    }
+
+    return parsedValue;
   } catch (error) {
     return null;
   }
