@@ -110,27 +110,27 @@ function LegalFooter() {
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
   const copy = {
     fr: {
-      legal: 'Politique de confidentialité + CGU fusionnées',
+      legal: 'Politique de confidentialité',
       contact: 'Contact confidentialité',
       addressLabel: 'Adresse'
     },
     en: {
-      legal: 'Merged Privacy Policy + Terms',
+      legal: 'Privacy Policy',
       contact: 'Privacy contact',
       addressLabel: 'Address'
     },
     wo: {
-      legal: 'Politique de confidentialité + CGU fusionnées',
+      legal: 'Politique de confidentialité',
       contact: 'Contact confidentialité',
       addressLabel: 'Adresse'
     },
     bm: {
-      legal: 'Politique de confidentialité + CGU fusionnées',
+      legal: 'Politique de confidentialité',
       contact: 'Contact confidentialité',
       addressLabel: 'Adresse'
     },
     mos: {
-      legal: 'Politique de confidentialité + CGU fusionnées',
+      legal: 'Politique de confidentialité',
       contact: 'Contact confidentialité',
       addressLabel: 'Adresse'
     }
