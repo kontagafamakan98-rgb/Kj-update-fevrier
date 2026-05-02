@@ -111,27 +111,27 @@ function LegalFooter() {
   const copy = {
     fr: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact confidentialité',
+      contact: 'Contact KOJO',
       addressLabel: 'Adresse'
     },
     en: {
       legal: 'Privacy Policy',
-      contact: 'Privacy contact',
+      contact: 'KOJO contact',
       addressLabel: 'Address'
     },
     wo: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact confidentialité',
+      contact: 'Contact KOJO',
       addressLabel: 'Adresse'
     },
     bm: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact confidentialité',
+      contact: 'Contact KOJO',
       addressLabel: 'Adresse'
     },
     mos: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact confidentialité',
+      contact: 'Contact KOJO',
       addressLabel: 'Adresse'
     }
   };
