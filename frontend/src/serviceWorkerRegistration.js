@@ -107,8 +107,13 @@ export function unregister() {
 
 // Show update notification to user
 function showUpdateNotification() {
-  // Create a custom notification element
+  const existingNotification = document.getElementById('kojo-sw-update-notification');
+  if (existingNotification) {
+    return;
+  }
+
   const notification = document.createElement('div');
+  notification.id = 'kojo-sw-update-notification';
   notification.style.cssText = `
     position: fixed;
     bottom: 80px;
@@ -127,45 +132,57 @@ function showUpdateNotification() {
     max-width: 90%;
     animation: slideUp 0.3s ease-out;
   `;
-  
-  notification.innerHTML = `
-    <div style="flex: 1;">
-      <div style="font-weight: 600; margin-bottom: 4px;">Mise à jour disponible</div>
-      <div style="font-size: 14px; opacity: 0.9;">Une nouvelle version est prête</div>
-    </div>
-    <button 
-      id="sw-update-btn"
-      style="
-        background: white;
-        color: #ea580c;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-weight: 600;
-        cursor: pointer;
-        font-size: 14px;
-      "
-    >
-      Actualiser
-    </button>
-    <button 
-      id="sw-dismiss-btn"
-      style="
-        background: transparent;
-        color: white;
-        border: 1px solid rgba(255,255,255,0.5);
-        padding: 8px 16px;
-        border-radius: 6px;
-        font-weight: 600;
-        cursor: pointer;
-        font-size: 14px;
-      "
-    >
-      Plus tard
-    </button>
-  `;
 
-  // Add animation keyframes
+  const content = document.createElement('div');
+  content.style.flex = '1';
+
+  const title = document.createElement('div');
+  title.style.fontWeight = '600';
+  title.style.marginBottom = '4px';
+  title.textContent = 'Mise à jour disponible';
+
+  const description = document.createElement('div');
+  description.style.fontSize = '14px';
+  description.style.opacity = '0.9';
+  description.textContent = 'Une nouvelle version est prête';
+
+  content.appendChild(title);
+  content.appendChild(description);
+
+  const refreshButton = document.createElement('button');
+  refreshButton.type = 'button';
+  refreshButton.style.cssText = `
+    background: white;
+    color: #ea580c;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  `;
+  refreshButton.textContent = 'Actualiser';
+  refreshButton.addEventListener('click', () => {
+    window.location.reload();
+  });
+
+  const dismissButton = document.createElement('button');
+  dismissButton.type = 'button';
+  dismissButton.style.cssText = `
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255,255,255,0.5);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  `;
+  dismissButton.textContent = 'Plus tard';
+  dismissButton.addEventListener('click', () => {
+    notification.remove();
+  });
+
   const style = document.createElement('style');
   style.textContent = `
     @keyframes slideUp {
@@ -180,17 +197,9 @@ function showUpdateNotification() {
     }
   `;
   document.head.appendChild(style);
-  
+
+  notification.appendChild(content);
+  notification.appendChild(refreshButton);
+  notification.appendChild(dismissButton);
   document.body.appendChild(notification);
-
-  // Update button click handler
-  document.getElementById('sw-update-btn')?.addEventListener('click', () => {
-    window.location.reload();
-  });
-
-  // Dismiss button click handler
-  document.getElementById('sw-dismiss-btn')?.addEventListener('click', () => {
-    notification.remove();
-  });
-
 }

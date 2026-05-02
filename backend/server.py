@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request, Response, Query
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -30,6 +31,7 @@ import hashlib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
+from urllib.parse import urlparse
 
 # Configure logging for West Africa production
 logging.basicConfig(
@@ -171,7 +173,10 @@ DEFAULT_SECURITY_HEADERS = {
     "X-Frame-Options": "DENY",
     "X-XSS-Protection": "1; mode=block",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(self), microphone=(), camera=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self' https://api.cloudinary.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 }
 
 DOCS_SECURITY_HEADERS = {
@@ -206,17 +211,61 @@ def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: in
     """Vérification simple du rate limiting"""
     now = time.time()
     window_start = now - (window_minutes * 60)
-    
-    # Nettoyer les anciennes entrées
+
     request_counts[client_ip] = [req_time for req_time in request_counts[client_ip] if req_time > window_start]
-    
-    # Vérifier si la limite est dépassée
+
     if len(request_counts[client_ip]) >= max_requests:
         return False
-    
-    # Ajouter la requête actuelle
+
     request_counts[client_ip].append(now)
     return True
+
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+def extract_host_from_url(raw_url: str) -> Optional[str]:
+    if not raw_url:
+        return None
+    candidate = raw_url.strip()
+    if not candidate:
+        return None
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+    parsed = urlparse(candidate)
+    return parsed.hostname
+
+def build_trusted_hosts() -> List[str]:
+    hosts = {
+        "localhost",
+        "127.0.0.1",
+        "*.vercel.app",
+        "kojo-work.preview.emergentagent.com"
+    }
+
+    raw_candidates = [FRONTEND_APP_URL, BACKEND_PUBLIC_URL]
+    raw_candidates.extend(origin.strip() for origin in os.environ.get('CORS_ORIGINS', '').split(',') if origin.strip())
+    raw_candidates.extend(host.strip() for host in os.environ.get('TRUSTED_HOSTS', '').split(',') if host.strip())
+
+    for candidate in raw_candidates:
+        host = extract_host_from_url(candidate)
+        if host:
+            hosts.add(host)
+
+    return sorted(hosts)
+
+def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
+    if path.startswith("/api/auth/email/") or path.startswith("/api/auth/password/"):
+        return ("auth-otp", 12, 5)
+    if path.startswith("/api/auth/login") or path.startswith("/api/auth/register"):
+        return ("auth-session", 20, 5)
+    if path.startswith("/api/owner"):
+        return ("owner", 30, 1)
+    return ("general-api", 240, 1)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -233,14 +282,46 @@ class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
             response.headers[header] = value
 
         response.headers["X-Kojo-Region"] = "west-africa"
-        response.headers["X-Kojo-Version"] = "1.0.0"
+        response.headers["X-Kojo-Version"] = "1.0.1"
+        response.headers["Vary"] = "Origin, Authorization, Accept-Encoding"
 
-        if request.url.path.startswith("/docs") or request.url.path.startswith("/redoc"):
+        path = request.url.path
+        has_auth_header = bool(request.headers.get("authorization"))
+        sensitive_prefixes = ("/api/auth", "/api/users/profile", "/api/messages", "/api/owner")
+
+        if path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/openapi.json"):
             response.headers["Cache-Control"] = "no-store"
-        elif request.url.path.startswith("/api"):
-            response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes cache
+        elif path.startswith("/api"):
+            is_sensitive = any(path.startswith(prefix) for prefix in sensitive_prefixes)
+            if has_auth_header or is_sensitive or request.method not in {"GET", "HEAD", "OPTIONS"}:
+                response.headers["Cache-Control"] = "private, no-store"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=120, stale-while-revalidate=60"
 
         return response
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if not path.startswith("/api"):
+            return await call_next(request)
+
+        bucket_name, max_requests, window_minutes = get_rate_limit_bucket(path)
+        client_ip = get_client_ip(request)
+        scoped_client = f"{client_ip}:{bucket_name}"
+
+        if not rate_limit_check(scoped_client, max_requests=max_requests, window_minutes=window_minutes):
+            retry_after = window_minutes * 60
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={
+                    "detail": "Trop de requêtes. Réessayez dans un instant.",
+                    "bucket": bucket_name
+                },
+                headers={"Retry-After": str(retry_after)}
+            )
+
+        return await call_next(request)
 
 # Fonction pour vérifier si l'utilisateur est le propriétaire
 async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -3086,13 +3167,10 @@ app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS Configuration optimized for West Africa
 WEST_AFRICA_ORIGINS = [
-    "http://localhost:3000",  # Development
-    "https://localhost:3000",  # Development HTTPS
-    "http://127.0.0.1:3000",   # Local development
-    "https://kojo-work.preview.emergentagent.com",  # Production
-    # Add common West African mobile network proxy IPs
-    "http://192.168.*",  # Local networks
-    "http://10.*",       # Private networks
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://kojo-work.preview.emergentagent.com",
 ]
 
 # Get additional origins from environment
@@ -3101,6 +3179,7 @@ allowed_origins = WEST_AFRICA_ORIGINS + env_origins
 
 # Support public Vercel deployments and common development/private network origins.
 # Exact origins from CORS_ORIGINS remain supported via allow_origins.
+TRUSTED_HOSTS = build_trusted_hosts()
 allowed_origin_regex = (
     r"^https://.*\.vercel\.app$"
     r"|^http://localhost(:\d+)?$"
@@ -3132,12 +3211,13 @@ app.add_middleware(
 
 # Trusted Host Middleware for security
 app.add_middleware(
-    TrustedHostMiddleware, 
-    allowed_hosts=["*"]  # In production, specify exact domains
+    TrustedHostMiddleware,
+    allowed_hosts=TRUSTED_HOSTS
 )
 
 # Add custom security middleware
 app.add_middleware(WestAfricaSecurityMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 @app.on_event("startup")
 async def startup_event():

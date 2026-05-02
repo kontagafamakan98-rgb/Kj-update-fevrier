@@ -78,7 +78,7 @@ function OwnerOnlyRoute({ children }) {
     return null;
   }
 
-  if (!user || !OwnerService.isFamakanLoggedIn()) {
+  if (!user || !OwnerService.isOwnerSessionValid(user)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -171,18 +171,11 @@ function AppRoutes() {
   const { t } = useLanguage();
 
   useEffect(() => {
-    // Initialize PWA features
-    const initPWA = async () => {
-      if (isPWASupported()) {
-        // Request notification permission when user is logged in
-        if (user) {
-          await requestNotificationPermission();
-        }
-      }
-      setPwaReady(true);
-    };
+    setPwaReady(true);
 
-    initPWA();
+    if (isPWASupported() && user) {
+      Promise.resolve(requestNotificationPermission()).catch(() => {});
+    }
   }, [user]);
 
   if (!pwaReady) {
@@ -202,7 +195,7 @@ function AppRoutes() {
       <ToastContainer />
 
       {/* Main Content with Suspense for lazy loaded routes */}
-      <main className="pb-16 md:pb-0">
+      <main className="pb-24 md:pb-0">
         <Suspense fallback={<PageLoader message={t('loadingPage')} />}>
           <Routes>
             {/* Public routes - eagerly loaded */}
@@ -254,7 +247,13 @@ function AppRoutes() {
                 <PhotoTest />
               </ProtectedRoute>
             } />
-            <Route path="/photo-debug" element={<PhotoTest />} />
+            <Route path="/photo-debug" element={
+              <ProtectedRoute>
+                <OwnerOnlyRoute>
+                  <PhotoTest />
+                </OwnerOnlyRoute>
+              </ProtectedRoute>
+            } />
             <Route path="/payment-demo" element={
               <ProtectedRoute>
                 <OwnerOnlyRoute>

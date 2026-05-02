@@ -354,12 +354,12 @@ export default function Register() {
               </div>
             )}
             
-            <div className="flex items-center justify-center space-x-4 text-sm">
+            <div className="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
                   1
                 </div>
-                <span className="ml-2 text-orange-600 font-medium">{t('personalInformation')}</span>
+                <span className="ml-2 text-orange-600 font-medium whitespace-nowrap">{t('personalInformation')}</span>
               </div>
 
               <div className="w-12 h-1 bg-gray-200"></div>
@@ -368,7 +368,7 @@ export default function Register() {
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
                   2
                 </div>
-                <span className="ml-2 text-gray-500 font-medium">{pageT('stepEmail')}</span>
+                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT('stepEmail')}</span>
               </div>
 
               <div className="w-12 h-1 bg-gray-200"></div>
@@ -377,7 +377,7 @@ export default function Register() {
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
                   3
                 </div>
-                <span className="ml-2 text-gray-500 font-medium">{pageT('stepPayments')}</span>
+                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT('stepPayments')}</span>
               </div>
             </div>
             
@@ -390,7 +390,7 @@ export default function Register() {
           </div>
         </div>
         
-        <form className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-md" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6 bg-white p-4 sm:p-8 rounded-xl shadow-md" onSubmit={handleSubmit}>
           {displayedError && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
               {displayedError}
@@ -403,7 +403,7 @@ export default function Register() {
               <legend className="block text-sm font-medium text-gray-700 mb-3">
                 {t('userType')}
               </legend>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label
                   htmlFor="user_type_client"
                   className={`relative flex items-center justify-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
@@ -491,7 +491,7 @@ export default function Register() {
             </div>
 
             {/* Names */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-2">
                   {t('firstName')}

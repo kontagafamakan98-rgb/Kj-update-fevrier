@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Briefcase,
@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import OwnerService from '../services/ownerService';
-import PreciseLocationDemo from '../components/PreciseLocationDemo';
+const PreciseLocationDemo = lazy(() => import('../components/PreciseLocationDemo'));
 import { jobsAPI } from '../services/api';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
@@ -41,8 +41,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
-    setIsFamakan(OwnerService.isFamakanLoggedIn());
   }, []);
+
+  useEffect(() => {
+    setIsFamakan(OwnerService.isOwnerSessionValid(user));
+  }, [user]);
 
   const loadDashboardData = async () => {
     try {
@@ -170,23 +173,25 @@ export default function Dashboard() {
           </div>
           <p className="text-sm text-orange-800 mb-4">{t('famakanDescription')}</p>
 
-          <div className="flex flex-wrap gap-4">
-            <Link to="/mobile-test" className="inline-flex items-center px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-md">
+          <div className="flex flex-wrap gap-3">
+            <Link to="/mobile-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors shadow-md">
               📱 {t('testMobileFeatures')}
             </Link>
-            <Link to="/create-job" className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md">
+            <Link to="/create-job" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
               🚀 {t('createJobGPS')}
             </Link>
-            <Link to="/photo-test" className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-md">
+            <Link to="/photo-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-md">
               📷 {t('debugPhotos')}
             </Link>
-            <Link to="/commission-dashboard" className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md">
+            <Link to="/commission-dashboard" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
               💼 {t('commissionDashboard')}
             </Link>
           </div>
 
           <div className="mt-6">
-            <PreciseLocationDemo />
+            <Suspense fallback={<div className="rounded-xl border border-orange-100 bg-white/70 px-4 py-3 text-sm text-orange-700">{pageT('loading')}</div>}>
+              <PreciseLocationDemo />
+            </Suspense>
           </div>
         </div>
       )}
@@ -196,7 +201,7 @@ export default function Dashboard() {
           <h2 className="text-lg font-medium text-gray-900">{t('quickActions')}</h2>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {quickActions.map((action) => {
               const Icon = action.icon;
               return (

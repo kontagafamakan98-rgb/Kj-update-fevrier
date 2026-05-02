@@ -1,18 +1,58 @@
 import { devLog, safeLog } from '../utils/env';
+import { buildApiUrl } from '../utils/backendUrl';
 
 // Service pour les fonctionnalités propriétaire - ACCÈS RESTREINT
 class OwnerService {
   constructor() {
-    this.API_BASE = process.env.REACT_APP_BACKEND_URL + '/api/owner';
+    this.API_BASE = buildApiUrl('/owner');
+  }
+
+  getStoredUser() {
+    try {
+      const rawUser = localStorage.getItem('user');
+      return rawUser ? JSON.parse(rawUser) : null;
+    } catch (error) {
+      safeLog.error('Impossible de lire la session utilisateur:', error);
+      return null;
+    }
+  }
+
+  hasActiveToken() {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return false;
+      const [, payloadSegment] = token.split('.');
+      if (!payloadSegment) return false;
+
+      const normalizedPayload = payloadSegment.replace(/-/g, '+').replace(/_/g, '/');
+      const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
+      const payload = JSON.parse(atob(paddedPayload));
+      if (!payload?.exp) return true;
+      return payload.exp * 1000 > Date.now();
+    } catch (error) {
+      safeLog.error('Impossible de vérifier le token propriétaire:', error);
+      return false;
+    }
+  }
+
+  isOwnerSessionValid(userCandidate = null) {
+    const user = userCandidate || this.getStoredUser();
+    if (!user || !this.hasActiveToken()) {
+      return false;
+    }
+
+    return user.user_type === 'owner'
+      || user.is_owner === true
+      || (Array.isArray(user.permissions) && user.permissions.includes('admin_access'));
   }
 
   // Vérifier les headers d'autorisation
   getAuthHeaders() {
     const token = localStorage.getItem('token');
     if (!token) {
-      throw new Error('Token d\'authentification manquant');
+      throw new Error("Token d'authentification manquant");
     }
-    
+
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -23,7 +63,7 @@ class OwnerService {
   async getCommissionStats() {
     try {
       devLog.info('🔐 Récupération stats commission (propriétaire)...');
-      
+
       const response = await fetch(`${this.API_BASE}/commission-stats`, {
         method: 'GET',
         headers: this.getAuthHeaders()
@@ -39,7 +79,7 @@ class OwnerService {
       const data = await response.json();
       devLog.info('✅ Stats commission récupérées:', data);
       return data;
-      
+
     } catch (error) {
       safeLog.error('❌ Erreur stats commission:', error);
       throw error;
@@ -50,7 +90,7 @@ class OwnerService {
   async getDebugInfo() {
     try {
       devLog.info('🔐 Récupération infos debug (propriétaire)...');
-      
+
       const response = await fetch(`${this.API_BASE}/debug-info`, {
         method: 'GET',
         headers: this.getAuthHeaders()
@@ -66,7 +106,7 @@ class OwnerService {
       const data = await response.json();
       devLog.info('✅ Infos debug récupérées:', data);
       return data;
-      
+
     } catch (error) {
       safeLog.error('❌ Erreur infos debug:', error);
       throw error;
@@ -77,7 +117,7 @@ class OwnerService {
   async getUsersManagement() {
     try {
       devLog.info('🔐 Récupération gestion utilisateurs (propriétaire)...');
-      
+
       const response = await fetch(`${this.API_BASE}/users-management`, {
         method: 'GET',
         headers: this.getAuthHeaders()
@@ -93,7 +133,7 @@ class OwnerService {
       const data = await response.json();
       devLog.info('✅ Gestion utilisateurs récupérée:', data);
       return data;
-      
+
     } catch (error) {
       safeLog.error('❌ Erreur gestion utilisateurs:', error);
       throw error;
@@ -104,7 +144,7 @@ class OwnerService {
   async updateCommissionSettings(settings) {
     try {
       devLog.info('🔐 Mise à jour paramètres commission (propriétaire)...', settings);
-      
+
       const response = await fetch(`${this.API_BASE}/update-commission-settings`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
@@ -121,7 +161,7 @@ class OwnerService {
       const data = await response.json();
       devLog.info('✅ Paramètres commission mis à jour:', data);
       return data;
-      
+
     } catch (error) {
       safeLog.error('❌ Erreur mise à jour commission:', error);
       throw error;
@@ -131,7 +171,6 @@ class OwnerService {
   // Vérifier si l'utilisateur actuel est le propriétaire
   async checkOwnerAccess() {
     try {
-      // Essayer d'accéder aux infos debug pour vérifier les permissions
       await this.getDebugInfo();
       return true;
     } catch (error) {
@@ -140,23 +179,9 @@ class OwnerService {
     }
   }
 
-  // Obtenir le statut propriétaire depuis le localStorage
-  isFamakanLoggedIn() {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return false;
-
-      // Décoder le token JWT (simple, sans vérification de signature)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const isFamakan = payload.sub === 'famakan_kontaga_master_2024' && payload.email === 'kontagamakan@gmail.com';
-      
-      devLog.info('🔍 Vérification Famakan Kontaga Master:', isFamakan ? '✅ FAMAKAN KONTAGA MASTER' : '👤 Utilisateur normal');
-      return isFamakan;
-      
-    } catch (error) {
-      safeLog.error('Erreur vérification Famakan:', error);
-      return false;
-    }
+  // Compatibilité ascendante
+  isFamakanLoggedIn(userCandidate = null) {
+    return this.isOwnerSessionValid(userCandidate);
   }
 }
 
