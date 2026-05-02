@@ -1,8 +1,9 @@
 {
+  "framework": "vite",
+  "installCommand": "npm install --prefix frontend",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "frontend/build",
   "rewrites": [
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
