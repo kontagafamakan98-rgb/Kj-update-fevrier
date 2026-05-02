@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
 import { loadRegistrationFlow } from '../utils/registrationFlowStorage';
+import { makeScopedTranslator } from '../utils/pack2PageI18n';
 
 const normalizeEmail = (value = '') => String(value || '').trim().toLowerCase();
 
@@ -68,6 +69,8 @@ export default function Login() {
   };
   const forgotPasswordLabel = forgotPasswordLabelMap[currentLanguage] || forgotPasswordLabelMap.fr;
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
+  const pageT = makeScopedTranslator(currentLanguage, t, 'register');
+  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -192,6 +195,19 @@ export default function Login() {
             >
               {t('login')}
             </LoadingButton>
+          </div>
+
+          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
+            <p className="text-sm font-semibold text-orange-900">📜 {pageT('legalNoticeTitle')}</p>
+            <a
+              href={legalDocumentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
+            >
+              {pageT('legalConsentLink')}
+            </a>
+            <p className="text-xs text-gray-600">{pageT('legalContactLine')}</p>
           </div>
 
           <div className="text-center">
