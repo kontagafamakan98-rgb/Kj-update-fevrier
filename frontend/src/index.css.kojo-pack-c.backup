@@ -1,5 +1,4 @@
-﻿@import './styles/kojo-pack-c-pwa-capacitor.css';
-@import './styles/kojo-pack-b-dashboard-jobs-profile.css';
+﻿@import './styles/kojo-pack-b-dashboard-jobs-profile.css';
 @import './styles/kojo-pack-a-auth-landing.css';
 @tailwind base;
 @tailwind components;
@@ -87,6 +86,5 @@ code {
     @apply bg-background text-foreground;
     }
 }
-
 
 
