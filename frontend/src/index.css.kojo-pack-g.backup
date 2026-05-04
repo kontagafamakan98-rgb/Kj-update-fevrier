@@ -1,5 +1,4 @@
-﻿@import './styles/kojo-pack-g-mobile-premium-no-color.css';
-@import './styles/kojo-pack-f-readability-no-color.css';
+﻿@import './styles/kojo-pack-f-readability-no-color.css';
 @import './styles/kojo-pack-c-pwa-capacitor.css';
 @import './styles/kojo-pack-b-dashboard-jobs-profile.css';
 @import './styles/kojo-pack-a-auth-landing.css';
@@ -89,7 +88,6 @@ code {
     @apply bg-background text-foreground;
     }
 }
-
 
 
 
