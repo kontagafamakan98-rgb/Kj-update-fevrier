@@ -6,7 +6,7 @@ html, body, #root {
     linear-gradient(180deg, #0d1527 0%, #070b16 100%);
   color: var(--kojo-text);
 }
-body.kojo-pack3 {
+body.kojo-final {
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background-image: url('/brand/kojo-orb.svg'), url('/brand/kojo-grid.svg');
@@ -15,13 +15,13 @@ body.kojo-pack3 {
   background-size: 560px 560px, 1400px 1400px;
   color: var(--kojo-text);
 }
-body.kojo-pack3 * { box-sizing: border-box; }
-body.kojo-pack3 a { color: inherit; text-decoration: none; }
-body.kojo-pack3 button,
-body.kojo-pack3 .btn,
-body.kojo-pack3 [type="button"],
-body.kojo-pack3 [type="submit"],
-body.kojo-pack3 [role="button"] {
+body.kojo-final * { box-sizing: border-box; }
+body.kojo-final a { color: inherit; text-decoration: none; }
+body.kojo-final button,
+body.kojo-final .btn,
+body.kojo-final [type="button"],
+body.kojo-final [type="submit"],
+body.kojo-final [role="button"] {
   border: 0;
   border-radius: 18px;
   padding: 13px 18px;
@@ -30,9 +30,9 @@ body.kojo-pack3 [role="button"] {
   background: linear-gradient(135deg, var(--kojo-red), var(--kojo-red-2));
   box-shadow: 0 16px 34px rgba(166,22,22,.38);
 }
-body.kojo-pack3 input,
-body.kojo-pack3 select,
-body.kojo-pack3 textarea {
+body.kojo-final input,
+body.kojo-final select,
+body.kojo-final textarea {
   width: 100%;
   border-radius: 16px;
   border: 1px solid rgba(255,255,255,.12);
@@ -40,49 +40,49 @@ body.kojo-pack3 textarea {
   color: var(--kojo-text);
   padding: 14px 16px;
 }
-body.kojo-pack3 .card,
-body.kojo-pack3 .panel,
-body.kojo-pack3 .surface,
-body.kojo-pack3 .glass-card,
-body.kojo-pack3 .auth-card,
-body.kojo-pack3 .job-card,
-body.kojo-pack3 .order-card,
-body.kojo-pack3 .dashboard-card,
-body.kojo-pack3 .stats-card,
-body.kojo-pack3 .profile-card,
-body.kojo-pack3 .settings-card,
-body.kojo-pack3 .tracking-summary,
-body.kojo-pack3 .route-card,
-body.kojo-pack3 .eta-card {
+body.kojo-final .card,
+body.kojo-final .panel,
+body.kojo-final .surface,
+body.kojo-final .glass-card,
+body.kojo-final .auth-card,
+body.kojo-final .job-card,
+body.kojo-final .order-card,
+body.kojo-final .dashboard-card,
+body.kojo-final .stats-card,
+body.kojo-final .profile-card,
+body.kojo-final .settings-card,
+body.kojo-final .tracking-summary,
+body.kojo-final .route-card,
+body.kojo-final .eta-card {
   background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
   border: 1px solid var(--kojo-stroke);
   border-radius: var(--kojo-radius-lg);
   box-shadow: var(--kojo-shadow-lg);
   backdrop-filter: blur(18px);
 }
-body.kojo-pack3 header,
-body.kojo-pack3 .header,
-body.kojo-pack3 .topbar,
-body.kojo-pack3 .app-header,
-body.kojo-pack3 .navbar,
-body.kojo-pack3 .mobile-header {
+body.kojo-final header,
+body.kojo-final .header,
+body.kojo-final .topbar,
+body.kojo-final .app-header,
+body.kojo-final .navbar,
+body.kojo-final .mobile-header {
   background: rgba(7,11,22,.58);
   border-bottom: 1px solid rgba(255,255,255,.08);
   backdrop-filter: blur(16px);
 }
-body.kojo-pack3 nav,
-body.kojo-pack3 .bottom-nav,
-body.kojo-pack3 .tabbar,
-body.kojo-pack3 .mobile-tabbar {
+body.kojo-final nav,
+body.kojo-final .bottom-nav,
+body.kojo-final .tabbar,
+body.kojo-final .mobile-tabbar {
   background: rgba(7,11,22,.72);
   border-top: 1px solid rgba(255,255,255,.08);
   backdrop-filter: blur(20px);
 }
-body.kojo-pack3 .badge,
-body.kojo-pack3 .chip,
-body.kojo-pack3 .pill,
-body.kojo-pack3 .tag,
-body.kojo-pack3 .status-badge {
+body.kojo-final .badge,
+body.kojo-final .chip,
+body.kojo-final .pill,
+body.kojo-final .tag,
+body.kojo-final .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -93,8 +93,8 @@ body.kojo-pack3 .status-badge {
   border: 1px solid rgba(240,194,106,.24);
   font-weight: 800;
 }
-body.kojo-pack3 .map,
-body.kojo-pack3 iframe {
+body.kojo-final .map,
+body.kojo-final iframe {
   border-radius: 26px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.10);
