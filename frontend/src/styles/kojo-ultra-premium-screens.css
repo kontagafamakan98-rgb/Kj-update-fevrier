@@ -1,0 +1,145 @@
+body.kojo-ultra-premium .login,
+body.kojo-ultra-premium .login-page,
+body.kojo-ultra-premium .auth-page,
+body.kojo-ultra-premium .signin-page,
+body.kojo-ultra-premium .register-page,
+body.kojo-ultra-premium .forgot-password-page,
+body.kojo-ultra-premium [data-screen="login"],
+body.kojo-ultra-premium [data-screen="register"],
+body.kojo-ultra-premium [data-screen="forgot-password"] {
+  position: relative;
+  isolation: isolate;
+}
+body.kojo-ultra-premium .login::before,
+body.kojo-ultra-premium .login-page::before,
+body.kojo-ultra-premium .auth-page::before,
+body.kojo-ultra-premium .signin-page::before,
+body.kojo-ultra-premium .register-page::before,
+body.kojo-ultra-premium .forgot-password-page::before,
+body.kojo-ultra-premium [data-screen="login"]::before,
+body.kojo-ultra-premium [data-screen="register"]::before,
+body.kojo-ultra-premium [data-screen="forgot-password"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(circle at top center, rgba(166,20,20,.24), transparent 32%);
+}
+body.kojo-ultra-premium .login .auth-card,
+body.kojo-ultra-premium .login-page .auth-card,
+body.kojo-ultra-premium .auth-page .auth-card,
+body.kojo-ultra-premium .signin-page .auth-card,
+body.kojo-ultra-premium .register-page .auth-card,
+body.kojo-ultra-premium .forgot-password-page .auth-card,
+body.kojo-ultra-premium [data-screen="login"] .auth-card,
+body.kojo-ultra-premium [data-screen="register"] .auth-card,
+body.kojo-ultra-premium [data-screen="forgot-password"] .auth-card {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 28px;
+}
+body.kojo-ultra-premium .dashboard,
+body.kojo-ultra-premium .dashboard-page,
+body.kojo-ultra-premium .home-page,
+body.kojo-ultra-premium [data-screen="dashboard"],
+body.kojo-ultra-premium [data-screen="home"] {
+  display: block;
+}
+body.kojo-ultra-premium .dashboard-card,
+body.kojo-ultra-premium .metric-card,
+body.kojo-ultra-premium .stats-card {
+  overflow: hidden;
+  position: relative;
+}
+body.kojo-ultra-premium .dashboard-card::after,
+body.kojo-ultra-premium .metric-card::after,
+body.kojo-ultra-premium .stats-card::after {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -30px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(240,195,107,.24), transparent 60%);
+}
+body.kojo-ultra-premium .jobs-page,
+body.kojo-ultra-premium .orders-page,
+body.kojo-ultra-premium .missions-page,
+body.kojo-ultra-premium [data-screen="jobs"],
+body.kojo-ultra-premium [data-screen="orders"] {
+  position: relative;
+}
+body.kojo-ultra-premium .job-card,
+body.kojo-ultra-premium .order-card,
+body.kojo-ultra-premium .list-card,
+body.kojo-ultra-premium .mission-card {
+  padding: 18px;
+  border-left: 4px solid rgba(240,195,107,.72);
+}
+body.kojo-ultra-premium .tracking-page,
+body.kojo-ultra-premium .map-page,
+body.kojo-ultra-premium .client-tracking-page,
+body.kojo-ultra-premium .worker-navigation-page,
+body.kojo-ultra-premium [data-screen="tracking"],
+body.kojo-ultra-premium [data-screen="navigation"] {
+  position: relative;
+}
+body.kojo-ultra-premium .tracking-page .map,
+body.kojo-ultra-premium .map-page .map,
+body.kojo-ultra-premium .client-tracking-page .map,
+body.kojo-ultra-premium .worker-navigation-page .map,
+body.kojo-ultra-premium [data-screen="tracking"] .map,
+body.kojo-ultra-premium [data-screen="navigation"] .map,
+body.kojo-ultra-premium .tracking-page iframe,
+body.kojo-ultra-premium .map-page iframe {
+  border-radius: 26px;
+  overflow: hidden;
+  box-shadow: var(--kojo-shadow-xl);
+  border: 1px solid rgba(255,255,255,.10);
+}
+body.kojo-ultra-premium .tracking-summary,
+body.kojo-ultra-premium .eta-card,
+body.kojo-ultra-premium .route-card {
+  background: rgba(6,10,20,.76);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 20px;
+  box-shadow: var(--kojo-shadow-lg);
+}
+body.kojo-ultra-premium .profile-page,
+body.kojo-ultra-premium .settings-page,
+body.kojo-ultra-premium [data-screen="profile"],
+body.kojo-ultra-premium [data-screen="settings"] {
+  position: relative;
+}
+body.kojo-ultra-premium .profile-card,
+body.kojo-ultra-premium .settings-card,
+body.kojo-ultra-premium .account-card {
+  padding: 22px;
+}
+body.kojo-ultra-premium .bottom-nav a,
+body.kojo-ultra-premium .tabbar a,
+body.kojo-ultra-premium .mobile-tabbar a,
+body.kojo-ultra-premium nav a {
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+body.kojo-ultra-premium .bottom-nav .active,
+body.kojo-ultra-premium .tabbar .active,
+body.kojo-ultra-premium .mobile-tabbar .active,
+body.kojo-ultra-premium nav .active {
+  background: rgba(240,195,107,.14);
+  color: #ffe5b4;
+}
+@media (max-width: 768px) {
+  body.kojo-ultra-premium {
+    background-size: 460px 460px, 1150px 1150px;
+    background-position: right -180px top -110px, center top;
+  }
+  body.kojo-ultra-premium .login .auth-card,
+  body.kojo-ultra-premium .login-page .auth-card,
+  body.kojo-ultra-premium .auth-page .auth-card,
+  body.kojo-ultra-premium .signin-page .auth-card,
+  body.kojo-ultra-premium .register-page .auth-card,
+  body.kojo-ultra-premium .forgot-password-page .auth-card { padding: 22px; }
+}

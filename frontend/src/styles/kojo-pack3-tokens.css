@@ -1,0 +1,19 @@
+:root {
+  --kojo-bg: #070b16;
+  --kojo-bg-2: #10192b;
+  --kojo-surface: rgba(255,255,255,.08);
+  --kojo-surface-2: rgba(255,255,255,.12);
+  --kojo-stroke: rgba(255,255,255,.10);
+  --kojo-text: #f8f3eb;
+  --kojo-muted: #b7bfd1;
+  --kojo-red: #a61616;
+  --kojo-red-2: #e34444;
+  --kojo-gold: #f0c26a;
+  --kojo-green: #3acf88;
+  --kojo-danger: #ff7b7b;
+  --kojo-radius-xl: 28px;
+  --kojo-radius-lg: 22px;
+  --kojo-radius-md: 18px;
+  --kojo-shadow-xl: 0 28px 90px rgba(0,0,0,.42);
+  --kojo-shadow-lg: 0 18px 44px rgba(0,0,0,.34);
+}

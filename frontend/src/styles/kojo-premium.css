@@ -1,0 +1,123 @@
+:root {
+  --kojo-bg: #070b16;
+  --kojo-bg-2: #0d1323;
+  --kojo-surface: rgba(255,255,255,0.08);
+  --kojo-surface-2: rgba(255,255,255,0.12);
+  --kojo-border: rgba(255,255,255,0.12);
+  --kojo-text: #f7f4ef;
+  --kojo-muted: #b8bfd2;
+  --kojo-primary: #a61b1b;
+  --kojo-primary-2: #e14b4b;
+  --kojo-accent: #f4c26b;
+  --kojo-success: #33c27f;
+  --kojo-radius: 20px;
+  --kojo-shadow: 0 20px 70px rgba(0,0,0,0.35);
+}
+html, body, #root {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top right, rgba(166,27,27,0.26), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(244,194,107,0.12), transparent 30%),
+    linear-gradient(180deg, #0b1220 0%, #070b16 100%);
+  color: var(--kojo-text);
+}
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--kojo-text);
+  background-image: url('/brand/kojo-orb.svg'), url('/brand/kojo-grid.svg');
+  background-repeat: no-repeat, no-repeat;
+  background-position: right -180px top -180px, center top;
+  background-size: 560px 560px, 1200px 1200px;
+}
+* { box-sizing: border-box; }
+a { color: inherit; }
+button, .btn, [type="button"], [type="submit"], [role="button"] {
+  border: 0;
+  border-radius: 18px;
+  padding: 12px 18px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: #fff;
+  background: linear-gradient(135deg, var(--kojo-primary), var(--kojo-primary-2));
+  box-shadow: 0 14px 30px rgba(166,27,27,0.35);
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+button:hover, .btn:hover, [type="button"]:hover, [type="submit"]:hover, [role="button"]:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 36px rgba(166,27,27,0.45);
+}
+button:disabled { opacity: .65; }
+input, select, textarea {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.06);
+  color: var(--kojo-text);
+  padding: 14px 16px;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+input::placeholder, textarea::placeholder { color: rgba(247,244,239,.55); }
+input:focus, select:focus, textarea:focus {
+  border-color: rgba(244,194,107,0.65);
+  box-shadow: 0 0 0 4px rgba(244,194,107,0.12);
+}
+header, .header, .app-header, .topbar, .navbar, .mobile-header {
+  backdrop-filter: blur(16px);
+  background: rgba(7,11,22,0.58);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.card, .panel, .surface, .dashboard-card, .job-card, .stats-card, .auth-card, .glass-card, .widget, .section-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+  border: 1px solid var(--kojo-border);
+  border-radius: 22px;
+  box-shadow: var(--kojo-shadow);
+  backdrop-filter: blur(18px);
+}
+.badge, .chip, .pill, .status-badge, .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 700;
+  background: rgba(244,194,107,0.14);
+  color: #ffd99f;
+  border: 1px solid rgba(244,194,107,0.22);
+}
+nav, .bottom-nav, .tabbar, .mobile-tabbar {
+  backdrop-filter: blur(20px);
+  background: rgba(7,11,22,0.72);
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+h1, h2, h3, h4, h5, h6 {
+  color: #fff9ef;
+  letter-spacing: -0.02em;
+}
+p, span, small, label, li { color: var(--kojo-muted); }
+main, .page, .screen, .layout, .dashboard, .content {
+  position: relative;
+  z-index: 1;
+}
+.hero, .welcome, .dashboard-hero, .page-hero {
+  background: linear-gradient(135deg, rgba(166,27,27,0.28), rgba(244,194,107,0.08));
+  border: 1px solid rgba(244,194,107,0.18);
+  border-radius: 28px;
+  box-shadow: var(--kojo-shadow);
+}
+hr { border: 0; border-top: 1px solid rgba(255,255,255,0.08); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(166,27,27,0.8), rgba(244,194,107,0.5));
+  border-radius: 999px;
+}
+@media (max-width: 768px) {
+  body {
+    background-size: 420px 420px, 900px 900px;
+    background-position: right -180px top -120px, center top;
+  }
+  .card, .panel, .surface, .dashboard-card, .job-card, .stats-card, .auth-card, .glass-card, .widget, .section-card {
+    border-radius: 18px;
+  }
+}
