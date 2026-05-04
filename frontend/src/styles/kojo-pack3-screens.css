@@ -20,26 +20,6 @@ body.kojo-pack3 [data-screen="forgot-password"] .auth-card {
   margin: 0 auto;
   padding: 28px;
 }
-body.kojo-pack3 [data-screen="dashboard"] .dashboard-card,
-body.kojo-pack3 [data-screen="home"] .dashboard-card,
-body.kojo-pack3 [data-screen="dashboard"] .stats-card,
-body.kojo-pack3 [data-screen="home"] .stats-card {
-  overflow: hidden;
-  position: relative;
-}
-body.kojo-pack3 [data-screen="dashboard"] .dashboard-card::after,
-body.kojo-pack3 [data-screen="home"] .dashboard-card::after,
-body.kojo-pack3 [data-screen="dashboard"] .stats-card::after,
-body.kojo-pack3 [data-screen="home"] .stats-card::after {
-  content: '';
-  position: absolute;
-  top: -40px;
-  right: -30px;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(240,194,106,.22), transparent 60%);
-}
 body.kojo-pack3 [data-screen="jobs"] .job-card,
 body.kojo-pack3 [data-screen="orders"] .order-card,
 body.kojo-pack3 [data-screen="missions"] .job-card,
@@ -47,27 +27,10 @@ body.kojo-pack3 [data-screen="tracking"] .route-card,
 body.kojo-pack3 [data-screen="navigation"] .route-card {
   border-left: 4px solid rgba(240,194,106,.72);
 }
-body.kojo-pack3 [data-screen="profile"] .profile-card,
-body.kojo-pack3 [data-screen="settings"] .settings-card {
-  padding: 22px;
-}
-body.kojo-pack3 .bottom-nav a,
-body.kojo-pack3 .tabbar a,
-body.kojo-pack3 .mobile-tabbar a,
-body.kojo-pack3 nav a {
-  border-radius: 16px;
-  padding: 10px 12px;
-}
 body.kojo-pack3 .bottom-nav .active,
 body.kojo-pack3 .tabbar .active,
 body.kojo-pack3 .mobile-tabbar .active,
 body.kojo-pack3 nav .active {
   background: rgba(240,194,106,.14);
   color: #ffe5b4;
-}
-@media (max-width: 768px) {
-  body.kojo-pack3 {
-    background-size: 430px 430px, 1050px 1050px;
-    background-position: right -170px top -100px, center top;
-  }
 }
