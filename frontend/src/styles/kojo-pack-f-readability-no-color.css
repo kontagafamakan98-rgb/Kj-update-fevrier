@@ -1,0 +1,172 @@
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+p,
+label,
+small,
+li,
+.helper-text,
+.field-hint,
+.caption,
+.subtitle,
+.text-muted,
+.muted {
+  line-height: 1.6;
+}
+
+button,
+.btn,
+[role="button"],
+[type="button"],
+[type="submit"] {
+  min-height: 48px;
+  padding-inline: 16px;
+}
+
+input,
+select,
+textarea {
+  min-height: 48px;
+}
+
+.hero,
+.hero-section,
+.hero-content,
+.home-hero,
+.landing-hero,
+.banner-content,
+.page-hero {
+  gap: 14px;
+}
+
+.hero h1,
+.hero-section h1,
+.hero-content h1,
+.home-hero h1,
+.landing-hero h1,
+.banner-content h1,
+.page-hero h1 {
+  max-width: 12ch;
+}
+
+.hero p,
+.hero-section p,
+.hero-content p,
+.home-hero p,
+.landing-hero p,
+.banner-content p,
+.page-hero p,
+.auth-page p,
+.login-page p,
+.register-page p,
+.dashboard p,
+.jobs p,
+.profile p,
+.settings p {
+  max-width: 60ch;
+}
+
+.card,
+.panel,
+.surface,
+.dashboard-card,
+.stats-card,
+.job-card,
+.order-card,
+.profile-card,
+.settings-card,
+.auth-card,
+.section,
+.list-item,
+.modal-content,
+.drawer-content,
+.sheet-content,
+.banner,
+.notification,
+.toast,
+.alert {
+  border-radius: 18px;
+}
+
+.auth-page form,
+.login-page form,
+.register-page form,
+.signin-page form,
+.signup-page form {
+  gap: 14px;
+}
+
+.form-group,
+.field,
+.input-group,
+.form-row {
+  margin-bottom: 12px;
+}
+
+.empty-state,
+.no-data,
+.zero-state,
+.loading-state,
+.skeleton-wrapper {
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.badge,
+.chip,
+.tag,
+.status,
+.pill {
+  min-height: 28px;
+  padding-inline: 10px;
+  border-radius: 999px;
+}
+
+@media (max-width: 768px) {
+  h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); }
+  h2 { font-size: clamp(1.25rem, 4vw, 1.6rem); }
+  p, label, small, li { font-size: 0.98rem; }
+
+  .hero h1,
+  .hero-section h1,
+  .hero-content h1,
+  .home-hero h1,
+  .landing-hero h1,
+  .banner-content h1,
+  .page-hero h1 {
+    max-width: 11ch;
+  }
+
+  .hero,
+  .hero-section,
+  .hero-content,
+  .home-hero,
+  .landing-hero,
+  .banner-content,
+  .page-hero,
+  .auth-page,
+  .login-page,
+  .register-page,
+  .dashboard,
+  .jobs,
+  .profile,
+  .settings {
+    scroll-margin-top: 84px;
+  }
+}
