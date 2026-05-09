@@ -23,6 +23,23 @@ const buildStringLocationFallback = (value) => {
   };
 };
 
+const ensureMinDescription = (description, title, location) => {
+  const raw = cleanText(description);
+  if (raw.length >= 20) return raw;
+
+  const locationText = cleanText(location?.fullAddress) || cleanText(location?.address) || cleanText(location);
+  const titleText = cleanText(title) || 'Job';
+  const parts = [`Besoin: ${titleText}`];
+
+  if (locationText) {
+    parts.push(`à ${locationText}`);
+  }
+
+  const fallback = parts.join(' ') + '.';
+  if (fallback.length >= 20) return fallback;
+  return `${fallback} Détails à confirmer.`;
+};
+
 export const buildJobCreatePayload = (formData) => {
   const rawLocation = formData?.location;
   let normalizedLocation;
@@ -40,10 +57,11 @@ export const buildJobCreatePayload = (formData) => {
   const budgetMin = cleanNumber(formData?.budget_min);
   const budgetMax = cleanNumber(formData?.budget_max);
   const mergedBudget = budgetMin ?? budgetMax;
+  const title = cleanText(formData?.title);
 
   const payload = {
-    title: cleanText(formData?.title),
-    description: cleanText(formData?.description) || 'Aucune description fournie',
+    title,
+    description: ensureMinDescription(formData?.description, title, normalizedLocation),
     category: cleanText(formData?.category) || 'general',
     location: normalizedLocation,
     budget_min: budgetMin ?? mergedBudget,

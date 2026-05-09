@@ -2207,6 +2207,21 @@ async def create_job(
             except (TypeError, ValueError):
                 return None
 
+        def _ensure_min_description(description, title, location_payload):
+            raw = _text(description)
+            if len(raw) >= 20:
+                return raw
+
+            location_text = _text(location_payload.get("fullAddress") or location_payload.get("address"))
+            title_text = _text(title) or "Job"
+            fallback = f"Besoin: {title_text}"
+            if location_text:
+                fallback += f" à {location_text}"
+            fallback += "."
+            if len(fallback) >= 20:
+                return fallback
+            return fallback + " Détails à confirmer."
+
         raw_location = incoming.get("location")
         if isinstance(raw_location, str):
             location_payload = {
@@ -2253,11 +2268,11 @@ async def create_job(
             budget_max = budget_min
 
         incoming["title"] = _text(incoming.get("title"))
-        incoming["description"] = _text(incoming.get("description")) or "Aucune description fournie"
         incoming["category"] = _text(incoming.get("category")) or "general"
         incoming["location"] = location_payload
         incoming["budget_min"] = budget_min
         incoming["budget_max"] = budget_max
+        incoming["description"] = _ensure_min_description(incoming.get("description"), incoming["title"], location_payload)
         incoming["required_skills"] = incoming.get("required_skills") if isinstance(incoming.get("required_skills"), list) else []
         incoming["estimated_duration"] = _text(incoming.get("estimated_duration")) or None
         incoming["parts_and_tools_notes"] = _text(incoming.get("parts_and_tools_notes"))
