@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import LocationDetector from '../components/LocationDetector';
@@ -7,106 +7,6 @@ import { getCountryByCode } from '../services/geolocationService';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
 import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, getLocationPrecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
-
-
-const getStoredSessionUser = () => {
-  const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
-
-  for (const key of keys) {
-    try {
-      const raw = window?.localStorage?.getItem?.(key) || window?.sessionStorage?.getItem?.(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      const candidate = parsed?.user || parsed?.profile || parsed?.currentUser || parsed?.data?.user || parsed;
-      if (candidate && typeof candidate === 'object') return candidate;
-    } catch (_) {}
-  }
-
-  return null;
-};
-
-const normalizeComparableId = (value) => String(value ?? '').trim();
-
-const isOwnedByCurrentUser = (job) => {
-  const user = getStoredSessionUser();
-  const currentUserIds = [
-    user?.id,
-    user?._id,
-    user?.userId,
-    user?.ownerId,
-    user?.clientId,
-    user?.profile?.id,
-    user?.profile?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  const jobOwnerIds = [
-    job?.ownerId,
-    job?.userId,
-    job?.clientId,
-    job?.createdBy,
-    job?.postedBy,
-    job?.posterId,
-    job?.owner?.id,
-    job?.owner?._id,
-    job?.user?.id,
-    job?.user?._id,
-    job?.client?.id,
-    job?.client?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  return currentUserIds.some((id) => jobOwnerIds.includes(id));
-};
-
-const formatJobStatus = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'Statut non dÃ©fini') return 'Statut non dÃ©fini';
-  if (normalized === 'open') return 'Ouvert';
-  if (normalized === 'closed') return 'FermÃ©';
-  if (normalized === 'draft') return 'Brouillon';
-  if (normalized === 'pending') return 'En attente';
-  if (normalized === 'published') return 'PubliÃ©';
-  return String(status).replace(/_/g, ' ');
-};
-
-const formatJobDate = (value) => {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return 'Date indisponible';
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-};
-
-const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
-  const min = Number(minValue);
-  const max = Number(maxValue);
-  const hasMin = Number.isFinite(min) && min > 0;
-  const hasMax = Number.isFinite(max) && max > 0;
-
-  if (hasMin && hasMax) return ${min} -  ;
-  if (hasMin) return ${min} ;
-  if (hasMax) return ${max} ;
-  return 'Budget non renseignÃ©';
-};
-
-const getLocationPrecisionMeta = (precision) => {
-  const normalized = String(precision || '').toLowerCase().trim();
-
-  if (normalized.includes('exact') || normalized.includes('precise')) {
-    return { label: 'Position exacte', shortLabel: 'Exacte', color: 'success' };
-  }
-
-  if (normalized.includes('approx') || normalized.includes('near') || normalized.includes('zone')) {
-    return { label: 'Zone approximative', shortLabel: 'Approx.', color: 'warning' };
-  }
-
-  if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return { label: 'Ville / rÃ©gion', shortLabel: 'RÃ©gion', color: 'info' };
-  }
-
-  return { label: 'Localisation disponible', shortLabel: 'Localisation', color: 'info' };
-};
 
 export default function CreateJob() {
   const { user } = useAuth();
@@ -145,9 +45,9 @@ export default function CreateJob() {
   ];
 
   const urgencyOptions = [
-    { value: 'low', label: pageT('urgencyLow'), emoji: 'ðŸ˜Š', color: 'bg-green-50 border-green-200 text-green-700' },
-    { value: 'normal', label: pageT('urgencyNormal'), emoji: 'ðŸ•', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
-    { value: 'high', label: pageT('urgencyHigh'), emoji: 'âš¡', color: 'bg-red-50 border-red-200 text-red-700' }
+    { value: 'low', label: pageT('urgencyLow'), emoji: '😊', color: 'bg-green-50 border-green-200 text-green-700' },
+    { value: 'normal', label: pageT('urgencyNormal'), emoji: '🕐', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
+    { value: 'high', label: pageT('urgencyHigh'), emoji: '⚡', color: 'bg-red-50 border-red-200 text-red-700' }
   ];
 
   const handleLocationDetected = (location) => {
@@ -254,7 +154,7 @@ export default function CreateJob() {
       setLocationDetails(null);
       setErrors({});
     } catch (error) {
-      safeLog.error('Erreur crÃ©ation job:', error);
+      safeLog.error('Erreur création job:', error);
       alert(error?.response?.data?.detail || pageT('errorCreated'));
     } finally {
       setLoading(false);
@@ -401,7 +301,7 @@ export default function CreateJob() {
                     <p className="mt-2 text-xs text-gray-600">
                       {currentLanguage === 'en'
                         ? 'Job publishing stays available even if GPS is not yet validated.'
-                        : 'La publication du job reste autorisÃ©e mÃªme si le GPS nâ€™est pas encore validÃ©.'}
+                        : 'La publication du job reste autorisée même si le GPS n’est pas encore validé.'}
                     </p>
                   </div>
                 )}
@@ -512,14 +412,14 @@ export default function CreateJob() {
             {showMechanicBlock && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                 <div className="flex items-center mb-4">
-                  <span className="text-2xl mr-3">ðŸ”§</span>
+                  <span className="text-2xl mr-3">🔧</span>
                   <h3 className="text-lg font-semibold text-blue-900">{pageT('mechanicInfoTitle')}</h3>
                 </div>
 
                 <div className="space-y-4">
                   <BooleanQuestion
                     fieldKey="mechanic_must_bring_parts"
-                    emoji="ðŸ”©"
+                    emoji="🔩"
                     title={pageT('partsQuestion')}
                     description={pageT('partsDescription')}
                     value={formData.mechanic_must_bring_parts}
@@ -530,7 +430,7 @@ export default function CreateJob() {
 
                   <BooleanQuestion
                     fieldKey="mechanic_must_bring_tools"
-                    emoji="ðŸ› ï¸"
+                    emoji="🛠️"
                     title={pageT('toolsQuestion')}
                     description={pageT('toolsDescription')}
                     value={formData.mechanic_must_bring_tools}
@@ -560,20 +460,20 @@ export default function CreateJob() {
                     <h4 className="font-medium text-blue-900 mb-2">{pageT('mechanicSummary')}</h4>
                     <div className="text-sm text-blue-800 space-y-1">
                       <p>
-                        ðŸ”© <strong>{pageT('partsSummary')} :</strong>{' '}
+                        🔩 <strong>{pageT('partsSummary')} :</strong>{' '}
                         <span className={formData.mechanic_must_bring_parts ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
                           {formData.mechanic_must_bring_parts ? pageT('byMechanic') : pageT('byClient')}
                         </span>
                       </p>
                       <p>
-                        ðŸ› ï¸ <strong>{pageT('toolsSummary')} :</strong>{' '}
+                        🛠️ <strong>{pageT('toolsSummary')} :</strong>{' '}
                         <span className={formData.mechanic_must_bring_tools ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
                           {formData.mechanic_must_bring_tools ? pageT('byMechanic') : pageT('byClient')}
                         </span>
                       </p>
                       {formData.parts_and_tools_notes && (
                         <p>
-                          ðŸ“ <strong>{pageT('notesSummary')} :</strong> {formData.parts_and_tools_notes}
+                          📝 <strong>{pageT('notesSummary')} :</strong> {formData.parts_and_tools_notes}
                         </p>
                       )}
                     </div>
@@ -658,4 +558,3 @@ function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange,
     </div>
   );
 }
-

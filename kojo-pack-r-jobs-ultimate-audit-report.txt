@@ -1,0 +1,21 @@
+﻿Pack R - Jobs ultimate audit + safe fix
+Date: 2026-05-08 23:03:10
+ProjectRoot: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Constats visibles traitÃ©s :
+- crash JobDetails getLocationPrecisionMeta
+- fallback status_undefined
+- fallback Invalid Date
+- fallback budget vide
+- fallback Location not specified
+- garde-fou ownership pour actions owner
+
+FICHIERS MODIFIÃ‰S:
+C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\CreateJob.js
+C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\JobDetails.js
+C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\Jobs.js
+
+FICHIERS NON MODIFIÃ‰S:
+Aucun.
+
+Note: le message console "A listener indicated an asynchronous response..." ressemble fortement Ã  du bruit dâ€™extension navigateur, pas au bug principal KOJO.
