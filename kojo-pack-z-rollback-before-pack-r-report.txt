@@ -1,0 +1,85 @@
+Backed up C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\CreateJob.js -> C:\Users\Famakan\Desktop\Kj-update-fevrier\kojo-emergency-backup-before-pack-r-rollback\CreateJob.js.before-rollback
+
+Backed up C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\Jobs.js -> C:\Users\Famakan\Desktop\Kj-update-fevrier\kojo-emergency-backup-before-pack-r-rollback\Jobs.js.before-rollback
+
+Backed up C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\JobDetails.js -> C:\Users\Famakan\Desktop\Kj-update-fevrier\kojo-emergency-backup-before-pack-r-rollback\JobDetails.js.before-rollback
+
+Git repo detected: True
+
+$ git rev-parse --is-inside-work-tree
+EXIT=0
+STDOUT:
+true
+
+STDERR:
+
+
+$ git log --date=iso --pretty=format:"%H|%s" -- frontend/src/pages/CreateJob.js frontend/src/pages/Jobs.js frontend/src/pages/JobDetails.js
+EXIT=0
+STDOUT:
+09b8cd3eb959973ed6c7d66764d18ae05b7d58de|Rebuild jobs pages cleanly
+becee7e8fd20471586bc395ad58557bf1cfd3149|Rebuild clean Jobs/JobDetails prologue
+992e161c33aed0019cbf4bfe5c79afd27bff121a|Recover jobs pages after duplicate helper injection
+65424887bba339a138757ff5111b5f4e3c00a326|Premium recovery fix for jobs pages
+a509068ec26fea8d00e3a433d9e15d252ae01104|Fix JobDetails build after jobs patch
+a72803d50332243394d9b472f38202b9aca00884|Ultimate jobs pages audit and safe fixes
+5899c0a33e89d3b48751d441e34fa7b2a00e9e88|Fix JobDetails getLocationPrecisionMeta runtime error
+43c48504f087d3940a2a2f072b62fc9fd3816230|Add carpentry category and worker signup specialties
+7325f2734b7806088ed84be6372de391638b01d9|Apply final KOJO fullstack audit super pack
+9e7240fc72a3b5a4d91d0c37eb6170e0cbc20d44|Add GPS precision badges for create job and worker map views
+a21c3f93697bbcf84e72c79294cb3089506f1e10|fix(location): save precise job gps and add maps directions for workers
+6831cdf95c0526e8039e39bb4c76b3c212f3d99d|fix(location): auto-detect precise job location on create job page
+2cc4329c19f72053f841ebb7afdd94c472f5bae8|fix(a11y): clean final label aria autofill warnings across kojo
+a861009b106ef6a1d4c15c83fa30987cc36c1997|fix(forms): resolve publish job label and autocomplete warnings
+c62174a79d5a57cf8402cb41d3437573911f7fb5|fix(forms): add missing id and name attributes across kojo
+c0be4babe0175d3e3d2834f209f736b429c1c138|fix(jobs): handle jobs api array response safely
+d792b92c91e49021e795a0508ebc6c3d320825d7|fix(i18n): finalize pack g accessibility fallback and remaining visible text cleanup
+13eef2636cff3ad2be5711ac8ebba6f8677ba6df|fix(i18n): apply translation pack 2 for main pages
+627fadb5d7b995dad0c5fbbec84310d1587fda67|auto-commit for 8496d84d-55a6-4d31-bce7-c4e4e0f5e245
+c75bbf06326a2771da95e4c711c0eaa00daabff3|auto-commit for 0ba624d4-2aa8-440c-9b8a-eee237b42083
+e35ab3ff0b3136037c56b086ff09af47e328b627|auto-commit for 7242d8ff-7025-4530-9cf2-aaceaec6eaf3
+98c755ef05a6ffc5b694b9b2be64965d30eee4ca|auto-commit for 1570536e-6f64-43b2-9f92-57bc9a58160b
+e8c4b8a1afb471d7f319d1d99513db0b947ccf6d|auto-commit for e6225cc4-032b-4df6-8187-72d7e3d4afee
+fc7e855e8ac638881783ec236c2d9087831eb38b|auto-commit for 1a9393eb-d221-40b9-aeaa-b71517914089
+e8fb291d681de4b320748e696120e8222b542106|auto-commit for fd7288c2-8a16-47bc-9004-fc3da641f1c2
+9ba30d1dcbd2f9d61549c0000a26a772308e42b7|auto-commit for ef265c57-fb48-4a30-b08b-c53e7055f7f8
+70d4e8f37af340493de61a164c91e0007afe5d23|auto-commit for 9bfa2326-0448-4ef3-b9a6-b277b7e84bec
+121d943e78fc4d887ce9046835932fc036a79933|auto-commit for c49a7e76-0323-41cd-ba83-fcb2f8b3be86
+78365a230553cbbb3051409397ab2f96bba05660|auto-commit for 1a8fd0ac-eea4-4665-88d8-ada6544ad7b0
+346bdca3bf9c697b94fcdd641ee78fc4c89aa925|auto-commit for cb2ae080-2f13-41db-86d9-585b04d51f83
+0b22236d521e3d56617d0ec4a150057d0ff223f2|auto-commit for 939f0b47-d0b7-413f-805c-9bf103a13bc1
+d523dbeb2354a5a9fd1b0102e8a48d014359f5c2|auto-commit for c4f0078a-2227-4468-b430-004e5f1be4c2
+d9fb5a4a6793ed9da8d47617b8b2831a8e172b67|auto-commit for bd340f01-fc21-4f53-8fbf-0569c5eb76a2
+2964e80813f02655ae842983e818536efa355b67|auto-commit for e652f697-97d9-4e05-9d40-4828812bf6ce
+dce0451c3517f5faf1275bd435ce833e8d16a46e|auto-commit for 56ea8f2a-c0f4-4121-b3ab-e972ff63d909
+fc0b381503c59798f98c0f5cacd8bae9fc576757|auto-commit for 1e5c6256-2134-424b-885d-ddea7745d336
+319a2ce91f129ef81b1eb9412f406e50bf18e11c|auto-commit for 0989605c-5127-4c13-863a-aaf1d4876201
+57a8eb3123168732c201189696821c3f1dba4d19|auto-commit for 9c524171-c3c4-464b-89a6-e53f47387844
+0c7ae76bc5e3349fce8b12342749a98d1cc06c8e|auto-commit for 5016e5f9-3bc8-43d9-a9c1-11477b03ae10
+1920cdd348844ea3b9a120a2c70129321319037f|auto-commit for cba1f51e-dab6-459d-af60-243e38d7e45d
+e889d3e3846edc28d95dcb944c776bbe48c5a1eb|auto-commit for 77e2e94f-fd09-45f5-b863-c627078842bc
+805690251209d6d7d8a2252274658837ef32e2f4|auto-commit for 6256d344-4b54-4db4-aa13-fdbe4d7da4f2
+8b8d98c62c2fdbb4e04c9456e021a9530dbda18a|auto-commit for f2efed85-1f57-4fe9-be19-c7c273dbc27d
+8f02a782892898af8ea908fb1806afb14f6b9b7d|auto-commit for b77df7ca-a4e2-4531-87d7-e2d535f74af0
+STDERR:
+
+
+$ git rev-parse c0be4babe0175d3e3d2834f209f736b429c1c138^
+EXIT=0
+STDOUT:
+c0be4babe0175d3e3d2834f209f736b429c1c138
+
+STDERR:
+
+
+Earliest suspicious commit: c0be4babe0175d3e3d2834f209f736b429c1c138 fix(jobs): handle jobs api array response safely
+Rollback target parent: c0be4babe0175d3e3d2834f209f736b429c1c138
+
+$ git checkout c0be4babe0175d3e3d2834f209f736b429c1c138 -- frontend/src/pages/CreateJob.js frontend/src/pages/Jobs.js frontend/src/pages/JobDetails.js
+EXIT=0
+STDOUT:
+
+STDERR:
+
+
+Rollback via suspicious-commit parent succeeded.
