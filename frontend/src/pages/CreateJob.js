@@ -77,11 +77,9 @@ export default function CreateJob() {
     setError('');
     const payload = buildJobCreatePayload(formData);
     if (!payload.title) return setError('Titre requis');
-    if (!payload.description) return setError('Description requise');
     if (!payload.location?.address && !payload.location?.fullAddress) return setError('Localisation requise');
-    if (payload.budget_min === null) return setError('Budget minimum requis');
-    if (payload.budget_max === null) return setError('Budget maximum requis');
-    if (payload.budget_min > payload.budget_max) return setError('Le budget maximum doit être supérieur ou égal au budget minimum');
+    if (payload.budget_min === null && payload.budget_max === null) return setError('Prix requis');
+    if (payload.budget_min > payload.budget_max) return setError('Le prix maximum doit être supérieur ou égal au prix minimum');
 
     setLoading(true);
     try {
@@ -102,15 +100,24 @@ export default function CreateJob() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Publier un job</h1>
-        <p className="mt-2 text-gray-600">Localisation automatique et carte restaurées, sans casser le correctif 422.</p>
+        <p className="mt-2 text-gray-600">Seuls le titre, le prix et la localisation sont obligatoires.</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
         {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
-        <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder="Titre" />
-        <textarea name="description" rows="5" value={formData.description} onChange={handleChange} className={inputClass} placeholder="Description" />
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">Titre *</label>
+          <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder="Titre" />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">Description</label>
+          <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder="Localisation" />
+            <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder="Localisation *" />
           </div>
           <div>
             <select name="category" value={formData.category} onChange={handleChange} className={inputClass}>
@@ -152,15 +159,23 @@ export default function CreateJob() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder="Budget min" />
-          <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder="Budget max" />
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Prix *</label>
+            <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder="Prix" />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Prix max</label>
+            <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
+          </div>
         </div>
+        <p className="text-sm text-gray-500">Si tu mets seulement le prix, il sera utilisé comme prix min et prix max.</p>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder="Durée estimée" />
+          <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder="Durée estimée (optionnel)" />
           <input type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className={inputClass} />
         </div>
         <div className="flex gap-2">
-          <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder="Compétence demandée" />
+          <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder="Compétence demandée (optionnel)" />
           <button type="button" onClick={addSkill} className="rounded-xl bg-gray-900 px-4 py-3 font-semibold text-white">Ajouter</button>
         </div>
         {formData.required_skills.length > 0 && (
@@ -172,7 +187,7 @@ export default function CreateJob() {
         )}
         <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_parts" checked={formData.mechanic_must_bring_parts} onChange={handleChange} /> Le travailleur doit apporter les pièces</label>
         <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_tools" checked={formData.mechanic_must_bring_tools} onChange={handleChange} /> Le travailleur doit apporter les outils</label>
-        <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder="Notes pièces / outils" />
+        <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder="Notes pièces / outils (optionnel)" />
         <div className="flex gap-3">
           <button type="button" onClick={() => navigate('/jobs')} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">Annuler</button>
           <button type="submit" disabled={loading} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">{loading ? 'Publication...' : 'Publier le job'}</button>
