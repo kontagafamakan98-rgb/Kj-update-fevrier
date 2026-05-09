@@ -10,11 +10,9 @@ import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser } from '../utils/jobPageSafeHelpers';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
-import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 
-function JobCard({ job, user, userType }) {
+function JobCard({ job, userType }) {
   const locationText = job.location_text || 'Localisation non précisée';
-  const hasApplied = userType === 'worker' && Boolean(getRememberedApplication(job.id, user));
 
   return (
     <Link to={`/jobs/${job.id}`} className="block bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-100">
@@ -37,14 +35,9 @@ function JobCard({ job, user, userType }) {
         <div className="ml-0 md:ml-6 text-right min-w-[170px]">
           <div className="text-2xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
           {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{job.estimated_duration}</div>}
-          {userType === 'worker' && job.status === 'open' && !hasApplied && (
+          {userType === 'worker' && job.status === 'open' && (
             <div className="mt-2 inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 border border-green-200">
               Postuler disponible
-            </div>
-          )}
-          {hasApplied && (
-            <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-              Proposition envoyée
             </div>
           )}
         </div>
@@ -177,7 +170,7 @@ export default function Jobs() {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredJobs.map((job) => (
-            <JobCard key={job.id} job={job} user={user} userType={user?.user_type} />
+            <JobCard key={job.id} job={job} userType={user?.user_type} />
           ))}
         </div>
       )}
