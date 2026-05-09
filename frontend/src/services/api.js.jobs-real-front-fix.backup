@@ -279,9 +279,8 @@ export const jobsAPI = {
   create: (jobData) => api.post('/jobs', jobData),
   update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
   delete: (id) => api.delete(`/jobs/${id}`),
-  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/proposals`, applicationData),
-  getApplications: (jobId) => api.get(`/jobs/${jobId}/proposals`),
-  getProposals: (jobId) => api.get(`/jobs/${jobId}/proposals`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
 };
 
 /**

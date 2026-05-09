@@ -1,0 +1,2314 @@
+KOJO JOBS FRONTEND CODE EXTRACTOR
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+FILE: frontend\src\pages\JobDetails.js
+size: 12250 chars
+imports:
+  import { useEffect, useState } from 'react';
+  import { useNavigate, useParams } from 'react-router-dom';
+  import axios from 'axios';
+  import { useAuth } from '../contexts/AuthContext';
+  import { useLanguage } from '../contexts/LanguageContext';
+  import ProposalModal from '../components/ProposalModal';
+  import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+  import { safeLog } from '../utils/env';
+  import { ensureJobOwnerActionBar } from '../utils/jobOwnerDeleteRuntime';
+functions:
+  - JobDetails
+  - ProposalCard
+pattern getLocationPrecisionMeta: 0
+pattern formatBudgetRange: 0
+pattern formatJobStatus: 0
+pattern formatJobDate: 0
+pattern isOwnedByCurrentUser: 0
+pattern ensureJobOwnerActionBar: 2
+--- ensureJobOwnerActionBar snippet #1 ---
+ffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import ProposalModal from '../components/ProposalModal';
+import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
+
+import { ensureJobOwnerActionBar } from '../utils/jobOwnerDeleteRuntime';
+export default function JobDetails() {
+  const [job, setJob] = useState(null);
+  /* KOJO_JOB_OWNER_BAR_START */
+  useEffect(() => {
+    return ensureJobOwnerActionBar(job);
+  }, [job]);
+  /* KOJO_JOB_OWNER_BAR_END */
+
+  const [proposals, setProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showProposalModal, setShowProp
+--- ensureJobOwnerActionBar snippet #2 ---
+s/LanguageContext';
+import ProposalModal from '../components/ProposalModal';
+import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
+
+import { ensureJobOwnerActionBar } from '../utils/jobOwnerDeleteRuntime';
+export default function JobDetails() {
+  const [job, setJob] = useState(null);
+  /* KOJO_JOB_OWNER_BAR_START */
+  useEffect(() => {
+    return ensureJobOwnerActionBar(job);
+  }, [job]);
+  /* KOJO_JOB_OWNER_BAR_END */
+
+  const [proposals, setProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [error, setError] = useState('');
+
+  const { id } = useParams();
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedT
+pattern status: 15
+--- status snippet #1 ---
+ loading job details:', jobError);
+      setError(pageT('loadError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const locale = getLocaleForLanguage(currentLanguage);
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+  const translateStatus = (status) => pageT(`status_${status}`) || status;
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gra
+--- status snippet #2 ---
+ls:', jobError);
+      setError(pageT('loadError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const locale = getLocaleForLanguage(currentLanguage);
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+  const translateStatus = (status) => pageT(`status_${status}`) || status;
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-80
+--- status snippet #3 ---
+Error);
+      setError(pageT('loadError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const locale = getLocaleForLanguage(currentLanguage);
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+  const translateStatus = (status) => pageT(`status_${status}`) || status;
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+--- status snippet #4 ---
+ setError(pageT('loadError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const locale = getLocaleForLanguage(currentLanguage);
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+  const translateStatus = (status) => pageT(`status_${status}`) || status;
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (
+--- status snippet #5 ---
+} finally {
+      setLoading(false);
+    }
+  };
+
+  const locale = getLocaleForLanguage(currentLanguage);
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+  const translateStatus = (status) => pageT(`status_${status}`) || status;
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open':
+        return 'bg-green-100 text-green-800';
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div 
+pattern budget: 2
+--- budget snippet #1 ---
+or(job.status)}`}>
+                    {translateStatus(job.status)}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {pageT('publishedOn', { date: formatDate(job.posted_at) })}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-orange-600">{job.budget_min} - {job.budget_max} FCFA</div>
+                {job.estimated_duration && (
+                  <div className="text-sm text-gray-500 mt-1">{pageT('estimatedDuration', { value: job.estimated_duration })}</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex space-x-4">
+              {canApply && (
+                <button onClick={() => setShowProposalModal(true)} 
+--- budget snippet #2 ---
+                    {translateStatus(job.status)}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {pageT('publishedOn', { date: formatDate(job.posted_at) })}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-orange-600">{job.budget_min} - {job.budget_max} FCFA</div>
+                {job.estimated_duration && (
+                  <div className="text-sm text-gray-500 mt-1">{pageT('estimatedDuration', { value: job.estimated_duration })}</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex space-x-4">
+              {canApply && (
+                <button onClick={() => setShowProposalModal(true)} className="bg-orang
+pattern client_id: 2
+--- client_id snippet #1 ---
+ useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadJobDetails();
+  }, [id]);
+
+  const loadJobDetails = async () => {
+    try {
+      const jobResponse = await axios.get(`/jobs/${id}`);
+      setJob(jobResponse.data);
+
+      if (user.user_type === 'client' && jobResponse.data.client_id === user.id) {
+        try {
+          const proposalsResponse = await axios.get(`/jobs/${id}/proposals`);
+          setProposals(proposalsResponse.data);
+        } catch (proposalError) {
+          safeLog.error('Error loading proposals:', proposalError);
+        }
+      }
+    } catch (jobError) {
+      safeLog.error('Error loading job details:', jobError);
+      setError(pageT('loadError'));
+    } finally
+--- client_id snippet #2 ---
+pin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
+  if (error || !job) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+          {error || pageT('notFound')}
+        </div>
+      </div>
+    );
+  }
+
+  const isJobOwner = user.user_type === 'client' && job.client_id === user.id;
+  const canApply = user.user_type === 'worker' && job.status === 'open';
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <button aria-label={pageT('backButtonAria')} onClick={() => navigate(-1)} className="mb-6 flex items-center text-orange-600 hover:text-orange-700">
+        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+pattern posted_at: 1
+--- posted_at snippet #1 ---
+ext-gray-900 mb-2">{job.title}</h1>
+                <div className="flex items-center space-x-4 flex-wrap">
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(job.status)}`}>
+                    {translateStatus(job.status)}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {pageT('publishedOn', { date: formatDate(job.posted_at) })}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-orange-600">{job.budget_min} - {job.budget_max} FCFA</div>
+                {job.estimated_duration && (
+                  <div className="text-sm text-gray-500 mt-1">{pageT('estimatedDuration', { value: job.estimated_duration })}</div>
+
+pattern created_at: 1
+--- created_at snippet #1 ---
+gap-3 flex-wrap">
+        <div className="flex items-center">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+            <span className="text-blue-600 font-semibold">T</span>
+          </div>
+          <div className="ml-3">
+            <p className="font-medium text-gray-900">{pageT('worker')}</p>
+            <p className="text-sm text-gray-500">{formatDate(proposal.created_at)}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xl font-bold text-gray-900">{proposal.proposed_amount} FCFA</div>
+          <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(proposal.status)}`}>
+            {pageT(`status_${proposal.status}`)}
+          </span>
+        </div>
+      </div>
+
+      <p className="text-gray-700 mb-2">{pro
+pattern Anonymous client: 0
+pattern Invalid Date: 0
+pattern status_undefined: 0
+pattern Location not specified: 0
+pattern /jobs: 2
+--- /jobs snippet #1 ---
+eState(false);
+  const [error, setError] = useState('');
+
+  const { id } = useParams();
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadJobDetails();
+  }, [id]);
+
+  const loadJobDetails = async () => {
+    try {
+      const jobResponse = await axios.get(`/jobs/${id}`);
+      setJob(jobResponse.data);
+
+      if (user.user_type === 'client' && jobResponse.data.client_id === user.id) {
+        try {
+          const proposalsResponse = await axios.get(`/jobs/${id}/proposals`);
+          setProposals(proposalsResponse.data);
+        } catch (proposalError) {
+          safeLog.error('Error loading proposals:', proposalError);
+        }
+      }
+    } catch (jobError) {
+    
+--- /jobs snippet #2 ---
+ator(currentLanguage, t, 'jobDetails');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadJobDetails();
+  }, [id]);
+
+  const loadJobDetails = async () => {
+    try {
+      const jobResponse = await axios.get(`/jobs/${id}`);
+      setJob(jobResponse.data);
+
+      if (user.user_type === 'client' && jobResponse.data.client_id === user.id) {
+        try {
+          const proposalsResponse = await axios.get(`/jobs/${id}/proposals`);
+          setProposals(proposalsResponse.data);
+        } catch (proposalError) {
+          safeLog.error('Error loading proposals:', proposalError);
+        }
+      }
+    } catch (jobError) {
+      safeLog.error('Error loading job details:', jobError);
+      setError(pageT('loadError'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const locale = getLocaleForLanguage(currentLanguag
+pattern delete: 0
+
+FILE: frontend\src\pages\Jobs.js
+size: 11991 chars
+imports:
+  import { useEffect, useState } from 'react';
+  import { Link, useSearchParams } from 'react-router-dom';
+  import { useAuth } from '../contexts/AuthContext';
+  import { useLanguage } from '../contexts/LanguageContext';
+  import JobCreateModal from '../components/JobCreateModal';
+  import MechanicRequirements from '../components/MechanicRequirements';
+  import { ListSkeleton } from '../components/SkeletonLoader';
+  import { jobsAPI } from '../services/api';
+  import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+  import { safeLog } from '../utils/env';
+functions:
+  - Jobs
+  - JobCard
+pattern getLocationPrecisionMeta: 0
+pattern formatBudgetRange: 0
+pattern formatJobStatus: 0
+pattern formatJobDate: 0
+pattern isOwnedByCurrentUser: 0
+pattern ensureJobOwnerActionBar: 0
+pattern status: 22
+--- status snippet #1 ---
+t { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
+
+export default function Jobs() {
+  const [jobs, setJobs] = useState([]);
+  const [filteredJobs, setFilteredJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [filters, setFilters] = useState({ category: '', status: '', search: '' });
+
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'jobs');
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    loadJobs();
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      setFilters((prev) => ({ ...prev, category: categoryParam }));
+    }
+  }, [search
+--- status snippet #2 ---
+ob) => job.client_id === user.id));
+      } else {
+        setJobs(jobsData);
+      }
+    } catch (error) {
+      safeLog.error('Error loading jobs:', error);
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterJobs = () => {
+    let filtered = [...jobs];
+
+    if (filters.category) {
+      filtered = filtered.filter((job) => job.category === filters.category);
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter((job) => job.status === filters.status);
+    }
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(
+        (job) => job.title.toLowerCase().includes(searchLower) || job.description.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setFilteredJobs(filtered);
+  };
+
+  const handleFilterChange = (key, value) 
+--- status snippet #3 ---
+   setJobs(jobsData);
+      }
+    } catch (error) {
+      safeLog.error('Error loading jobs:', error);
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterJobs = () => {
+    let filtered = [...jobs];
+
+    if (filters.category) {
+      filtered = filtered.filter((job) => job.category === filters.category);
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter((job) => job.status === filters.status);
+    }
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(
+        (job) => job.title.toLowerCase().includes(searchLower) || job.description.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setFilteredJobs(filtered);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }
+--- status snippet #4 ---
+);
+      }
+    } catch (error) {
+      safeLog.error('Error loading jobs:', error);
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterJobs = () => {
+    let filtered = [...jobs];
+
+    if (filters.category) {
+      filtered = filtered.filter((job) => job.category === filters.category);
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter((job) => job.status === filters.status);
+    }
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(
+        (job) => job.title.toLowerCase().includes(searchLower) || job.description.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setFilteredJobs(filtered);
+  };
+
+  const handleFilterChange = (key, value) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const c
+--- status snippet #5 ---
+[
+    { value: '', label: t('allCategories') },
+    { value: 'plumbing', label: t('plumbing') },
+    { value: 'electrical', label: t('electrical') },
+    { value: 'construction', label: t('construction') },
+    { value: 'cleaning', label: t('cleaning') },
+    { value: 'gardening', label: t('gardening') },
+    { value: 'tutoring', label: t('tutoring') },
+    { value: 'mechanics', label: t('mechanics') }
+  ];
+
+  const statuses = [
+    { value: '', label: t('allStatuses') },
+    { value: 'open', label: t('open') },
+    { value: 'in_progress', label: t('inProgress') },
+    { value: 'completed', label: t('completed') },
+    { value: 'cancelled', label: t('cancelled') }
+  ];
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-6">
+          <div className="h-8 w-
+pattern budget: 2
+--- budget snippet #1 ---
+="round" strokeWidth="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0v1m6-1v1m-6 0H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2h-2m-6 0V7"></path>
+              </svg>
+              {formatDate(job.posted_at)}
+            </div>
+          </div>
+        </div>
+
+        <div className="ml-0 md:ml-6 text-right min-w-[170px]">
+          <div className="text-2xl font-bold text-orange-600">
+            {job.budget_min} - {job.budget_max} FCFA
+          </div>
+          {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{pageT('duration', { value: job.estimated_duration })}</div>}
+          {userType === 'worker' && job.status === 'open' && (
+            <button className="mt-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm">
+              {pageT('apply')}
+            </button>
+--- budget snippet #2 ---
+h="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0v1m6-1v1m-6 0H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2h-2m-6 0V7"></path>
+              </svg>
+              {formatDate(job.posted_at)}
+            </div>
+          </div>
+        </div>
+
+        <div className="ml-0 md:ml-6 text-right min-w-[170px]">
+          <div className="text-2xl font-bold text-orange-600">
+            {job.budget_min} - {job.budget_max} FCFA
+          </div>
+          {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{pageT('duration', { value: job.estimated_duration })}</div>}
+          {userType === 'worker' && job.status === 'open' && (
+            <button className="mt-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded text-sm">
+              {pageT('apply')}
+            </button>
+          )}
+     
+pattern client_id: 1
+--- client_id snippet #1 ---
+{
+      setFilters((prev) => ({ ...prev, category: categoryParam }));
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    filterJobs();
+  }, [jobs, filters]);
+
+  const loadJobs = async () => {
+    try {
+      const response = await jobsAPI.getAll();
+      const jobsData = Array.isArray(response) ? response : response?.data || [];
+
+      if (user.user_type === 'client') {
+        setJobs(jobsData.filter((job) => job.client_id === user.id));
+      } else {
+        setJobs(jobsData);
+      }
+    } catch (error) {
+      safeLog.error('Error loading jobs:', error);
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterJobs = () => {
+    let filtered = [...jobs];
+
+    if (filters.category) {
+      filtered = filtered.filter((job) => job.category === filters.category);
+    }
+
+    if (filters.status) {
+ 
+pattern posted_at: 1
+--- posted_at snippet #1 ---
+>
+
+            <div className="flex items-center">
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0v1m6-1v1m-6 0H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2h-2m-6 0V7"></path>
+              </svg>
+              {formatDate(job.posted_at)}
+            </div>
+          </div>
+        </div>
+
+        <div className="ml-0 md:ml-6 text-right min-w-[170px]">
+          <div className="text-2xl font-bold text-orange-600">
+            {job.budget_min} - {job.budget_max} FCFA
+          </div>
+          {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{pageT('duration', { value: job.estimated_duration })}</div>}
+          {userT
+pattern created_at: 0
+pattern Anonymous client: 0
+pattern Invalid Date: 0
+pattern status_undefined: 0
+pattern Location not specified: 0
+pattern /jobs: 1
+--- /jobs snippet #1 ---
+ day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+  const translateStatus = (status) => {
+    switch (status) {
+      case 'open':
+        return t('open');
+      case 'in_progress':
+        return t('inProgress');
+      case 'completed':
+        return t('completed');
+      case 'cancelled':
+        return t('cancelled');
+      default:
+        return status;
+    }
+  };
+
+  return (
+    <Link to={`/jobs/${job.id}`} className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6">
+      <div className="flex justify-between items-start gap-6 flex-wrap">
+        <div className="flex-1">
+          <div className="flex items-center space-x-3 mb-2 flex-wrap">
+            <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
+            <span className={`px-2 py-1 text-xs rounded-full
+pattern delete: 0
+
+FILE: frontend\src\pages\CreateJob.js
+size: 18618 chars
+imports:
+  import { useState } from 'react';
+  import { useAuth } from '../contexts/AuthContext';
+  import { useLanguage } from '../contexts/LanguageContext';
+  import LocationDetector from '../components/LocationDetector';
+  import { getCountryByCode } from '../services/geolocationService';
+  import { makeScopedTranslator } from '../utils/pack2PageI18n';
+  import { safeLog } from '../utils/env';
+functions:
+  - CreateJob
+  - BooleanQuestion
+pattern getLocationPrecisionMeta: 0
+pattern formatBudgetRange: 0
+pattern formatJobStatus: 0
+pattern formatJobDate: 0
+pattern isOwnedByCurrentUser: 0
+pattern ensureJobOwnerActionBar: 0
+pattern status: 0
+pattern budget: 23
+--- budget snippet #1 ---
+import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
+
+export default function CreateJob() {
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'createJob');
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'general',
+    location: '',
+    budget_min: '',
+    budget_max: '',
+    requirements: '',
+    deadline: '',
+    urgency: 'normal',
+    mechanic_must_bring_parts: false,
+    mechanic_must_bring_tools: false,
+    parts_and_tools_notes: ''
+  });
+
+  const [errors, setErrors] = useState(() => ({}));
+  const [loading, setLoading] = useState(false);
+
+  const categories = [
+    { value: 'general', label: pageT('categoryGeneral') },
+    { value: 'plumbing',
+--- budget snippet #2 ---
+ranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
+
+export default function CreateJob() {
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'createJob');
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'general',
+    location: '',
+    budget_min: '',
+    budget_max: '',
+    requirements: '',
+    deadline: '',
+    urgency: 'normal',
+    mechanic_must_bring_parts: false,
+    mechanic_must_bring_tools: false,
+    parts_and_tools_notes: ''
+  });
+
+  const [errors, setErrors] = useState(() => ({}));
+  const [loading, setLoading] = useState(false);
+
+  const categories = [
+    { value: 'general', label: pageT('categoryGeneral') },
+    { value: 'plumbing', label: pageT('categ
+--- budget snippet #3 ---
+me]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const newErrors = {};
+      if (!formData.title.trim()) newErrors.title = pageT('titleRequired');
+      if (!formData.description.trim()) newErrors.description = pageT('descriptionRequired');
+      if (!formData.location.trim()) newErrors.location = pageT('locationRequired');
+      if (!formData.budget_min) newErrors.budget_min = pageT('budgetMinRequired');
+      if (!formData.budget_max) newErrors.budget_max = pageT('budgetMaxRequired');
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        setLoading(false);
+        return;
+      }
+
+      alert(pageT('successCreated'));
+
+      setFormData({
+        title: '',
+        description: '',
+        category: 'general',
+        loca
+--- budget snippet #4 ---
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const newErrors = {};
+      if (!formData.title.trim()) newErrors.title = pageT('titleRequired');
+      if (!formData.description.trim()) newErrors.description = pageT('descriptionRequired');
+      if (!formData.location.trim()) newErrors.location = pageT('locationRequired');
+      if (!formData.budget_min) newErrors.budget_min = pageT('budgetMinRequired');
+      if (!formData.budget_max) newErrors.budget_max = pageT('budgetMaxRequired');
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        setLoading(false);
+        return;
+      }
+
+      alert(pageT('successCreated'));
+
+      setFormData({
+        title: '',
+        description: '',
+        category: 'general',
+        location: '',
+        budg
+--- budget snippet #5 ---
+ = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const newErrors = {};
+      if (!formData.title.trim()) newErrors.title = pageT('titleRequired');
+      if (!formData.description.trim()) newErrors.description = pageT('descriptionRequired');
+      if (!formData.location.trim()) newErrors.location = pageT('locationRequired');
+      if (!formData.budget_min) newErrors.budget_min = pageT('budgetMinRequired');
+      if (!formData.budget_max) newErrors.budget_max = pageT('budgetMaxRequired');
+
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        setLoading(false);
+        return;
+      }
+
+      alert(pageT('successCreated'));
+
+      setFormData({
+        title: '',
+        description: '',
+        category: 'general',
+        location: '',
+        budget_min: '',
+        
+pattern client_id: 0
+pattern posted_at: 0
+pattern created_at: 0
+pattern Anonymous client: 0
+pattern Invalid Date: 0
+pattern status_undefined: 0
+pattern Location not specified: 0
+pattern /jobs: 0
+pattern delete: 0
+
+FILE: frontend\src\services\api.js
+size: 12457 chars
+imports:
+  import axios from 'axios';
+  import { devLog, safeLog } from '../utils/env';
+  import kojoCache, { CACHE_KEYS } from '../utils/cache';
+  import networkOptimizer from '../utils/networkOptimizer';
+  import { buildApiUrl } from '../utils/backendUrl';
+functions:
+  - isPublicAuthEndpoint
+pattern getLocationPrecisionMeta: 0
+pattern formatBudgetRange: 0
+pattern formatJobStatus: 0
+pattern formatJobDate: 0
+pattern isOwnedByCurrentUser: 0
+pattern ensureJobOwnerActionBar: 0
+pattern status: 14
+--- status snippet #1 ---
+onfig.data,
+      params: config.params
+    });
+    
+    return config;
+  },
+  (error) => {
+    safeLog.error('âŒ Request interceptor error:', error);
+    return Promise.reject(error);
+  }
+);
+
+/**
+ * Response interceptor - Handle responses and errors
+ */
+apiClient.interceptors.response.use(
+  (response) => {
+    devLog.info(`âœ… API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+      status: response.status,
+      data: response.data
+    });
+    
+    return response;
+  },
+  (error) => {
+    const { response, config } = error;
+    
+    // Enhanced error handling for non-JSON responses
+    let errorMessage = error.message;
+    let errorData = null;
+    
+    if (response) {
+      // Try to parse JSON response
+      try {
+        errorData = response.data;
+        if (typeof errorData === 'string') {
+--- status snippet #2 ---
+ params: config.params
+    });
+    
+    return config;
+  },
+  (error) => {
+    safeLog.error('âŒ Request interceptor error:', error);
+    return Promise.reject(error);
+  }
+);
+
+/**
+ * Response interceptor - Handle responses and errors
+ */
+apiClient.interceptors.response.use(
+  (response) => {
+    devLog.info(`âœ… API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+      status: response.status,
+      data: response.data
+    });
+    
+    return response;
+  },
+  (error) => {
+    const { response, config } = error;
+    
+    // Enhanced error handling for non-JSON responses
+    let errorMessage = error.message;
+    let errorData = null;
+    
+    if (response) {
+      // Try to parse JSON response
+      try {
+        errorData = response.data;
+        if (typeof errorData === 'string') {
+          // Han
+--- status snippet #3 ---
+errorMessage = error.message;
+    let errorData = null;
+    
+    if (response) {
+      // Try to parse JSON response
+      try {
+        errorData = response.data;
+        if (typeof errorData === 'string') {
+          // Handle cases where server returns HTML or plain text errors
+          if (errorData.startsWith('<!DOCTYPE') || errorData.includes('<html>')) {
+            errorMessage = `Erreur serveur (${response.status}): Page d'erreur reÃ§ue`;
+            errorData = { detail: errorMessage };
+          } else if (errorData.includes('Internal Server Error')) {
+            errorMessage = `Erreur serveur interne (${response.status})`;
+            errorData = { detail: errorMessage };
+          } else {
+            errorData = { detail: errorData };
+          }
+        }
+      } catch (parseError) {
+        // Response is not J
+--- status snippet #4 ---
+     // Handle cases where server returns HTML or plain text errors
+          if (errorData.startsWith('<!DOCTYPE') || errorData.includes('<html>')) {
+            errorMessage = `Erreur serveur (${response.status}): Page d'erreur reÃ§ue`;
+            errorData = { detail: errorMessage };
+          } else if (errorData.includes('Internal Server Error')) {
+            errorMessage = `Erreur serveur interne (${response.status})`;
+            errorData = { detail: errorMessage };
+          } else {
+            errorData = { detail: errorData };
+          }
+        }
+      } catch (parseError) {
+        // Response is not JSON
+        errorMessage = `Erreur de format de rÃ©ponse (${response.status})`;
+        errorData = { detail: errorMessage };
+      }
+    }
+    
+    // Log error details
+    safeLog.error(`âŒ API Error: ${config?.
+--- status snippet #5 ---
+rorMessage };
+          } else if (errorData.includes('Internal Server Error')) {
+            errorMessage = `Erreur serveur interne (${response.status})`;
+            errorData = { detail: errorMessage };
+          } else {
+            errorData = { detail: errorData };
+          }
+        }
+      } catch (parseError) {
+        // Response is not JSON
+        errorMessage = `Erreur de format de rÃ©ponse (${response.status})`;
+        errorData = { detail: errorMessage };
+      }
+    }
+    
+    // Log error details
+    safeLog.error(`âŒ API Error: ${config?.method?.toUpperCase()} ${config?.url}`, {
+      status: response?.status,
+      statusText: response?.statusText,
+      data: errorData,
+      message: errorMessage
+    });
+    
+    // Handle 401 Unauthorized - logout user only for protected endpoints
+    if (response?.statu
+pattern budget: 0
+pattern client_id: 0
+pattern posted_at: 0
+pattern created_at: 0
+pattern Anonymous client: 0
+pattern Invalid Date: 0
+pattern status_undefined: 0
+pattern Location not specified: 0
+pattern /jobs: 7
+--- /jobs snippet #1 ---
+('/users/profile', CACHE_KEYS.USER_PROFILE),
+  updateProfile: async (data) => {
+    const result = await api.put('/users/profile', data);
+    // Update cache with new profile data
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
+export const jobsAPI = {
+  getAll: (params = {}) => api.get('/jobs', { params }),
+  getById: (id) => api.get(`/jobs/${id}`),
+  create: (jobData) => api.post('/jobs', jobData),
+  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export 
+--- /jobs snippet #2 ---
+dateProfile: async (data) => {
+    const result = await api.put('/users/profile', data);
+    // Update cache with new profile data
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
+export const jobsAPI = {
+  getAll: (params = {}) => api.get('/jobs', { params }),
+  getById: (id) => api.get(`/jobs/${id}`),
+  create: (jobData) => api.post('/jobs', jobData),
+  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/
+--- /jobs snippet #3 ---
+= await api.put('/users/profile', data);
+    // Update cache with new profile data
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
+export const jobsAPI = {
+  getAll: (params = {}) => api.get('/jobs', { params }),
+  getById: (id) => api.get(`/jobs/${id}`),
+  create: (jobData) => api.post('/jobs', jobData),
+  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.
+--- /jobs snippet #4 ---
+ cache with new profile data
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
+export const jobsAPI = {
+  getAll: (params = {}) => api.get('/jobs', { params }),
+  getById: (id) => api.get(`/jobs/${id}`),
+  create: (jobData) => api.post('/jobs', jobData),
+  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+  uploadProfilePhoto: (fo
+--- /jobs snippet #5 ---
+EYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
+export const jobsAPI = {
+  getAll: (params = {}) => api.get('/jobs', { params }),
+  getById: (id) => api.get(`/jobs/${id}`),
+  create: (jobData) => api.post('/jobs', jobData),
+  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+  uploadProfilePhoto: (formData) => api.uploadFile('/users/profile-photo', form
+pattern delete: 6
+--- delete snippet #1 ---
+{}) => {
+    try {
+      const response = await apiClient.post(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // PUT request
+  put: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await apiClient.put(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // DELETE request
+  delete: async (endpoint, config = {}) => {
+    try {
+      const response = await apiClient.delete(endpoint, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // PATCH request
+  patch: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await apiClient.patch(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error
+--- delete snippet #2 ---
+  return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // PUT request
+  put: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await apiClient.put(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // DELETE request
+  delete: async (endpoint, config = {}) => {
+    try {
+      const response = await apiClient.delete(endpoint, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // PATCH request
+  patch: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await apiClient.patch(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // File upload
+  uploadFile: async (endpoint, formData, onUploadProgress = n
+--- delete snippet #3 ---
+ta
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
+export const jobsAPI = {
+  getAll: (params = {}) => api.get('/jobs', { params }),
+  getById: (id) => api.get(`/jobs/${id}`),
+  create: (jobData) => api.post('/jobs', jobData),
+  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+  uploadProfilePhoto: (formData) => api.uploadFile(
+--- delete snippet #4 ---
+(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
+export const jobsAPI = {
+  getAll: (params = {}) => api.get('/jobs', { params }),
+  getById: (id) => api.get(`/jobs/${id}`),
+  create: (jobData) => api.post('/jobs', jobData),
+  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/apply`, applicationData),
+  getApplications: (jobId) => api.get(`/jobs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+  uploadProfilePhoto: (formData) => api.uploadFile('/users/profile-phot
+--- delete snippet #5 ---
+bs/${jobId}/applications`),
+};
+
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+  uploadProfilePhoto: (formData) => api.uploadFile('/users/profile-photo', formData),
+  getProfilePhoto: () => api.get('/users/profile-photo'),
+  getUserProfilePhoto: (userId) => api.get(`/users/${userId}/profile-photo`),
+  deleteProfilePhoto: () => api.delete('/users/profile-photo'),
+  getPaymentAccounts: () => api.get('/users/payment-accounts'),
+  updatePaymentAccounts: (data) => api.put('/users/payment-accounts', data),
+  verifyPaymentAccess: (data) => api.post('/users/verify-payment-access', data),
+};
+
+/**
+ * Real payments API endpoints
+ */
+export const paymentAPI = {
+  getConfig: () => api.get('/payments/config'),
+  getQuote: (data
+
+FILE: frontend\src\utils\jobPageSafeHelpers.js
+size: 3535 chars
+pattern getLocationPrecisionMeta: 1
+--- getLocationPrecisionMeta snippet #1 ---
+dgetRange = (minValue, maxValue, currency = 'FCFA') => {
+  const min = Number(minValue);
+  const max = Number(maxValue);
+  const hasMin = Number.isFinite(min) && min > 0;
+  const hasMax = Number.isFinite(max) && max > 0;
+
+  if (hasMin && hasMax) return `${min} - ${max} ${currency}`;
+  if (hasMin) return `${min} ${currency}`;
+  if (hasMax) return `${max} ${currency}`;
+  return 'Budget non renseigné';
+};
+
+export const getLocationPrecisionMeta = (precision) => {
+  const normalized = String(precision || '').toLowerCase().trim();
+  if (['exact', 'precise', 'gps', 'house', 'full'].includes(normalized)) {
+    return { label: 'Position précise', color: 'success' };
+  }
+  if (['area', 'approximate', 'approx', 'quarter', 'district', 'zone'].includes(normalized)) {
+    return { label: 'Zone approximative', color: 'warning' };
+  }
+  if (['c
+pattern formatBudgetRange: 1
+--- formatBudgetRange snippet #1 ---
+export const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
+  const min = Number(minValue);
+  const max = Number(maxValue);
+  const hasMin = Number.isFinite(min) && min > 0;
+  const hasMax = Number.isFinite(max) && max > 0;
+
+  if (hasMin && hasMax) return `${min} - ${max} ${currency}`;
+  if (hasMin) return `${min} ${currency}`;
+  if (hasMax) return `${max} ${currency}`;
+  return 'Budget non renseigné';
+};
+
+expor
+pattern formatJobStatus: 1
+--- formatJobStatus snippet #1 ---
+ return { label: 'Position précise', color: 'success' };
+  }
+  if (['area', 'approximate', 'approx', 'quarter', 'district', 'zone'].includes(normalized)) {
+    return { label: 'Zone approximative', color: 'warning' };
+  }
+  if (['city', 'region', 'country'].includes(normalized)) {
+    return { label: 'Zone large', color: 'muted' };
+  }
+  return { label: 'Localisation non précisée', color: 'muted' };
+};
+
+export const formatJobStatus = (status) => {
+  const normalized = String(status || '').trim().toLowerCase();
+  const map = {
+    open: 'Ouvert',
+    published: 'Publié',
+    active: 'Actif',
+    pending: 'En attente',
+    assigned: 'Attribué',
+    in_progress: 'En cours',
+    completed: 'Terminé',
+    closed: 'Fermé',
+    cancelled: 'Annulé',
+    canceled: 'Annulé',
+    draft: 'Brouillon',
+  };
+  return map[normalized] || 'Non pr
+pattern formatJobDate: 1
+--- formatJobDate snippet #1 ---
+) => {
+  const normalized = String(status || '').trim().toLowerCase();
+  const map = {
+    open: 'Ouvert',
+    published: 'Publié',
+    active: 'Actif',
+    pending: 'En attente',
+    assigned: 'Attribué',
+    in_progress: 'En cours',
+    completed: 'Terminé',
+    closed: 'Fermé',
+    cancelled: 'Annulé',
+    canceled: 'Annulé',
+    draft: 'Brouillon',
+  };
+  return map[normalized] || 'Non précisé';
+};
+
+export const formatJobDate = (value) => {
+  if (!value) return 'Date non renseignée';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date non renseignée';
+  try {
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    }).format(date);
+  } catch (_err) {
+    return 'Date non renseignée';
+  }
+};
+
+export const getStoredSessionUser = () => {
+  i
+pattern isOwnedByCurrentUser: 1
+--- isOwnedByCurrentUser snippet #1 ---
+JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch (_err) {}
+  }
+  return null;
+};
+
+export const normalizeComparableId = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') {
+    if (value._id) return String(value._id).trim();
+    if (value.id) return String(value.id).trim();
+  }
+  return String(value).trim();
+};
+
+export const isOwnedByCurrentUser = (job, currentUser) => {
+  const sessionUser = currentUser || getStoredSessionUser();
+  if (!job || !sessionUser) return false;
+
+  const currentIds = new Set([
+    normalizeComparableId(sessionUser._id),
+    normalizeComparableId(sessionUser.id),
+    normalizeComparableId(sessionUser.user_id),
+    normalizeComparableId(sessionUser.userId),
+  ].filter(Boolean));
+
+  const ownerCandidates = [
+    j
+pattern ensureJobOwnerActionBar: 0
+pattern status: 2
+--- status snippet #1 ---
+osition précise', color: 'success' };
+  }
+  if (['area', 'approximate', 'approx', 'quarter', 'district', 'zone'].includes(normalized)) {
+    return { label: 'Zone approximative', color: 'warning' };
+  }
+  if (['city', 'region', 'country'].includes(normalized)) {
+    return { label: 'Zone large', color: 'muted' };
+  }
+  return { label: 'Localisation non précisée', color: 'muted' };
+};
+
+export const formatJobStatus = (status) => {
+  const normalized = String(status || '').trim().toLowerCase();
+  const map = {
+    open: 'Ouvert',
+    published: 'Publié',
+    active: 'Actif',
+    pending: 'En attente',
+    assigned: 'Attribué',
+    in_progress: 'En cours',
+    completed: 'Terminé',
+    closed: 'Fermé',
+    cancelled: 'Annulé',
+    canceled: 'Annulé',
+    draft: 'Brouillon',
+  };
+  return map[normalized] || 'Non précisé';
+};
+
+export 
+--- status snippet #2 ---
+
+  if (['area', 'approximate', 'approx', 'quarter', 'district', 'zone'].includes(normalized)) {
+    return { label: 'Zone approximative', color: 'warning' };
+  }
+  if (['city', 'region', 'country'].includes(normalized)) {
+    return { label: 'Zone large', color: 'muted' };
+  }
+  return { label: 'Localisation non précisée', color: 'muted' };
+};
+
+export const formatJobStatus = (status) => {
+  const normalized = String(status || '').trim().toLowerCase();
+  const map = {
+    open: 'Ouvert',
+    published: 'Publié',
+    active: 'Actif',
+    pending: 'En attente',
+    assigned: 'Attribué',
+    in_progress: 'En cours',
+    completed: 'Terminé',
+    closed: 'Fermé',
+    cancelled: 'Annulé',
+    canceled: 'Annulé',
+    draft: 'Brouillon',
+  };
+  return map[normalized] || 'Non précisé';
+};
+
+export const formatJobDate = (value) => {
+  if (
+pattern budget: 0
+pattern client_id: 1
+--- client_id snippet #1 ---
+er) => {
+  const sessionUser = currentUser || getStoredSessionUser();
+  if (!job || !sessionUser) return false;
+
+  const currentIds = new Set([
+    normalizeComparableId(sessionUser._id),
+    normalizeComparableId(sessionUser.id),
+    normalizeComparableId(sessionUser.user_id),
+    normalizeComparableId(sessionUser.userId),
+  ].filter(Boolean));
+
+  const ownerCandidates = [
+    job.owner_id,
+    job.ownerId,
+    job.client_id,
+    job.clientId,
+    job.user_id,
+    job.userId,
+    job.created_by,
+    job.createdBy,
+    job.poster_id,
+    job.posterId,
+    job.customer_id,
+    job.customerId,
+    job?.owner?._id,
+    job?.owner?.id,
+    job?.client?._id,
+    job?.client?.id,
+    job?.user?._id,
+    job?.user?.id,
+  ].map(normalizeComparableId).filter(Boolean);
+
+  return ownerCandidates.some((id) => currentIds.has(id));
+};
+
+pattern posted_at: 0
+pattern created_at: 0
+pattern Anonymous client: 0
+pattern Invalid Date: 0
+pattern status_undefined: 0
+pattern Location not specified: 0
+pattern /jobs: 0
+pattern delete: 0
+
+FILE: frontend\src\utils\jobOwnerDeleteRuntime.js
+size: 7289 chars
+functions:
+  - getAuthToken
+  - unique
+  - getBaseCandidates
+  - buildDeleteCandidates
+pattern getLocationPrecisionMeta: 0
+pattern formatBudgetRange: 0
+pattern formatJobStatus: 0
+pattern formatJobDate: 0
+pattern isOwnedByCurrentUser: 2
+--- isOwnedByCurrentUser snippet #1 ---
+(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch (_err) {}
+    }
+  }
+  return null;
+};
+
+export const normalizeComparableId = (value) => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') {
+    if (value._id) return String(value._id).trim();
+    if (value.id) return String(value.id).trim();
+  }
+  return String(value).trim();
+};
+
+export const isOwnedByCurrentUser = (job, currentUser) => {
+  const sessionUser = currentUser || getStoredSessionUser();
+  if (!job || !sessionUser) return false;
+  const currentIds = new Set([
+    normalizeComparableId(sessionUser._id),
+    normalizeComparableId(sessionUser.id),
+    normalizeComparableId(sessionUser.user_id),
+    normalizeComparableId(sessionUser.userId),
+  ].filter(Boolean));
+  const ownerIds = [
+    job.owner_
+--- isOwnedByCurrentUser snippet #2 ---
+e.url} -> NETWORK_ERROR:${error?.message || 'unknown'}`);
+    }
+  }
+  const detail = attempts.join(' | ');
+  throw new Error(`Suppression impossible pour le moment. Essais: ${detail}`);
+};
+
+export const ensureJobOwnerActionBar = (job) => {
+  if (typeof document === 'undefined') return () => {};
+  const previous = document.getElementById('kojo-job-owner-action-bar');
+  if (previous) previous.remove();
+
+  if (!job || !isOwnedByCurrentUser(job)) return () => {};
+  const jobId = getPrimaryJobId(job);
+  if (!jobId) return () => {};
+
+  const bar = document.createElement('div');
+  bar.id = 'kojo-job-owner-action-bar';
+  bar.style.position = 'fixed';
+  bar.style.right = '16px';
+  bar.style.bottom = '16px';
+  bar.style.zIndex = '9999';
+  bar.style.display = 'flex';
+  bar.style.gap = '10px';
+  bar.style.padding = '12px';
+  bar.style.borde
+pattern ensureJobOwnerActionBar: 1
+--- ensureJobOwnerActionBar snippet #1 ---
+hod} ${candidate.url} -> ${response.status}`);
+      if (response.ok) {
+        return { ok: true, status: response.status, attempts };
+      }
+    } catch (error) {
+      attempts.push(`${candidate.method} ${candidate.url} -> NETWORK_ERROR:${error?.message || 'unknown'}`);
+    }
+  }
+  const detail = attempts.join(' | ');
+  throw new Error(`Suppression impossible pour le moment. Essais: ${detail}`);
+};
+
+export const ensureJobOwnerActionBar = (job) => {
+  if (typeof document === 'undefined') return () => {};
+  const previous = document.getElementById('kojo-job-owner-action-bar');
+  if (previous) previous.remove();
+
+  if (!job || !isOwnedByCurrentUser(job)) return () => {};
+  const jobId = getPrimaryJobId(job);
+  if (!jobId) return () => {};
+
+  const bar = document.createElement('div');
+  bar.id = 'kojo-job-owner-action-bar';
+  ba
+pattern status: 3
+--- status snippet #1 ---
+eteCandidates(jobId)) {
+    try {
+      const response = await fetch(candidate.url, {
+        method: candidate.method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: candidate.method === 'POST' ? JSON.stringify({}) : undefined,
+      });
+      attempts.push(`${candidate.method} ${candidate.url} -> ${response.status}`);
+      if (response.ok) {
+        return { ok: true, status: response.status, attempts };
+      }
+    } catch (error) {
+      attempts.push(`${candidate.method} ${candidate.url} -> NETWORK_ERROR:${error?.message || 'unknown'}`);
+    }
+  }
+  const detail = attempts.join(' | ');
+  throw new Error(`Suppression impossible pour le moment. Essais: ${detail}`);
+};
+
+export const ensureJobOwnerActionBar = (job) => {
+--- status snippet #2 ---
+fetch(candidate.url, {
+        method: candidate.method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: candidate.method === 'POST' ? JSON.stringify({}) : undefined,
+      });
+      attempts.push(`${candidate.method} ${candidate.url} -> ${response.status}`);
+      if (response.ok) {
+        return { ok: true, status: response.status, attempts };
+      }
+    } catch (error) {
+      attempts.push(`${candidate.method} ${candidate.url} -> NETWORK_ERROR:${error?.message || 'unknown'}`);
+    }
+  }
+  const detail = attempts.join(' | ');
+  throw new Error(`Suppression impossible pour le moment. Essais: ${detail}`);
+};
+
+export const ensureJobOwnerActionBar = (job) => {
+  if (typeof document === 'undefined') return () => {};
+  cons
+--- status snippet #3 ---
+rl, {
+        method: candidate.method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: candidate.method === 'POST' ? JSON.stringify({}) : undefined,
+      });
+      attempts.push(`${candidate.method} ${candidate.url} -> ${response.status}`);
+      if (response.ok) {
+        return { ok: true, status: response.status, attempts };
+      }
+    } catch (error) {
+      attempts.push(`${candidate.method} ${candidate.url} -> NETWORK_ERROR:${error?.message || 'unknown'}`);
+    }
+  }
+  const detail = attempts.join(' | ');
+  throw new Error(`Suppression impossible pour le moment. Essais: ${detail}`);
+};
+
+export const ensureJobOwnerActionBar = (job) => {
+  if (typeof document === 'undefined') return () => {};
+  const previous = docu
+pattern budget: 0
+pattern client_id: 1
+--- client_id snippet #1 ---
+currentUser) => {
+  const sessionUser = currentUser || getStoredSessionUser();
+  if (!job || !sessionUser) return false;
+  const currentIds = new Set([
+    normalizeComparableId(sessionUser._id),
+    normalizeComparableId(sessionUser.id),
+    normalizeComparableId(sessionUser.user_id),
+    normalizeComparableId(sessionUser.userId),
+  ].filter(Boolean));
+  const ownerIds = [
+    job.owner_id,
+    job.ownerId,
+    job.client_id,
+    job.clientId,
+    job.user_id,
+    job.userId,
+    job.created_by,
+    job.createdBy,
+    job.poster_id,
+    job.posterId,
+    job.customer_id,
+    job.customerId,
+    job?.owner?._id,
+    job?.owner?.id,
+    job?.client?._id,
+    job?.client?.id,
+    job?.user?._id,
+    job?.user?.id,
+  ].map(normalizeComparableId).filter(Boolean);
+  return ownerIds.some((id) => currentIds.has(id));
+};
+
+export const g
+pattern posted_at: 0
+pattern created_at: 0
+pattern Anonymous client: 0
+pattern Invalid Date: 0
+pattern status_undefined: 0
+pattern Location not specified: 0
+pattern /jobs: 6
+--- /jobs snippet #1 ---
+(typeof window !== 'undefined') {
+    envs.push(window.__API_BASE_URL__);
+    envs.push(window.location?.origin || '');
+  }
+  envs.push('');
+  envs.push('/api');
+  return unique(envs.map((value) => String(value || '').replace(/\/$/, '')));
+};
+
+const buildDeleteCandidates = (jobId) => {
+  const bases = getBaseCandidates();
+  const urls = [];
+  for (const base of bases) {
+    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.
+--- /jobs snippet #2 ---
+_URL__);
+    envs.push(window.location?.origin || '');
+  }
+  envs.push('');
+  envs.push('/api');
+  return unique(envs.map((value) => String(value || '').replace(/\/$/, '')));
+};
+
+const buildDeleteCandidates = (jobId) => {
+  const bases = getBaseCandidates();
+  const urls = [];
+  for (const base of bases) {
+    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.filter((item) => {
+    const key = `${item.method}:${item.url}`;
+
+--- /jobs snippet #3 ---
+envs.push('/api');
+  return unique(envs.map((value) => String(value || '').replace(/\/$/, '')));
+};
+
+const buildDeleteCandidates = (jobId) => {
+  const bases = getBaseCandidates();
+  const urls = [];
+  for (const base of bases) {
+    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.filter((item) => {
+    const key = `${item.method}:${item.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+--- /jobs snippet #4 ---
+| '').replace(/\/$/, '')));
+};
+
+const buildDeleteCandidates = (jobId) => {
+  const bases = getBaseCandidates();
+  const urls = [];
+  for (const base of bases) {
+    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.filter((item) => {
+    const key = `${item.method}:${item.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const deleteJobWithFallbacks = async (job) => {
+  const j
+--- /jobs snippet #5 ---
+x 30px rgba(0,0,0,0.25)';
+  bar.style.backdropFilter = 'blur(8px)';
+
+  const listBtn = document.createElement('button');
+  listBtn.type = 'button';
+  listBtn.textContent = 'Mes jobs';
+  listBtn.style.border = '0';
+  listBtn.style.borderRadius = '12px';
+  listBtn.style.padding = '10px 14px';
+  listBtn.style.cursor = 'pointer';
+  listBtn.style.fontWeight = '700';
+  listBtn.onclick = () => {
+    window.location.href = '/jobs';
+  };
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.textContent = 'Supprimer ce job';
+  deleteBtn.style.border = '0';
+  deleteBtn.style.borderRadius = '12px';
+  deleteBtn.style.padding = '10px 14px';
+  deleteBtn.style.cursor = 'pointer';
+  deleteBtn.style.fontWeight = '700';
+  deleteBtn.style.background = '#dc2626';
+  deleteBtn.style.color = '#fff';
+  deleteBtn
+pattern delete: 22
+--- delete snippet #1 ---
+vs.push(window.location?.origin || '');
+  }
+  envs.push('');
+  envs.push('/api');
+  return unique(envs.map((value) => String(value || '').replace(/\/$/, '')));
+};
+
+const buildDeleteCandidates = (jobId) => {
+  const bases = getBaseCandidates();
+  const urls = [];
+  for (const base of bases) {
+    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.filter((item) => {
+    const key = `${item.method}:${item.url}`;
+    if (seen.ha
+--- delete snippet #2 ---
+\/$/, '')));
+};
+
+const buildDeleteCandidates = (jobId) => {
+  const bases = getBaseCandidates();
+  const urls = [];
+  for (const base of bases) {
+    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.filter((item) => {
+    const key = `${item.method}:${item.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const deleteJobWithFallbacks = async (job) => {
+  const jobId = getPrima
+--- delete snippet #3 ---
+bases) {
+    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.filter((item) => {
+    const key = `${item.method}:${item.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const deleteJobWithFallbacks = async (job) => {
+  const jobId = getPrimaryJobId(job);
+  if (!jobId) {
+    throw new Error('Identifiant du job introuvable');
+  }
+  const token = getAuthToken();
+  const attempts
+--- delete snippet #4 ---
+;
+    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
+    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
+    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
+  }
+  const seen = new Set();
+  return urls.filter((item) => {
+    const key = `${item.method}:${item.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+export const deleteJobWithFallbacks = async (job) => {
+  const jobId = getPrimaryJobId(job);
+  if (!jobId) {
+    throw new Error('Identifiant du job introuvable');
+  }
+  const token = getAuthToken();
+  const attempts = [];
+  for (const candidate of buildDeleteCandidates(jobId)) {
+    try {
+      const response = await fetch(candidate.url, {
+        method: candidate.method,
+        headers: {
+          'Content-Type': 'applicatio
+--- delete snippet #5 ---
+)';
+  bar.style.backdropFilter = 'blur(8px)';
+
+  const listBtn = document.createElement('button');
+  listBtn.type = 'button';
+  listBtn.textContent = 'Mes jobs';
+  listBtn.style.border = '0';
+  listBtn.style.borderRadius = '12px';
+  listBtn.style.padding = '10px 14px';
+  listBtn.style.cursor = 'pointer';
+  listBtn.style.fontWeight = '700';
+  listBtn.onclick = () => {
+    window.location.href = '/jobs';
+  };
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.textContent = 'Supprimer ce job';
+  deleteBtn.style.border = '0';
+  deleteBtn.style.borderRadius = '12px';
+  deleteBtn.style.padding = '10px 14px';
+  deleteBtn.style.cursor = 'pointer';
+  deleteBtn.style.fontWeight = '700';
+  deleteBtn.style.background = '#dc2626';
+  deleteBtn.style.color = '#fff';
+  deleteBtn.onclick = async () =>
+
+FILE: frontend\src\components\JobCreateModal.js
+size: 13646 chars
+imports:
+  import { useState } from 'react';
+  import { useAuth } from '../contexts/AuthContext';
+  import { useLanguage } from '../contexts/LanguageContext';
+  import LocationDetector from './LocationDetector';
+  import { jobsAPI } from '../services/api';
+  import { makeScopedTranslator } from '../utils/pack2PageI18n';
+  import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, getLocationPrecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
+functions:
+  - JobCreateModal
+pattern getLocationPrecisionMeta: 2
+--- getLocationPrecisionMeta snippet #1 ---
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import LocationDetector from './LocationDetector';
+import { jobsAPI } from '../services/api';
+import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, getLocationPrecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
+
+export default function JobCreateModal({ onClose, onJobCreated }) {
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'createJob');
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'plumbing',
+    budget_
+--- getLocationPrecisionMeta snippet #2 ---
+ired_skills: prev.required_skills.filter((skill) => skill !== skillToRemove) }));
+  };
+
+  const handleSkillKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addSkill();
+    }
+  };
+
+  const locationCoordinates = getLocationCoordinates(formData.location);
+  const locationPreviewUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(formData.location) : '';
+  const locationPrecisionMeta = getLocationPrecisionMeta(formData.location, currentLanguage);
+  const locationToneClasses = locationPrecisionMeta.tone === 'green'
+    ? { panel: 'border-green-200 bg-green-50', badge: 'bg-green-100 text-green-800', title: 'text-green-900', text: 'text-green-700' }
+    : locationPrecisionMeta.tone === 'amber'
+      ? { panel: 'border-amber-200 bg-amber-50', badge: 'bg-amber-100 text-amber-800', title: 'text-amber-900
+pattern formatBudgetRange: 0
+pattern formatJobStatus: 0
+pattern formatJobDate: 0
+pattern isOwnedByCurrentUser: 0
+pattern ensureJobOwnerActionBar: 0
+pattern status: 0
+pattern budget: 18
+--- budget snippet #1 ---
+nates, getLocationPrecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
+
+export default function JobCreateModal({ onClose, onJobCreated }) {
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'createJob');
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'plumbing',
+    budget_min: '',
+    budget_max: '',
+    location: {
+      address: '',
+      fullAddress: '',
+      latitude: null,
+      longitude: null,
+      coordinates: null,
+      city: '',
+      district: '',
+      country: '',
+      countryCode: ''
+    },
+    required_skills: [],
+    estimated_duration: '',
+    deadline: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  con
+--- budget snippet #2 ---
+ecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
+
+export default function JobCreateModal({ onClose, onJobCreated }) {
+  const { user } = useAuth();
+  const { t, currentLanguage } = useLanguage();
+  const pageT = makeScopedTranslator(currentLanguage, t, 'createJob');
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: 'plumbing',
+    budget_min: '',
+    budget_max: '',
+    location: {
+      address: '',
+      fullAddress: '',
+      latitude: null,
+      longitude: null,
+      coordinates: null,
+      city: '',
+      district: '',
+      country: '',
+      countryCode: ''
+    },
+    required_skills: [],
+    estimated_duration: '',
+    deadline: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [skillInput, setS
+--- budget snippet #3 ---
+t('construction') },
+    { value: 'carpentry', label: t('carpentry') },
+    { value: 'cleaning', label: t('cleaning') },
+    { value: 'gardening', label: t('gardening') },
+    { value: 'tutoring', label: t('tutoring') },
+    { value: 'mechanics', label: t('mechanics') }
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      if (parseFloat(formData.budget_min) >= parseFloat(formData.budget_max)) {
+        throw new Error(t('jobBudgetRangeError'));
+      }
+
+      const jobData = {
+        ...formData,
+        location: normalizeLocationPayload(formData.location),
+        budget_min: parseFloat(formData.budget_min),
+        budget_max: parseFloat(formData.budget_max),
+        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
+      };
+
+--- budget snippet #4 ---
+carpentry', label: t('carpentry') },
+    { value: 'cleaning', label: t('cleaning') },
+    { value: 'gardening', label: t('gardening') },
+    { value: 'tutoring', label: t('tutoring') },
+    { value: 'mechanics', label: t('mechanics') }
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      if (parseFloat(formData.budget_min) >= parseFloat(formData.budget_max)) {
+        throw new Error(t('jobBudgetRangeError'));
+      }
+
+      const jobData = {
+        ...formData,
+        location: normalizeLocationPayload(formData.location),
+        budget_min: parseFloat(formData.budget_min),
+        budget_max: parseFloat(formData.budget_max),
+        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
+      };
+
+      await jobsAPI.create(jobData
+--- budget snippet #5 ---
+ value: 'mechanics', label: t('mechanics') }
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      if (parseFloat(formData.budget_min) >= parseFloat(formData.budget_max)) {
+        throw new Error(t('jobBudgetRangeError'));
+      }
+
+      const jobData = {
+        ...formData,
+        location: normalizeLocationPayload(formData.location),
+        budget_min: parseFloat(formData.budget_min),
+        budget_max: parseFloat(formData.budget_max),
+        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null
+      };
+
+      await jobsAPI.create(jobData);
+      onJobCreated();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message || t('jobCreateError'));
+    } finally {
+      setLoading(false);
+    }
+
+pattern client_id: 0
+pattern posted_at: 0
+pattern created_at: 0
+pattern Anonymous client: 0
+pattern Invalid Date: 0
+pattern status_undefined: 0
+pattern Location not specified: 0
+pattern /jobs: 0
+pattern delete: 0
+
+SUMMARY
+1. Ce pack ne modifie rien.
+2. Il extrait le vrai code frontend Jobs actuellement actif.
+3. Envoie ce rapport pour recevoir le correctif final precis.
