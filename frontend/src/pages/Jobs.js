@@ -1,101 +1,13 @@
-const getStoredSessionUser = () => {
-  const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
-
-  for (const key of keys) {
-    try {
-      const raw = window?.localStorage?.getItem?.(key) || window?.sessionStorage?.getItem?.(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      const candidate = parsed?.user || parsed?.profile || parsed?.currentUser || parsed?.data?.user || parsed;
-      if (candidate && typeof candidate === 'object') return candidate;
-    } catch (_) {}
-  }
-
-  return null;
-};
-
-const normalizeComparableId = (value) => String(value ?? '').trim();
-
-const isOwnedByCurrentUser = (job) => {
-  const user = getStoredSessionUser();
-  const currentUserIds = [
-    user?.id,
-    user?._id,
-    user?.userId,
-    user?.ownerId,
-    user?.clientId,
-    user?.profile?.id,
-    user?.profile?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  const jobOwnerIds = [
-    job?.ownerId,
-    job?.userId,
-    job?.clientId,
-    job?.createdBy,
-    job?.postedBy,
-    job?.posterId,
-    job?.owner?.id,
-    job?.owner?._id,
-    job?.user?.id,
-    job?.user?._id,
-    job?.client?.id,
-    job?.client?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  return currentUserIds.some((id) => jobOwnerIds.includes(id));
-};
-
-const formatJobStatus = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'status_undefined') return 'Statut non défini';
-  if (normalized === 'open') return 'Ouvert';
-  if (normalized === 'closed') return 'Fermé';
-  if (normalized === 'draft') return 'Brouillon';
-  if (normalized === 'pending') return 'En attente';
-  if (normalized === 'published') return 'Publié';
-  return String(status || '').replace(/_/g, ' ');
-};
-
-const formatJobDate = (value) => {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return 'Date indisponible';
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-};
-
-const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
-  const min = Number(minValue);
-  const max = Number(maxValue);
-  const hasMin = Number.isFinite(min) && min > 0;
-  const hasMax = Number.isFinite(max) && max > 0;
-
-  if (hasMin && hasMax) return `${min} - ${max} ${currency}`;
-  if (hasMin) return `${min} ${currency}`;
-  if (hasMax) return `${max} ${currency}`;
-  return 'Budget non renseigné';
-};
-
-const getLocationPrecisionMeta = (precision) => {
-  const normalized = String(precision || '').toLowerCase().trim();
-
-  if (normalized.includes('exact') || normalized.includes('precise')) {
-    return { label: 'Position exacte', shortLabel: 'Exacte', color: 'success' };
-  }
-
-  if (normalized.includes('approx') || normalized.includes('near') || normalized.includes('zone')) {
-    return { label: 'Zone approximative', shortLabel: 'Approx.', color: 'warning' };
-  }
-
-  if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return { label: 'Ville / région', shortLabel: 'Région', color: 'info' };
-  }
-
-  return { label: 'Localisation disponible', shortLabel: 'Localisation', color: 'info' };
-};
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import JobCreateModal from '../components/JobCreateModal';
+import MechanicRequirements from '../components/MechanicRequirements';
+import { ListSkeleton } from '../components/SkeletonLoader';
+import { jobsAPI } from '../services/api';
+import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
 
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
@@ -169,7 +81,6 @@ export default function Jobs() {
     { value: 'plumbing', label: t('plumbing') },
     { value: 'electrical', label: t('electrical') },
     { value: 'construction', label: t('construction') },
-    { value: 'carpentry', label: t('carpentry') },
     { value: 'cleaning', label: t('cleaning') },
     { value: 'gardening', label: t('gardening') },
     { value: 'tutoring', label: t('tutoring') },
@@ -221,11 +132,8 @@ export default function Jobs() {
       <div className="bg-white rounded-lg shadow mb-6 p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label htmlFor="jobs_search" className="block text-sm font-medium text-gray-700 mb-2">{t('search')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('search')}</label>
             <input
-              id="jobs_search"
-              name="jobs_search"
-              autoComplete="off"
               type="text"
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
@@ -235,11 +143,8 @@ export default function Jobs() {
           </div>
 
           <div>
-            <label htmlFor="jobs_category_filter" className="block text-sm font-medium text-gray-700 mb-2">{pageT('categoryLabel')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('categoryLabel')}</label>
             <select
-              id="jobs_category_filter"
-              name="jobs_category_filter"
-              autoComplete="off"
               value={filters.category}
               onChange={(e) => handleFilterChange('category', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"
@@ -253,11 +158,8 @@ export default function Jobs() {
           </div>
 
           <div>
-            <label htmlFor="jobs_status_filter" className="block text-sm font-medium text-gray-700 mb-2">{pageT('statusLabel')}</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('statusLabel')}</label>
             <select
-              id="jobs_status_filter"
-              name="jobs_status_filter"
-              autoComplete="off"
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"
@@ -332,7 +234,11 @@ function JobCard({ job, userType, currentLanguage, t, pageT }) {
 
   const locale = getLocaleForLanguage(currentLanguage);
   const formatDate = (dateString) =>
-    formatJobDate(dateString);
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
 
   const translateStatus = (status) => {
     switch (status) {
@@ -390,7 +296,7 @@ function JobCard({ job, userType, currentLanguage, t, pageT }) {
 
         <div className="ml-0 md:ml-6 text-right min-w-[170px]">
           <div className="text-2xl font-bold text-orange-600">
-            {formatBudgetRange(job.budget_min, job.budget_max)}
+            {job.budget_min} - {job.budget_max} FCFA
           </div>
           {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{pageT('duration', { value: job.estimated_duration })}</div>}
           {userType === 'worker' && job.status === 'open' && (
