@@ -1,3 +1,5 @@
+import { jobsAPI } from '../services/api';
+
 export const getStoredSessionUser = () => {
   if (typeof window === 'undefined') return null;
   const buckets = [window.localStorage, window.sessionStorage].filter(Boolean);
@@ -27,12 +29,14 @@ export const normalizeComparableId = (value) => {
 export const isOwnedByCurrentUser = (job, currentUser) => {
   const sessionUser = currentUser || getStoredSessionUser();
   if (!job || !sessionUser) return false;
+
   const currentIds = new Set([
     normalizeComparableId(sessionUser._id),
     normalizeComparableId(sessionUser.id),
     normalizeComparableId(sessionUser.user_id),
     normalizeComparableId(sessionUser.userId),
   ].filter(Boolean));
+
   const ownerIds = [
     job.owner_id,
     job.ownerId,
@@ -53,6 +57,7 @@ export const isOwnedByCurrentUser = (job, currentUser) => {
     job?.user?._id,
     job?.user?.id,
   ].map(normalizeComparableId).filter(Boolean);
+
   return ownerIds.some((id) => currentIds.has(id));
 };
 
@@ -61,94 +66,18 @@ export const getPrimaryJobId = (job) => {
   return normalizeComparableId(job._id || job.id || job.job_id || job.jobId || job.slug);
 };
 
-const getAuthToken = () => {
-  if (typeof window === 'undefined') return '';
-  const buckets = [window.localStorage, window.sessionStorage].filter(Boolean);
-  const keys = ['token', 'authToken', 'accessToken', 'kojo_token', 'jwt'];
-  for (const bucket of buckets) {
-    for (const key of keys) {
-      const raw = bucket.getItem(key);
-      if (!raw) continue;
-      if (raw.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(raw);
-          for (const nested of ['token', 'accessToken', 'authToken', 'jwt']) {
-            if (parsed && parsed[nested]) return String(parsed[nested]);
-          }
-        } catch (_err) {}
-      }
-      return String(raw);
-    }
-  }
-  return '';
-};
-
-const unique = (items) => Array.from(new Set(items.filter(Boolean)));
-
-const getBaseCandidates = () => {
-  const envs = [];
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      envs.push(import.meta.env.VITE_API_BASE_URL);
-      envs.push(import.meta.env.VITE_API_URL);
-    }
-  } catch (_err) {}
-  if (typeof window !== 'undefined') {
-    envs.push(window.__API_BASE_URL__);
-    envs.push(window.location?.origin || '');
-  }
-  envs.push('');
-  envs.push('/api');
-  return unique(envs.map((value) => String(value || '').replace(/\/$/, '')));
-};
-
-const buildDeleteCandidates = (jobId) => {
-  const bases = getBaseCandidates();
-  const urls = [];
-  for (const base of bases) {
-    urls.push({ method: 'DELETE', url: `${base}/jobs/${jobId}` });
-    urls.push({ method: 'POST', url: `${base}/jobs/${jobId}/delete` });
-    urls.push({ method: 'DELETE', url: `${base}/api/jobs/${jobId}` });
-    urls.push({ method: 'POST', url: `${base}/api/jobs/${jobId}/delete` });
-    urls.push({ method: 'DELETE', url: `${base}/job/${jobId}` });
-    urls.push({ method: 'POST', url: `${base}/job/${jobId}/delete` });
-  }
-  const seen = new Set();
-  return urls.filter((item) => {
-    const key = `${item.method}:${item.url}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
-
 export const deleteJobWithFallbacks = async (job) => {
   const jobId = getPrimaryJobId(job);
   if (!jobId) {
     throw new Error('Identifiant du job introuvable');
   }
-  const token = getAuthToken();
-  const attempts = [];
-  for (const candidate of buildDeleteCandidates(jobId)) {
-    try {
-      const response = await fetch(candidate.url, {
-        method: candidate.method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: candidate.method === 'POST' ? JSON.stringify({}) : undefined,
-      });
-      attempts.push(`${candidate.method} ${candidate.url} -> ${response.status}`);
-      if (response.ok) {
-        return { ok: true, status: response.status, attempts };
-      }
-    } catch (error) {
-      attempts.push(`${candidate.method} ${candidate.url} -> NETWORK_ERROR:${error?.message || 'unknown'}`);
-    }
+
+  try {
+    return await jobsAPI.delete(jobId);
+  } catch (error) {
+    const detail = error?.response?.data?.detail || error?.message || 'Suppression impossible pour le moment';
+    throw new Error(detail);
   }
-  const detail = attempts.join(' | ');
-  throw new Error(`Suppression impossible pour le moment. Essais: ${detail}`);
 };
 
 export const ensureJobOwnerActionBar = (job) => {

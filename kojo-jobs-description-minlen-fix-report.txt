@@ -1,0 +1,26 @@
+KOJO JOBS DESCRIPTION MINLEN FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Backup: frontend\src\utils\jobCreateBridge.js.jobs-description-minlen-fix.backup
+Written: frontend\src\utils\jobCreateBridge.js
+
+Backup: backend\server.py.jobs-description-minlen-fix.backup
+backend/server.py create_job route updated to auto-normalize short descriptions
+
+CAUSE
+- le modèle JobCreate exige au moins 20 caractères pour description
+- une description courte comme "fuite deau" est rejetée
+
+CORRECTION
+- les descriptions trop courtes sont automatiquement enrichies côté front
+- sécurité supplémentaire côté back avant validation Pydantic
+
+FILES A MODIFIER
+- frontend/src/utils/jobCreateBridge.js
+- backend/server.py
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Fix jobs short description validation"
+4. git push origin main

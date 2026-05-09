@@ -1,0 +1,31 @@
+KOJO JOBS CREATEJOB I18N FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Backup: frontend\src\utils\jobUiLocale.js.jobs-createjob-i18n-fix.backup
+Written: frontend\src\utils\jobUiLocale.js
+
+Backup: frontend\src\pages\Jobs.js.jobs-createjob-i18n-fix.backup
+Written: frontend\src\pages\Jobs.js
+
+Backup: frontend\src\pages\CreateJob.js.jobs-createjob-i18n-fix.backup
+Written: frontend\src\pages\CreateJob.js
+
+Backup: frontend\src\components\JobCreateModal.js.jobs-createjob-i18n-fix.backup
+Written: frontend\src\components\JobCreateModal.js
+
+OBJECTIF
+- le bouton Create Job ne doit plus rester en anglais quand la langue change
+- centralisation des libellés jobs/create job selon currentLanguage
+- harmonisation entre Jobs.js, CreateJob.js et JobCreateModal.js
+
+FILES A MODIFIER
+- frontend/src/utils/jobUiLocale.js
+- frontend/src/pages/Jobs.js
+- frontend/src/pages/CreateJob.js
+- frontend/src/components/JobCreateModal.js
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Fix jobs create button language for all locales"
+4. git push origin main
