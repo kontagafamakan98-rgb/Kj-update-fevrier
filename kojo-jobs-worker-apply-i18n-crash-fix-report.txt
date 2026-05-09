@@ -1,0 +1,29 @@
+KOJO JOBS WORKER APPLY I18N + CRASH FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Written: frontend\src\utils\jobProposalLocale.js
+
+Backup: frontend\src\components\ProposalModal.js.jobs-worker-apply-i18n-crash-fix.backup
+Written: frontend\src\components\ProposalModal.js
+
+Backup: frontend\src\pages\JobDetails.js.jobs-worker-apply-i18n-crash-fix.backup
+Written: frontend\src\pages\JobDetails.js
+
+CORRECTIONS
+- bouton Postuler force sur la bonne langue active au lieu de reprendre un libellé erroné
+- ProposalModal utilise maintenant le vrai schema backend ProposalCreate
+- envoi des champs requis: proposed_amount, estimated_completion_time, message
+- garde aussi des alias compat pour eviter une autre regression
+- transforme les erreurs 422 detail en vrai texte lisible pour eviter le crash React
+- message trop court bloque cote frontend avant appel API
+
+FILES MODIFIED
+- frontend/src/utils/jobProposalLocale.js
+- frontend/src/components/ProposalModal.js
+- frontend/src/pages/JobDetails.js
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Fix worker apply i18n and proposal crash"
+4. git push origin main
