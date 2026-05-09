@@ -6,6 +6,7 @@ import JobCreateModal from '../components/JobCreateModal';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { jobsAPI } from '../services/api';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser } from '../utils/jobPageSafeHelpers';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
@@ -53,6 +54,7 @@ export default function Jobs() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobs');
+  const jobUi = getJobUiLabel(currentLanguage);
   const [searchParams] = useSearchParams();
   const locale = getLocaleForLanguage(currentLanguage);
 
@@ -71,10 +73,10 @@ export default function Jobs() {
       const jobsData = normalizeJobList(Array.isArray(response) ? response : response?.data || []);
       const visibleJobs = user?.user_type === 'client'
         ? jobsData.filter((job) => isOwnedByCurrentUser(job, user))
-        : jobsData;
+        : jobsData.filter((job) => job.status === 'open' || !job.status);
       setJobs(visibleJobs);
     } catch (error) {
-      safeLog.error('Error loading jobs:', error);
+      safeLog('Jobs load error', error);
       setJobs([]);
     } finally {
       setLoading(false);
@@ -82,23 +84,15 @@ export default function Jobs() {
   };
 
   const filteredJobs = useMemo(() => {
-    let filtered = [...jobs];
-
-    if (filters.category) {
-      filtered = filtered.filter((job) => String(job.category || '') === filters.category);
-    }
-    if (filters.status) {
-      filtered = filtered.filter((job) => String(job.status || '') === filters.status);
-    }
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter((job) =>
-        String(job.title || '').toLowerCase().includes(searchLower) ||
-        String(job.description || '').toLowerCase().includes(searchLower) ||
-        String(job.location_text || '').toLowerCase().includes(searchLower)
-      );
-    }
-    return filtered;
+    return jobs.filter((job) => {
+      if (filters.category && job.category !== filters.category) return false;
+      if (filters.status && job.status !== filters.status) return false;
+      if (filters.search) {
+        const haystack = `${job.title || ''} ${job.description || ''} ${job.location_text || ''}`.toLowerCase();
+        if (!haystack.includes(filters.search.toLowerCase())) return false;
+      }
+      return true;
+    });
   }, [jobs, filters]);
 
   const categories = [
@@ -137,7 +131,7 @@ export default function Jobs() {
         </div>
         {user?.user_type === 'client' && (
           <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
-            {pageT('createJob') || 'Publier un job'}
+            {jobUi.createJob}
           </button>
         )}
       </div>

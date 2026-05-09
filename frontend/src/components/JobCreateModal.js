@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 import { jobsAPI } from '../services/api';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
+import { getJobUiLabel } from '../utils/jobUiLocale';
 import {
   emptyJobLocation,
   mergeManualAddress,
@@ -11,6 +13,8 @@ import {
 } from '../utils/jobLocationRuntime';
 
 export default function JobCreateModal({ onClose, onJobCreated }) {
+  const { currentLanguage } = useLanguage();
+  const ui = getJobUiLabel(currentLanguage);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -104,8 +108,8 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
       <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-gray-100 max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 sticky top-0 bg-white">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Publier un job</h2>
-            <p className="text-sm text-gray-500">Seuls le titre, le prix et la localisation sont obligatoires.</p>
+            <h2 className="text-xl font-bold text-gray-900">{ui.createJobTitle}</h2>
+            <p className="text-sm text-gray-500">{ui.createJobSubtitle}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
         </div>
@@ -114,18 +118,18 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Titre *</label>
-            <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder="Ex: Réparation de plomberie" />
+            <label className="mb-2 block text-sm font-medium text-gray-700">{ui.title} *</label>
+            <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder={ui.title} />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Description</label>
-            <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
+            <label className="mb-2 block text-sm font-medium text-gray-700">{ui.description}</label>
+            <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Catégorie</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.category}</label>
               <select name="category" value={formData.category} onChange={handleChange} className={inputClass}>
                 <option value="general">Général</option>
                 <option value="plumbing">Plomberie</option>
@@ -138,18 +142,18 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
               </select>
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Localisation *</label>
-              <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder="Quartier, ville, adresse utile" />
+              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.location} *</label>
+              <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder={ui.location} />
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-60">
-              {locating ? 'Localisation...' : 'Utiliser ma position actuelle'}
+              {locating ? ui.locating : ui.useCurrentLocation}
             </button>
             {hasCoordinates(formData.location) && (
               <div className="flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                GPS détecté
+                {ui.gpsDetected}
               </div>
             )}
           </div>
@@ -159,7 +163,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           {locationLabel && (
             <div className="rounded-2xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 text-sm text-gray-700">
-                <div className="font-semibold">Adresse retenue</div>
+                <div className="font-semibold">{ui.selectedAddress}</div>
                 <div>{locationLabel}</div>
               </div>
               {mapUrl && (
@@ -170,32 +174,31 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Prix *</label>
-              <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder="Ex: 5000" />
+              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.price} *</label>
+              <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder={ui.price} />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Prix max</label>
-              <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
+              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.priceMax}</label>
+              <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
             </div>
           </div>
-          <p className="text-sm text-gray-500">Si tu mets seulement le prix, il sera utilisé comme prix min et prix max.</p>
+          <p className="text-sm text-gray-500">{ui.priceHint}</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Durée estimée</label>
-              <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
+              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.estimatedDuration}</label>
+              <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Deadline</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.deadline}</label>
               <input type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className={inputClass} />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Compétences demandées</label>
             <div className="flex gap-2">
-              <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder="Optionnel" />
-              <button type="button" onClick={addSkill} className="rounded-xl bg-gray-900 px-4 py-3 font-semibold text-white">Ajouter</button>
+              <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder={ui.skillPlaceholder} />
+              <button type="button" onClick={addSkill} className="rounded-xl bg-gray-900 px-4 py-3 font-semibold text-white">{ui.add}</button>
             </div>
             {formData.required_skills.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -211,23 +214,23 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
               <input type="checkbox" name="mechanic_must_bring_parts" checked={formData.mechanic_must_bring_parts} onChange={handleChange} />
-              <span>Le travailleur doit apporter les pièces</span>
+              <span>{ui.workerBringsParts}</span>
             </label>
             <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">
               <input type="checkbox" name="mechanic_must_bring_tools" checked={formData.mechanic_must_bring_tools} onChange={handleChange} />
-              <span>Le travailleur doit apporter les outils</span>
+              <span>{ui.workerBringsTools}</span>
             </label>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Notes pièces / outils</label>
-            <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
+            <label className="mb-2 block text-sm font-medium text-gray-700">{ui.partsNotes}</label>
+            <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-            <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">Annuler</button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">{ui.cancel}</button>
             <button type="submit" disabled={loading} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
-              {loading ? 'Publication...' : 'Publier le job'}
+              {loading ? ui.publishing : ui.createJob}
             </button>
           </div>
         </form>
