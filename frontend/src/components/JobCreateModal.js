@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import { jobsAPI } from '../services/api';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
+import {
+  emptyJobLocation,
+  mergeManualAddress,
+  detectCurrentJobLocation,
+  buildMapEmbedUrl,
+  buildLocationLabel,
+  hasCoordinates,
+} from '../utils/jobLocationRuntime';
 
 export default function JobCreateModal({ onClose, onJobCreated }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: 'general',
-    location: '',
+    location: emptyJobLocation(),
     budget_min: '',
     budget_max: '',
     required_skills: [],
@@ -21,11 +29,33 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [skillInput, setSkillInput] = useState('');
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     setError('');
+  };
+
+  const handleLocationInput = (e) => {
+    const value = e.target.value;
+    setFormData((prev) => ({ ...prev, location: mergeManualAddress(prev.location, value) }));
+    setLocationError('');
+    setError('');
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setLocating(true);
+    setLocationError('');
+    try {
+      const detected = await detectCurrentJobLocation();
+      setFormData((prev) => ({ ...prev, location: detected }));
+    } catch (locError) {
+      setLocationError(locError?.message || 'Impossible de récupérer votre position');
+    } finally {
+      setLocating(false);
+    }
   };
 
   const addSkill = () => {
@@ -68,6 +98,8 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   };
 
   const inputClass = 'w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100';
+  const locationLabel = buildLocationLabel(formData.location);
+  const mapUrl = buildMapEmbedUrl(formData.location);
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 px-4 py-6">
@@ -75,7 +107,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 sticky top-0 bg-white">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Publier un job</h2>
-            <p className="text-sm text-gray-500">Version stabilisée contre les erreurs 422.</p>
+            <p className="text-sm text-gray-500">Localisation automatique et carte restaurées.</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
         </div>
@@ -109,9 +141,34 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">Localisation</label>
-              <input name="location" value={formData.location} onChange={handleChange} className={inputClass} placeholder="Quartier, ville, adresse utile" />
+              <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder="Quartier, ville, adresse utile" />
             </div>
           </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-60">
+              {locating ? 'Localisation...' : 'Utiliser ma position actuelle'}
+            </button>
+            {hasCoordinates(formData.location) && (
+              <div className="flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                GPS détecté
+              </div>
+            )}
+          </div>
+
+          {locationError && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{locationError}</div>}
+
+          {locationLabel && (
+            <div className="rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 text-sm text-gray-700">
+                <div className="font-semibold">Adresse retenue</div>
+                <div>{locationLabel}</div>
+              </div>
+              {mapUrl && (
+                <iframe title="Aperçu de la localisation du job" src={mapUrl} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
