@@ -1,0 +1,26 @@
+ETAPE 1
+Créer un compte Brevo sur https://www.brevo.com/
+
+ETAPE 2
+Dans Brevo, aller dans Transactional > Settings > Senders & IP.
+Ajouter l'adresse email qui enverra les codes KOJO.
+Valider cette adresse depuis le mail reçu.
+
+ETAPE 3
+Dans Brevo, aller dans Settings > SMTP & API > API Keys.
+Créer une nouvelle clé API.
+Copier la clé.
+
+ETAPE 4
+Dans Render > ton backend > Environment, ajouter ces variables :
+EMAIL_PROVIDER=brevo
+BREVO_API_KEY=ta_cle_api_brevo
+BREVO_SENDER_EMAIL=ton_email_expediteur
+BREVO_SENDER_NAME=KOJO
+PASSWORD_RESET_FROM_EMAIL=ton_email_expediteur
+
+ETAPE 5
+Dans ton backend Python, utiliser brevo_mailer.py et password_reset_email.py au lieu du code Gmail OAuth.
+
+ETAPE 6
+Redéployer Render.

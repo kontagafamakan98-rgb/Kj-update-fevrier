@@ -1,0 +1,6 @@
+﻿Pack K - Brevo backend safe
+Date: 2026-05-08 21:01:50
+ProjectRoot: C:\Users\Famakan\Desktop\Kj-update-fevrier
+Fichiers copiÃ©s vers: C:\Users\Famakan\Desktop\Kj-update-fevrier\kojo-brevo-pack-ready
+Important: remplace le code Gmail OAuth de forgot password par le code Brevo fourni.
+Variables Render Ã  crÃ©er: EMAIL_PROVIDER, BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME, PASSWORD_RESET_FROM_EMAIL

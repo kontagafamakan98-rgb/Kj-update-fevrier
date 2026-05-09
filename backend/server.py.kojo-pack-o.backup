@@ -170,12 +170,6 @@ GMAIL_TOKEN_REFRESH_RETRIES = max(1, int(os.environ.get('GMAIL_TOKEN_REFRESH_RET
 GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS = max(0.5, float(os.environ.get('GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS', '1')))
 GMAIL_ACCESS_TOKEN_SAFETY_SECONDS = max(30, int(os.environ.get('GMAIL_ACCESS_TOKEN_SAFETY_SECONDS', '60')))
 GMAIL_ACCESS_TOKEN_CACHE: Dict[str, Any] = {"access_token": "", "expires_at": 0.0}
-EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', 'gmail').strip().lower()
-BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
-BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
-BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME', 'KOJO').strip() or 'KOJO'
-PASSWORD_RESET_FROM_EMAIL = os.environ.get('PASSWORD_RESET_FROM_EMAIL', BREVO_SENDER_EMAIL).strip() or BREVO_SENDER_EMAIL
-BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
 # Security Headers for West Africa
 DEFAULT_SECURITY_HEADERS = {
@@ -1224,66 +1218,6 @@ def get_gmail_access_token(force_refresh: bool = False) -> str:
     raise HTTPException(status_code=502, detail="Impossible d'obtenir un accès Gmail après plusieurs tentatives. Vérifiez la configuration OAuth Google sur Render.")
 
 
-
-
-def brevo_is_configured() -> bool:
-    return all([
-        BREVO_API_KEY,
-        BREVO_SENDER_EMAIL,
-    ])
-
-
-def get_missing_brevo_env_vars() -> List[str]:
-    missing = []
-    if not BREVO_API_KEY:
-        missing.append('BREVO_API_KEY')
-    if not BREVO_SENDER_EMAIL:
-        missing.append('BREVO_SENDER_EMAIL')
-    return missing
-
-
-def send_email_via_brevo_api(to_email: str, subject: str, text_body: str, html_body: Optional[str] = None):
-    if not brevo_is_configured():
-        missing = ', '.join(get_missing_brevo_env_vars())
-        raise HTTPException(status_code=503, detail=f"Configuration Brevo incomplète: {missing}")
-
-    sender_email = PASSWORD_RESET_FROM_EMAIL or BREVO_SENDER_EMAIL
-    payload = {
-        'sender': {
-            'email': sender_email,
-            'name': BREVO_SENDER_NAME,
-        },
-        'to': [
-            {
-                'email': to_email,
-            }
-        ],
-        'subject': subject,
-        'htmlContent': html_body or f'<pre>{text_body}</pre>',
-        'textContent': text_body,
-    }
-
-    try:
-        brevo_response = requests.post(
-            BREVO_API_URL,
-            headers={
-                'accept': 'application/json',
-                'content-type': 'application/json',
-                'api-key': BREVO_API_KEY,
-            },
-            json=payload,
-            timeout=30,
-        )
-    except requests.RequestException as exc:
-        logger.error('❌ Brevo send transport error: %s', exc)
-        raise HTTPException(status_code=502, detail='Transport Brevo indisponible. Réessayez dans un instant.')
-
-    if not brevo_response.ok:
-        logger.error('❌ Brevo send failed: %s', brevo_response.text)
-        raise HTTPException(status_code=502, detail="Échec d'envoi Brevo. Vérifiez BREVO_API_KEY et l'expéditeur sur Render.")
-
-    return brevo_response.json()
-
 def send_email_via_gmail_api(to_email: str, subject: str, text_body: str, html_body: Optional[str] = None):
     if not gmail_is_configured():
         missing = ', '.join(get_missing_gmail_env_vars())
@@ -1414,10 +1348,7 @@ async def issue_email_otp(email: str, purpose: str = "signup") -> dict:
     otp_hash = hash_email_otp(email, purpose, otp_code)
     expires_at = now + timedelta(minutes=EMAIL_OTP_EXPIRY_MINUTES)
     email_content = build_email_otp_email(purpose, otp_code)
-    if EMAIL_PROVIDER == 'brevo':
-        send_email_via_brevo_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
-    else:
-        send_email_via_gmail_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
+    send_email_via_gmail_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
 
     await db.email_otps.update_one(
         {"email": email, "purpose": purpose},
