@@ -1,0 +1,14 @@
+KOJO JOBS DELETE TARGET BACKEND FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+Target: C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\utils\jobOwnerDeleteRuntime.js
+
+Backup: jobOwnerDeleteRuntime.js.jobs-delete-target-backend-fix.backup
+jobOwnerDeleteRuntime.js rewritten to use jobsAPI.delete() only
+Manual fetch guesses to Vercel frontend origin removed
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Fix jobs delete to target backend API"
+4. git push origin main
+5. attendre Vercel puis re-tester suppression
