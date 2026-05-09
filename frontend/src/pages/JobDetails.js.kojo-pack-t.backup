@@ -78,75 +78,6 @@ const formatJobDate = (value) => {
   });
 };
 
-const getStoredSessionUser = () => {
-  const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
-
-  for (const key of keys) {
-    try {
-      const raw = window?.localStorage?.getItem?.(key) || window?.sessionStorage?.getItem?.(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      const candidate = parsed?.user || parsed?.profile || parsed?.currentUser || parsed?.data?.user || parsed;
-      if (candidate && typeof candidate === 'object') return candidate;
-    } catch (_) {}
-  }
-
-  return null;
-};
-
-const normalizeComparableId = (value) => String(value ?? '').trim();
-
-const isOwnedByCurrentUser = (job) => {
-  const user = getStoredSessionUser();
-  const currentUserIds = [
-    user?.id,
-    user?._id,
-    user?.userId,
-    user?.ownerId,
-    user?.clientId,
-    user?.profile?.id,
-    user?.profile?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  const jobOwnerIds = [
-    job?.ownerId,
-    job?.userId,
-    job?.clientId,
-    job?.createdBy,
-    job?.postedBy,
-    job?.posterId,
-    job?.owner?.id,
-    job?.owner?._id,
-    job?.user?.id,
-    job?.user?._id,
-    job?.client?.id,
-    job?.client?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  return currentUserIds.some((id) => jobOwnerIds.includes(id));
-};
-
-const formatJobStatus = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'Statut non défini') return 'Statut non défini';
-  if (normalized === 'open') return 'Ouvert';
-  if (normalized === 'closed') return 'Fermé';
-  if (normalized === 'draft') return 'Brouillon';
-  if (normalized === 'pending') return 'En attente';
-  if (normalized === 'published') return 'Publié';
-  return String(status).replace(/_/g, ' ');
-};
-
-const formatJobDate = (value) => {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return 'Date indisponible';
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-};
-
 const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
   const min = Number(minValue);
   const max = Number(maxValue);
@@ -157,7 +88,6 @@ const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
   if (hasMin) return `${min} ${currency}`;
   if (hasMax) return `${max} ${currency}`;
   return 'Budget non renseigné';
-};
 };
 
 const getLocationPrecisionMeta = (precision) => {
