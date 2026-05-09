@@ -170,13 +170,12 @@ GMAIL_TOKEN_REFRESH_RETRIES = max(1, int(os.environ.get('GMAIL_TOKEN_REFRESH_RET
 GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS = max(0.5, float(os.environ.get('GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS', '1')))
 GMAIL_ACCESS_TOKEN_SAFETY_SECONDS = max(30, int(os.environ.get('GMAIL_ACCESS_TOKEN_SAFETY_SECONDS', '60')))
 GMAIL_ACCESS_TOKEN_CACHE: Dict[str, Any] = {"access_token": "", "expires_at": 0.0}
-EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', 'brevo').strip().lower()
+EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', 'gmail').strip().lower()
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
 BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
 BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME', 'KOJO').strip() or 'KOJO'
 PASSWORD_RESET_FROM_EMAIL = os.environ.get('PASSWORD_RESET_FROM_EMAIL', BREVO_SENDER_EMAIL).strip() or BREVO_SENDER_EMAIL
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
-GMAIL_DEPRECATED_NOTICE = 'Gmail OAuth disabled in favor of Brevo'
 
 # Security Headers for West Africa
 DEFAULT_SECURITY_HEADERS = {
@@ -1415,7 +1414,10 @@ async def issue_email_otp(email: str, purpose: str = "signup") -> dict:
     otp_hash = hash_email_otp(email, purpose, otp_code)
     expires_at = now + timedelta(minutes=EMAIL_OTP_EXPIRY_MINUTES)
     email_content = build_email_otp_email(purpose, otp_code)
-    send_email_via_brevo_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
+    if EMAIL_PROVIDER == 'brevo':
+        send_email_via_brevo_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
+    else:
+        send_email_via_gmail_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
 
     await db.email_otps.update_one(
         {"email": email, "purpose": purpose},

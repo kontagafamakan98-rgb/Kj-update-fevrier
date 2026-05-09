@@ -1,0 +1,12 @@
+Pack P - Brevo final cleanup safe
+ProjectRoot: C:\Users\Famakan\Desktop\Kj-update-fevrier
+Patched file: C:\Users\Famakan\Desktop\Kj-update-fevrier\backend\server.py
+Backup file: C:\Users\Famakan\Desktop\Kj-update-fevrier\backend\server.py.kojo-pack-p.backup
+Modifications:
+- EMAIL_PROVIDER par défaut passe à brevo
+- Le flux email OTP central envoie maintenant directement via Brevo
+- Un fichier render-env-cleanup-brevo-final.txt a été généré pour nettoyer Render
+
+Important:
+- Ce pack est safe: il ne supprime pas brutalement les anciennes fonctions Gmail du fichier
+- Il force simplement le flux actif à utiliser Brevo uniquement
