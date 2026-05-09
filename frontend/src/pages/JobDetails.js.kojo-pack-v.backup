@@ -1,3 +1,11 @@
+﻿import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import ProposalModal from '../components/ProposalModal';
+import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
 const getStoredSessionUser = () => {
   const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
 
@@ -48,7 +56,7 @@ const isOwnedByCurrentUser = (job) => {
 
 const formatJobStatus = (status) => {
   const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'status_undefined') return 'Statut non défini';
+  if (!normalized || normalized === 'undefined' || normalized === 'Statut non défini') return 'Statut non défini';
   if (normalized === 'open') return 'Ouvert';
   if (normalized === 'closed') return 'Fermé';
   if (normalized === 'draft') return 'Brouillon';
@@ -77,7 +85,6 @@ const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
   if (hasMin) return `${min} ${currency}`;
   if (hasMax) return `${max} ${currency}`;
   return 'Budget non renseigné';
-};
 
 const getLocationPrecisionMeta = (precision) => {
   const normalized = String(precision || '').toLowerCase().trim();
@@ -96,6 +103,7 @@ const getLocationPrecisionMeta = (precision) => {
 
   return { label: 'Localisation disponible', shortLabel: 'Localisation', color: 'info' };
 };
+
 
 export default function JobDetails() {
   const [job, setJob] = useState(null);
@@ -429,3 +437,5 @@ function ProposalCard({ proposal, pageT, currentLanguage }) {
     </div>
   );
 }
+
+
