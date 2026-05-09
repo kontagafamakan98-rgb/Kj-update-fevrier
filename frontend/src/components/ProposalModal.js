@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { jobsAPI, messagesAPI } from '../services/api';
+import { jobsAPI } from '../services/api';
 import { getJobProposalUiLabel } from '../utils/jobProposalLocale';
-import {
-  buildInitialProposalConversationMessage,
-  getCounterpartForWorker,
-  rememberAppliedJob,
-} from '../utils/jobProposalWorkflow';
 
 const normalizeProposalApiError = (submitError, ui) => {
   const detail = submitError?.response?.data?.detail;
@@ -30,7 +25,7 @@ const normalizeProposalApiError = (submitError, ui) => {
   }
 
   if (detail && typeof detail === 'object') {
-    return detail.msg || detail.message || ui.submitError;
+    return detail.msg || ui.submitError;
   }
 
   return submitError?.message || ui.submitError;
@@ -91,7 +86,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
 
     setLoading(true);
     try {
-      const payload = {
+      await jobsAPI.apply(jobId, {
         proposed_amount: amount,
         estimated_completion_time: estimatedCompletionTime,
         message,
@@ -99,41 +94,10 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
         estimated_duration: estimatedCompletionTime,
         cover_letter: message,
         description: message,
-      };
-
-      const createdProposal = await jobsAPI.apply(jobId, payload);
-      const normalizedCreatedProposal = {
-        ...(createdProposal && typeof createdProposal === 'object' ? createdProposal : {}),
-        ...payload,
-        job_id: jobId,
-        created_at: createdProposal?.created_at || new Date().toISOString(),
-      };
-
-      rememberAppliedJob({
-        jobId,
-        proposal: normalizedCreatedProposal,
-        job,
       });
 
-      try {
-        const counterpart = getCounterpartForWorker(job);
-        if (counterpart?.id) {
-          await messagesAPI.send({
-            receiver_id: counterpart.id,
-            content: buildInitialProposalConversationMessage({
-              job,
-              amount,
-              estimatedCompletionTime,
-              message,
-            }),
-          });
-        }
-      } catch (_messageError) {
-        // The proposal should still succeed even if automatic discussion bootstrap fails.
-      }
-
       if (typeof onProposalSubmitted === 'function') {
-        onProposalSubmitted(normalizedCreatedProposal);
+        onProposalSubmitted();
       }
     } catch (submitError) {
       setError(normalizeProposalApiError(submitError, ui));

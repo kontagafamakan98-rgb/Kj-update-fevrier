@@ -1,191 +1,278 @@
-const DEFAULT_API_BASE_URL = 'https://kojo-backend-03az.onrender.com/api';
+﻿/**
+ * API Service - Centralized HTTP client for Kojo application
+ * Provides consistent API calls with authentication, error handling, and logging
+ */
 
-const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
+import axios from 'axios';
+import { devLog, safeLog } from '../utils/env';
+import kojoCache, { CACHE_KEYS } from '../utils/cache';
+import networkOptimizer from '../utils/networkOptimizer';
+import { buildApiUrl } from '../utils/backendUrl';
 
-const detectApiBaseUrl = () => {
-  const envBase = typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL
-    ? import.meta.env.VITE_API_URL
-    : '';
-  const runtimeBase = typeof window !== 'undefined' && window.__KOJO_API_URL__
-    ? window.__KOJO_API_URL__
-    : '';
-  return trimTrailingSlash(envBase || runtimeBase || DEFAULT_API_BASE_URL) || DEFAULT_API_BASE_URL;
+const API_BASE_URL = buildApiUrl('');
+
+const isPublicAuthEndpoint = (url = '') => {
+  const normalizedUrl = String(url || '');
+  return normalizedUrl.includes('/auth/login')
+    || normalizedUrl.includes('/auth/register')
+    || normalizedUrl.includes('/auth/register-verified')
+    || normalizedUrl.includes('/auth/email/')
+    || normalizedUrl.includes('/auth/password/');
 };
 
-const getStorageBuckets = () => {
-  if (typeof window === 'undefined') return [];
-  return [window.localStorage, window.sessionStorage].filter(Boolean);
-};
+/**
+ * Create axios instance with dynamic configuration based on network quality
+ */
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-const extractTokenFromRawValue = (raw) => {
-  if (!raw) return '';
+// Dynamic timeout based on network quality
+apiClient.interceptors.request.use((config) => {
+  const networkConfig = networkOptimizer.getConfig();
+  const timeoutUrl = String(config.baseURL || '') + String(config.url || '');
+  const isPasswordRecoveryRequest = timeoutUrl.includes('/auth/password/');
+  const dynamicTimeout = networkConfig.requestTimeout || 10000;
+  config.timeout = isPasswordRecoveryRequest ? Math.max(dynamicTimeout, 30000) : dynamicTimeout;
+  return config;
+});
 
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim();
-    if (!trimmed) return '';
-
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
-      return trimmed.replace(/^Bearer\s+/i, '').trim();
+/**
+ * Request interceptor - Add authentication token
+ */
+apiClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
-
-    try {
-      const parsed = JSON.parse(trimmed);
-      return extractTokenFromRawValue(parsed);
-    } catch (_error) {
-      return trimmed.replace(/^Bearer\s+/i, '').trim();
-    }
+    
+    devLog.info(`ðŸ”„ API Request: ${config.method?.toUpperCase()} ${config.url}`, {
+      data: config.data,
+      params: config.params
+    });
+    
+    return config;
+  },
+  (error) => {
+    safeLog.error('âŒ Request interceptor error:', error);
+    return Promise.reject(error);
   }
+);
 
-  if (typeof raw === 'object') {
-    const candidates = [
-      raw.token,
-      raw.access_token,
-      raw.accessToken,
-      raw.auth_token,
-      raw.authToken,
-      raw.jwt,
-      raw.jwt_token,
-      raw.bearer,
-      raw.bearer_token,
-      raw.data,
-      raw.session,
-      raw.user,
-    ];
-
-    for (const candidate of candidates) {
-      const token = extractTokenFromRawValue(candidate);
-      if (token) return token;
-    }
-  }
-
-  return '';
-};
-
-export const getAuthToken = () => {
-  const keys = [
-    'token',
-    'auth_token',
-    'access_token',
-    'accessToken',
-    'kojo_token',
-    'jwt',
-    'bearer_token',
-    'auth',
-    'auth_user',
-    'session_user',
-    'currentUser',
-    'user',
-    'kojo_user',
-  ];
-
-  for (const bucket of getStorageBuckets()) {
-    for (const key of keys) {
-      try {
-        const raw = bucket.getItem(key);
-        const token = extractTokenFromRawValue(raw);
-        if (token) return token;
-      } catch (_error) {}
-    }
-  }
-
-  return '';
-};
-
-const buildQueryString = (params = {}) => {
-  const searchParams = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === '') return;
-    if (Array.isArray(value)) {
-      value.forEach((item) => {
-        if (item !== undefined && item !== null && item !== '') {
-          searchParams.append(key, String(item));
-        }
-      });
-      return;
-    }
-    searchParams.append(key, String(value));
-  });
-  const query = searchParams.toString();
-  return query ? `?${query}` : '';
-};
-
-const extractErrorMessage = (payload, fallback) => {
-  const detail = payload?.detail;
-
-  if (typeof detail === 'string' && detail.trim()) return detail.trim();
-  if (Array.isArray(detail) && detail.length > 0) {
-    const joined = detail
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object') return item.msg || item.message || JSON.stringify(item);
-        return '';
-      })
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    if (joined) return joined;
-  }
-
-  if (detail && typeof detail === 'object') {
-    return detail.msg || detail.message || fallback;
-  }
-
-  if (typeof payload?.message === 'string' && payload.message.trim()) return payload.message.trim();
-  return fallback;
-};
-
-const request = async (method, path, { params, data, headers } = {}) => {
-  const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
-  const url = `${detectApiBaseUrl()}${normalizedPath}${buildQueryString(params)}`;
-  const token = getAuthToken();
-  const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
-
-  const response = await fetch(url, {
-    method,
-    headers: {
-      Accept: 'application/json',
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(headers || {}),
-    },
-    body: data === undefined ? undefined : (isFormData ? data : JSON.stringify(data)),
-  });
-
-  const rawText = await response.text();
-  let payload = null;
-
-  if (rawText) {
-    try {
-      payload = JSON.parse(rawText);
-    } catch (_error) {
-      payload = rawText;
-    }
-  }
-
-  if (!response.ok) {
-    const fallbackMessage = `HTTP ${response.status}`;
-    const errorMessage = typeof payload === 'string'
-      ? payload
-      : extractErrorMessage(payload, fallbackMessage);
-    const error = new Error(errorMessage || fallbackMessage);
-    error.response = {
+/**
+ * Response interceptor - Handle responses and errors
+ */
+apiClient.interceptors.response.use(
+  (response) => {
+    devLog.info(`âœ… API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, {
       status: response.status,
-      data: typeof payload === 'string' ? { detail: payload } : (payload || { detail: fallbackMessage }),
+      data: response.data
+    });
+    
+    return response;
+  },
+  (error) => {
+    const { response, config } = error;
+    
+    // Enhanced error handling for non-JSON responses
+    let errorMessage = error.message;
+    let errorData = null;
+    
+    if (response) {
+      // Try to parse JSON response
+      try {
+        errorData = response.data;
+        if (typeof errorData === 'string') {
+          // Handle cases where server returns HTML or plain text errors
+          if (errorData.startsWith('<!DOCTYPE') || errorData.includes('<html>')) {
+            errorMessage = `Erreur serveur (${response.status}): Page d'erreur reÃ§ue`;
+            errorData = { detail: errorMessage };
+          } else if (errorData.includes('Internal Server Error')) {
+            errorMessage = `Erreur serveur interne (${response.status})`;
+            errorData = { detail: errorMessage };
+          } else {
+            errorData = { detail: errorData };
+          }
+        }
+      } catch (parseError) {
+        // Response is not JSON
+        errorMessage = `Erreur de format de rÃ©ponse (${response.status})`;
+        errorData = { detail: errorMessage };
+      }
+    }
+    
+    // Log error details
+    safeLog.error(`âŒ API Error: ${config?.method?.toUpperCase()} ${config?.url}`, {
+      status: response?.status,
+      statusText: response?.statusText,
+      data: errorData,
+      message: errorMessage
+    });
+    
+    // Handle 401 Unauthorized - logout user only for protected endpoints
+    if (response?.status === 401 && !isPublicAuthEndpoint(config?.url)) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Redirect to login if not already there
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    
+    // Handle network errors
+    if (!response) {
+      safeLog.error('âŒ Network Error: Unable to reach server');
+      errorData = { detail: 'Impossible de contacter le serveur. VÃ©rifiez votre connexion internet.' };
+    }
+    
+    // Create a better error object
+    const enhancedError = {
+      ...error,
+      response: response ? {
+        ...response,
+        data: errorData
+      } : null,
+      message: errorMessage
     };
-    throw error;
+    
+    return Promise.reject(enhancedError);
   }
+);
 
-  return payload;
-};
-
+/**
+ * Generic API methods with intelligent caching for West African networks
+ */
 export const api = {
-  get: (path, options) => request('GET', path, options),
-  post: (path, data, options = {}) => request('POST', path, { ...options, data }),
-  put: (path, data, options = {}) => request('PUT', path, { ...options, data }),
-  patch: (path, data, options = {}) => request('PATCH', path, { ...options, data }),
-  delete: (path, options) => request('DELETE', path, options),
+  // GET request with smart caching
+  get: async (endpoint, config = {}) => {
+    try {
+      const response = await apiClient.get(endpoint, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // GET with cache support
+  getWithCache: async (endpoint, cacheKey, expiryTime = null, config = {}) => {
+    try {
+      // Use network-aware cache expiry
+      const networkConfig = networkOptimizer.getConfig();
+      const defaultExpiry = expiryTime || networkConfig.cacheExpiry;
+      
+      return await kojoCache.cacheWithRetry(
+        cacheKey,
+        async () => {
+          const response = await apiClient.get(endpoint, config);
+          return response.data;
+        },
+        networkOptimizer.getMaxRetries(),
+        defaultExpiry
+      );
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // POST request
+  post: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await apiClient.post(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // PUT request
+  put: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await apiClient.put(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // DELETE request
+  delete: async (endpoint, config = {}) => {
+    try {
+      const response = await apiClient.delete(endpoint, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // PATCH request
+  patch: async (endpoint, data = {}, config = {}) => {
+    try {
+      const response = await apiClient.patch(endpoint, data, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // File upload
+  uploadFile: async (endpoint, formData, onUploadProgress = null) => {
+    try {
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      };
+      
+      if (onUploadProgress) {
+        config.onUploadProgress = onUploadProgress;
+      }
+      
+      const response = await apiClient.post(endpoint, formData, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
 };
 
+/**
+ * Authentication API endpoints with intelligent caching
+ */
+export const authAPI = {
+  login: (credentials) => api.post('/auth/login', credentials),
+  register: (userData) => api.post('/auth/register', userData),
+  registerVerified: (userData) => api.post('/auth/register-verified', userData),
+  checkEmailAvailability: (payload) => api.post('/auth/email/check-availability', payload),
+  sendEmailOtp: (payload) => api.post('/auth/email/send-otp', payload),
+  verifyEmailOtp: (payload) => api.post('/auth/email/verify-otp', payload),
+  resendEmailOtp: (payload) => api.post('/auth/email/resend-otp', payload),
+  requestPasswordResetOtp: (payload) => api.post('/auth/password/forgot/request', payload),
+  resendPasswordResetOtp: (payload) => api.post('/auth/password/forgot/resend', payload),
+  verifyPasswordResetOtp: (payload) => api.post('/auth/password/forgot/verify', payload),
+  resetPassword: (payload) => api.post('/auth/password/reset', payload),
+  logout: () => {
+    // Clear all cache on logout
+    kojoCache.clear();
+    return api.post('/auth/logout');
+  },
+  getProfile: () => api.getWithCache('/users/profile', CACHE_KEYS.USER_PROFILE),
+  updateProfile: async (data) => {
+    const result = await api.put('/users/profile', data);
+    // Update cache with new profile data
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, result);
+    return result;
+  },
+  changePassword: (data) => api.put('/users/change-password', data),
+};
+
+/**
+ * Jobs API endpoints
+ */
 export const jobsAPI = {
   getAll: (params = {}) => api.get('/jobs', { params }),
   getById: (id) => api.get(`/jobs/${id}`),
@@ -197,11 +284,123 @@ export const jobsAPI = {
   getProposals: (jobId) => api.get(`/jobs/${jobId}/proposals`),
 };
 
-export const messagesAPI = {
-  send: (payload) => api.post('/messages', payload),
-  list: () => api.get('/messages'),
-  getConversations: () => api.get('/messages/conversations'),
-  getConversation: (conversationId) => api.get(`/messages/${conversationId}`),
+/**
+ * Users API endpoints
+ */
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+  uploadProfilePhoto: (formData) => api.uploadFile('/users/profile-photo', formData),
+  getProfilePhoto: () => api.get('/users/profile-photo'),
+  getUserProfilePhoto: (userId) => api.get(`/users/${userId}/profile-photo`),
+  deleteProfilePhoto: () => api.delete('/users/profile-photo'),
+  getPaymentAccounts: () => api.get('/users/payment-accounts'),
+  updatePaymentAccounts: (data) => api.put('/users/payment-accounts', data),
+  verifyPaymentAccess: (data) => api.post('/users/verify-payment-access', data),
 };
 
+/**
+ * Real payments API endpoints
+ */
+export const paymentAPI = {
+  getConfig: () => api.get('/payments/config'),
+  getQuote: (data) => api.post('/payments/quote', data),
+  createCheckout: (data) => api.post('/payments/checkout', data),
+  getPaymentStatus: (paymentId) => api.get(`/payments/status/${paymentId}`),
+  getPaymentStatusByToken: (invoiceToken) => api.get(`/payments/status/token/${invoiceToken}`),
+  getMyPayments: () => api.get('/payments/my'),
+};
+
+/**
+ * Messages API endpoints
+ */
+export const messagesAPI = {
+  getConversations: () => api.get('/messages/conversations'),
+  getMessages: (conversationId) => api.get(`/messages/${conversationId}`),
+  getAllMessages: () => api.get('/messages'),
+  sendMessage: (messageData) => api.post('/messages', messageData),
+};
+
+/**
+ * Owner API endpoints (protected)
+ */
+export const ownerAPI = {
+  getDebugInfo: () => api.get('/owner/debug-info'),
+  getUsersManagement: () => api.get('/owner/users-management'),
+  getCommissionStats: () => api.get('/owner/commission-stats'),
+  getSystemHealth: () => api.get('/owner/system-health'),
+};
+
+/**
+ * Health check endpoint
+ */
+export const healthAPI = {
+  check: () => api.get('/health'),
+};
+
+/**
+ * Error handling utilities
+ */
+export const handleApiError = (error) => {
+  if (!error.response) {
+    return {
+      message: 'Erreur de connexion. VÃ©rifiez votre connexion internet.',
+      type: 'network_error',
+      messageKey: 'networkConnectionError'
+    };
+  }
+
+  const { status, data } = error.response;
+  const requestUrl = error.config?.url || '';
+  const detail = String(data?.detail || '').trim();
+  const normalizedDetail = detail.toLowerCase();
+
+  switch (status) {
+    case 400:
+      return {
+        message: data?.detail || 'DonnÃ©es invalides',
+        type: 'validation_error'
+      };
+    case 401:
+      if (requestUrl.includes('/auth/login') && (normalizedDetail.includes('invalid credentials') || normalizedDetail.includes('invalid password') || normalizedDetail.includes('incorrect password'))) {
+        return {
+          message: 'Mot de passe incorrect.',
+          type: 'invalid_credentials',
+          messageKey: 'incorrectPassword'
+        };
+      }
+
+      return {
+        message: detail || 'Session expirÃ©e. Veuillez vous reconnecter.',
+        type: 'auth_error',
+        messageKey: 'sessionExpiredReconnect'
+      };
+    case 403:
+      return {
+        message: 'AccÃ¨s interdit',
+        type: 'permission_error'
+      };
+    case 404:
+      return {
+        message: 'Ressource non trouvÃ©e',
+        type: 'not_found_error'
+      };
+    case 500:
+      return {
+        message: 'Erreur serveur. Veuillez rÃ©essayer plus tard.',
+        type: 'server_error'
+      };
+    default:
+      return {
+        message: data?.detail || 'Une erreur inattendue s\'est produite',
+        type: 'unknown_error'
+      };
+  }
+};
+
+// Export axios instance for advanced use cases
+export { apiClient };
+
+// Export default api
 export default api;
+
