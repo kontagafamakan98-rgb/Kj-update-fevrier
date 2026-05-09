@@ -1,0 +1,18 @@
+KOJO JOBS APPLY PROPOSALS FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Backup: ProposalModal.js.jobs-apply-proposals-fix.backup
+ProposalModal.js rewritten for /jobs/{job_id}/proposals flow
+
+api.js already aligned to proposal endpoints
+Backup: api.js.jobs-apply-proposals-fix.backup
+
+JobDetails.js updated to use getProposals when available
+Backup: JobDetails.js.jobs-apply-proposals-fix.backup
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Fix jobs apply proposals flow"
+4. git push origin main
+5. tester Postuler puis verifier propositions cote client
