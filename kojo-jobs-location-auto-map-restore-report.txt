@@ -1,0 +1,27 @@
+KOJO JOBS LOCATION AUTO MAP RESTORE
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Backup: frontend\src\utils\jobLocationRuntime.js.jobs-location-auto-map-restore.backup
+Written: frontend\src\utils\jobLocationRuntime.js
+
+Backup: frontend\src\components\JobCreateModal.js.jobs-location-auto-map-restore.backup
+Written: frontend\src\components\JobCreateModal.js
+
+Backup: frontend\src\pages\CreateJob.js.jobs-location-auto-map-restore.backup
+Written: frontend\src\pages\CreateJob.js
+
+OBJECTIF
+- restauration de la localisation automatique
+- restauration de la carte dans CreateJob et JobCreateModal
+- conservation du correctif 422
+
+FILES A MODIFIER
+- frontend/src/utils/jobLocationRuntime.js
+- frontend/src/components/JobCreateModal.js
+- frontend/src/pages/CreateJob.js
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Restore jobs auto location and map preview"
+4. git push origin main

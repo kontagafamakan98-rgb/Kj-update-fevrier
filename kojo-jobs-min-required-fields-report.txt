@@ -1,0 +1,31 @@
+KOJO JOBS MIN REQUIRED FIELDS FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Backup: frontend\src\utils\jobCreateBridge.js.jobs-min-required-fields.backup
+Written: frontend\src\utils\jobCreateBridge.js
+
+Backup: frontend\src\components\JobCreateModal.js.jobs-min-required-fields.backup
+Written: frontend\src\components\JobCreateModal.js
+
+Backup: frontend\src\pages\CreateJob.js.jobs-min-required-fields.backup
+Written: frontend\src\pages\CreateJob.js
+
+Backup: backend\server.py.jobs-min-required-fields.backup
+backend/server.py create_job route updated for minimal required fields
+
+REGLE APPLIQUEE
+- obligatoires: titre, prix, localisation
+- description optionnelle
+- si un seul prix est saisi, il remplit automatiquement budget_min et budget_max
+
+FILES A MODIFIER
+- frontend/src/utils/jobCreateBridge.js
+- frontend/src/components/JobCreateModal.js
+- frontend/src/pages/CreateJob.js
+- backend/server.py
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Make title price and location only required for jobs"
+4. git push origin main

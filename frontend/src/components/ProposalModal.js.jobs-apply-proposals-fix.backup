@@ -1,78 +1,129 @@
-import { useState } from 'react';
-import axios from 'axios';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useMemo, useState } from 'react';
+import { jobsAPI } from '../services/api';
 
-export default function ProposalModal({ jobId, onClose, onProposalSubmitted }) {
+export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
   const [formData, setFormData] = useState({
     proposed_amount: '',
-    estimated_completion_time: '',
-    message: ''
+    estimated_duration: '',
+    cover_letter: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const { t } = useLanguage();
+  const title = useMemo(() => job?.title || 'ce job', [job]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
-    try {
-      const proposalData = {
-        ...formData,
-        proposed_amount: parseFloat(formData.proposed_amount)
-      };
+    const amount = Number(formData.proposed_amount);
+    const message = String(formData.cover_letter || '').trim();
 
-      await axios.post(`/jobs/${jobId}/proposals`, proposalData);
-      onProposalSubmitted();
-    } catch (err) {
-      setError(err.response?.data?.detail || t('proposalSubmitError'));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Entre un montant valide.');
+      return;
+    }
+
+    if (!message) {
+      setError('Explique ta proposition en quelques lignes.');
+      return;
+    }
+
+    const jobId = job?.id || job?._id || job?.job_id || job?.jobId;
+    if (!jobId) {
+      setError('Identifiant du job introuvable.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await jobsAPI.apply(jobId, {
+        proposed_amount: amount,
+        amount,
+        cover_letter: message,
+        message,
+        description: message,
+        estimated_duration: formData.estimated_duration?.trim() || null,
+      });
+
+      if (typeof onProposalSubmitted === 'function') {
+        onProposalSubmitted();
+      }
+    } catch (submitError) {
+      setError(submitError?.response?.data?.detail || submitError?.message || 'Envoi de la proposition impossible');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
-  };
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">{t('makeProposal')}</h2>
-          <button aria-label={t('close')} onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </button>
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-gray-100">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Postuler</h2>
+            <p className="text-sm text-gray-500">Envoie ta proposition pour {title}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{error}</div>}
+        <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
 
-          <div>
-            <label htmlFor="proposed_amount" className="block text-sm font-medium text-gray-700 mb-2">{t('proposedAmount')}</label>
-            <input type="number" id="proposed_amount" name="proposed_amount" autoComplete="off" required min="0" value={formData.proposed_amount} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="10000" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Montant proposé</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                name="proposed_amount"
+                value={formData.proposed_amount}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                placeholder="5000"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Durée estimée</label>
+              <input
+                type="text"
+                name="estimated_duration"
+                value={formData.estimated_duration}
+                onChange={handleChange}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+                placeholder="Ex: 2 heures"
+              />
+            </div>
           </div>
 
           <div>
-            <label htmlFor="estimated_completion_time" className="block text-sm font-medium text-gray-700 mb-2">{t('estimatedCompletionTime')}</label>
-            <input type="text" id="estimated_completion_time" name="estimated_completion_time" autoComplete="off" required value={formData.estimated_completion_time} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('proposalTimePlaceholder')} />
+            <label className="mb-2 block text-sm font-medium text-gray-700">Message</label>
+            <textarea
+              name="cover_letter"
+              rows="6"
+              value={formData.cover_letter}
+              onChange={handleChange}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+              placeholder="Présente ton offre, ton expérience et comment tu vas faire le travail"
+            />
           </div>
 
-          <div>
-            <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">{t('messageToClient')}</label>
-            <textarea id="message" name="message" autoComplete="off" required rows={4} value={formData.message} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={t('proposalMessagePlaceholder')} />
-          </div>
-
-          <div className="flex justify-end space-x-4 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">{t('cancel')}</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md disabled:opacity-50">{loading ? t('loading') : t('sendProposal')}</button>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
+            <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">
+              Annuler
+            </button>
+            <button type="submit" disabled={loading} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+              {loading ? 'Envoi...' : 'Envoyer la proposition'}
+            </button>
           </div>
         </form>
       </div>

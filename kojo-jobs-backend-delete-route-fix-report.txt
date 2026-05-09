@@ -3,10 +3,8 @@ Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
 Server file: C:\Users\Famakan\Desktop\Kj-update-fevrier\backend\server.py
 
 Backup created: server.py.jobs-backend-delete-route-fix.backup
-Updated get_job to ignore deleted jobs
-Updated get_jobs to hide deleted jobs and sort by created_at
-Inserted delete job route before proposal routes
-server.py updated
+Delete route already exists, no route insertion needed
+No textual change applied
 
 NEXT
 1. cd frontend && npm run build
