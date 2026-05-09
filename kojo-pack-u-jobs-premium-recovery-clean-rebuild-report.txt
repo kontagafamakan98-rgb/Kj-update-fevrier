@@ -1,0 +1,15 @@
+Pack U - Jobs premium recovery clean rebuild
+ProjectRoot: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Fichiers modifiés:
+C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\JobDetails.js
+C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\Jobs.js
+
+Fichiers inchangés:
+Aucun
+
+Ce pack reconstruit proprement la zone helper en haut de Jobs.js / JobDetails.js pour éliminer :
+- doublons de helpers
+- extra brace inattendue
+- formatBudgetRange cassé
+- fallback textes cassés
