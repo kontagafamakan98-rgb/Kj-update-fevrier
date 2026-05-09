@@ -1,8 +1,0 @@
-cd /d C:\Users\Famakan\Desktop\Kj-update-fevrier
-powershell -Command "Invoke-WebRequest -Uri \"REPLACE_ME\" -OutFile \"kojo-pack-ay-api-full-compat-repair.zip\""
-powershell -Command "Expand-Archive -Force 'kojo-pack-ay-api-full-compat-repair.zip' '.'"
-xcopy /E /I /Y .\kojo_pack_ay_api_full_compat_repair\frontend\src\services frontend\src\services
-npm run build
-git add .
-git commit -m "Repair api compatibility exports"
-git push origin main
