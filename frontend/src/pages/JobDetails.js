@@ -1,101 +1,11 @@
-const getStoredSessionUser = () => {
-  const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
-
-  for (const key of keys) {
-    try {
-      const raw = window?.localStorage?.getItem?.(key) || window?.sessionStorage?.getItem?.(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      const candidate = parsed?.user || parsed?.profile || parsed?.currentUser || parsed?.data?.user || parsed;
-      if (candidate && typeof candidate === 'object') return candidate;
-    } catch (_) {}
-  }
-
-  return null;
-};
-
-const normalizeComparableId = (value) => String(value ?? '').trim();
-
-const isOwnedByCurrentUser = (job) => {
-  const user = getStoredSessionUser();
-  const currentUserIds = [
-    user?.id,
-    user?._id,
-    user?.userId,
-    user?.ownerId,
-    user?.clientId,
-    user?.profile?.id,
-    user?.profile?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  const jobOwnerIds = [
-    job?.ownerId,
-    job?.userId,
-    job?.clientId,
-    job?.createdBy,
-    job?.postedBy,
-    job?.posterId,
-    job?.owner?.id,
-    job?.owner?._id,
-    job?.user?.id,
-    job?.user?._id,
-    job?.client?.id,
-    job?.client?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  return currentUserIds.some((id) => jobOwnerIds.includes(id));
-};
-
-const formatJobStatus = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'status_undefined') return 'Statut non défini';
-  if (normalized === 'open') return 'Ouvert';
-  if (normalized === 'closed') return 'Fermé';
-  if (normalized === 'draft') return 'Brouillon';
-  if (normalized === 'pending') return 'En attente';
-  if (normalized === 'published') return 'Publié';
-  return String(status || '').replace(/_/g, ' ');
-};
-
-const formatJobDate = (value) => {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return 'Date indisponible';
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-};
-
-const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
-  const min = Number(minValue);
-  const max = Number(maxValue);
-  const hasMin = Number.isFinite(min) && min > 0;
-  const hasMax = Number.isFinite(max) && max > 0;
-
-  if (hasMin && hasMax) return `${min} - ${max} ${currency}`;
-  if (hasMin) return `${min} ${currency}`;
-  if (hasMax) return `${max} ${currency}`;
-  return 'Budget non renseigné';
-};
-
-const getLocationPrecisionMeta = (precision) => {
-  const normalized = String(precision || '').toLowerCase().trim();
-
-  if (normalized.includes('exact') || normalized.includes('precise')) {
-    return { label: 'Position exacte', shortLabel: 'Exacte', color: 'success' };
-  }
-
-  if (normalized.includes('approx') || normalized.includes('near') || normalized.includes('zone')) {
-    return { label: 'Zone approximative', shortLabel: 'Approx.', color: 'warning' };
-  }
-
-  if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return { label: 'Ville / région', shortLabel: 'Région', color: 'info' };
-  }
-
-  return { label: 'Localisation disponible', shortLabel: 'Localisation', color: 'info' };
-};
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import ProposalModal from '../components/ProposalModal';
+import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { safeLog } from '../utils/env';
 
 export default function JobDetails() {
   const [job, setJob] = useState(null);
@@ -137,7 +47,13 @@ export default function JobDetails() {
 
   const locale = getLocaleForLanguage(currentLanguage);
   const formatDate = (dateString) =>
-    formatJobDate(dateString);
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
 
   const translateStatus = (status) => pageT(`status_${status}`) || status;
 
@@ -176,23 +92,6 @@ export default function JobDetails() {
 
   const isJobOwner = user.user_type === 'client' && job.client_id === user.id;
   const canApply = user.user_type === 'worker' && job.status === 'open';
-  const normalizedLocation = normalizeLocationPayload(job.location || {});
-  const locationLabel = getLocationAddress(normalizedLocation) || t('locationNotSpecified');
-  const locationCoordinates = getLocationCoordinates(normalizedLocation);
-  const googleDirectionsUrl = buildGoogleMapsDirectionsUrl(normalizedLocation);
-  const appleDirectionsUrl = buildAppleMapsDirectionsUrl(normalizedLocation);
-  const mapViewUrl = locationCoordinates
-    ? buildOpenStreetMapPageUrl(normalizedLocation)
-    : buildGoogleMapsPlaceUrl(normalizedLocation);
-  const embeddedMapUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(normalizedLocation) : '';
-  const locationPrecisionMeta = getLocationPrecisionMeta(normalizedLocation, currentLanguage);
-  const mapToneClasses = locationPrecisionMeta.tone === 'green'
-    ? { panel: 'border-green-200 bg-green-50', badge: 'bg-green-100 text-green-800', text: 'text-green-700' }
-    : locationPrecisionMeta.tone === 'amber'
-      ? { panel: 'border-amber-200 bg-amber-50', badge: 'bg-amber-100 text-amber-800', text: 'text-amber-700' }
-      : locationPrecisionMeta.tone === 'blue'
-        ? { panel: 'border-blue-200 bg-blue-50', badge: 'bg-blue-100 text-blue-800', text: 'text-blue-700' }
-        : { panel: 'border-gray-200 bg-gray-50', badge: 'bg-gray-200 text-gray-800', text: 'text-gray-700' };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -219,7 +118,7 @@ export default function JobDetails() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
+                <div className="text-3xl font-bold text-orange-600">{job.budget_min} - {job.budget_max} FCFA</div>
                 {job.estimated_duration && (
                   <div className="text-sm text-gray-500 mt-1">{pageT('estimatedDuration', { value: job.estimated_duration })}</div>
                 )}
@@ -288,10 +187,7 @@ export default function JobDetails() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-gray-700">{locationLabel || t('locationNotSpecified')}</span>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${mapToneClasses.badge}`}>{locationPrecisionMeta.label}</span>
-                </div>
+                <span className="text-gray-700">{job.location?.address || t('locationNotSpecified')}</span>
               </div>
 
               {job.deadline && (
@@ -306,59 +202,6 @@ export default function JobDetails() {
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-1">{pageT('mapTitle')}</h3>
-                <p className="text-sm text-gray-600">
-                  {locationPrecisionMeta.isPrecise ? pageT('mapSubtitlePrecise') : pageT('mapSubtitleApproximate')}
-                </p>
-              </div>
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${mapToneClasses.badge}`}>
-                {locationPrecisionMeta.label}
-              </span>
-            </div>
-
-            <div className={`mt-4 rounded-lg border p-4 ${mapToneClasses.panel}`}>
-              <p className="text-sm font-medium text-gray-900">{locationLabel || t('locationNotSpecified')}</p>
-              <p className={`mt-1 text-xs font-semibold ${mapToneClasses.text}`}>{locationPrecisionMeta.label}</p>
-              {locationCoordinates ? (
-                <p className={`mt-1 text-xs ${mapToneClasses.text}`}>
-                  {pageT('coordinatesValue', {
-                    lat: locationCoordinates.lat.toFixed(6),
-                    lng: locationCoordinates.lng.toFixed(6)
-                  })}
-                </p>
-              ) : (
-                <p className={`mt-1 text-xs ${mapToneClasses.text}`}>{pageT('mapFallbackHelp')}</p>
-              )}
-            </div>
-
-            {locationCoordinates && embeddedMapUrl && (
-              <div className="mt-4 overflow-hidden rounded-lg border border-gray-200 h-64">
-                <iframe
-                  title={pageT('mapPreviewTitle')}
-                  src={embeddedMapUrl}
-                  className="w-full h-full border-0"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-              <a href={googleDirectionsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-lg bg-orange-600 px-4 py-3 text-sm font-medium text-white hover:bg-orange-700">
-                {pageT('openGoogleMaps')}
-              </a>
-              <a href={appleDirectionsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                {pageT('openAppleMaps')}
-              </a>
-              <a href={mapViewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                {pageT('viewMap')}
-              </a>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{pageT('client')}</h3>
             <div className="flex items-center">
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
@@ -366,7 +209,7 @@ export default function JobDetails() {
               </div>
               <div className="ml-3">
                 <p className="font-medium text-gray-900">{job.client_name || pageT('anonymousClient')}</p>
-                <p className="text-sm text-gray-500">â˜…â˜…â˜…â˜…â˜† (4.2)</p>
+                <p className="text-sm text-gray-500">★★★★☆ (4.2)</p>
               </div>
             </div>
             <button className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">{pageT('viewProfile')}</button>
@@ -382,7 +225,12 @@ export default function JobDetails() {
 function ProposalCard({ proposal, pageT, currentLanguage }) {
   const locale = getLocaleForLanguage(currentLanguage);
   const formatDate = (dateString) =>
-    formatJobDate(dateString);
+    new Date(dateString).toLocaleDateString(locale, {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
 
   const getStatusColor = (status) => {
     switch (status) {

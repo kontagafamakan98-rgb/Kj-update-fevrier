@@ -1,110 +1,10 @@
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import LocationDetector from '../components/LocationDetector';
-import { jobsAPI } from '../services/api';
 import { getCountryByCode } from '../services/geolocationService';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
-import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, getLocationPrecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
-
-const getStoredSessionUser = () => {
-  const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
-
-  for (const key of keys) {
-    try {
-      const raw = window?.localStorage?.getItem?.(key) || window?.sessionStorage?.getItem?.(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      const candidate = parsed?.user || parsed?.profile || parsed?.currentUser || parsed?.data?.user || parsed;
-      if (candidate && typeof candidate === 'object') return candidate;
-    } catch (_) {}
-  }
-
-  return null;
-};
-
-const normalizeComparableId = (value) => String(value ?? '').trim();
-
-const isOwnedByCurrentUser = (job) => {
-  const user = getStoredSessionUser();
-  const currentUserIds = [
-    user?.id,
-    user?._id,
-    user?.userId,
-    user?.ownerId,
-    user?.clientId,
-    user?.profile?.id,
-    user?.profile?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  const jobOwnerIds = [
-    job?.ownerId,
-    job?.userId,
-    job?.clientId,
-    job?.createdBy,
-    job?.postedBy,
-    job?.posterId,
-    job?.owner?.id,
-    job?.owner?._id,
-    job?.user?.id,
-    job?.user?._id,
-    job?.client?.id,
-    job?.client?._id,
-  ].map(normalizeComparableId).filter(Boolean);
-
-  return currentUserIds.some((id) => jobOwnerIds.includes(id));
-};
-
-const formatJobStatus = (status) => {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'status_undefined') return 'Statut non défini';
-  if (normalized === 'open') return 'Ouvert';
-  if (normalized === 'closed') return 'Fermé';
-  if (normalized === 'draft') return 'Brouillon';
-  if (normalized === 'pending') return 'En attente';
-  if (normalized === 'published') return 'Publié';
-  return String(status || '').replace(/_/g, ' ');
-};
-
-const formatJobDate = (value) => {
-  const date = new Date(value);
-  if (!value || Number.isNaN(date.getTime())) return 'Date indisponible';
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-};
-
-const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
-  const min = Number(minValue);
-  const max = Number(maxValue);
-  const hasMin = Number.isFinite(min) && min > 0;
-  const hasMax = Number.isFinite(max) && max > 0;
-
-  if (hasMin && hasMax) return `${min} - ${max} ${currency}`;
-  if (hasMin) return `${min} ${currency}`;
-  if (hasMax) return `${max} ${currency}`;
-  return 'Budget non renseigné';
-};
-
-const getLocationPrecisionMeta = (precision) => {
-  const normalized = String(precision || '').toLowerCase().trim();
-
-  if (normalized.includes('exact') || normalized.includes('precise')) {
-    return { label: 'Position exacte', shortLabel: 'Exacte', color: 'success' };
-  }
-
-  if (normalized.includes('approx') || normalized.includes('near') || normalized.includes('zone')) {
-    return { label: 'Zone approximative', shortLabel: 'Approx.', color: 'warning' };
-  }
-
-  if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return { label: 'Ville / région', shortLabel: 'Région', color: 'info' };
-  }
-
-  return { label: 'Localisation disponible', shortLabel: 'Localisation', color: 'info' };
-};
 
 export default function CreateJob() {
   const { user } = useAuth();
@@ -128,7 +28,6 @@ export default function CreateJob() {
 
   const [errors, setErrors] = useState(() => ({}));
   const [loading, setLoading] = useState(false);
-  const [locationDetails, setLocationDetails] = useState(null);
 
   const categories = [
     { value: 'general', label: pageT('categoryGeneral') },
@@ -137,48 +36,26 @@ export default function CreateJob() {
     { value: 'painting', label: pageT('categoryPainting') },
     { value: 'cleaning', label: pageT('categoryCleaning') },
     { value: 'construction', label: pageT('categoryConstruction') },
-    { value: 'carpentry', label: pageT('categoryCarpentry') },
     { value: 'gardening', label: pageT('categoryGardening') },
     { value: 'mechanics', label: pageT('categoryMechanics') }
   ];
 
   const urgencyOptions = [
-    { value: 'low', label: pageT('urgencyLow'), emoji: 'ðŸ˜Š', color: 'bg-green-50 border-green-200 text-green-700' },
-    { value: 'normal', label: pageT('urgencyNormal'), emoji: 'ðŸ•', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
-    { value: 'high', label: pageT('urgencyHigh'), emoji: 'âš¡', color: 'bg-red-50 border-red-200 text-red-700' }
+    { value: 'low', label: pageT('urgencyLow'), emoji: '😊', color: 'bg-green-50 border-green-200 text-green-700' },
+    { value: 'normal', label: pageT('urgencyNormal'), emoji: '🕐', color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
+    { value: 'high', label: pageT('urgencyHigh'), emoji: '⚡', color: 'bg-red-50 border-red-200 text-red-700' }
   ];
 
   const handleLocationDetected = (location) => {
-    const detectedAddress = location?.fullAddress || location?.address;
-    if (!detectedAddress) return;
-
-    const normalizedLocation = normalizeLocationPayload(location);
-    setLocationDetails(normalizedLocation);
     setFormData((prev) => ({
       ...prev,
-      location: detectedAddress
-    }));
-
-    setErrors((prev) => ({
-      ...prev,
-      location: ''
+      location: location.fullAddress
     }));
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-
-    if (name === 'location') {
-      setLocationDetails((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          address: value,
-          fullAddress: value
-        };
-      });
-    }
 
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: '' }));
@@ -200,38 +77,12 @@ export default function CreateJob() {
       if (!formData.location.trim()) newErrors.location = pageT('locationRequired');
       if (!formData.budget_min) newErrors.budget_min = pageT('budgetMinRequired');
       if (!formData.budget_max) newErrors.budget_max = pageT('budgetMaxRequired');
-      if (formData.budget_min && formData.budget_max && parseFloat(formData.budget_min) > parseFloat(formData.budget_max)) {
-        newErrors.budget_max = pageT('budgetMaxRequired');
-      }
 
       if (Object.keys(newErrors).length > 0) {
         setErrors(newErrors);
         setLoading(false);
         return;
       }
-
-      const locationPayload = normalizeLocationPayload({
-        ...locationDetails,
-        address: formData.location.trim(),
-        fullAddress: formData.location.trim(),
-        country: locationDetails?.country ?? userCountry?.nameFrench ?? '',
-        countryCode: locationDetails?.countryCode ?? user?.country?.toLowerCase() ?? ''
-      });
-
-      await jobsAPI.create({
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        category: formData.category,
-        budget_min: parseFloat(formData.budget_min),
-        budget_max: parseFloat(formData.budget_max),
-        location: locationPayload,
-        required_skills: [],
-        estimated_duration: null,
-        deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
-        mechanic_must_bring_parts: formData.mechanic_must_bring_parts,
-        mechanic_must_bring_tools: formData.mechanic_must_bring_tools,
-        parts_and_tools_notes: formData.parts_and_tools_notes?.trim() || null
-      });
 
       alert(pageT('successCreated'));
 
@@ -249,11 +100,9 @@ export default function CreateJob() {
         mechanic_must_bring_tools: false,
         parts_and_tools_notes: ''
       });
-      setLocationDetails(null);
-      setErrors({});
     } catch (error) {
-      safeLog.error('Erreur crÃ©ation job:', error);
-      alert(error?.response?.data?.detail || pageT('errorCreated'));
+      safeLog.error('Erreur création job:', error);
+      alert(pageT('errorCreated'));
     } finally {
       setLoading(false);
     }
@@ -261,16 +110,6 @@ export default function CreateJob() {
 
   const userCountry = getCountryByCode(user?.country);
   const showMechanicBlock = ['general', 'plumbing', 'electrical', 'mechanics'].includes(formData.category);
-  const locationCoordinates = getLocationCoordinates(locationDetails);
-  const locationPreviewUrl = locationCoordinates ? buildOpenStreetMapEmbedUrl(locationDetails) : '';
-  const locationPrecisionMeta = getLocationPrecisionMeta(locationDetails, currentLanguage);
-  const locationToneClasses = locationPrecisionMeta.tone === 'green'
-    ? { panel: 'border-green-200 bg-green-50', badge: 'bg-green-100 text-green-800', title: 'text-green-900', text: 'text-green-700' }
-    : locationPrecisionMeta.tone === 'amber'
-      ? { panel: 'border-amber-200 bg-amber-50', badge: 'bg-amber-100 text-amber-800', title: 'text-amber-900', text: 'text-amber-700' }
-      : locationPrecisionMeta.tone === 'blue'
-        ? { panel: 'border-blue-200 bg-blue-50', badge: 'bg-blue-100 text-blue-800', title: 'text-blue-900', text: 'text-blue-700' }
-        : { panel: 'border-gray-200 bg-gray-50', badge: 'bg-gray-200 text-gray-800', title: 'text-gray-900', text: 'text-gray-700' };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -292,7 +131,6 @@ export default function CreateJob() {
                 type="text"
                 id="title"
                 name="title"
-                autoComplete="off"
                 value={formData.title}
                 onChange={handleChange}
                 placeholder={pageT('titlePlaceholder')}
@@ -310,7 +148,6 @@ export default function CreateJob() {
               <textarea
                 id="description"
                 name="description"
-                autoComplete="off"
                 rows={4}
                 value={formData.description}
                 onChange={handleChange}
@@ -329,7 +166,6 @@ export default function CreateJob() {
               <select
                 id="category"
                 name="category"
-                autoComplete="off"
                 value={formData.category}
                 onChange={handleChange}
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -351,7 +187,6 @@ export default function CreateJob() {
                   type="text"
                   id="location"
                   name="location"
-                  autoComplete="street-address"
                   value={formData.location}
                   onChange={handleChange}
                   placeholder={pageT('locationPlaceholder')}
@@ -365,58 +200,20 @@ export default function CreateJob() {
                     onLocationDetected={handleLocationDetected}
                     userCountry={user?.country?.toLowerCase() || 'senegal'}
                     size="medium"
-                    autoDetect
                   />
                   <p className="text-sm text-gray-500">{pageT('locationHelp')}</p>
                 </div>
-
-                {locationCoordinates && locationPreviewUrl && (
-                  <div className={`rounded-xl border p-4 ${locationToneClasses.panel}`}>
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div>
-                        <p className={`text-sm font-semibold ${locationToneClasses.title}`}>{pageT('preciseLocationReady')}</p>
-                        <p className={`text-xs ${locationToneClasses.text}`}>{pageT('preciseLocationHelp')}</p>
-                      </div>
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${locationToneClasses.badge}`}>
-                        {locationPrecisionMeta.label}
-                      </span>
-                    </div>
-                    <div className="mt-3 overflow-hidden rounded-lg border border-green-200 bg-white h-60">
-                      <iframe
-                        title={pageT('mapPreviewTitle')}
-                        src={locationPreviewUrl}
-                        className="w-full h-full border-0"
-                        loading="lazy"
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
-                    </div>
-                    <p className={`mt-2 text-xs ${locationToneClasses.text}`}>
-                      {pageT('coordinatesSaved', {
-                        lat: locationCoordinates.lat.toFixed(6),
-                        lng: locationCoordinates.lng.toFixed(6)
-                      })}
-                    </p>
-                    <p className="mt-2 text-xs text-gray-600">
-                      {currentLanguage === 'en'
-                        ? 'Job publishing stays available even if GPS is not yet validated.'
-                        : 'La publication du job reste autorisÃ©e mÃªme si le GPS nâ€™est pas encore validÃ©.'}
-                    </p>
-                  </div>
-                )}
               </div>
               {errors.location && <p className="mt-1 text-sm text-red-600">{errors.location}</p>}
             </div>
 
             <div>
-              <p className="block text-sm font-medium text-gray-700 mb-2">{pageT('budgetLabel')}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('budgetLabel')}</label>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="budget_min" className="sr-only">{pageT('budgetMinPlaceholder')}</label>
                   <input
                     type="number"
-                    id="budget_min"
                     name="budget_min"
-                    autoComplete="off"
                     value={formData.budget_min}
                     onChange={handleChange}
                     placeholder={pageT('budgetMinPlaceholder')}
@@ -427,12 +224,9 @@ export default function CreateJob() {
                   {errors.budget_min && <p className="mt-1 text-sm text-red-600">{errors.budget_min}</p>}
                 </div>
                 <div>
-                  <label htmlFor="budget_max" className="sr-only">{pageT('budgetMaxPlaceholder')}</label>
                   <input
                     type="number"
-                    id="budget_max"
                     name="budget_max"
-                    autoComplete="off"
                     value={formData.budget_max}
                     onChange={handleChange}
                     placeholder={pageT('budgetMaxPlaceholder')}
@@ -452,7 +246,6 @@ export default function CreateJob() {
               <textarea
                 id="requirements"
                 name="requirements"
-                autoComplete="off"
                 rows={3}
                 value={formData.requirements}
                 onChange={handleChange}
@@ -469,7 +262,6 @@ export default function CreateJob() {
                 type="date"
                 id="deadline"
                 name="deadline"
-                autoComplete="off"
                 value={formData.deadline}
                 onChange={handleChange}
                 className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -477,7 +269,7 @@ export default function CreateJob() {
             </div>
 
             <div>
-              <p className="block text-sm font-medium text-gray-700 mb-2">{pageT('urgencyLabel')}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{pageT('urgencyLabel')}</label>
               <div className="grid grid-cols-3 gap-3">
                 {urgencyOptions.map((urgency) => (
                   <label
@@ -490,9 +282,7 @@ export default function CreateJob() {
                   >
                     <input
                       type="radio"
-                      id={`urgency_${urgency.value}`}
                       name="urgency"
-                      autoComplete="off"
                       value={urgency.value}
                       checked={formData.urgency === urgency.value}
                       onChange={handleChange}
@@ -510,14 +300,13 @@ export default function CreateJob() {
             {showMechanicBlock && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                 <div className="flex items-center mb-4">
-                  <span className="text-2xl mr-3">ðŸ”§</span>
+                  <span className="text-2xl mr-3">🔧</span>
                   <h3 className="text-lg font-semibold text-blue-900">{pageT('mechanicInfoTitle')}</h3>
                 </div>
 
                 <div className="space-y-4">
                   <BooleanQuestion
-                    fieldKey="mechanic_must_bring_parts"
-                    emoji="ðŸ”©"
+                    emoji="🔩"
                     title={pageT('partsQuestion')}
                     description={pageT('partsDescription')}
                     value={formData.mechanic_must_bring_parts}
@@ -527,8 +316,7 @@ export default function CreateJob() {
                   />
 
                   <BooleanQuestion
-                    fieldKey="mechanic_must_bring_tools"
-                    emoji="ðŸ› ï¸"
+                    emoji="🛠️"
                     title={pageT('toolsQuestion')}
                     description={pageT('toolsDescription')}
                     value={formData.mechanic_must_bring_tools}
@@ -544,7 +332,6 @@ export default function CreateJob() {
                     <textarea
                       id="parts_and_tools_notes"
                       name="parts_and_tools_notes"
-                      autoComplete="off"
                       rows={3}
                       value={formData.parts_and_tools_notes}
                       onChange={handleChange}
@@ -558,20 +345,20 @@ export default function CreateJob() {
                     <h4 className="font-medium text-blue-900 mb-2">{pageT('mechanicSummary')}</h4>
                     <div className="text-sm text-blue-800 space-y-1">
                       <p>
-                        ðŸ”© <strong>{pageT('partsSummary')} :</strong>{' '}
+                        🔩 <strong>{pageT('partsSummary')} :</strong>{' '}
                         <span className={formData.mechanic_must_bring_parts ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
                           {formData.mechanic_must_bring_parts ? pageT('byMechanic') : pageT('byClient')}
                         </span>
                       </p>
                       <p>
-                        ðŸ› ï¸ <strong>{pageT('toolsSummary')} :</strong>{' '}
+                        🛠️ <strong>{pageT('toolsSummary')} :</strong>{' '}
                         <span className={formData.mechanic_must_bring_tools ? 'text-green-700 font-medium' : 'text-red-700 font-medium'}>
                           {formData.mechanic_must_bring_tools ? pageT('byMechanic') : pageT('byClient')}
                         </span>
                       </p>
                       {formData.parts_and_tools_notes && (
                         <p>
-                          ðŸ“ <strong>{pageT('notesSummary')} :</strong> {formData.parts_and_tools_notes}
+                          📝 <strong>{pageT('notesSummary')} :</strong> {formData.parts_and_tools_notes}
                         </p>
                       )}
                     </div>
@@ -617,7 +404,7 @@ export default function CreateJob() {
   );
 }
 
-function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange, yesLabel, noLabel }) {
+function BooleanQuestion({ emoji, title, description, value, onChange, yesLabel, noLabel }) {
   return (
     <div className="flex items-center justify-between p-4 bg-white border border-blue-200 rounded-lg gap-4 flex-wrap">
       <div className="flex items-center">
@@ -630,10 +417,7 @@ function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange,
       <div className="flex items-center space-x-3">
         <label className="flex items-center">
           <input
-            id={`${fieldKey}_yes`}
-            name={fieldKey}
             type="radio"
-            autoComplete="off"
             checked={value === true}
             onChange={() => onChange(true)}
             className="w-4 h-4 text-orange-600 focus:ring-orange-500"
@@ -642,10 +426,7 @@ function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange,
         </label>
         <label className="flex items-center">
           <input
-            id={`${fieldKey}_no`}
-            name={fieldKey}
             type="radio"
-            autoComplete="off"
             checked={value === false}
             onChange={() => onChange(false)}
             className="w-4 h-4 text-orange-600 focus:ring-orange-500"
