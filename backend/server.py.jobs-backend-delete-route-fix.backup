@@ -2227,8 +2227,7 @@ async def get_jobs(
         if category:
             query["category"] = category
         
-        query["deleted"] = {"$ne": True}
-        jobs = await db.jobs.find(query).sort("created_at", -1).to_list(limit)
+        jobs = await db.jobs.find(query).sort("posted_at", -1).to_list(limit)
         
         logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
         return [Job(**job) for job in jobs]
@@ -2239,46 +2238,10 @@ async def get_jobs(
 
 @api_router.get("/jobs/{job_id}")
 async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({"id": job_id})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return Job(**job)
-
-
-@api_router.delete("/jobs/{job_id}")
-async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    if job.get("client_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    now_iso = datetime.now(timezone.utc).isoformat()
-    await db.jobs.update_one(
-        {"id": job_id},
-        {
-            "$set": {
-                "deleted": True,
-                "status": "cancelled",
-                "deleted_at": now_iso,
-                "deleted_by": current_user.id,
-                "updated_at": now_iso
-            }
-        }
-    )
-
-    try:
-        await db.job_proposals.delete_many({"job_id": job_id})
-    except Exception:
-        pass
-
-    try:
-        await db.proposals.delete_many({"job_id": job_id})
-    except Exception:
-        pass
-
-    return {"message": "Job deleted successfully", "job_id": job_id}
 
 # Job Proposal Routes
 @api_router.post("/jobs/{job_id}/proposals")
