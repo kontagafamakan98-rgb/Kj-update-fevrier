@@ -134,35 +134,6 @@ const extractErrorMessage = (payload, fallback) => {
   return fallback;
 };
 
-export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
-  if (typeof error?.response?.data?.detail === 'string' && error.response.data.detail.trim()) {
-    return error.response.data.detail.trim();
-  }
-
-  if (Array.isArray(error?.response?.data?.detail) && error.response.data.detail.length > 0) {
-    const joined = error.response.data.detail
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object') return item.msg || item.message || '';
-        return '';
-      })
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    if (joined) return joined;
-  }
-
-  if (typeof error?.response?.data?.message === 'string' && error.response.data.message.trim()) {
-    return error.response.data.message.trim();
-  }
-
-  if (typeof error?.message === 'string' && error.message.trim()) {
-    return error.message.trim();
-  }
-
-  return fallback;
-};
-
 const request = async (method, path, { params, data, headers } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${detectApiBaseUrl()}${normalizedPath}${buildQueryString(params)}`;
@@ -215,19 +186,6 @@ export const api = {
   delete: (path, options) => request('DELETE', path, options),
 };
 
-export const authAPI = {
-  register: (userData) => api.post('/auth/register', userData),
-  signup: (userData) => api.post('/auth/register', userData),
-  login: (credentials) => api.post('/auth/login', credentials),
-  signin: (credentials) => api.post('/auth/login', credentials),
-  logout: async () => ({ success: true }),
-  me: () => api.get('/auth/me'),
-  getMe: () => api.get('/auth/me'),
-  getProfile: () => api.get('/auth/me'),
-  getCurrentUser: () => api.get('/auth/me'),
-  updateProfile: (payload) => api.put('/auth/me', payload),
-};
-
 export const jobsAPI = {
   getAll: (params = {}) => api.get('/jobs', { params }),
   getById: (id) => api.get(`/jobs/${id}`),
@@ -245,97 +203,5 @@ export const messagesAPI = {
   getConversations: () => api.get('/messages/conversations'),
   getConversation: (conversationId) => api.get(`/messages/${conversationId}`),
 };
-
-const camelToKebab = (value) => String(value || '')
-  .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-  .replace(/_/g, '-')
-  .toLowerCase();
-
-const createResourceApi = (resourceName) => {
-  const basePath = `/${String(resourceName || '').replace(/^\/+|\/+$/g, '')}`;
-
-  const baseApi = {
-    list: (params = {}) => api.get(basePath, { params }),
-    getAll: (params = {}) => api.get(basePath, { params }),
-    getById: (id) => api.get(`${basePath}/${id}`),
-    get: (id, params = {}) => id ? api.get(`${basePath}/${id}`, { params }) : api.get(basePath, { params }),
-    create: (payload) => api.post(basePath, payload),
-    post: (payload) => api.post(basePath, payload),
-    update: (id, payload) => api.put(`${basePath}/${id}`, payload),
-    patch: (id, payload) => api.patch(`${basePath}/${id}`, payload),
-    remove: (id) => api.delete(`${basePath}/${id}`),
-    delete: (id) => api.delete(`${basePath}/${id}`),
-  };
-
-  return new Proxy(baseApi, {
-    get(target, prop) {
-      if (typeof prop !== 'string') return target[prop];
-      if (prop in target) return target[prop];
-
-      return (...args) => {
-        const action = camelToKebab(prop);
-        const firstArg = args[0];
-        const secondArg = args[1];
-
-        if (prop.startsWith('get') || prop.startsWith('list') || prop.startsWith('fetch')) {
-          if (typeof firstArg === 'string' || typeof firstArg === 'number') {
-            return api.get(`${basePath}/${firstArg}`);
-          }
-          return api.get(`${basePath}/${action}`, { params: firstArg || {} });
-        }
-
-        if (prop.startsWith('create') || prop.startsWith('init') || prop.startsWith('start') || prop.startsWith('submit') || prop.startsWith('pay') || prop.startsWith('process')) {
-          return api.post(`${basePath}/${action}`, firstArg || {});
-        }
-
-        if (prop.startsWith('update') || prop.startsWith('set')) {
-          if (typeof firstArg === 'string' || typeof firstArg === 'number') {
-            return api.put(`${basePath}/${firstArg}`, secondArg || {});
-          }
-          return api.put(`${basePath}/${action}`, firstArg || {});
-        }
-
-        if (prop.startsWith('delete') || prop.startsWith('remove') || prop.startsWith('cancel')) {
-          if (typeof firstArg === 'string' || typeof firstArg === 'number') {
-            return api.delete(`${basePath}/${firstArg}`);
-          }
-          return api.post(`${basePath}/${action}`, firstArg || {});
-        }
-
-        return api.post(`${basePath}/${action}`, firstArg || {});
-      };
-    },
-  });
-};
-
-export const paymentAPI = createResourceApi('payments');
-export const paymentsAPI = paymentAPI;
-export const commissionAPI = createResourceApi('commissions');
-export const commissionsAPI = commissionAPI;
-export const userAPI = createResourceApi('users');
-export const usersAPI = userAPI;
-export const profileAPI = userAPI;
-export const profilesAPI = userAPI;
-export const workerAPI = createResourceApi('workers');
-export const workersAPI = workerAPI;
-export const notificationAPI = createResourceApi('notifications');
-export const notificationsAPI = notificationAPI;
-export const reviewAPI = createResourceApi('reviews');
-export const reviewsAPI = reviewAPI;
-export const adminAPI = createResourceApi('admin');
-export const walletAPI = createResourceApi('wallet');
-export const walletsAPI = walletAPI;
-export const proposalAPI = createResourceApi('proposals');
-export const proposalsAPI = proposalAPI;
-export const uploadAPI = createResourceApi('uploads');
-export const filesAPI = createResourceApi('files');
-export const searchAPI = createResourceApi('search');
-export const statsAPI = createResourceApi('stats');
-export const dashboardAPI = createResourceApi('dashboard');
-export const settingsAPI = createResourceApi('settings');
-export const supportAPI = createResourceApi('support');
-export const messageAPI = createResourceApi('messages');
-export const conversationAPI = messageAPI;
-export const conversationsAPI = messageAPI;
 
 export default api;
