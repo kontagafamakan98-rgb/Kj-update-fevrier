@@ -46,14 +46,13 @@ export default function CreateJob() {
     e.preventDefault();
     setError('');
     const payload = buildJobCreatePayload(formData);
-    if (!payload.title || !payload.description || !payload.budget_min || !payload.budget_max) {
-      setError('Remplis tous les champs obligatoires.');
-      return;
-    }
-    if (payload.budget_min > payload.budget_max) {
-      setError('Le budget maximum doit être supérieur ou égal au budget minimum.');
-      return;
-    }
+    if (!payload.title) return setError('Titre requis');
+    if (!payload.description) return setError('Description requise');
+    if (!payload.location?.address && !payload.location?.fullAddress) return setError('Localisation requise');
+    if (payload.budget_min === null) return setError('Budget minimum requis');
+    if (payload.budget_max === null) return setError('Budget maximum requis');
+    if (payload.budget_min > payload.budget_max) return setError('Le budget maximum doit être supérieur ou égal au budget minimum');
+
     setLoading(true);
     try {
       await jobsAPI.create(payload);
@@ -71,7 +70,7 @@ export default function CreateJob() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Publier un job</h1>
-        <p className="mt-2 text-gray-600">Remplis bien les champs pour éviter l’erreur 422 du backend.</p>
+        <p className="mt-2 text-gray-600">Version stable contre l’erreur 422 et le crash React.</p>
       </div>
       <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
         {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}

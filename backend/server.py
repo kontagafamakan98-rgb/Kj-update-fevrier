@@ -2187,26 +2187,105 @@ async def get_worker_profile(current_user: User = Depends(get_current_user)):
 # Job Routes
 @api_router.post("/jobs", response_model=Job)
 async def create_job(
-    job_data: JobCreate,
+    job_data: dict,
     current_user: User = Depends(get_current_user)
 ):
     try:
         if current_user.user_type != UserType.CLIENT:
             raise HTTPException(status_code=403, detail="Only clients can create jobs")
-        
-        # Additional validation
-        if job_data.budget_min > job_data.budget_max:
+
+        incoming = dict(job_data or {})
+
+        def _text(value):
+            return str(value).strip() if value is not None else ""
+
+        def _number(value):
+            if value in (None, ""):
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        raw_location = incoming.get("location")
+        if isinstance(raw_location, str):
+            location_payload = {
+                "address": raw_location.strip(),
+                "fullAddress": raw_location.strip(),
+                "city": "",
+                "district": "",
+                "country": "",
+                "countryCode": "",
+                "latitude": None,
+                "longitude": None,
+                "coordinates": None,
+            }
+        elif isinstance(raw_location, dict):
+            location_payload = {
+                "address": _text(raw_location.get("address") or raw_location.get("fullAddress")),
+                "fullAddress": _text(raw_location.get("fullAddress") or raw_location.get("address")),
+                "city": _text(raw_location.get("city")),
+                "district": _text(raw_location.get("district")),
+                "country": _text(raw_location.get("country")),
+                "countryCode": _text(raw_location.get("countryCode")),
+                "latitude": raw_location.get("latitude"),
+                "longitude": raw_location.get("longitude"),
+                "coordinates": raw_location.get("coordinates"),
+            }
+        else:
+            location_payload = {
+                "address": "",
+                "fullAddress": "",
+                "city": "",
+                "district": "",
+                "country": "",
+                "countryCode": "",
+                "latitude": None,
+                "longitude": None,
+                "coordinates": None,
+            }
+
+        incoming["title"] = _text(incoming.get("title"))
+        incoming["description"] = _text(incoming.get("description"))
+        incoming["category"] = _text(incoming.get("category")) or "general"
+        incoming["location"] = location_payload
+        incoming["budget_min"] = _number(incoming.get("budget_min"))
+        incoming["budget_max"] = _number(incoming.get("budget_max"))
+        incoming["required_skills"] = incoming.get("required_skills") if isinstance(incoming.get("required_skills"), list) else []
+        incoming["estimated_duration"] = _text(incoming.get("estimated_duration")) or None
+        incoming["parts_and_tools_notes"] = _text(incoming.get("parts_and_tools_notes"))
+        incoming["urgency"] = _text(incoming.get("urgency")) or "normal"
+        incoming["mechanic_must_bring_parts"] = bool(incoming.get("mechanic_must_bring_parts"))
+        incoming["mechanic_must_bring_tools"] = bool(incoming.get("mechanic_must_bring_tools"))
+        incoming["deadline"] = incoming.get("deadline") or None
+
+        if not incoming["title"]:
+            raise HTTPException(status_code=422, detail="title is required")
+        if not incoming["description"]:
+            raise HTTPException(status_code=422, detail="description is required")
+        if not (location_payload.get("address") or location_payload.get("fullAddress")):
+            raise HTTPException(status_code=422, detail="location is required")
+        if incoming["budget_min"] is None:
+            raise HTTPException(status_code=422, detail="budget_min is required")
+        if incoming["budget_max"] is None:
+            raise HTTPException(status_code=422, detail="budget_max is required")
+        if incoming["budget_min"] > incoming["budget_max"]:
             raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
-        
-        job = Job(**job_data.dict(), client_id=current_user.id)
+
+        try:
+            validated_input = JobCreate(**incoming)
+        except Exception as validation_error:
+            raise HTTPException(status_code=422, detail=str(validation_error))
+
+        job = Job(**validated_input.dict(), client_id=current_user.id)
         result = await db.jobs.insert_one(job.dict())
-        
+
         if not result.inserted_id:
             raise HTTPException(status_code=500, detail="Failed to create job")
-            
+
         logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
         return job
-        
+
     except HTTPException:
         raise
     except Exception as e:

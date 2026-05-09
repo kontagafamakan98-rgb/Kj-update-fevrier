@@ -6,7 +6,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'plumbing',
+    category: 'general',
     location: '',
     budget_min: '',
     budget_max: '',
@@ -43,13 +43,6 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
     setFormData((prev) => ({ ...prev, required_skills: prev.required_skills.filter((item) => item !== skill) }));
   };
 
-  const handleSkillKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addSkill();
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -58,14 +51,14 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
     if (!payload.title) return setError('Titre requis');
     if (!payload.description) return setError('Description requise');
     if (!payload.location?.address && !payload.location?.fullAddress) return setError('Localisation requise');
-    if (!payload.budget_min) return setError('Budget minimum requis');
-    if (!payload.budget_max) return setError('Budget maximum requis');
+    if (payload.budget_min === null) return setError('Budget minimum requis');
+    if (payload.budget_max === null) return setError('Budget maximum requis');
     if (payload.budget_min > payload.budget_max) return setError('Le budget maximum doit être supérieur ou égal au budget minimum');
 
     setLoading(true);
     try {
-      await jobsAPI.create(payload);
-      if (typeof onJobCreated === 'function') onJobCreated();
+      const created = await jobsAPI.create(payload);
+      if (typeof onJobCreated === 'function') onJobCreated(created);
       if (typeof onClose === 'function') onClose();
     } catch (submitError) {
       setError(normalizeApiErrorMessage(submitError));
@@ -82,7 +75,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 sticky top-0 bg-white">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Publier un job</h2>
-            <p className="text-sm text-gray-500">Remplis les infos proprement pour éviter les erreurs de validation.</p>
+            <p className="text-sm text-gray-500">Version stabilisée contre les erreurs 422.</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
         </div>
@@ -104,6 +97,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">Catégorie</label>
               <select name="category" value={formData.category} onChange={handleChange} className={inputClass}>
+                <option value="general">Général</option>
                 <option value="plumbing">Plomberie</option>
                 <option value="electrical">Électricité</option>
                 <option value="construction">Construction</option>
@@ -111,7 +105,6 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
                 <option value="gardening">Jardinage</option>
                 <option value="tutoring">Cours</option>
                 <option value="mechanics">Mécanique</option>
-                <option value="general">Général</option>
               </select>
             </div>
             <div>
@@ -145,7 +138,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">Compétences demandées</label>
             <div className="flex gap-2">
-              <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={handleSkillKeyDown} className={inputClass} placeholder="Ex: soudure" />
+              <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder="Ex: soudure" />
               <button type="button" onClick={addSkill} className="rounded-xl bg-gray-900 px-4 py-3 font-semibold text-white">Ajouter</button>
             </div>
             {formData.required_skills.length > 0 && (
