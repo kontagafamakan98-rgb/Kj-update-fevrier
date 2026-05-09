@@ -7,15 +7,8 @@ import ProposalModal from '../components/ProposalModal';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
 
-import { ensureJobOwnerActionBar } from '../utils/jobOwnerDeleteRuntime';
 export default function JobDetails() {
   const [job, setJob] = useState(null);
-  /* KOJO_JOB_OWNER_BAR_START */
-  useEffect(() => {
-    return ensureJobOwnerActionBar(job);
-  }, [job]);
-  /* KOJO_JOB_OWNER_BAR_END */
-
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showProposalModal, setShowProposalModal] = useState(false);
