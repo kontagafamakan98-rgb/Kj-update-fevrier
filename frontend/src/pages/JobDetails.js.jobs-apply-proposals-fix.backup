@@ -59,7 +59,7 @@ export default function JobDetails() {
 
       if (isOwnedByCurrentUser(jobData, user)) {
         try {
-          const proposalsResponse = await jobsAPI.getProposals ? await jobsAPI.getProposals(id) : await jobsAPI.getApplications(id);
+          const proposalsResponse = await jobsAPI.getApplications(id);
           const proposalData = Array.isArray(proposalsResponse) ? proposalsResponse : proposalsResponse?.data || [];
           setProposals(proposalData);
         } catch (proposalError) {
