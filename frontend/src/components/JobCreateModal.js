@@ -79,11 +79,9 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
     const payload = buildJobCreatePayload(formData);
     if (!payload.title) return setError('Titre requis');
-    if (!payload.description) return setError('Description requise');
     if (!payload.location?.address && !payload.location?.fullAddress) return setError('Localisation requise');
-    if (payload.budget_min === null) return setError('Budget minimum requis');
-    if (payload.budget_max === null) return setError('Budget maximum requis');
-    if (payload.budget_min > payload.budget_max) return setError('Le budget maximum doit être supérieur ou égal au budget minimum');
+    if (payload.budget_min === null && payload.budget_max === null) return setError('Prix requis');
+    if (payload.budget_min > payload.budget_max) return setError('Le prix maximum doit être supérieur ou égal au prix minimum');
 
     setLoading(true);
     try {
@@ -107,7 +105,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 sticky top-0 bg-white">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Publier un job</h2>
-            <p className="text-sm text-gray-500">Localisation automatique et carte restaurées.</p>
+            <p className="text-sm text-gray-500">Seuls le titre, le prix et la localisation sont obligatoires.</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
         </div>
@@ -116,13 +114,13 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">Titre</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Titre *</label>
             <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder="Ex: Réparation de plomberie" />
           </div>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">Description</label>
-            <textarea name="description" rows="5" value={formData.description} onChange={handleChange} className={inputClass} placeholder="Explique clairement le travail à faire" />
+            <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -140,7 +138,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
               </select>
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Localisation</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Localisation *</label>
               <input name="location_text" value={locationLabel} onChange={handleLocationInput} className={inputClass} placeholder="Quartier, ville, adresse utile" />
             </div>
           </div>
@@ -172,19 +170,20 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Budget min</label>
-              <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder="1000" />
+              <label className="mb-2 block text-sm font-medium text-gray-700">Prix *</label>
+              <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder="Ex: 5000" />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Budget max</label>
-              <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder="5000" />
+              <label className="mb-2 block text-sm font-medium text-gray-700">Prix max</label>
+              <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
             </div>
           </div>
+          <p className="text-sm text-gray-500">Si tu mets seulement le prix, il sera utilisé comme prix min et prix max.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">Durée estimée</label>
-              <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder="Ex: 2 heures" />
+              <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">Deadline</label>
@@ -195,7 +194,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">Compétences demandées</label>
             <div className="flex gap-2">
-              <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder="Ex: soudure" />
+              <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder="Optionnel" />
               <button type="button" onClick={addSkill} className="rounded-xl bg-gray-900 px-4 py-3 font-semibold text-white">Ajouter</button>
             </div>
             {formData.required_skills.length > 0 && (
@@ -222,7 +221,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">Notes pièces / outils</label>
-            <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder="Détails utiles sur pièces et outils" />
+            <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder="Optionnel" />
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">

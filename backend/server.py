@@ -2245,12 +2245,19 @@ async def create_job(
                 "coordinates": None,
             }
 
+        budget_min = _number(incoming.get("budget_min"))
+        budget_max = _number(incoming.get("budget_max"))
+        if budget_min is None and budget_max is not None:
+            budget_min = budget_max
+        if budget_max is None and budget_min is not None:
+            budget_max = budget_min
+
         incoming["title"] = _text(incoming.get("title"))
-        incoming["description"] = _text(incoming.get("description"))
+        incoming["description"] = _text(incoming.get("description")) or "Aucune description fournie"
         incoming["category"] = _text(incoming.get("category")) or "general"
         incoming["location"] = location_payload
-        incoming["budget_min"] = _number(incoming.get("budget_min"))
-        incoming["budget_max"] = _number(incoming.get("budget_max"))
+        incoming["budget_min"] = budget_min
+        incoming["budget_max"] = budget_max
         incoming["required_skills"] = incoming.get("required_skills") if isinstance(incoming.get("required_skills"), list) else []
         incoming["estimated_duration"] = _text(incoming.get("estimated_duration")) or None
         incoming["parts_and_tools_notes"] = _text(incoming.get("parts_and_tools_notes"))
@@ -2261,14 +2268,10 @@ async def create_job(
 
         if not incoming["title"]:
             raise HTTPException(status_code=422, detail="title is required")
-        if not incoming["description"]:
-            raise HTTPException(status_code=422, detail="description is required")
         if not (location_payload.get("address") or location_payload.get("fullAddress")):
             raise HTTPException(status_code=422, detail="location is required")
-        if incoming["budget_min"] is None:
-            raise HTTPException(status_code=422, detail="budget_min is required")
-        if incoming["budget_max"] is None:
-            raise HTTPException(status_code=422, detail="budget_max is required")
+        if incoming["budget_min"] is None and incoming["budget_max"] is None:
+            raise HTTPException(status_code=422, detail="price is required")
         if incoming["budget_min"] > incoming["budget_max"]:
             raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
 

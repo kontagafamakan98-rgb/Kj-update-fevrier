@@ -37,13 +37,17 @@ export const buildJobCreatePayload = (formData) => {
     normalizedLocation = buildStringLocationFallback(rawLocation);
   }
 
+  const budgetMin = cleanNumber(formData?.budget_min);
+  const budgetMax = cleanNumber(formData?.budget_max);
+  const mergedBudget = budgetMin ?? budgetMax;
+
   const payload = {
     title: cleanText(formData?.title),
-    description: cleanText(formData?.description),
+    description: cleanText(formData?.description) || 'Aucune description fournie',
     category: cleanText(formData?.category) || 'general',
     location: normalizedLocation,
-    budget_min: cleanNumber(formData?.budget_min),
-    budget_max: cleanNumber(formData?.budget_max),
+    budget_min: budgetMin ?? mergedBudget,
+    budget_max: budgetMax ?? mergedBudget,
     required_skills: Array.isArray(formData?.required_skills)
       ? formData.required_skills.map((item) => cleanText(item)).filter(Boolean)
       : [],
