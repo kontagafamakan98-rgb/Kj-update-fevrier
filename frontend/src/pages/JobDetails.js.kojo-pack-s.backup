@@ -84,10 +84,10 @@ const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
   const hasMin = Number.isFinite(min) && min > 0;
   const hasMax = Number.isFinite(max) && max > 0;
 
-  if (hasMin && hasMax) return `${min} - ${max} ${currency}`;
-  if (hasMin) return `${min} ${currency}`;
-  if (hasMax) return `${max} ${currency}`;
-  return 'Budget non renseigné';
+  if (hasMin && hasMax) return ${min} -  ;
+  if (hasMin) return ${min} ;
+  if (hasMax) return ${max} ;
+  return 'Budget non renseignÃ©';
 };
 
 const getLocationPrecisionMeta = (precision) => {

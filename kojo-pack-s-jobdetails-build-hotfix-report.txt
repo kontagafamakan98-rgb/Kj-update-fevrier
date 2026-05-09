@@ -1,0 +1,4 @@
+Pack S - JobDetails build hotfix
+Patched file: C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\JobDetails.js
+Backup file: C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\JobDetails.js.kojo-pack-s.backup
+Correctif appliqué : réparation de formatBudgetRange cassé par le précédent pack.
