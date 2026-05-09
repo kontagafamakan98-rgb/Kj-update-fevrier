@@ -1,0 +1,7 @@
+API FULL COMPAT REPAIR
+- restores authAPI
+- restores handleApiError
+- restores paymentAPI and paymentsAPI
+- restores userAPI and usersAPI
+- restores commission, worker, notification, review, wallet, proposal, conversation aliases
+- keeps jobsAPI and messagesAPI
