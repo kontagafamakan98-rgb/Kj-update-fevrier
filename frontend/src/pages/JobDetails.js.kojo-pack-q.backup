@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,41 +6,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import ProposalModal from '../components/ProposalModal';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
-
-const getLocationPrecisionMeta = (precision) => {
-  const normalized = String(precision || '').toLowerCase().trim();
-
-  if (normalized.includes('exact') || normalized.includes('precise')) {
-    return {
-      label: 'Position exacte',
-      shortLabel: 'Exacte',
-      color: 'success',
-    };
-  }
-
-  if (normalized.includes('approx') || normalized.includes('near') || normalized.includes('zone')) {
-    return {
-      label: 'Zone approximative',
-      shortLabel: 'Approx.',
-      color: 'warning',
-    };
-  }
-
-  if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return {
-      label: 'Ville / rÃ©gion',
-      shortLabel: 'RÃ©gion',
-      color: 'info',
-    };
-  }
-
-  return {
-    label: 'Localisation disponible',
-    shortLabel: 'Localisation',
-    color: 'info',
-  };
-};
-
 import {
   buildAppleMapsDirectionsUrl,
   buildGoogleMapsDirectionsUrl,
@@ -327,7 +292,7 @@ export default function JobDetails() {
               </div>
               <div className="ml-3">
                 <p className="font-medium text-gray-900">{job.client_name || pageT('anonymousClient')}</p>
-                <p className="text-sm text-gray-500">â˜…â˜…â˜…â˜…â˜† (4.2)</p>
+                <p className="text-sm text-gray-500">★★★★☆ (4.2)</p>
               </div>
             </div>
             <button className="w-full mt-4 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg">{pageT('viewProfile')}</button>
@@ -395,4 +360,3 @@ function ProposalCard({ proposal, pageT, currentLanguage }) {
     </div>
   );
 }
-

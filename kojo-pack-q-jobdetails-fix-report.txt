@@ -1,0 +1,9 @@
+﻿Pack Q - JobDetails getLocationPrecisionMeta fix
+Date: 2026-05-08 22:46:45
+ProjectRoot: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+FICHIERS MODIFIÃ‰S:
+C:\Users\Famakan\Desktop\Kj-update-fevrier\frontend\src\pages\JobDetails.js
+
+FICHIERS IGNORÃ‰S:
+Aucun.
