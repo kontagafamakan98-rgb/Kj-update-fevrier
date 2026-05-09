@@ -1,14 +1,3 @@
-﻿import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
-import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
-import ProposalModal from '../components/ProposalModal';
-import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
-import { safeLog } from '../utils/env';
-
-
-
 const getStoredSessionUser = () => {
   const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
 
@@ -59,13 +48,13 @@ const isOwnedByCurrentUser = (job) => {
 
 const formatJobStatus = (status) => {
   const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'Statut non dÃ©fini') return 'Statut non dÃ©fini';
+  if (!normalized || normalized === 'undefined' || normalized === 'status_undefined') return 'Statut non défini';
   if (normalized === 'open') return 'Ouvert';
-  if (normalized === 'closed') return 'FermÃ©';
+  if (normalized === 'closed') return 'Fermé';
   if (normalized === 'draft') return 'Brouillon';
   if (normalized === 'pending') return 'En attente';
-  if (normalized === 'published') return 'PubliÃ©';
-  return String(status).replace(/_/g, ' ');
+  if (normalized === 'published') return 'Publié';
+  return String(status || '').replace(/_/g, ' ');
 };
 
 const formatJobDate = (value) => {
@@ -102,56 +91,11 @@ const getLocationPrecisionMeta = (precision) => {
   }
 
   if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return { label: 'Ville / rÃ©gion', shortLabel: 'RÃ©gion', color: 'info' };
+    return { label: 'Ville / région', shortLabel: 'Région', color: 'info' };
   }
 
   return { label: 'Localisation disponible', shortLabel: 'Localisation', color: 'info' };
 };
-
-const getLocationPrecisionMeta = (precision) => {
-  const normalized = String(precision || '').toLowerCase().trim();
-
-  if (normalized.includes('exact') || normalized.includes('precise')) {
-    return {
-      label: 'Position exacte',
-      shortLabel: 'Exacte',
-      color: 'success',
-    };
-  }
-
-  if (normalized.includes('approx') || normalized.includes('near') || normalized.includes('zone')) {
-    return {
-      label: 'Zone approximative',
-      shortLabel: 'Approx.',
-      color: 'warning',
-    };
-  }
-
-  if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return {
-      label: 'Ville / rÃ©gion',
-      shortLabel: 'RÃ©gion',
-      color: 'info',
-    };
-  }
-
-  return {
-    label: 'Localisation disponible',
-    shortLabel: 'Localisation',
-    color: 'info',
-  };
-};
-
-import {
-  buildAppleMapsDirectionsUrl,
-  buildGoogleMapsDirectionsUrl,
-  buildGoogleMapsPlaceUrl,
-  buildOpenStreetMapEmbedUrl,
-  buildOpenStreetMapPageUrl,
-  getLocationAddress,
-  getLocationCoordinates,
-  normalizeLocationPayload
-} from '../utils/locationMaps';
 
 export default function JobDetails() {
   const [job, setJob] = useState(null);
@@ -485,5 +429,3 @@ function ProposalCard({ proposal, pageT, currentLanguage }) {
     </div>
   );
 }
-
-

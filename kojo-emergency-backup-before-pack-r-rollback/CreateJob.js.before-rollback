@@ -1,4 +1,3 @@
-﻿import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import LocationDetector from '../components/LocationDetector';
@@ -7,7 +6,6 @@ import { getCountryByCode } from '../services/geolocationService';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
 import { buildOpenStreetMapEmbedUrl, getLocationCoordinates, getLocationPrecisionMeta, normalizeLocationPayload } from '../utils/locationMaps';
-
 
 const getStoredSessionUser = () => {
   const keys = ['user', 'currentUser', 'authUser', 'auth_user', 'sessionUser', 'kojoUser', 'profile'];
@@ -59,13 +57,13 @@ const isOwnedByCurrentUser = (job) => {
 
 const formatJobStatus = (status) => {
   const normalized = String(status || '').trim().toLowerCase();
-  if (!normalized || normalized === 'undefined' || normalized === 'Statut non dÃ©fini') return 'Statut non dÃ©fini';
+  if (!normalized || normalized === 'undefined' || normalized === 'status_undefined') return 'Statut non défini';
   if (normalized === 'open') return 'Ouvert';
-  if (normalized === 'closed') return 'FermÃ©';
+  if (normalized === 'closed') return 'Fermé';
   if (normalized === 'draft') return 'Brouillon';
   if (normalized === 'pending') return 'En attente';
-  if (normalized === 'published') return 'PubliÃ©';
-  return String(status).replace(/_/g, ' ');
+  if (normalized === 'published') return 'Publié';
+  return String(status || '').replace(/_/g, ' ');
 };
 
 const formatJobDate = (value) => {
@@ -84,10 +82,10 @@ const formatBudgetRange = (minValue, maxValue, currency = 'FCFA') => {
   const hasMin = Number.isFinite(min) && min > 0;
   const hasMax = Number.isFinite(max) && max > 0;
 
-  if (hasMin && hasMax) return ${min} -  ;
-  if (hasMin) return ${min} ;
-  if (hasMax) return ${max} ;
-  return 'Budget non renseignÃ©';
+  if (hasMin && hasMax) return `${min} - ${max} ${currency}`;
+  if (hasMin) return `${min} ${currency}`;
+  if (hasMax) return `${max} ${currency}`;
+  return 'Budget non renseigné';
 };
 
 const getLocationPrecisionMeta = (precision) => {
@@ -102,7 +100,7 @@ const getLocationPrecisionMeta = (precision) => {
   }
 
   if (normalized.includes('city') || normalized.includes('region') || normalized.includes('area')) {
-    return { label: 'Ville / rÃ©gion', shortLabel: 'RÃ©gion', color: 'info' };
+    return { label: 'Ville / région', shortLabel: 'Région', color: 'info' };
   }
 
   return { label: 'Localisation disponible', shortLabel: 'Localisation', color: 'info' };
@@ -658,4 +656,3 @@ function BooleanQuestion({ fieldKey, emoji, title, description, value, onChange,
     </div>
   );
 }
-
