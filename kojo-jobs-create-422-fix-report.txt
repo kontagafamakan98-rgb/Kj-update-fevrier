@@ -1,0 +1,17 @@
+KOJO JOBS CREATE 422 FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Written: frontend\src\utils\jobCreateBridge.js
+
+Backup: JobCreateModal.js.jobs-create-422-fix.backup
+Written: frontend\src\components\JobCreateModal.js
+
+Backup: CreateJob.js.jobs-create-422-fix.backup
+Written: frontend\src\pages\CreateJob.js
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Fix jobs create 422 validation and React crash"
+4. git push origin main
+5. re-tester publication job

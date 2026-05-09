@@ -1,0 +1,79 @@
+import { normalizeLocationPayload } from './locationMaps';
+
+const cleanText = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const cleanNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const buildStringLocationFallback = (value) => {
+  const text = cleanText(value);
+  return {
+    address: text,
+    fullAddress: text,
+    city: '',
+    district: '',
+    country: '',
+    countryCode: '',
+    latitude: null,
+    longitude: null,
+    coordinates: null,
+  };
+};
+
+export const buildJobCreatePayload = (formData) => {
+  const rawLocation = formData?.location;
+  let normalizedLocation;
+
+  try {
+    if (typeof rawLocation === 'object' && rawLocation !== null) {
+      normalizedLocation = normalizeLocationPayload(rawLocation);
+    } else {
+      normalizedLocation = normalizeLocationPayload(buildStringLocationFallback(rawLocation));
+    }
+  } catch (_error) {
+    normalizedLocation = buildStringLocationFallback(rawLocation);
+  }
+
+  return {
+    title: cleanText(formData?.title),
+    description: cleanText(formData?.description),
+    category: cleanText(formData?.category) || 'general',
+    location: normalizedLocation,
+    budget_min: cleanNumber(formData?.budget_min),
+    budget_max: cleanNumber(formData?.budget_max),
+    required_skills: Array.isArray(formData?.required_skills) ? formData.required_skills.filter(Boolean) : [],
+    estimated_duration: cleanText(formData?.estimated_duration) || null,
+    deadline: formData?.deadline ? new Date(formData.deadline).toISOString() : null,
+    urgency: cleanText(formData?.urgency) || 'normal',
+    mechanic_must_bring_parts: Boolean(formData?.mechanic_must_bring_parts),
+    mechanic_must_bring_tools: Boolean(formData?.mechanic_must_bring_tools),
+    parts_and_tools_notes: cleanText(formData?.parts_and_tools_notes) || '',
+  };
+};
+
+export const normalizeApiErrorMessage = (error) => {
+  const detail = error?.response?.data?.detail;
+
+  if (Array.isArray(detail)) {
+    return detail.map((item) => {
+      if (!item || typeof item !== 'object') return String(item);
+      const loc = Array.isArray(item.loc) ? item.loc.join(' > ') : 'champ';
+      return `${loc}: ${item.msg || 'valeur invalide'}`;
+    }).join(' | ');
+  }
+
+  if (detail && typeof detail === 'object') {
+    if (detail.msg) return detail.msg;
+    try {
+      return JSON.stringify(detail);
+    } catch (_error) {
+      return 'Erreur de validation';
+    }
+  }
+
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (typeof error?.message === 'string' && error.message.trim()) return error.message;
+  return 'Opération impossible pour le moment';
+};
