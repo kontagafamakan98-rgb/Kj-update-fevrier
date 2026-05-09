@@ -1,0 +1,23 @@
+KOJO JOBS REAL FRONT FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Backup: CreateJob.js.jobs-real-front-fix.backup
+Written: frontend\src\pages\CreateJob.js
+
+Backup: Jobs.js.jobs-real-front-fix.backup
+Written: frontend\src\pages\Jobs.js
+
+Backup: JobDetails.js.jobs-real-front-fix.backup
+Written: frontend\src\pages\JobDetails.js
+
+api.js jobsAPI block updated
+Backup: api.js.jobs-real-front-fix.backup
+
+Written: frontend\src\utils\jobDisplayBridge.js
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Fix jobs pages real frontend mapping and actions"
+4. git push origin main
+5. tester creation job, liste jobs, detail job et suppression
