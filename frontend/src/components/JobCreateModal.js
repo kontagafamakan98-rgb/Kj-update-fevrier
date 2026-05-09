@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { jobsAPI } from '../services/api';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
@@ -15,6 +15,8 @@ import {
 export default function JobCreateModal({ onClose, onJobCreated }) {
   const { currentLanguage } = useLanguage();
   const ui = getJobUiLabel(currentLanguage);
+  const manualLocationEditedRef = useRef(false);
+  const [autoLocationTried, setAutoLocationTried] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -36,6 +38,29 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
 
+  const autoDetectLocation = async ({ silent = false } = {}) => {
+    setLocating(true);
+    if (!silent) setLocationError('');
+    try {
+      const detected = await detectCurrentJobLocation();
+      if (!manualLocationEditedRef.current) {
+        setFormData((prev) => ({ ...prev, location: detected }));
+      }
+    } catch (locError) {
+      if (!silent) {
+        setLocationError(locError?.message || 'Impossible de récupérer votre position');
+      }
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (autoLocationTried) return;
+    setAutoLocationTried(true);
+    autoDetectLocation({ silent: true });
+  }, [autoLocationTried]);
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -44,22 +69,16 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
 
   const handleLocationInput = (e) => {
     const value = e.target.value;
+    manualLocationEditedRef.current = true;
     setFormData((prev) => ({ ...prev, location: mergeManualAddress(prev.location, value) }));
     setLocationError('');
     setError('');
   };
 
   const handleUseCurrentLocation = async () => {
-    setLocating(true);
+    manualLocationEditedRef.current = false;
     setLocationError('');
-    try {
-      const detected = await detectCurrentJobLocation();
-      setFormData((prev) => ({ ...prev, location: detected }));
-    } catch (locError) {
-      setLocationError(locError?.message || 'Impossible de récupérer votre position');
-    } finally {
-      setLocating(false);
-    }
+    await autoDetectLocation({ silent: false });
   };
 
   const addSkill = () => {
