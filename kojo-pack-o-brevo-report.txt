@@ -1,0 +1,8 @@
+Pack O - Brevo server patch
+ProjectRoot: C:\Users\Famakan\Desktop\Kj-update-fevrier
+Patched file: C:\Users\Famakan\Desktop\Kj-update-fevrier\backend\server.py
+Backup file: C:\Users\Famakan\Desktop\Kj-update-fevrier\backend\server.py.kojo-pack-o.backup
+Modifications:
+- Ajout des variables Brevo dans backend/server.py
+- Ajout de send_email_via_brevo_api()
+- Le forgot password utilise Brevo si EMAIL_PROVIDER=brevo

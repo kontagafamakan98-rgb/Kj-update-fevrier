@@ -1,0 +1,9 @@
+ETAPE 3 ULTRA SIMPLE
+
+1. Lance la commande CMD fournie.
+2. Le pack copie les fichiers Brevo dans ton projet.
+3. Le pack crée un fichier texte nommé KOJO-FICHIERS-PYTHON-A-OUVRIR.txt.
+4. Ouvre KOJO-FICHIERS-PYTHON-A-OUVRIR.txt.
+5. Envoie-moi le contenu exact de ce fichier texte.
+
+Ne touche à rien d'autre pour le moment.
