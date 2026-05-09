@@ -9,21 +9,44 @@ import { safeLog } from '../utils/env';
 import { deleteJobWithFallbacks, ensureJobOwnerActionBar } from '../utils/jobOwnerDeleteRuntime';
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser } from '../utils/jobPageSafeHelpers';
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
+import { getJobProposalUiLabel } from '../utils/jobProposalLocale';
 
-function ProposalCard({ proposal }) {
+const asTextError = (value, fallback) => {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    const text = value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') return item.msg || item.message || '';
+        return '';
+      })
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    if (text) return text;
+  }
+  if (value && typeof value === 'object') return value.msg || value.message || fallback;
+  return fallback;
+};
+
+function ProposalCard({ proposal, ui }) {
+  const workerName = proposal.worker_name || proposal.worker?.full_name || proposal.worker?.name || ui.workerFallback;
+  const amount = proposal.proposed_amount ?? proposal.amount ?? null;
+  const message = proposal.cover_letter || proposal.message || proposal.description || '';
+
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="font-semibold text-gray-900">{proposal.worker_name || 'Travailleur'}</div>
+          <div className="font-semibold text-gray-900">{workerName}</div>
           <div className="text-sm text-gray-500">{formatJobDate(proposal.created_at)}</div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold text-orange-600">{formatBudgetRange(proposal.proposed_amount, null)}</div>
+          <div className="text-lg font-bold text-orange-600">{formatBudgetRange(amount, null)}</div>
           <div className="text-xs text-gray-500">{formatJobStatus(proposal.status || 'pending')}</div>
         </div>
       </div>
-      {proposal.cover_letter && <p className="mt-3 text-sm text-gray-700">{proposal.cover_letter}</p>}
+      {message && <p className="mt-3 text-sm text-gray-700">{message}</p>}
     </div>
   );
 }
@@ -40,6 +63,7 @@ export default function JobDetails() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
+  const ui = getJobProposalUiLabel(currentLanguage);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,7 +95,7 @@ export default function JobDetails() {
       }
     } catch (jobError) {
       safeLog.error('Error loading job details:', jobError);
-      setError(jobError?.response?.data?.detail || jobError?.message || pageT('loadError') || 'Impossible de charger ce job');
+      setError(asTextError(jobError?.response?.data?.detail, jobError?.message || pageT('loadError') || 'Impossible de charger ce job'));
     } finally {
       setLoading(false);
     }
@@ -132,7 +156,7 @@ export default function JobDetails() {
                   <span className="px-3 py-1 rounded-full text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200">
                     {formatJobStatus(job.status)}
                   </span>
-                  <span className="text-sm text-gray-500">Publié le {publishedLabel}</span>
+                  <span className="text-sm text-gray-500">{ui.publishedOnPrefix} {publishedLabel}</span>
                 </div>
               </div>
               <div className="text-left lg:text-right">
@@ -145,33 +169,33 @@ export default function JobDetails() {
               {isJobOwner && (
                 <>
                   <button onClick={() => navigate('/jobs')} className="rounded-xl border border-gray-200 px-4 py-3 font-semibold text-gray-700 hover:bg-gray-50">
-                    Mes jobs
+                    {ui.myJobs}
                   </button>
                   <button onClick={handleDelete} disabled={deleting} className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
-                    {deleting ? 'Suppression...' : 'Supprimer ce job'}
+                    {deleting ? ui.deleting : ui.deleteJob}
                   </button>
                 </>
               )}
 
               {canApply && (
                 <button onClick={() => setShowProposalModal(true)} className="rounded-xl bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
-                  {pageT('apply') || 'Postuler'}
+                  {ui.apply}
                 </button>
               )}
             </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Description</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.description}</h2>
             <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
           </div>
 
           {isJobOwner && proposals.length > 0 && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Propositions reçues</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.receivedProposals}</h2>
               <div className="space-y-4">
                 {proposals.map((proposal) => (
-                  <ProposalCard key={proposal.id || proposal._id || Math.random()} proposal={proposal} />
+                  <ProposalCard key={proposal.id || proposal._id || `${proposal.worker_id || 'proposal'}-${proposal.created_at || Math.random()}`} proposal={proposal} ui={ui} />
                 ))}
               </div>
             </div>
@@ -180,7 +204,7 @@ export default function JobDetails() {
 
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Informations</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.information}</h2>
             <div className="space-y-3 text-gray-700">
               <div>{job.location_text}</div>
               {job.location_precision && <div className="text-sm text-gray-500">{job.location_precision}</div>}
@@ -189,7 +213,7 @@ export default function JobDetails() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Client</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.client}</h2>
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
                 {String(job.client_name || 'C').charAt(0).toUpperCase()}
