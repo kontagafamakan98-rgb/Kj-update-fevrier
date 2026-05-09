@@ -1,0 +1,25 @@
+KOJO JOBS PROPOSAL + BACKEND ACCEPT FIX
+
+INCLUDED
+- backend/server.py
+- frontend/src/services/api.js
+- frontend/src/components/ProposalModal.js
+- frontend/src/pages/JobDetails.js
+- frontend/src/pages/Jobs.js
+- frontend/src/utils/jobProposalWorkflow.js
+
+BACKEND FIXES
+- adds POST /jobs/{job_id}/proposals
+- adds GET /jobs/{job_id}/proposals
+- adds PUT /jobs/{job_id}
+- validates proposal payload and blocks duplicate proposals by the same worker
+- allows client-side assignment by setting assigned_worker_id and accepted_proposal_id
+- marks accepted proposal as accepted and updates job status to assigned
+
+FRONTEND FIXES
+- hides Postuler after successful proposal
+- stores applied state locally to survive refresh
+- starts discussion automatically after proposal submission
+- shows worker/client discussion panel inside JobDetails
+- lets client open a proposal discussion and assign the worker
+- uses a stronger API client that pulls bearer token from common browser storage keys
