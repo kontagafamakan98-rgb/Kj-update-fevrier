@@ -1,0 +1,1352 @@
+KOJO JOBS BACKEND CODE EXTRACTOR
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+Server file: C:\Users\Famakan\Desktop\Kj-update-fevrier\backend\server.py
+
+FUNCTIONS RELATED TO JOBS
+- create_database_indexes
+- verify_owner_access
+- ensure_owner_exists
+- create_access_token
+- create_email_verification_token
+- delete_profile_photo
+- delete_push_token
+- create_worker_profile
+- create_job
+- get_jobs
+- get_job
+- create_proposal
+- get_job_proposals
+- create_paydunya_invoice
+- create_real_payment_checkout
+
+db.jobs usage count: 15
+--- db.jobs snippet #1 ---
+dex("id", unique=True)
+        await db.users.create_index("user_type")
+        await db.users.create_index("country")
+        await db.users.create_index([("email", 1), ("password_hash", 1)])
+        
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+       
+
+--- db.jobs snippet #2 ---
+ndex("user_type")
+        await db.users.create_index("country")
+        await db.users.create_index([("email", 1), ("password_hash", 1)])
+        
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+     
+
+--- db.jobs snippet #3 ---
+index("country")
+        await db.users.create_index([("email", 1), ("password_hash", 1)])
+        
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id
+
+--- db.jobs snippet #4 ---
+e_index([("email", 1), ("password_hash", 1)])
+        
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id")
+        await db.proposals.create_index([("j
+
+--- db.jobs snippet #5 ---
+       
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id")
+        await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
+        
+      
+
+--- db.jobs snippet #6 ---
+    await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id")
+        await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
+        
+        # Messages collection indexes
+        await db.messages.create_inde
+
+--- db.jobs snippet #7 ---
+bs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id")
+        await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
+        
+        # Messages collection indexes
+        await db.messages.create_index("id", unique=True)
+        await db.messages.create_index("job_id")
+        aw
+
+--- db.jobs snippet #8 ---
+    if job_data.budget_min > job_data.budget_max:
+            raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
+        
+        job = Job(**job_data.dict(), client_id=current_user.id)
+        result = await db.jobs.insert_one(job.dict())
+        
+        if not result.inserted_id:
+            raise HTTPException(status_code=500, detail="Failed to create job")
+            
+        logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
+        return job
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to create job: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error cr
+
+--- db.jobs snippet #9 ---
+=50, ge=1, le=100),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        query = {}
+        if status:
+            query["status"] = status
+        if category:
+            query["category"] = category
+        
+        jobs = await db.jobs.find(query).sort("posted_at", -1).to_list(limit)
+        
+        logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
+        return [Job(**job) for job in jobs]
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to retrieve jobs: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await 
+
+--- db.jobs snippet #10 ---
+d to retrieve jobs: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return Job(**job)
+
+# Job Proposal Routes
+@api_router.post("/jobs/{job_id}/proposals")
+async def create_proposal(
+    job_id: str,
+    proposal_data: ProposalCreate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create proposals")
+  
+
+--- db.jobs snippet #11 ---
+alCreate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create proposals")
+    
+    # Check if job exists
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if worker already proposed
+    existing_proposal = await db.job_proposals.find_one({
+        "job_id": job_id,
+        "worker_id": current_user.id
+    })
+    if existing_proposal:
+        raise HTTPException(status_code=400, detail="You have already proposed for this job")
+    
+    proposal = JobProposal(
+        **proposal_data.dict(),
+       
+
+--- db.jobs snippet #12 ---
+turn {"message": "Proposal submitted successfully"}
+
+@api_router.get("/jobs/{job_id}/proposals")
+async def get_job_proposals(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # Check if user is the job owner
+    job = await db.jobs.find_one({"id": job_id, "client_id": current_user.id})
+    if not job:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    proposals = await db.job_proposals.find({"job_id": job_id}).to_list(100)
+    return [JobProposal(**proposal) for proposal in proposals]
+
+# Messaging Routes
+@api_router.post("/messages")
+async def send_message(
+    message_data: MessageCreate,
+    current_user: User = Depends(get_current_user)
+):
+    # Generate conversation ID
+    conversation_id = f"{mi
+
+--- db.jobs snippet #13 ---
+        "formatted": phone if is_valid else None
+    }
+
+@api_router.get("/stats")
+async def get_system_stats():
+    """Statistics endpoint for monitoring"""
+    try:
+        total_users = await db.users.count_documents({})
+        total_jobs = await db.jobs.count_documents({})
+        total_workers = await db.users.count_documents({"user_type": "worker"})
+        total_clients = await db.users.count_documents({"user_type": "client"})
+        
+        return {
+            "total_users": total_users,
+            "total_jobs": total_jobs,
+            "total_workers": total_workers,
+            "total_clients": total_clients,
+            "supported_countries": ["senegal", "mali", "ivory_coast", "burkina_faso"],
+          
+
+--- db.jobs snippet #14 ---
+s = await db.users.count_documents({})
+        clients = await db.users.count_documents({"user_type": "client"})
+        workers = await db.users.count_documents({"user_type": "worker"})
+        
+        # Compter les jobs
+        total_jobs = await db.jobs.count_documents({})
+        active_jobs = await db.jobs.count_documents({"status": "open"})
+        
+        debug_info = {
+            "system_status": "running",
+            "database_connected": True,
+            "total_users": total_users,
+            "user_breakdown": {
+                "clients": clients,
+                "workers": workers,
+                "owner": 1
+            },
+            "jobs_stats": {
+                "total_jobs": total_jobs,
+         
+
+--- db.jobs snippet #15 ---
+ await db.users.count_documents({"user_type": "client"})
+        workers = await db.users.count_documents({"user_type": "worker"})
+        
+        # Compter les jobs
+        total_jobs = await db.jobs.count_documents({})
+        active_jobs = await db.jobs.count_documents({"status": "open"})
+        
+        debug_info = {
+            "system_status": "running",
+            "database_connected": True,
+            "total_users": total_users,
+            "user_breakdown": {
+                "clients": clients,
+                "workers": workers,
+                "owner": 1
+            },
+            "jobs_stats": {
+                "total_jobs": total_jobs,
+                "active_jobs": active_jobs
+            },
+            "server_inf
+
+route decorator count: 0
+
+AUTH / USER CANDIDATES
+- get_current_user: 29
+- current_user: 112
+- get_current_active_user: 0
+- decode_token: 0
+- verify_token: 0
+- Authorization: 7
+- Bearer: 6
+
+OWNER FIELD CANDIDATES
+- client_id: 11
+- owner_id: 0
+- created_by: 0
+- user_id: 36
+- poster_id: 0
+- customer_id: 0
+
+JOB FUNCTION SNIPPETS
+--- function create_database_indexes ---
+ction on startup
+    logger.info(f"✅ MongoDB connected to: {db_name}")
+except Exception as e:
+    logger.error(f"❌ MongoDB connection failed: {e}")
+    raise
+
+# MongoDB Indexes for Performance (West Africa optimization)
+async def create_database_indexes():
+    """Create indexes on frequently queried fields for better performance"""
+    try:
+        # Users collection indexes
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("id", unique=True)
+        await db.users.create_index("user_type")
+        await db.users.create_index("country")
+        await db.users.create_index([("email", 1), ("password_hash", 1)])
+        
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id")
+        await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
+        
+        # Messages collection indexes
+        await db.messages.create_index("id", unique=True)
+        await db.messages.create_index("job_id")
+        await db.messages.create_index([("sender_id", 1), ("receiver_id", 1)])
+        await db.messages.create_index([("created_at", -1)])
+        
+        # Commissions collection indexes
+        await db.commissions.create_index("id", unique=True)
+        await db.commissions.create_index("job_id")
+        await db.commissions.create_index("worker_id")
+        await db.commissions.create_index("status")
+        await db.commissions.create_index([("created_at", -1)])
+
+        # Payments collection indexes
+        await db.payments.create_index("id", unique=True)
+        await db.payments.create_index("job_id")
+        await db.payments.create_index("payer_id")
+        await db.payments.create_index("receiver_id")
+        await db.payments.create_index("status")
+        await db.payments.create_index("invoice_token", sparse=True)
+        await db.payments.create_index([("cre
+
+--- function verify_owner_access ---
+   "bucket": bucket_name
+                },
+                headers={"Retry-After": str(retry_after)}
+            )
+
+        return await call_next(request)
+
+# Fonction pour vérifier si l'utilisateur est le propriétaire
+async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Vérifie que seul le propriétaire peut accéder aux fonctionnalités sensibles"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        email = payload.get("email")
+        
+        # Vérification stricte: seul Famakan Kontaga Master a accès
+        if user_id != OWNER_USER_ID or email != OWNER_EMAIL:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
+            )
+        
+        # Récupérer les données utilisateur depuis la DB
+        user = await db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Propriétaire non trouvé"
+            )
+            
+        return user
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expiré"
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide"
+        )
+
+# Fonction pour créer le compte propriétaire s'il n'existe pas
+async def ensure_owner_exists():
+    """Crée le compte propriétaire s'il n'existe pas déjà et si les secrets requis sont fournis."""
+    if not OWNER_EMAIL:
+        logger.warning("⚠️ OWNER_EMAIL non défini: création automatique du compte owner désactivée.")
+        return
+
+    existing_owner = await db.users.find_one({"id": OWNER_USER_ID})
+    if existing_owner:
+        logger.info(f"✅ Compte owner existe déjà: {OWNER_EMAIL}")
+        return
+
+    if not OWNER_INITIAL_PASSWORD:
+        logger.warning("⚠️ Compte owner absent et OWNER_INITIAL_PASSWORD non défini: aucune création automatique effectuée.")
+        return
+
+    if len(OWNER_INITIAL_PASSWORD) < 12:
+        logger.warning("⚠️ OWNER_INITIAL_PASSWORD trop court (minimum 12 caractères): 
+
+--- function ensure_owner_exists ---
+ept jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide"
+        )
+
+# Fonction pour créer le compte propriétaire s'il n'existe pas
+async def ensure_owner_exists():
+    """Crée le compte propriétaire s'il n'existe pas déjà et si les secrets requis sont fournis."""
+    if not OWNER_EMAIL:
+        logger.warning("⚠️ OWNER_EMAIL non défini: création automatique du compte owner désactivée.")
+        return
+
+    existing_owner = await db.users.find_one({"id": OWNER_USER_ID})
+    if existing_owner:
+        logger.info(f"✅ Compte owner existe déjà: {OWNER_EMAIL}")
+        return
+
+    if not OWNER_INITIAL_PASSWORD:
+        logger.warning("⚠️ Compte owner absent et OWNER_INITIAL_PASSWORD non défini: aucune création automatique effectuée.")
+        return
+
+    if len(OWNER_INITIAL_PASSWORD) < 12:
+        logger.warning("⚠️ OWNER_INITIAL_PASSWORD trop court (minimum 12 caractères): création automatique du compte owner refusée.")
+        return
+
+    hashed_password = bcrypt.hashpw(OWNER_INITIAL_PASSWORD.encode('utf-8'), bcrypt.gensalt())
+
+    owner_data = {
+        "id": OWNER_USER_ID,
+        "email": OWNER_EMAIL,
+        "password_hash": hashed_password.decode('utf-8'),
+        "first_name": "Famakan",
+        "last_name": "Kontaga Master",
+        "user_type": "owner",
+        "phone": "+223701234567",
+        "country": "mali",
+        "preferred_language": "fr",
+        "profile_photo": None,
+        "is_verified": True,
+        "rating": 0.0,
+        "total_reviews": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "is_owner": True,
+        "permissions": [
+            "commission_access",
+            "debug_access",
+            "admin_access",
+            "full_dashboard_access",
+            "mobile_test_access",
+            "photo_debug_access"
+        ]
+    }
+
+    await db.users.insert_one(owner_data)
+    logger.info(f"✅ Compte owner créé: {OWNER_EMAIL}")
+    logger.warning("⚠️ Changez OWNER_INITIAL_PASSWORD après la première connexion et retirez-le ensuite du fichier .env.")
+
+# Enums
+class UserType(str, Enum):
+    CLIENT = "client"
+    WORKER = "worker"
+    OWNER = "owner"
+
+class JobStatus(str, Enum):
+    OPEN = "open"
+    IN_PROGRESS = "in_progress" 
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+c
+
+--- function create_access_token ---
+ or char in '\n\t')
+    
+    # Limit length to prevent buffer overflow attacks
+    if len(sanitized) > 1000:
+        raise ValueError(f"{field_name} is too long (max 1000 characters)")
+    
+    return sanitized.strip()
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+def gmail_is_configured() -> bool:
+    return all([
+        GMAIL_CLIENT_ID,
+        GMAIL_CLIENT_SECRET,
+        GMAIL_REFRESH_TOKEN,
+        GMAIL_SENDER_EMAIL
+    ])
+
+def get_missing_gmail_env_vars() -> List[str]:
+    missing = []
+    if not GMAIL_CLIENT_ID:
+        missing.append("GMAIL_CLIENT_ID")
+    if not GMAIL_CLIENT_SECRET:
+        missing.append("GMAIL_CLIENT_SECRET")
+    if not GMAIL_REFRESH_TOKEN:
+        missing.append("GMAIL_REFRESH_TOKEN")
+    if not GMAIL_SENDER_EMAIL:
+        missing.append("GMAIL_SENDER_EMAIL")
+    return missing
+
+def generate_email_otp_code(length: int = 6) -> str:
+    return ''.join(secrets.choice('0123456789') for _ in range(length))
+
+def hash_email_otp(email: str, purpose: str, otp_code: str) -> str:
+    payload = f"{EMAIL_OTP_SECRET}:{purpose}:{email.lower().strip()}:{otp_code}"
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+def mask_email_address(email: str) -> str:
+    if '@' not in email:
+        return email
+    local, domain = email.split('@', 1)
+    masked_local = local[:2] + ('*' * max(1, len(local) - 2)) if len(local) > 2 else local[0] + '*'
+    domain_name, *domain_parts = domain.split('.')
+    masked_domain = domain_name[:1] + ('*' * max(1, len(domain_name) - 1))
+    return f"{masked_local}@{'.'.join([masked_domain] + domain_parts)}"
+
+def create_email_verification_token(email: str, purpose: str = "signup") -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=EMAIL_VERIFICATION_TOKEN_MINUTES)
+    payload = {
+        "sub": email.lower().strip(),
+        "purpose": purpose,
+        "type": "email_verification",
+        "exp": expire
+    }
+    return jwt.encode(payload, EMAIL_OTP_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_email_verification_token(token: str, email: str, purpose: str = "signup") -> dict:
+    try:
+        payload = jwt.decode(token, EMAIL_OTP_SECRET, algorithms=[JWT_ALGORITHM])
+        if
+
+--- function create_email_verification_token ---
+ else local[0] + '*'
+    domain_name, *domain_parts = domain.split('.')
+    masked_domain = domain_name[:1] + ('*' * max(1, len(domain_name) - 1))
+    return f"{masked_local}@{'.'.join([masked_domain] + domain_parts)}"
+
+def create_email_verification_token(email: str, purpose: str = "signup") -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=EMAIL_VERIFICATION_TOKEN_MINUTES)
+    payload = {
+        "sub": email.lower().strip(),
+        "purpose": purpose,
+        "type": "email_verification",
+        "exp": expire
+    }
+    return jwt.encode(payload, EMAIL_OTP_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_email_verification_token(token: str, email: str, purpose: str = "signup") -> dict:
+    try:
+        payload = jwt.decode(token, EMAIL_OTP_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "email_verification":
+            raise HTTPException(status_code=401, detail="Jeton de vérification invalide")
+        if payload.get("sub") != email.lower().strip():
+            raise HTTPException(status_code=401, detail="Jeton de vérification non valide pour cet email")
+        if payload.get("purpose") != purpose:
+            raise HTTPException(status_code=401, detail="Jeton de vérification non valide pour cette opération")
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="La vérification email a expiré. Veuillez demander un nouveau code.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Jeton de vérification email invalide")
+
+def invalidate_gmail_access_token_cache():
+    GMAIL_ACCESS_TOKEN_CACHE["access_token"] = ""
+    GMAIL_ACCESS_TOKEN_CACHE["expires_at"] = 0.0
+
+
+def get_gmail_access_token(force_refresh: bool = False) -> str:
+    now_ts = time.time()
+    cached_token = GMAIL_ACCESS_TOKEN_CACHE.get("access_token", "")
+    cached_expires_at = float(GMAIL_ACCESS_TOKEN_CACHE.get("expires_at", 0.0) or 0.0)
+
+    if cached_token and not force_refresh and now_ts < (cached_expires_at - GMAIL_ACCESS_TOKEN_SAFETY_SECONDS):
+        return cached_token
+
+    last_error = ""
+
+    for attempt in range(1, GMAIL_TOKEN_REFRESH_RETRIES + 1):
+        try:
+            token_response = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": GMAIL_CLIENT_ID,
+                    "client_secret": GMAIL
+
+--- function delete_profile_photo ---
+cept Exception as e:
+        logger.error(f"Error fetching profile photo for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@api_router.delete("/users/profile-photo")
+async def delete_profile_photo(current_user: User = Depends(get_current_user)):
+    if not current_user.profile_photo:
+        raise HTTPException(status_code=404, detail="No profile photo to delete")
+    
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"profile_photo": None, "updated_at": datetime.now(timezone.utc)}}
+    )
+    
+    return {"message": "Profile photo deleted successfully"}
+
+# Push Token Routes - For Mobile Notifications
+@api_router.post("/users/push-token")
+async def register_push_token(
+    token_data: PushTokenCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Register push notification token for mobile app"""
+    try:
+        logger.info(f"Registering push token for user: {current_user.id}")
+        
+        # Verify user_id matches current user (security check)
+        if token_data.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403, 
+                detail="Cannot register push token for different user"
+            )
+        
+        # Check if token already exists for this user and device
+        existing_token = await db.push_tokens.find_one({
+            "user_id": current_user.id,
+            "device_type": token_data.device_type,
+            "device_id": token_data.device_id
+        })
+        
+        if existing_token:
+            # Update existing token
+            await db.push_tokens.update_one(
+                {"id": existing_token["id"]},
+                {
+                    "$set": {
+                        "push_token": token_data.push_token,
+                        "active": True,
+                        "updated_at": datetime.now(timezone.utc)
+                    }
+                }
+            )
+            logger.info(f"Updated existing push token for user: {current_user.id}")
+            return {
+                "message": "Push token updated successfully",
+                "token_id": existing_token["id"],
+                "action": "updated"
+            }
+        else:
+            # Create new token
+            push_token = PushToken(
+                user_id=current_user.id,
+                push_token=token_data.push_token,
+     
+
+--- function delete_push_token ---
+  }
+    except Exception as e:
+        logger.error(f"Error getting push tokens: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get push tokens")
+
+@api_router.delete("/users/push-token/{token_id}")
+async def delete_push_token(
+    token_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete/deactivate a push token"""
+    try:
+        # Find token and verify ownership
+        token = await db.push_tokens.find_one({"id": token_id, "user_id": current_user.id})
+        if not token:
+            raise HTTPException(status_code=404, detail="Push token not found")
+        
+        # Deactivate token instead of deleting (for audit trail)
+        await db.push_tokens.update_one(
+            {"id": token_id},
+            {
+                "$set": {
+                    "active": False,
+                    "updated_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+        
+        logger.info(f"Deactivated push token {token_id} for user: {current_user.id}")
+        return {"message": "Push token deactivated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting push token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete push token")
+
+# Worker Profile Routes
+@api_router.post("/workers/profile")
+async def create_worker_profile(
+    profile_data: WorkerProfile,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create worker profiles")
+    
+    profile_data.user_id = current_user.id
+    await db.worker_profiles.insert_one(profile_data.dict())
+    return {"message": "Worker profile created successfully"}
+
+@api_router.get("/workers/profile")
+async def get_worker_profile(current_user: User = Depends(get_current_user)):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    profile = await db.worker_profiles.find_one({"user_id": current_user.id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+    
+    return WorkerProfile(**profile)
+
+# Job Routes
+@api_router.post("/jobs", response_model=Job)
+async def create_job(
+    job_data: JobCreate,
+    current_user: User = Depends(get_current_use
+
+--- function create_worker_profile ---
+pt Exception as e:
+        logger.error(f"Error deleting push token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete push token")
+
+# Worker Profile Routes
+@api_router.post("/workers/profile")
+async def create_worker_profile(
+    profile_data: WorkerProfile,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create worker profiles")
+    
+    profile_data.user_id = current_user.id
+    await db.worker_profiles.insert_one(profile_data.dict())
+    return {"message": "Worker profile created successfully"}
+
+@api_router.get("/workers/profile")
+async def get_worker_profile(current_user: User = Depends(get_current_user)):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    profile = await db.worker_profiles.find_one({"user_id": current_user.id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+    
+    return WorkerProfile(**profile)
+
+# Job Routes
+@api_router.post("/jobs", response_model=Job)
+async def create_job(
+    job_data: JobCreate,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        if current_user.user_type != UserType.CLIENT:
+            raise HTTPException(status_code=403, detail="Only clients can create jobs")
+        
+        # Additional validation
+        if job_data.budget_min > job_data.budget_max:
+            raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
+        
+        job = Job(**job_data.dict(), client_id=current_user.id)
+        result = await db.jobs.insert_one(job.dict())
+        
+        if not result.inserted_id:
+            raise HTTPException(status_code=500, detail="Failed to create job")
+            
+        logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
+        return job
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to create job: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error creating job")
+
+@api_router.get("/jobs", response_model=List[Job])
+async def get_jobs(
+    status: Optional[JobStatus] = None,
+    category: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    curr
+
+--- function create_job ---
+ current_user.id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+    
+    return WorkerProfile(**profile)
+
+# Job Routes
+@api_router.post("/jobs", response_model=Job)
+async def create_job(
+    job_data: JobCreate,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        if current_user.user_type != UserType.CLIENT:
+            raise HTTPException(status_code=403, detail="Only clients can create jobs")
+        
+        # Additional validation
+        if job_data.budget_min > job_data.budget_max:
+            raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
+        
+        job = Job(**job_data.dict(), client_id=current_user.id)
+        result = await db.jobs.insert_one(job.dict())
+        
+        if not result.inserted_id:
+            raise HTTPException(status_code=500, detail="Failed to create job")
+            
+        logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
+        return job
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to create job: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error creating job")
+
+@api_router.get("/jobs", response_model=List[Job])
+async def get_jobs(
+    status: Optional[JobStatus] = None,
+    category: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        query = {}
+        if status:
+            query["status"] = status
+        if category:
+            query["category"] = category
+        
+        jobs = await db.jobs.find(query).sort("posted_at", -1).to_list(limit)
+        
+        logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
+        return [Job(**job) for job in jobs]
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to retrieve jobs: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return Job(**job)
+
+# Job Proposal Routes
+@api_router.post("/jobs/{job_id}/proposals")
+async def create_p
+
+--- function get_jobs ---
+  except Exception as e:
+        logger.error(f"❌ Failed to create job: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error creating job")
+
+@api_router.get("/jobs", response_model=List[Job])
+async def get_jobs(
+    status: Optional[JobStatus] = None,
+    category: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        query = {}
+        if status:
+            query["status"] = status
+        if category:
+            query["category"] = category
+        
+        jobs = await db.jobs.find(query).sort("posted_at", -1).to_list(limit)
+        
+        logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
+        return [Job(**job) for job in jobs]
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to retrieve jobs: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return Job(**job)
+
+# Job Proposal Routes
+@api_router.post("/jobs/{job_id}/proposals")
+async def create_proposal(
+    job_id: str,
+    proposal_data: ProposalCreate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create proposals")
+    
+    # Check if job exists
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if worker already proposed
+    existing_proposal = await db.job_proposals.find_one({
+        "job_id": job_id,
+        "worker_id": current_user.id
+    })
+    if existing_proposal:
+        raise HTTPException(status_code=400, detail="You have already proposed for this job")
+    
+    proposal = JobProposal(
+        **proposal_data.dict(),
+        job_id=job_id,
+        worker_id=current_user.id
+    )
+    
+    await db.job_proposals.insert_one(proposal.dict())
+    return {"message": "Proposal submitted successfully"}
+
+@api_router.get("/jobs/{job_id}/proposals")
+async def get_job_proposals(
+    job_id: str,
+    current_user: User = Depends(get_current
+
+--- function get_job ---
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to retrieve jobs: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return Job(**job)
+
+# Job Proposal Routes
+@api_router.post("/jobs/{job_id}/proposals")
+async def create_proposal(
+    job_id: str,
+    proposal_data: ProposalCreate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create proposals")
+    
+    # Check if job exists
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if worker already proposed
+    existing_proposal = await db.job_proposals.find_one({
+        "job_id": job_id,
+        "worker_id": current_user.id
+    })
+    if existing_proposal:
+        raise HTTPException(status_code=400, detail="You have already proposed for this job")
+    
+    proposal = JobProposal(
+        **proposal_data.dict(),
+        job_id=job_id,
+        worker_id=current_user.id
+    )
+    
+    await db.job_proposals.insert_one(proposal.dict())
+    return {"message": "Proposal submitted successfully"}
+
+@api_router.get("/jobs/{job_id}/proposals")
+async def get_job_proposals(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # Check if user is the job owner
+    job = await db.jobs.find_one({"id": job_id, "client_id": current_user.id})
+    if not job:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    proposals = await db.job_proposals.find({"job_id": job_id}).to_list(100)
+    return [JobProposal(**proposal) for proposal in proposals]
+
+# Messaging Routes
+@api_router.post("/messages")
+async def send_message(
+    message_data: MessageCreate,
+    current_user: User = Depends(get_current_user)
+):
+    # Generate conversation ID
+    conversation_id = f"{min(current_user.id, message_data.receiver_id)}_{max(current_user.id, message_data.receiver_id)}"
+    
+    message = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        rec
+
+--- function create_proposal ---
+job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return Job(**job)
+
+# Job Proposal Routes
+@api_router.post("/jobs/{job_id}/proposals")
+async def create_proposal(
+    job_id: str,
+    proposal_data: ProposalCreate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create proposals")
+    
+    # Check if job exists
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if worker already proposed
+    existing_proposal = await db.job_proposals.find_one({
+        "job_id": job_id,
+        "worker_id": current_user.id
+    })
+    if existing_proposal:
+        raise HTTPException(status_code=400, detail="You have already proposed for this job")
+    
+    proposal = JobProposal(
+        **proposal_data.dict(),
+        job_id=job_id,
+        worker_id=current_user.id
+    )
+    
+    await db.job_proposals.insert_one(proposal.dict())
+    return {"message": "Proposal submitted successfully"}
+
+@api_router.get("/jobs/{job_id}/proposals")
+async def get_job_proposals(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # Check if user is the job owner
+    job = await db.jobs.find_one({"id": job_id, "client_id": current_user.id})
+    if not job:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    proposals = await db.job_proposals.find({"job_id": job_id}).to_list(100)
+    return [JobProposal(**proposal) for proposal in proposals]
+
+# Messaging Routes
+@api_router.post("/messages")
+async def send_message(
+    message_data: MessageCreate,
+    current_user: User = Depends(get_current_user)
+):
+    # Generate conversation ID
+    conversation_id = f"{min(current_user.id, message_data.receiver_id)}_{max(current_user.id, message_data.receiver_id)}"
+    
+    message = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        receiver_id=message_data.receiver_id,
+        content=message_data.content
+    )
+    
+    await db.messages.insert_one(message.dict())
+    return {"message": "Message sent successfully"}
+
+@api_router.get("/messages")
+async def get_all_messages(current_user: User = Depends(get_current_user)):
+    """Récupér
+
+--- function get_job_proposals ---
+  job_id=job_id,
+        worker_id=current_user.id
+    )
+    
+    await db.job_proposals.insert_one(proposal.dict())
+    return {"message": "Proposal submitted successfully"}
+
+@api_router.get("/jobs/{job_id}/proposals")
+async def get_job_proposals(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # Check if user is the job owner
+    job = await db.jobs.find_one({"id": job_id, "client_id": current_user.id})
+    if not job:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    proposals = await db.job_proposals.find({"job_id": job_id}).to_list(100)
+    return [JobProposal(**proposal) for proposal in proposals]
+
+# Messaging Routes
+@api_router.post("/messages")
+async def send_message(
+    message_data: MessageCreate,
+    current_user: User = Depends(get_current_user)
+):
+    # Generate conversation ID
+    conversation_id = f"{min(current_user.id, message_data.receiver_id)}_{max(current_user.id, message_data.receiver_id)}"
+    
+    message = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        receiver_id=message_data.receiver_id,
+        content=message_data.content
+    )
+    
+    await db.messages.insert_one(message.dict())
+    return {"message": "Message sent successfully"}
+
+@api_router.get("/messages")
+async def get_all_messages(current_user: User = Depends(get_current_user)):
+    """Récupérer tous les messages de l'utilisateur connecté"""
+    messages = await db.messages.find({
+        "$or": [
+            {"sender_id": current_user.id},
+            {"receiver_id": current_user.id}
+        ]
+    }, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return messages
+
+@api_router.get("/messages/conversations")
+async def get_conversations(current_user: User = Depends(get_current_user)):
+    # Get unique conversation partners
+    pipeline = [
+        {"$match": {
+            "$or": [
+                {"sender_id": current_user.id},
+                {"receiver_id": current_user.id}
+            ]
+        }},
+        {"$group": {
+            "_id": "$conversation_id",
+            "last_message": {"$last": "$content"},
+            "last_timestamp": {"$last": "$timestamp"}
+        }},
+        {"$sort": {"last_timestamp": -1}}
+    ]
+    
+    conversations = await db.messages.aggregate(pipeline).to_list(100)
+    return conversations
+
+@api_router.get("/messages/{conversation_id}")
+async def get_conversat
+
+--- function create_paydunya_invoice ---
+ayments/ipn/paydunya"
+    return '/api/payments/ipn/paydunya'
+
+def serialize_payment_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    serialized = dict(record)
+    serialized.pop('_id', None)
+    return serialized
+
+def create_paydunya_invoice(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    endpoint = f"{get_paydunya_base_url()}/checkout-invoice/create"
+    try:
+        response = requests.post(endpoint, headers=get_paydunya_headers(), json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya create invoice error: {exc}")
+        raise HTTPException(status_code=502, detail='Impossible de créer la session de paiement PayDunya')
+
+    if str(data.get('response_code')) != '00':
+        logger.error(f"PayDunya create invoice failed: {data}")
+        raise HTTPException(status_code=502, detail=data.get('response_text') or 'Création de paiement refusée par PayDunya')
+
+    return data
+
+def confirm_paydunya_invoice(invoice_token: str) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    endpoint = f"{get_paydunya_base_url()}/checkout-invoice/confirm/{invoice_token}"
+    try:
+        response = requests.get(endpoint, headers=get_paydunya_headers(), timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya confirm invoice error: {exc}")
+        raise HTTPException(status_code=502, detail='Impossible de vérifier le statut du paiement PayDunya')
+
+def map_paydunya_status(raw_status: Optional[str]) -> str:
+    normalized = str(raw_status or '').strip().lower()
+    mapping = {
+        'pending': 'pending',
+        'created': 'pending',
+        'completed': 'completed',
+        'success': 'completed',
+        'cancelled': 'cancelled',
+        'canceled': 'cancelled',
+        'failed': 'failed'
+    }
+    return mapping.get(normalized, 'pending')
+
+async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> Dict[str, Any]:
+    invoice_token = payment_record.get('invoice_token')
+    if not invoice_token or not is_paydunya_configur
+
+--- function create_real_payment_checkout ---
+red(),
+        'channel': channel,
+        'country': normalize_payment_country(request.country),
+        'payment_method': request.payment_method.value,
+        **breakdown
+    }
+
+@api_router.post('/payments/checkout')
+async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_user: User = Depends(get_current_user)):
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas encore configuré en production")
+
+    normalized_country = normalize_payment_country(request.country or current_user.country)
+    channel = get_paydunya_channel(request.payment_method.value, normalized_country)
+    breakdown = calculate_payment_breakdown(request.amount)
+
+    payment_record = {
+        'id': str(uuid.uuid4()),
+        'job_id': request.job_id or '',
+        'payer_id': current_user.id,
+        'receiver_id': request.worker_id or '',
+        'amount': round(request.amount),
+        'payment_method': request.payment_method.value,
+        'status': 'pending',
+        'country': normalized_country,
+        'provider': 'paydunya',
+        'provider_channel': channel,
+        'commission_amount': breakdown['commission_amount'],
+        'worker_amount': breakdown['worker_amount'],
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+    await db.payments.insert_one(payment_record)
+
+    return_url = build_checkout_redirect_url(f"/payment-demo?payment_id={payment_record['id']}", request.return_url)
+    cancel_url = build_checkout_redirect_url(f"/payment-demo?payment_id={payment_record['id']}&cancelled=1", request.cancel_url)
+    callback_url = build_payment_callback_url()
+
+    payload = {
+        'invoice': {
+            'total_amount': payment_record['amount'],
+            'description': f"Paiement KOJO {payment_record['id']}",
+            'channels': [channel],
+            'customer': {
+                'name': f"{current_user.first_name} {current_user.last_name}".strip(),
+                'email': current_user.email,
+                'phone': current_user.phone
+            }
+        },
+        'store': {
+            'name': PAYDUNYA_STORE_NAME
+        },
+        'actions': {
+            'cancel_url': cancel_url,
+            'return_url': return_url,
+            'callback_url': callback_url
+        },
+        'custom_data': {
+            'payment_id': pa
+
+SUMMARY
+1. Ce pack ne modifie rien.
+2. Il extrait les vraies fonctions jobs dans server.py.
+3. Envoie ce rapport pour generer le pack backend correctif final precis.
