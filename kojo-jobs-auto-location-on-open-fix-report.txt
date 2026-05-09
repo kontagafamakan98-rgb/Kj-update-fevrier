@@ -1,0 +1,23 @@
+KOJO JOBS AUTO LOCATION ON OPEN FIX
+Project root: C:\Users\Famakan\Desktop\Kj-update-fevrier
+
+Backup: frontend\src\pages\CreateJob.js.jobs-auto-location-on-open-fix.backup
+Written: frontend\src\pages\CreateJob.js
+
+Backup: frontend\src\components\JobCreateModal.js.jobs-auto-location-on-open-fix.backup
+Written: frontend\src\components\JobCreateModal.js
+
+OBJECTIF
+- tenter automatiquement la détection de localisation dès l’ouverture de la page Publier un job
+- garder le bouton de secours Utiliser ma position actuelle si l’auto-détection échoue
+- ne pas écraser une adresse saisie manuellement pendant une tentative auto
+
+FILES A MODIFIER
+- frontend/src/pages/CreateJob.js
+- frontend/src/components/JobCreateModal.js
+
+NEXT
+1. cd frontend && npm run build
+2. git add .
+3. git commit -m "Restore jobs automatic location on create open"
+4. git push origin main
