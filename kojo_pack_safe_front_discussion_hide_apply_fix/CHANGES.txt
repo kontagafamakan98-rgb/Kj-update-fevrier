@@ -1,0 +1,21 @@
+SAFE FRONTEND-ONLY FIX
+
+Files included:
+- frontend/src/components/ProposalModal.js
+- frontend/src/pages/JobDetails.js
+- frontend/src/pages/Jobs.js
+- frontend/src/utils/jobProposalWorkflow.js
+
+What this pack fixes:
+- hides the Apply/Postuler button after a successful proposal
+- remembers applied jobs locally so the worker no longer sees the same job as available
+- sends the proposal into Messages without editing src/services/api.js
+- opens a real discussion area in JobDetails for client and worker
+- filters discussion messages by job, so messages from other jobs do not mix together
+- lets the client reply from the job details page
+- lets the client accept a worker from the proposal card using the existing jobsAPI.update flow
+
+What this pack does NOT touch:
+- frontend/src/services/api.js
+- backend/server.py
+- Auth, payment, users, commission, or other shared API exports
