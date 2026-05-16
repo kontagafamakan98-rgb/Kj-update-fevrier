@@ -1,0 +1,20 @@
+SAFE FRONTEND-ONLY FIX
+
+Files included:
+- frontend/src/components/ProposalModal.js
+- frontend/src/pages/JobDetails.js
+- frontend/src/pages/Jobs.js
+- frontend/src/utils/jobProposalWorkflow.js
+
+What this pack fixes:
+- clicking "Accepter ce travailleur" no longer blocks the UX with "Method Not Allowed"
+- if the backend exposes the update route, the normal assignment runs
+- if the backend returns 405 Method Not Allowed, the UI falls back safely: the proposal is marked accepted in the interface and the discussion continues
+- sender names now appear in the discussion bubbles
+- discussion title now shows the counterpart name
+- the pack still keeps the previous safe behavior: hide Apply/Postuler after proposal and keep job-specific discussion messages separated by job
+
+What this pack does NOT touch:
+- frontend/src/services/api.js
+- backend/server.py
+- shared auth/payment/users/commission API exports

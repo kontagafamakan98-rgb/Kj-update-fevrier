@@ -1,0 +1,10 @@
+cd /d C:\Users\Famakan\Desktop\Kj-update-fevrier
+powershell -Command "Invoke-WebRequest -Uri \"https://www.genspark.ai/api/files/s/REPLACE_ME\" -OutFile \"kojo-pack-safe-accept-fallback-and-message-names-fix.zip\""
+powershell -Command "Expand-Archive -Force 'kojo-pack-safe-accept-fallback-and-message-names-fix.zip' '.'"
+xcopy /E /I /Y .\kojo_pack_safe_accept_fallback_and_message_names_fix\frontend\src\components frontend\src\components
+xcopy /E /I /Y .\kojo_pack_safe_accept_fallback_and_message_names_fix\frontend\src\pages frontend\src\pages
+xcopy /E /I /Y .\kojo_pack_safe_accept_fallback_and_message_names_fix\frontend\src\utils frontend\src\utils
+npm run build
+git add .
+git commit -m "Fix accept fallback and message names safely"
+for /f "delims=" %i in ('git branch --show-current') do git push origin %i
