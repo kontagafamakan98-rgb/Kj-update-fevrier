@@ -1,0 +1,20 @@
+SAFE FRONTEND-ONLY FIX
+
+Files included:
+- frontend/src/components/ProposalModal.js
+- frontend/src/pages/JobDetails.js
+- frontend/src/pages/Jobs.js
+- frontend/src/utils/jobProposalWorkflow.js
+
+What this pack fixes:
+- removes visible [KOJO_JOB:...] markers from discussion messages and labels
+- sends clean message content while still keeping job-scoped discussion filtering support
+- improves sender and receiver naming in job discussions
+- when clicking "Discussion ouverte", the interface jumps directly to the active discussion block
+- keeps the previous safe fallback for "Accepter ce travailleur" when the backend returns Method Not Allowed
+- keeps Apply/Postuler hidden after a successful proposal
+
+What this pack does NOT touch:
+- frontend/src/services/api.js
+- backend/server.py
+- shared auth/payment/users/commission API exports
