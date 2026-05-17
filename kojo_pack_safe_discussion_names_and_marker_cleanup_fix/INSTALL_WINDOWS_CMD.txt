@@ -1,0 +1,10 @@
+cd /d C:\Users\Famakan\Desktop\Kj-update-fevrier
+powershell -Command "Invoke-WebRequest -Uri \"https://www.genspark.ai/api/files/s/REPLACE_ME\" -OutFile \"kojo-pack-safe-discussion-names-and-marker-cleanup-fix.zip\""
+powershell -Command "Expand-Archive -Force 'kojo-pack-safe-discussion-names-and-marker-cleanup-fix.zip' '.'"
+xcopy /E /I /Y .\kojo_pack_safe_discussion_names_and_marker_cleanup_fix\frontend\src\components frontend\src\components
+xcopy /E /I /Y .\kojo_pack_safe_discussion_names_and_marker_cleanup_fix\frontend\src\pages frontend\src\pages
+xcopy /E /I /Y .\kojo_pack_safe_discussion_names_and_marker_cleanup_fix\frontend\src\utils frontend\src\utils
+npm run build
+git add .
+git commit -m "Fix discussion names and marker cleanup safely"
+for /f "delims=" %i in ('git branch --show-current') do git push origin %i
