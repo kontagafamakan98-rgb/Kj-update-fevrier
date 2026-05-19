@@ -1,0 +1,18 @@
+SAFE FRONTEND-ONLY FIX V2
+
+Files included:
+- frontend/src/components/ProposalModal.js
+- frontend/src/pages/JobDetails.js
+- frontend/src/pages/Jobs.js
+- frontend/src/utils/jobProposalWorkflow.js
+
+What this pack fixes:
+- clicking "Discussion ouverte" now selects the correct proposal, jumps to the discussion block, and focuses the message textarea
+- discussion sender names are resolved more aggressively from client/job/proposal data when the API omits them
+- outgoing discussion payloads now keep clean names and stop sending visible KOJO markers in message text fields
+- previous KOJO markers are stripped from displayed content and displayed names
+- Apply/Postuler stays hidden after a successful proposal
+- safe acceptance fallback remains active when backend returns Method Not Allowed
+
+Important note:
+- this pack does not touch login/auth flow files, api shared exports, or backend/server.py
