@@ -76,13 +76,12 @@ export function AuthProvider({ children }) {
       return { success: true, user };
       
     } catch (error) {
-      const errorInfo = handleApiError(error);
-      safeLog.error('Login failed:', errorInfo);
-      
-      return { 
-        success: false, 
-        error: errorInfo.message,
-        errorKey: errorInfo.messageKey || ''
+      const errorMessage = handleApiError(error);
+      safeLog.error('Login failed:', errorMessage);
+
+      return {
+        success: false,
+        error: errorMessage
       };
     }
   };
@@ -122,12 +121,12 @@ export function AuthProvider({ children }) {
       return { success: true };
       
     } catch (error) {
-      const errorInfo = handleApiError(error);
-      safeLog.error('Registration failed:', errorInfo);
-      
-      return { 
-        success: false, 
-        error: errorInfo.message
+      const errorMessage = handleApiError(error);
+      safeLog.error('Registration failed:', errorMessage);
+
+      return {
+        success: false,
+        error: errorMessage
       };
     }
   };

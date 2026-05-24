@@ -1896,7 +1896,7 @@ async def register_user(user_data: UserRegister):
         elif field == 'phone':
             error_msg = "Le numéro de téléphone n'est pas au bon format"
         else:
-            error_msg = f"Erreur de validation: {first_error['msg']}"
+            error_msg = f"Erreur de validation: {first_error.get('msg', 'Erreur inconnue')}"
         
         log_and_raise_http_exception(422, f"Erreur de validation: {error_msg}")
     

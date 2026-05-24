@@ -39,7 +39,7 @@ export default function Profile() {
   const [success, setSuccess] = useState('');
   const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
 
-  const { user, loadUser, updateUser } = useAuth();
+  const { user, loadUser } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'profile');
   const toast = useToast();
@@ -73,10 +73,6 @@ export default function Profile() {
       setError('');
       await usersAPI.updateProfile(updatedData);
       setProfile((prev) => ({ ...prev, ...updatedData }));
-
-      if (updateUser && user) {
-        updateUser({ ...user, ...updatedData });
-      }
 
       setPhotoRefreshKey((prev) => prev + 1);
       await loadUser();
