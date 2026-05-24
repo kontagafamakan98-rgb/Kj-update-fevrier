@@ -317,9 +317,11 @@ const normalizeConversationListResponse = (payload) => {
 
 export const messagesAPI = {
   send: (payload) => api.post('/messages', payload),
+  sendMessage: (payload) => api.post('/messages', payload),
   list: async () => normalizeMessageListResponse(await api.get('/messages')),
   getConversations: async () => normalizeConversationListResponse(await api.get('/messages/conversations')),
   getConversation: async (conversationId) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`)),
+  getMessages: async (conversationId) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`)),
 };
 
 const camelToKebab = (value) => String(value || '')

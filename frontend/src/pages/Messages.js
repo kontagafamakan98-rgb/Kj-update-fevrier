@@ -9,6 +9,7 @@ import { safeLog } from '../utils/env';
 export default function Messages() {
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
+  const [activeConversationData, setActiveConversationData] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -37,11 +38,12 @@ export default function Messages() {
     }
   };
 
-  const loadMessages = async (conversationId) => {
+  const loadMessages = async (conversationId, conversationData) => {
     try {
       const data = await messagesAPI.getMessages(conversationId);
       setMessages(data);
       setActiveConversation(conversationId);
+      setActiveConversationData(conversationData);
     } catch (error) {
       safeLog.error('Error loading messages:', handleApiError(error));
     }
@@ -61,7 +63,7 @@ export default function Messages() {
       });
 
       setNewMessage('');
-      loadMessages(activeConversation);
+      loadMessages(activeConversation, activeConversationData);
     } catch (error) {
       safeLog.error('Error sending message:', handleApiError(error));
     }
@@ -73,7 +75,7 @@ export default function Messages() {
       minute: '2-digit'
     });
 
-  const getOtherPersonName = () => pageT('otherUser');
+  const getOtherPersonName = () => activeConversationData?.other_user_name || pageT('otherUser');
 
   if (loading) {
     return (
@@ -106,17 +108,17 @@ export default function Messages() {
               conversations.map((conversation) => (
                 <button
                   key={conversation._id}
-                  onClick={() => loadMessages(conversation._id)}
+                  onClick={() => loadMessages(conversation._id, conversation)}
                   className={`w-full p-4 text-left hover:bg-gray-50 border-b border-gray-100 ${
                     activeConversation === conversation._id ? 'bg-orange-50 border-orange-200' : ''
                   }`}
                 >
                   <div className="flex items-center">
                     <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                      <span className="text-gray-600 font-medium">{getOtherPersonName().charAt(0)}</span>
+                      <span className="text-gray-600 font-medium">{(conversation.other_user_name || getOtherPersonName()).charAt(0)}</span>
                     </div>
                     <div className="ml-3 flex-1">
-                      <p className="text-sm font-medium text-gray-900">{getOtherPersonName()}</p>
+                      <p className="text-sm font-medium text-gray-900">{conversation.other_user_name || getOtherPersonName()}</p>
                       <p className="text-xs text-gray-500 truncate">{conversation.last_message}</p>
                     </div>
                   </div>
@@ -138,7 +140,7 @@ export default function Messages() {
           {activeConversation ? (
             <>
               <div className="p-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="font-semibold text-gray-900">{getOtherPersonName(activeConversation)}</h3>
+                <h3 className="font-semibold text-gray-900">{getOtherPersonName()}</h3>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4">

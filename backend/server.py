@@ -1936,6 +1936,10 @@ async def logout_user(current_user: User = Depends(get_current_user)):
     return {"message": "Logout successful", "status": "success"}
 
 # User Routes
+@api_router.get("/auth/me")
+async def get_current_user_auth(current_user: User = Depends(get_current_user)):
+    return current_user.dict(exclude={"password_hash"})
+
 @api_router.get("/users/profile")
 async def get_profile(current_user: User = Depends(get_current_user)):
     return current_user.dict(exclude={"password_hash"})
@@ -2454,7 +2458,7 @@ async def get_all_messages(current_user: User = Depends(get_current_user)):
 
 @api_router.get("/messages/conversations")
 async def get_conversations(current_user: User = Depends(get_current_user)):
-    # Get unique conversation partners
+    # Get unique conversation partners with other user info
     pipeline = [
         {"$match": {
             "$or": [
@@ -2465,13 +2469,42 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
         {"$group": {
             "_id": "$conversation_id",
             "last_message": {"$last": "$content"},
-            "last_timestamp": {"$last": "$timestamp"}
+            "last_timestamp": {"$last": "$timestamp"},
+            "sender_ids": {"$addToSet": "$sender_id"},
+            "receiver_ids": {"$addToSet": "$receiver_id"}
         }},
         {"$sort": {"last_timestamp": -1}}
     ]
-    
+
     conversations = await db.messages.aggregate(pipeline).to_list(100)
-    return conversations
+
+    # Get other user info for each conversation
+    result = []
+    for conv in conversations:
+        # Extract other user ID from conversation
+        conv_parts = conv["_id"].split("_")
+        other_user_id = None
+
+        # Find the ID that is not current user
+        for uid in conv_parts:
+            if uid != current_user.id:
+                other_user_id = uid
+                break
+
+        # Fetch other user data
+        if other_user_id:
+            other_user = await db.users.find_one({"id": other_user_id})
+            if other_user:
+                other_user_dict = {k: v for k, v in other_user.items() if k != "_id"}
+                conv["other_user"] = User(**other_user_dict).dict(exclude={"password_hash"})
+                conv["other_user_name"] = other_user.get("full_name") or other_user.get("email") or "Unknown"
+            else:
+                conv["other_user"] = None
+                conv["other_user_name"] = "Unknown"
+
+        result.append(conv)
+
+    return result
 
 @api_router.get("/messages/{conversation_id}")
 async def get_conversation_messages(
