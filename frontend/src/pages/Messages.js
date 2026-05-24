@@ -114,8 +114,12 @@ export default function Messages() {
                   }`}
                 >
                   <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                      <span className="text-gray-600 font-medium">{(conversation.other_user_name || getOtherPersonName()).charAt(0)}</span>
+                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                      {conversation.other_user?.profile_photo ? (
+                        <img src={conversation.other_user.profile_photo} alt={conversation.other_user_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-gray-600 font-medium">{(conversation.other_user_name || getOtherPersonName()).charAt(0)}</span>
+                      )}
                     </div>
                     <div className="ml-3 flex-1">
                       <p className="text-sm font-medium text-gray-900">{conversation.other_user_name || getOtherPersonName()}</p>
