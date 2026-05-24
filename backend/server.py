@@ -2497,7 +2497,10 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
             if other_user:
                 other_user_dict = {k: v for k, v in other_user.items() if k != "_id"}
                 conv["other_user"] = User(**other_user_dict).dict(exclude={"password_hash"})
-                conv["other_user_name"] = other_user.get("full_name") or other_user.get("email") or "Unknown"
+                first_name = other_user.get("first_name", "").strip()
+                last_name = other_user.get("last_name", "").strip()
+                full_name = f"{first_name} {last_name}".strip()
+                conv["other_user_name"] = full_name or other_user.get("email") or "Unknown"
             else:
                 conv["other_user"] = None
                 conv["other_user_name"] = "Unknown"
