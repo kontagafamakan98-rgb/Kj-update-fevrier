@@ -34,6 +34,13 @@ from email.utils import formataddr
 from urllib.parse import urlparse
 
 # Configure logging for West Africa production
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -42,7 +49,8 @@ logging.basicConfig(
         logging.handlers.RotatingFileHandler(
             'kojo_backend.log',
             maxBytes=10*1024*1024,
-            backupCount=5
+            backupCount=5,
+            encoding='utf-8'
         )
     ]
 )
@@ -72,19 +80,37 @@ try:
     db_name = os.environ.get('DB_NAME', 'kojo_db')  # Default fallback
     if not db_name:
         raise ValueError("DB_NAME environment variable is required")
-    
-    client = AsyncIOMotorClient(mongo_url)
+
+    client = AsyncIOMotorClient(
+        mongo_url,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=5000,
+    )
     db = client[db_name]
-    
+
     # Test connection on startup
     logger.info(f"✅ MongoDB connected to: {db_name}")
 except Exception as e:
     logger.error(f"❌ MongoDB connection failed: {e}")
     raise
 
+async def is_database_available() -> bool:
+    """Return True when MongoDB is reachable, otherwise False."""
+    try:
+        await db.command("ping")
+        return True
+    except Exception as e:
+        logger.warning(f"⚠️ MongoDB unavailable: {e}")
+        return False
+
 # MongoDB Indexes for Performance (West Africa optimization)
 async def create_database_indexes():
     """Create indexes on frequently queried fields for better performance"""
+    if not await is_database_available():
+        logger.warning("⚠️ Skipping MongoDB index creation because the database is unavailable.")
+        return
+
     try:
         # Users collection indexes
         await db.users.create_index("email", unique=True)
@@ -377,6 +403,10 @@ async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depend
 # Fonction pour créer le compte propriétaire s'il n'existe pas
 async def ensure_owner_exists():
     """Crée le compte propriétaire s'il n'existe pas déjà et si les secrets requis sont fournis."""
+    if not await is_database_available():
+        logger.warning("⚠️ Skipping owner bootstrap because MongoDB is unavailable.")
+        return
+
     if not OWNER_EMAIL:
         logger.warning("⚠️ OWNER_EMAIL non défini: création automatique du compte owner désactivée.")
         return
@@ -2531,20 +2561,15 @@ async def root():
 
 @api_router.get("/health")
 async def health_check():
-    try:
-        # Test database connection
-        await db.users.count_documents({})
-        
-        return {
-            "status": "healthy", 
-            "timestamp": datetime.now(timezone.utc),
-            "database": "connected",
-            "version": "1.0.0",
-            "environment": "production"
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Service unavailable")
+    db_available = await is_database_available()
+
+    return {
+        "status": "healthy" if db_available else "degraded",
+        "timestamp": datetime.now(timezone.utc),
+        "database": "connected" if db_available else "unavailable",
+        "version": "1.0.0",
+        "environment": os.environ.get("APP_ENV", "production")
+    }
 
 # ============================================
 # GÉOLOCALISATION - Détection automatique du pays
@@ -2798,24 +2823,35 @@ async def validate_phone_for_country(request: PhoneValidationRequest):
 @api_router.get("/stats")
 async def get_system_stats():
     """Statistics endpoint for monitoring"""
-    try:
-        total_users = await db.users.count_documents({})
-        total_jobs = await db.jobs.count_documents({})
-        total_workers = await db.users.count_documents({"user_type": "worker"})
-        total_clients = await db.users.count_documents({"user_type": "client"})
-        
+    db_available = await is_database_available()
+
+    if not db_available:
         return {
-            "total_users": total_users,
-            "total_jobs": total_jobs,
-            "total_workers": total_workers,
-            "total_clients": total_clients,
+            "total_users": 0,
+            "total_jobs": 0,
+            "total_workers": 0,
+            "total_clients": 0,
             "supported_countries": ["senegal", "mali", "ivory_coast", "burkina_faso"],
             "supported_languages": ["fr", "en", "wo", "bm"],
+            "database": "unavailable",
             "timestamp": datetime.now(timezone.utc)
         }
-    except Exception as e:
-        logger.error(f"Stats endpoint failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve statistics")
+
+    total_users = await db.users.count_documents({})
+    total_jobs = await db.jobs.count_documents({})
+    total_workers = await db.users.count_documents({"user_type": "worker"})
+    total_clients = await db.users.count_documents({"user_type": "client"})
+    
+    return {
+        "total_users": total_users,
+        "total_jobs": total_jobs,
+        "total_workers": total_workers,
+        "total_clients": total_clients,
+        "supported_countries": ["senegal", "mali", "ivory_coast", "burkina_faso"],
+        "supported_languages": ["fr", "en", "wo", "bm"],
+        "database": "connected",
+        "timestamp": datetime.now(timezone.utc)
+    }
 
 # ============================================================================
 # ENDPOINTS PROTÉGÉS PROPRIÉTAIRE - ACCÈS RESTREINT
