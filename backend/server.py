@@ -727,7 +727,7 @@ class UserWithPayment(BaseModel):
     legal_documents_accepted_at: Optional[datetime] = None
     legal_documents_version: str = Field(min_length=5, max_length=120)
     payment_accounts: PaymentAccount
-    email_verification_token: str = Field(min_length=20, description="Jeton de vérification email")
+    email_verification_token: Optional[str] = None
     
     @validator('password')
     def password_must_be_strong(cls, v):
@@ -1719,12 +1719,18 @@ async def reset_password_with_verified_token(payload: PasswordResetConfirmReques
 
 @api_router.post("/auth/register-verified")
 async def register_user_verified(user_data: UserWithPayment):
-    """Inscription avec vérification obligatoire des comptes de paiement"""
+    """Inscription avec vérification optionnelle de l'email et validation obligatoire des comptes de paiement"""
     
     try:
         # Sanitize email input to prevent injection
         clean_email = sanitize_email(user_data.email)
-        verify_email_verification_token(user_data.email_verification_token, clean_email, "signup")
+        email_verified = False
+        email_verified_at = None
+
+        if user_data.email_verification_token:
+            verify_email_verification_token(user_data.email_verification_token, clean_email, "signup")
+            email_verified = True
+            email_verified_at = datetime.now(timezone.utc)
         
         # Check if email already exists
         existing_user = await db.users.find_one({"email": clean_email})
@@ -1779,8 +1785,8 @@ async def register_user_verified(user_data: UserWithPayment):
                 legal_documents_version=user_data.legal_documents_version,
                 profile_photo=profile_photo_path,  # Ajouter le chemin de la photo
                 is_verified=payment_validation["is_verified"],
-                email_verified=True,
-                email_verified_at=datetime.now(timezone.utc),
+                email_verified=email_verified,
+                email_verified_at=email_verified_at,
                 payment_accounts=payment_validation["account_details"],
                 payment_accounts_count=payment_validation["linked_accounts_count"],
                 created_at=datetime.now(timezone.utc).isoformat(),
