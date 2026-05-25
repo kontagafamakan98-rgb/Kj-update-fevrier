@@ -84,7 +84,7 @@ export default function Jobs() {
         : jobsData.filter((job) => job.status === 'open' || !job.status);
       setJobs(visibleJobs);
     } catch (error) {
-      safeLog('Jobs load error', error);
+      safeLog.error('Jobs load error', error);
       setJobs([]);
     } finally {
       setLoading(false);

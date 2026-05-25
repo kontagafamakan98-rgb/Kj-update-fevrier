@@ -52,8 +52,8 @@ export default function Dashboard() {
       const jobs = await jobsAPI.getAll();
       const jobsList = Array.isArray(jobs) ? jobs : jobs?.data || [];
 
-      if (user.user_type === 'client') {
-        const clientJobs = jobsList.filter((job) => job.client_id === user.id);
+      if (user?.user_type === 'client') {
+        const clientJobs = jobsList.filter((job) => job.client_id === user?.id);
         setStats({
           totalJobs: clientJobs.length,
           activeJobs: clientJobs.filter((job) => job.status === 'open' || job.status === 'in_progress').length,
@@ -86,7 +86,7 @@ export default function Dashboard() {
   ];
 
   const quickActions = (() => {
-    const baseActions = user.user_type === 'client'
+    const baseActions = user?.user_type === 'client'
       ? [
           { to: '/create-job', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
           { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-blue-600 bg-blue-100' },
@@ -139,10 +139,10 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
-          {t('welcomeUser')} {user.first_name}!
+          {t('welcomeUser')} {user?.first_name || 'User'}!
         </h1>
         <p className="text-gray-600 mt-1">
-          {user.user_type === 'client' ? t('manageProjectsClient') : t('discoverOpportunitiesWorker')}
+          {user?.user_type === 'client' ? t('manageProjectsClient') : t('discoverOpportunitiesWorker')}
         </p>
       </div>
 
@@ -248,7 +248,7 @@ export default function Dashboard() {
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">
-            {user.user_type === 'client' ? t('myRecentJobs') : t('availableJobs')}
+            {user?.user_type === 'client' ? t('myRecentJobs') : t('availableJobs')}
           </h2>
         </div>
         <div className="divide-y divide-gray-200">
@@ -281,7 +281,7 @@ export default function Dashboard() {
             ))
           ) : (
             <div className="p-6 text-center text-gray-500">
-              {user.user_type === 'client' ? t('noJobsPosted') : t('noJobsAvailable')}
+              {user?.user_type === 'client' ? t('noJobsPosted') : t('noJobsAvailable')}
             </div>
           )}
         </div>

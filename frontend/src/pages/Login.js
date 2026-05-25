@@ -10,7 +10,7 @@ import { makeScopedTranslator } from '../utils/pack2PageI18n';
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
 
-  const minimumRequired = user.user_type === 'worker' ? 2 : 1;
+  const minimumRequired = user?.user_type === 'worker' ? 2 : 1;
   return !user.is_verified || Number(user.payment_accounts_count || 0) < minimumRequired;
 };
 
