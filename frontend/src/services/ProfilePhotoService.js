@@ -4,6 +4,7 @@
  */
 
 import { usersAPI } from './api';
+import { buildBackendUrl } from '../utils/backendUrl';
 import { safeLog } from '../utils/env';
 
 class ProfilePhotoService {
@@ -23,11 +24,10 @@ class ProfilePhotoService {
       const photoUrl = response.photo_url;
       
       if (photoUrl) {
-        // Ensure full URL with backend domain
-        const fullUrl = photoUrl.startsWith('http') 
-          ? photoUrl 
-          : `${process.env.REACT_APP_BACKEND_URL}${photoUrl}`;
-        
+        const fullUrl = photoUrl.startsWith('http')
+          ? photoUrl
+          : buildBackendUrl(photoUrl);
+
         // Add cache busting to ensure fresh images
         return `${fullUrl}?t=${Date.now()}`;
       }
@@ -55,11 +55,10 @@ class ProfilePhotoService {
       const photoUrl = response.photo_url;
       
       if (photoUrl) {
-        // Ensure full URL with backend domain
-        const fullUrl = photoUrl.startsWith('http') 
-          ? photoUrl 
-          : `${process.env.REACT_APP_BACKEND_URL}${photoUrl}`;
-        
+        const fullUrl = photoUrl.startsWith('http')
+          ? photoUrl
+          : buildBackendUrl(photoUrl);
+
         // Add cache busting to ensure fresh images
         return `${fullUrl}?t=${Date.now()}`;
       }

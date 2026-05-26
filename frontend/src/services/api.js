@@ -2,14 +2,32 @@ const DEFAULT_API_BASE_URL = 'https://kojo-backend-03az.onrender.com/api';
 
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 
+const normalizeApiBaseUrl = (value) => {
+  const trimmed = trimTrailingSlash(String(value || '').trim());
+  if (!trimmed) return '';
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
 const detectApiBaseUrl = () => {
-  const envBase = typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL
-    ? import.meta.env.VITE_API_URL
+  const envBase = (() => {
+    if (typeof import.meta !== 'undefined' && import.meta?.env) {
+      return import.meta.env.VITE_API_URL
+        || import.meta.env.VITE_API_BASE_URL
+        || import.meta.env.VITE_BACKEND_URL
+        || '';
+    }
+    return '';
+  })();
+
+  const reactEnvBase = typeof process !== 'undefined' && process.env
+    ? process.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_API_URL || ''
     : '';
+
   const runtimeBase = typeof window !== 'undefined' && window.__KOJO_API_URL__
     ? window.__KOJO_API_URL__
     : '';
-  return trimTrailingSlash(envBase || runtimeBase || DEFAULT_API_BASE_URL) || DEFAULT_API_BASE_URL;
+
+  return normalizeApiBaseUrl(envBase || reactEnvBase || runtimeBase) || DEFAULT_API_BASE_URL;
 };
 
 const getStorageBuckets = () => {
@@ -213,6 +231,7 @@ export const api = {
   put: (path, data, options = {}) => request('PUT', path, { ...options, data }),
   patch: (path, data, options = {}) => request('PATCH', path, { ...options, data }),
   delete: (path, options) => request('DELETE', path, options),
+  uploadFile: (path, formData, options = {}) => request('POST', path, { ...options, data: formData }),
 };
 
 export const authAPI = {
@@ -226,6 +245,16 @@ export const authAPI = {
   getProfile: () => api.get('/auth/me'),
   getCurrentUser: () => api.get('/auth/me'),
   updateProfile: (payload) => api.put('/auth/me', payload),
+  // Email verification methods
+  checkEmailAvailability: (payload) => api.post('/auth/email/check-availability', payload),
+  sendEmailOtp: (payload) => api.post('/auth/email/send-otp', payload),
+  resendEmailOtp: (payload) => api.post('/auth/email/resend-otp', payload),
+  verifyEmailOtp: (payload) => api.post('/auth/email/verify-otp', payload),
+  // Password reset methods
+  requestPasswordResetOtp: (payload) => api.post('/auth/password/forgot/request', payload),
+  resendPasswordResetOtp: (payload) => api.post('/auth/password/forgot/resend', payload),
+  verifyPasswordResetOtp: (payload) => api.post('/auth/password/forgot/verify', payload),
+  resetPassword: (payload) => api.post('/auth/password/reset', payload),
 };
 
 export const jobsAPI = {

@@ -1,5 +1,10 @@
 ﻿const trimTrailingSlashes = (value = '') => String(value || '').replace(/\/+$/, '');
-const PROD_ENV_BACKEND_URL = (import.meta.env.VITE_API_BASE_URL || '').trim();
+const PROD_ENV_BACKEND_URL = (
+  import.meta.env.VITE_API_URL
+  || import.meta.env.VITE_API_BASE_URL
+  || import.meta.env.VITE_BACKEND_URL
+  || ''
+).trim();
 const DEFAULT_REMOTE_BACKEND_URL = PROD_ENV_BACKEND_URL || 'https://kojo-backend-03az.onrender.com';
 const ensureLeadingSlash = (value = '') => {
   if (!value) return '';
