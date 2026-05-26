@@ -391,7 +391,16 @@ export const paymentsAPI = paymentAPI;
 export const commissionAPI = createResourceApi('commissions');
 export const commissionsAPI = commissionAPI;
 export const userAPI = createResourceApi('users');
-export const usersAPI = userAPI;
+export const usersAPI = {
+  ...userAPI,
+  // Profile photo methods
+  getProfilePhoto: () => api.get('/users/profile-photo'),
+  getUserProfilePhoto: (userId) => api.get(`/users/${userId}/profile-photo`),
+  uploadProfilePhoto: (formData) => api.post('/users/profile-photo', formData),
+  deleteProfilePhoto: () => api.delete('/users/profile-photo'),
+  // Profile update
+  updateProfile: (payload) => api.put('/users/profile', payload),
+};
 export const profileAPI = userAPI;
 export const profilesAPI = userAPI;
 export const workerAPI = createResourceApi('workers');
