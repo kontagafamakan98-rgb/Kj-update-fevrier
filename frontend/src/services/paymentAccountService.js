@@ -1,4 +1,4 @@
-import { authAPI } from './api';
+import { authAPI, api } from './api';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
 
@@ -28,7 +28,9 @@ class PaymentAccountService {
         email_verification_token: emailVerificationToken
       };
 
-      const responseData = await authAPI.registerVerified(registrationData);
+      const responseData = await (authAPI.registerVerified
+        ? authAPI.registerVerified(registrationData)
+        : api.post('/auth/register-verified', registrationData));
 
       devLog.info('✅ Inscription avec paiement + email réussie:', responseData);
       
