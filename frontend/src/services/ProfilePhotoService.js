@@ -16,13 +16,12 @@ class ProfilePhotoService {
   async getPhotoUrl(userId) {
     try {
       if (!userId) {
-        safeLog.warn('ProfilePhotoService: No userId provided');
         return null;
       }
 
       const response = await usersAPI.getUserProfilePhoto(userId);
       const photoUrl = response.photo_url;
-      
+
       if (photoUrl) {
         const fullUrl = photoUrl.startsWith('http')
           ? photoUrl
@@ -31,15 +30,14 @@ class ProfilePhotoService {
         // Add cache busting to ensure fresh images
         return `${fullUrl}?t=${Date.now()}`;
       }
-      
+
       return null;
     } catch (error) {
       if (error.response?.status === 404) {
-        // No photo found - this is normal
-        safeLog.info(`ProfilePhotoService: No photo found for user ${userId}`);
+        // No photo found - this is normal, return null silently
         return null;
       }
-      
+
       safeLog.error(`ProfilePhotoService: Error fetching photo for user ${userId}:`, error);
       return null;
     }
@@ -66,11 +64,10 @@ class ProfilePhotoService {
       return null;
     } catch (error) {
       if (error.response?.status === 404) {
-        // No photo found - this is normal
-        safeLog.info('ProfilePhotoService: No photo found for current user');
+        // No photo found - this is normal, return null silently
         return null;
       }
-      
+
       safeLog.error('ProfilePhotoService: Error fetching current user photo:', error);
       return null;
     }
