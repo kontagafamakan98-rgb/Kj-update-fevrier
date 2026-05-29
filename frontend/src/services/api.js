@@ -237,6 +237,7 @@ export const api = {
 export const authAPI = {
   register: (userData) => api.post('/auth/register', userData),
   signup: (userData) => api.post('/auth/register', userData),
+  registerVerified: (userData) => api.post('/auth/register-verified', userData),
   login: (credentials) => api.post('/auth/login', credentials),
   signin: (credentials) => api.post('/auth/login', credentials),
   logout: async () => ({ success: true }),
