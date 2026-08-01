@@ -3496,6 +3496,21 @@ async def verify_payment_access(current_user: User = Depends(get_current_user)):
 
 # ============================================================================
 
+# Health check at the root path (no /api prefix), for infrastructure monitors
+# (Render health checks, UptimeRobot, etc.) that ping "/health" directly.
+# This mirrors /api/health below; keep both in sync if the logic changes.
+@app.get("/health")
+async def root_health_check():
+    db_available = await is_database_available()
+
+    return {
+        "status": "healthy" if db_available else "degraded",
+        "timestamp": datetime.now(timezone.utc),
+        "database": "connected" if db_available else "unavailable",
+        "version": "1.0.0",
+        "environment": os.environ.get("APP_ENV", "production")
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
