@@ -3496,10 +3496,19 @@ async def verify_payment_access(current_user: User = Depends(get_current_user)):
 
 # ============================================================================
 
+# Root path, for infrastructure probes (Render's default health check hits "/"
+# directly, distinct from the app's API root at "/api/"). Methods declared
+# explicitly (GET + HEAD) so uptime monitors using HEAD requests aren't
+# rejected with 405 Method Not Allowed.
+@app.api_route("/", methods=["GET", "HEAD"])
+async def app_root():
+    return {"message": "Kojo API - Connecting Mali & Senegal", "status": "running"}
+
 # Health check at the root path (no /api prefix), for infrastructure monitors
 # (Render health checks, UptimeRobot, etc.) that ping "/health" directly.
 # This mirrors /api/health below; keep both in sync if the logic changes.
-@app.get("/health")
+# Methods declared explicitly (GET + HEAD) for the same reason as above.
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def root_health_check():
     db_available = await is_database_available()
 
@@ -3548,7 +3557,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_origins=allowed_origins,
     allow_origin_regex=allowed_origin_regex,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=[
         "Accept",
         "Accept-Language",
