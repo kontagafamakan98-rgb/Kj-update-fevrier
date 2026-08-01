@@ -1,147 +1,66 @@
-const CACHE_NAME = 'kojo-pwa-v2-fixed';
-const urlsToCache = [
-  '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
-];
+/* eslint-disable no-restricted-globals */
+//
+// KOJO — Service Worker "kill switch"
+// ------------------------------------------------------------------
+// Kojo n'utilise plus de Service Worker (voir src/index.js, qui appelle
+// serviceWorkerRegistration.unregister()). Ce fichier existe uniquement
+// pour NETTOYER les navigateurs qui ont encore une ancienne version du
+// Service Worker active (installee avant ce correctif).
+//
+// Pourquoi c'est necessaire : un navigateur qui a deja installe un
+// Service Worker continue de l'utiliser tant que le NAVIGATEUR ne
+// detecte pas que le fichier /service-worker.js a change d'octets.
+// Simplement arreter d'appeler register() ne suffit donc pas a faire
+// disparaitre les Service Workers deja actifs chez les utilisateurs :
+// eux continuent de recevoir de vieilles pages/JS mis en cache, ce qui
+// provoquait les plantages ("kojo crashe") apres chaque mise a jour.
+//
+// Ce script : prend le controle immediatement, vide TOUS les caches
+// crees par les anciennes versions (kojo-v1.0.0, kojo-runtime-v1.0.0,
+// kojo-pwa-v2-fixed, etc.), se desinscrit lui-meme, puis recharge les
+// onglets ouverts pour qu'ils repartent sur une base 100% reseau.
+// ------------------------------------------------------------------
 
-// Install Service Worker
-self.addEventListener('install', (event) => {
-    //  // Removed console.log
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-    //  // Removed console.log
-        return cache.addAll(urlsToCache);
-      })
-      .catch((error) => {
-        console.error('Cache installation failed:', error);
-      })
-  );
+self.addEventListener('install', () => {
+  // Ne pas attendre : on veut prendre la main tout de suite pour nettoyer.
+  self.skipWaiting();
 });
 
-// Fetch event
-self.addEventListener('fetch', (event) => {
-  // Only handle GET requests for caching
-  if (event.request.method !== 'GET') {
-    // For non-GET requests (POST, PUT, DELETE), just fetch normally
-    event.respondWith(fetch(event.request));
-    return;
-  }
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        // 1) Supprimer tous les caches, quel que soit leur nom/version
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      } catch (err) {
+        // silencieux : on veut quand meme continuer le nettoyage
+      }
 
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        if (response) {
-          return response;
-        }
-        
-        return fetch(event.request).then((response) => {
-          // Check if valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
+      try {
+        // 2) Ce Service Worker se desinscrit lui-meme : plus aucun
+        //    Service Worker Kojo ne controlera les prochaines visites.
+        await self.registration.unregister();
+      } catch (err) {
+        // ignore
+      }
 
-          // Clone the response
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            })
-            .catch((error) => {
-            });
-
-          return response;
-        }).catch(() => {
-          // Return offline fallback for navigation requests
-          if (event.request.destination === 'document') {
-            return caches.match('/');
+      try {
+        // 3) Recharger les onglets ouverts pour repartir sur du frais
+        const allClients = await self.clients.matchAll({ type: 'window' });
+        allClients.forEach((client) => {
+          try {
+            client.navigate(client.url);
+          } catch (err) {
+            // ignore
           }
         });
-      })
-  );
-});
-
-// Activate Service Worker
-self.addEventListener('activate', (event) => {
-    //  // Removed console.log
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-    //  // Removed console.log
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-});
-
-// Push notification handling
-self.addEventListener('push', (event) => {
-    //  // Removed console.log
-  
-  let notificationData = {};
-  
-  try {
-    notificationData = event.data ? event.data.json() : {};
-  } catch (e) {
-    notificationData = {
-      title: 'Kojo',
-      body: 'Vous avez reçu une nouvelle notification',
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-72x72.png'
-    };
-  }
-
-  const options = {
-    body: notificationData.body || 'Nouvelle notification',
-    icon: notificationData.icon || '/icons/icon-192x192.png',
-    badge: notificationData.badge || '/icons/icon-72x72.png',
-    vibrate: [200, 100, 200],
-    data: notificationData.data || {},
-    actions: [
-      {
-        action: 'view',
-        title: 'Voir'
-      },
-      {
-        action: 'dismiss',
-        title: 'Ignorer'
+      } catch (err) {
+        // ignore
       }
-    ]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification(
-      notificationData.title || 'Kojo',
-      options
-    )
+    })()
   );
 });
 
-// Notification click handling
-self.addEventListener('notificationclick', (event) => {
-    //  // Removed console.log
-  
-  event.notification.close();
-  
-  if (event.action === 'view') {
-    event.waitUntil(
-      self.clients.openWindow(event.notification.data.url || '/')
-    );
-  } else if (event.action === 'dismiss') {
-    // Do nothing, notification is already closed
-  } else {
-    event.waitUntil(
-      self.clients.openWindow('/')
-    );
-  }
-});
+// Ne rien intercepter : laisser passer toutes les requetes au reseau.
+self.addEventListener('fetch', () => {});
