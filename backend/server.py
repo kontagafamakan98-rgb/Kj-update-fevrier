@@ -411,7 +411,7 @@ async def ensure_owner_exists():
         logger.warning("⚠️ OWNER_EMAIL non défini: création automatique du compte owner désactivée.")
         return
 
-    existing_owner = await db.users.find_one({"id": OWNER_USER_ID})
+    existing_owner = await db.users.find_one({"$or": [{"id": OWNER_USER_ID}, {"email": OWNER_EMAIL}]})
     if existing_owner:
         logger.info(f"✅ Compte owner existe déjà: {OWNER_EMAIL}")
         return
@@ -453,9 +453,16 @@ async def ensure_owner_exists():
         ]
     }
 
-    await db.users.insert_one(owner_data)
-    logger.info(f"✅ Compte owner créé: {OWNER_EMAIL}")
-    logger.warning("⚠️ Changez OWNER_INITIAL_PASSWORD après la première connexion et retirez-le ensuite du fichier .env.")
+    # Ce bootstrap ne doit JAMAIS faire planter le démarrage de l'application.
+    # Si l'insertion échoue (ex: doublon d'email/id détecté par un index unique
+    # malgré le contrôle ci-dessus, condition de course, etc.), on logue
+    # l'erreur et on continue le démarrage normalement.
+    try:
+        await db.users.insert_one(owner_data)
+        logger.info(f"✅ Compte owner créé: {OWNER_EMAIL}")
+        logger.warning("⚠️ Changez OWNER_INITIAL_PASSWORD après la première connexion et retirez-le ensuite du fichier .env.")
+    except Exception as exc:
+        logger.error(f"⚠️ Création automatique du compte owner ignorée (compte probablement déjà existant sous un autre id): {exc}")
 
 # Enums
 class UserType(str, Enum):
@@ -3588,13 +3595,21 @@ app.add_middleware(RateLimitMiddleware)
 async def startup_event():
     """Initialiser le système au démarrage"""
     logger.info("🚀 Démarrage de l'API Kojo...")
-    
-    # Créer le compte propriétaire s'il n'existe pas
-    await ensure_owner_exists()
-    
+
+    # Créer le compte propriétaire s'il n'existe pas.
+    # Protégé par try/except : un souci de bootstrap (compte déjà existant,
+    # doublon, etc.) ne doit jamais empêcher l'API de démarrer.
+    try:
+        await ensure_owner_exists()
+    except Exception as exc:
+        logger.error(f"⚠️ ensure_owner_exists() a échoué, démarrage poursuivi quand même: {exc}")
+
     # Créer les index MongoDB pour les performances
-    await create_database_indexes()
-    
+    try:
+        await create_database_indexes()
+    except Exception as exc:
+        logger.error(f"⚠️ create_database_indexes() a échoué, démarrage poursuivi quand même: {exc}")
+
     # Créer le dossier uploads
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(exist_ok=True)
