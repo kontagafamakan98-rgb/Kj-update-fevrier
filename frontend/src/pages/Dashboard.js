@@ -7,6 +7,7 @@ import {
   GraduationCap,
   Hammer,
   Leaf,
+  LifeBuoy,
   MessageSquare,
   Monitor,
   PlusCircle,
@@ -106,6 +107,13 @@ export default function Dashboard() {
         icon: Monitor,
         iconClass: 'text-amber-600 bg-amber-100',
         cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
+      });
+      baseActions.push({
+        to: '/support-admin',
+        label: 'Demandes de support',
+        subtitle: 'Consulter et répondre aux clients',
+        icon: LifeBuoy,
+        iconClass: 'text-orange-600 bg-orange-100',
       });
     }
 

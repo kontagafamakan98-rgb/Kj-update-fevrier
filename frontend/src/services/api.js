@@ -443,6 +443,11 @@ export const reviewAPI = createResourceApi('reviews');
 export const reviewsAPI = reviewAPI;
 export const adminAPI = createResourceApi('admin');
 export const walletAPI = createResourceApi('wallet');
+export const supportAPI = {
+  createTicket: (payload) => api.post('/support/tickets', payload),
+  listTickets: (statusFilter) => api.get('/support/tickets', { params: statusFilter ? { status_filter: statusFilter } : {} }),
+  updateTicketStatus: (ticketId, status) => api.patch(`/support/tickets/${ticketId}/status`, { status }),
+};
 export const walletsAPI = walletAPI;
 export const proposalAPI = createResourceApi('proposals');
 export const proposalsAPI = proposalAPI;
@@ -452,7 +457,6 @@ export const searchAPI = createResourceApi('search');
 export const statsAPI = createResourceApi('stats');
 export const dashboardAPI = createResourceApi('dashboard');
 export const settingsAPI = createResourceApi('settings');
-export const supportAPI = createResourceApi('support');
 export const messageAPI = {
   list: (params = {}) => messagesAPI.list(params),
   getAll: (params = {}) => messagesAPI.list(params),

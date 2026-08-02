@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
@@ -188,6 +189,16 @@ export default function Profile() {
               setSuccess(t('paymentAccountsUpdated'));
             }}
           />
+        </div>
+
+        <div className="px-6 pb-6">
+          <Link
+            to="/support"
+            className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <span>Besoin d'aide ? Contactez le support Kojo</span>
+            <span className="text-orange-600">→</span>
+          </Link>
         </div>
       </div>
     </div>

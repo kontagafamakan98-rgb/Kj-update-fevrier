@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
@@ -38,6 +38,8 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const EmailVerificationPage = lazy(() => import('./pages/EmailVerificationPage'));
 const PaymentVerificationPage = lazy(() => import('./pages/PaymentVerificationPage'));
 const CommissionDashboard = lazy(() => import('./pages/CommissionDashboard'));
+const Support = lazy(() => import('./pages/Support'));
+const SupportAdmin = lazy(() => import('./pages/SupportAdmin'));
 
 // Note: Axios configuration moved to /services/api.js for centralized management
 
@@ -111,28 +113,23 @@ function LegalFooter() {
   const copy = {
     fr: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact KOJO',
-      addressLabel: 'Adresse'
+      contact: 'Nous contacter',
     },
     en: {
       legal: 'Privacy Policy',
-      contact: 'KOJO contact',
-      addressLabel: 'Address'
+      contact: 'Contact us',
     },
     wo: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact KOJO',
-      addressLabel: 'Adresse'
+      contact: 'Nous contacter',
     },
     bm: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact KOJO',
-      addressLabel: 'Adresse'
+      contact: 'Nous contacter',
     },
     mos: {
       legal: 'Politique de confidentialité',
-      contact: 'Contact KOJO',
-      addressLabel: 'Adresse'
+      contact: 'Nous contacter',
     }
   };
   const labels = copy[currentLanguage] || copy.fr;
@@ -140,25 +137,14 @@ function LegalFooter() {
   return (
     <footer className="border-t border-orange-100 bg-white/95 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-sm">
-        <div className="text-gray-600 space-y-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-medium text-gray-800">Kojo</span>
-            <span>•</span>
-            <a href="tel:+18193003507" className="hover:text-orange-600">+18193003507</a>
-            <span>•</span>
-            <a href="mailto:Kojoapp98@gmail.com" className="hover:text-orange-600">Kojoapp98@gmail.com</a>
-          </div>
-          <div className="text-xs text-gray-500">
-            {labels.addressLabel} : Hamdallaye Aci 2000 Bamako Mali
-          </div>
-        </div>
+        <span className="font-medium text-gray-800">Kojo</span>
         <div className="flex flex-wrap items-center gap-4 text-orange-700">
           <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
             {labels.legal}
           </a>
-          <a href="mailto:Kojoapp98@gmail.com?subject=Contact%20KOJO" className="hover:text-orange-800 underline underline-offset-2">
+          <Link to="/support" className="hover:text-orange-800 underline underline-offset-2">
             {labels.contact}
-          </a>
+          </Link>
         </div>
       </div>
     </footer>
@@ -265,6 +251,14 @@ function AppRoutes() {
               <ProtectedRoute>
                 <OwnerOnlyRoute>
                   <CommissionDashboard />
+                </OwnerOnlyRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/support" element={<Support />} />
+            <Route path="/support-admin" element={
+              <ProtectedRoute>
+                <OwnerOnlyRoute>
+                  <SupportAdmin />
                 </OwnerOnlyRoute>
               </ProtectedRoute>
             } />

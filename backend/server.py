@@ -676,6 +676,35 @@ class PushToken(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class SupportTicketStatus(str, Enum):
+    NEW = "Nouveau"
+    IN_PROGRESS = "En cours"
+    RESOLVED = "Résolu"
+
+class SupportTicketCreate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=150)
+    phone: str = Field(min_length=6, max_length=30, pattern=r'^\+?[0-9\s\-\.]{6,20}$')
+    email: EmailStr
+    reason: str = Field(min_length=2, max_length=150)
+    message: str = Field(min_length=5, max_length=3000)
+    channel: str = Field(default="robot", pattern=r'^(robot|direct)$')
+
+class SupportTicket(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: Optional[str] = None
+    full_name: str
+    phone: str
+    email: EmailStr
+    reason: str
+    message: str
+    channel: str = "robot"
+    status: SupportTicketStatus = SupportTicketStatus.NEW
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SupportTicketStatusUpdate(BaseModel):
+    status: SupportTicketStatus
+
 # Request/Response Models
 # Pattern pour détecter les tentatives d'injection SQL
 SQL_INJECTION_PATTERN = re.compile(r"['\";#\-\-]|(/\*)|(\*/)|(\bOR\b)|(\bAND\b)|(\bUNION\b)|(\bSELECT\b)|(\bDROP\b)|(\bINSERT\b)|(\bDELETE\b)|(\bUPDATE\b)", re.IGNORECASE)
@@ -2098,6 +2127,58 @@ async def delete_profile_photo(current_user: User = Depends(get_current_user)):
     )
     
     return {"message": "Profile photo deleted successfully"}
+
+# ============================================================================
+# SUPPORT - page "Nous contacter" (remplace l'affichage permanent des
+# coordonnées en pied de page). Route de creation publique (accessible sans
+# connexion, comme le pied de page l'etait), consultation/gestion reservee
+# a l'owner.
+# ============================================================================
+
+@api_router.post("/support/tickets")
+async def create_support_ticket(ticket_data: SupportTicketCreate):
+    ticket = SupportTicket(
+        full_name=ticket_data.full_name.strip(),
+        phone=ticket_data.phone.strip(),
+        email=ticket_data.email,
+        reason=ticket_data.reason.strip(),
+        message=ticket_data.message.strip(),
+        channel=ticket_data.channel,
+    )
+    await db.support_tickets.insert_one(ticket.dict())
+    return {
+        "message": "Merci, votre demande a bien été envoyée. Notre équipe vous répondra dans les meilleurs délais.",
+        "ticket_id": ticket.id,
+    }
+
+@api_router.get("/support/tickets")
+async def list_support_tickets(
+    status_filter: Optional[str] = None,
+    owner_user = Depends(verify_owner_access)
+):
+    query = {}
+    if status_filter:
+        query["status"] = status_filter
+    tickets = await db.support_tickets.find(query).sort("created_at", -1).to_list(500)
+    return [SupportTicket(**t).dict() for t in tickets]
+
+@api_router.patch("/support/tickets/{ticket_id}/status")
+async def update_support_ticket_status(
+    ticket_id: str,
+    status_update: SupportTicketStatusUpdate,
+    owner_user = Depends(verify_owner_access)
+):
+    result = await db.support_tickets.update_one(
+        {"id": ticket_id},
+        {"$set": {
+            "status": status_update.status.value,
+            "updated_at": datetime.now(timezone.utc)
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Demande de support introuvable")
+    updated = await db.support_tickets.find_one({"id": ticket_id})
+    return SupportTicket(**updated).dict()
 
 # Push Token Routes - For Mobile Notifications
 @api_router.post("/users/push-token")
