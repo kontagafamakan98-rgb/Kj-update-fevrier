@@ -69,15 +69,25 @@ const isMethodNotAllowedError = (error) => {
 
 function ProposalCard({ proposal, ui, isSelected, isAccepted, onOpenDiscussion, onAccept, canAccept }) {
   const workerName = extractProposalWorkerName(proposal, ui.workerFallback || 'Travailleur');
+  const workerPhoto = proposal?.worker_photo || proposal?.worker?.profile_photo || null;
   const amount = proposal.proposed_amount ?? proposal.amount ?? null;
   const message = extractProposalMessage(proposal);
 
   return (
     <div className={`rounded-xl border p-4 shadow-sm ${isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-gray-100 bg-white'}`}>
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="font-semibold text-gray-900">{workerName}</div>
-          <div className="text-sm text-gray-500">{formatJobDate(proposal.created_at)}</div>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+            {workerPhoto ? (
+              <img src={workerPhoto} alt={workerName} className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-sm font-semibold text-gray-500">{workerName.charAt(0).toUpperCase()}</span>
+            )}
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900">{workerName}</div>
+            <div className="text-sm text-gray-500">{formatJobDate(proposal.created_at)}</div>
+          </div>
         </div>
         <div className="text-right">
           <div className="text-lg font-bold text-orange-600">{formatBudgetRange(amount, null)}</div>

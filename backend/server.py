@@ -2482,7 +2482,39 @@ async def get_job_proposals(
         raise HTTPException(status_code=403, detail="Access denied")
     
     proposals = await db.job_proposals.find({"job_id": job_id}).to_list(100)
-    return [JobProposal(**proposal) for proposal in proposals]
+
+    # Enrichir chaque proposition avec le nom et la photo du travailleur.
+    # Sans ca, le frontend n'a que worker_id (aucun nom, aucune photo) et
+    # retombe systematiquement sur "Travailleur" generique sans image.
+    worker_ids = list({p.get("worker_id") for p in proposals if p.get("worker_id")})
+    workers_by_id = {}
+    if worker_ids:
+        workers_cursor = db.users.find(
+            {"id": {"$in": worker_ids}},
+            {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "profile_photo": 1, "rating": 1, "total_reviews": 1}
+        )
+        async for w in workers_cursor:
+            workers_by_id[w["id"]] = w
+
+    enriched = []
+    for p in proposals:
+        proposal_out = JobProposal(**p).dict()
+        worker = workers_by_id.get(p.get("worker_id"))
+        if worker:
+            full_name = f"{worker.get('first_name', '')} {worker.get('last_name', '')}".strip()
+            proposal_out["worker_name"] = full_name or None
+            proposal_out["worker_photo"] = worker.get("profile_photo")
+            proposal_out["worker"] = {
+                "id": worker.get("id"),
+                "first_name": worker.get("first_name"),
+                "last_name": worker.get("last_name"),
+                "profile_photo": worker.get("profile_photo"),
+                "rating": worker.get("rating"),
+                "total_reviews": worker.get("total_reviews"),
+            }
+        enriched.append(proposal_out)
+
+    return enriched
 
 # Messaging Routes
 @api_router.post("/messages")
