@@ -510,6 +510,22 @@ class User(BaseModel):
     legal_documents_accepted_at: Optional[datetime] = None
     legal_documents_version: Optional[str] = Field(default=None, max_length=120)
     
+    is_owner: bool = False
+
+    @validator('is_owner', always=True)
+    def compute_is_owner(cls, v, values):
+        """
+        Determine reel du statut owner : par email, la meme methode utilisee
+        partout ailleurs dans ce backend (voir verify_owner_access). On ne se
+        fie pas a un champ "is_owner" ou "user_type" potentiellement absent/
+        obsolete en base pour les comptes crees avant l'introduction de ce
+        systeme.
+        """
+        email = values.get('email')
+        if not email or not OWNER_EMAIL:
+            return False
+        return str(email).strip().lower() == OWNER_EMAIL.strip().lower()
+
     @validator('phone')
     def validate_phone(cls, v):
         """Nettoie et valide le numéro de téléphone pour l'Afrique de l'Ouest"""
@@ -2395,7 +2411,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    is_owner_user = current_user.user_type == UserType.OWNER
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
     if job.get("client_id") != current_user.id and not is_owner_user:
         raise HTTPException(status_code=403, detail="Access denied")
 

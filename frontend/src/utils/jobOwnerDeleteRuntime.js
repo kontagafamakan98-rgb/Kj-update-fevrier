@@ -33,7 +33,10 @@ export const isOwnedByCurrentUser = (job, currentUser) => {
   // Le compte owner a une mainmise sur toute la plateforme : il est
   // toujours considere comme "proprietaire" d'un job pour les actions
   // (ex: suppression), meme s'il ne l'a pas cree lui-meme.
-  if (sessionUser.user_type === 'owner') return true;
+  // is_owner est calcule cote backend par email (voir server.py), plus
+  // fiable que user_type qui peut etre absent/obsolete sur les comptes
+  // crees avant l'introduction du systeme owner.
+  if (sessionUser.is_owner === true) return true;
 
   const currentIds = new Set([
     normalizeComparableId(sessionUser._id),
