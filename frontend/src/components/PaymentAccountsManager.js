@@ -57,10 +57,11 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       const result = await PaymentAccountService.getUserPaymentAccounts();
       
       if (result.success && result.data) {
+        const savedAccounts = result.data.payment_accounts || {};
         setAccounts({
-          orange_money: result.data.orange_money || '',
-          wave: result.data.wave || '',
-          bank_account: result.data.bank_account || {
+          orange_money: savedAccounts.orange_money || '',
+          wave: savedAccounts.wave || '',
+          bank_account: savedAccounts.bank_account || {
             account_number: '',
             bank_name: '',
             account_holder: '',
