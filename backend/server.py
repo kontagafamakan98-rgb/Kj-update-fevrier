@@ -2060,9 +2060,9 @@ async def upload_profile_photo(
 @api_router.get("/users/profile-photo")
 async def get_current_user_profile_photo(current_user: User = Depends(get_current_user)):
     """Get current user's profile photo"""
-    if not current_user.profile_photo:
-        raise HTTPException(status_code=404, detail="No profile photo found")
-    
+    # Pas de photo = etat normal (compte sans photo), pas une erreur.
+    # On renvoie 200 avec photo_url: null plutot qu'un 404 pour eviter
+    # de polluer la console navigateur sur chaque page qui verifie la photo.
     return {
         "photo_url": current_user.profile_photo,
         "user_id": current_user.id
@@ -2076,11 +2076,9 @@ async def get_user_profile_photo(user_id: str):
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        if not user.get("profile_photo"):
-            raise HTTPException(status_code=404, detail="No profile photo found for this user")
-        
+        # Pas de photo = etat normal, pas une erreur (voir commentaire ci-dessus).
         return {
-            "photo_url": user["profile_photo"],
+            "photo_url": user.get("profile_photo"),
             "user_id": user_id
         }
     except Exception as e:
