@@ -2395,7 +2395,8 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if job.get("client_id") != current_user.id:
+    is_owner_user = current_user.user_type == UserType.OWNER
+    if job.get("client_id") != current_user.id and not is_owner_user:
         raise HTTPException(status_code=403, detail="Access denied")
 
     now_iso = datetime.now(timezone.utc).isoformat()

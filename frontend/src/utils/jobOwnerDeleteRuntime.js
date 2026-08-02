@@ -30,6 +30,11 @@ export const isOwnedByCurrentUser = (job, currentUser) => {
   const sessionUser = currentUser || getStoredSessionUser();
   if (!job || !sessionUser) return false;
 
+  // Le compte owner a une mainmise sur toute la plateforme : il est
+  // toujours considere comme "proprietaire" d'un job pour les actions
+  // (ex: suppression), meme s'il ne l'a pas cree lui-meme.
+  if (sessionUser.user_type === 'owner') return true;
+
   const currentIds = new Set([
     normalizeComparableId(sessionUser._id),
     normalizeComparableId(sessionUser.id),
