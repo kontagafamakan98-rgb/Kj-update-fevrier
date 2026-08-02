@@ -133,6 +133,7 @@ export default function JobDetails() {
   const [messageSuccess, setMessageSuccess] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [acceptingProposal, setAcceptingProposal] = useState(false);
+  const [completingJob, setCompletingJob] = useState(false);
   const discussionSectionRef = useRef(null);
   const discussionInputRef = useRef(null);
 
@@ -450,6 +451,40 @@ export default function JobDetails() {
     }
   };
 
+  const handleCompleteJob = async () => {
+    if (!job?.id) return;
+    if (!window.confirm('Confirmer que le travail est terminé ? Le paiement séquestré sera versé au travailleur.')) {
+      return;
+    }
+
+    setCompletingJob(true);
+    setMessageError('');
+    setMessageSuccess('');
+
+    try {
+      const response = await jobsAPI.completeJob(job.id);
+      const updatedJob = response?.data?.job || response?.data;
+      const payoutStatus = response?.data?.payout_status;
+
+      setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
+
+      if (payoutStatus === 'released') {
+        setMessageSuccess('Mission clôturée et paiement versé au travailleur avec succès.');
+      } else if (payoutStatus === 'releasing') {
+        setMessageSuccess('Mission clôturée. Le versement au travailleur est en cours de traitement.');
+      } else {
+        setMessageSuccess(response?.data?.message || 'Mission clôturée. Le versement nécessite un suivi manuel.');
+      }
+    } catch (completeError) {
+      setMessageError(asTextError(
+        completeError?.response?.data?.detail,
+        completeError?.message || 'Impossible de clôturer la mission.'
+      ));
+    } finally {
+      setCompletingJob(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -516,6 +551,11 @@ export default function JobDetails() {
                   <button onClick={handleDelete} disabled={deleting} className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
                     {deleting ? ui.deleting : ui.deleteJob}
                   </button>
+                  {job.status === 'in_progress' && assignedWorkerId && (
+                    <button onClick={handleCompleteJob} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+                      {completingJob ? 'Clôture en cours...' : '✅ Travail Terminé'}
+                    </button>
+                  )}
                 </>
               )}
 

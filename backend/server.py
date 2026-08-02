@@ -2585,6 +2585,220 @@ async def accept_job_proposal(
     }
 
 
+@api_router.post("/jobs/{job_id}/complete")
+async def complete_job_and_release_payment(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Bouton "Travail Termine" : cloture la mission et declenche le versement
+    (decaissement PayDunya) du montant sequestre vers le travailleur.
+
+    Le paiement collecte reste "sequestre" (payout_status='held') tant que
+    cette route n'a pas ete appelee : c'est ca, l'escrow, dans ce systeme.
+    Si le decaissement automatique echoue (pas de compte mobile money
+    valide, panne PayDunya, etc.), la mission est quand meme cloturee mais
+    le paiement reste marque a traiter manuellement (payout_status=
+    'release_failed') plutot que de bloquer le client indefiniment.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if job.get("client_id") != current_user.id and not is_owner_user:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    worker_id = job.get("assigned_worker_id")
+    if not worker_id:
+        raise HTTPException(status_code=400, detail="Aucun travailleur attribué à cette mission")
+
+    if job.get("status") == JobStatus.COMPLETED.value:
+        raise HTTPException(status_code=409, detail="Cette mission est déjà marquée comme terminée")
+
+    # Trouver le paiement collecte et sequestre pour ce job (le plus recent)
+    payment_record = await db.payments.find_one(
+        {"job_id": job_id, "status": "completed"},
+        sort=[("created_at", -1)]
+    )
+    if not payment_record:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun paiement confirmé trouvé pour cette mission. Le client doit d'abord payer."
+        )
+
+    # Idempotence : si deja libere ou en cours de liberation, ne pas relancer
+    current_payout_status = payment_record.get("payout_status") or "held"
+    if current_payout_status == "released":
+        # Deja verse : on se contente de cloturer le job si ce n'est pas fait
+        await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {"message": "Mission déjà clôturée et paiement déjà versé", "job": Job(**updated_job).dict(), "payout_status": "released"}
+    if current_payout_status == "releasing":
+        raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
+
+    # Verrou : marquer "releasing" seulement si toujours "held", pour eviter
+    # un double-versement en cas de double-clic/appel concurrent.
+    lock_result = await db.payments.update_one(
+        {"id": payment_record["id"], "payout_status": current_payout_status},
+        {"$set": {"payout_status": "releasing", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if lock_result.matched_count == 0:
+        raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
+
+    worker = await db.users.find_one({"id": worker_id})
+    worker_payment_accounts = (worker or {}).get("payment_accounts") or {}
+    worker_amount = payment_record.get("worker_amount") or 0
+
+    # On choisit Orange Money en priorite, sinon Wave (le compte bancaire
+    # n'est pas un mode de decaissement automatique supporte par PayDunya
+    # actuellement : dans ce cas on reste en versement manuel).
+    payout_method = None
+    payout_phone = None
+    if worker_payment_accounts.get("orange_money"):
+        payout_method = "orange_money"
+        payout_phone = worker_payment_accounts["orange_money"]
+    elif worker_payment_accounts.get("wave"):
+        payout_method = "wave"
+        payout_phone = worker_payment_accounts["wave"]
+
+    async def _mark_release_failed(reason: str):
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "payout_status": "release_failed",
+                "payout_failure_reason": reason,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+
+    if not payout_method or not payout_phone:
+        await _mark_release_failed("Le travailleur n'a pas de compte Orange Money ou Wave configuré")
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {
+            "message": "Mission clôturée, mais le versement automatique est impossible : le travailleur n'a pas de compte Orange Money ou Wave enregistré. Un versement manuel est nécessaire.",
+            "job": Job(**updated_job).dict(),
+            "payout_status": "release_failed",
+        }
+
+    withdraw_mode = get_paydunya_withdraw_mode(payout_method, worker.get("country"))
+    account_alias = strip_country_code_for_disburse(payout_phone)
+
+    try:
+        invoice = create_paydunya_disburse_invoice(
+            account_alias=account_alias,
+            amount=worker_amount,
+            withdraw_mode=withdraw_mode,
+            callback_url=build_disburse_callback_url(),
+        )
+        disburse_token = invoice.get("disburse_token")
+
+        submit_result = submit_paydunya_disburse_invoice(disburse_token, disburse_id=payment_record["id"])
+        provider_status = str(submit_result.get("status") or ("success" if str(submit_result.get("response_code")) == "00" else "failed"))
+
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "disburse_token": disburse_token,
+                "disburse_provider_response": submit_result,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
+        if provider_status == "success":
+            final_payout_status = "released"
+        elif provider_status == "pending":
+            # Statut definitif inconnu pour l'instant (ex: Orange Money Mali
+            # repond toujours "pending") : le callback ou un check-status
+            # ulterieur confirmera. On garde "releasing" pour que le suivi
+            # sache qu'il faut verifier plus tard.
+            final_payout_status = "releasing"
+        else:
+            final_payout_status = "release_failed"
+            await db.payments.update_one(
+                {"id": payment_record["id"]},
+                {"$set": {"payout_failure_reason": submit_result.get("response_text") or "Échec du versement PayDunya"}}
+            )
+
+        await db.payments.update_one({"id": payment_record["id"]}, {"$set": {"payout_status": final_payout_status}})
+
+    except HTTPException as exc:
+        await _mark_release_failed(str(exc.detail))
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {
+            "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
+            "job": Job(**updated_job).dict(),
+            "payout_status": "release_failed",
+        }
+
+    await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+
+    # Notifier le travailleur et confirmer au client via le chat (canal
+    # fiable existant, pas de vrai systeme de notifications push).
+    conversation_id = f"{min(current_user.id, worker_id)}_{max(current_user.id, worker_id)}"
+    if final_payout_status == "released":
+        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA a été envoyé."
+    elif final_payout_status == "releasing":
+        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA est en cours de traitement."
+    else:
+        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA sera versé manuellement, contactez le support si besoin."
+
+    try:
+        await db.messages.insert_one(Message(
+            conversation_id=conversation_id,
+            sender_id=current_user.id,
+            receiver_id=worker_id,
+            content=worker_message
+        ).dict())
+    except Exception as exc:
+        logger.error(f"⚠️ Échec de l'envoi du message automatique de fin de mission: {exc}")
+
+    updated_job = await db.jobs.find_one({"id": job_id})
+    return {
+        "message": "Mission clôturée avec succès",
+        "job": Job(**updated_job).dict(),
+        "payout_status": final_payout_status,
+    }
+
+
+@api_router.post('/payments/disburse-ipn')
+async def paydunya_disburse_ipn(request: Request):
+    """Callback asynchrone PayDunya pour confirmer le statut final d'un
+    versement (utile notamment quand submit-invoice a renvoye 'pending')."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    disburse_token = payload.get('token') or payload.get('disburse_invoice')
+    provider_status = str(payload.get('status') or '').strip().lower()
+
+    if not disburse_token:
+        return {'status': 'ignored'}
+
+    payment_record = await db.payments.find_one({'disburse_token': disburse_token})
+    if not payment_record:
+        return {'status': 'ignored'}
+
+    if provider_status == 'success':
+        payout_status = 'released'
+    elif provider_status == 'failed':
+        payout_status = 'release_failed'
+    else:
+        payout_status = 'releasing'
+
+    await db.payments.update_one(
+        {'id': payment_record['id']},
+        {'$set': {
+            'payout_status': payout_status,
+            'disburse_callback_payload': payload,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    return {'status': 'ok'}
+
+
 @api_router.get("/jobs/{job_id}/proposals")
 async def get_job_proposals(
     job_id: str,
@@ -3127,6 +3341,11 @@ def build_payment_callback_url() -> str:
         return f"{BACKEND_PUBLIC_URL}/api/payments/ipn/paydunya"
     return '/api/payments/ipn/paydunya'
 
+def build_disburse_callback_url() -> str:
+    if BACKEND_PUBLIC_URL:
+        return f"{BACKEND_PUBLIC_URL}/api/payments/disburse-ipn"
+    return '/api/payments/disburse-ipn'
+
 def serialize_payment_record(record: Dict[str, Any]) -> Dict[str, Any]:
     serialized = dict(record)
     serialized.pop('_id', None)
@@ -3200,6 +3419,105 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
     await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
     latest = await db.payments.find_one({'id': payment_record['id']})
     return latest or payment_record
+
+# ============================================================================
+# PAYDUNYA DISBURSEMENT (PER / decaissement) - versement au TRAVAILLEUR
+# une fois la mission marquee terminee. API distincte de la collecte,
+# doc: https://developers.paydunya.com/doc/EN/api_deboursement
+# ============================================================================
+
+PAYDUNYA_DISBURSE_BASE_URL = "https://app.paydunya.com/api/v2/disburse"
+
+def get_paydunya_withdraw_mode(payment_method: str, country: Optional[str]) -> str:
+    """Reutilise exactement le meme mapping canal que la collecte : les
+    valeurs (ex: 'orange-money-mali', 'wave-senegal') sont identiques cote
+    PayDunya pour encaisser ET decaisser."""
+    return get_paydunya_channel(payment_method, country)
+
+def strip_country_code_for_disburse(phone: Optional[str]) -> str:
+    """PayDunya attend le numero beneficiaire SANS indicatif pays pour le
+    decaissement (ex: '771111111', pas '+221771111111')."""
+    if not phone:
+        return ""
+    digits = re.sub(r'\D', '', str(phone))
+    # Indicatifs des 4 pays prioritaires Kojo (Senegal, Mali, Burkina, CI)
+    for code in ('221', '223', '226', '225'):
+        if digits.startswith(code) and len(digits) > len(code):
+            return digits[len(code):]
+    # Deja sans indicatif, ou indicatif non reconnu : on renvoie tel quel
+    return digits
+
+def create_paydunya_disburse_invoice(account_alias: str, amount: float, withdraw_mode: str, callback_url: str) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    payload = {
+        "account_alias": account_alias,
+        "amount": round(amount),
+        "withdraw_mode": withdraw_mode,
+        "callback_url": callback_url,
+    }
+    try:
+        response = requests.post(
+            f"{PAYDUNYA_DISBURSE_BASE_URL}/get-invoice",
+            headers=get_paydunya_headers(),
+            json=payload,
+            timeout=30
+        )
+        data = response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya disburse get-invoice error: {exc}")
+        raise HTTPException(status_code=502, detail="Impossible de préparer le versement PayDunya")
+    except ValueError:
+        logger.error("PayDunya disburse get-invoice: reponse non-JSON")
+        raise HTTPException(status_code=502, detail="Réponse invalide de PayDunya lors de la préparation du versement")
+
+    if str(data.get('response_code')) != '00' or not data.get('disburse_token'):
+        logger.error(f"PayDunya disburse get-invoice failed: {data}")
+        raise HTTPException(status_code=502, detail=data.get('response_text') or "Préparation du versement refusée par PayDunya")
+
+    return data
+
+def submit_paydunya_disburse_invoice(disburse_token: str, disburse_id: Optional[str] = None) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    payload = {"disburse_invoice": disburse_token}
+    if disburse_id:
+        payload["disburse_id"] = disburse_id
+
+    try:
+        response = requests.post(
+            f"{PAYDUNYA_DISBURSE_BASE_URL}/submit-invoice",
+            headers=get_paydunya_headers(),
+            json=payload,
+            timeout=30
+        )
+        data = response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya disburse submit-invoice error: {exc}")
+        raise HTTPException(status_code=502, detail="Impossible d'exécuter le versement PayDunya")
+    except ValueError:
+        logger.error("PayDunya disburse submit-invoice: reponse non-JSON")
+        raise HTTPException(status_code=502, detail="Réponse invalide de PayDunya lors du versement")
+
+    return data
+
+def check_paydunya_disburse_status(disburse_token: str) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    try:
+        response = requests.post(
+            f"{PAYDUNYA_DISBURSE_BASE_URL}/check-status",
+            headers=get_paydunya_headers(),
+            json={"disburse_invoice": disburse_token},
+            timeout=30
+        )
+        return response.json()
+    except (requests.RequestException, ValueError) as exc:
+        logger.error(f"PayDunya disburse check-status error: {exc}")
+        raise HTTPException(status_code=502, detail="Impossible de vérifier le statut du versement PayDunya")
 
 @api_router.get('/payments/config')
 async def get_real_payments_config():
@@ -3373,6 +3691,12 @@ async def paydunya_payment_ipn(request: Request):
         update_fields['invoice_token'] = invoice_token
     if local_status == 'completed':
         update_fields['completed_at'] = datetime.now(timezone.utc).isoformat()
+        # payout_status suit l'etat du versement au TRAVAILLEUR, separement
+        # du statut de la collecte cote client. On ne l'ecrase que s'il
+        # n'a encore jamais ete initialise (evite d'ecraser 'released' si
+        # un IPN en double arrive apres coup).
+        if not payment_record.get('payout_status'):
+            update_fields['payout_status'] = 'held'
 
     await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
     return {'status': 'ok'}
