@@ -420,10 +420,26 @@ export default function JobDetails() {
       setSelectedProposalId(proposalId);
       setMessageSuccess(
         location
-          ? 'Travailleur attribué. Votre position lui a été envoyée automatiquement.'
-          : 'Travailleur attribué. L’adresse de la mission lui a été envoyée.'
+          ? 'Travailleur attribué. Votre position lui a été envoyée automatiquement. Redirection vers le paiement...'
+          : 'Travailleur attribué. L’adresse de la mission lui a été envoyée. Redirection vers le paiement...'
       );
       await loadDiscussionMessages(workerId);
+
+      // Redirection automatique vers le paiement : le client n'a aucune
+      // action manuelle supplementaire a faire une fois le travailleur
+      // attribue. On laisse 1.5s pour que le message de confirmation
+      // ci-dessus soit visible avant de quitter la page.
+      const proposedAmount = proposal?.proposed_amount ?? proposal?.amount ?? null;
+      const paymentAmount = proposedAmount || job?.budget_max || job?.budget_min || null;
+      const paymentParams = new URLSearchParams({
+        job_id: job.id,
+        worker_id: workerId,
+        ...(paymentAmount ? { amount: String(Math.round(paymentAmount)) } : {}),
+        ...(job?.title ? { job_title: encodeURIComponent(job.title) } : {}),
+      });
+      setTimeout(() => {
+        navigate(`/payment?${paymentParams.toString()}`);
+      }, 1500);
     } catch (acceptError) {
       setMessageError(asTextError(
         acceptError?.response?.data?.detail,

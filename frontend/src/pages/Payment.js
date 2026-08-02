@@ -8,7 +8,7 @@ import { safeLog } from '../utils/env';
 const COPY = {
   fr: {
     title: 'KOJO Paiements réels',
-    subtitle: 'Pack 2 bascule KOJO du mode simulation vers un vrai checkout PayDunya pour Orange Money, Wave et carte bancaire.',
+    subtitle: 'Payez en toute sécurité par Orange Money, Wave ou carte bancaire.',
     setupTitle: 'État du gateway',
     configured: 'Passerelle configurée',
     notConfigured: 'Passerelle non configurée',
@@ -52,7 +52,7 @@ const COPY = {
   },
   en: {
     title: 'KOJO Real Payments',
-    subtitle: 'Pack 2 moves KOJO from simulation to a real PayDunya checkout for Orange Money, Wave, and bank cards.',
+    subtitle: 'Pay securely with Orange Money, Wave, or bank card.',
     setupTitle: 'Gateway status',
     configured: 'Gateway configured',
     notConfigured: 'Gateway not configured',
@@ -88,7 +88,7 @@ const COPY = {
   },
   wo: {
     title: 'KOJO Fay yu dëgg',
-    subtitle: 'Pack 2 dafay jële KOJO ci simulation ba ci checkout bu dëgg PayDunya ngir Orange Money, Wave ak kart bank.',
+    subtitle: 'Fey ci kaaraange ak Orange Money, Wave walla kart bank.',
     setupTitle: 'Tolluwaay bi',
     configured: 'Gateway bi set na',
     notConfigured: 'Gateway bi setuwoonul',
@@ -124,7 +124,7 @@ const COPY = {
   },
   bm: {
     title: 'KOJO Sariya-faga yatiyalen',
-    subtitle: 'Pack 2 bɛ KOJO bɔ simulation la ka taa PayDunya checkout yatiyalen ma Orange Money, Wave ani bank karti ye.',
+    subtitle: 'Sara ka lakana ni Orange Money, Wave walima bank karti ye.',
     setupTitle: 'Gateway jɔyɔrɔ',
     configured: 'Gateway labɛnnen don',
     notConfigured: 'Gateway ma labɛnnen tɛ',
@@ -160,7 +160,7 @@ const COPY = {
   },
   mos: {
     title: 'KOJO paoongo yel-kɩɩm',
-    subtitle: 'Pack 2 lebgda KOJO simulation n yik PayDunya checkout yel-kɩɩm n Orange Money, Wave la bank carte yinga.',
+    subtitle: 'Yao ne bãane ne Orange Money, Wave bɩ bank carte.',
     setupTitle: 'Gateway bãngre',
     configured: 'Gateway sigd n be',
     notConfigured: 'Gateway sigd ka beoogre',
@@ -198,11 +198,30 @@ const COPY = {
 
 const getCopy = (lang) => COPY[lang] || COPY.fr;
 
-const PaymentDemo = () => {
+const Payment = () => {
   const { currentLanguage } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
+
+  // Contexte optionnel transmis depuis la page d'un job (juste apres
+  // l'acceptation d'un travailleur) : job_id, worker_id, et le montant
+  // convenu. Quand ce contexte est present, le paiement est directement
+  // rattache a ce job au lieu d'etre un paiement libre/demo.
+  const jobPaymentContext = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const jobId = params.get('job_id');
+    const workerId = params.get('worker_id');
+    const amountParam = params.get('amount');
+    const jobTitle = params.get('job_title');
+    if (!jobId) return null;
+    return {
+      jobId,
+      workerId: workerId || null,
+      amount: amountParam ? Number(amountParam) : null,
+      jobTitle: jobTitle ? decodeURIComponent(jobTitle) : null,
+    };
+  }, []);
 
   const [providerConfig, setProviderConfig] = useState(null);
   const [quote, setQuote] = useState(null);
@@ -212,7 +231,7 @@ const PaymentDemo = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
-    amount: 25000,
+    amount: jobPaymentContext?.amount || 25000,
     country: 'senegal',
     method: 'orange_money'
   });
@@ -297,8 +316,10 @@ const PaymentDemo = () => {
         amount: Number(form.amount),
         paymentMethod: form.method,
         country: form.country,
-        returnUrl: `${window.location.origin}/payment-demo`,
-        cancelUrl: `${window.location.origin}/payment-demo`
+        jobId: jobPaymentContext?.jobId || null,
+        workerId: jobPaymentContext?.workerId || null,
+        returnUrl: `${window.location.origin}/payment`,
+        cancelUrl: `${window.location.origin}/payment`
       });
       window.location.href = checkout.checkout_url;
     } catch (err) {
@@ -325,6 +346,11 @@ const PaymentDemo = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{copy.title}</h1>
           <p className="text-gray-600">{copy.subtitle}</p>
+          {jobPaymentContext && (
+            <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
+              💼 Paiement pour la mission{jobPaymentContext.jobTitle ? ` « ${jobPaymentContext.jobTitle} »` : ''} — le montant a été rempli automatiquement suite à l'attribution du travailleur.
+            </div>
+          )}
         </div>
 
         {statusData && (
@@ -378,8 +404,9 @@ const PaymentDemo = () => {
                   min="500"
                   step="500"
                   value={form.amount}
+                  readOnly={Boolean(jobPaymentContext?.amount)}
                   onChange={(e) => setForm((prev) => ({ ...prev, amount: Number(e.target.value) || 0 }))}
-                  className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className={`mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500 ${jobPaymentContext?.amount ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
               </div>
 
@@ -505,4 +532,4 @@ const PaymentDemo = () => {
   );
 };
 
-export default PaymentDemo;
+export default Payment;

@@ -33,7 +33,7 @@ const CreateJob = lazy(() => import('./pages/CreateJob'));
 // Lazy load test and demo pages (rarely used)
 const MobileTest = lazy(() => import('./pages/MobileTest'));
 const PhotoTest = lazy(() => import('./pages/PhotoTest'));
-const PaymentDemo = lazy(() => import('./pages/PaymentDemo'));
+const Payment = lazy(() => import('./pages/Payment'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const EmailVerificationPage = lazy(() => import('./pages/EmailVerificationPage'));
 const PaymentVerificationPage = lazy(() => import('./pages/PaymentVerificationPage'));
@@ -254,11 +254,9 @@ function AppRoutes() {
                 </OwnerOnlyRoute>
               </ProtectedRoute>
             } />
-            <Route path="/payment-demo" element={
+            <Route path="/payment" element={
               <ProtectedRoute>
-                <OwnerOnlyRoute>
-                  <PaymentDemo />
-                </OwnerOnlyRoute>
+                <Payment />
               </ProtectedRoute>
             } />
             <Route path="/email-verification" element={<EmailVerificationPage />} />

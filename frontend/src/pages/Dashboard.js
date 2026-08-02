@@ -100,7 +100,7 @@ export default function Dashboard() {
 
     if (isFamakan) {
       baseActions.push({
-        to: '/payment-demo',
+        to: '/payment',
         label: t('languagesPayments'),
         subtitle: t('publicFeature'),
         icon: Monitor,

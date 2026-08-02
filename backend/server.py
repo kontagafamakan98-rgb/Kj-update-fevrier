@@ -3256,8 +3256,8 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
     await db.payments.insert_one(payment_record)
 
-    return_url = build_checkout_redirect_url(f"/payment-demo?payment_id={payment_record['id']}", request.return_url)
-    cancel_url = build_checkout_redirect_url(f"/payment-demo?payment_id={payment_record['id']}&cancelled=1", request.cancel_url)
+    return_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}", request.return_url)
+    cancel_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}&cancelled=1", request.cancel_url)
     callback_url = build_payment_callback_url()
 
     payload = {

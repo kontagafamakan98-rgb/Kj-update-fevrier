@@ -167,8 +167,8 @@ class CommissionService {
       workerId,
       jobId,
       country,
-      returnUrl: `${window.location.origin}/payment-demo`,
-      cancelUrl: `${window.location.origin}/payment-demo`
+      returnUrl: `${window.location.origin}/payment`,
+      cancelUrl: `${window.location.origin}/payment`
     });
 
     const commission = this.calculateCommissions(amount);
