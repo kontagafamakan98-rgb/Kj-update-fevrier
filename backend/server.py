@@ -605,6 +605,8 @@ class Job(BaseModel):
     posted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deadline: Optional[datetime] = None
     assigned_worker_id: Optional[str] = None
+    accepted_proposal_id: Optional[str] = None
+    shared_location: Optional[dict] = None  # Position GPS partagee au travailleur lors de l'acceptation
     # Nouvelles informations pour mécaniciens avec validation
     mechanic_must_bring_parts: bool = False
     mechanic_must_bring_tools: bool = False  
@@ -2470,6 +2472,118 @@ async def create_proposal(
     
     await db.job_proposals.insert_one(proposal.dict())
     return {"message": "Proposal submitted successfully"}
+
+class ProposalAcceptLocation(BaseModel):
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    accuracy: Optional[float] = None
+
+class ProposalAcceptRequest(BaseModel):
+    location: Optional[ProposalAcceptLocation] = None
+
+@api_router.post("/jobs/{job_id}/proposals/{proposal_id}/accept")
+async def accept_job_proposal(
+    job_id: str,
+    proposal_id: str,
+    accept_data: ProposalAcceptRequest = ProposalAcceptRequest(),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Accepte une proposition de travailleur pour un job :
+    - Attribue le job au travailleur (assigned_worker_id, status -> in_progress)
+    - Marque cette proposition "accepted" et les autres "rejected"
+    - Si une position GPS est fournie (capturee cote client au moment du
+      clic), elle est enregistree sur le job ET envoyee automatiquement au
+      travailleur via un message dans la discussion, sans action manuelle
+      supplementaire.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if job.get("client_id") != current_user.id and not is_owner_user:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    proposal = await db.job_proposals.find_one({"id": proposal_id, "job_id": job_id})
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    worker_id = proposal.get("worker_id")
+    worker = await db.users.find_one({"id": worker_id})
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+
+    # Empeche d'ecraser accidentellement une mission deja attribuee a un
+    # AUTRE travailleur (mais permet de re-confirmer le meme travailleur).
+    existing_assigned = job.get("assigned_worker_id")
+    if existing_assigned and existing_assigned != worker_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Ce job a déjà été attribué à un autre travailleur"
+        )
+
+    now = datetime.now(timezone.utc)
+
+    shared_location = None
+    loc = accept_data.location
+    if loc and loc.latitude is not None and loc.longitude is not None:
+        shared_location = {
+            "latitude": loc.latitude,
+            "longitude": loc.longitude,
+            "accuracy": loc.accuracy,
+            "shared_at": now.isoformat(),
+            "maps_url": f"https://www.google.com/maps?q={loc.latitude},{loc.longitude}"
+        }
+
+    job_update = {
+        "assigned_worker_id": worker_id,
+        "accepted_proposal_id": proposal_id,
+        "status": JobStatus.IN_PROGRESS.value,
+    }
+    if shared_location:
+        job_update["shared_location"] = shared_location
+
+    await db.jobs.update_one({"id": job_id}, {"$set": job_update})
+
+    await db.job_proposals.update_one(
+        {"id": proposal_id},
+        {"$set": {"status": "accepted"}}
+    )
+    await db.job_proposals.update_many(
+        {"job_id": job_id, "id": {"$ne": proposal_id}},
+        {"$set": {"status": "rejected"}}
+    )
+
+    # Message automatique au travailleur (envoye cote serveur pour etre
+    # fiable meme si l'app du client a un souci reseau juste apres l'appel).
+    job_location = job.get("location") or {}
+    address_text = job_location.get("fullAddress") or job_location.get("address")
+
+    message_lines = [f"✅ Votre proposition a été acceptée pour « {job.get('title', 'la mission')} »."]
+    if shared_location:
+        message_lines.append(f"📍 Position du client : {shared_location['maps_url']}")
+    elif address_text:
+        message_lines.append(f"📍 Adresse : {address_text}")
+
+    conversation_id = f"{min(current_user.id, worker_id)}_{max(current_user.id, worker_id)}"
+    auto_message = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        receiver_id=worker_id,
+        content="\n".join(message_lines)
+    )
+    try:
+        await db.messages.insert_one(auto_message.dict())
+    except Exception as exc:
+        logger.error(f"⚠️ Échec de l'envoi du message automatique d'acceptation: {exc}")
+
+    updated_job = await db.jobs.find_one({"id": job_id})
+    return {
+        "message": "Proposition acceptée avec succès",
+        "job": Job(**updated_job).dict(),
+    }
+
 
 @api_router.get("/jobs/{job_id}/proposals")
 async def get_job_proposals(

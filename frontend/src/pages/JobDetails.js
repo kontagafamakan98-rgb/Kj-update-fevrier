@@ -11,7 +11,6 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import { getJobProposalUiLabel } from '../utils/jobProposalLocale';
 import {
-  buildAcceptanceConversationMessage,
   extractProposalId,
   extractProposalMessage,
   extractProposalWorkerId,
@@ -24,7 +23,6 @@ import {
   hasCurrentUserAppliedToJob,
   normalizeApiList,
   normalizeMessages,
-  rememberAcceptedProposal,
   rememberAppliedJob,
   loadProposalConversationMessages,
   sendProposalConversationMessage,
@@ -59,12 +57,6 @@ const getReadableUserName = (person, fallback) => {
   if (combined) return combined;
   if (typeof person?.email === 'string' && person.email.trim()) return person.email.trim();
   return fallback;
-};
-
-const isMethodNotAllowedError = (error) => {
-  const status = Number(error?.status || error?.response?.status || error?.response?.statusCode || 0);
-  const detail = asTextError(error?.response?.data?.detail, error?.message || '');
-  return status === 405 || /method not allowed/i.test(String(detail || ''));
 };
 
 function ProposalCard({ proposal, ui, isSelected, isAccepted, onOpenDiscussion, onAccept, canAccept }) {
@@ -371,9 +363,37 @@ export default function JobDetails() {
     }
   };
 
+  const captureCurrentLocation = () => new Promise((resolve) => {
+    // La localisation est un bonus : si le navigateur ne la supporte pas,
+    // si la permission est refusee, ou si ca prend trop de temps, on
+    // n'empeche JAMAIS l'attribution du travailleur. On retombe alors sur
+    // l'adresse deja renseignee sur le job (geree cote backend).
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    const timeoutId = setTimeout(() => resolve(null), 6000);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        clearTimeout(timeoutId);
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+      },
+      () => {
+        clearTimeout(timeoutId);
+        resolve(null);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+    );
+  });
+
   const handleAcceptProposal = async (proposal) => {
     const workerId = extractProposalWorkerId(proposal);
-    if (!job?.id || !workerId) {
+    const proposalId = extractProposalId(proposal);
+    if (!job?.id || !workerId || !proposalId) {
       setMessageError('Impossible d’attribuer ce travailleur.');
       return;
     }
@@ -383,57 +403,27 @@ export default function JobDetails() {
     setMessageSuccess('');
 
     try {
-      let serverUpdateWorked = false;
+      const location = await captureCurrentLocation();
 
-      try {
-        await jobsAPI.update(job.id, {
-          assigned_worker_id: workerId,
-          status: 'assigned',
-          accepted_proposal_id: extractProposalId(proposal),
-        });
-        serverUpdateWorked = true;
-      } catch (acceptError) {
-        if (!isMethodNotAllowedError(acceptError)) {
-          throw acceptError;
-        }
-      }
-
-      rememberAcceptedProposal({
-        jobId: job.id,
-        proposal,
-        user,
+      const response = await jobsAPI.acceptProposal(job.id, proposalId, {
+        location: location || undefined,
       });
+      const updatedJob = response?.data?.job || response?.data;
 
-      setJob((previous) => previous ? {
-        ...previous,
-        assigned_worker_id: workerId,
-        accepted_proposal_id: extractProposalId(proposal),
-        status: 'assigned',
-      } : previous);
+      setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
 
       setProposals((previous) => previous.map((item) => ({
         ...item,
-        status: extractProposalWorkerId(item) === workerId ? 'accepted' : (item?.status || 'pending'),
+        status: extractProposalWorkerId(item) === workerId ? 'accepted' : 'rejected',
       })));
 
-      try {
-        await sendProposalConversationMessage({
-          receiverId: workerId,
-          receiverName: extractProposalWorkerName(proposal, 'Travailleur'),
-          jobId: job?.id,
-          content: buildAcceptanceConversationMessage({ job }),
-        });
-      } catch (_messageError) {
-      }
-
-      setSelectedProposalId(extractProposalId(proposal));
-      setMessageSuccess(serverUpdateWorked
-        ? 'Travailleur attribué. La discussion reste ouverte pour finaliser la mission.'
-        : 'Travailleur accepté. La discussion est ouverte et le bouton ne bloque plus.');
+      setSelectedProposalId(proposalId);
+      setMessageSuccess(
+        location
+          ? 'Travailleur attribué. Votre position lui a été envoyée automatiquement.'
+          : 'Travailleur attribué. L’adresse de la mission lui a été envoyée.'
+      );
       await loadDiscussionMessages(workerId);
-      if (serverUpdateWorked) {
-        await loadJobDetails();
-      }
     } catch (acceptError) {
       setMessageError(asTextError(
         acceptError?.response?.data?.detail,
