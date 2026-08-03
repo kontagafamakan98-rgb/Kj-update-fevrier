@@ -79,9 +79,18 @@ export function AuthProvider({ children }) {
       const errorMessage = handleApiError(error);
       safeLog.error('Login failed:', errorMessage);
 
+      // Le backend renvoie "Invalid credentials" en anglais, quelle que
+      // soit la langue de l'utilisateur. On detecte precisement ce cas
+      // (401 + ce message) pour afficher une version traduite au lieu du
+      // texte brut du backend.
+      const status = error?.response?.status;
+      const rawDetail = typeof error?.response?.data?.detail === 'string' ? error.response.data.detail : '';
+      const isInvalidCredentials = status === 401 && /invalid credentials/i.test(rawDetail);
+
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        errorKey: isInvalidCredentials ? 'invalidCredentials' : ''
       };
     }
   };
