@@ -418,7 +418,19 @@ const createResourceApi = (resourceName) => {
   });
 };
 
-export const paymentAPI = createResourceApi('payments');
+// paymentAPI est defini explicitement (pas via createResourceApi) car le
+// proxy generique construit des URLs qui ne correspondent PAS aux vraies
+// routes backend pour ce module (ex: getConfig() -> /payments/get-config
+// au lieu de /payments/config, en GET au lieu du bon verbe HTTP, etc.)
+// Voir backend/server.py pour les routes reelles.
+export const paymentAPI = {
+  getConfig: () => api.get('/payments/config'),
+  getQuote: (payload) => api.post('/payments/quote', payload),
+  createCheckout: (payload) => api.post('/payments/checkout', payload),
+  getPaymentStatus: (paymentId) => api.get(`/payments/status/${paymentId}`),
+  getPaymentStatusByToken: (invoiceToken) => api.get(`/payments/status/token/${invoiceToken}`),
+  getMyPayments: () => api.get('/payments/my'),
+};
 export const paymentsAPI = paymentAPI;
 export const commissionAPI = createResourceApi('commissions');
 export const commissionsAPI = commissionAPI;

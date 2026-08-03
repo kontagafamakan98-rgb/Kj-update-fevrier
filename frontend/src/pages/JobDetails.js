@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -520,9 +520,21 @@ export default function JobDetails() {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
                 <div className="flex items-center gap-4 flex-wrap">
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200">
-                    {assignedWorkerId ? 'Attribué' : formatJobStatus(job.status)}
-                  </span>
+                  {(() => {
+                    const isCompleted = job.status === 'completed';
+                    const isInProgress = job.status === 'in_progress' && assignedWorkerId;
+                    const label = isCompleted ? 'Terminée' : isInProgress ? 'Attribuée' : formatJobStatus(job.status);
+                    const badgeClass = isCompleted
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : isInProgress
+                        ? 'bg-orange-50 text-orange-700 border-orange-200'
+                        : 'bg-gray-50 text-gray-700 border-gray-200';
+                    return (
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium border ${badgeClass}`}>
+                        {label}
+                      </span>
+                    );
+                  })()}
                   <span className="text-sm text-gray-500">{ui.publishedOnPrefix} {publishedLabel}</span>
                   {hasApplied && !isJobOwner && (
                     <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -569,6 +581,44 @@ export default function JobDetails() {
             {!canApply && hasApplied && !isJobOwner && (
               <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
                 Votre proposition a déjà été envoyée. Le bouton « Postuler » reste masqué et la discussion avec le client est disponible plus bas.
+              </div>
+            )}
+
+            {assignedWorkerId && (
+              <div className="mt-6 border-t border-gray-100 pt-5">
+                {(() => {
+                  const steps = [
+                    { key: 'assigned', label: 'Travailleur attribué', done: true },
+                    { key: 'payment', label: 'Paiement séquestré', done: job.status === 'in_progress' || job.status === 'completed' },
+                    { key: 'completed', label: 'Mission terminée', done: job.status === 'completed' },
+                  ];
+                  return (
+                    <div className="flex items-center">
+                      {steps.map((step, idx) => (
+                        <Fragment key={step.key}>
+                          <div className="flex flex-col items-center gap-1 text-center w-24">
+                            <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.done ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                              {step.done ? '✓' : idx + 1}
+                            </div>
+                            <span className={`text-xs leading-tight ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</span>
+                          </div>
+                          {idx < steps.length - 1 && (
+                            <div className={`h-0.5 flex-1 ${steps[idx + 1].done ? 'bg-emerald-600' : 'bg-gray-200'}`} />
+                          )}
+                        </Fragment>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {job.shared_location?.maps_url && (
+              <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
+                <span className="text-sm text-orange-800">📍 Position partagée avec le travailleur au moment de l'attribution</span>
+                <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
+                  Voir sur la carte
+                </a>
               </div>
             )}
           </div>
@@ -626,6 +676,13 @@ export default function JobDetails() {
                     Proposition attribuée
                   </div>
                 )}
+                <button
+                  type="button"
+                  onClick={() => navigate('/messages')}
+                  className="text-sm font-medium text-orange-600 hover:text-orange-700 whitespace-nowrap"
+                >
+                  Ouvrir dans Messages →
+                </button>
               </div>
 
               {messageError && (

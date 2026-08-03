@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Send, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { messagesAPI, handleApiError } from '../services/api';
@@ -77,18 +78,20 @@ export default function Messages() {
 
   const getOtherPersonName = () => activeConversationData?.other_user_name || pageT('otherUser');
 
+  const EmptyIcon = () => (
+    <MessageCircle size={48} className="mx-auto text-gray-300" strokeWidth={1.5} />
+  );
+
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow overflow-hidden h-[600px] flex">
-          <div className="w-1/3 border-r border-gray-200 p-4">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh] flex">
+          <div className="w-full sm:w-1/3 border-r border-gray-100 p-4">
             <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
             <ListSkeleton count={4} type="message" />
           </div>
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-gray-400 text-center">
-              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mx-auto"></div>
-            </div>
+          <div className="hidden sm:flex flex-1 items-center justify-center">
+            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mx-auto"></div>
           </div>
         </div>
       </div>
@@ -96,11 +99,15 @@ export default function Messages() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white rounded-lg shadow overflow-hidden h-[600px] flex">
-        <div className="w-1/3 border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">{t('messages')}</h2>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">{t('messages')}</h1>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[75vh] flex">
+        {/* Liste des conversations : plein ecran sur mobile tant qu'aucune n'est ouverte,
+            colonne fixe a partir de sm. */}
+        <div className={`w-full sm:w-[320px] sm:flex-shrink-0 border-r border-gray-100 flex-col ${activeConversation ? 'hidden sm:flex' : 'flex'}`}>
+          <div className="px-4 py-3 border-b border-gray-100">
+            <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Conversations</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -109,64 +116,86 @@ export default function Messages() {
                 <button
                   key={conversation._id}
                   onClick={() => loadMessages(conversation._id, conversation)}
-                  className={`w-full p-4 text-left hover:bg-gray-50 border-b border-gray-100 ${
-                    activeConversation === conversation._id ? 'bg-orange-50 border-orange-200' : ''
+                  className={`w-full px-4 py-3 text-left border-b border-gray-50 transition-colors hover:bg-gray-50 ${
+                    activeConversation === conversation._id ? 'bg-orange-50' : ''
                   }`}
                 >
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                  <div className="flex items-center gap-3">
+                    <div className="h-11 w-11 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
                       {conversation.other_user?.profile_photo ? (
-                        <img src={conversation.other_user.profile_photo} alt={conversation.other_user_name} className="w-full h-full object-cover" />
+                        <img src={conversation.other_user.profile_photo} alt={conversation.other_user_name} className="h-full w-full object-cover" />
                       ) : (
-                        <span className="text-gray-600 font-medium">{(conversation.other_user_name || getOtherPersonName()).charAt(0)}</span>
+                        <span className="text-gray-600 font-semibold">{(conversation.other_user_name || getOtherPersonName()).charAt(0).toUpperCase()}</span>
                       )}
                     </div>
-                    <div className="ml-3 flex-1">
-                      <p className="text-sm font-medium text-gray-900">{conversation.other_user_name || getOtherPersonName()}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{conversation.other_user_name || getOtherPersonName()}</p>
                       <p className="text-xs text-gray-500 truncate">{conversation.last_message}</p>
                     </div>
                   </div>
                 </button>
               ))
             ) : (
-              <div className="p-4 text-center text-gray-500">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                </svg>
-                <p className="mt-2 text-sm">{t('noConversations')}</p>
-                <p className="text-xs text-gray-400">{t('startApplyingJobs')}</p>
+              <div className="px-4 py-12 text-center">
+                <EmptyIcon />
+                <p className="mt-3 text-sm font-medium text-gray-600">{t('noConversations')}</p>
+                <p className="mt-1 text-xs text-gray-400">{t('startApplyingJobs')}</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col">
+        {/* Fil de discussion : plein ecran sur mobile des qu'une conversation est ouverte */}
+        <div className={`flex-1 flex-col ${activeConversation ? 'flex' : 'hidden sm:flex'}`}>
           {activeConversation ? (
             <>
-              <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setActiveConversation(null)}
+                  className="sm:hidden text-gray-500 hover:text-gray-700"
+                  aria-label="Retour aux conversations"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+                  {activeConversationData?.other_user?.profile_photo ? (
+                    <img src={activeConversationData.other_user.profile_photo} alt={getOtherPersonName()} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-gray-600 font-semibold">{getOtherPersonName().charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
                 <h3 className="font-semibold text-gray-900">{getOtherPersonName()}</h3>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((message) => (
-                  <div key={message.id} className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                        message.sender_id === user?.id ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-900'
-                      }`}
-                    >
-                      <p className="text-sm">{message.content}</p>
-                      <p className={`text-xs mt-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-500'}`}>
-                        {formatMessageTime(message.timestamp)}
-                      </p>
-                    </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
+                {messages.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-gray-400">
+                    Aucun message pour l'instant. Écrivez le premier ci-dessous.
                   </div>
-                ))}
+                ) : (
+                  messages.map((message) => (
+                    <div key={message.id} className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}>
+                      <div
+                        className={`max-w-[80%] sm:max-w-md px-4 py-2 rounded-2xl text-sm ${
+                          message.sender_id === user?.id
+                            ? 'bg-orange-600 text-white rounded-tr-sm'
+                            : 'bg-white border border-gray-100 text-gray-900 rounded-tl-sm'
+                        }`}
+                      >
+                        <p className="whitespace-pre-line">{message.content}</p>
+                        <p className={`text-[11px] mt-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-400'}`}>
+                          {formatMessageTime(message.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
                 <div ref={messagesEndRef} />
               </div>
 
-              <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
-                <div className="flex space-x-2">
+              <form onSubmit={sendMessage} className="p-3 border-t border-gray-100 bg-white">
+                <div className="flex items-center gap-2">
                   <label htmlFor="message_input" className="sr-only">{pageT('placeholder')}</label>
                   <input
                     id="message_input"
@@ -177,28 +206,24 @@ export default function Messages() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder={pageT('placeholder')}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+                    className="flex-1 rounded-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                   <button
                     aria-label={pageT('sendMessageAria')}
                     type="submit"
                     disabled={!newMessage.trim()}
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md disabled:opacity-50"
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                    </svg>
+                    <Send size={17} />
                   </button>
                 </div>
               </form>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 items-center justify-center text-gray-400 hidden sm:flex">
               <div className="text-center">
-                <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                </svg>
-                <p className="mt-2">{t('selectConversation')}</p>
+                <EmptyIcon />
+                <p className="mt-3 text-sm">{t('selectConversation')}</p>
               </div>
             </div>
           )}
