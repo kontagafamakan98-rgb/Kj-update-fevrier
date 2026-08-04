@@ -41,7 +41,7 @@ export default function Profile() {
   const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
 
   const { user, loadUser } = useAuth();
-  const { t, currentLanguage } = useLanguage();
+  const { t, currentLanguage, getAvailableLanguagesForCountry } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'profile');
   const toast = useToast();
 
@@ -330,11 +330,9 @@ function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
         <div>
           <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
           <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
-            <option value="fr">{t('french')}</option>
-            <option value="en">{t('english')}</option>
-            <option value="wo">{t('wolof')}</option>
-            <option value="bm">{t('bambara')}</option>
-            <option value="mos">{t('moore')}</option>
+            {getAvailableLanguagesForCountry(formData.country).map(lang => (
+              <option key={lang} value={lang}>{getLanguageLabel(lang, t)}</option>
+            ))}
           </select>
         </div>
 

@@ -492,7 +492,7 @@ class Country(str, Enum):
     """4 pays prioritaires pour le lancement de Kojo"""
     SENEGAL = "senegal"      # 🇸🇳 Pays principal - Dakar hub tech
     MALI = "mali"            # 🇲🇱 Pays prioritaire - Bamako  
-    IVORY_COAST = "ivory_coast"  # 🇨🇮 Pays prioritaire - Abidjan hub économique
+    COTE_DIVOIRE = "cote_divoire"  # 🇨🇮 Pays prioritaire - Abidjan hub économique
     BURKINA_FASO = "burkina_faso"  # 🇧🇫 Pays prioritaire - Ouagadougou
 
 # Models
@@ -599,6 +599,7 @@ class Job(BaseModel):
     budget_min: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
     budget_max: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
     location: dict = Field(...)  # Location structure
+    country: Optional[str] = None
     status: JobStatus = JobStatus.OPEN
     required_skills: List[str] = Field(default=[], max_items=20)  # Max 20 skills
     estimated_duration: Optional[str] = Field(None, max_length=100)  # Duration string limit
@@ -2051,6 +2052,24 @@ async def update_profile(
     
     return {"message": "Profile updated successfully"}
 
+class CountryUpdate(BaseModel):
+    country: Country
+
+@api_router.patch("/auth/me/country")
+async def update_user_country(
+    country_update: CountryUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if is_owner_user:
+        return {"message": "Owner accounts have access to all countries. Country change bypassed.", "country": current_user.country}
+        
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"country": country_update.country.value, "updated_at": datetime.now(timezone.utc)}}
+    )
+    return {"message": "Country updated successfully", "country": country_update.country.value}
+
 # Profile Photo Routes
 @api_router.post("/users/profile-photo")
 async def upload_profile_photo(
@@ -2439,7 +2458,7 @@ async def create_job(
         except Exception as validation_error:
             raise HTTPException(status_code=422, detail=str(validation_error))
 
-        job = Job(**validated_input.dict(), client_id=current_user.id)
+        job = Job(**validated_input.dict(), client_id=current_user.id, country=current_user.country)
         result = await db.jobs.insert_one(job.dict())
 
         if not result.inserted_id:
@@ -2469,6 +2488,15 @@ async def get_jobs(
             query["category"] = category
         
         query["deleted"] = {"$ne": True}
+        
+        is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+        if not is_owner_user:
+            query["$or"] = [
+                {"country": current_user.country},
+                {"country": {"$exists": False}},
+                {"country": None}
+            ]
+
         jobs = await db.jobs.find(query).sort("created_at", -1).to_list(limit)
         
         logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
@@ -2483,6 +2511,12 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+        
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    job_country = job.get("country")
+    if not is_owner_user and job_country and job_country != current_user.country:
+        raise HTTPException(status_code=403, detail="Ce job n'appartient pas à votre pays.")
+        
     return Job(**job)
 
 
@@ -3201,6 +3235,17 @@ def detect_country_from_phone(phone: str) -> Optional[str]:
             return country
     
     return None
+
+@api_router.get("/geolocation/available-countries")
+async def get_available_countries():
+    return {
+        "countries": [
+            {"id": "mali", "name": "Mali", "flag": "🇲🇱", "languages": ["fr", "en", "bm"]},
+            {"id": "senegal", "name": "Sénégal", "flag": "🇸🇳", "languages": ["fr", "en", "wo"]},
+            {"id": "cote_divoire", "name": "Côte d'Ivoire", "flag": "🇨🇮", "languages": ["fr", "en"]},
+            {"id": "burkina_faso", "name": "Burkina Faso", "flag": "🇧🇫", "languages": ["fr", "en", "mos"]}
+        ]
+    }
 
 @api_router.get("/geolocation/detect")
 async def detect_geolocation(request: Request, phone: Optional[str] = None):

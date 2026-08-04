@@ -6,7 +6,9 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { PaymentProvider } from './contexts/PaymentContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { CountryProvider } from "./contexts/CountryContext";
 import Navbar from "./components/Navbar";
+import CountryChangePopup from "./components/CountryChangePopup";
 import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -176,6 +178,9 @@ function AppRoutes() {
       
       {/* Toast Notifications */}
       <ToastContainer />
+      
+      {/* Geolocation Popup */}
+      <CountryChangePopup />
 
       {/* Main Content with Suspense for lazy loaded routes */}
       <main className="pb-24 md:pb-0">
@@ -307,13 +312,15 @@ function App() {
       <BrowserRouter>
         <LanguageProvider>
           <AuthProvider>
-            <PaymentProvider>
-              <ToastProvider>
-                <ErrorBoundary>
-                  <AppRoutes />
-                </ErrorBoundary>
-              </ToastProvider>
-            </PaymentProvider>
+            <CountryProvider>
+              <PaymentProvider>
+                <ToastProvider>
+                  <ErrorBoundary>
+                    <AppRoutes />
+                  </ErrorBoundary>
+                </ToastProvider>
+              </PaymentProvider>
+            </CountryProvider>
           </AuthProvider>
         </LanguageProvider>
       </BrowserRouter>

@@ -40,13 +40,14 @@ const RegistrationLanguageSelector = ({
 }) => {
   const [orderedLanguages, setOrderedLanguages] = useState([]);
   const [suggestionMessage, setSuggestionMessage] = useState(null);
-  const { changeLanguage, t } = useLanguage(); // Utiliser le contexte de langue
+  const { changeLanguage, t, getAvailableLanguagesForCountry } = useLanguage(); // Utiliser le contexte de langue
   const normalizedCountryCode = normalizeCountryCode(detectedCountry?.code || '');
 
   useEffect(() => {
     if (detectedCountry) {
-      // Organiser les langues selon le pays détecté
-      const languages = getOrderedLanguagesForCountry(detectedCountry);
+      // Filtrer les langues selon le pays détecté
+      const allowedLangCodes = getAvailableLanguagesForCountry(detectedCountry.code);
+      const languages = allowedLangCodes.map(code => AVAILABLE_LANGUAGES[code]).filter(Boolean);
       setOrderedLanguages(languages);
       
       // Obtenir le message de suggestion
@@ -62,13 +63,10 @@ const RegistrationLanguageSelector = ({
       // Ordre par défaut sans géolocalisation
       setOrderedLanguages([
         AVAILABLE_LANGUAGES['fr'],
-        AVAILABLE_LANGUAGES['en'],
-        AVAILABLE_LANGUAGES['wo'], 
-        AVAILABLE_LANGUAGES['bm'],
-        AVAILABLE_LANGUAGES['mos']
+        AVAILABLE_LANGUAGES['en']
       ]);
     }
-  }, [detectedCountry, selectedLanguage]);
+  }, [detectedCountry, selectedLanguage, getAvailableLanguagesForCountry]);
 
   const handleLanguageSelect = (languageCode) => {
     devLog.info(`🔄 Changement de langue: ${languageCode}`);

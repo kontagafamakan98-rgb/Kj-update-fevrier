@@ -246,6 +246,7 @@ export const authAPI = {
   getProfile: () => api.get('/auth/me'),
   getCurrentUser: () => api.get('/auth/me'),
   updateProfile: (payload) => api.put('/auth/me', payload),
+  updateCountry: (payload) => api.patch('/auth/me/country', payload),
   // Email verification methods
   checkEmailAvailability: (payload) => api.post('/auth/email/check-availability', payload),
   sendEmailOtp: (payload) => api.post('/auth/email/send-otp', payload),
@@ -483,5 +484,10 @@ export const messageAPI = {
 };
 export const conversationAPI = messageAPI;
 export const conversationsAPI = messageAPI;
+
+export const geolocationAPI = {
+  detect: (params) => api.get('/geolocation/detect', { params }),
+  getAvailableCountries: () => api.get('/geolocation/available-countries'),
+};
 
 export default api;

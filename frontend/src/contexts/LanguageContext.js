@@ -2283,10 +2283,24 @@ export function LanguageProvider({ children }) {
     localStorage.setItem('language', lang);
   };
 
+  const COUNTRY_LANGUAGE_MAP = {
+    mali: ['fr', 'en', 'bm'],
+    senegal: ['fr', 'en', 'wo'],
+    burkina_faso: ['fr', 'en', 'mos'],
+    ivory_coast: ['fr', 'en'],
+    cote_divoire: ['fr', 'en'],
+  };
+
+  const getAvailableLanguagesForCountry = (countryId) => {
+    if (!countryId) return ['fr', 'en'];
+    return COUNTRY_LANGUAGE_MAP[countryId] || ['fr', 'en'];
+  };
+
   const value = {
     currentLanguage,
     changeLanguage,
-    t
+    t,
+    getAvailableLanguagesForCountry
   };
 
   return (
