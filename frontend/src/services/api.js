@@ -269,6 +269,7 @@ export const jobsAPI = {
   getProposals: (jobId) => api.get(`/jobs/${jobId}/proposals`),
   acceptProposal: (jobId, proposalId, payload = {}) => api.post(`/jobs/${jobId}/proposals/${proposalId}/accept`, payload),
   completeJob: (jobId) => api.post(`/jobs/${jobId}/complete`),
+  getPaymentStatus: (jobId) => api.get(`/jobs/${jobId}/payment-status`),
 };
 
 const stripKojoMarker = (value) => String(value || '').replace(/\[KOJO_JOB:[^\]]+\]\s*/gi, '').trim();

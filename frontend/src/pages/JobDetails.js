@@ -134,6 +134,8 @@ export default function JobDetails() {
   const [sendingMessage, setSendingMessage] = useState(false);
   const [acceptingProposal, setAcceptingProposal] = useState(false);
   const [completingJob, setCompletingJob] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState(null);
+  const [paymentStatusLoading, setPaymentStatusLoading] = useState(false);
   const discussionSectionRef = useRef(null);
   const discussionInputRef = useRef(null);
 
@@ -147,6 +149,27 @@ export default function JobDetails() {
   useEffect(() => {
     loadJobDetails();
   }, [id, user?.id, user?.user_type]);
+
+  const refreshPaymentStatus = async () => {
+    if (!job?.id) return;
+    setPaymentStatusLoading(true);
+    try {
+      const response = await jobsAPI.getPaymentStatus(job.id);
+      setPaymentStatus(response?.data || null);
+    } catch (_err) {
+      // Statut de paiement indisponible : on ne bloque jamais l'affichage
+      // de la page pour ca, on retombe juste sur "aucune donnee".
+      setPaymentStatus(null);
+    } finally {
+      setPaymentStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (job?.id && assignedWorkerId) {
+      refreshPaymentStatus();
+    }
+  }, [job?.id, assignedWorkerId]);
 
   useEffect(() => {
     return ensureJobOwnerActionBar(job);
@@ -475,6 +498,7 @@ export default function JobDetails() {
       } else {
         setMessageSuccess(response?.data?.message || 'Mission clôturée. Le versement nécessite un suivi manuel.');
       }
+      await refreshPaymentStatus();
     } catch (completeError) {
       setMessageError(asTextError(
         completeError?.response?.data?.detail,
@@ -563,7 +587,7 @@ export default function JobDetails() {
                   <button onClick={handleDelete} disabled={deleting} className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
                     {deleting ? ui.deleting : ui.deleteJob}
                   </button>
-                  {job.status === 'in_progress' && assignedWorkerId && (
+                  {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && (
                     <button onClick={handleCompleteJob} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
                       {completingJob ? 'Clôture en cours...' : '✅ Travail Terminé'}
                     </button>
@@ -584,34 +608,81 @@ export default function JobDetails() {
               </div>
             )}
 
-            {assignedWorkerId && (
-              <div className="mt-6 border-t border-gray-100 pt-5">
-                {(() => {
-                  const steps = [
-                    { key: 'assigned', label: 'Travailleur attribué', done: true },
-                    { key: 'payment', label: 'Paiement séquestré', done: job.status === 'in_progress' || job.status === 'completed' },
-                    { key: 'completed', label: 'Mission terminée', done: job.status === 'completed' },
-                  ];
-                  return (
-                    <div className="flex items-center">
-                      {steps.map((step, idx) => (
-                        <Fragment key={step.key}>
-                          <div className="flex flex-col items-center gap-1 text-center w-24">
-                            <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.done ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                              {step.done ? '✓' : idx + 1}
-                            </div>
-                            <span className={`text-xs leading-tight ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</span>
+            {assignedWorkerId && (() => {
+              const hasPayment = Boolean(paymentStatus?.has_payment);
+              const paymentState = hasPayment ? paymentStatus.payment_status : 'none'; // none | pending | completed | failed | cancelled
+              const payoutState = paymentStatus?.payout_status; // held | releasing | released | release_failed
+              const isCompletedJob = job.status === 'completed';
+
+              const paymentDone = paymentState === 'completed';
+              const missionDone = isCompletedJob;
+
+              const steps = [
+                { key: 'assigned', label: 'Travailleur attribué', done: true },
+                { key: 'payment', label: 'Paiement effectué', done: paymentDone },
+                { key: 'completed', label: 'Mission terminée', done: missionDone },
+              ];
+
+              let statusBadge;
+              if (paymentState === 'none') {
+                statusBadge = { text: '⏳ En attente de paiement', className: 'bg-gray-100 text-gray-600 border-gray-200' };
+              } else if (paymentState === 'pending') {
+                statusBadge = { text: '⏳ Paiement en cours de confirmation', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+              } else if (paymentState === 'failed' || paymentState === 'cancelled') {
+                statusBadge = { text: '❌ Paiement échoué', className: 'bg-red-50 text-red-700 border-red-200' };
+              } else if (paymentDone && payoutState === 'released') {
+                statusBadge = { text: '✅ Payé — versé au travailleur', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+              } else if (paymentDone) {
+                statusBadge = { text: '🔒 Payé — argent séquestré jusqu’à la fin de la mission', className: 'bg-orange-50 text-orange-700 border-orange-200' };
+              } else {
+                statusBadge = { text: '⏳ En attente de paiement', className: 'bg-gray-100 text-gray-600 border-gray-200' };
+              }
+
+              return (
+                <div className="mt-6 border-t border-gray-100 pt-5">
+                  <div className="flex items-center">
+                    {steps.map((step, idx) => (
+                      <Fragment key={step.key}>
+                        <div className="flex flex-col items-center gap-1 text-center w-24">
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.done ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                            {step.done ? '✓' : idx + 1}
                           </div>
-                          {idx < steps.length - 1 && (
-                            <div className={`h-0.5 flex-1 ${steps[idx + 1].done ? 'bg-emerald-600' : 'bg-gray-200'}`} />
-                          )}
-                        </Fragment>
-                      ))}
+                          <span className={`text-xs leading-tight ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</span>
+                        </div>
+                        {idx < steps.length - 1 && (
+                          <div className={`h-0.5 flex-1 ${steps[idx + 1].done ? 'bg-emerald-600' : 'bg-gray-200'}`} />
+                        )}
+                      </Fragment>
+                    ))}
+                  </div>
+
+                  <div className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${statusBadge.className}`}>
+                    {paymentStatusLoading ? 'Vérification du statut de paiement...' : statusBadge.text}
+                  </div>
+
+                  {isJobOwner && paymentState === 'none' && !isCompletedJob && (
+                    <div className="mt-3">
+                      <button
+                        onClick={() => {
+                          const proposedAmount = selectedProposal?.proposed_amount ?? selectedProposal?.amount ?? null;
+                          const paymentAmount = proposedAmount || job?.budget_max || job?.budget_min || null;
+                          const paymentParams = new URLSearchParams({
+                            job_id: job.id,
+                            worker_id: assignedWorkerId,
+                            ...(paymentAmount ? { amount: String(Math.round(paymentAmount)) } : {}),
+                            ...(job?.title ? { job_title: encodeURIComponent(job.title) } : {}),
+                          });
+                          navigate(`/payment?${paymentParams.toString()}`);
+                        }}
+                        className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
+                      >
+                        Payer maintenant
+                      </button>
                     </div>
-                  );
-                })()}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })()}
 
             {job.shared_location?.maps_url && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">

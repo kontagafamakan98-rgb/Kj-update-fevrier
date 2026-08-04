@@ -2925,6 +2925,48 @@ async def get_job_proposals(
 
     return enriched
 
+@api_router.get("/jobs/{job_id}/payment-status")
+async def get_job_payment_status(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Statut REEL du paiement d'un job, base uniquement sur ce qui existe
+    en base de donnees (jamais devine a partir du statut du job). Sert de
+    source de verite unique pour l'affichage cote client ET travailleur,
+    afin d'eviter d'afficher "argent sequestre" quand rien n'a ete paye.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    allowed = (
+        job.get("client_id") == current_user.id
+        or job.get("assigned_worker_id") == current_user.id
+        or is_owner_user
+    )
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    payment_record = await db.payments.find_one(
+        {"job_id": job_id},
+        sort=[("created_at", -1)]
+    )
+
+    if not payment_record:
+        return {"has_payment": False, "payment_status": None, "payout_status": None, "amount": None}
+
+    return {
+        "has_payment": True,
+        "payment_status": payment_record.get("status"),
+        "payout_status": payment_record.get("payout_status"),
+        "amount": payment_record.get("amount"),
+        "worker_amount": payment_record.get("worker_amount"),
+        "created_at": payment_record.get("created_at"),
+        "completed_at": payment_record.get("completed_at"),
+    }
+
 # Messaging Routes
 @api_router.post("/messages")
 async def send_message(
