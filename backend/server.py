@@ -3387,7 +3387,7 @@ async def get_system_stats():
             "total_jobs": 0,
             "total_workers": 0,
             "total_clients": 0,
-            "supported_countries": ["senegal", "mali", "ivory_coast", "burkina_faso"],
+            "supported_countries": ["senegal", "mali", "cote_divoire", "burkina_faso"],
             "supported_languages": ["fr", "en", "wo", "bm"],
             "database": "unavailable",
             "timestamp": datetime.now(timezone.utc)
@@ -3403,7 +3403,7 @@ async def get_system_stats():
         "total_jobs": total_jobs,
         "total_workers": total_workers,
         "total_clients": total_clients,
-        "supported_countries": ["senegal", "mali", "ivory_coast", "burkina_faso"],
+        "supported_countries": ["senegal", "mali", "cote_divoire", "burkina_faso"],
         "supported_languages": ["fr", "en", "wo", "bm"],
         "database": "connected",
         "timestamp": datetime.now(timezone.utc)
@@ -3423,11 +3423,11 @@ PAYDUNYA_CHANNELS = {
         "senegal": "orange-money-senegal",
         "mali": "orange-money-mali",
         "burkina_faso": "orange-money-burkina",
-        "ivory_coast": "orange-money-ci"
+        "cote_divoire": "orange-money-ci"
     },
     "wave": {
         "senegal": "wave-senegal",
-        "ivory_coast": "wave-ci"
+        "cote_divoire": "wave-ci"
     },
     "bank_card": {
         "default": "card"
@@ -3444,12 +3444,12 @@ def normalize_payment_country(country: Optional[str]) -> str:
         'burkina-faso': 'burkina_faso',
         'burkina faso': 'burkina_faso',
         'burkina_faso': 'burkina_faso',
-        'ivory coast': 'ivory_coast',
-        'cote divoire': 'ivory_coast',
-        "côte d'ivoire": 'ivory_coast',
-        "cote d'ivoire": 'ivory_coast',
-        'cote_d_ivoire': 'ivory_coast',
-        'ivory_coast': 'ivory_coast'
+        'ivory coast': 'cote_divoire',
+        'cote divoire': 'cote_divoire',
+        "côte d'ivoire": 'cote_divoire',
+        "cote d'ivoire": 'cote_divoire',
+        'cote_d_ivoire': 'cote_divoire',
+        'ivory_coast': 'cote_divoire'
     }
     return aliases.get(value, value.replace('-', '_').replace(' ', '_'))
 
