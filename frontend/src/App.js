@@ -136,16 +136,13 @@ function LegalFooter() {
 
   return (
     <footer className="border-t border-orange-100 bg-white/95 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-sm">
-        <span className="font-medium text-gray-800">Kojo</span>
-        <div className="flex flex-wrap items-center gap-4 text-orange-700">
-          <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
-            {labels.legal}
-          </a>
-          <Link to="/support" className="hover:text-orange-800 underline underline-offset-2">
-            {labels.contact}
-          </Link>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">
+        <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
+          {labels.legal}
+        </a>
+        <Link to="/support" className="hover:text-orange-800 underline underline-offset-2">
+          {labels.contact}
+        </Link>
       </div>
     </footer>
   );
