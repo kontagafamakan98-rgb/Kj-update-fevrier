@@ -66,6 +66,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("kojo_backend")
 
+# Silence noisy /favicon.ico (and other junk) requests from uvicorn's access
+# log entirely - browsers, bots and health checks hit this path constantly
+# even though this backend has no favicon to serve, and it clutters the logs.
+class _IgnoreNoisyPathsFilter(logging.Filter):
+    _IGNORED_SUBSTRINGS = ("/favicon.ico",)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not any(path in message for path in self._IGNORED_SUBSTRINGS)
+
+logging.getLogger("uvicorn.access").addFilter(_IgnoreNoisyPathsFilter())
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 cloudinary.config(secure=True)
@@ -4535,6 +4547,19 @@ async def root_health_check():
         "version": "1.0.0",
         "environment": os.environ.get("APP_ENV", "production")
     }
+
+# Favicon & root routes - this API has no frontend to serve, but browsers/bots/
+# uptime monitors (e.g. Render health pings) request GET /favicon.ico and GET /
+# by default. Without an explicit handler these show up as noisy 404s in the
+# Render logs. Returning 204 (no content) for the favicon keeps logs clean and
+# is the standard fix; a simple JSON message on "/" avoids the same issue there.
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return JSONResponse({"service": "Kojo API", "status": "ok"})
 
 # Include the router in the main app
 app.include_router(api_router)
