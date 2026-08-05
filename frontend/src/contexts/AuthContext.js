@@ -4,6 +4,7 @@ import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
+import { registerPushSubscription, unregisterPushSubscription, isPushSupported } from '../utils/pushRegistration';
 
 const AuthContext = createContext();
 
@@ -73,6 +74,12 @@ export function AuthProvider({ children }) {
       kojoCache.set(CACHE_KEYS.USER_PROFILE, user, 24 * 60 * 60 * 1000); // 24 hours
       
       devLog.info('✅ User logged in successfully');
+
+      // Enregistrer la subscription push en arrière-plan (silencieux)
+      if (isPushSupported()) {
+        registerPushSubscription(user.id).catch(() => {});
+      }
+
       return { success: true, user };
       
     } catch (error) {
@@ -106,6 +113,12 @@ export function AuthProvider({ children }) {
       kojoCache.set(CACHE_KEYS.USER_PROFILE, userData, 24 * 60 * 60 * 1000); // 24 hours
       
       devLog.info('✅ User auto-logged in after registration');
+
+      // Enregistrer la subscription push en arrière-plan (silencieux)
+      if (isPushSupported()) {
+        registerPushSubscription(userData.id).catch(() => {});
+      }
+
       return { success: true };
       
     } catch (error) {
@@ -142,6 +155,10 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
+      // Révoquer la subscription push avant de se déconnecter
+      if (isPushSupported()) {
+        unregisterPushSubscription().catch(() => {});
+      }
       // Attempt to notify server of logout
       await authAPI.logout();
     } catch (error) {

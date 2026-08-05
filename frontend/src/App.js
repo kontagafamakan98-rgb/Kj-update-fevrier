@@ -7,6 +7,7 @@ import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
 import { PaymentProvider } from './contexts/PaymentContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { CountryProvider } from "./contexts/CountryContext";
+import { NotificationProvider } from './contexts/NotificationContext';
 import Navbar from "./components/Navbar";
 import CountryChangePopup from "./components/CountryChangePopup";
 import OfflineIndicator from "./components/OfflineIndicator";
@@ -17,6 +18,7 @@ import ToastContainer from "./components/ToastContainer";
 import PageLoader from "./components/PageLoader";
 import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
+import { useNotifications } from './contexts/NotificationContext';
 
 
 // Eager load critical pages (public pages shown immediately)
@@ -154,6 +156,7 @@ function AppRoutes() {
   const [pwaReady, setPwaReady] = useState(false);
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { addLocalNotification } = useNotifications();
 
   useEffect(() => {
     setPwaReady(true);
@@ -162,6 +165,32 @@ function AppRoutes() {
       Promise.resolve(requestNotificationPermission()).catch(() => {});
     }
   }, [user]);
+
+  // Écouter les messages du Service Worker push (notifications foreground)
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handler = (event) => {
+      if (!event.data) return;
+      const { type, payload } = event.data;
+      if (type === 'KOJO_PUSH_FOREGROUND' && payload) {
+        // Ajouter dans le centre de notifications sans afficher le toast système
+        addLocalNotification({
+          id: `local_${Date.now()}`,
+          title: payload.title || 'Kojo',
+          body: payload.body || '',
+          type: payload.data?.type || 'general',
+          related_id: payload.data?.job_id || null,
+          related_type: payload.data?.job_id ? 'job' : null,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handler);
+    return () => navigator.serviceWorker.removeEventListener('message', handler);
+  }, [addLocalNotification]);
 
   if (!pwaReady) {
     return <MobileLoader />;
@@ -315,9 +344,11 @@ function App() {
             <CountryProvider>
               <PaymentProvider>
                 <ToastProvider>
-                  <ErrorBoundary>
-                    <AppRoutes />
-                  </ErrorBoundary>
+                  <NotificationProvider>
+                    <ErrorBoundary>
+                      <AppRoutes />
+                    </ErrorBoundary>
+                  </NotificationProvider>
                 </ToastProvider>
               </PaymentProvider>
             </CountryProvider>

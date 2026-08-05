@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { isPWA } from '../utils/pwa';
 import LanguageSelector from './LanguageSelector';
+import NotificationDropdown from './NotificationDropdown';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -81,6 +82,8 @@ export default function Navbar() {
 
             {user ? (
               <div className="flex items-center space-x-4">
+                {/* Cloche notifications */}
+                <NotificationDropdown />
                 <Link to="/profile" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                   {t('profile')}
                 </Link>
@@ -159,6 +162,9 @@ export default function Navbar() {
                   <Link to="/support" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     Support
                   </Link>
+                  <div className="px-4 py-2 border-t border-gray-100">
+                    <NotificationDropdown />
+                  </div>
                   <div className="pt-2">
                     <button onClick={handleLogout} className="w-full rounded-2xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors">
                       {t('logout')}

@@ -32,6 +32,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 from urllib.parse import urlparse
+import asyncio
+
+# Web Push (VAPID) - Sans Firebase
+try:
+    from pywebpush import webpush, WebPushException
+    import json as _json
+    WEBPUSH_AVAILABLE = True
+except ImportError:
+    WEBPUSH_AVAILABLE = False
+    logger.warning("⚠️ pywebpush non installé - notifications push désactivées")
 
 # Configure logging for West Africa production
 for stream in (sys.stdout, sys.stderr):
@@ -160,6 +170,19 @@ async def create_database_indexes():
         await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)
         await db.email_otps.create_index("expires_at", expireAfterSeconds=0)
         await db.email_otps.create_index([("created_at", -1)])
+
+        # Notifications collection indexes
+        await db.notifications.create_index("id", unique=True)
+        await db.notifications.create_index("user_id")
+        await db.notifications.create_index([("user_id", 1), ("is_read", 1)])
+        await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+        # TTL : suppression automatique des notifications après 90 jours
+        await db.notifications.create_index("created_at", expireAfterSeconds=90 * 24 * 3600)
+
+        # Push tokens collection indexes
+        await db.push_tokens.create_index("id", unique=True)
+        await db.push_tokens.create_index("user_id")
+        await db.push_tokens.create_index([("user_id", 1), ("active", 1)])
         
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:
@@ -203,6 +226,13 @@ BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME', 'KOJO').strip() or 'KOJO
 PASSWORD_RESET_FROM_EMAIL = os.environ.get('PASSWORD_RESET_FROM_EMAIL', BREVO_SENDER_EMAIL).strip() or BREVO_SENDER_EMAIL
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 GMAIL_DEPRECATED_NOTICE = 'Gmail OAuth disabled in favor of Brevo'
+
+# ============================================================================
+# VAPID / Web Push Configuration (sans Firebase)
+# ============================================================================
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '').strip()
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
+VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'mailto:kojo@example.com').strip()
 
 # Security Headers for West Africa
 DEFAULT_SECURITY_HEADERS = {
@@ -706,6 +736,34 @@ class SupportTicket(BaseModel):
 class SupportTicketStatusUpdate(BaseModel):
     status: SupportTicketStatus
 
+# ============================================================================
+# NOTIFICATION MODELS
+# ============================================================================
+
+class NotificationType(str, Enum):
+    PROPOSAL_RECEIVED   = "proposal_received"    # Client : nouvelle proposition
+    PROPOSAL_ACCEPTED   = "proposal_accepted"    # Worker : proposition acceptée
+    JOB_IN_PROGRESS     = "job_in_progress"      # Worker : mission démarrée
+    PAYMENT_RECEIVED    = "payment_received"     # Worker : paiement reçu
+    PAYMENT_CONFIRMED   = "payment_confirmed"    # Client : paiement confirmé
+    JOB_COMPLETED       = "job_completed"        # Client + Worker : mission terminée
+    NEW_MESSAGE         = "new_message"          # Message reçu
+    GENERAL             = "general"              # Notification générique
+
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    title: str = Field(max_length=200)
+    body: str = Field(max_length=500)
+    type: NotificationType = NotificationType.GENERAL
+    related_id: Optional[str] = None        # job_id ou message_id
+    related_type: Optional[str] = None      # "job", "message", etc.
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MarkReadRequest(BaseModel):
+    notification_ids: Optional[List[str]] = None  # None = marquer tout
+
 # Request/Response Models
 # Pattern pour détecter les tentatives d'injection SQL
 SQL_INJECTION_PATTERN = re.compile(r"['\";#\-\-]|(/\*)|(\*/)|(\bOR\b)|(\bAND\b)|(\bUNION\b)|(\bSELECT\b)|(\bDROP\b)|(\bINSERT\b)|(\bDELETE\b)|(\bUPDATE\b)", re.IGNORECASE)
@@ -865,6 +923,134 @@ class PushTokenCreate(BaseModel):
     push_token: str = Field(min_length=10, max_length=500)
     device_type: str = Field(min_length=2, max_length=50, pattern=r'^(ios|android|web)$')
     device_id: Optional[str] = Field(None, max_length=200)
+
+# ============================================================================
+# NOTIFICATION SERVICE — stockage in-app + envoi Web Push (VAPID)
+# ============================================================================
+
+async def store_notification(
+    user_id: str,
+    title: str,
+    body: str,
+    notif_type: NotificationType = NotificationType.GENERAL,
+    related_id: Optional[str] = None,
+    related_type: Optional[str] = None,
+) -> Notification:
+    """Persiste une notification en base et retourne l'objet créé."""
+    notif = Notification(
+        user_id=user_id,
+        title=title,
+        body=body,
+        type=notif_type,
+        related_id=related_id,
+        related_type=related_type,
+    )
+    await db.notifications.insert_one(notif.dict())
+    return notif
+
+
+async def send_web_push_to_user(user_id: str, title: str, body: str, data: Optional[dict] = None):
+    """Envoie une notification Web Push à tous les appareils actifs d'un utilisateur."""
+    if not WEBPUSH_AVAILABLE:
+        logger.debug("pywebpush non disponible, push ignoré")
+        return
+
+    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        logger.debug("Clés VAPID non configurées, push ignoré")
+        return
+
+    tokens = await db.push_tokens.find(
+        {"user_id": user_id, "active": True, "device_type": "web"}
+    ).to_list(length=None)
+
+    if not tokens:
+        return
+
+    payload_dict = {"title": title, "body": body}
+    if data:
+        payload_dict["data"] = data
+    payload_str = _json.dumps(payload_dict, ensure_ascii=False)
+
+    failed_token_ids = []
+    for token_doc in tokens:
+        subscription_info = token_doc.get("push_token")
+        if not subscription_info:
+            continue
+
+        # Le push_token pour le web est stocké comme une chaîne JSON
+        # représentant l'objet PushSubscription (endpoint + keys)
+        if isinstance(subscription_info, str):
+            try:
+                subscription_info = _json.loads(subscription_info)
+            except Exception:
+                logger.warning(f"Token push invalide pour user {user_id}, ignoré")
+                failed_token_ids.append(token_doc["id"])
+                continue
+
+        try:
+            webpush(
+                subscription_info=subscription_info,
+                data=payload_str,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={
+                    "sub": VAPID_CLAIMS_EMAIL,
+                    "exp": int((datetime.now(timezone.utc) + timedelta(hours=12)).timestamp()),
+                },
+            )
+        except WebPushException as exc:
+            status_code = getattr(exc.response, "status_code", None) if exc.response else None
+            if status_code in (404, 410):
+                # Token expiré / révoqué par le navigateur
+                failed_token_ids.append(token_doc["id"])
+                logger.info(f"Token push expiré pour user {user_id}, désactivé")
+            else:
+                logger.warning(f"WebPushException pour user {user_id}: {exc}")
+        except Exception as exc:
+            logger.warning(f"Erreur push pour user {user_id}: {exc}")
+
+    # Désactiver les tokens expirés
+    for tid in failed_token_ids:
+        await db.push_tokens.update_one(
+            {"id": tid},
+            {"$set": {"active": False, "updated_at": datetime.now(timezone.utc)}}
+        )
+
+
+async def notify_user(
+    user_id: str,
+    title: str,
+    body: str,
+    notif_type: NotificationType = NotificationType.GENERAL,
+    related_id: Optional[str] = None,
+    related_type: Optional[str] = None,
+    push_data: Optional[dict] = None,
+):
+    """
+    Fonction principale : stocke la notification en base ET envoie le push Web.
+    Silencieuse en cas d'erreur pour ne jamais bloquer un flux métier.
+    """
+    try:
+        await store_notification(
+            user_id=user_id,
+            title=title,
+            body=body,
+            notif_type=notif_type,
+            related_id=related_id,
+            related_type=related_type,
+        )
+    except Exception as exc:
+        logger.error(f"Erreur stockage notification pour {user_id}: {exc}")
+
+    try:
+        await send_web_push_to_user(
+            user_id=user_id,
+            title=title,
+            body=body,
+            data=push_data or ({"job_id": related_id} if related_id else None),
+        )
+    except Exception as exc:
+        logger.error(f"Erreur envoi push pour {user_id}: {exc}")
+
 
 # Utility Functions
 # Validation functions
@@ -2323,6 +2509,90 @@ async def delete_push_token(
         logger.error(f"Error deleting push token: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete push token")
 
+# ============================================================================
+# NOTIFICATION ROUTES
+# ============================================================================
+
+@api_router.get("/notifications/vapid-public-key")
+async def get_vapid_public_key():
+    """Retourne la clé VAPID publique pour que le frontend puisse s'abonner."""
+    if not VAPID_PUBLIC_KEY:
+        raise HTTPException(status_code=503, detail="Notifications push non configurées sur ce serveur")
+    return {"vapid_public_key": VAPID_PUBLIC_KEY}
+
+
+@api_router.get("/notifications")
+async def get_notifications(
+    limit: int = Query(default=50, ge=1, le=100),
+    unread_only: bool = Query(default=False),
+    current_user: User = Depends(get_current_user)
+):
+    """Récupère les notifications de l'utilisateur connecté (les plus récentes en premier)."""
+    query: dict = {"user_id": current_user.id}
+    if unread_only:
+        query["is_read"] = False
+
+    notifications = await db.notifications.find(query).sort("created_at", -1).to_list(limit)
+    unread_count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
+
+    return {
+        "notifications": [Notification(**n).dict() for n in notifications],
+        "unread_count": unread_count,
+        "total": len(notifications),
+    }
+
+
+@api_router.get("/notifications/unread-count")
+async def get_unread_count(current_user: User = Depends(get_current_user)):
+    """Retourne uniquement le compteur de notifications non lues (polling léger)."""
+    count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
+    return {"unread_count": count}
+
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Marque une notification spécifique comme lue."""
+    result = await db.notifications.update_one(
+        {"id": notification_id, "user_id": current_user.id},
+        {"$set": {"is_read": True}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification introuvable")
+    return {"message": "Notification marquée comme lue"}
+
+
+@api_router.put("/notifications/mark-all-read")
+async def mark_all_notifications_read(current_user: User = Depends(get_current_user)):
+    """Marque toutes les notifications de l'utilisateur comme lues."""
+    result = await db.notifications.update_many(
+        {"user_id": current_user.id, "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": f"{result.modified_count} notification(s) marquée(s) comme lue(s)", "updated": result.modified_count}
+
+
+@api_router.delete("/notifications/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Supprime une notification de l'utilisateur."""
+    result = await db.notifications.delete_one({"id": notification_id, "user_id": current_user.id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Notification introuvable")
+    return {"message": "Notification supprimée"}
+
+
+@api_router.delete("/notifications")
+async def delete_all_notifications(current_user: User = Depends(get_current_user)):
+    """Supprime toutes les notifications de l'utilisateur."""
+    result = await db.notifications.delete_many({"user_id": current_user.id})
+    return {"message": f"{result.deleted_count} notification(s) supprimée(s)", "deleted": result.deleted_count}
+
+
 # Worker Profile Routes
 @api_router.post("/workers/profile")
 async def create_worker_profile(
@@ -2586,6 +2856,20 @@ async def create_proposal(
     )
     
     await db.job_proposals.insert_one(proposal.dict())
+
+    # Notifier le client qu'une nouvelle proposition est arrivée
+    client_id = job.get("client_id")
+    if client_id:
+        worker_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Un travailleur"
+        asyncio.create_task(notify_user(
+            user_id=client_id,
+            title="Nouvelle proposition reçue",
+            body=f"{worker_name} a soumis une proposition pour « {job.get('title', 'votre mission')} »",
+            notif_type=NotificationType.PROPOSAL_RECEIVED,
+            related_id=job_id,
+            related_type="job",
+        ))
+
     return {"message": "Proposal submitted successfully"}
 
 class ProposalAcceptLocation(BaseModel):
@@ -2692,6 +2976,17 @@ async def accept_job_proposal(
         await db.messages.insert_one(auto_message.dict())
     except Exception as exc:
         logger.error(f"⚠️ Échec de l'envoi du message automatique d'acceptation: {exc}")
+
+    # Notifier le travailleur que sa proposition a été acceptée
+    client_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Le client"
+    asyncio.create_task(notify_user(
+        user_id=worker_id,
+        title="Proposition acceptée ! 🎉",
+        body=f"{client_name} a accepté votre proposition pour « {job.get('title', 'la mission')} »",
+        notif_type=NotificationType.PROPOSAL_ACCEPTED,
+        related_id=job_id,
+        related_type="job",
+    ))
 
     updated_job = await db.jobs.find_one({"id": job_id})
     return {
@@ -2868,6 +3163,33 @@ async def complete_job_and_release_payment(
         ).dict())
     except Exception as exc:
         logger.error(f"⚠️ Échec de l'envoi du message automatique de fin de mission: {exc}")
+
+    # Notifier le travailleur via push selon le statut du versement
+    if final_payout_status == "released":
+        push_body = f"Votre paiement de {worker_amount} FCFA pour « {job.get('title', 'la mission')} » a été envoyé."
+    elif final_payout_status == "releasing":
+        push_body = f"Votre paiement de {worker_amount} FCFA pour « {job.get('title', 'la mission')} » est en cours de traitement."
+    else:
+        push_body = f"Mission « {job.get('title', 'la mission')} » terminée. Versement à traiter manuellement."
+
+    asyncio.create_task(notify_user(
+        user_id=worker_id,
+        title="Mission terminée — Paiement en route 💰",
+        body=push_body,
+        notif_type=NotificationType.PAYMENT_RECEIVED,
+        related_id=job_id,
+        related_type="job",
+    ))
+
+    # Notifier le client que la mission est bien clôturée
+    asyncio.create_task(notify_user(
+        user_id=current_user.id,
+        title="Mission clôturée ✅",
+        body=f"La mission « {job.get('title', 'la mission')} » a été marquée comme terminée.",
+        notif_type=NotificationType.JOB_COMPLETED,
+        related_id=job_id,
+        related_type="job",
+    ))
 
     updated_job = await db.jobs.find_one({"id": job_id})
     return {
@@ -3867,6 +4189,40 @@ async def paydunya_payment_ipn(request: Request):
             update_fields['payout_status'] = 'held'
 
     await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
+
+    # Envoyer les notifications push si le paiement vient d'être confirmé
+    if local_status == 'completed':
+        job_id_for_notif = payment_record.get('job_id') or ''
+        amount_for_notif = int(payment_record.get('amount', 0) or 0)
+        payer_id = payment_record.get('payer_id')
+        receiver_id = payment_record.get('receiver_id')
+
+        # Récupérer le titre du job si disponible
+        job_title = "la mission"
+        if job_id_for_notif:
+            job_doc = await db.jobs.find_one({"id": job_id_for_notif}, {"title": 1})
+            if job_doc:
+                job_title = job_doc.get("title", "la mission")
+
+        if payer_id:
+            asyncio.create_task(notify_user(
+                user_id=payer_id,
+                title="Paiement confirmé ✅",
+                body=f"Votre paiement de {amount_for_notif} FCFA pour « {job_title} » a bien été reçu.",
+                notif_type=NotificationType.PAYMENT_CONFIRMED,
+                related_id=job_id_for_notif or None,
+                related_type="job" if job_id_for_notif else None,
+            ))
+        if receiver_id:
+            asyncio.create_task(notify_user(
+                user_id=receiver_id,
+                title="Paiement sécurisé 🔒",
+                body=f"Le client a payé {amount_for_notif} FCFA pour « {job_title} ». Fonds sécurisés jusqu'à la fin de la mission.",
+                notif_type=NotificationType.PAYMENT_RECEIVED,
+                related_id=job_id_for_notif or None,
+                related_type="job" if job_id_for_notif else None,
+            ))
+
     return {'status': 'ok'}
 
 async def compute_real_commission_stats() -> Dict[str, Any]:

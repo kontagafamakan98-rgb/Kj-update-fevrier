@@ -451,7 +451,24 @@ export const profileAPI = userAPI;
 export const profilesAPI = userAPI;
 export const workerAPI = createResourceApi('workers');
 export const workersAPI = workerAPI;
-export const notificationAPI = createResourceApi('notifications');
+export const notificationAPI = {
+  // Récupérer toutes les notifications (+ unread_count)
+  getAll: (params = {}) => api.get('/notifications', { params }),
+  // Compteur non-lus uniquement (polling léger)
+  getUnreadCount: () => api.get('/notifications/unread-count'),
+  // Clé VAPID publique pour l'abonnement push
+  getVapidPublicKey: () => api.get('/notifications/vapid-public-key'),
+  // Marquer une notification comme lue
+  markRead: (notificationId) => api.put(`/notifications/${notificationId}/read`),
+  // Marquer toutes comme lues
+  markAllRead: () => api.put('/notifications/mark-all-read'),
+  // Supprimer une notification
+  deleteOne: (notificationId) => api.delete(`/notifications/${notificationId}`),
+  // Supprimer toutes
+  deleteAll: () => api.delete('/notifications'),
+  // Enregistrer un push token (web subscription JSON)
+  registerPushToken: (payload) => api.post('/users/push-token', payload),
+};
 export const notificationsAPI = notificationAPI;
 export const reviewAPI = createResourceApi('reviews');
 export const reviewsAPI = reviewAPI;
