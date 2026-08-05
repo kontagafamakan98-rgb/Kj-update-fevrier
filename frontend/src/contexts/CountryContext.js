@@ -9,7 +9,7 @@ export const useCountry = () => {
 };
 
 export const CountryProvider = ({ children }) => {
-  const { user, updateUser } = useAuth();
+  const { user, loadUser } = useAuth();
   const [availableCountries, setAvailableCountries] = useState([]);
   const [loadingCountries, setLoadingCountries] = useState(true);
 
@@ -32,8 +32,8 @@ export const CountryProvider = ({ children }) => {
     if (!user) return false;
     try {
       await authAPI.updateCountry({ country: newCountry });
-      // Update local user state
-      updateUser({ ...user, country: newCountry });
+      // Recharger le profil depuis le backend pour mettre à jour l'état local
+      await loadUser();
       return true;
     } catch (error) {
       console.error('Error changing country:', error);

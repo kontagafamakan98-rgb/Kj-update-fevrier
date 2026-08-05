@@ -1,29 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
 import { useCountry } from '../contexts/CountryContext';
-import { useLanguage } from '../contexts/LanguageContext';
+import FlagIcon from './FlagIcon';
 
-/**
- * CountrySelector
- * Sélecteur de pays compact pour la Navbar.
- * Affiche le drapeau + nom court du pays actuel, ouvre un dropdown
- * avec les 4 pays disponibles. Owner : lecture seule (tous les pays).
- */
+const COUNTRIES = [
+  { id: 'senegal',      name: 'Sénégal' },
+  { id: 'mali',         name: 'Mali' },
+  { id: 'cote_divoire', name: "Côte d'Ivoire" },
+  { id: 'burkina_faso', name: 'Burkina Faso' },
+];
+
 export default function CountrySelector({ className = '' }) {
-  const { currentCountry, currentCountryDetails, availableCountries, changeUserCountry, isOwner } = useCountry();
-  const { t } = useLanguage();
+  const { currentCountry, changeUserCountry, isOwner } = useCountry();
   const [isOpen, setIsOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const dropdownRef = useRef(null);
-  const buttonRef = useRef(null);
+  const [saving, setSaving]  = useState(false);
+  const wrapperRef           = useRef(null);
+
+  const current = COUNTRIES.find(c => c.id === currentCountry) || COUNTRIES[0];
 
   // Fermer en cliquant dehors
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e) => {
-      if (
-        dropdownRef.current && !dropdownRef.current.contains(e.target) &&
-        buttonRef.current && !buttonRef.current.contains(e.target)
-      ) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setIsOpen(false);
       }
     };
@@ -40,102 +38,65 @@ export default function CountrySelector({ className = '' }) {
   }, [isOpen]);
 
   const handleSelect = async (countryId) => {
-    if (countryId === currentCountry || isOwner) return;
+    if (countryId === currentCountry) { setIsOpen(false); return; }
     setSaving(true);
     setIsOpen(false);
     const success = await changeUserCountry(countryId);
     setSaving(false);
-    if (success) {
-      // Recharger pour que le filtre pays des jobs soit immédiatement appliqué
-      window.location.reload();
-    }
-  };
-
-  // Owner : affichage sans interaction
-  if (isOwner) {
-    return (
-      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-sm text-gray-500 ${className}`} title="Owner : accès tous pays">
-        <span>🌍</span>
-        <span className="hidden lg:inline text-xs">Tous pays</span>
-      </div>
-    );
-  }
-
-  const shortName = (country) => {
-    const names = {
-      senegal: 'Sénégal',
-      mali: 'Mali',
-      cote_divoire: "Côte d'Ivoire",
-      burkina_faso: 'Burkina',
-    };
-    return names[country?.id] || country?.name || '';
+    if (success) window.location.reload();
   };
 
   return (
-    <div className={`relative ${className}`}>
-      {/* Bouton déclencheur */}
+    <div className={`relative ${className}`} ref={wrapperRef}>
+      {/* Bouton déclencheur — même style que LanguageSelector */}
       <button
-        ref={buttonRef}
-        onClick={() => setIsOpen((v) => !v)}
+        onClick={() => !isOwner && setIsOpen(v => !v)}
         disabled={saving}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label={`Pays actuel : ${currentCountryDetails?.name || currentCountry}. Cliquer pour changer.`}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-gray-200 bg-white hover:border-orange-400 hover:bg-orange-50 text-sm text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-60"
+        className="flex items-center space-x-2 px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-60"
       >
         {saving ? (
-          <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+          <span className="w-5 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin inline-block" />
         ) : (
-          <span className="text-base leading-none" aria-hidden="true">
-            {currentCountryDetails?.flag || '🌍'}
-          </span>
+          <FlagIcon country={current.id} className="w-5 h-4" showEmoji={false} />
         )}
-        <span className="hidden lg:inline font-medium text-xs">
-          {shortName(currentCountryDetails)}
-        </span>
-        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <span className="text-sm font-medium">{isOwner ? 'Tous les pays' : current.name}</span>
+        {!isOwner && (
+          <svg
+            className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown — même structure que LanguageSelector */}
       {isOpen && (
-        <ul
-          ref={dropdownRef}
-          role="listbox"
-          aria-label="Choisir un pays"
-          className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden py-1"
-        >
-          <li className="px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-            Votre pays
-          </li>
-          {availableCountries.map((country) => {
-            const isSelected = country.id === currentCountry;
-            return (
-              <li
-                key={country.id}
-                role="option"
-                aria-selected={isSelected}
-                onClick={() => handleSelect(country.id)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelect(country.id); }}
-                tabIndex={0}
-                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors text-sm
-                  ${isSelected
-                    ? 'bg-orange-50 text-orange-700 font-semibold'
-                    : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-              >
-                <span className="text-lg leading-none">{country.flag}</span>
-                <span className="flex-1">{country.name}</span>
-                {isSelected && (
-                  <svg className="w-4 h-4 text-orange-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+            <div className="py-1">
+              {COUNTRIES.map((country) => (
+                <button
+                  key={country.id}
+                  onClick={() => handleSelect(country.id)}
+                  className={`
+                    w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-3
+                    ${currentCountry === country.id ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}
+                  `}
+                >
+                  <FlagIcon country={country.id} className="w-5 h-4" showEmoji={false} />
+                  <span className="font-medium">{country.name}</span>
+                  {currentCountry === country.id && (
+                    <span className="ml-auto text-orange-600">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

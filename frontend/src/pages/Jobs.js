@@ -11,6 +11,7 @@ import { safeLog } from '../utils/env';
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser } from '../utils/jobPageSafeHelpers';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
+import CountrySelector from '../components/CountrySelector';
 
 function JobCard({ job, user, userType }) {
   const locationText = job.location_text || 'Localisation non précisée';
@@ -137,11 +138,15 @@ export default function Jobs() {
           </h1>
           <p className="mt-2 text-gray-600">{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
         </div>
-        {user?.user_type === 'client' && (
-          <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
-            {jobUi.createJob}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {/* Sélecteur de pays — visible uniquement sur cette page */}
+          <CountrySelector />
+          {user?.user_type === 'client' && (
+            <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
+              {jobUi.createJob}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
