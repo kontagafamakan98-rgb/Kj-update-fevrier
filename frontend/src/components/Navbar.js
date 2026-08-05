@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { isPWA } from '../utils/pwa';
 import LanguageSelector from './LanguageSelector';
 import NotificationDropdown from './NotificationDropdown';
+import CountrySelector from './CountrySelector';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -82,6 +83,8 @@ export default function Navbar() {
 
             {user ? (
               <div className="flex items-center space-x-4">
+                {/* Sélecteur de pays */}
+                <CountrySelector />
                 {/* Cloche notifications */}
                 <NotificationDropdown />
                 <Link to="/profile" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
@@ -144,6 +147,13 @@ export default function Navbar() {
                   <option value="mos">Mooré</option>
                 </select>
               </div>
+
+              {user && (
+                <div className="rounded-2xl border border-gray-200 px-3 py-3">
+                  <p className="block text-xs font-medium text-gray-500 mb-2">Votre pays</p>
+                  <CountrySelector className="w-full" />
+                </div>
+              )}
 
               {user ? (
                 <>
