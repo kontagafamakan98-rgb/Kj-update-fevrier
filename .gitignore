@@ -84,7 +84,12 @@ kojo-jobs-*-report.txt
 
 # Local data dumps / backups that should never live in the repo
 mongodb-data/
-/uploads/
+# Exclut le dossier uploads/ à N'IMPORTE QUEL niveau du repo (pas seulement
+# à la racine) - l'ancien pattern "/uploads/" avec le slash de tête n'excluait
+# QUE la racine et laissait passer backend/uploads/, qui est le dossier
+# réellement utilisé par server.py en prod (contient d'anciennes photos de
+# profil utilisateurs committées par erreur).
+uploads/
 backup_*/
 *_extract/
 kojo-emergency-backup*/
