@@ -12,7 +12,7 @@ const COPY = {
     setupTitle: 'État du gateway',
     configured: 'Passerelle configurée',
     notConfigured: 'Passerelle non configurée',
-    setupHelp: 'Ajoute les clés PayDunya côté backend avant le passage en prod.',
+    setupHelp: 'Le service de paiement est momentanément indisponible. Merci de réessayer un peu plus tard.',
     amount: 'Montant',
     country: 'Pays',
     method: 'Méthode',
@@ -56,7 +56,7 @@ const COPY = {
     setupTitle: 'Gateway status',
     configured: 'Gateway configured',
     notConfigured: 'Gateway not configured',
-    setupHelp: 'Add the PayDunya keys on the backend before going live.',
+    setupHelp: 'The payment service is temporarily unavailable. Please try again shortly.',
     amount: 'Amount',
     country: 'Country',
     method: 'Method',
@@ -92,7 +92,7 @@ const COPY = {
     setupTitle: 'Tolluwaay bi',
     configured: 'Gateway bi set na',
     notConfigured: 'Gateway bi setuwoonul',
-    setupHelp: 'Yokk keys yi ci backend bi bala ngaa dem production.',
+    setupHelp: 'Service wanewu bii dafa ñàkk ci waxtu bii. Ndeysaan delluwaatal ci kaw.',
     amount: 'Monto',
     country: 'Réew',
     method: 'Yoonu fey',
@@ -128,7 +128,7 @@ const COPY = {
     setupTitle: 'Gateway jɔyɔrɔ',
     configured: 'Gateway labɛnnen don',
     notConfigured: 'Gateway ma labɛnnen tɛ',
-    setupHelp: 'PayDunya keys fara backend la ka kɛ production ye.',
+    setupHelp: 'Wari sarali kɛlan tɛ se sisan. I ka segin ka a lajɛ dɔɔni kɔfɛ.',
     amount: 'Jate',
     country: 'Jamana',
     method: 'Sariya-faga fɛɛrɛ',
@@ -164,7 +164,7 @@ const COPY = {
     setupTitle: 'Gateway bãngre',
     configured: 'Gateway sigd n be',
     notConfigured: 'Gateway sigd ka beoogre',
-    setupHelp: 'Yɩ PayDunya keys backend pʋgẽ ninsaal bala production.',
+    setupHelp: 'Yaool-yaoolem koɛɛg-koɛɛgo ka be zĩ-zãnga. Y sã n maan sõma, y le maane a poore.',
     amount: 'Sõor',
     country: 'Tẽng',
     method: 'Paoongo sõngre',
@@ -231,7 +231,10 @@ const Payment = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
-    amount: jobPaymentContext?.amount || 25000,
+    // Plus de valeur "démo" (25000) codée en dur : sans contexte de mission,
+    // le montant part de 0 plutôt que de suggérer un chiffre arbitraire qui
+    // n'a de sens pour personne.
+    amount: jobPaymentContext?.amount || 0,
     country: 'senegal',
     method: 'orange_money'
   });
@@ -395,10 +398,10 @@ const Payment = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="block">
-                <label htmlFor="payment_demo_amount" className="text-sm font-medium text-gray-700">{copy.amount}</label>
+                <label htmlFor="payment_amount" className="text-sm font-medium text-gray-700">{copy.amount}</label>
                 <input
-                  id="payment_demo_amount"
-                  name="payment_demo_amount"
+                  id="payment_amount"
+                  name="payment_amount"
                   type="number"
                   autoComplete="off"
                   min="500"
@@ -411,10 +414,10 @@ const Payment = () => {
               </div>
 
               <div className="block">
-                <label htmlFor="payment_demo_country" className="text-sm font-medium text-gray-700">{copy.country}</label>
+                <label htmlFor="payment_country" className="text-sm font-medium text-gray-700">{copy.country}</label>
                 <select
-                  id="payment_demo_country"
-                  name="payment_demo_country"
+                  id="payment_country"
+                  name="payment_country"
                   autoComplete="off"
                   value={form.country}
                   onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value }))}
@@ -427,10 +430,10 @@ const Payment = () => {
               </div>
 
               <div className="block">
-                <label htmlFor="payment_demo_method" className="text-sm font-medium text-gray-700">{copy.method}</label>
+                <label htmlFor="payment_method_select" className="text-sm font-medium text-gray-700">{copy.method}</label>
                 <select
-                  id="payment_demo_method"
-                  name="payment_demo_method"
+                  id="payment_method_select"
+                  name="payment_method_select"
                   autoComplete="off"
                   value={form.method}
                   onChange={(e) => setForm((prev) => ({ ...prev, method: e.target.value }))}
@@ -479,11 +482,14 @@ const Payment = () => {
 
             {!providerConfig?.configured && (
               <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5">
-                <h3 className="font-semibold text-amber-900 mb-2">{copy.backendSetup}</h3>
-                <ul className="list-disc list-inside text-sm text-amber-800 space-y-1">
-                  {copy.backendItems.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-                <p className="text-sm text-amber-700 mt-3">{copy.setupHelp}</p>
+                {/* Message générique pour les utilisateurs : les noms de
+                    variables d'environnement backend (PAYDUNYA_MASTER_KEY,
+                    etc.) ne doivent jamais apparaître dans une UI destinée
+                    aux clients/travailleurs - ça n'a de sens que pour
+                    l'équipe technique, qui a de toute façon accès aux logs
+                    et à la config Render directement. */}
+                <h3 className="font-semibold text-amber-900 mb-2">{copy.notConfigured}</h3>
+                <p className="text-sm text-amber-700">{copy.setupHelp}</p>
               </div>
             )}
           </div>

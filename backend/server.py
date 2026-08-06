@@ -3417,6 +3417,25 @@ async def paydunya_disburse_ipn(request: Request):
     return {'status': 'ok'}
 
 
+@api_router.get("/proposals/mine")
+async def get_my_proposals(current_user: User = Depends(get_current_user)):
+    """
+    Liste des propositions envoyées par le travailleur connecté, tous jobs
+    confondus - permet au frontend d'afficher fiablement "déjà postulé" en
+    se basant sur des données serveur, au lieu d'un simple marqueur
+    localStorage (qui se perd en changeant d'appareil/navigateur ou en
+    vidant le cache, ce qui laissait l'utilisateur postuler une 2e fois et
+    tomber sur une erreur "vous avez déjà postulé").
+    """
+    if current_user.user_type != UserType.WORKER:
+        return []
+
+    proposals = await db.job_proposals.find(
+        {"worker_id": current_user.id},
+        {"_id": 0, "job_id": 1, "status": 1, "proposed_amount": 1, "created_at": 1}
+    ).to_list(500)
+    return proposals
+
 @api_router.get("/jobs/{job_id}/proposals")
 async def get_job_proposals(
     job_id: str,

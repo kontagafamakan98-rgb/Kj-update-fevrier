@@ -269,6 +269,7 @@ export const jobsAPI = {
   getApplications: (jobId) => api.get(`/jobs/${jobId}/proposals`),
   getProposals: (jobId) => api.get(`/jobs/${jobId}/proposals`),
   acceptProposal: (jobId, proposalId, payload = {}) => api.post(`/jobs/${jobId}/proposals/${proposalId}/accept`, payload),
+  getMyProposals: () => api.get('/proposals/mine'),
   completeJob: (jobId) => api.post(`/jobs/${jobId}/complete`),
   getPaymentStatus: (jobId) => api.get(`/jobs/${jobId}/payment-status`),
 };
