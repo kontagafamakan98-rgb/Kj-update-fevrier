@@ -195,13 +195,46 @@ async def create_database_indexes():
         await db.push_tokens.create_index("id", unique=True)
         await db.push_tokens.create_index("user_id")
         await db.push_tokens.create_index([("user_id", 1), ("active", 1)])
-        
+
+        # TTL index: Mongo purge automatiquement les tokens révoqués une fois
+        # leur date d'expiration naturelle (expire_at) atteinte - la collection
+        # de révocation reste donc de taille bornée sans job de nettoyage manuel.
+        await db.revoked_tokens.create_index("jti", unique=True)
+        await db.revoked_tokens.create_index("expire_at", expireAfterSeconds=0)
+
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:
         logger.warning(f"⚠️ Error creating indexes (may already exist): {e}")
 
 # JWT Settings - Enhanced Security
-JWT_SECRET = os.environ.get('JWT_SECRET', 'kojo-prod-secret-2025-afrique-ouest-' + str(uuid.uuid4()))
+# IMPORTANT: JWT_SECRET must be a FIXED value set via the JWT_SECRET env var on
+# Render. If it's missing, every process/worker/restart used to generate its
+# own random secret (uuid4()) - this silently invalidated ALL existing user
+# sessions on every deploy/restart, and caused random auth failures whenever
+# more than one worker process was running (each with a different secret).
+APP_ENV = os.environ.get("APP_ENV", "production").strip().lower()
+_env_jwt_secret = os.environ.get('JWT_SECRET', '').strip()
+
+if _env_jwt_secret:
+    JWT_SECRET = _env_jwt_secret
+elif APP_ENV in ("production", "prod"):
+    # Fail fast and loud rather than silently issuing tokens that won't
+    # validate after the next restart or on a different worker.
+    raise RuntimeError(
+        "JWT_SECRET environment variable is not set. Refusing to start in "
+        "production with an auto-generated secret, since that would silently "
+        "invalidate all user sessions on every restart/deploy and break auth "
+        "across multiple worker processes. Set JWT_SECRET on Render (a long "
+        "random string) and redeploy."
+    )
+else:
+    # Local/dev only: stable fallback so tokens survive local restarts.
+    JWT_SECRET = 'kojo-dev-only-insecure-secret-do-not-use-in-prod'
+    logger.warning(
+        "⚠️ JWT_SECRET not set - using an insecure fixed dev secret. "
+        "This is only acceptable outside production (APP_ENV=%s).", APP_ENV
+    )
+
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 JWT_REFRESH_EXPIRATION_DAYS = 7
@@ -280,24 +313,75 @@ app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Rate limiting simple pour protection (West Africa specific)
+#
+# NOTE (limitation connue): ce compteur vit en mémoire du process Python.
+# Si Render fait tourner plusieurs workers/instances, chaque process a son
+# propre compteur -> la limite globale réelle est max_requests * (nb workers),
+# pas max_requests. Une correction complète nécessiterait un store partagé
+# (ex: Redis) entre workers, ce qui est un changement d'infra (nouvel add-on
+# Render), pas juste un changement de code - à évaluer séparément si le
+# service tourne avec plusieurs workers/instances.
+#
+# Ce qui EST corrigé ici : la fuite mémoire. Avant, chaque IP:bucket vue une
+# fois restait indéfiniment dans le dict (avec une liste vide), même après
+# expiration de sa fenêtre - sur un serveur qui tourne des mois face à du
+# scan/bot traffic, ça grossissait sans limite. Maintenant : (1) les clés
+# devenues vides sont supprimées immédiatement, (2) une purge périodique
+# tourne en tâche de fond, (3) une taille max sert de garde-fou.
 from collections import defaultdict
 import time
 
-# Stockage simple en mémoire pour rate limiting
-request_counts = defaultdict(list)
+request_counts: Dict[str, List[float]] = defaultdict(list)
+RATE_LIMIT_MAX_TRACKED_KEYS = 50_000  # garde-fou anti-DoS mémoire
 
 def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: int = 1) -> bool:
-    """Vérification simple du rate limiting"""
+    """Vérification simple du rate limiting (en mémoire, par process)"""
     now = time.time()
     window_start = now - (window_minutes * 60)
 
-    request_counts[client_ip] = [req_time for req_time in request_counts[client_ip] if req_time > window_start]
+    recent = [req_time for req_time in request_counts.get(client_ip, []) if req_time > window_start]
 
-    if len(request_counts[client_ip]) >= max_requests:
+    if len(recent) >= max_requests:
+        request_counts[client_ip] = recent
         return False
 
-    request_counts[client_ip].append(now)
+    recent.append(now)
+    request_counts[client_ip] = recent
+
+    # Garde-fou: si le dict grossit anormalement (ex: attaque par IP spoofing/
+    # cycling), on vide les entrées les plus anciennes plutôt que de laisser
+    # la mémoire grossir indéfiniment.
+    if len(request_counts) > RATE_LIMIT_MAX_TRACKED_KEYS:
+        _purge_stale_rate_limit_entries(max_age_seconds=300)
+
     return True
+
+def _purge_stale_rate_limit_entries(max_age_seconds: int = 3600) -> int:
+    """Supprime du dict les clés dont toutes les requêtes sont expirées.
+    Retourne le nombre de clés supprimées."""
+    now = time.time()
+    cutoff = now - max_age_seconds
+    stale_keys = [
+        key for key, timestamps in request_counts.items()
+        if not timestamps or max(timestamps) < cutoff
+    ]
+    for key in stale_keys:
+        del request_counts[key]
+    return len(stale_keys)
+
+async def _rate_limit_cleanup_loop():
+    """Tâche de fond: purge les entrées de rate-limit inactives toutes les
+    10 minutes pour borner l'usage mémoire sur un process longue durée."""
+    while True:
+        try:
+            await asyncio.sleep(600)
+            removed = _purge_stale_rate_limit_entries(max_age_seconds=3600)
+            if removed:
+                logger.info(f"🧹 Rate-limit cleanup: {removed} entrées inactives purgées")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur cleanup rate-limit: {e}")
 
 def get_client_ip(request: Request) -> str:
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
@@ -413,7 +497,10 @@ async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depend
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
         email = payload.get("email")
-        
+
+        if await is_token_revoked(payload.get("jti")):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token révoqué")
+
         # Vérification stricte: seul Famakan Kontaga Master a accès
         if user_id != OWNER_USER_ID or email != OWNER_EMAIL:
             raise HTTPException(
@@ -1386,9 +1473,38 @@ def sanitize_input_string(input_str: str, field_name: str = "field") -> str:
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
-    to_encode.update({"exp": expire})
+    # jti = identifiant unique du token, nécessaire pour pouvoir le révoquer
+    # individuellement (ex: au logout) sans invalider tous les autres tokens
+    # de l'utilisateur ni changer JWT_SECRET.
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
+
+async def revoke_token(jti: str, expire_at: datetime):
+    """Ajoute un token à la liste noire jusqu'à sa date d'expiration naturelle."""
+    if not jti:
+        return
+    try:
+        await db.revoked_tokens.update_one(
+            {"jti": jti},
+            {"$set": {"jti": jti, "expire_at": expire_at, "revoked_at": datetime.now(timezone.utc)}},
+            upsert=True
+        )
+    except Exception as e:
+        logger.error(f"⚠️ Impossible d'enregistrer la révocation du token: {e}")
+
+async def is_token_revoked(jti: Optional[str]) -> bool:
+    if not jti:
+        return False
+    try:
+        revoked = await db.revoked_tokens.find_one({"jti": jti}, {"_id": 1})
+        return revoked is not None
+    except Exception as e:
+        # En cas de panne de la vérification de révocation, on choisit de ne
+        # PAS bloquer tous les utilisateurs (fail-open) - la vérification de
+        # signature/expiration JWT reste, elle, toujours appliquée.
+        logger.error(f"⚠️ Erreur vérification révocation token: {e}")
+        return False
 
 def gmail_is_configured() -> bool:
     return all([
@@ -1735,7 +1851,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user_id: str = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
+
+        if await is_token_revoked(payload.get("jti")):
+            raise HTTPException(status_code=401, detail="Token revoked")
+
         user = await db.users.find_one({"id": user_id})
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
@@ -2215,12 +2334,26 @@ async def login_user(credentials: UserLogin):
     }
 
 @api_router.post("/auth/logout")
-async def logout_user(current_user: User = Depends(get_current_user)):
+async def logout_user(
+    current_user: User = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
     """
     Déconnexion de l'utilisateur.
-    Note: Avec JWT, la déconnexion est gérée côté client en supprimant le token.
-    Cet endpoint est fourni pour la compatibilité et pour loguer les déconnexions.
+    Le token présenté est ajouté à une liste noire (db.revoked_tokens) jusqu'à
+    sa date d'expiration naturelle, afin qu'il ne puisse plus être réutilisé
+    même s'il a été intercepté avant le logout.
     """
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        jti = payload.get("jti")
+        exp_timestamp = payload.get("exp")
+        if jti and exp_timestamp:
+            expire_at = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+            await revoke_token(jti, expire_at)
+    except jwt.InvalidTokenError:
+        pass  # token déjà invalide/expiré, rien à révoquer
+
     logger.info(f"User {current_user.email} logged out")
     return {"message": "Logout successful", "status": "success"}
 
@@ -2302,8 +2435,11 @@ async def upload_profile_photo(
         }
 
     except Exception as e:
+        # Détail complet loggé côté serveur uniquement - on ne renvoie jamais
+        # le message d'erreur brut d'un service tiers (Cloudinary) au client,
+        # ça peut exposer des détails d'infra/config non destinés au public.
         logger.error(f"Erreur upload photo Cloudinary: {e}")
-        raise HTTPException(status_code=500, detail=f"Cloudinary upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Échec de l'envoi de la photo. Veuillez réessayer.")
 
 @api_router.get("/users/profile-photo")
 async def get_current_user_profile_photo(current_user: User = Depends(get_current_user)):
@@ -4583,10 +4719,35 @@ allowed_origins = WEST_AFRICA_ORIGINS + env_origins
 # Support public Vercel deployments and common development/private network origins.
 # Exact origins from CORS_ORIGINS remain supported via allow_origins.
 TRUSTED_HOSTS = build_trusted_hosts()
-ENABLE_TRUSTED_HOST_MIDDLEWARE = os.environ.get('ENABLE_TRUSTED_HOST_MIDDLEWARE', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+# Activé par défaut désormais: build_trusted_hosts() couvre déjà localhost,
+# *.onrender.com, *.vercel.app et toute origine dérivée de FRONTEND_APP_URL /
+# BACKEND_PUBLIC_URL / CORS_ORIGINS / TRUSTED_HOSTS, donc le risque de casser
+# l'auth Render/Vercel est faible. Garde-fou de secours: mettre
+# DISABLE_TRUSTED_HOST_MIDDLEWARE=true sur Render pour revenir à l'ancien
+# comportement (désactivé) sans toucher au code, en cas de souci imprévu.
+ENABLE_TRUSTED_HOST_MIDDLEWARE = os.environ.get('DISABLE_TRUSTED_HOST_MIDDLEWARE', '').strip().lower() not in {'1', 'true', 'yes', 'on'}
+# VERCEL_PROJECT_NAME (recommandé): si défini, restreint le CORS aux seules
+# preview/production deployments DU PROJET Vercel de Kojo
+# (ex: kojo-frontend-*.vercel.app), au lieu d'accepter N'IMPORTE QUEL
+# sous-domaine *.vercel.app - y compris ceux d'un projet Vercel gratuit
+# créé par un tiers. allow_credentials=True + un motif aussi large que
+# *.vercel.app est une surface d'attaque évitable. Tant que la variable
+# n'est pas configurée sur Render, on retombe sur l'ancien motif large
+# (pas de régression fonctionnelle immédiate) mais un avertissement est loggé.
+_vercel_project_name = os.environ.get('VERCEL_PROJECT_NAME', '').strip()
+if _vercel_project_name:
+    _vercel_origin_pattern = rf"^https://{re.escape(_vercel_project_name)}(-[a-z0-9-]+)?\.vercel\.app$"
+else:
+    _vercel_origin_pattern = r"^https://.*\.vercel\.app$"
+    logger.warning(
+        "⚠️ VERCEL_PROJECT_NAME non défini - CORS accepte tout sous-domaine "
+        "*.vercel.app (pas seulement ceux du projet Kojo). Définir "
+        "VERCEL_PROJECT_NAME sur Render pour restreindre correctement."
+    )
+
 allowed_origin_regex = (
-    r"^https://.*\.vercel\.app$"
-    r"|^http://localhost(:\d+)?$"
+    _vercel_origin_pattern
+    + r"|^http://localhost(:\d+)?$"
     r"|^https://localhost(:\d+)?$"
     r"|^http://127\.0\.0\.1(:\d+)?$"
     r"|^http://192\.168\.\d+\.\d+(:\d+)?$"
@@ -4648,7 +4809,11 @@ async def startup_event():
     uploads_dir = Path("uploads")
     uploads_dir.mkdir(exist_ok=True)
     logger.info("📁 Dossier uploads créé/vérifié")
-    
+
+    # Purge périodique du compteur de rate-limiting (voir commentaire au-dessus
+    # de request_counts) pour éviter une fuite mémoire sur un process longue durée
+    asyncio.create_task(_rate_limit_cleanup_loop())
+
     logger.info("✅ API Kojo prête!")
 
 @app.on_event("shutdown")
