@@ -4702,6 +4702,11 @@ app.include_router(api_router)
 
 # Serve uploaded files under /api prefix for proper Kubernetes ingress routing
 from fastapi.staticfiles import StaticFiles
+# Le dossier doit exister AVANT le mount, car StaticFiles() vérifie sa présence
+# immédiatement au chargement du module (avant même l'événement de démarrage
+# de l'app) - sur un déploiement Render tout frais / après un git-filter-repo,
+# le dossier n'existe plus dans le repo cloné, donc on le (re)crée ici.
+os.makedirs("uploads", exist_ok=True)
 app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS Configuration optimized for West Africa
