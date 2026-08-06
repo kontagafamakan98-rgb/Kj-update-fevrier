@@ -15,6 +15,7 @@ export default function Messages() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
+  const lastMessageCountRef = useRef(0);
 
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
@@ -25,26 +26,61 @@ export default function Messages() {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Ne fait défiler vers le bas que si de VRAIS nouveaux messages sont
+    // arrivés (pas à chaque poll silencieux qui ne change rien) - sinon un
+    // utilisateur remonté lire d'anciens messages serait ramené en bas
+    // toutes les 5 secondes.
+    if (messages.length > lastMessageCountRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    lastMessageCountRef.current = messages.length;
   }, [messages]);
 
-  const loadConversations = async () => {
+  // Rafraîchissement automatique (polling) : sans ça, un message envoyé par
+  // l'autre personne pendant que la conversation est ouverte n'apparaissait
+  // jamais tant qu'on ne rechargeait pas la page manuellement.
+  useEffect(() => {
+    if (!activeConversation) return undefined;
+    const intervalId = setInterval(() => {
+      loadMessages(activeConversation, activeConversationData, { silent: true });
+    }, 5000);
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversation]);
+
+  // Rafraîchit la liste des conversations (aperçus + ordre) même quand
+  // aucune conversation n'est ouverte, pour voir arriver un nouveau message.
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      loadConversations({ silent: true });
+    }, 15000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  const loadConversations = async ({ silent = false } = {}) => {
     try {
       const data = await messagesAPI.getConversations();
       setConversations(data);
     } catch (error) {
       safeLog.error('Error loading conversations:', handleApiError(error));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
-  const loadMessages = async (conversationId, conversationData) => {
+  const loadMessages = async (conversationId, conversationData, { silent = false } = {}) => {
     try {
       const data = await messagesAPI.getMessages(conversationId);
+      if (!silent) {
+        // Nouvelle conversation ouverte : on veut toujours défiler en bas au
+        // premier chargement, quelle que soit la taille de la précédente.
+        lastMessageCountRef.current = 0;
+      }
       setMessages(data);
-      setActiveConversation(conversationId);
-      setActiveConversationData(conversationData);
+      if (!silent) {
+        setActiveConversation(conversationId);
+        setActiveConversationData(conversationData);
+      }
     } catch (error) {
       safeLog.error('Error loading messages:', handleApiError(error));
     }

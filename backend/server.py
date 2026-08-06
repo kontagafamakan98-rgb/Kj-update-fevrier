@@ -157,10 +157,17 @@ async def create_database_indexes():
         await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
         
         # Messages collection indexes
+        # NOTE: les index précédents portaient sur "job_id" et "created_at",
+        # deux champs qui n'existent pas sur le modèle Message (id,
+        # conversation_id, sender_id, receiver_id, content, timestamp, read)
+        # - ces index ne servaient donc à rien. "conversation_id", lui,
+        # est utilisé dans quasiment toutes les requêtes messages et n'était
+        # pas indexé du tout (full collection scan à chaque conversation
+        # ouverte).
         await db.messages.create_index("id", unique=True)
-        await db.messages.create_index("job_id")
         await db.messages.create_index([("sender_id", 1), ("receiver_id", 1)])
-        await db.messages.create_index([("created_at", -1)])
+        await db.messages.create_index([("conversation_id", 1), ("timestamp", 1)])
+        await db.messages.create_index([("timestamp", -1)])
         
         # Commissions collection indexes
         await db.commissions.create_index("id", unique=True)
@@ -3350,34 +3357,60 @@ async def complete_job_and_release_payment(
 @api_router.post('/payments/disburse-ipn')
 async def paydunya_disburse_ipn(request: Request):
     """Callback asynchrone PayDunya pour confirmer le statut final d'un
-    versement (utile notamment quand submit-invoice a renvoye 'pending')."""
+    versement (utile notamment quand submit-invoice a renvoye 'pending').
+
+    SECURITE: comme pour l'IPN de collecte, on ne fait pas confiance au
+    statut envoyé dans le payload du callback - on reconfirme auprès de
+    PayDunya via check-status, en utilisant le disburse_token retrouvé côté
+    serveur (jamais celui du payload) pour identifier quel enregistrement
+    mettre à jour.
+    """
     try:
         payload = await request.json()
     except Exception:
         payload = {}
 
-    disburse_token = payload.get('token') or payload.get('disburse_invoice')
-    provider_status = str(payload.get('status') or '').strip().lower()
-
-    if not disburse_token:
+    disburse_token_hint = payload.get('token') or payload.get('disburse_invoice')
+    if not disburse_token_hint:
         return {'status': 'ignored'}
 
-    payment_record = await db.payments.find_one({'disburse_token': disburse_token})
+    payment_record = await db.payments.find_one({'disburse_token': disburse_token_hint})
     if not payment_record:
         return {'status': 'ignored'}
 
+    # Le disburse_token utilisé pour la vérification vient TOUJOURS de
+    # l'enregistrement trouvé en base, pas du payload reçu.
+    real_disburse_token = payment_record.get('disburse_token')
+    try:
+        check_result = check_paydunya_disburse_status(real_disburse_token)
+    except Exception as exc:
+        logger.error(f"⚠️ Échec de vérification IPN décaissement PayDunya: {exc}")
+        return {'status': 'error', 'detail': 'verification failed'}
+
+    # Meme convention de parsing que submit_paydunya_disburse_invoice (deja
+    # utilisee ailleurs dans ce fichier pour cette meme famille d'API PayDunya).
+    provider_status = str(
+        check_result.get("status")
+        or ("success" if str(check_result.get("response_code")) == "00" else "")
+    ).strip().lower()
+
     if provider_status == 'success':
         payout_status = 'released'
-    elif provider_status == 'failed':
+    elif provider_status == 'pending':
+        payout_status = 'releasing'
+    elif provider_status:
         payout_status = 'release_failed'
     else:
-        payout_status = 'releasing'
+        # Reponse PayDunya inattendue/non concluante: on ne change rien
+        # plutot que de deviner, un prochain check-status/IPN confirmera.
+        return {'status': 'inconclusive'}
 
     await db.payments.update_one(
         {'id': payment_record['id']},
         {'$set': {
             'payout_status': payout_status,
             'disburse_callback_payload': payload,
+            'disburse_verified_payload': check_result,
             'updated_at': datetime.now(timezone.utc).isoformat()
         }}
     )
@@ -3498,7 +3531,7 @@ async def get_all_messages(current_user: User = Depends(get_current_user)):
             {"sender_id": current_user.id},
             {"receiver_id": current_user.id}
         ]
-    }, {"_id": 0}).sort("created_at", -1).to_list(100)
+    }, {"_id": 0}).sort("timestamp", -1).to_list(100)
     return messages
 
 @api_router.get("/messages/conversations")
@@ -3511,6 +3544,12 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
                 {"receiver_id": current_user.id}
             ]
         }},
+        # IMPORTANT: $group avec $last/$first dépend de l'ORDRE dans lequel
+        # les documents arrivent au stage - sans ce $sort explicite juste
+        # avant, MongoDB ne garantit PAS que "$last" corresponde réellement
+        # au message le plus récent (l'aperçu affiché pouvait donc être un
+        # message au hasard, pas le dernier envoyé).
+        {"$sort": {"timestamp": 1}},
         {"$group": {
             "_id": "$conversation_id",
             "last_message": {"$last": "$content"},
@@ -3559,8 +3598,12 @@ async def get_conversation_messages(
     conversation_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    # Verify user is part of conversation
-    if current_user.id not in conversation_id:
+    # Verify user is part of conversation. conversation_id est formaté
+    # "{id1}_{id2}" - on compare les IDs exacts après split, pas une
+    # recherche de sous-chaîne ("in") qui pouvait matcher par accident si
+    # l'ID d'un utilisateur apparaissait comme fragment d'un autre.
+    participant_ids = conversation_id.split("_")
+    if current_user.id not in participant_ids:
         raise HTTPException(status_code=403, detail="Access denied")
     
     messages = await db.messages.find({
@@ -4053,6 +4096,12 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
 
     if local_status == 'completed' and not payment_record.get('completed_at'):
         update_fields['completed_at'] = datetime.now(timezone.utc).isoformat()
+        # payout_status suit l'etat du versement au TRAVAILLEUR, separement du
+        # statut de la collecte. Initialise seulement s'il n'a jamais ete
+        # defini, pour ne pas ecraser 'released'/'releasing' en cas de
+        # reconfirmation d'un paiement deja traite plus loin dans le flux.
+        if not payment_record.get('payout_status'):
+            update_fields['payout_status'] = 'held'
 
     await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
     latest = await db.payments.find_one({'id': payment_record['id']})
@@ -4189,16 +4238,57 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
     if not is_paydunya_configured():
         raise HTTPException(status_code=503, detail="PayDunya n'est pas encore configuré en production")
 
+    # SECURITE: le montant, le job et le travailleur ne sont plus pris tels
+    # quels depuis la requête client (n'importe quel utilisateur pouvait
+    # auparavant envoyer un montant arbitraire, sans rapport avec le prix
+    # réellement convenu sur la mission). Si un job_id est fourni, tout est
+    # dérivé côté serveur à partir du job et de sa proposition acceptée :
+    # - seul le client propriétaire du job peut lancer un paiement pour lui
+    # - le montant est celui de la proposition acceptée (proposed_amount),
+    #   pas une valeur libre envoyée par le front-end
+    # - le worker_id est celui réellement assigné à la mission
+    job = None
+    resolved_amount = request.amount
+    resolved_worker_id = request.worker_id or ''
+
+    if request.job_id:
+        job = await db.jobs.find_one({"id": request.job_id, "deleted": {"$ne": True}})
+        if not job:
+            raise HTTPException(status_code=404, detail="Mission introuvable")
+
+        is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+        if job.get("client_id") != current_user.id and not is_owner_user:
+            raise HTTPException(status_code=403, detail="Seul le client à l'origine de cette mission peut lancer son paiement")
+
+        assigned_worker_id = job.get("assigned_worker_id")
+        if not assigned_worker_id:
+            raise HTTPException(status_code=400, detail="Aucun travailleur n'a encore été attribué à cette mission")
+        resolved_worker_id = assigned_worker_id
+
+        accepted_proposal_id = job.get("accepted_proposal_id")
+        accepted_proposal = (
+            await db.job_proposals.find_one({"id": accepted_proposal_id, "job_id": request.job_id})
+            if accepted_proposal_id else None
+        )
+        if accepted_proposal and accepted_proposal.get("proposed_amount"):
+            resolved_amount = float(accepted_proposal["proposed_amount"])
+        elif job.get("budget_max") or job.get("budget_min"):
+            # Filet de sécurité si la proposition n'a pas de montant exploitable :
+            # on retombe sur le budget de la mission plutôt que sur l'input client.
+            resolved_amount = float(job.get("budget_max") or job.get("budget_min"))
+        else:
+            raise HTTPException(status_code=400, detail="Impossible de déterminer le montant à payer pour cette mission")
+
     normalized_country = normalize_payment_country(request.country or current_user.country)
     channel = get_paydunya_channel(request.payment_method.value, normalized_country)
-    breakdown = calculate_payment_breakdown(request.amount)
+    breakdown = calculate_payment_breakdown(resolved_amount)
 
     payment_record = {
         'id': str(uuid.uuid4()),
         'job_id': request.job_id or '',
         'payer_id': current_user.id,
-        'receiver_id': request.worker_id or '',
-        'amount': round(request.amount),
+        'receiver_id': resolved_worker_id,
+        'amount': round(resolved_amount),
         'payment_method': request.payment_method.value,
         'status': 'pending',
         'country': normalized_country,
@@ -4302,6 +4392,21 @@ async def get_my_payments(current_user: User = Depends(get_current_user)):
 
 @api_router.post('/payments/ipn/paydunya')
 async def paydunya_payment_ipn(request: Request):
+    """
+    Callback IPN PayDunya (endpoint public, non authentifié - c'est le
+    fonctionnement normal d'un webhook).
+
+    SECURITE: on ne fait JAMAIS confiance au statut envoyé dans le payload
+    reçu ici - n'importe qui connaissant/obtenant un payment_id ou
+    invoice_token (ex: le payeur lui-même, à qui ces valeurs sont
+    légitimement renvoyées lors du checkout) pourrait sinon forger une
+    requête déclarant un paiement "completed" sans jamais avoir payé, ce
+    qui débloquerait ensuite un vrai décaissement vers le travailleur.
+    Le payload ne sert donc qu'à IDENTIFIER quel paiement re-vérifier ; le
+    statut réel est systématiquement reconfirmé auprès de l'API PayDunya
+    elle-même via sync_payment_status_with_paydunya(), à partir du
+    invoice_token stocké côté serveur (jamais celui du payload).
+    """
     try:
         payload = await request.json()
     except Exception:
@@ -4310,36 +4415,27 @@ async def paydunya_payment_ipn(request: Request):
     invoice_data = payload.get('invoice', {}) if isinstance(payload, dict) else {}
     custom_data = payload.get('custom_data', {}) if isinstance(payload, dict) else {}
     payment_id = custom_data.get('payment_id') or payload.get('payment_id')
-    invoice_token = invoice_data.get('token') or payload.get('token')
-    provider_status = invoice_data.get('status') or payload.get('status')
+    invoice_token_hint = invoice_data.get('token') or payload.get('token')
 
-    query = {'id': payment_id} if payment_id else {'invoice_token': invoice_token}
+    query = {'id': payment_id} if payment_id else ({'invoice_token': invoice_token_hint} if invoice_token_hint else None)
     payment_record = await db.payments.find_one(query) if query else None
     if not payment_record:
         return {'status': 'ignored'}
 
-    local_status = map_paydunya_status(provider_status)
-    update_fields = {
-        'status': local_status,
-        'provider_status': provider_status,
-        'provider_callback_payload': payload,
-        'updated_at': datetime.now(timezone.utc).isoformat()
-    }
-    if invoice_token:
-        update_fields['invoice_token'] = invoice_token
-    if local_status == 'completed':
-        update_fields['completed_at'] = datetime.now(timezone.utc).isoformat()
-        # payout_status suit l'etat du versement au TRAVAILLEUR, separement
-        # du statut de la collecte cote client. On ne l'ecrase que s'il
-        # n'a encore jamais ete initialise (evite d'ecraser 'released' si
-        # un IPN en double arrive apres coup).
-        if not payment_record.get('payout_status'):
-            update_fields['payout_status'] = 'held'
+    previous_status = payment_record.get('status')
 
-    await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
+    try:
+        payment_record = await sync_payment_status_with_paydunya(payment_record)
+    except Exception as exc:
+        logger.error(f"⚠️ Échec de vérification IPN PayDunya auprès du serveur: {exc}")
+        return {'status': 'error', 'detail': 'verification failed'}
 
-    # Envoyer les notifications push si le paiement vient d'être confirmé
-    if local_status == 'completed':
+    local_status = payment_record.get('status')
+
+    # Notifications push seulement lors de la transition VERS completed, pas
+    # à chaque IPN en double (PayDunya peut renvoyer plusieurs callbacks
+    # pour le même événement).
+    if local_status == 'completed' and previous_status != 'completed':
         job_id_for_notif = payment_record.get('job_id') or ''
         amount_for_notif = int(payment_record.get('amount', 0) or 0)
         payer_id = payment_record.get('payer_id')
