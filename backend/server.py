@@ -168,6 +168,7 @@ async def create_database_indexes():
         await db.messages.create_index([("sender_id", 1), ("receiver_id", 1)])
         await db.messages.create_index([("conversation_id", 1), ("timestamp", 1)])
         await db.messages.create_index([("timestamp", -1)])
+        await db.messages.create_index("job_id", sparse=True)
         
         # Commissions collection indexes
         await db.commissions.create_index("id", unique=True)
@@ -772,6 +773,11 @@ class Message(BaseModel):
     sender_id: str
     receiver_id: str
     content: str = Field(min_length=1, max_length=5000)  # Message content limits
+    # Rattache optionnellement le message à un job précis, pour permettre au
+    # frontend de distinguer plusieurs échanges avec la même personne selon
+    # la mission concernée (le fil complet reste consultable sur /messages,
+    # ce champ ne sert qu'au filtrage contextuel depuis la page d'un job).
+    job_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     read: bool = False
 
@@ -1023,6 +1029,12 @@ class ProposalCreate(BaseModel):
 class MessageCreate(BaseModel):
     receiver_id: str
     content: str = Field(min_length=1, max_length=5000)
+    # Optionnel: le frontend l'envoie déjà depuis la page d'un job
+    # (sendProposalConversationMessage) mais ce champ était jusqu'ici
+    # silencieusement ignoré par Pydantic, ce qui cassait complètement le
+    # filtrage par job côté JobDetails.js (le panneau de discussion
+    # affichait 0 message, tout le temps).
+    job_id: Optional[str] = None
 
 class PushTokenCreate(BaseModel):
     user_id: str = Field(min_length=1, max_length=100)
@@ -3125,7 +3137,8 @@ async def accept_job_proposal(
         conversation_id=conversation_id,
         sender_id=current_user.id,
         receiver_id=worker_id,
-        content="\n".join(message_lines)
+        content="\n".join(message_lines),
+        job_id=job_id
     )
     try:
         await db.messages.insert_one(auto_message.dict())
@@ -3314,7 +3327,8 @@ async def complete_job_and_release_payment(
             conversation_id=conversation_id,
             sender_id=current_user.id,
             receiver_id=worker_id,
-            content=worker_message
+            content=worker_message,
+            job_id=job_id
         ).dict())
     except Exception as exc:
         logger.error(f"⚠️ Échec de l'envoi du message automatique de fin de mission: {exc}")
@@ -3531,16 +3545,17 @@ async def send_message(
 ):
     # Generate conversation ID
     conversation_id = f"{min(current_user.id, message_data.receiver_id)}_{max(current_user.id, message_data.receiver_id)}"
-    
+
     message = Message(
         conversation_id=conversation_id,
         sender_id=current_user.id,
         receiver_id=message_data.receiver_id,
-        content=message_data.content
+        content=message_data.content,
+        job_id=message_data.job_id
     )
-    
+
     await db.messages.insert_one(message.dict())
-    return {"message": "Message sent successfully"}
+    return message.dict()
 
 @api_router.get("/messages")
 async def get_all_messages(current_user: User = Depends(get_current_user)):

@@ -6,6 +6,7 @@ import { messagesAPI, handleApiError } from '../services/api';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
+import { stripJobMarkerFromMessage } from '../utils/jobProposalWorkflow';
 
 export default function Messages() {
   const [conversations, setConversations] = useState([]);
@@ -166,7 +167,7 @@ export default function Messages() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-gray-900 truncate">{conversation.other_user_name || getOtherPersonName()}</p>
-                      <p className="text-xs text-gray-500 truncate">{conversation.last_message}</p>
+                      <p className="text-xs text-gray-500 truncate">{stripJobMarkerFromMessage(conversation.last_message)}</p>
                     </div>
                   </div>
                 </button>
@@ -219,7 +220,13 @@ export default function Messages() {
                             : 'bg-white border border-gray-100 text-gray-900 rounded-tl-sm'
                         }`}
                       >
-                        <p className="whitespace-pre-line">{message.content}</p>
+                        {/* stripJobMarkerFromMessage nettoie un éventuel
+                            ancien marqueur "[KOJO_JOB:...]" présent sur des
+                            messages historiques (le mécanisme d'origine
+                            insérait ce texte directement dans le contenu ;
+                            il est désormais stocké dans un champ séparé,
+                            mais on garde ce nettoyage par sécurité). */}
+                        <p className="whitespace-pre-line">{stripJobMarkerFromMessage(message.content)}</p>
                         <p className={`text-[11px] mt-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-400'}`}>
                           {formatMessageTime(message.timestamp)}
                         </p>
