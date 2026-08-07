@@ -13,15 +13,10 @@ import { normalizeJobList } from '../utils/jobDisplayBridge';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import CountrySelector from '../components/CountrySelector';
 
-function JobCard({ job, user, userType, appliedJobIds }) {
+function JobCard({ job, user, userType }) {
   const locationText = job.location_text || 'Localisation non précisée';
   const jobId = job.id || job._id || job.job_id || job.jobId;
-  // Source de vérité serveur (appliedJobIds) quand disponible ; retombe sur
-  // le marqueur localStorage seulement si le chargement serveur a échoué,
-  // pour ne pas régresser en cas de souci réseau ponctuel.
-  const hasApplied = userType === 'worker' && (
-    appliedJobIds ? appliedJobIds.has(String(jobId)) : Boolean(getRememberedApplication(jobId, user))
-  );
+  const hasApplied = userType === 'worker' && Boolean(getRememberedApplication(jobId, user));
 
   return (
     <Link to={`/jobs/${job.id}`} className="block bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-100">
@@ -65,9 +60,6 @@ export default function Jobs() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filters, setFilters] = useState({ category: '', status: '', search: '' });
-  // null = pas encore chargé (JobCard retombe alors sur localStorage) ;
-  // Set (même vide) = donnée serveur fiable disponible.
-  const [appliedJobIds, setAppliedJobIds] = useState(null);
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobs');
@@ -81,25 +73,7 @@ export default function Jobs() {
       setFilters((prev) => ({ ...prev, category: categoryParam }));
     }
     loadJobs();
-    if (user?.user_type === 'worker') {
-      loadAppliedJobIds();
-    } else {
-      setAppliedJobIds(null);
-    }
   }, [searchParams, user?.id, user?.user_type]);
-
-  const loadAppliedJobIds = async () => {
-    try {
-      const response = await jobsAPI.getMyProposals();
-      const proposals = Array.isArray(response) ? response : response?.data || [];
-      setAppliedJobIds(new Set(proposals.map((p) => String(p.job_id)).filter(Boolean)));
-    } catch (error) {
-      safeLog.error('Failed to load my proposals', error);
-      // On laisse appliedJobIds a null : JobCard retombe alors sur le
-      // marqueur localStorage plutot que d'afficher "Postuler disponible"
-      // partout par erreur.
-    }
-  };
 
   const loadJobs = async () => {
     setLoading(true);
@@ -209,7 +183,7 @@ export default function Jobs() {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredJobs.map((job) => (
-            <JobCard key={job.id} job={job} user={user} userType={user?.user_type} appliedJobIds={appliedJobIds} />
+            <JobCard key={job.id} job={job} user={user} userType={user?.user_type} />
           ))}
         </div>
       )}
