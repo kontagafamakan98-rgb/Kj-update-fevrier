@@ -168,7 +168,7 @@ async def create_database_indexes():
         await db.messages.create_index([("sender_id", 1), ("receiver_id", 1)])
         await db.messages.create_index([("conversation_id", 1), ("timestamp", 1)])
         await db.messages.create_index([("timestamp", -1)])
-        await db.messages.create_index("job_id", sparse=True)
+        await db.messages.create_index("job_id")
         
         # Commissions collection indexes
         await db.commissions.create_index("id", unique=True)

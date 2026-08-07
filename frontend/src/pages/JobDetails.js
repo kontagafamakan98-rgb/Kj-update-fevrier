@@ -166,12 +166,6 @@ export default function JobDetails() {
   };
 
   useEffect(() => {
-    if (job?.id && assignedWorkerId) {
-      refreshPaymentStatus();
-    }
-  }, [job?.id, assignedWorkerId]);
-
-  useEffect(() => {
     return ensureJobOwnerActionBar(job);
   }, [job]);
 
@@ -180,7 +174,16 @@ export default function JobDetails() {
   const rememberedAcceptedProposal = useMemo(() => getRememberedAcceptedProposal(job?.id, user), [job?.id, user]);
   const currentUserProposal = useMemo(() => getCurrentUserProposal(proposals, user) || rememberedApplication, [proposals, user, rememberedApplication]);
   const hasApplied = useMemo(() => hasCurrentUserAppliedToJob(job?.id, proposals, user), [job?.id, proposals, user]);
+  // DOIT être déclaré AVANT le useEffect qui l'utilise en dépendance
+  // (lignes suivantes) - sinon JavaScript lève une ReferenceError TDZ
+  // (Temporal Dead Zone) car const/let ne sont pas hoistés comme var.
   const assignedWorkerId = normalizeComparableId(job?.assigned_worker_id || rememberedAcceptedProposal?.worker_id);
+
+  useEffect(() => {
+    if (job?.id && assignedWorkerId) {
+      refreshPaymentStatus();
+    }
+  }, [job?.id, assignedWorkerId]);
   const currentUserIds = useMemo(() => new Set([
     normalizeComparableId(user?._id),
     normalizeComparableId(user?.id),
