@@ -16,11 +16,40 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Durée de vie du token côté client (doit rester <= JWT_EXPIRATION_HOURS
+  // configuré sur le backend, ici 24h). Si un token volé parvient à
+  // bypasser la révocation serveur (ex: serveur temporairement indisponible),
+  // cette expiration client l'invalide localement sans attendre le backend.
+  const TOKEN_CLIENT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+  const saveToken = (token) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('token_expires_at', String(Date.now() + TOKEN_CLIENT_TTL_MS));
+  };
+
+  const clearToken = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('token_expires_at');
+    localStorage.removeItem('user');
+  };
+
+  const isTokenExpiredLocally = () => {
+    const expiresAt = localStorage.getItem('token_expires_at');
+    if (!expiresAt) return false; // token sans expiry stockée = ancien format, on laisse le serveur décider
+    return Date.now() > Number(expiresAt);
+  };
+
   useEffect(() => {
     // Check if user is logged in on app start
     const token = localStorage.getItem('token');
     if (token) {
-      loadUser();
+      if (isTokenExpiredLocally()) {
+        // Token expiré côté client : on nettoie sans appel réseau inutile
+        clearToken();
+        setLoading(false);
+      } else {
+        loadUser();
+      }
     } else {
       setLoading(false);
     }
@@ -53,8 +82,7 @@ export function AuthProvider({ children }) {
         setUser(cachedUser);
         devLog.info('📱 User loaded from cache (API failed)');
       } else {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearToken();
       }
     } finally {
       setLoading(false);
@@ -66,7 +94,7 @@ export function AuthProvider({ children }) {
       const response = await authAPI.login({ email, password });
       const { access_token, user } = response;
       
-      localStorage.setItem('token', access_token);
+      saveToken(access_token);
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       
@@ -105,7 +133,7 @@ export function AuthProvider({ children }) {
   // Nouvelle fonction pour connexion automatique après inscription
   const autoLoginAfterRegistration = (userData, token) => {
     try {
-      localStorage.setItem('token', token);
+      saveToken(token);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
@@ -132,7 +160,7 @@ export function AuthProvider({ children }) {
       const response = await authAPI.register(userData);
       const { access_token, user } = response;
       
-      localStorage.setItem('token', access_token);
+      saveToken(access_token);
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       
@@ -165,8 +193,7 @@ export function AuthProvider({ children }) {
       devLog.warn('Server logout failed:', error);
     } finally {
       // Always clear local data
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      clearToken();
       kojoCache.clear(); // Clear all cached data
       clearRegistrationFlow();
       setUser(null);

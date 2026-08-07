@@ -20,7 +20,6 @@ from datetime import datetime, timedelta, timezone
 import jwt
 import bcrypt
 from enum import Enum
-import shutil
 import base64
 import io
 import cloudinary
@@ -2340,7 +2339,12 @@ async def login_user(credentials: UserLogin):
         clean_email = sanitize_email(credentials.email)
         user = await db.users.find_one({"email": clean_email})
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # sanitize_email() lève ValueError pour des raisons lisibles par un
+        # humain ("Email too long", "Invalid characters"...) sans détail
+        # d'infra. On le logue quand même pour tracer les tentatives
+        # suspectes, mais on renvoie un message générique au client.
+        logger.warning(f"Tentative de login avec email invalide: {e}")
+        raise HTTPException(status_code=400, detail="Adresse email invalide")
     if not user or not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
@@ -2613,8 +2617,11 @@ async def register_push_token(
             }
             
     except ValidationError as e:
+        # Détail Pydantic loggé côté serveur uniquement - exposer la structure
+        # interne du modèle push token au client n'apporte rien à l'utilisateur
+        # final et donne des informations inutiles sur l'implémentation backend.
         logger.error(f"Validation error in push token registration: {e}")
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail="Données de token invalides")
     except Exception as e:
         logger.error(f"Error registering push token: {e}")
         raise HTTPException(status_code=500, detail="Failed to register push token")
