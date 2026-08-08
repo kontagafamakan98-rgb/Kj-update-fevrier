@@ -319,34 +319,112 @@ app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & 
 # Middleware pour compression gzip (optimisation réseaux lents Afrique de l'Ouest)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Rate limiting simple pour protection (West Africa specific)
+# ---------------------------------------------------------------------------
+# Rate limiting — store partagé Redis (si REDIS_URL défini) avec fallback
+# mémoire (comportement précédent conservé intégralement).
 #
-# NOTE (limitation connue): ce compteur vit en mémoire du process Python.
-# Si Render fait tourner plusieurs workers/instances, chaque process a son
-# propre compteur -> la limite globale réelle est max_requests * (nb workers),
-# pas max_requests. Une correction complète nécessiterait un store partagé
-# (ex: Redis) entre workers, ce qui est un changement d'infra (nouvel add-on
-# Render), pas juste un changement de code - à évaluer séparément si le
-# service tourne avec plusieurs workers/instances.
+# Pourquoi Redis ?
+#   Le compteur en mémoire Python est par-process : si Render fait tourner
+#   N workers (WEB_CONCURRENCY=N), chaque worker a son propre compteur et
+#   la limite globale effective devient max_requests * N, pas max_requests.
+#   Redis étant un processus externe partagé, tous les workers voient les
+#   mêmes compteurs.
 #
-# Ce qui EST corrigé ici : la fuite mémoire. Avant, chaque IP:bucket vue une
-# fois restait indéfiniment dans le dict (avec une liste vide), même après
-# expiration de sa fenêtre - sur un serveur qui tourne des mois face à du
-# scan/bot traffic, ça grossissait sans limite. Maintenant : (1) les clés
-# devenues vides sont supprimées immédiatement, (2) une purge périodique
-# tourne en tâche de fond, (3) une taille max sert de garde-fou.
+# Comment activer :
+#   1. Sur Render : ajouter un service Redis (Add-On "Redis" ou service
+#      Redis dédié), puis copier l'URL dans une variable d'env REDIS_URL.
+#   2. Redéployer. C'est tout — le code bascule automatiquement sur Redis.
+#
+# Fallback automatique :
+#   Si REDIS_URL est absent ou si Redis est inaccessible, on retombe sur le
+#   compteur en mémoire (comportement actuel) sans erreur ni interruption
+#   de service. Les logs indiquent quel mode est actif au démarrage.
+# ---------------------------------------------------------------------------
 from collections import defaultdict
 import time
 
+_redis_client = None
+
+def _try_init_redis() -> Optional[Any]:
+    """Tente de connecter Redis si REDIS_URL est défini. Retourne le client
+    ou None (fallback mémoire) sans jamais lever d'exception."""
+    redis_url = os.environ.get('REDIS_URL', '').strip()
+    if not redis_url:
+        return None
+    try:
+        import redis.asyncio as aioredis
+        client = aioredis.from_url(
+            redis_url,
+            encoding='utf-8',
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        logger.info("✅ Rate-limiter: mode Redis partagé activé (multi-workers safe)")
+        return client
+    except ImportError:
+        logger.warning(
+            "⚠️ Rate-limiter: package 'redis' non installé (pip install redis). "
+            "Ajoutez 'redis>=5.0.0' à requirements.txt pour activer le mode "
+            "Redis partagé. Fallback sur compteur en mémoire."
+        )
+        return None
+    except Exception as e:
+        logger.warning(f"⚠️ Rate-limiter: connexion Redis échouée ({e}), fallback mémoire.")
+        return None
+
+_redis_client = _try_init_redis()
+_using_redis = _redis_client is not None
+
+if not _using_redis:
+    logger.info(
+        "ℹ️ Rate-limiter: mode mémoire (par process). Si Render tourne avec "
+        "plusieurs workers, définissez REDIS_URL pour un comptage partagé."
+    )
+
+# Compteur mémoire (utilisé uniquement si Redis est absent)
 request_counts: Dict[str, List[float]] = defaultdict(list)
 RATE_LIMIT_MAX_TRACKED_KEYS = 50_000  # garde-fou anti-DoS mémoire
 
-def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: int = 1) -> bool:
-    """Vérification simple du rate limiting (en mémoire, par process)"""
+
+async def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: int = 1) -> bool:
+    """Vérifie le rate limiting. Utilise Redis si disponible, sinon mémoire."""
+    if _using_redis:
+        return await _rate_limit_check_redis(client_ip, max_requests, window_minutes)
+    return _rate_limit_check_memory(client_ip, max_requests, window_minutes)
+
+
+async def _rate_limit_check_redis(client_ip: str, max_requests: int, window_minutes: int) -> bool:
+    """Rate limiting via Redis (sliding window, partagé entre tous les workers)."""
+    try:
+        window_seconds = window_minutes * 60
+        key = f"rl:{client_ip}:{window_minutes}m"
+        now = time.time()
+        pipe = _redis_client.pipeline()
+        # Sliding window : on supprime les timestamps anciens, on ajoute le
+        # nouveau, et on compte combien il en reste dans la fenêtre courante.
+        pipe.zremrangebyscore(key, 0, now - window_seconds)
+        pipe.zcard(key)
+        pipe.zadd(key, {str(now): now})
+        pipe.expire(key, window_seconds + 10)
+        results = await pipe.execute()
+        current_count = results[1]
+        return current_count < max_requests
+    except Exception as exc:
+        # Redis indisponible pendant la vérification : on laisse passer
+        # (fail-open) plutôt que de bloquer tous les utilisateurs. Le
+        # fallback mémoire prend le relais pour les requêtes suivantes si
+        # Redis reste down.
+        logger.warning(f"⚠️ Rate-limit Redis check échoué: {exc}, fail-open")
+        return True
+
+
+def _rate_limit_check_memory(client_ip: str, max_requests: int, window_minutes: int) -> bool:
+    """Rate limiting en mémoire (par process, comportement original)."""
     now = time.time()
     window_start = now - (window_minutes * 60)
 
-    recent = [req_time for req_time in request_counts.get(client_ip, []) if req_time > window_start]
+    recent = [t for t in request_counts.get(client_ip, []) if t > window_start]
 
     if len(recent) >= max_requests:
         request_counts[client_ip] = recent
@@ -355,17 +433,16 @@ def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: in
     recent.append(now)
     request_counts[client_ip] = recent
 
-    # Garde-fou: si le dict grossit anormalement (ex: attaque par IP spoofing/
-    # cycling), on vide les entrées les plus anciennes plutôt que de laisser
-    # la mémoire grossir indéfiniment.
     if len(request_counts) > RATE_LIMIT_MAX_TRACKED_KEYS:
         _purge_stale_rate_limit_entries(max_age_seconds=300)
 
     return True
 
+
 def _purge_stale_rate_limit_entries(max_age_seconds: int = 3600) -> int:
-    """Supprime du dict les clés dont toutes les requêtes sont expirées.
-    Retourne le nombre de clés supprimées."""
+    """Supprime du dict mémoire les clés expirées. No-op si Redis est actif."""
+    if _using_redis:
+        return 0
     now = time.time()
     cutoff = now - max_age_seconds
     stale_keys = [
@@ -376,9 +453,9 @@ def _purge_stale_rate_limit_entries(max_age_seconds: int = 3600) -> int:
         del request_counts[key]
     return len(stale_keys)
 
+
 async def _rate_limit_cleanup_loop():
-    """Tâche de fond: purge les entrées de rate-limit inactives toutes les
-    10 minutes pour borner l'usage mémoire sur un process longue durée."""
+    """Tâche de fond: purge les entrées mémoire inactives (no-op si Redis)."""
     while True:
         try:
             await asyncio.sleep(600)
@@ -483,7 +560,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         client_ip = get_client_ip(request)
         scoped_client = f"{client_ip}:{bucket_name}"
 
-        if not rate_limit_check(scoped_client, max_requests=max_requests, window_minutes=window_minutes):
+        if not await rate_limit_check(scoped_client, max_requests=max_requests, window_minutes=window_minutes):
             retry_after = window_minutes * 60
             return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

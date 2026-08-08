@@ -52,9 +52,14 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'build',
       sourcemap: false,
-      minify: false,
-      reportCompressedSize: false,
-      cssMinify: false,
+      // Minification activée : réduit la taille des bundles (~40-60% selon
+      // le code), accélère le premier chargement - critique pour les
+      // connexions mobiles 3G/4G en Afrique de l'Ouest. Désactivé par
+      // défaut dans l'ancien code, probablement pour faciliter le debug.
+      // Pour déboguer un problème de prod : passer temporairement à
+      // `minify: false` localement, jamais en prod.
+      minify: 'esbuild',
+      cssMinify: true,
       rollupOptions: {
         output: {
           manualChunks(id) {
