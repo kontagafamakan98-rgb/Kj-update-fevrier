@@ -4418,14 +4418,29 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
             await db.job_proposals.find_one({"id": accepted_proposal_id, "job_id": request.job_id})
             if accepted_proposal_id else None
         )
-        if accepted_proposal and accepted_proposal.get("proposed_amount"):
-            resolved_amount = float(accepted_proposal["proposed_amount"])
+        # Supporte les deux noms de champ utilisés selon les versions :
+        # "proposed_amount" (nouveau) et "amount" (ancien format).
+        proposal_amount = None
+        if accepted_proposal:
+            raw = accepted_proposal.get("proposed_amount") or accepted_proposal.get("amount")
+            if raw:
+                try:
+                    proposal_amount = float(raw)
+                except (TypeError, ValueError):
+                    pass
+
+        if proposal_amount and proposal_amount > 0:
+            resolved_amount = proposal_amount
         elif job.get("budget_max") or job.get("budget_min"):
-            # Filet de sécurité si la proposition n'a pas de montant exploitable :
-            # on retombe sur le budget de la mission plutôt que sur l'input client.
+            # Filet de sécurité : pas de proposition trouvée ou montant invalide →
+            # on utilise le budget du job plutôt que l'input client.
             resolved_amount = float(job.get("budget_max") or job.get("budget_min"))
+        elif resolved_amount and resolved_amount >= 200:
+            # Dernier recours : le frontend a passé un montant valide, on l'accepte
+            # uniquement s'il est >= 200 FCFA (minimum PayDunya).
+            pass
         else:
-            raise HTTPException(status_code=400, detail="Impossible de déterminer le montant à payer pour cette mission")
+            raise HTTPException(status_code=400, detail="Impossible de déterminer le montant à payer pour cette mission. Vérifiez que la proposition a bien un montant.")
 
     normalized_country = normalize_payment_country(request.country or current_user.country)
     channel = get_paydunya_channel(request.payment_method.value, normalized_country)

@@ -18,7 +18,7 @@ const COPY = {
     method: 'Méthode',
     loginNeeded: 'Connecte-toi pour lancer un paiement réel.',
     loginCta: 'Se connecter',
-    payNow: 'Lancer le checkout réel',
+    payNow: 'Payer maintenant',
     paying: 'Redirection en cours...',
     quoteTitle: 'Répartition automatique',
     total: 'Total client',
@@ -31,16 +31,6 @@ const COPY = {
     failed: 'Paiement échoué',
     unknown: 'Statut inconnu',
     refreshStatus: 'Actualiser le statut',
-    backendSetup: 'Variables backend à renseigner',
-    backendItems: [
-      'PAYDUNYA_MASTER_KEY',
-      'PAYDUNYA_PRIVATE_KEY',
-      'PAYDUNYA_TOKEN',
-      'PAYDUNYA_MODE=test ou live',
-      'PAYDUNYA_STORE_NAME',
-      'FRONTEND_APP_URL',
-      'BACKEND_PUBLIC_URL'
-    ],
     supportTitle: 'Canaux confirmés par la doc officielle',
     supportText: 'PayDunya documente Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire, et le paiement carte. Le check status se fait avec le token de facture et l’IPN confirme les paiements.',
     myPayments: 'Mes paiements récents',
@@ -62,7 +52,7 @@ const COPY = {
     method: 'Method',
     loginNeeded: 'Log in to launch a real payment.',
     loginCta: 'Log in',
-    payNow: 'Start real checkout',
+    payNow: 'Pay now',
     paying: 'Redirecting...',
     quoteTitle: 'Automatic split',
     total: 'Client total',
@@ -75,8 +65,6 @@ const COPY = {
     failed: 'Payment failed',
     unknown: 'Unknown status',
     refreshStatus: 'Refresh status',
-    backendSetup: 'Backend variables to set',
-    backendItems: ['PAYDUNYA_MASTER_KEY','PAYDUNYA_PRIVATE_KEY','PAYDUNYA_TOKEN','PAYDUNYA_MODE=test or live','PAYDUNYA_STORE_NAME','FRONTEND_APP_URL','BACKEND_PUBLIC_URL'],
     supportTitle: 'Officially documented channels',
     supportText: 'PayDunya officially documents Orange Money for Senegal / Mali / Burkina / Côte d’Ivoire, Wave for Senegal / Côte d’Ivoire, plus card payments. Invoice tokens are used for status checks and IPN confirms payments.',
     myPayments: 'My recent payments',
@@ -111,8 +99,6 @@ const COPY = {
     failed: 'Fey gi antuwul',
     unknown: 'Status xamul',
     refreshStatus: 'Yeesal status',
-    backendSetup: 'Variables backend yi',
-    backendItems: ['PAYDUNYA_MASTER_KEY','PAYDUNYA_PRIVATE_KEY','PAYDUNYA_TOKEN','PAYDUNYA_MODE=test walla live','PAYDUNYA_STORE_NAME','FRONTEND_APP_URL','BACKEND_PUBLIC_URL'],
     supportTitle: 'Canaux yi doc bi wone',
     supportText: 'PayDunya wax na Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire ak kart bank. Tokenu invoice mooy seetal status, IPN mooy dëggal fey gi.',
     myPayments: 'Samay paiements yu mujj',
@@ -147,8 +133,6 @@ const COPY = {
     failed: 'Sariya-faga ma se ka kɛ',
     unknown: 'Status min tɛ se ka dɔn',
     refreshStatus: 'Status kura',
-    backendSetup: 'Backend variables',
-    backendItems: ['PAYDUNYA_MASTER_KEY','PAYDUNYA_PRIVATE_KEY','PAYDUNYA_TOKEN','PAYDUNYA_MODE=test walima live','PAYDUNYA_STORE_NAME','FRONTEND_APP_URL','BACKEND_PUBLIC_URL'],
     supportTitle: 'Canaux minnu bɛ doc la',
     supportText: 'PayDunya bɛ Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire ani bank karti jira. Invoice token bɛ status lajɛ, IPN bɛ sariya-faga tabali kɔrɔsiya.',
     myPayments: 'Ne ka paiements kura',
@@ -183,8 +167,6 @@ const COPY = {
     failed: 'Paoongo ka paam',
     unknown: 'Status ka dɔk ye',
     refreshStatus: 'Status taaba',
-    backendSetup: 'Backend variables',
-    backendItems: ['PAYDUNYA_MASTER_KEY','PAYDUNYA_PRIVATE_KEY','PAYDUNYA_TOKEN','PAYDUNYA_MODE=test bɩ live','PAYDUNYA_STORE_NAME','FRONTEND_APP_URL','BACKEND_PUBLIC_URL'],
     supportTitle: 'Canaux doc yeta',
     supportText: 'PayDunya goma Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire la bank carte. Invoice token nonga status yɩɩme, IPN paamda paoongo tabga.',
     myPayments: 'Mam paiements kɩtã',
@@ -230,6 +212,9 @@ const Payment = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
+  // État séparé pour les erreurs de checkout — protège le message contre
+  // l'écrasement par les appels refresh/quote qui réinitialisent error=''.
+  const [checkoutError, setCheckoutError] = useState('');
   const [form, setForm] = useState({
     // Plus de valeur "démo" (25000) codée en dur : sans contexte de mission,
     // le montant part de 0 plutôt que de suggérer un chiffre arbitraire qui
@@ -314,6 +299,7 @@ const Payment = () => {
 
     setProcessing(true);
     setError('');
+    setCheckoutError('');
     try {
       const checkout = await CommissionService.createCheckout({
         amount: Number(form.amount),
@@ -326,7 +312,8 @@ const Payment = () => {
       });
       window.location.href = checkout.checkout_url;
     } catch (err) {
-      setError(err?.response?.data?.detail || err.message || 'Erreur paiement');
+      const msg = err?.response?.data?.detail || err.message || 'Erreur paiement';
+      setCheckoutError(msg);
       setProcessing(false);
     }
   };
@@ -525,6 +512,12 @@ const Payment = () => {
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
             {error}
+          </div>
+        )}
+
+        {checkoutError && (
+          <div className="rounded-2xl border border-red-300 bg-red-100 px-5 py-4 text-red-800 font-medium">
+            ⚠️ {checkoutError}
           </div>
         )}
 
