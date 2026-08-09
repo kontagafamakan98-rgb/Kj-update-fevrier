@@ -2988,7 +2988,13 @@ async def create_job(
             raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
 
         try:
-            validated_input = JobCreate(**incoming)
+            # JobCreate ne connaît qu'un sous-ensemble de champs. Le frontend
+            # peut envoyer des champs supplémentaires (job_type, location_text,
+            # urgency, etc.) que Pydantic rejetterait avec une 422 si on les
+            # passe tels quels. On ne garde que les champs reconnus par le modèle.
+            jobcreate_fields = set(JobCreate.model_fields.keys())
+            filtered_for_validation = {k: v for k, v in incoming.items() if k in jobcreate_fields}
+            validated_input = JobCreate(**filtered_for_validation)
         except Exception as validation_error:
             raise HTTPException(status_code=422, detail=str(validation_error))
 
@@ -4178,7 +4184,18 @@ def create_paydunya_invoice(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     if str(data.get('response_code')) != '00':
         logger.error(f"PayDunya create invoice failed: {data}")
-        raise HTTPException(status_code=502, detail=data.get('response_text') or 'Création de paiement refusée par PayDunya')
+        response_text = data.get('response_text') or ''
+        # Traduit les messages d'erreur PayDunya courants en messages
+        # lisibles par l'utilisateur (plutôt que des messages techniques anglais).
+        if 'Minimum checkout amount' in response_text or 'Total Amount' in response_text:
+            user_message = "Le montant est trop faible pour être traité par PayDunya (minimum 200 FCFA)."
+        elif 'Invalid' in response_text:
+            user_message = "Données de paiement invalides. Vérifiez les informations et réessayez."
+        elif response_text:
+            user_message = f"Paiement refusé : {response_text}"
+        else:
+            user_message = "Création de paiement refusée par PayDunya."
+        raise HTTPException(status_code=400, detail=user_message)
 
     return data
 
@@ -4413,6 +4430,18 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
     normalized_country = normalize_payment_country(request.country or current_user.country)
     channel = get_paydunya_channel(request.payment_method.value, normalized_country)
     breakdown = calculate_payment_breakdown(resolved_amount)
+
+    # Validation du montant minimum PayDunya (200 FCFA) AVANT de créer
+    # l'enregistrement en base et d'appeler l'API — évite de créer un
+    # payment_record "pending" orphelin qu'on ne pourra jamais compléter,
+    # et renvoie un 400 lisible au lieu d'un 502 cryptique.
+    PAYDUNYA_MINIMUM_AMOUNT = 200
+    if round(resolved_amount) < PAYDUNYA_MINIMUM_AMOUNT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Le montant minimum pour un paiement est de {PAYDUNYA_MINIMUM_AMOUNT} FCFA "
+                   f"(montant envoyé : {round(resolved_amount)} FCFA)."
+        )
 
     payment_record = {
         'id': str(uuid.uuid4()),
