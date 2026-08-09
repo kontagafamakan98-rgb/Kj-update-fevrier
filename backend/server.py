@@ -3224,29 +3224,48 @@ async def accept_job_proposal(
         {"$set": {"status": "rejected"}}
     )
 
-    # Message automatique au travailleur (envoye cote serveur pour etre
-    # fiable meme si l'app du client a un souci reseau juste apres l'appel).
-    job_location = job.get("location") or {}
-    address_text = job_location.get("fullAddress") or job_location.get("address")
+    # Message automatique au travailleur — adresse conditionnelle au paiement.
+    # Si le client a déjà payé : on envoie l'adresse immédiatement.
+    # Si le client n'a pas encore payé : on prévient le travailleur d'attendre.
+    # (L'adresse sera envoyée automatiquement via l'IPN PayDunya dès confirmation.)
+    payment_completed = await db.payments.find_one({
+        "job_id": job_id,
+        "status": "completed",
+    })
 
-    message_lines = [f"✅ Votre proposition a été acceptée pour « {job.get('title', 'la mission')} »."]
+    # Rechargement du job pour avoir shared_location si elle vient d'être ajoutée
+    updated_job = await db.jobs.find_one({"id": job_id}) or {**job, **job_update}
     if shared_location:
-        message_lines.append(f"📍 Position du client : {shared_location['maps_url']}")
-    elif address_text:
-        message_lines.append(f"📍 Adresse : {address_text}")
+        updated_job["shared_location"] = shared_location
 
-    conversation_id = f"{min(current_user.id, worker_id)}_{max(current_user.id, worker_id)}"
-    auto_message = Message(
-        conversation_id=conversation_id,
-        sender_id=current_user.id,
-        receiver_id=worker_id,
-        content="\n".join(message_lines),
-        job_id=job_id
-    )
-    try:
-        await db.messages.insert_one(auto_message.model_dump())
-    except Exception as exc:
-        logger.error(f"⚠️ Échec de l'envoi du message automatique d'acceptation: {exc}")
+    if payment_completed:
+        await _dispatch_address_to_worker(
+            job=updated_job,
+            worker_id=worker_id,
+            sender_id=current_user.id,
+            phase="accepted",
+        )
+    else:
+        # Envoie d'abord le message de félicitations sans adresse
+        message_lines = [f"✅ Votre proposition a été acceptée pour « {job.get('title', 'la mission')} »."]
+        conversation_id = f"{min(current_user.id, worker_id)}_{max(current_user.id, worker_id)}"
+        try:
+            await db.messages.insert_one(Message(
+                conversation_id=conversation_id,
+                sender_id=current_user.id,
+                receiver_id=worker_id,
+                content="\n".join(message_lines),
+                job_id=job_id,
+            ).model_dump())
+        except Exception as exc:
+            logger.error(f"⚠️ Échec du message d'acceptation: {exc}")
+
+        # Puis le message d'attente de paiement dans la langue du travailleur
+        await _send_payment_pending_to_worker(
+            job=updated_job,
+            worker_id=worker_id,
+            sender_id=current_user.id,
+        )
 
     # Notifier le travailleur que sa proposition a été acceptée
     client_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Le client"
@@ -4642,7 +4661,155 @@ async def paydunya_payment_ipn(request: Request):
                 related_type="job" if job_id_for_notif else None,
             ))
 
+        # Envoi automatique de l'adresse au travailleur après confirmation du
+        # paiement. Si la proposition avait déjà été acceptée avant le paiement,
+        # le travailleur a reçu un message "veuillez attendre le paiement" — ici
+        # on lui envoie maintenant l'adresse réelle du chantier dans sa langue.
+        if job_id_for_notif and receiver_id:
+            job_doc_full = await db.jobs.find_one({"id": job_id_for_notif})
+            if job_doc_full and job_doc_full.get("assigned_worker_id") == receiver_id:
+                payer_doc = await db.users.find_one({"id": payer_id}, {"id": 1}) if payer_id else None
+                dispatch_sender = (payer_doc or {}).get("id") or payer_id or receiver_id
+                await _dispatch_address_to_worker(
+                    job=job_doc_full,
+                    worker_id=receiver_id,
+                    sender_id=dispatch_sender,
+                    phase="payment_done",
+                )
+
     return {'status': 'ok'}
+
+# ---------------------------------------------------------------------------
+# Envoi conditionnel de l'adresse au travailleur selon statut du paiement
+# ---------------------------------------------------------------------------
+
+_ADDRESS_MSG: Dict[str, Dict[str, str]] = {
+    "fr": {
+        "accepted_with_address": "\u2705 Votre proposition a \u00e9t\u00e9 accept\u00e9e pour \u00ab {title} \u00bb.\n\ud83d\udccd Adresse du chantier : {address}",
+        "accepted_with_gps":     "\u2705 Votre proposition a \u00e9t\u00e9 accept\u00e9e pour \u00ab {title} \u00bb.\n\ud83d\udccd Position GPS du client : {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Paiement confirm\u00e9 pour \u00ab {title} \u00bb.\n\ud83d\udccd Adresse du chantier : {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Paiement confirm\u00e9 pour \u00ab {title} \u00bb.\n\ud83d\udccd Position GPS du client : {maps_url}",
+        "wait_payment":          "\u23f3 Votre proposition pour \u00ab {title} \u00bb a bien \u00e9t\u00e9 accept\u00e9e, mais le paiement du client n'a pas encore \u00e9t\u00e9 effectu\u00e9. L'adresse vous sera communiqu\u00e9e automatiquement d\u00e8s que le paiement sera confirm\u00e9.",
+    },
+    "en": {
+        "accepted_with_address": "\u2705 Your proposal was accepted for \u00ab {title} \u00bb.\n\ud83d\udccd Job address: {address}",
+        "accepted_with_gps":     "\u2705 Your proposal was accepted for \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS location: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Payment confirmed for \u00ab {title} \u00bb.\n\ud83d\udccd Job address: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Payment confirmed for \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS location: {maps_url}",
+        "wait_payment":          "\u23f3 Your proposal for \u00ab {title} \u00bb has been accepted, but the client has not yet completed the payment. The job address will be sent to you automatically once payment is confirmed.",
+    },
+    "wo": {
+        "accepted_with_address": "\u2705 Y\u00e9gg na ci kow \u00ab {title} \u00bb.\n\ud83d\udccd Aadreesa bopp bii: {address}",
+        "accepted_with_gps":     "\u2705 Y\u00e9gg na ci kow \u00ab {title} \u00bb.\n\ud83d\udccd Dem xam ci carte bi: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Ligg\u00e9eyukaay bi dafay d\u00ebkk \u00ab {title} \u00bb.\n\ud83d\udccd Aadreesa bopp bii: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Ligg\u00e9eyukaay bi dafay d\u00ebkk \u00ab {title} \u00bb.\n\ud83d\udccd Dem xam ci carte bi: {maps_url}",
+        "wait_payment":          "\u23f3 B\u00ebgg\u00ebl bi ak \u00ab {title} \u00bb y\u00e9gg na, waaye jaamu gu customer bii dafa s\u00e0nni. Aadreesa bi dinañu la y\u00f3nnee d\u00ebgg rekk jant bi payer bi dafa yokku.",
+    },
+    "bm": {
+        "accepted_with_address": "\u2705 I latig\u025b ye ka sigi \u00ab {title} \u00bb kan.\n\ud83d\udccd Liganbo y\u0254r\u0254 \u0254: {address}",
+        "accepted_with_gps":     "\u2705 I latig\u025b ye ka sigi \u00ab {title} \u00bb kan.\n\ud83d\udccd Customer GPS y\u0254r\u0254: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Sarabu ka k\u025b \u00ab {title} \u00bb k\u0254f\u025b.\n\ud83d\udccd Liganbo y\u0254r\u0254 \u0254: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Sarabu ka k\u025b \u00ab {title} \u00bb k\u0254f\u025b.\n\ud83d\udccd Customer GPS y\u0254r\u0254: {maps_url}",
+        "wait_payment":          "\u23f3 I latig\u025bra \u00ab {title} \u00bb kan, nga customer ma saraba t\u025b k\u025b fo. Liganbo y\u0254r\u0254 \u0254 b\u025bna i g\u025bn sarabu ka s\u0254r\u0254.",
+    },
+    "mos": {
+        "accepted_with_address": "\u2705 Y wilg n bees n \u00ab {title} \u00bb.\n\ud83d\udccd Liggdi t\u1ebd\u014bgo: {address}",
+        "accepted_with_gps":     "\u2705 Y wilg n bees n \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS t\u1ebd\u014bgo: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Cobd-k\u00e3ab paas la \u00ab {title} \u00bb.\n\ud83d\udccd Liggdi t\u1ebd\u014bgo: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Cobd-k\u00e3ab paas la \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS t\u1ebd\u014bgo: {maps_url}",
+        "wait_payment":          "\u23f3 Y wilg bees la \u00ab {title} \u00bb zugu, la b\u00e3an n client soab n k\u00f5 cobd-k\u00e3ab. T\u1ebd\u014bgo la n t\u0169 ne fo n cobd-k\u00e3ab paasame.",
+    },
+}
+def _get_address_msg(lang: str, key: str, **kwargs) -> str:
+    texts = _ADDRESS_MSG.get(lang) or _ADDRESS_MSG["fr"]
+    template = texts.get(key) or _ADDRESS_MSG["fr"][key]
+    return template.format(**kwargs)
+
+
+async def _dispatch_address_to_worker(
+    job: Dict[str, Any],
+    worker_id: str,
+    sender_id: str,
+    phase: str = "accepted",
+) -> None:
+    """Envoie l'adresse au travailleur dans sa langue (sans doublon)."""
+    if job.get("shared_address_sent"):
+        return
+
+    worker_doc = await db.users.find_one({"id": worker_id}, {"preferred_language": 1})
+    lang = (worker_doc or {}).get("preferred_language") or "fr"
+    if lang not in _ADDRESS_MSG:
+        lang = "fr"
+
+    job_title = job.get("title") or "la mission"
+    job_location = job.get("location") or {}
+    shared_location = job.get("shared_location")
+    address_text = (
+        job_location.get("fullAddress")
+        or job_location.get("address")
+        or job_location.get("text")
+    )
+
+    if shared_location and shared_location.get("maps_url"):
+        msg_key = "accepted_with_gps" if phase == "accepted" else "payment_done_gps"
+        content = _get_address_msg(lang, msg_key, title=job_title,
+                                   maps_url=shared_location["maps_url"])
+    elif address_text:
+        msg_key = "accepted_with_address" if phase == "accepted" else "payment_done_address"
+        content = _get_address_msg(lang, msg_key, title=job_title, address=address_text)
+    else:
+        return  # pas d'adresse disponible
+
+    conversation_id = f"{min(sender_id, worker_id)}_{max(sender_id, worker_id)}"
+    try:
+        await db.messages.insert_one(Message(
+            conversation_id=conversation_id,
+            sender_id=sender_id,
+            receiver_id=worker_id,
+            content=content,
+            job_id=job.get("id"),
+        ).model_dump())
+        await db.jobs.update_one(
+            {"id": job.get("id")},
+            {"$set": {"shared_address_sent": True}}
+        )
+        asyncio.create_task(notify_user(
+            user_id=worker_id,
+            title="📍 Adresse du chantier reçue",
+            body=f"L'adresse de « {job_title} » vous a été envoyée.",
+            notif_type=NotificationType.GENERAL,
+            related_id=job.get("id"),
+            related_type="job",
+        ))
+    except Exception as exc:
+        logger.error(f"⚠️ Échec envoi adresse au travailleur: {exc}")
+
+
+async def _send_payment_pending_to_worker(
+    job: Dict[str, Any],
+    worker_id: str,
+    sender_id: str,
+) -> None:
+    """Notifie le travailleur dans sa langue que le paiement est en attente."""
+    worker_doc = await db.users.find_one({"id": worker_id}, {"preferred_language": 1})
+    lang = (worker_doc or {}).get("preferred_language") or "fr"
+    if lang not in _ADDRESS_MSG:
+        lang = "fr"
+
+    job_title = job.get("title") or "la mission"
+    content = _get_address_msg(lang, "wait_payment", title=job_title)
+    conversation_id = f"{min(sender_id, worker_id)}_{max(sender_id, worker_id)}"
+    try:
+        await db.messages.insert_one(Message(
+            conversation_id=conversation_id,
+            sender_id=sender_id,
+            receiver_id=worker_id,
+            content=content,
+            job_id=job.get("id"),
+        ).model_dump())
+    except Exception as exc:
+        logger.error(f"⚠️ Échec envoi message attente paiement: {exc}")
+
 
 async def compute_real_commission_stats() -> Dict[str, Any]:
     completed_payments = [item async for item in db.payments.find({'status': 'completed'}).sort('created_at', -1)]
