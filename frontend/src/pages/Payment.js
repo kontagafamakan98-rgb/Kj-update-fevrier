@@ -300,6 +300,15 @@ const Payment = () => {
     setProcessing(true);
     setError('');
     setCheckoutError('');
+
+    // Validation côté client — évite un aller-retour API inutile et donne
+    // un retour immédiat si le montant est trop faible.
+    if (!form.amount || form.amount < 200) {
+      setCheckoutError('Le montant minimum pour un paiement est de 200 FCFA.');
+      setProcessing(false);
+      return;
+    }
+
     try {
       const checkout = await CommissionService.createCheckout({
         amount: Number(form.amount),
@@ -391,13 +400,21 @@ const Payment = () => {
                   name="payment_amount"
                   type="number"
                   autoComplete="off"
-                  min="500"
+                  min="200"
                   step="500"
                   value={form.amount}
                   readOnly={Boolean(jobPaymentContext?.amount)}
-                  onChange={(e) => setForm((prev) => ({ ...prev, amount: Number(e.target.value) || 0 }))}
-                  className={`mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500 ${jobPaymentContext?.amount ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                  onChange={(e) => {
+                    setCheckoutError('');
+                    setForm((prev) => ({ ...prev, amount: Number(e.target.value) || 0 }));
+                  }}
+                  className={`mt-2 w-full rounded-xl border ${form.amount > 0 && form.amount < 200 ? 'border-red-400 ring-1 ring-red-400' : 'border-gray-300'} px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500 ${jobPaymentContext?.amount ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 />
+                {form.amount > 0 && form.amount < 200 && (
+                  <p className="mt-1 text-sm text-red-600">
+                    ⚠️ Le montant minimum accepté par PayDunya est de 200 FCFA.
+                  </p>
+                )}
               </div>
 
               <div className="block">
