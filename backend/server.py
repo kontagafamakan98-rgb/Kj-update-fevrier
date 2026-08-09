@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request, Response, Query
+from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.gzip import GZipMiddleware
@@ -13,7 +14,7 @@ import logging.handlers
 import sys
 import re
 from pathlib import Path
-from pydantic import BaseModel, Field, EmailStr, validator, ValidationError
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator, ValidationError
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -725,21 +726,24 @@ class User(BaseModel):
     
     is_owner: bool = False
 
-    @validator('is_owner', always=True)
-    def compute_is_owner(cls, v, values):
+    @model_validator(mode='after')
+    def compute_is_owner(self):
         """
         Determine reel du statut owner : par email, la meme methode utilisee
         partout ailleurs dans ce backend (voir verify_owner_access). On ne se
         fie pas a un champ "is_owner" ou "user_type" potentiellement absent/
         obsolete en base pour les comptes crees avant l'introduction de ce
         systeme.
+        Migré de @validator(always=True) V1 → @model_validator(mode='after') V2.
         """
-        email = values.get('email')
-        if not email or not OWNER_EMAIL:
-            return False
-        return str(email).strip().lower() == OWNER_EMAIL.strip().lower()
+        if not self.email or not OWNER_EMAIL:
+            self.is_owner = False
+        else:
+            self.is_owner = str(self.email).strip().lower() == OWNER_EMAIL.strip().lower()
+        return self
 
-    @validator('phone')
+    @field_validator('phone')
+    @classmethod
     def validate_phone(cls, v):
         """Nettoie et valide le numéro de téléphone pour l'Afrique de l'Ouest"""
         if not v:
@@ -793,11 +797,11 @@ class User(BaseModel):
 
 class WorkerProfile(BaseModel):
     user_id: str
-    specialties: List[str] = Field(default=[], max_items=10)  # Max 10 specialties
+    specialties: List[str] = Field(default=[], max_length=10)  # Max 10 specialties
     experience_years: int = Field(default=0, ge=0, le=50)  # 0-50 years experience
 
     cv_file: Optional[str] = Field(None, max_length=500)  # File path length limit
-    portfolio_images: List[str] = Field(default=[], max_items=10)  # Max 10 portfolio images
+    portfolio_images: List[str] = Field(default=[], max_length=10)  # Max 10 portfolio images
     availability: bool = True
     description: Optional[str] = Field(None, max_length=1000)  # Description length limit
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -814,7 +818,7 @@ class Job(BaseModel):
     location: dict = Field(...)  # Location structure
     country: Optional[str] = None
     status: JobStatus = JobStatus.OPEN
-    required_skills: List[str] = Field(default=[], max_items=20)  # Max 20 skills
+    required_skills: List[str] = Field(default=[], max_length=20)  # Max 20 skills
     estimated_duration: Optional[str] = Field(None, max_length=100)  # Duration string limit
     posted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deadline: Optional[datetime] = None
@@ -827,9 +831,10 @@ class Job(BaseModel):
     parts_and_tools_notes: Optional[str] = Field(None, max_length=1000)  # Notes length limit
     
     # Validation custom pour budget cohérent
-    @validator('budget_max')
-    def budget_max_must_be_greater_than_min(cls, v, values):
-        if 'budget_min' in values and v < values['budget_min']:
+    @field_validator('budget_max')
+    @classmethod
+    def budget_max_must_be_greater_than_min(cls, v, info):
+        if 'budget_min' in info.data and v < info.data['budget_min']:
             raise ValueError('budget_max must be greater than or equal to budget_min')
         return v
 
@@ -975,13 +980,15 @@ class UserRegister(BaseModel):
     legal_documents_accepted_at: Optional[datetime] = None
     legal_documents_version: str = Field(min_length=5, max_length=120)
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def password_must_be_strong(cls, v):
         if not v or len(v.strip()) < 6:
             raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
         return v
     
-    @validator('email')
+    @field_validator('email')
+    @classmethod
     def email_no_injection(cls, v):
         # Vérifier que l'email ne contient pas de tentatives d'injection
         email_str = str(v)
@@ -989,13 +996,15 @@ class UserRegister(BaseModel):
             raise ValueError("L'adresse email contient des caractères non autorisés")
         return v
     
-    @validator('first_name', 'last_name')
+    @field_validator('first_name', 'last_name')
+    @classmethod
     def names_no_injection(cls, v):
         if SQL_INJECTION_PATTERN.search(v):
             raise ValueError("Le nom contient des caractères non autorisés")
         return v
 
-    @validator('legal_documents_accepted')
+    @field_validator('legal_documents_accepted')
+    @classmethod
     def legal_documents_must_be_accepted(cls, v):
         if v is not True:
             raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d’utilisation est obligatoire")
@@ -1030,13 +1039,15 @@ class UserWithPayment(BaseModel):
     payment_accounts: PaymentAccount
     email_verification_token: Optional[str] = None
     
-    @validator('password')
+    @field_validator('password')
+    @classmethod
     def password_must_be_strong(cls, v):
         if not v or len(v.strip()) < 6:
             raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
         return v
 
-    @validator('legal_documents_accepted')
+    @field_validator('legal_documents_accepted')
+    @classmethod
     def legal_documents_must_be_accepted(cls, v):
         if v is not True:
             raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d’utilisation est obligatoire")
@@ -1070,7 +1081,8 @@ class PasswordResetConfirmRequest(BaseModel):
     verification_token: str = Field(min_length=20)
     new_password: str = Field(min_length=6, max_length=128)
 
-    @validator('new_password')
+    @field_validator('new_password')
+    @classmethod
     def password_must_be_strong(cls, v):
         if not v or len(v.strip()) < 6:
             raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
@@ -1083,7 +1095,7 @@ class JobCreate(BaseModel):
     budget_min: float = Field(ge=0.0, le=10000000.0)
     budget_max: float = Field(ge=0.0, le=10000000.0)
     location: dict = Field(...)
-    required_skills: List[str] = Field(default=[], max_items=20)
+    required_skills: List[str] = Field(default=[], max_length=20)
     estimated_duration: Optional[str] = Field(None, max_length=100)
     deadline: Optional[datetime] = None
     # Nouvelles informations pour mécaniciens avec validation
@@ -1091,9 +1103,10 @@ class JobCreate(BaseModel):
     mechanic_must_bring_tools: bool = False
     parts_and_tools_notes: Optional[str] = Field(None, max_length=1000)
     
-    @validator('budget_max')
-    def budget_max_must_be_greater_than_min(cls, v, values):
-        if 'budget_min' in values and v < values['budget_min']:
+    @field_validator('budget_max')
+    @classmethod
+    def budget_max_must_be_greater_than_min(cls, v, info):
+        if 'budget_min' in info.data and v < info.data['budget_min']:
             raise ValueError('budget_max must be greater than or equal to budget_min')
         return v
 
@@ -1139,7 +1152,7 @@ async def store_notification(
         related_id=related_id,
         related_type=related_type,
     )
-    await db.notifications.insert_one(notif.dict())
+    await db.notifications.insert_one(notif.model_dump())
     return notif
 
 
@@ -2292,7 +2305,7 @@ async def register_user_verified(user_data: UserWithPayment):
             logger.error(f"❌ Erreur création utilisateur: {str(e)}")
             log_and_raise_http_exception(500, "Erreur lors de la création du compte utilisateur")
         
-        await db.users.insert_one(user.dict())
+        await db.users.insert_one(user.model_dump())
         await db.email_otps.delete_one({"email": clean_email, "purpose": "signup"})
         
         # Créer le profil travailleur si c'est un travailleur avec des informations supplémentaires
@@ -2310,7 +2323,7 @@ async def register_user_verified(user_data: UserWithPayment):
                 updated_at=datetime.now(timezone.utc)
             )
             
-            await db.worker_profiles.insert_one(worker_profile.dict())
+            await db.worker_profiles.insert_one(worker_profile.model_dump())
             worker_profile_created = True
             logger.info(f"✅ Profil travailleur créé pour {user.email}")
         
@@ -2320,7 +2333,7 @@ async def register_user_verified(user_data: UserWithPayment):
         response_data = {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": user.dict(exclude={"password_hash"}),
+            "user": user.model_dump(exclude={"password_hash"}),
             "payment_verification": {
                 "linked_accounts": payment_validation["linked_accounts_count"],
                 "required_minimum": 2 if user_data.user_type == "worker" else 1,
@@ -2360,14 +2373,14 @@ async def register_user(user_data: UserRegister):
         
         # Create new user with sanitized email
         hashed_password = hash_password(user_data.password)
-        user_dict = user_data.dict(exclude={"password"})
+        user_dict = user_data.model_dump(exclude={"password"})
         user_dict["email"] = clean_email  # Use sanitized email
         user = User(
             **user_dict,
             password_hash=hashed_password
         )
         
-        await db.users.insert_one(user.dict())
+        await db.users.insert_one(user.model_dump())
         
         # Create access token
         access_token = create_access_token(data={"sub": user.id, "email": user.email})
@@ -2375,7 +2388,7 @@ async def register_user(user_data: UserRegister):
         return {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": user.dict(exclude={"password_hash"})
+            "user": user.model_dump(exclude={"password_hash"})
         }
     
     except ValidationError as e:
@@ -2430,7 +2443,7 @@ async def login_user(credentials: UserLogin):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": User(**user).dict(exclude={"password_hash"})
+        "user": User(**user).model_dump(exclude={"password_hash"})
     }
 
 @api_router.post("/auth/logout")
@@ -2460,11 +2473,11 @@ async def logout_user(
 # User Routes
 @api_router.get("/auth/me")
 async def get_current_user_auth(current_user: User = Depends(get_current_user)):
-    return current_user.dict(exclude={"password_hash"})
+    return current_user.model_dump(exclude={"password_hash"})
 
 @api_router.get("/users/profile")
 async def get_profile(current_user: User = Depends(get_current_user)):
-    return current_user.dict(exclude={"password_hash"})
+    return current_user.model_dump(exclude={"password_hash"})
 
 @api_router.put("/users/profile")
 async def update_profile(
@@ -2598,7 +2611,7 @@ async def create_support_ticket(ticket_data: SupportTicketCreate):
         message=ticket_data.message.strip(),
         channel=ticket_data.channel,
     )
-    await db.support_tickets.insert_one(ticket.dict())
+    await db.support_tickets.insert_one(ticket.model_dump())
     return {
         "message": "Merci, votre demande a bien été envoyée. Notre équipe vous répondra dans les meilleurs délais.",
         "ticket_id": ticket.id,
@@ -2613,7 +2626,7 @@ async def list_support_tickets(
     if status_filter:
         query["status"] = status_filter
     tickets = await db.support_tickets.find(query).sort("created_at", -1).to_list(500)
-    return [SupportTicket(**t).dict() for t in tickets]
+    return [SupportTicket(**t).model_dump() for t in tickets]
 
 @api_router.patch("/support/tickets/{ticket_id}/status")
 async def update_support_ticket_status(
@@ -2631,7 +2644,7 @@ async def update_support_ticket_status(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Demande de support introuvable")
     updated = await db.support_tickets.find_one({"id": ticket_id})
-    return SupportTicket(**updated).dict()
+    return SupportTicket(**updated).model_dump()
 
 # Push Token Routes - For Mobile Notifications
 @api_router.post("/users/push-token")
@@ -2684,7 +2697,7 @@ async def register_push_token(
                 device_id=token_data.device_id
             )
             
-            await db.push_tokens.insert_one(push_token.dict())
+            await db.push_tokens.insert_one(push_token.model_dump())
             logger.info(f"Created new push token for user: {current_user.id}")
             
             return {
@@ -2787,7 +2800,7 @@ async def get_notifications(
     unread_count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
 
     return {
-        "notifications": [Notification(**n).dict() for n in notifications],
+        "notifications": [Notification(**n).model_dump() for n in notifications],
         "unread_count": unread_count,
         "total": len(notifications),
     }
@@ -2854,7 +2867,7 @@ async def create_worker_profile(
         raise HTTPException(status_code=403, detail="Only workers can create worker profiles")
     
     profile_data.user_id = current_user.id
-    await db.worker_profiles.insert_one(profile_data.dict())
+    await db.worker_profiles.insert_one(profile_data.model_dump())
     return {"message": "Worker profile created successfully"}
 
 @api_router.get("/workers/profile")
@@ -2979,8 +2992,8 @@ async def create_job(
         except Exception as validation_error:
             raise HTTPException(status_code=422, detail=str(validation_error))
 
-        job = Job(**validated_input.dict(), client_id=current_user.id, country=current_user.country)
-        result = await db.jobs.insert_one(job.dict())
+        job = Job(**validated_input.model_dump(), client_id=current_user.id, country=current_user.country)
+        result = await db.jobs.insert_one(job.model_dump())
 
         if not result.inserted_id:
             raise HTTPException(status_code=500, detail="Failed to create job")
@@ -3101,12 +3114,12 @@ async def create_proposal(
         raise HTTPException(status_code=400, detail="You have already proposed for this job")
     
     proposal = JobProposal(
-        **proposal_data.dict(),
+        **proposal_data.model_dump(),
         job_id=job_id,
         worker_id=current_user.id
     )
     
-    await db.job_proposals.insert_one(proposal.dict())
+    await db.job_proposals.insert_one(proposal.model_dump())
 
     # Notifier le client qu'une nouvelle proposition est arrivée
     client_id = job.get("client_id")
@@ -3225,7 +3238,7 @@ async def accept_job_proposal(
         job_id=job_id
     )
     try:
-        await db.messages.insert_one(auto_message.dict())
+        await db.messages.insert_one(auto_message.model_dump())
     except Exception as exc:
         logger.error(f"⚠️ Échec de l'envoi du message automatique d'acceptation: {exc}")
 
@@ -3243,7 +3256,7 @@ async def accept_job_proposal(
     updated_job = await db.jobs.find_one({"id": job_id})
     return {
         "message": "Proposition acceptée avec succès",
-        "job": Job(**updated_job).dict(),
+        "job": Job(**updated_job).model_dump(),
     }
 
 
@@ -3295,7 +3308,7 @@ async def complete_job_and_release_payment(
         # Deja verse : on se contente de cloturer le job si ce n'est pas fait
         await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
         updated_job = await db.jobs.find_one({"id": job_id})
-        return {"message": "Mission déjà clôturée et paiement déjà versé", "job": Job(**updated_job).dict(), "payout_status": "released"}
+        return {"message": "Mission déjà clôturée et paiement déjà versé", "job": Job(**updated_job).model_dump(), "payout_status": "released"}
     if current_payout_status == "releasing":
         raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
 
@@ -3340,7 +3353,7 @@ async def complete_job_and_release_payment(
         updated_job = await db.jobs.find_one({"id": job_id})
         return {
             "message": "Mission clôturée, mais le versement automatique est impossible : le travailleur n'a pas de compte Orange Money ou Wave enregistré. Un versement manuel est nécessaire.",
-            "job": Job(**updated_job).dict(),
+            "job": Job(**updated_job).model_dump(),
             "payout_status": "release_failed",
         }
 
@@ -3390,7 +3403,7 @@ async def complete_job_and_release_payment(
         updated_job = await db.jobs.find_one({"id": job_id})
         return {
             "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
-            "job": Job(**updated_job).dict(),
+            "job": Job(**updated_job).model_dump(),
             "payout_status": "release_failed",
         }
 
@@ -3413,7 +3426,7 @@ async def complete_job_and_release_payment(
             receiver_id=worker_id,
             content=worker_message,
             job_id=job_id
-        ).dict())
+        ).model_dump())
     except Exception as exc:
         logger.error(f"⚠️ Échec de l'envoi du message automatique de fin de mission: {exc}")
 
@@ -3447,7 +3460,7 @@ async def complete_job_and_release_payment(
     updated_job = await db.jobs.find_one({"id": job_id})
     return {
         "message": "Mission clôturée avec succès",
-        "job": Job(**updated_job).dict(),
+        "job": Job(**updated_job).model_dump(),
         "payout_status": final_payout_status,
     }
 
@@ -3561,7 +3574,7 @@ async def get_job_proposals(
 
     enriched = []
     for p in proposals:
-        proposal_out = JobProposal(**p).dict()
+        proposal_out = JobProposal(**p).model_dump()
         worker = workers_by_id.get(p.get("worker_id"))
         if worker:
             full_name = f"{worker.get('first_name', '')} {worker.get('last_name', '')}".strip()
@@ -3638,8 +3651,8 @@ async def send_message(
         job_id=message_data.job_id
     )
 
-    await db.messages.insert_one(message.dict())
-    return message.dict()
+    await db.messages.insert_one(message.model_dump())
+    return message.model_dump()
 
 @api_router.get("/messages")
 async def get_all_messages(current_user: User = Depends(get_current_user)):
@@ -3698,7 +3711,7 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
             other_user = await db.users.find_one({"id": other_user_id})
             if other_user:
                 other_user_dict = {k: v for k, v in other_user.items() if k != "_id"}
-                conv["other_user"] = User(**other_user_dict).dict(exclude={"password_hash"})
+                conv["other_user"] = User(**other_user_dict).model_dump(exclude={"password_hash"})
                 first_name = other_user.get("first_name", "").strip()
                 last_name = other_user.get("last_name", "").strip()
                 full_name = f"{first_name} {last_name}".strip()
@@ -5003,38 +5016,37 @@ if ENABLE_TRUSTED_HOST_MIDDLEWARE:
 
 # Add custom security middleware
 app.add_middleware(WestAfricaSecurityMiddleware)
-app.add_middleware(RateLimitMiddleware)
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialiser le système au démarrage"""
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """
+    Gestionnaire de cycle de vie de l'application (remplace les anciens
+    @app.on_event('startup') / @app.on_event('shutdown') dépréciés depuis
+    FastAPI 0.93 / Starlette 0.27). Tout ce qui est avant le `yield` s'exécute
+    au démarrage, tout ce qui est après au shutdown.
+    """
+    # ---- STARTUP ----
     logger.info("🚀 Démarrage de l'API Kojo...")
 
-    # Créer le compte propriétaire s'il n'existe pas.
-    # Protégé par try/except : un souci de bootstrap (compte déjà existant,
-    # doublon, etc.) ne doit jamais empêcher l'API de démarrer.
     try:
         await ensure_owner_exists()
     except Exception as exc:
         logger.error(f"⚠️ ensure_owner_exists() a échoué, démarrage poursuivi quand même: {exc}")
 
-    # Créer les index MongoDB pour les performances
     try:
         await create_database_indexes()
     except Exception as exc:
         logger.error(f"⚠️ create_database_indexes() a échoué, démarrage poursuivi quand même: {exc}")
 
-    # Créer le dossier uploads
-    uploads_dir = Path("uploads")
-    uploads_dir.mkdir(exist_ok=True)
+    Path("uploads").mkdir(exist_ok=True)
     logger.info("📁 Dossier uploads créé/vérifié")
 
-    # Purge périodique du compteur de rate-limiting (voir commentaire au-dessus
-    # de request_counts) pour éviter une fuite mémoire sur un process longue durée
     asyncio.create_task(_rate_limit_cleanup_loop())
-
     logger.info("✅ API Kojo prête!")
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
+    yield  # l'application tourne ici
+
+    # ---- SHUTDOWN ----
     client.close()
+
+
+app.add_middleware(RateLimitMiddleware)
