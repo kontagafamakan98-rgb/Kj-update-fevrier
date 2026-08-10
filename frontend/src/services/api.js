@@ -1,3 +1,9 @@
+// URL de fallback — utilisée SEULEMENT si aucune variable d'environnement
+// n'est définie. En production Vercel, définir VITE_API_URL dans les
+// variables d'environnement Vercel pour pointer vers le bon backend Render.
+// Laisser cette valeur en dur est acceptable en tant que dernier recours
+// (l'URL Render ne change pas souvent), mais la var d'env est préférable
+// car elle permet de changer de backend sans modifier le code.
 const DEFAULT_API_BASE_URL = 'https://kojo-backend-03az.onrender.com/api';
 
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');

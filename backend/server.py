@@ -41,7 +41,9 @@ try:
     WEBPUSH_AVAILABLE = True
 except ImportError:
     WEBPUSH_AVAILABLE = False
-    logger.warning("⚠️ pywebpush non installé - notifications push désactivées")
+    # logger n'est pas encore initialisé ici — on utilise print()
+    # Le message sera répété via logger une fois le logging configuré.
+    print("⚠️ pywebpush non installé - notifications push désactivées")
 
 # Configure logging for West Africa production
 for stream in (sys.stdout, sys.stderr):
@@ -65,6 +67,10 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("kojo_backend")
+
+# Maintenant que le logger est prêt, on peut réémettre le warning pywebpush
+if not WEBPUSH_AVAILABLE:
+    logger.warning("⚠️ pywebpush non installé - notifications push désactivées")
 
 # Silence noisy /favicon.ico (and other junk) requests from uvicorn's access
 # log entirely - browsers, bots and health checks hit this path constantly
@@ -315,7 +321,18 @@ OWNER_USER_ID = os.environ.get('OWNER_USER_ID', 'famakan_kontaga_master_2024').s
 OWNER_INITIAL_PASSWORD = os.environ.get('OWNER_INITIAL_PASSWORD', '').strip()
 
 # Create the main app without a prefix
-app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & Senegal")
+_is_prod = APP_ENV in ("production", "prod")
+app = FastAPI(
+    title="Kojo API",
+    description="Service/Worker Platform for Mali & Senegal",
+    # Désactive la documentation interactive en production — /docs et /redoc
+    # exposent le schéma complet de l'API (noms de routes, modèles, types)
+    # ce qui facilite la reconnaissance pour un attaquant. Inutile en prod
+    # puisque le frontend n'en a pas besoin.
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
+)
 
 # Middleware pour compression gzip (optimisation réseaux lents Afrique de l'Ouest)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
