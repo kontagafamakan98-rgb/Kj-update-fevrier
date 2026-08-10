@@ -90,7 +90,9 @@ mongodb-data/
 # réellement utilisé par server.py en prod (contient d'anciennes photos de
 # profil utilisateurs committées par erreur).
 uploads/
-backup_*/
+# Fichiers de config personnels — jamais dans le repo
+.gitconfig
+
 *_extract/
 kojo-emergency-backup*/
 
