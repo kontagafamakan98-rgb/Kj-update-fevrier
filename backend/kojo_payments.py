@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Intégration PayDunya : canaux, factures, statuts, décaissements."""
 
-import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -16,7 +15,6 @@ from kojo_settings import (
     PAYDUNYA_MASTER_KEY,
     PAYDUNYA_MODE,
     PAYDUNYA_PRIVATE_KEY,
-    PAYDUNYA_STORE_NAME,
     PAYDUNYA_TOKEN,
     PAYDUNYA_DISBURSE_BASE_URL,
     PAYMENT_COMMISSION_RATE,

@@ -3,14 +3,13 @@
 
 import base64
 import hashlib
-import os
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import jwt
 import requests
@@ -23,17 +22,14 @@ from kojo_settings import (
     BREVO_SENDER_EMAIL,
     BREVO_SENDER_NAME,
     EMAIL_OTP_EXPIRY_MINUTES,
-    EMAIL_OTP_MAX_ATTEMPTS,
     EMAIL_OTP_RESEND_COOLDOWN_SECONDS,
     EMAIL_OTP_SECRET,
     EMAIL_PROVIDER,
     EMAIL_VERIFICATION_TOKEN_MINUTES,
-    FRONTEND_APP_URL,
     GMAIL_ACCESS_TOKEN_CACHE,
     GMAIL_ACCESS_TOKEN_SAFETY_SECONDS,
     GMAIL_CLIENT_ID,
     GMAIL_CLIENT_SECRET,
-    GMAIL_DEPRECATED_NOTICE,
     GMAIL_REFRESH_TOKEN,
     GMAIL_SENDER_EMAIL,
     GMAIL_SENDER_NAME,
