@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
 from kojo_core import db
+from kojo_shared import _send_payment_pending_to_worker
 from kojo_models import (
     Country, EmailOtpRequest, EmailOtpResendRequest,
     EmailOtpVerifyRequest, Job, JobCreate, JobProposal, JobStatus, Language,

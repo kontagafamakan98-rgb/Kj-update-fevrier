@@ -39,6 +39,18 @@ jobs:
         working-directory: backend
         run: python -m py_compile server.py tests/*.py
 
+      - name: Static check — no undefined names (pyflakes)
+        working-directory: backend
+        run: |
+          pip install --quiet pyflakes
+          UNDEFINED=$(python -m pyflakes kojo_*.py server.py | grep "undefined name" || true)
+          if [ -n "$UNDEFINED" ]; then
+            echo "$UNDEFINED"
+            echo "::error::Noms non définis détectés (imports manquants lors du découpage)"
+            exit 1
+          fi
+          echo "✓ Aucun nom non défini dans les modules kojo_*"
+
       - name: Run tests against real MongoDB
         working-directory: backend
         env:
