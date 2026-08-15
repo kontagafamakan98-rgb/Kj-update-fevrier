@@ -95,12 +95,25 @@ class FakeCollection:
             return {k: v for k, v in doc.items() if k in include}
         return {k: v for k, v in doc.items() if k not in exclude and k != "_id"}
 
-    async def find_one(self, query=None, projection=None):
+    async def find_one(self, query=None, projection=None, sort=None):
+        """find_one avec tri optionnel (utilisé par ex. par la clôture de
+        mission pour retrouver le paiement le plus récent).
+        Accepte sort="field" ou sort=[("field", -1)] comme le vrai Mongo."""
         query = query or {}
-        for doc in self._docs:
-            if self._match(query, doc):
-                return self._project(doc, projection)
-        return None
+        matches = [d for d in self._docs if self._match(query, d)]
+        if sort and len(matches) > 1:
+            if isinstance(sort, list):
+                sort_key, sort_dir = sort[0]
+            else:
+                sort_key, sort_dir = sort, 1
+            matches = sorted(
+                matches,
+                key=lambda d: str(d.get(sort_key, "")),
+                reverse=sort_dir == -1,
+            )
+        if not matches:
+            return None
+        return self._project(matches[0], projection)
 
     def find(self, query=None, projection=None):
         query = query or {}
@@ -145,6 +158,31 @@ class FakeCollection:
                 return result
         result = MagicMock()
         result.deleted_count = 0
+        return result
+
+    async def update_many(self, query: Dict, update: Dict):
+        """Met à jour tous les documents correspondants (utilisé par
+        l'acceptation de proposition pour rejeter les autres)."""
+        matched = 0
+        for doc in self._docs:
+            if not self._match(query, doc):
+                continue
+            matched += 1
+            if "$set" in update:
+                doc.update(update["$set"])
+            if "$push" in update:
+                for k, v in update["$push"].items():
+                    doc.setdefault(k, []).append(v)
+        result = MagicMock()
+        result.matched_count = matched
+        result.modified_count = matched
+        return result
+
+    async def delete_many(self, query: Dict):
+        before = len(self._docs)
+        self._docs = [d for d in self._docs if not self._match(query, d)]
+        result = MagicMock()
+        result.deleted_count = before - len(self._docs)
         return result
 
     async def count_documents(self, query=None):
