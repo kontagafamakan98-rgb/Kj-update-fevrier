@@ -87,7 +87,7 @@ cd frontend && npm test
 | `APP_ENV` | ✅ | `production` (désactive `/docs`, active HSTS, CORS strict) |
 | `DB_NAME` | | défaut `kojo_db` |
 | `RENDER_EXTERNAL_HOSTNAME` | 🔄 auto | Injecté par Render ; ajouté aux hôtes de confiance au boot |
-| `VERCEL_PROJECT_NAME` | recommandé | Restreint le CORS aux sous-domaines Vercel du projet |
+| `VERCEL_PROJECT_NAME` | recommandé | **`kj-update-fevrier`** — restreint le CORS aux seuls domaines du projet Vercel Kojo (`kj-update-fevrier*.vercel.app`) au lieu de tout `*.vercel.app` (surface d'attaque évitable) |
 
 **Pièges à connaître (leçons du terrain)** :
 
@@ -174,7 +174,10 @@ curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 
 
 ## CI
 
-`.github/workflows/ci.yml` : tests backend contre un vrai MongoDB (service
-container), syntaxe Python (`py_compile`), **pyflakes (aucun nom non défini
-dans les modules `kojo_*` — garde-fou contre les imports manquants du
-découpage)**, tests Vitest + build Vite sur Node 24.
+`.github/workflows/ci.yml` (3 jobs) :
+- **backend-tests** : tests contre un vrai MongoDB (service container),
+  syntaxe Python (`py_compile`), **pyflakes (aucun nom non défini dans les
+  modules `kojo_*` — garde-fou contre les imports manquants du découpage)**
+- **frontend-build** : tests Vitest + build Vite sur Node 24
+- **mobile-build** : `cap sync android` + build APK debug (Gradle 8.14 /
+  AGP 8.13, Java 17, SDK Android) — valide la config Capacitor à chaque push

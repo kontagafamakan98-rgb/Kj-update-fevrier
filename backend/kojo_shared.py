@@ -7,7 +7,6 @@ import json as _json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import HTTPException
 
 from kojo_core import db
 from kojo_models import Message, Notification, NotificationType

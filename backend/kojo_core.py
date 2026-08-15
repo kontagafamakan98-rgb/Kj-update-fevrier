@@ -8,13 +8,13 @@ import time
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import bcrypt
 import jwt
 from cloudinary import uploader as cloudinary_uploader
-from fastapi import Depends, HTTPException, Request, Response, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -22,10 +22,7 @@ from starlette.responses import JSONResponse
 
 from kojo_models import PaymentAccount, User
 from kojo_settings import (
-    APP_ENV,
     BACKEND_PUBLIC_URL,
-    DEFAULT_SECURITY_HEADERS,
-    DOCS_SECURITY_HEADERS,
     FRONTEND_APP_URL,
     JWT_ALGORITHM,
     JWT_EXPIRATION_HOURS,
