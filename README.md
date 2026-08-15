@@ -180,4 +180,5 @@ curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 
   modules `kojo_*` — garde-fou contre les imports manquants du découpage)**
 - **frontend-build** : tests Vitest + build Vite sur Node 24
 - **mobile-build** : `cap sync android` + build APK debug (Gradle 8.14 /
-  AGP 8.13, Java 17, SDK Android) — valide la config Capacitor à chaque push
+  AGP 8.13, **Java 21** — requis par Capacitor 8, SDK Android) — valide la
+  config Capacitor à chaque push
