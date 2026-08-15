@@ -104,6 +104,13 @@ export default function Navbar() {
           </div>
 
           <div className="md:hidden flex items-center">
+            {user && (
+              <div className="mr-1">
+                {/* Cloche notifications accessible directement depuis le header
+                    mobile, sans passer par le menu */}
+                <NotificationDropdown />
+              </div>
+            )}
             <button
               aria-label={isMobileMenuOpen ? t('closeMenu') : t('openMenu')}
               aria-expanded={isMobileMenuOpen}
@@ -162,9 +169,6 @@ export default function Navbar() {
                   <Link to="/support" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     Support
                   </Link>
-                  <div className="px-4 py-2 border-t border-gray-100">
-                    <NotificationDropdown />
-                  </div>
                   <div className="pt-2">
                     <button onClick={handleLogout} className="w-full rounded-2xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors">
                       {t('logout')}

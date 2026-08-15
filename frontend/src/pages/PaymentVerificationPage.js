@@ -7,6 +7,7 @@ import PaymentAccountSetup from '../components/PaymentAccountSetup';
 import CountryDisplay from '../components/CountryDisplay';
 import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry } from '../services/geolocationService';
+import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
@@ -34,6 +35,9 @@ const PaymentVerificationPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [errorKey, setErrorKey] = useState('');
+  // Erreurs de champ renvoyées par le backend, transmises au formulaire pour
+  // un affichage sous le champ concerné (ex: « Numéro Orange Money invalide »).
+  const [serverFieldErrors, setServerFieldErrors] = useState(null);
   const displayedError = errorKey ? pageT(errorKey) : error;
   const [detectedCountry, setDetectedCountry] = useState(null);
   const [geoLoading, setGeoLoading] = useState(true);
@@ -108,6 +112,7 @@ const PaymentVerificationPage = () => {
     setLoading(true);
     setError(null);
     setErrorKey('');
+    setServerFieldErrors(null);
 
     try {
       devLog.info('🏦 Finalisation du compte après email vérifié...');
@@ -126,6 +131,14 @@ const PaymentVerificationPage = () => {
       );
 
       if (!result.success) {
+        // Erreur de validation d'un compte précis (ex: « Numéro Orange Money
+        // invalide ») : on la transmet au formulaire pour l'afficher sous le
+        // champ concerné, sans bannière générale dupliquée.
+        const fieldError = mapPaymentAccountErrorToField(result.error);
+        if (fieldError) {
+          setServerFieldErrors({ [fieldError.field]: fieldError.message });
+          return;
+        }
         throw new Error(result.error);
       }
 
@@ -311,6 +324,7 @@ const PaymentVerificationPage = () => {
           userType={effectiveUser.user_type}
           isRegistration={isRegistrationFlow}
           initialAccounts={prefilledPaymentAccounts}
+          serverFieldErrors={serverFieldErrors}
           onComplete={isRegistrationFlow ? handleRegistrationCompletion : handleExistingAccountCompletion}
         />
 

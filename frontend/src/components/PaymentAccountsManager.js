@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import PaymentAccountService from '../services/paymentAccountService';
-import { detectUserCountry, getPhoneExampleForCountry, getPopularBanksByCountry } from '../services/geolocationService';
+import { detectUserCountry, getPhoneExampleForCountry, getPhonePrefixByCountry, getPopularBanksByCountry } from '../services/geolocationService';
+import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { devLog, safeLog } from '../utils/env';
 
 const PaymentAccountsManager = ({ onSuccess }) => {
@@ -123,6 +124,13 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       const prefix = cleanNumber.substring(0, 3);
       return `+${prefix}${cleanNumber.substring(3)}`;
     }
+    // Numéro local sans indicatif (8-9 chiffres, zéro initial éventuel) :
+    // on ajoute automatiquement l'indicatif du pays détecté pour correspondre
+    // au format international exigé par le backend (ex: 771234567 → +221771234567).
+    const local = cleanNumber.startsWith('0') ? cleanNumber.slice(1) : cleanNumber;
+    if (local.length >= 8 && local.length <= 9 && detectedCountry?.code) {
+      return `${getPhonePrefixByCountry(detectedCountry.code)}${local}`;
+    }
     return number;
   };
 
@@ -183,7 +191,15 @@ const PaymentAccountsManager = ({ onSuccess }) => {
         // Reload to get updated data immediately without timer noise
         await loadPaymentAccounts();
       } else {
-        setError(result.error || t('updateError'));
+        // Erreur backend avec un champ précis (ex: « Numéro Wave invalide ») :
+        // affichée sous le champ concerné au lieu d'une erreur générale.
+        const fieldError = mapPaymentAccountErrorToField(result.error);
+        if (fieldError) {
+          setValidationErrors({ [fieldError.field]: fieldError.message });
+          setError('');
+        } else {
+          setError(result.error || t('updateError'));
+        }
       }
     } catch (error) {
       safeLog.error('Erreur sauvegarde comptes:', error);
@@ -202,10 +218,13 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   };
 
   const getLinkedAccountsCount = () => {
+    // Compter UNIQUEMENT les numéros valides au format international (indicatif
+    // pays requis, aligné sur la validation backend). Un numéro incomplet ou
+    // sans indicatif ne doit pas être compté comme un compte lié.
     let count = 0;
-    if (accounts.orange_money?.trim()) count++;
-    if (accounts.wave?.trim()) count++;
-    if (accounts.bank_account?.account_number?.trim()) count++;
+    if (accounts.orange_money?.trim() && validateOrangeMoneyNumber(accounts.orange_money)) count++;
+    if (accounts.wave?.trim() && validateWaveNumber(accounts.wave)) count++;
+    if (accounts.bank_account?.account_number?.trim() && validateBankAccount(accounts.bank_account)) count++;
     return count;
   };
 

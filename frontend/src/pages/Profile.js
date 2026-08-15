@@ -232,7 +232,12 @@ function ProfileView({ profile, t }) {
   );
 }
 
-function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
+export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
+  // getAvailableLanguagesForCountry vient du contexte de langue : il était
+  // référencé ici sans être importé ni reçu en prop, ce qui faisait planter
+  // le formulaire d'édition du profil (ReferenceError) à chaque clic sur
+  // « Modifier » — corrigé en le récupérant directement depuis useLanguage().
+  const { getAvailableLanguagesForCountry } = useLanguage();
   const [formData, setFormData] = useState({
     first_name: profile.first_name || '',
     last_name: profile.last_name || '',

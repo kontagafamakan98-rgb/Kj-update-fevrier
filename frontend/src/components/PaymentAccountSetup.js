@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { detectUserCountry, getPhoneExampleForCountry, getPopularBanksByCountry } from '../services/geolocationService';
+import { detectUserCountry, getPhoneExampleForCountry, getPhonePrefixByCountry, getPopularBanksByCountry } from '../services/geolocationService';
+import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
 import { getAuthToken } from '../services/api';
@@ -19,7 +20,7 @@ const createDefaultAccounts = (initialAccounts = null) => ({
   }
 });
 
-const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration = false, initialAccounts = null }) => {
+const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration = false, initialAccounts = null, serverFieldErrors = null }) => {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [accounts, setAccounts] = useState(() => createDefaultAccounts(initialAccounts));
@@ -45,6 +46,14 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     }
   }, [initialAccounts]);
 
+  // Erreurs de champ renvoyées par le backend (ex: inscription finale) :
+  // affichées sous le champ concerné comme les erreurs de validation locales.
+  useEffect(() => {
+    if (serverFieldErrors && Object.keys(serverFieldErrors).length > 0) {
+      setValidationErrors((prev) => ({ ...prev, ...serverFieldErrors }));
+    }
+  }, [serverFieldErrors]);
+
   const detectUserCountryAsync = async () => {
     try {
       const country = await detectUserCountry();
@@ -58,12 +67,16 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
   };
 
   useEffect(() => {
-    // Compter les comptes liés
+    // Compter les comptes liés — UNIQUEMENT les numéros valides au format
+    // international (indicatif pays + numéro). Un champ rempli mais invalide
+    // (ex: 771234567 sans le +221) ne doit pas afficher « ✅ Valide » : le
+    // backend rejetterait le numéro au moment de la soumission.
     let count = 0;
-    if (accounts.orange_money.trim()) count++;
-    if (accounts.wave.trim()) count++;
+    if (accounts.orange_money.trim() && validateOrangeMoneyNumber(accounts.orange_money)) count++;
+    if (accounts.wave.trim() && validateWaveNumber(accounts.wave)) count++;
     if (accounts.bank_account && accounts.bank_account.account_number.trim() && 
-        accounts.bank_account.bank_name.trim() && accounts.bank_account.account_holder.trim()) count++;
+        accounts.bank_account.bank_name.trim() && accounts.bank_account.account_holder.trim() &&
+        validateBankAccount(accounts.bank_account)) count++;
     setLinkedAccountsCount(count);
   }, [accounts]);
 
@@ -105,6 +118,13 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     if (cleanNumber.length >= 11) {
       const prefix = cleanNumber.substring(0, 3);
       return `+${prefix}${cleanNumber.substring(3)}`;
+    }
+    // Numéro local sans indicatif (8-9 chiffres, zéro initial éventuel) :
+    // on ajoute automatiquement l'indicatif du pays détecté pour correspondre
+    // au format international exigé par le backend (ex: 771234567 → +221771234567).
+    const local = cleanNumber.startsWith('0') ? cleanNumber.slice(1) : cleanNumber;
+    if (local.length >= 8 && local.length <= 9 && detectedCountry?.code) {
+      return `${getPhonePrefixByCountry(detectedCountry.code)}${local}`;
     }
     return number;
   };
@@ -205,7 +225,15 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
 
     } catch (error) {
       safeLog.error('Erreur validation comptes:', error);
-      setValidationErrors({ general: error.message });
+      // Erreur backend avec un champ précis (ex: « Numéro Orange Money
+      // invalide ») → affichée SOUS le champ concerné, pas en erreur générale.
+      const fieldError = mapPaymentAccountErrorToField(error.message);
+      setValidationErrors((prev) => ({
+        ...prev,
+        ...(fieldError
+          ? { [fieldError.field]: fieldError.message }
+          : { general: error.message }),
+      }));
     } finally {
       setLoading(false);
     }
