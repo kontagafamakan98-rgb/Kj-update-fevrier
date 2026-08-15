@@ -136,13 +136,12 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # compileSdk 36 (variables.gradle) : pré-installer la plateforme et
-      # les build-tools, sinon AGP tente un téléchargement dont les licences
-      # ne sont pas encore acceptées -> échec rapide du premier build.
-      - name: Install SDK platform + accept licenses
-        run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      # compileSdk 36 (variables.gradle) : accepter les licences SDK une
+      # fois pour toutes, puis laisser Gradle/AGP télécharger la plateforme
+      # et les build-tools dont il a besoin (échec rapide sinon : licences
+      # non acceptées pour platforms;android-36).
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
 
       # chmod défensif : le bit exécutable peut être perdu selon l'OS
       # d'origine du commit (ici : Windows). Le fix durable est le mode
