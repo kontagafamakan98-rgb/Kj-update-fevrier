@@ -253,17 +253,29 @@ function AppRoutes() {
               </ProtectedRoute>
             } />
             
-            {/* Test and demo routes - lazy loaded */}
-            <Route path="/mobile-test" element={
-              <ProtectedRoute>
-                <MobileTest />
-              </ProtectedRoute>
-            } />
-            <Route path="/photo-test" element={
-              <ProtectedRoute>
-                <PhotoTest />
-              </ProtectedRoute>
-            } />
+            {/* Test and demo routes - lazy loaded.
+                Gardées derrière import.meta.env.DEV : ces pages étaient
+                accessibles à N'IMPORTE QUEL utilisateur connecté en
+                production (juste derrière ProtectedRoute, pas de check
+                d'environnement). Elles n'ont d'utilité qu'en développement
+                local — en build de prod, ces routes ne sont plus enregistrées. */}
+            {import.meta.env.DEV && (
+              <>
+                <Route path="/mobile-test" element={
+                  <ProtectedRoute>
+                    <MobileTest />
+                  </ProtectedRoute>
+                } />
+                <Route path="/photo-test" element={
+                  <ProtectedRoute>
+                    <PhotoTest />
+                  </ProtectedRoute>
+                } />
+              </>
+            )}
+            {/* /photo-debug reste disponible en prod : déjà protégée par
+                OwnerOnlyRoute (accès admin uniquement), utile pour diagnostiquer
+                un souci d'upload photo en prod sans devoir redéployer. */}
             <Route path="/photo-debug" element={
               <ProtectedRoute>
                 <OwnerOnlyRoute>

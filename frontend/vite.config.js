@@ -75,5 +75,13 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // Config Vitest — les tests utilisent `vite.config.js`, pas besoin
+    // d'un fichier séparé. Lancer avec `npm test`.
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/setupTests.js',
+      css: true,
+    },
   }
 })
