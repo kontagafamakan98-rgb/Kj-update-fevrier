@@ -58,6 +58,9 @@ venv/
 *.dylib
 *.pem
 
+# MongoDB portable local (validation hors Docker)
+.mongo-tmp/
+
 # Notebook / misc
 .ipynb_checkpoints/
 chainlit.md
