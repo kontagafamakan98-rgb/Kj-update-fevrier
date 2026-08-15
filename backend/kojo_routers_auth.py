@@ -1,12 +1,15 @@
 import asyncio
+import base64
+import io
 import jwt
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from cloudinary import uploader as cloudinary_uploader
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from kojo_core import db
 from kojo_models import (

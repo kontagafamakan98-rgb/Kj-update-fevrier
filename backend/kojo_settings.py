@@ -135,6 +135,9 @@ PAYDUNYA_TOKEN = os.environ.get('PAYDUNYA_TOKEN', '').strip()
 
 PAYDUNYA_STORE_NAME = os.environ.get('PAYDUNYA_STORE_NAME', 'KOJO')
 
+# API de décaissement PayDunya (versements aux travailleurs)
+PAYDUNYA_DISBURSE_BASE_URL = "https://app.paydunya.com/api/v2/disburse"
+
 FRONTEND_APP_URL = os.environ.get('FRONTEND_APP_URL', '').rstrip('/')
 
 BACKEND_PUBLIC_URL = os.environ.get('BACKEND_PUBLIC_URL', '').rstrip('/')
