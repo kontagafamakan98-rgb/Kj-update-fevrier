@@ -1,70 +1,55 @@
-# Getting Started with Create React App
+# Kojo — Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Application React 18 + Vite 7 + Tailwind CSS 3 + React Router 7 (SPA, PWA + Capacitor pour Android/iOS).
 
-## Available Scripts
+## Prérequis
 
-In the project directory, you can run:
+- Node.js **>= 20.19** (CI : Node 24) — voir `engines` dans `package.json`.
+- npm **>= 10**.
 
-### `npm start`
+## Installation
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```bash
+cp .env.example .env.local   # Adapter VITE_API_URL si besoin
+npm install
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Scripts
 
-### `npm test`
+| Commande | Description |
+|---|---|
+| `npm start` | Serveur de dev Vite sur http://localhost:3000 |
+| `npm run build` | Build de production dans `build/` (minifié + chunks vendor) |
+| `npm test` | Tests Vitest (jsdom) — exécution unique |
+| `npm run test:watch` | Tests en mode watch |
+| `npm run preview` | Prévisualise le build (`vite preview`) |
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Structure
 
-### `npm run build`
+```
+src/
+├── App.js               # Routage + providers
+├── pages/               # Pages (Home, Jobs, JobDetails, Messages, Payment…)
+├── components/          # Composants métier
+├── contexts/            # Auth, Language, Payment, Toast, Country, Notification
+├── i18n/                # Traductions JSON par langue (fr, en, wo, bm, mos)
+├── services/            # Appels API (api.js, paymentAccountService…)
+├── utils/               # Helpers (cache, géolocalisation, push, validation…)
+└── styles/              # CSS (Tailwind + feuilles kojo-*)
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Backend
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+L'API FastAPI attendue se configure via `VITE_API_URL` (défaut : l'URL Render
+codée en dur dans `src/services/api.js` comme dernier recours). Voir le
+`README.md` racine pour lancer le backend localement.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## PWA / Service workers
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `public/push-sw.js` : service worker **push notifications** (VAPID), seul SW
+  réellement enregistré (via `src/utils/pushRegistration.js`).
+- `public/service-worker.js` : SW « kill switch » qui nettoie les caches des
+  anciennes versions puis se désinscrit — le cache applicatif (offline) est
+  volontairement **désactivé** (`src/index.js` appelle
+  `serviceWorkerRegistration.unregister()` + purge des caches) suite à des
+  plantages en prod liés au cache.

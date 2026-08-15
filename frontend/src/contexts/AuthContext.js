@@ -157,7 +157,9 @@ export function AuthProvider({ children }) {
 
   const register = async (userData) => {
     try {
-      const response = await authAPI.register(userData);
+      // Toute inscription passe par register-verified (vérification email OTP
+      // obligatoire côté backend). userData doit contenir email_verification_token.
+      const response = await authAPI.registerVerified(userData);
       const { access_token, user } = response;
       
       saveToken(access_token);

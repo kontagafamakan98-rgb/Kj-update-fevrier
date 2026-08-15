@@ -241,8 +241,11 @@ export const api = {
 };
 
 export const authAPI = {
-  register: (userData) => api.post('/auth/register', userData),
-  signup: (userData) => api.post('/auth/register', userData),
+  // SECURITE : l'ancien endpoint /auth/register (sans vérification email)
+  // a été supprimé du backend — TOUTE inscription passe désormais par
+  // /auth/register-verified, qui exige un jeton de vérification email (OTP).
+  register: (userData) => api.post('/auth/register-verified', userData),
+  signup: (userData) => api.post('/auth/register-verified', userData),
   registerVerified: (userData) => api.post('/auth/register-verified', userData),
   login: (credentials) => api.post('/auth/login', credentials),
   signin: (credentials) => api.post('/auth/login', credentials),

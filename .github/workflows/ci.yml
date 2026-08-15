@@ -2,15 +2,24 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
 jobs:
-  # ─── Backend : tests Python ──────────────────────────────────────────────
+  # ─── Backend : tests Python (FakeDB + vrai MongoDB) ──────────────────────
   backend-tests:
-    name: Backend tests (Python)
+    name: Backend tests (Python + MongoDB)
     runs-on: ubuntu-latest
+
+    # Vrai MongoDB : la suite s'exécute contre une vraie instance (mode
+    # TEST_MONGO_URL), ce qui couvre l'atomicité, les indexes et les
+    # opérateurs réels que la FakeDB locale ne reproduit pas.
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
 
     steps:
       - uses: actions/checkout@v4
@@ -20,31 +29,37 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         working-directory: backend
         run: pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Syntax check (py_compile)
+        working-directory: backend
+        run: python -m py_compile server.py tests/*.py
+
+      - name: Run tests against real MongoDB
         working-directory: backend
         env:
           JWT_SECRET: ci-test-secret-kojo-32-chars-minimum
-          MONGO_URL: mongodb://localhost:27017
+          EMAIL_OTP_SECRET: ci-otp-secret-kojo-32-chars-minimum
+          TEST_MONGO_URL: mongodb://localhost:27017
           DB_NAME: kojo_test
           APP_ENV: test
           REDIS_URL: ""
           DISABLE_TRUSTED_HOST_MIDDLEWARE: "true"
         run: python -m pytest tests/ -q --tb=short
 
-  # ─── Frontend : build Vite ───────────────────────────────────────────────
+  # ─── Frontend : tests Vitest + build Vite ────────────────────────────────
   frontend-build:
-    name: Frontend build (Node/Vite)
+    name: Frontend tests + build (Node/Vite)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
           node-version: "24"

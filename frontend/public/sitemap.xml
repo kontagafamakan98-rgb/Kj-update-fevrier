@@ -5,7 +5,7 @@
   <!-- Homepage -->
   <url>
     <loc>https://kojo.com/</loc>
-    <lastmod>2025-01-01</lastmod>
+    <lastmod>2026-08-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <mobile:mobile/>
@@ -14,7 +14,7 @@
   <!-- Login Page -->
   <url>
     <loc>https://kojo.com/login</loc>
-    <lastmod>2025-01-01</lastmod>
+    <lastmod>2026-08-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <mobile:mobile/>
@@ -23,7 +23,7 @@
   <!-- Registration Page -->
   <url>
     <loc>https://kojo.com/register</loc>
-    <lastmod>2025-01-01</lastmod>
+    <lastmod>2026-08-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
     <mobile:mobile/>
