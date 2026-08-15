@@ -40,7 +40,7 @@ backend/
 ├── kojo_payments.py       # Intégration PayDunya (factures, statuts, décaissements)
 ├── kojo_routers_*.py      # Endpoints HTTP par domaine (auth, users, jobs,
 │                          #   messages, payments, notifications, geo, owner, support)
-└── tests/                 # 60 tests pytest
+└── tests/                 # 69 tests pytest
 ```
 
 ### Frontend
@@ -71,14 +71,84 @@ cd frontend && npm test
 
 ## Déploiement
 
-**Backend (Render)** — Web Service Python
-Start command : `uvicorn server:app --host 0.0.0.0 --port $PORT`
-Variables d'env → voir `backend/.env.example` (`JWT_SECRET` et
-`EMAIL_OTP_SECRET` sont **obligatoires** en production — le serveur refuse de
-démarrer sans eux).
+### Backend — Render (Web Service Python)
 
-**Frontend (Vercel)** — `vercel.json` à la racine (output `frontend/build`)
-Variables d'env → voir `frontend/.env.example`
+- **Service** : `kojo-backend-03az` — `https://kojo-backend-03az.onrender.com`
+- **Start command** : `uvicorn server:app --host 0.0.0.0 --port $PORT`
+- **Source** : lié à GitHub (branche `main`) — chaque push déclenche un
+  déploiement automatique ; en cas d'échec au boot, **l'ancienne version reste
+  servie** (vérifier le statut du déploiement, pas seulement le health check).
+
+| Variable | Obligatoire ? | Notes |
+|---|---|---|
+| `MONGO_URL` | ✅ | URI Atlas/auto-hébergé (le boot échoue sans elle) |
+| `JWT_SECRET` | ✅ en prod | Fail-fast : le serveur refuse de démarrer sans lui |
+| `EMAIL_OTP_SECRET` | ✅ en prod | **Ajoutée par l'audit** : fail-fast identique à `JWT_SECRET` |
+| `APP_ENV` | ✅ | `production` (désactive `/docs`, active HSTS, CORS strict) |
+| `DB_NAME` | | défaut `kojo_db` |
+| `RENDER_EXTERNAL_HOSTNAME` | 🔄 auto | Injecté par Render ; ajouté aux hôtes de confiance au boot |
+| `VERCEL_PROJECT_NAME` | recommandé | Restreint le CORS aux sous-domaines Vercel du projet |
+
+**Pièges à connaître (leçons du terrain)** :
+
+- `EMAIL_OTP_SECRET` est **indispensable en prod depuis l'audit** — l'ancien
+  code utilisait un fallback silencieux sur `JWT_SECRET` (faille corrigée).
+  Erreur typique au déploiement : `RuntimeError: EMAIL_OTP_SECRET
+  environment variable is not set. Refusing to start in production...`.
+  Générer : `python -c "import secrets; print(secrets.token_hex(32))"`.
+- **Ne jamais changer (roter) `EMAIL_OTP_SECRET`** : il signe les jetons de
+  vérification email et les hashes OTP — le changer invalide tous les jetons
+  déjà émis. Le conserver avec les autres secrets du gestionnaire de mots de
+  passe.
+- `RENDER_EXTERNAL_HOSTNAME` étant injecté automatiquement, `build_trusted_hosts`
+  s'exécute avec une URL non vide au boot : tout import manquant dans un
+  module découpé (`kojo_*`) crashe le démarrage. Garde-fou : l'étape pyflakes
+  de la CI (« undefined name » → build rouge).
+
+### Frontend — Vercel
+
+- **Projet** : `kj-update-fevrier` — **prod : `https://kj-update-fevrier.vercel.app`**
+- **Root Directory = `frontend`** — réglage **du dashboard** (Settings →
+  General → Root Directory). ⚠️ **Ce n'est PAS une clé valide de `vercel.json`**
+  : l'ajouter au fichier casse le déploiement avec l'erreur de schéma
+  *« should NOT have additional property `rootDirectory` »*.
+- **`vercel.json`** (à la racine du repo — lu même avec Root Directory défini) :
+
+```json
+{
+  "framework": "vite",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+- **Variables d'env** (dashboard, onglet Settings → Environment Variables) :
+  `VITE_API_URL=https://kojo-backend-03az.onrender.com/api`
+
+**Pièges à connaître (leçons du terrain)** :
+
+- ⚠️ **Ne pas mettre `--prefix frontend`** dans `installCommand`/
+  `buildCommand` : le Root Directory `frontend` du dashboard y est déjà
+  appliqué → le préfixe crée le chemin doublé `frontend/frontend` et l'échec
+  `ENOENT .../frontend/frontend/package.json`.
+- ⚠️ **Le script `vercel-build` n'existe pas** — utiliser `npm run build`
+  (alias de `vite build`).
+- ⚠️ `rootDirectory` n'est pas accepté par le schéma `vercel.json` (voir
+  ci-dessus).
+
+### Vérification post-déploiement
+
+```bash
+# Backend — le nouveau code est en prod si :
+curl -s https://kojo-backend-03az.onrender.com/api/health   # PAS de champ "environment"
+curl -s -o /dev/null -w '%{http_code}' https://kojo-backend-03az.onrender.com/docs   # 404
+curl -s -o /dev/null -w '%{http_code}' https://kojo-backend-03az.onrender.com/api/stats  # 403/401 sans token
+
+# Frontend
+curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 200
+```
 
 ## Sécurité
 
@@ -97,4 +167,6 @@ Variables d'env → voir `frontend/.env.example`
 ## CI
 
 `.github/workflows/ci.yml` : tests backend contre un vrai MongoDB (service
-container), syntaxe Python, tests Vitest + build Vite sur Node 24.
+container), syntaxe Python (`py_compile`), **pyflakes (aucun nom non défini
+dans les modules `kojo_*` — garde-fou contre les imports manquants du
+découpage)**, tests Vitest + build Vite sur Node 24.
