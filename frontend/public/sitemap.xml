@@ -4,7 +4,7 @@
   
   <!-- Homepage -->
   <url>
-    <loc>https://kojo.com/</loc>
+    <loc>https://kj-update-fevrier.vercel.app/</loc>
     <lastmod>2026-08-15</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -13,7 +13,7 @@
   
   <!-- Login Page -->
   <url>
-    <loc>https://kojo.com/login</loc>
+    <loc>https://kj-update-fevrier.vercel.app/login</loc>
     <lastmod>2026-08-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -22,7 +22,7 @@
   
   <!-- Registration Page -->
   <url>
-    <loc>https://kojo.com/register</loc>
+    <loc>https://kj-update-fevrier.vercel.app/register</loc>
     <lastmod>2026-08-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

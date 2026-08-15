@@ -75,14 +75,23 @@ export function AuthProvider({ children }) {
       
     } catch (error) {
       safeLog.error('Error loading user:', error);
-      
-      // Try to load from cache if API fails
-      const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);
-      if (cachedUser) {
-        setUser(cachedUser);
-        devLog.info('📱 User loaded from cache (API failed)');
-      } else {
+
+      // 401 = token expiré/révoqué : ne JAMAIS se rabattre sur le cache,
+      // sinon l'app affiche un utilisateur fantôme dont tous les appels
+      // API échouent. On purge la session (le redirect /login est géré
+      // globalement par api.js).
+      if (error?.response?.status === 401) {
         clearToken();
+        setUser(null);
+      } else {
+        // Hors 401 (réseau, 5xx…) : cache autorisé en dernier recours
+        const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);
+        if (cachedUser) {
+          setUser(cachedUser);
+          devLog.info('📱 User loaded from cache (API failed)');
+        } else {
+          clearToken();
+        }
       }
     } finally {
       setLoading(false);

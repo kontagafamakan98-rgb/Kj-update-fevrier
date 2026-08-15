@@ -8,6 +8,7 @@ import { Camera, Edit2, X } from 'lucide-react';
 import profilePhotoService from '../services/ProfilePhotoService';
 import { devConsole } from '../utils/devLogger';
 import { devLog, safeLog } from '../utils/env';
+import { buildApiUrl } from '../utils/backendUrl';
 
 const ProfilePhoto = ({ 
   user, 
@@ -118,9 +119,11 @@ const ProfilePhoto = ({
         
         // Update photo URL from backend response
         const photoUrl = result.photo_url;
-        const fullUrl = photoUrl.startsWith('http') 
-          ? photoUrl 
-          : `${process.env.REACT_APP_BACKEND_URL}${photoUrl}`;
+        // URL absolue (Cloudinary) → telle quelle ; relative → résolue via le
+        // backend central (jamais de préfixe "undefined" si l'env manque).
+        const fullUrl = photoUrl.startsWith('http')
+          ? photoUrl
+          : buildApiUrl(photoUrl);
         
         const cacheBustedUrl = `${fullUrl}?t=${Date.now()}`;
         setProfilePhoto({ url: cacheBustedUrl });

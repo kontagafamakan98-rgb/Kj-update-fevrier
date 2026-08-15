@@ -22,14 +22,31 @@ router = APIRouter()
 async def get_profile(current_user: User = Depends(get_current_user)):
     return current_user.model_dump(exclude={"password_hash"})
 
+# Champs modifiables via PUT /users/profile — WHITELIST STRICTE.
+# SECURITE : interdire l'écriture des champs sensibles (user_type,
+# is_verified, rating, total_reviews, payment_accounts, payment_accounts_count,
+# id, email, password_hash, created_at...) qui permettaient auparavant de
+# frauder sa réputation, de s'auto-vérifier ou de contourner la validation
+# des comptes de paiement (mass-assignment).
+EDITABLE_PROFILE_FIELDS = {
+    "first_name",
+    "last_name",
+    "phone",
+    "preferred_language",
+    "country",
+    "bio",
+    "skills",
+    "profile_photo",
+}
+
 @router.put("/users/profile")
 async def update_profile(
     user_data: dict,
     current_user: User = Depends(get_current_user)
 ):
-    # Remove fields that shouldn't be updated via this endpoint
-    forbidden_fields = {"id", "email", "password_hash", "created_at"}
-    update_data = {k: v for k, v in user_data.items() if k not in forbidden_fields}
+    # Seuls les champs de la whitelist sont acceptés ; les autres sont ignorés
+    # (jamais stockés), y compris les champs sensibles tentés par un client.
+    update_data = {k: v for k, v in user_data.items() if k in EDITABLE_PROFILE_FIELDS}
     update_data["updated_at"] = datetime.now(timezone.utc)
     
     await db.users.update_one(
@@ -130,7 +147,7 @@ async def register_push_token(
 ):
     """Register push notification token for mobile app"""
     try:
-        logger.info(f"Registering push token for user: {current_user.id}")
+        logger.debug(f"Registering push token for user: {current_user.id}")
         
         # Verify user_id matches current user (security check)
         if token_data.user_id != current_user.id:
@@ -158,13 +175,23 @@ async def register_push_token(
                     }
                 }
             )
-            logger.info(f"Updated existing push token for user: {current_user.id}")
+            logger.debug(f"Updated existing push token for user: {current_user.id}")
             return {
                 "message": "Push token updated successfully",
                 "token_id": existing_token["id"],
                 "action": "updated"
             }
         else:
+            # Limite d'appareils par utilisateur : evite le gonflement de la
+            # collection push_tokens et le spam push multi-appareils.
+            MAX_PUSH_TOKENS_PER_USER = 10
+            active_count = await db.push_tokens.count_documents({"user_id": current_user.id, "active": True})
+            if active_count >= MAX_PUSH_TOKENS_PER_USER:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Trop de dispositifs enregistrés (maximum {MAX_PUSH_TOKENS_PER_USER}). Supprimez un ancien appareil."
+                )
+
             # Create new token
             push_token = PushToken(
                 user_id=current_user.id,
@@ -174,7 +201,7 @@ async def register_push_token(
             )
             
             await db.push_tokens.insert_one(push_token.model_dump())
-            logger.info(f"Created new push token for user: {current_user.id}")
+            logger.debug(f"Created new push token for user: {current_user.id}")
             
             return {
                 "message": "Push token registered successfully",
@@ -240,7 +267,7 @@ async def delete_push_token(
             }
         )
         
-        logger.info(f"Deactivated push token {token_id} for user: {current_user.id}")
+        logger.debug(f"Deactivated push token {token_id} for user: {current_user.id}")
         return {"message": "Push token deactivated successfully"}
         
     except HTTPException:

@@ -18,12 +18,10 @@ import os
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, FastAPI, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 
 from kojo_core import (
@@ -39,7 +37,7 @@ from kojo_core import (
     request_counts,
 )
 from kojo_email import generate_email_otp_code, hash_email_otp
-from kojo_settings import APP_ENV, logger
+from kojo_settings import APP_ENV, APP_VERSION, logger
 
 # Routers par domaine (chacun exporte `router`)
 from kojo_routers_auth import router as auth_router
@@ -82,16 +80,25 @@ async def root():
     return {"message": "Kojo API - Connecting Mali & Senegal", "status": "running"}
 
 
-@api_router.get("/health")
-async def health_check():
-    db_available = await is_database_available()
+async def _health_payload() -> dict:
+    """Payload partagé des health checks (/api/health et /health).
 
+    Une seule source de vérité pour la version (APP_VERSION) et l'état DB :
+    les deux routes ci-dessous l'appellent, plus de dérive possible entre
+    /api/health et /health.
+    """
+    db_available = await is_database_available()
     return {
         "status": "healthy" if db_available else "degraded",
         "timestamp": datetime.now(timezone.utc),
         "database": "connected" if db_available else "unavailable",
-        "version": "1.0.0"
+        "version": APP_VERSION,
     }
+
+
+@api_router.get("/health")
+async def health_check():
+    return await _health_payload()
 
 
 # Inclusion des routers par domaine
@@ -114,18 +121,11 @@ async def app_root():
     return {"message": "Kojo API - Connecting Mali & Senegal", "status": "running"}
 
 
-# Ceci reflète /api/health ci-dessus ; garder les deux en phase si la logique
-# change. Méthodes déclarées explicitement (GET + HEAD) pour la même raison.
+# Même payload que /api/health via _health_payload() — plus de dérive possible.
+# Méthodes déclarées explicitement (GET + HEAD) pour les moniteurs d'infra.
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def root_health_check():
-    db_available = await is_database_available()
-
-    return {
-        "status": "healthy" if db_available else "degraded",
-        "timestamp": datetime.now(timezone.utc),
-        "database": "connected" if db_available else "unavailable",
-        "version": "1.0.0"
-    }
+    return await _health_payload()
 
 
 # Favicon & racine — cette API ne sert pas de frontend, mais les navigateurs/
@@ -139,14 +139,6 @@ async def favicon():
 
 app.include_router(api_router)
 
-# Serve uploaded files under /api prefix for proper Kubernetes ingress routing
-# Le dossier doit exister AVANT le mount, car StaticFiles() vérifie sa présence
-# immédiatement au chargement du module (avant même l'événement de démarrage
-# de l'app) - sur un déploiement Render tout frais / après un git-filter-repo,
-# le dossier n'existe plus dans le repo cloné, donc on le (re)crée ici.
-os.makedirs("uploads", exist_ok=True)
-app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
-
 # ---------------------------------------------------------------------------
 # CORS Configuration optimized for West Africa
 # ---------------------------------------------------------------------------
@@ -154,7 +146,6 @@ WEST_AFRICA_ORIGINS = [
     "http://localhost:3000",
     "https://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://kojo-work.preview.emergentagent.com",
 ]
 
 # Get additional origins from environment
@@ -190,13 +181,20 @@ else:
         "VERCEL_PROJECT_NAME sur Render pour restreindre correctement."
     )
 
+# Les IP privées LAN (192.168.x / 10.x) ne sont autorisées qu'hors production :
+# en prod elles élargiraient inutilement la surface CORS credentialed (réseau
+# d'entreprise, VPN, réseau privé de plateforme hébergée).
+_private_lan_pattern = (
+    r"|^http://192\.168\.\d+\.\d+(:\d+)?$"
+    r"|^http://10\.\d+\.\d+\.\d+(:\d+)?$"
+) if not _is_prod else ""
+
 allowed_origin_regex = (
     _vercel_origin_pattern
     + r"|^http://localhost(:\d+)?$"
     r"|^https://localhost(:\d+)?$"
     r"|^http://127\.0\.0\.1(:\d+)?$"
-    r"|^http://192\.168\.\d+\.\d+(:\d+)?$"
-    r"|^http://10\.\d+\.\d+\.\d+(:\d+)?$"
+    + _private_lan_pattern
 )
 
 app.add_middleware(
@@ -254,15 +252,19 @@ async def lifespan(application: FastAPI):
     except Exception as exc:
         logger.error(f"⚠️ create_database_indexes() a échoué, démarrage poursuivi quand même: {exc}")
 
-    Path("uploads").mkdir(exist_ok=True)
-    logger.info("📁 Dossier uploads créé/vérifié")
-
-    asyncio.create_task(_rate_limit_cleanup_loop())
+    # Tâche de fond stockée pour être annulée proprement au shutdown (évite
+    # le warning "Task was destroyed but it is pending" et coupe la boucle).
+    rate_limit_task = asyncio.create_task(_rate_limit_cleanup_loop())
     logger.info("✅ API Kojo prête!")
 
     yield  # l'application tourne ici
 
     # ---- SHUTDOWN ----
+    rate_limit_task.cancel()
+    try:
+        await rate_limit_task
+    except asyncio.CancelledError:
+        pass
     client.close()
 
 

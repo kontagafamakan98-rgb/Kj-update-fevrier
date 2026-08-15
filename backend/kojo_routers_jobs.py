@@ -208,7 +208,7 @@ async def get_jobs(
 
         jobs = await db.jobs.find(query).sort("created_at", -1).to_list(limit)
         
-        logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
+        logger.debug(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
         return [Job(**job) for job in jobs]
         
     except Exception as e:
@@ -273,11 +273,20 @@ async def create_proposal(
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Only workers can create proposals")
     
-    # Check if job exists
-    job = await db.jobs.find_one({"id": job_id})
+    # Check if job exists (et n'est pas supprimé)
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
+    # Un job déjà attribué/terminé/annulé n'accepte plus de propositions
+    if job.get("status") != JobStatus.OPEN.value:
+        raise HTTPException(status_code=400, detail="Ce job n'accepte plus de nouvelles propositions")
+
+    # Cohérence pays : un travailleur ne postule que sur des jobs de son pays
+    job_country = job.get("country")
+    if job_country and current_user.country.value != job_country:
+        raise HTTPException(status_code=403, detail="Ce job n'est pas dans votre pays")
+
     # Check if worker already proposed
     existing_proposal = await db.job_proposals.find_one({
         "job_id": job_id,

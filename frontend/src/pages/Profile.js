@@ -14,7 +14,7 @@ import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
-import { usersAPI } from '../services/api';
+import { usersAPI, getAuthToken } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
@@ -95,7 +95,7 @@ export default function Profile() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
+          Authorization: `Bearer ${getAuthToken()}`
         },
         body: JSON.stringify(workerData)
       });

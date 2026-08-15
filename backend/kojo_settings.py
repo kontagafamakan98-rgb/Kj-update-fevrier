@@ -70,6 +70,10 @@ cloudinary.config(secure=True)
 
 APP_ENV = os.environ.get("APP_ENV", "production").strip().lower()
 
+# Version de l'API — source unique de vérité : health checks (/health,
+# /api/health) et en-tête X-Kojo-Version. À bumper ensemble, jamais ailleurs.
+APP_VERSION = "1.0.1"
+
 _env_jwt_secret = os.environ.get('JWT_SECRET', '').strip()
 
 if _env_jwt_secret:
@@ -204,6 +208,10 @@ def get_security_headers_for_path(path: str) -> dict:
     return DEFAULT_SECURITY_HEADERS
 
 OWNER_EMAIL = os.environ.get('OWNER_EMAIL', '').strip()
+
+# Alias legacy (même valeur que OWNER_EMAIL) — centralisé ici pour que les
+# routers utilisent la constante au lieu de lire os.environ directement.
+FAMAKAN_OWNER_EMAIL = os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip() or OWNER_EMAIL
 
 OWNER_USER_ID = os.environ.get('OWNER_USER_ID', 'famakan_kontaga_master_2024').strip() or 'famakan_kontaga_master_2024'
 

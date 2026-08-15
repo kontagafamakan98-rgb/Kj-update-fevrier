@@ -1,5 +1,5 @@
 import asyncio
-import os
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -11,10 +11,10 @@ from kojo_models import (
     User,
 )
 from kojo_settings import (
+    FAMAKAN_OWNER_EMAIL,
     OWNER_EMAIL,
     PAYDUNYA_MODE,
     PAYDUNYA_STORE_NAME,
-    PAYMENT_COMMISSION_RATE,
     logger,
 )
 from kojo_core import (
@@ -25,12 +25,38 @@ from kojo_payments import (
     PAYDUNYA_CHANNELS,
     build_checkout_redirect_url, build_payment_callback_url,
     calculate_payment_breakdown, check_paydunya_disburse_status,
-    create_paydunya_invoice, get_paydunya_channel,
-    is_paydunya_configured, normalize_payment_country,
-    serialize_payment_record, sync_payment_status_with_paydunya,
+    create_paydunya_invoice, get_effective_commission_rate,
+    get_paydunya_channel, is_paydunya_configured,
+    normalize_payment_country, serialize_payment_record,
+    sync_payment_status_with_paydunya,
 )
 
 router = APIRouter()
+
+# Cache court du statut re-vérifié auprès de PayDunya : chaque GET
+# /payments/status/* déclenche un appel sortant coûteux — on ne le refait
+# pas plus d'une fois toutes les 15 s par paiement (les transitions réelles
+# sont de toute façon poussées par l'IPN).
+PAYMENT_STATUS_CACHE_TTL_SECONDS = 15
+_payment_status_cache: dict = {}
+
+
+def _get_cached_payment_status(payment_id: str):
+    cached = _payment_status_cache.get(payment_id)
+    if cached and (time.time() - cached["at"]) < PAYMENT_STATUS_CACHE_TTL_SECONDS:
+        return cached["record"]
+    return None
+
+
+def _cache_payment_status(payment_id: str, record: dict):
+    now = time.time()
+    _payment_status_cache[payment_id] = {"at": now, "record": record}
+    # Garde-fou : purge les entrées expirées si le cache grossit trop
+    if len(_payment_status_cache) > 2000:
+        expired = [pid for pid, entry in _payment_status_cache.items() if now - entry["at"] > PAYMENT_STATUS_CACHE_TTL_SECONDS]
+        for pid in expired:
+            _payment_status_cache.pop(pid, None)
+
 
 @router.post('/payments/disburse-ipn')
 async def paydunya_disburse_ipn(request: Request):
@@ -100,7 +126,7 @@ async def get_real_payments_config():
         'provider': 'paydunya',
         'configured': is_paydunya_configured(),
         'mode': PAYDUNYA_MODE,
-        'commission_rate_percent': round(PAYMENT_COMMISSION_RATE * 100, 2),
+        'commission_rate_percent': round((await get_effective_commission_rate()) * 100, 2),
         'supported_channels': {
             'orange_money': list(PAYDUNYA_CHANNELS['orange_money'].keys()),
             'wave': list(PAYDUNYA_CHANNELS['wave'].keys()),
@@ -111,7 +137,8 @@ async def get_real_payments_config():
 @router.post('/payments/quote')
 async def get_payment_quote(request: PaymentQuoteRequest):
     channel = get_paydunya_channel(request.payment_method.value, request.country)
-    breakdown = calculate_payment_breakdown(request.amount)
+    rate = await get_effective_commission_rate()
+    breakdown = calculate_payment_breakdown(request.amount, rate)
     return {
         'provider': 'paydunya',
         'configured': is_paydunya_configured(),
@@ -184,7 +211,8 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
     normalized_country = normalize_payment_country(request.country or current_user.country)
     channel = get_paydunya_channel(request.payment_method.value, normalized_country)
-    breakdown = calculate_payment_breakdown(resolved_amount)
+    rate = await get_effective_commission_rate()
+    breakdown = calculate_payment_breakdown(resolved_amount, rate)
 
     # Validation du montant minimum PayDunya (200 FCFA) AVANT de créer
     # l'enregistrement en base et d'appeler l'API — évite de créer un
@@ -281,10 +309,15 @@ async def get_payment_status(payment_id: str, current_user: User = Depends(get_c
     if not payment_record:
         raise HTTPException(status_code=404, detail='Paiement introuvable')
 
-    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip():
+    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != FAMAKAN_OWNER_EMAIL:
         raise HTTPException(status_code=403, detail='Accès interdit à ce paiement')
 
+    cached_record = _get_cached_payment_status(payment_record['id'])
+    if cached_record is not None:
+        return serialize_payment_record(cached_record)
+
     payment_record = await sync_payment_status_with_paydunya(payment_record)
+    _cache_payment_status(payment_record['id'], payment_record)
     return serialize_payment_record(payment_record)
 
 @router.get('/payments/status/token/{invoice_token}')
@@ -293,10 +326,15 @@ async def get_payment_status_by_token(invoice_token: str, current_user: User = D
     if not payment_record:
         raise HTTPException(status_code=404, detail='Paiement introuvable')
 
-    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip():
+    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != FAMAKAN_OWNER_EMAIL:
         raise HTTPException(status_code=403, detail='Accès interdit à ce paiement')
 
+    cached_record = _get_cached_payment_status(payment_record['id'])
+    if cached_record is not None:
+        return serialize_payment_record(cached_record)
+
     payment_record = await sync_payment_status_with_paydunya(payment_record)
+    _cache_payment_status(payment_record['id'], payment_record)
     return serialize_payment_record(payment_record)
 
 @router.get('/payments/my')

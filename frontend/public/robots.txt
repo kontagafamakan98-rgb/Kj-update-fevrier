@@ -16,7 +16,7 @@ Disallow: /payment-demo
 Disallow: /mobile-test
 
 # Sitemap location
-Sitemap: https://kojo.com/sitemap.xml
+Sitemap: https://kj-update-fevrier.vercel.app/sitemap.xml
 
 # Crawl-delay for slow servers (West Africa optimization)
 Crawl-delay: 2

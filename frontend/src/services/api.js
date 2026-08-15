@@ -187,6 +187,41 @@ export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
   return fallback;
 };
 
+// Ces endpoints renvoient un 401 comme RÉSULTAT MÉTIER (identifiants
+// invalides, OTP refusé…) : il ne faut PAS les traiter comme une session
+// expirée (sinon déconnexion surprise pendant le login / la vérification).
+const BUSINESS_401_PREFIXES = ['/auth/login', '/auth/register', '/auth/email/', '/auth/password/'];
+
+let sessionRedirecting = false;
+
+/**
+ * Session expirée ou révoquée (401) : purge locale et redirection vers
+ * /login. Garde-fou anti-boucle (une seule redirection) et anti-crash
+ * (jsdom/tests).
+ */
+const handleUnauthorized = (path) => {
+  if (BUSINESS_401_PREFIXES.some((prefix) => path.startsWith(prefix))) return;
+  if (sessionRedirecting) return;
+  sessionRedirecting = true;
+
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem('token');
+      window.localStorage.removeItem('token_expires_at');
+      window.localStorage.removeItem('user');
+    }
+  } catch (_error) {}
+
+  try {
+    if (typeof window !== 'undefined' && window.location && !window.location.pathname.endsWith('/login')) {
+      window.location.href = '/login';
+    }
+  } catch (_error) {
+    // Navigation non implémentée (tests jsdom) : on laisse l'état local nettoyé.
+    sessionRedirecting = false;
+  }
+};
+
 const request = async (method, path, { params, data, headers } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${detectApiBaseUrl()}${normalizedPath}${buildQueryString(params)}`;
@@ -216,6 +251,10 @@ const request = async (method, path, { params, data, headers } = {}) => {
   }
 
   if (!response.ok) {
+    if (response.status === 401) {
+      handleUnauthorized(normalizedPath);
+    }
+
     const fallbackMessage = `HTTP ${response.status}`;
     const errorMessage = typeof payload === 'string'
       ? payload
@@ -492,8 +531,6 @@ export const supportAPI = {
 export const walletsAPI = walletAPI;
 export const proposalAPI = createResourceApi('proposals');
 export const proposalsAPI = proposalAPI;
-export const uploadAPI = createResourceApi('uploads');
-export const filesAPI = createResourceApi('files');
 export const searchAPI = createResourceApi('search');
 export const statsAPI = createResourceApi('stats');
 export const dashboardAPI = createResourceApi('dashboard');

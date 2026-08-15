@@ -22,6 +22,7 @@ from starlette.responses import JSONResponse
 
 from kojo_models import PaymentAccount, User
 from kojo_settings import (
+    APP_VERSION,
     BACKEND_PUBLIC_URL,
     FRONTEND_APP_URL,
     JWT_ALGORITHM,
@@ -300,8 +301,7 @@ def build_trusted_hosts() -> List[str]:
         "127.0.0.1",
         "*.vercel.app",
         "*.onrender.com",
-        "onrender.com",
-        "kojo-work.preview.emergentagent.com"
+        "onrender.com"
     }
 
     render_external_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
@@ -321,6 +321,13 @@ def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
         return ("auth-otp", 12, 5)
     if path.startswith("/api/auth/login") or path.startswith("/api/auth/register"):
         return ("auth-session", 20, 5)
+    if path.startswith("/api/messages"):
+        # Envoi de messages : 60 POST/min/IP (les GET/HEAD/OPTIONS de
+        # lecture/polling sont exemptés, voir RateLimitMiddleware)
+        return ("messages", 60, 1)
+    if path.startswith("/api/support"):
+        # Tickets support (création publique) : 10 POST/5min/IP
+        return ("support", 10, 5)
     if path.startswith("/api/owner"):
         return ("owner", 30, 1)
     return ("general-api", 240, 1)
@@ -335,7 +342,7 @@ class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
             response.headers[header] = value
 
         response.headers["X-Kojo-Region"] = "west-africa"
-        response.headers["X-Kojo-Version"] = "1.0.1"
+        response.headers["X-Kojo-Version"] = APP_VERSION
         response.headers["Vary"] = "Origin, Authorization, Accept-Encoding"
 
         path = request.url.path
@@ -367,7 +374,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # lecture seule et peu coûteuses : on ne les compte PAS dans le bucket
         # général pour éviter de faux 429 massifs. Les buckets critiques
         # (auth, owner) continuent de compter TOUTES les méthodes.
-        if bucket_name == "general-api" and request.method in {"GET", "HEAD", "OPTIONS"}:
+        if bucket_name in ("general-api", "messages") and request.method in {"GET", "HEAD", "OPTIONS"}:
             return await call_next(request)
 
         client_ip = get_client_ip(request)

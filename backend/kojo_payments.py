@@ -4,6 +4,7 @@
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import requests
 from fastapi import HTTPException
@@ -72,14 +73,35 @@ def get_paydunya_headers() -> Dict[str, str]:
         'PAYDUNYA-TOKEN': PAYDUNYA_TOKEN,
     }
 
-def calculate_payment_breakdown(amount: float) -> Dict[str, Any]:
-    commission_amount = round(amount * PAYMENT_COMMISSION_RATE)
+async def get_effective_commission_rate() -> float:
+    """Taux de commission EFFECTIF : db.settings (type=commission) s'il existe,
+    sinon la constante d'environnement PAYMENT_COMMISSION_RATE.
+
+    Le taux stocké en base est un POURCENTAGE (ex: 14 = 14%), la constante
+    env est un décimal (ex: 0.14). Fail-safe : si la lecture DB échoue ou
+    que la valeur est invalide, on retombe sur l'env.
+    """
+    try:
+        doc = await db.settings.find_one({"type": "commission"})
+        if doc and doc.get("commission_rate") is not None:
+            rate_percent = float(doc["commission_rate"])
+            if 0 <= rate_percent <= 50:
+                return rate_percent / 100.0
+            logger.warning(f"⚠️ Taux de commission en base invalide ({rate_percent}), repli env")
+    except Exception as exc:
+        logger.warning(f"⚠️ Lecture du taux de commission en base impossible, repli env: {exc}")
+    return float(PAYMENT_COMMISSION_RATE)
+
+
+def calculate_payment_breakdown(amount: float, commission_rate: Optional[float] = None) -> Dict[str, Any]:
+    rate = commission_rate if commission_rate is not None else float(PAYMENT_COMMISSION_RATE)
+    commission_amount = round(amount * rate)
     worker_amount = round(amount - commission_amount)
     return {
         'total_amount': round(amount),
         'commission_amount': commission_amount,
         'worker_amount': worker_amount,
-        'commission_rate': round(PAYMENT_COMMISSION_RATE * 100, 2)
+        'commission_rate': round(rate * 100, 2)
     }
 
 def get_paydunya_channel(payment_method: str, country: Optional[str]) -> str:
@@ -101,8 +123,26 @@ def get_paydunya_channel(payment_method: str, country: Optional[str]) -> str:
     )
 
 def build_checkout_redirect_url(fallback_path: str, explicit_url: Optional[str] = None) -> str:
+    """URL de retour PayDunya.
+
+    SECURITE : un explicit_url fourni par le client n'est accepté que s'il
+    est relatif (chemin de l'app) ou s'il pointe vers l'origine du frontend
+    (FRONTEND_APP_URL). Tout autre domaine (site de phishing) est rejeté et
+    on retombe sur le fallback, pour éviter la redirection ouverte après
+    paiement.
+    """
     if explicit_url and explicit_url.strip():
-        return explicit_url.strip()
+        candidate = explicit_url.strip()
+        if candidate.startswith('/'):
+            return candidate
+        try:
+            parsed = urlparse(candidate)
+            if parsed.scheme in ('http', 'https') and parsed.netloc:
+                if FRONTEND_APP_URL and parsed.netloc == urlparse(FRONTEND_APP_URL).netloc:
+                    return candidate
+            # Protocoles non-http(s) (javascript:, data:...) : rejetés
+        except ValueError:
+            pass
     if FRONTEND_APP_URL:
         return f"{FRONTEND_APP_URL}{fallback_path}"
     return fallback_path

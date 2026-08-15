@@ -4,7 +4,6 @@ import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
-import { PaymentProvider } from './contexts/PaymentContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { CountryProvider } from "./contexts/CountryContext";
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -320,32 +319,18 @@ function AppRoutes() {
 
 function App() {
   useEffect(() => {
-    // Add mobile viewport optimizations
-    const addMobileOptimizations = () => {
-      // Prevent zoom on input focus (iOS)
-      const meta = document.createElement('meta');
-      meta.name = 'viewport';
-      meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
-      
-      const existingMeta = document.querySelector('meta[name="viewport"]');
-      if (existingMeta) {
-        existingMeta.remove();
-      }
-      document.head.appendChild(meta);
+    // Le viewport est déclaré dans index.html (avec zoom autorisé pour
+    // l'accessibilité) — on ne le réinjecte plus ici.
 
-      // Add iOS status bar styling
-      if (window.navigator.standalone) {
-        document.body.classList.add('ios-standalone');
-      }
+    // iOS standalone (ajouté à l'écran d'accueil)
+    if (window.navigator.standalone) {
+      document.body.classList.add('ios-standalone');
+    }
 
-      // Add PWA display mode class
-      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
-        document.body.classList.add('pwa-standalone');
-      }
-    };
-
-    addMobileOptimizations();
-
+    // PWA display mode standalone
+    if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
+      document.body.classList.add('pwa-standalone');
+    }
   }, []);
 
   return (
@@ -354,15 +339,13 @@ function App() {
         <LanguageProvider>
           <AuthProvider>
             <CountryProvider>
-              <PaymentProvider>
-                <ToastProvider>
-                  <NotificationProvider>
-                    <ErrorBoundary>
-                      <AppRoutes />
-                    </ErrorBoundary>
-                  </NotificationProvider>
-                </ToastProvider>
-              </PaymentProvider>
+              <ToastProvider>
+                <NotificationProvider>
+                  <ErrorBoundary>
+                    <AppRoutes />
+                  </ErrorBoundary>
+                </NotificationProvider>
+              </ToastProvider>
             </CountryProvider>
           </AuthProvider>
         </LanguageProvider>

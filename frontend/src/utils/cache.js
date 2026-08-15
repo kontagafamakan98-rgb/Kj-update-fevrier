@@ -10,23 +10,13 @@ const CACHE_EXPIRY_TIME = 1000 * 60 * 30; // 30 minutes default
 const CRITICAL_DATA_EXPIRY = 1000 * 60 * 60 * 24; // 24 hours for critical data
 
 /**
- * Smart cache with compression for West African networks
+ * Smart cache for West African networks (stockage JSON, expiration et
+ * nettoyage — sans compression : LZString/pako n'étant pas installés,
+ * l'ancien code gardait la compression éternellement désactivée).
  */
 class KojoCache {
   constructor() {
     this.namespace = 'kojo_cache_';
-    this.compressionEnabled = this.supportsCompression();
-  }
-
-  /**
-   * Check if browser supports compression
-   */
-  supportsCompression() {
-    try {
-      return typeof LZString !== 'undefined' || typeof pako !== 'undefined';
-    } catch {
-      return false;
-    }
   }
 
   /**
@@ -37,35 +27,18 @@ class KojoCache {
   }
 
   /**
-   * Compress data if possible (for slow networks)
+   * Sérialise la donnée en JSON (format historique du cache : les entrées
+   * déjà stockées restent lisibles).
    */
-  compress(data) {
-    try {
-      const jsonString = JSON.stringify(data);
-      if (this.compressionEnabled && window.LZString) {
-        return window.LZString.compress(jsonString);
-      }
-      return jsonString;
-    } catch (error) {
-      safeLog.warn('Cache compression failed:', error);
-      return JSON.stringify(data);
-    }
+  serialize(data) {
+    return JSON.stringify(data);
   }
 
   /**
-   * Decompress data
+   * Désérialise une entrée JSON (tolérante : null en cas de corruption).
    */
-  decompress(compressedData) {
-    try {
-      if (this.compressionEnabled && window.LZString && typeof compressedData === 'string') {
-        const decompressed = window.LZString.decompress(compressedData);
-        return decompressed ? JSON.parse(decompressed) : JSON.parse(compressedData);
-      }
-      return JSON.parse(compressedData);
-    } catch (error) {
-      safeLog.warn('Cache decompression failed:', error);
-      return null;
-    }
+  deserialize(raw) {
+    return JSON.parse(raw);
   }
 
   /**
@@ -78,15 +51,14 @@ class KojoCache {
         data: data,
         timestamp: Date.now(),
         expiry: Date.now() + expiryTime,
-        version: CACHE_VERSION,
-        compressed: this.compressionEnabled
+        version: CACHE_VERSION
       };
 
-      const compressed = this.compress(cacheData);
-      localStorage.setItem(cacheKey, compressed);
+      const serialized = this.serialize(cacheData);
+      localStorage.setItem(cacheKey, serialized);
       
       // Log cache size for monitoring
-      this.logCacheSize(key, compressed);
+      this.logCacheSize(key, serialized);
       
       return true;
     } catch (error) {
@@ -111,7 +83,7 @@ class KojoCache {
         return null;
       }
 
-      const cacheData = this.decompress(cachedItem);
+      const cacheData = this.deserialize(cachedItem);
       
       if (!cacheData || !cacheData.timestamp) {
         this.remove(key);
@@ -177,7 +149,7 @@ class KojoCache {
           try {
             const cachedItem = localStorage.getItem(key);
             if (cachedItem) {
-              const cacheData = this.decompress(cachedItem);
+              const cacheData = this.deserialize(cachedItem);
               if (!cacheData || Date.now() > cacheData.expiry) {
                 localStorage.removeItem(key);
                 cleanedCount++;
@@ -215,7 +187,7 @@ class KojoCache {
           const cachedItem = localStorage.getItem(key);
           if (cachedItem) {
             totalSize += cachedItem.length;
-            const cacheData = this.decompress(cachedItem);
+            const cacheData = this.deserialize(cachedItem);
             if (cacheData && Date.now() <= cacheData.expiry) {
               validEntries++;
             } else {
@@ -231,8 +203,7 @@ class KojoCache {
         totalEntries: kojoKeys.length,
         validEntries,
         expiredEntries,
-        totalSize: `${(totalSize / 1024).toFixed(2)} KB`,
-        compressionEnabled: this.compressionEnabled
+        totalSize: `${(totalSize / 1024).toFixed(2)} KB`
       };
     } catch (error) {
       safeLog.warn('Cache stats failed:', error);
@@ -295,7 +266,7 @@ class KojoCache {
       
       if (!cachedItem) return null;
 
-      const cacheData = this.decompress(cachedItem);
+      const cacheData = this.deserialize(cachedItem);
       return cacheData ? cacheData.data : null;
     } catch (error) {
       safeLog.warn(`Stale cache get failed for key ${key}:`, error);

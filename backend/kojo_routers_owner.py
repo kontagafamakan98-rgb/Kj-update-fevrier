@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from kojo_core import db
 from kojo_models import (
@@ -10,11 +10,11 @@ from kojo_models import (
 )
 from kojo_settings import (
     JWT_ALGORITHM,
-    PAYMENT_COMMISSION_RATE,
 )
 from kojo_core import (
     get_current_user, is_database_available, verify_owner_access,
 )
+from kojo_payments import get_effective_commission_rate
 
 router = APIRouter()
 
@@ -53,6 +53,7 @@ async def get_system_stats(current_user: User = Depends(get_current_user)):
     }
 
 async def compute_real_commission_stats() -> Dict[str, Any]:
+    commission_rate = await get_effective_commission_rate()
     completed_payments = [item async for item in db.payments.find({'status': 'completed'}).sort('created_at', -1)]
     now = datetime.now(timezone.utc)
     today = now.date()
@@ -105,7 +106,7 @@ async def compute_real_commission_stats() -> Dict[str, Any]:
     return {
         'total_transactions': total_transactions,
         'total_commission_earned': total_commission_earned,
-        'commission_rate': round(PAYMENT_COMMISSION_RATE * 100),
+        'commission_rate': round(commission_rate * 100),
         'total_volume': total_volume,
         'daily_commission': daily_commission,
         'monthly_commission': monthly_commission,
@@ -172,15 +173,20 @@ async def get_debug_info(owner_user = Depends(verify_owner_access)):
         raise HTTPException(status_code=500, detail="Erreur serveur")
 
 @router.get("/owner/users-management")
-async def get_users_management(owner_user = Depends(verify_owner_access)):
-    """Gestion des utilisateurs - PROPRIÉTAIRE UNIQUEMENT"""
+async def get_users_management(
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    owner_user = Depends(verify_owner_access)
+):
+    """Gestion des utilisateurs - PROPRIÉTAIRE UNIQUEMENT (paginé)"""
     try:
-        # Récupérer tous les utilisateurs (sauf le propriétaire)
+        # Récupérer les utilisateurs (sauf le propriétaire), paginé pour
+        # éviter de charger toute la collection en mémoire à chaque appel.
         users_cursor = db.users.find(
             {"user_type": {"$ne": "owner"}},
             {"password_hash": 0, "_id": 0}  # Exclure les mots de passe et _id
-        )
-        users = await users_cursor.to_list(length=None)
+        ).skip(offset).limit(limit)
+        users = await users_cursor.to_list(length=limit)
         
         # Statistiques des utilisateurs
         user_stats = {

@@ -46,13 +46,24 @@ async def check_signup_email_availability(payload: EmailOtpRequest):
         "message": "Adresse email disponible" if not existing_user else "Cette adresse email est déjà utilisée"
     }
 
+def _generic_otp_response(clean_email: str) -> dict:
+    """Réponse identique qu'un email soit libre ou déjà inscrit (anti-énumération)."""
+    return {
+        "message": "Si cette adresse est disponible, un code de vérification a été envoyé.",
+        "masked_email": mask_email_address(clean_email),
+        "expires_in_seconds": EMAIL_OTP_EXPIRY_MINUTES * 60,
+        "cooldown_seconds": EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+    }
+
 @router.post("/auth/email/send-otp")
 async def send_signup_email_otp(payload: EmailOtpRequest):
     clean_email = sanitize_email(payload.email)
 
     existing_user = await db.users.find_one({"email": clean_email})
     if existing_user:
-        raise HTTPException(status_code=400, detail="Cette adresse email est déjà utilisée")
+        # Réponse générique sans envoi d'email : on ne révèle pas qu'un compte
+        # existe déjà, et on n'envoie pas d'OTP à une adresse déjà inscrite.
+        return _generic_otp_response(clean_email)
 
     return await issue_email_otp(clean_email, payload.purpose)
 
@@ -62,7 +73,7 @@ async def resend_signup_email_otp(payload: EmailOtpResendRequest):
 
     existing_user = await db.users.find_one({"email": clean_email})
     if existing_user:
-        raise HTTPException(status_code=400, detail="Cette adresse email est déjà utilisée")
+        return _generic_otp_response(clean_email)
 
     return await issue_email_otp(clean_email, payload.purpose)
 
@@ -309,6 +320,15 @@ async def register_user_verified(user_data: UserWithPayment):
                     if ',' in user_data.profile_photo_base64
                     else user_data.profile_photo_base64
                 )
+
+                # Même limite que l'endpoint d'upload dédié (5 Mo) : sans ça,
+                # un payload base64 arbitrairement gros coûtait un décodage +
+                # un upload Cloudinary (DoS / coût).
+                if len(image_data) > 5 * 1024 * 1024:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Photo trop volumineuse. Taille maximale : 5 Mo"
+                    )
 
                 upload_result = cloudinary_uploader.upload(
                     io.BytesIO(image_data),

@@ -11,6 +11,16 @@ export default defineConfig(({ mode }) => {
     PUBLIC_URL: '',
   }
 
+  // Origin du backend (pour la CSP connect-src en prod) — dynamique selon
+  // VITE_API_URL, avec repli sur l'URL Render par défaut de l'app.
+  const rawApiUrl = (env.VITE_API_URL || env.VITE_API_BASE_URL || env.VITE_BACKEND_URL || '').trim()
+  let apiOrigin = 'https://kojo-backend-03az.onrender.com'
+  try {
+    apiOrigin = new URL(rawApiUrl || 'https://kojo-backend-03az.onrender.com/api').origin
+  } catch (_error) {
+    // URL invalide : on garde l'origin par défaut
+  }
+
   return {
     plugins: [
       react(),
@@ -22,6 +32,38 @@ export default defineConfig(({ mode }) => {
             loader: 'jsx',
             jsx: 'automatic',
           })
+        },
+      },
+      {
+        // CSP injectée UNIQUEMENT en build de production (le dev Vite a besoin
+        // de scripts inline/HMR). Durcissement XSS : bloque les scripts
+        // externes injectés et eval, sans casser le bundling Vite.
+        name: 'inject-production-csp',
+        transformIndexHtml(html) {
+          if (mode !== 'production') return html
+          const csp = [
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob: https://res.cloudinary.com",
+            `connect-src 'self' ${apiOrigin}`,
+            "font-src 'self' data:",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "frame-ancestors 'none'",
+            "worker-src 'self'",
+            "manifest-src 'self'",
+          ].join('; ')
+          return {
+            html,
+            tags: [
+              {
+                tag: 'meta',
+                attrs: { 'http-equiv': 'Content-Security-Policy', content: csp },
+                injectTo: 'head-prepend',
+              },
+            ],
+          }
         },
       },
     ],

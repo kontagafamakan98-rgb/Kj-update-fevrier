@@ -16,6 +16,17 @@ async def send_message(
     message_data: MessageCreate,
     current_user: User = Depends(get_current_user)
 ):
+    # Anti-spam / anti-bruit : le destinataire doit exister, et on ne peut
+    # pas s'envoyer un message à soi-même.
+    if message_data.receiver_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas vous envoyer un message à vous-même")
+
+    # Projection {"id": 1} (pas {"_id": 1}) : reste truthy avec la FakeDB de
+    # test qui projette vers un dict vide pour _id seul.
+    receiver_exists = await db.users.find_one({"id": message_data.receiver_id}, {"id": 1})
+    if receiver_exists is None:
+        raise HTTPException(status_code=404, detail="Destinataire introuvable")
+
     # Generate conversation ID
     conversation_id = f"{min(current_user.id, message_data.receiver_id)}_{max(current_user.id, message_data.receiver_id)}"
 
