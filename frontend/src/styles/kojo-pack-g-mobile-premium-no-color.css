@@ -1,0 +1,96 @@
+html,
+body {
+  overscroll-behavior-y: contain;
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  .app-header,
+  .header,
+  .topbar,
+  .navbar,
+  .mobile-header,
+  .page-header {
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+
+  .bottom-nav,
+  .tabbar,
+  .mobile-tabbar,
+  .mobile-nav,
+  .footer-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  main,
+  .main-content,
+  .page-content,
+  .screen-content,
+  .content-shell,
+  .page-shell {
+    padding-bottom: max(18px, env(safe-area-inset-bottom));
+  }
+}
+
+.bottom-nav a,
+.tabbar a,
+.mobile-tabbar a,
+.mobile-nav a,
+.footer-nav a,
+.bottom-nav button,
+.tabbar button,
+.mobile-tabbar button,
+.mobile-nav button,
+.footer-nav button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.modal-content,
+.dialog,
+.drawer-content,
+.sheet-content,
+.bottom-sheet,
+.side-sheet,
+.menu-sheet,
+.toast,
+.snackbar,
+.notification,
+.banner,
+.install-banner,
+.update-banner,
+.network-banner,
+.offline-banner {
+  border-radius: 18px;
+}
+
+.backdrop,
+.modal-backdrop,
+.drawer-backdrop,
+.overlay {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.avatar,
+.profile-avatar,
+.user-avatar,
+img.avatar,
+img.profile-photo {
+  object-fit: cover;
+}
+
+.skeleton,
+.skeleton-loader,
+.shimmer,
+.loading-shimmer {
+  border-radius: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

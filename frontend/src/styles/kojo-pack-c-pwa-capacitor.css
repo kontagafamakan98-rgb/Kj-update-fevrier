@@ -1,0 +1,101 @@
+:root {
+  --kojo-c-bg: #0f172a;
+  --kojo-c-surface: #111827;
+  --kojo-c-surface-soft: rgba(255, 255, 255, 0.92);
+  --kojo-c-text: #0f172a;
+  --kojo-c-text-light: #f8fafc;
+  --kojo-c-muted: #64748b;
+  --kojo-c-stroke: rgba(15, 23, 42, 0.08);
+  --kojo-c-red: #a61616;
+  --kojo-c-red-2: #e34444;
+  --kojo-c-gold: #f0c26a;
+  --kojo-c-radius: 18px;
+  --kojo-c-shadow: 0 14px 32px rgba(15, 23, 42, 0.12);
+}
+
+html,
+body {
+  background-color: var(--kojo-c-bg);
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  .app-header,
+  .header,
+  .topbar,
+  .navbar,
+  .mobile-header {
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+
+  .bottom-nav,
+  .tabbar,
+  .mobile-tabbar,
+  .mobile-nav,
+  .footer-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  main,
+  .main-content,
+  .page-content,
+  .screen-content,
+  .content-shell,
+  .page-shell {
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  .app-header,
+  .header,
+  .topbar,
+  .navbar,
+  .mobile-header {
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+}
+
+.install-banner,
+.pwa-install-banner,
+.update-banner,
+.app-update-banner,
+.offline-banner,
+.network-banner,
+.sw-update-banner {
+  border-radius: var(--kojo-c-radius);
+  border: 1px solid var(--kojo-c-stroke);
+  background: var(--kojo-c-surface-soft);
+  color: var(--kojo-c-text);
+  box-shadow: var(--kojo-c-shadow);
+}
+
+.install-banner button,
+.pwa-install-banner button,
+.update-banner button,
+.app-update-banner button,
+.offline-banner button,
+.network-banner button,
+.sw-update-banner button,
+.install-banner .btn,
+.pwa-install-banner .btn,
+.update-banner .btn,
+.app-update-banner .btn,
+.offline-banner .btn,
+.network-banner .btn,
+.sw-update-banner .btn {
+  border-radius: 14px;
+}
+
+.splash-shell,
+.splash-screen,
+.launch-screen,
+.app-splash {
+  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+  color: var(--kojo-c-text-light);
+}

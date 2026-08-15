@@ -1,0 +1,5263 @@
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request, Response, Query
+from contextlib import asynccontextmanager
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+import logging
+import logging.handlers
+import sys
+import re
+from pathlib import Path
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator, ValidationError
+from typing import List, Optional, Dict, Any
+import uuid
+from datetime import datetime, timedelta, timezone
+import jwt
+import bcrypt
+from enum import Enum
+import base64
+import io
+import cloudinary
+from cloudinary import uploader as cloudinary_uploader
+import requests
+import secrets
+import hashlib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+from urllib.parse import urlparse
+import asyncio
+
+# Web Push (VAPID) - Sans Firebase
+try:
+    from pywebpush import webpush, WebPushException
+    import json as _json
+    WEBPUSH_AVAILABLE = True
+except ImportError:
+    WEBPUSH_AVAILABLE = False
+    logger.warning("⚠️ pywebpush non installé - notifications push désactivées")
+
+# Configure logging for West Africa production
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.handlers.RotatingFileHandler(
+            'kojo_backend.log',
+            maxBytes=10*1024*1024,
+            backupCount=5,
+            encoding='utf-8'
+        )
+    ]
+)
+logger = logging.getLogger("kojo_backend")
+
+# Silence noisy /favicon.ico (and other junk) requests from uvicorn's access
+# log entirely - browsers, bots and health checks hit this path constantly
+# even though this backend has no favicon to serve, and it clutters the logs.
+class _IgnoreNoisyPathsFilter(logging.Filter):
+    _IGNORED_SUBSTRINGS = ("/favicon.ico",)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not any(path in message for path in self._IGNORED_SUBSTRINGS)
+
+logging.getLogger("uvicorn.access").addFilter(_IgnoreNoisyPathsFilter())
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+cloudinary.config(secure=True)
+def upload_profile_photo_to_cloudinary(file_obj, user_identifier: str):
+    result = cloudinary_uploader.upload(
+        file_obj,
+        folder="kojo/profile_photos",
+        public_id=f"profile_{user_identifier}_{uuid.uuid4().hex}",
+        resource_type="image"
+    )
+    return {
+        "photo_url": result.get("secure_url") or result.get("url"),
+        "public_id": result.get("public_id")
+    }
+
+# MongoDB connection - Enhanced error handling
+try:
+    mongo_url = os.environ.get('MONGO_URL')
+    if not mongo_url:
+        raise ValueError("MONGO_URL environment variable is required")
+    
+    db_name = os.environ.get('DB_NAME', 'kojo_db')  # Default fallback
+    if not db_name:
+        raise ValueError("DB_NAME environment variable is required")
+
+    client = AsyncIOMotorClient(
+        mongo_url,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=5000,
+    )
+    db = client[db_name]
+
+    # Test connection on startup
+    logger.info(f"✅ MongoDB connected to: {db_name}")
+except Exception as e:
+    logger.error(f"❌ MongoDB connection failed: {e}")
+    raise
+
+async def is_database_available() -> bool:
+    """Return True when MongoDB is reachable, otherwise False."""
+    try:
+        await db.command("ping")
+        return True
+    except Exception as e:
+        logger.warning(f"⚠️ MongoDB unavailable: {e}")
+        return False
+
+# MongoDB Indexes for Performance (West Africa optimization)
+async def create_database_indexes():
+    """Create indexes on frequently queried fields for better performance"""
+    if not await is_database_available():
+        logger.warning("⚠️ Skipping MongoDB index creation because the database is unavailable.")
+        return
+
+    try:
+        # Users collection indexes
+        await db.users.create_index("email", unique=True)
+        await db.users.create_index("id", unique=True)
+        await db.users.create_index("user_type")
+        await db.users.create_index("country")
+        await db.users.create_index([("email", 1), ("password_hash", 1)])
+        
+        # Jobs collection indexes
+        await db.jobs.create_index("id", unique=True)
+        await db.jobs.create_index("client_id")
+        await db.jobs.create_index("status")
+        await db.jobs.create_index("category")
+        await db.jobs.create_index("country")
+        await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        
+        # Proposals collection indexes
+        await db.proposals.create_index("id", unique=True)
+        await db.proposals.create_index("job_id")
+        await db.proposals.create_index("worker_id")
+        await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
+        
+        # Messages collection indexes
+        # NOTE: les index précédents portaient sur "job_id" et "created_at",
+        # deux champs qui n'existent pas sur le modèle Message (id,
+        # conversation_id, sender_id, receiver_id, content, timestamp, read)
+        # - ces index ne servaient donc à rien. "conversation_id", lui,
+        # est utilisé dans quasiment toutes les requêtes messages et n'était
+        # pas indexé du tout (full collection scan à chaque conversation
+        # ouverte).
+        await db.messages.create_index("id", unique=True)
+        await db.messages.create_index([("sender_id", 1), ("receiver_id", 1)])
+        await db.messages.create_index([("conversation_id", 1), ("timestamp", 1)])
+        await db.messages.create_index([("timestamp", -1)])
+        await db.messages.create_index("job_id")
+        
+        # Commissions collection indexes
+        await db.commissions.create_index("id", unique=True)
+        await db.commissions.create_index("job_id")
+        await db.commissions.create_index("worker_id")
+        await db.commissions.create_index("status")
+        await db.commissions.create_index([("created_at", -1)])
+
+        # Payments collection indexes
+        await db.payments.create_index("id", unique=True)
+        await db.payments.create_index("job_id")
+        await db.payments.create_index("payer_id")
+        await db.payments.create_index("receiver_id")
+        await db.payments.create_index("status")
+        await db.payments.create_index("invoice_token", sparse=True)
+        await db.payments.create_index([("created_at", -1)])
+
+        # Email OTP collection indexes
+        await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)
+        await db.email_otps.create_index("expires_at", expireAfterSeconds=0)
+        await db.email_otps.create_index([("created_at", -1)])
+
+        # Notifications collection indexes
+        await db.notifications.create_index("id", unique=True)
+        await db.notifications.create_index("user_id")
+        await db.notifications.create_index([("user_id", 1), ("is_read", 1)])
+        await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+        # TTL : suppression automatique des notifications après 90 jours
+        await db.notifications.create_index("created_at", expireAfterSeconds=90 * 24 * 3600)
+
+        # Push tokens collection indexes
+        await db.push_tokens.create_index("id", unique=True)
+        await db.push_tokens.create_index("user_id")
+        await db.push_tokens.create_index([("user_id", 1), ("active", 1)])
+
+        # TTL index: Mongo purge automatiquement les tokens révoqués une fois
+        # leur date d'expiration naturelle (expire_at) atteinte - la collection
+        # de révocation reste donc de taille bornée sans job de nettoyage manuel.
+        await db.revoked_tokens.create_index("jti", unique=True)
+        await db.revoked_tokens.create_index("expire_at", expireAfterSeconds=0)
+
+        logger.info("✅ MongoDB indexes created successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ Error creating indexes (may already exist): {e}")
+
+# JWT Settings - Enhanced Security
+# IMPORTANT: JWT_SECRET must be a FIXED value set via the JWT_SECRET env var on
+# Render. If it's missing, every process/worker/restart used to generate its
+# own random secret (uuid4()) - this silently invalidated ALL existing user
+# sessions on every deploy/restart, and caused random auth failures whenever
+# more than one worker process was running (each with a different secret).
+APP_ENV = os.environ.get("APP_ENV", "production").strip().lower()
+_env_jwt_secret = os.environ.get('JWT_SECRET', '').strip()
+
+if _env_jwt_secret:
+    JWT_SECRET = _env_jwt_secret
+elif APP_ENV in ("production", "prod"):
+    # Fail fast and loud rather than silently issuing tokens that won't
+    # validate after the next restart or on a different worker.
+    raise RuntimeError(
+        "JWT_SECRET environment variable is not set. Refusing to start in "
+        "production with an auto-generated secret, since that would silently "
+        "invalidate all user sessions on every restart/deploy and break auth "
+        "across multiple worker processes. Set JWT_SECRET on Render (a long "
+        "random string) and redeploy."
+    )
+else:
+    # Local/dev only: stable fallback so tokens survive local restarts.
+    JWT_SECRET = 'kojo-dev-only-insecure-secret-do-not-use-in-prod'
+    logger.warning(
+        "⚠️ JWT_SECRET not set - using an insecure fixed dev secret. "
+        "This is only acceptable outside production (APP_ENV=%s).", APP_ENV
+    )
+
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
+JWT_REFRESH_EXPIRATION_DAYS = 7
+
+# Gmail OTP settings
+EMAIL_OTP_SECRET = os.environ.get('EMAIL_OTP_SECRET', JWT_SECRET)
+EMAIL_OTP_EXPIRY_MINUTES = int(os.environ.get('EMAIL_OTP_EXPIRY_MINUTES', '10'))
+EMAIL_OTP_MAX_ATTEMPTS = int(os.environ.get('EMAIL_OTP_MAX_ATTEMPTS', '5'))
+
+# Real payment gateway settings (Pack 2)
+PAYMENT_COMMISSION_RATE = float(os.environ.get('PAYMENT_COMMISSION_RATE', '0.14'))
+PAYDUNYA_MODE = os.environ.get('PAYDUNYA_MODE', 'test').strip().lower()
+PAYDUNYA_MASTER_KEY = os.environ.get('PAYDUNYA_MASTER_KEY', '').strip()
+PAYDUNYA_PRIVATE_KEY = os.environ.get('PAYDUNYA_PRIVATE_KEY', '').strip()
+PAYDUNYA_TOKEN = os.environ.get('PAYDUNYA_TOKEN', '').strip()
+PAYDUNYA_STORE_NAME = os.environ.get('PAYDUNYA_STORE_NAME', 'KOJO')
+FRONTEND_APP_URL = os.environ.get('FRONTEND_APP_URL', '').rstrip('/')
+BACKEND_PUBLIC_URL = os.environ.get('BACKEND_PUBLIC_URL', '').rstrip('/')
+EMAIL_OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('EMAIL_OTP_RESEND_COOLDOWN_SECONDS', '60'))
+EMAIL_VERIFICATION_TOKEN_MINUTES = int(os.environ.get('EMAIL_VERIFICATION_TOKEN_MINUTES', '30'))
+GMAIL_CLIENT_ID = os.environ.get('GMAIL_CLIENT_ID', '').strip()
+GMAIL_CLIENT_SECRET = os.environ.get('GMAIL_CLIENT_SECRET', '').strip()
+GMAIL_REFRESH_TOKEN = os.environ.get('GMAIL_REFRESH_TOKEN', '').strip()
+GMAIL_SENDER_EMAIL = os.environ.get('GMAIL_SENDER_EMAIL', '').strip()
+GMAIL_SENDER_NAME = os.environ.get('GMAIL_SENDER_NAME', 'KOJO').strip() or 'KOJO'
+GMAIL_TOKEN_REFRESH_RETRIES = max(1, int(os.environ.get('GMAIL_TOKEN_REFRESH_RETRIES', '3')))
+GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS = max(0.5, float(os.environ.get('GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS', '1')))
+GMAIL_ACCESS_TOKEN_SAFETY_SECONDS = max(30, int(os.environ.get('GMAIL_ACCESS_TOKEN_SAFETY_SECONDS', '60')))
+GMAIL_ACCESS_TOKEN_CACHE: Dict[str, Any] = {"access_token": "", "expires_at": 0.0}
+EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', 'brevo').strip().lower()
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
+BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
+BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME', 'KOJO').strip() or 'KOJO'
+PASSWORD_RESET_FROM_EMAIL = os.environ.get('PASSWORD_RESET_FROM_EMAIL', BREVO_SENDER_EMAIL).strip() or BREVO_SENDER_EMAIL
+BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
+GMAIL_DEPRECATED_NOTICE = 'Gmail OAuth disabled in favor of Brevo'
+
+# ============================================================================
+# VAPID / Web Push Configuration (sans Firebase)
+# ============================================================================
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '').strip()
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
+VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'mailto:kojo@example.com').strip()
+
+# Security Headers for West Africa
+DEFAULT_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(self), microphone=(), camera=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self' https://api.cloudinary.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+}
+
+DOCS_SECURITY_HEADERS = {
+    **DEFAULT_SECURITY_HEADERS,
+    "Content-Security-Policy": "default-src 'self' https://cdn.jsdelivr.net https://fastapi.tiangolo.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com https://cdn.jsdelivr.net; connect-src 'self'; font-src 'self' https://cdn.jsdelivr.net data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+}
+
+def get_security_headers_for_path(path: str) -> dict:
+    if path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/openapi.json"):
+        return DOCS_SECURITY_HEADERS
+    return DEFAULT_SECURITY_HEADERS
+
+# Owner/Admin configuration - SEUL FAMAKAN KONTAGA MASTER A ACCÈS
+OWNER_EMAIL = os.environ.get('OWNER_EMAIL', '').strip()
+OWNER_USER_ID = os.environ.get('OWNER_USER_ID', 'famakan_kontaga_master_2024').strip() or 'famakan_kontaga_master_2024'
+OWNER_INITIAL_PASSWORD = os.environ.get('OWNER_INITIAL_PASSWORD', '').strip()
+
+# Create the main app without a prefix
+app = FastAPI(title="Kojo API", description="Service/Worker Platform for Mali & Senegal")
+
+# Middleware pour compression gzip (optimisation réseaux lents Afrique de l'Ouest)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# ---------------------------------------------------------------------------
+# Rate limiting — store partagé Redis (si REDIS_URL défini) avec fallback
+# mémoire (comportement précédent conservé intégralement).
+#
+# Pourquoi Redis ?
+#   Le compteur en mémoire Python est par-process : si Render fait tourner
+#   N workers (WEB_CONCURRENCY=N), chaque worker a son propre compteur et
+#   la limite globale effective devient max_requests * N, pas max_requests.
+#   Redis étant un processus externe partagé, tous les workers voient les
+#   mêmes compteurs.
+#
+# Comment activer :
+#   1. Sur Render : ajouter un service Redis (Add-On "Redis" ou service
+#      Redis dédié), puis copier l'URL dans une variable d'env REDIS_URL.
+#   2. Redéployer. C'est tout — le code bascule automatiquement sur Redis.
+#
+# Fallback automatique :
+#   Si REDIS_URL est absent ou si Redis est inaccessible, on retombe sur le
+#   compteur en mémoire (comportement actuel) sans erreur ni interruption
+#   de service. Les logs indiquent quel mode est actif au démarrage.
+# ---------------------------------------------------------------------------
+from collections import defaultdict
+import time
+
+_redis_client = None
+
+def _try_init_redis() -> Optional[Any]:
+    """Tente de connecter Redis si REDIS_URL est défini. Retourne le client
+    ou None (fallback mémoire) sans jamais lever d'exception."""
+    redis_url = os.environ.get('REDIS_URL', '').strip()
+    if not redis_url:
+        return None
+    try:
+        import redis.asyncio as aioredis
+        client = aioredis.from_url(
+            redis_url,
+            encoding='utf-8',
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        logger.info("✅ Rate-limiter: mode Redis partagé activé (multi-workers safe)")
+        return client
+    except ImportError:
+        logger.warning(
+            "⚠️ Rate-limiter: package 'redis' non installé (pip install redis). "
+            "Ajoutez 'redis>=5.0.0' à requirements.txt pour activer le mode "
+            "Redis partagé. Fallback sur compteur en mémoire."
+        )
+        return None
+    except Exception as e:
+        logger.warning(f"⚠️ Rate-limiter: connexion Redis échouée ({e}), fallback mémoire.")
+        return None
+
+_redis_client = _try_init_redis()
+_using_redis = _redis_client is not None
+
+if not _using_redis:
+    logger.info(
+        "ℹ️ Rate-limiter: mode mémoire (par process). Si Render tourne avec "
+        "plusieurs workers, définissez REDIS_URL pour un comptage partagé."
+    )
+
+# Compteur mémoire (utilisé uniquement si Redis est absent)
+request_counts: Dict[str, List[float]] = defaultdict(list)
+RATE_LIMIT_MAX_TRACKED_KEYS = 50_000  # garde-fou anti-DoS mémoire
+
+
+async def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: int = 1) -> bool:
+    """Vérifie le rate limiting. Utilise Redis si disponible, sinon mémoire."""
+    if _using_redis:
+        return await _rate_limit_check_redis(client_ip, max_requests, window_minutes)
+    return _rate_limit_check_memory(client_ip, max_requests, window_minutes)
+
+
+async def _rate_limit_check_redis(client_ip: str, max_requests: int, window_minutes: int) -> bool:
+    """Rate limiting via Redis (sliding window, partagé entre tous les workers)."""
+    try:
+        window_seconds = window_minutes * 60
+        key = f"rl:{client_ip}:{window_minutes}m"
+        now = time.time()
+        pipe = _redis_client.pipeline()
+        # Sliding window : on supprime les timestamps anciens, on ajoute le
+        # nouveau, et on compte combien il en reste dans la fenêtre courante.
+        pipe.zremrangebyscore(key, 0, now - window_seconds)
+        pipe.zcard(key)
+        pipe.zadd(key, {str(now): now})
+        pipe.expire(key, window_seconds + 10)
+        results = await pipe.execute()
+        current_count = results[1]
+        return current_count < max_requests
+    except Exception as exc:
+        # Redis indisponible pendant la vérification : on laisse passer
+        # (fail-open) plutôt que de bloquer tous les utilisateurs. Le
+        # fallback mémoire prend le relais pour les requêtes suivantes si
+        # Redis reste down.
+        logger.warning(f"⚠️ Rate-limit Redis check échoué: {exc}, fail-open")
+        return True
+
+
+def _rate_limit_check_memory(client_ip: str, max_requests: int, window_minutes: int) -> bool:
+    """Rate limiting en mémoire (par process, comportement original)."""
+    now = time.time()
+    window_start = now - (window_minutes * 60)
+
+    recent = [t for t in request_counts.get(client_ip, []) if t > window_start]
+
+    if len(recent) >= max_requests:
+        request_counts[client_ip] = recent
+        return False
+
+    recent.append(now)
+    request_counts[client_ip] = recent
+
+    if len(request_counts) > RATE_LIMIT_MAX_TRACKED_KEYS:
+        _purge_stale_rate_limit_entries(max_age_seconds=300)
+
+    return True
+
+
+def _purge_stale_rate_limit_entries(max_age_seconds: int = 3600) -> int:
+    """Supprime du dict mémoire les clés expirées. No-op si Redis est actif."""
+    if _using_redis:
+        return 0
+    now = time.time()
+    cutoff = now - max_age_seconds
+    stale_keys = [
+        key for key, timestamps in request_counts.items()
+        if not timestamps or max(timestamps) < cutoff
+    ]
+    for key in stale_keys:
+        del request_counts[key]
+    return len(stale_keys)
+
+
+async def _rate_limit_cleanup_loop():
+    """Tâche de fond: purge les entrées mémoire inactives (no-op si Redis)."""
+    while True:
+        try:
+            await asyncio.sleep(600)
+            removed = _purge_stale_rate_limit_entries(max_age_seconds=3600)
+            if removed:
+                logger.info(f"🧹 Rate-limit cleanup: {removed} entrées inactives purgées")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.warning(f"⚠️ Erreur cleanup rate-limit: {e}")
+
+def get_client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "").strip()
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+def extract_host_from_url(raw_url: str) -> Optional[str]:
+    if not raw_url:
+        return None
+    candidate = raw_url.strip()
+    if not candidate:
+        return None
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+    parsed = urlparse(candidate)
+    return parsed.hostname
+
+def build_trusted_hosts() -> List[str]:
+    hosts = {
+        "localhost",
+        "127.0.0.1",
+        "*.vercel.app",
+        "*.onrender.com",
+        "onrender.com",
+        "kojo-work.preview.emergentagent.com"
+    }
+
+    render_external_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
+    raw_candidates = [FRONTEND_APP_URL, BACKEND_PUBLIC_URL, render_external_host]
+    raw_candidates.extend(origin.strip() for origin in os.environ.get('CORS_ORIGINS', '').split(',') if origin.strip())
+    raw_candidates.extend(host.strip() for host in os.environ.get('TRUSTED_HOSTS', '').split(',') if host.strip())
+
+    for candidate in raw_candidates:
+        host = extract_host_from_url(candidate)
+        if host:
+            hosts.add(host)
+
+    return sorted(hosts)
+
+def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
+    if path.startswith("/api/auth/email/") or path.startswith("/api/auth/password/"):
+        return ("auth-otp", 12, 5)
+    if path.startswith("/api/auth/login") or path.startswith("/api/auth/register"):
+        return ("auth-session", 20, 5)
+    if path.startswith("/api/owner"):
+        return ("owner", 30, 1)
+    return ("general-api", 240, 1)
+
+# Create a router with the /api prefix
+api_router = APIRouter(prefix="/api")
+
+# Security
+security = HTTPBearer()
+
+# Custom Security Middleware for West Africa
+class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+
+        for header, value in get_security_headers_for_path(request.url.path).items():
+            response.headers[header] = value
+
+        response.headers["X-Kojo-Region"] = "west-africa"
+        response.headers["X-Kojo-Version"] = "1.0.1"
+        response.headers["Vary"] = "Origin, Authorization, Accept-Encoding"
+
+        path = request.url.path
+        has_auth_header = bool(request.headers.get("authorization"))
+        sensitive_prefixes = ("/api/auth", "/api/users/profile", "/api/messages", "/api/owner")
+
+        if path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/openapi.json"):
+            response.headers["Cache-Control"] = "no-store"
+        elif path.startswith("/api"):
+            is_sensitive = any(path.startswith(prefix) for prefix in sensitive_prefixes)
+            if has_auth_header or is_sensitive or request.method not in {"GET", "HEAD", "OPTIONS"}:
+                response.headers["Cache-Control"] = "private, no-store"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=120, stale-while-revalidate=60"
+
+        return response
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if not path.startswith("/api"):
+            return await call_next(request)
+
+        bucket_name, max_requests, window_minutes = get_rate_limit_bucket(path)
+        client_ip = get_client_ip(request)
+        scoped_client = f"{client_ip}:{bucket_name}"
+
+        if not await rate_limit_check(scoped_client, max_requests=max_requests, window_minutes=window_minutes):
+            retry_after = window_minutes * 60
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={
+                    "detail": "Trop de requêtes. Réessayez dans un instant.",
+                    "bucket": bucket_name
+                },
+                headers={"Retry-After": str(retry_after)}
+            )
+
+        return await call_next(request)
+
+# Fonction pour vérifier si l'utilisateur est le propriétaire
+async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Vérifie que seul le propriétaire peut accéder aux fonctionnalités sensibles"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("sub")
+        email = payload.get("email")
+
+        if await is_token_revoked(payload.get("jti")):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token révoqué")
+
+        # Vérification stricte: seul Famakan Kontaga Master a accès
+        if user_id != OWNER_USER_ID or email != OWNER_EMAIL:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
+            )
+        
+        # Récupérer les données utilisateur depuis la DB
+        user = await db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Propriétaire non trouvé"
+            )
+            
+        return user
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expiré"
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide"
+        )
+
+# Fonction pour créer le compte propriétaire s'il n'existe pas
+async def ensure_owner_exists():
+    """Crée le compte propriétaire s'il n'existe pas déjà et si les secrets requis sont fournis."""
+    if not await is_database_available():
+        logger.warning("⚠️ Skipping owner bootstrap because MongoDB is unavailable.")
+        return
+
+    if not OWNER_EMAIL:
+        logger.warning("⚠️ OWNER_EMAIL non défini: création automatique du compte owner désactivée.")
+        return
+
+    existing_owner = await db.users.find_one({"$or": [{"id": OWNER_USER_ID}, {"email": OWNER_EMAIL}]})
+    if existing_owner:
+        logger.info(f"✅ Compte owner existe déjà: {OWNER_EMAIL}")
+        return
+
+    if not OWNER_INITIAL_PASSWORD:
+        logger.warning("⚠️ Compte owner absent et OWNER_INITIAL_PASSWORD non défini: aucune création automatique effectuée.")
+        return
+
+    if len(OWNER_INITIAL_PASSWORD) < 12:
+        logger.warning("⚠️ OWNER_INITIAL_PASSWORD trop court (minimum 12 caractères): création automatique du compte owner refusée.")
+        return
+
+    hashed_password = bcrypt.hashpw(OWNER_INITIAL_PASSWORD.encode('utf-8'), bcrypt.gensalt())
+
+    owner_data = {
+        "id": OWNER_USER_ID,
+        "email": OWNER_EMAIL,
+        "password_hash": hashed_password.decode('utf-8'),
+        "first_name": "Famakan",
+        "last_name": "Kontaga Master",
+        "user_type": "owner",
+        "phone": "+223701234567",
+        "country": "mali",
+        "preferred_language": "fr",
+        "profile_photo": None,
+        "is_verified": True,
+        "rating": 0.0,
+        "total_reviews": 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "is_owner": True,
+        "permissions": [
+            "commission_access",
+            "debug_access",
+            "admin_access",
+            "full_dashboard_access",
+            "mobile_test_access",
+            "photo_debug_access"
+        ]
+    }
+
+    # Ce bootstrap ne doit JAMAIS faire planter le démarrage de l'application.
+    # Si l'insertion échoue (ex: doublon d'email/id détecté par un index unique
+    # malgré le contrôle ci-dessus, condition de course, etc.), on logue
+    # l'erreur et on continue le démarrage normalement.
+    try:
+        await db.users.insert_one(owner_data)
+        logger.info(f"✅ Compte owner créé: {OWNER_EMAIL}")
+        logger.warning("⚠️ Changez OWNER_INITIAL_PASSWORD après la première connexion et retirez-le ensuite du fichier .env.")
+    except Exception as exc:
+        logger.error(f"⚠️ Création automatique du compte owner ignorée (compte probablement déjà existant sous un autre id): {exc}")
+
+# Enums
+class UserType(str, Enum):
+    CLIENT = "client"
+    WORKER = "worker"
+    OWNER = "owner"
+
+class JobStatus(str, Enum):
+    OPEN = "open"
+    IN_PROGRESS = "in_progress" 
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+class PaymentMethod(str, Enum):
+    ORANGE_MONEY = "orange_money"  
+    WAVE = "wave"
+    BANK_ACCOUNT = "bank_account"
+
+class Language(str, Enum):
+    FRENCH = "fr"
+    ENGLISH = "en"
+    WOLOF = "wo"
+    BAMBARA = "bm"
+    MOORE = "mos"  # Mooré - Langue principale du Burkina Faso
+
+class Country(str, Enum):
+    """4 pays prioritaires pour le lancement de Kojo"""
+    SENEGAL = "senegal"      # 🇸🇳 Pays principal - Dakar hub tech
+    MALI = "mali"            # 🇲🇱 Pays prioritaire - Bamako  
+    COTE_DIVOIRE = "cote_divoire"  # 🇨🇮 Pays prioritaire - Abidjan hub économique
+    BURKINA_FASO = "burkina_faso"  # 🇧🇫 Pays prioritaire - Ouagadougou
+
+# Models
+class User(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    password_hash: str = Field(min_length=60, max_length=100)  # bcrypt hash length
+    first_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$', description="Prénom")
+    last_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$', description="Nom de famille")
+    phone: str = Field(description="Numéro de téléphone international")
+    user_type: UserType
+    country: Country
+    preferred_language: Language
+    legal_documents_accepted: bool = Field(default=False)
+    legal_documents_accepted_at: Optional[datetime] = None
+    legal_documents_version: Optional[str] = Field(default=None, max_length=120)
+    
+    is_owner: bool = False
+
+    @model_validator(mode='after')
+    def compute_is_owner(self):
+        """
+        Determine reel du statut owner : par email, la meme methode utilisee
+        partout ailleurs dans ce backend (voir verify_owner_access). On ne se
+        fie pas a un champ "is_owner" ou "user_type" potentiellement absent/
+        obsolete en base pour les comptes crees avant l'introduction de ce
+        systeme.
+        Migré de @validator(always=True) V1 → @model_validator(mode='after') V2.
+        """
+        if not self.email or not OWNER_EMAIL:
+            self.is_owner = False
+        else:
+            self.is_owner = str(self.email).strip().lower() == OWNER_EMAIL.strip().lower()
+        return self
+
+    @field_validator('phone')
+    @classmethod
+    def validate_phone(cls, v):
+        """Nettoie et valide le numéro de téléphone pour l'Afrique de l'Ouest"""
+        if not v:
+            raise ValueError("Le numéro de téléphone est requis")
+        
+        # Nettoyer le numéro - supprimer espaces, tirets, parenthèses
+        clean_phone = re.sub(r'[\s\-\(\)]', '', v)
+        
+        # Vérifier le format international de base
+        if not clean_phone.startswith('+'):
+            raise ValueError("Le numéro de téléphone doit commencer par +")
+        
+        # Extraire les chiffres seulement
+        digits_only = ''.join(filter(str.isdigit, clean_phone))
+        
+        # Vérifier que c'est un pays ouest-africain supporté
+        west_african_codes = ['221', '223', '225', '226']  # Sénégal, Mali, Côte d'Ivoire, Burkina Faso
+        
+        valid_country = False
+        for code in west_african_codes:
+            if digits_only.startswith(code):
+                valid_country = True
+                # Vérifier la longueur totale (code pays + numéro)
+                if len(digits_only) < 11 or len(digits_only) > 12:
+                    raise ValueError(f"Numéro {code} doit contenir 8-9 chiffres après l'indicatif pays")
+                
+                # Vérifier que le préfixe opérateur est valide (70-99 pour Orange/Wave)
+                if len(digits_only) >= 5:
+                    operator_prefix = digits_only[3:5]
+                    if not (70 <= int(operator_prefix) <= 99):
+                        # Autoriser aussi quelques autres préfixes connus
+                        other_valid = ['65', '66', '67', '68', '58', '59', '48', '49', '51', '52', '33', '75', '76']
+                        if operator_prefix not in other_valid:
+                            raise ValueError(f"Préfixe opérateur {operator_prefix} non supporté pour +{code}")
+                break
+        
+        if not valid_country:
+            raise ValueError("Seuls les numéros du Sénégal (+221), Mali (+223), Côte d'Ivoire (+225) et Burkina Faso (+226) sont supportés")
+        
+        return clean_phone
+    profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
+    is_verified: bool = False
+    email_verified: bool = False
+    email_verified_at: Optional[datetime] = None
+    payment_accounts: Optional[dict] = Field(None)  # Payment methods dict
+    payment_accounts_count: int = Field(default=0, ge=0, le=10)  # Non-negative, max 10
+    rating: float = Field(default=0.0, ge=0.0, le=5.0)  # Rating between 0-5
+    total_reviews: int = Field(default=0, ge=0)  # Non-negative
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class WorkerProfile(BaseModel):
+    user_id: str
+    specialties: List[str] = Field(default=[], max_length=10)  # Max 10 specialties
+    experience_years: int = Field(default=0, ge=0, le=50)  # 0-50 years experience
+
+    cv_file: Optional[str] = Field(None, max_length=500)  # File path length limit
+    portfolio_images: List[str] = Field(default=[], max_length=10)  # Max 10 portfolio images
+    availability: bool = True
+    description: Optional[str] = Field(None, max_length=1000)  # Description length limit
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Job(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    title: str = Field(min_length=5, max_length=200)  # Title length constraints
+    description: str = Field(min_length=20, max_length=5000)  # Description constraints
+    category: str = Field(min_length=3, max_length=50)  # Category constraints
+    budget_min: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
+    budget_max: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
+    location: dict = Field(...)  # Location structure
+    country: Optional[str] = None
+    status: JobStatus = JobStatus.OPEN
+    required_skills: List[str] = Field(default=[], max_length=20)  # Max 20 skills
+    estimated_duration: Optional[str] = Field(None, max_length=100)  # Duration string limit
+    posted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    deadline: Optional[datetime] = None
+    assigned_worker_id: Optional[str] = None
+    accepted_proposal_id: Optional[str] = None
+    shared_location: Optional[dict] = None  # Position GPS partagee au travailleur lors de l'acceptation
+    # Nouvelles informations pour mécaniciens avec validation
+    mechanic_must_bring_parts: bool = False
+    mechanic_must_bring_tools: bool = False  
+    parts_and_tools_notes: Optional[str] = Field(None, max_length=1000)  # Notes length limit
+    
+    # Validation custom pour budget cohérent
+    @field_validator('budget_max')
+    @classmethod
+    def budget_max_must_be_greater_than_min(cls, v, info):
+        if 'budget_min' in info.data and v < info.data['budget_min']:
+            raise ValueError('budget_max must be greater than or equal to budget_min')
+        return v
+
+class JobProposal(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str
+    worker_id: str
+    proposed_amount: float = Field(ge=0.0, le=10000000.0)  # Valid amount range
+    estimated_completion_time: str = Field(min_length=1, max_length=100)  # Time estimate
+    message: str = Field(min_length=10, max_length=2000)  # Proposal message
+    status: str = Field(default="pending", pattern=r'^(pending|accepted|rejected)$')  # Valid statuses only
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class Message(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    conversation_id: str
+    sender_id: str
+    receiver_id: str
+    content: str = Field(min_length=1, max_length=5000)  # Message content limits
+    # Rattache optionnellement le message à un job précis, pour permettre au
+    # frontend de distinguer plusieurs échanges avec la même personne selon
+    # la mission concernée (le fil complet reste consultable sur /messages,
+    # ce champ ne sert qu'au filtrage contextuel depuis la page d'un job).
+    job_id: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    read: bool = False
+
+class PaymentStatus(str, Enum):
+    PENDING = "pending"
+    COMPLETED = "completed" 
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+class Payment(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str
+    payer_id: str
+    receiver_id: str
+    amount: float = Field(gt=0.0, le=10000000.0)  # Positive amount, max 10M FCFA
+    payment_method: PaymentMethod
+    transaction_id: Optional[str] = Field(None, max_length=200)  # Transaction ID limit
+    status: PaymentStatus = PaymentStatus.PENDING  # Use enum for better validation
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PaymentQuoteRequest(BaseModel):
+    amount: float = Field(gt=0.0, le=10000000.0)
+    payment_method: PaymentMethod
+    country: Optional[str] = Field(default='senegal', max_length=50)
+    worker_id: Optional[str] = Field(default=None, max_length=100)
+    job_id: Optional[str] = Field(default=None, max_length=100)
+
+class PaymentCheckoutRequest(PaymentQuoteRequest):
+    return_url: Optional[str] = Field(default=None, max_length=500)
+    cancel_url: Optional[str] = Field(default=None, max_length=500)
+
+class PushToken(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    push_token: str = Field(min_length=10, max_length=500)  # Expo push token length
+    device_type: str = Field(min_length=2, max_length=50)  # ios, android, web
+    device_id: Optional[str] = Field(None, max_length=200)  # Optional device identifier
+    active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SupportTicketStatus(str, Enum):
+    NEW = "Nouveau"
+    IN_PROGRESS = "En cours"
+    RESOLVED = "Résolu"
+
+class SupportTicketCreate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=150)
+    phone: str = Field(min_length=6, max_length=30, pattern=r'^\+?[0-9\s\-\.]{6,20}$')
+    email: EmailStr
+    reason: str = Field(min_length=2, max_length=150)
+    message: str = Field(min_length=5, max_length=3000)
+    channel: str = Field(default="robot", pattern=r'^(robot|direct)$')
+
+class SupportTicket(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: Optional[str] = None
+    full_name: str
+    phone: str
+    email: EmailStr
+    reason: str
+    message: str
+    channel: str = "robot"
+    status: SupportTicketStatus = SupportTicketStatus.NEW
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SupportTicketStatusUpdate(BaseModel):
+    status: SupportTicketStatus
+
+# ============================================================================
+# NOTIFICATION MODELS
+# ============================================================================
+
+class NotificationType(str, Enum):
+    PROPOSAL_RECEIVED   = "proposal_received"    # Client : nouvelle proposition
+    PROPOSAL_ACCEPTED   = "proposal_accepted"    # Worker : proposition acceptée
+    JOB_IN_PROGRESS     = "job_in_progress"      # Worker : mission démarrée
+    PAYMENT_RECEIVED    = "payment_received"     # Worker : paiement reçu
+    PAYMENT_CONFIRMED   = "payment_confirmed"    # Client : paiement confirmé
+    JOB_COMPLETED       = "job_completed"        # Client + Worker : mission terminée
+    NEW_MESSAGE         = "new_message"          # Message reçu
+    GENERAL             = "general"              # Notification générique
+
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    title: str = Field(max_length=200)
+    body: str = Field(max_length=500)
+    type: NotificationType = NotificationType.GENERAL
+    related_id: Optional[str] = None        # job_id ou message_id
+    related_type: Optional[str] = None      # "job", "message", etc.
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MarkReadRequest(BaseModel):
+    notification_ids: Optional[List[str]] = None  # None = marquer tout
+
+# Request/Response Models
+# Pattern pour détecter les tentatives d'injection SQL
+SQL_INJECTION_PATTERN = re.compile(r"['\";#\-\-]|(/\*)|(\*/)|(\bOR\b)|(\bAND\b)|(\bUNION\b)|(\bSELECT\b)|(\bDROP\b)|(\bINSERT\b)|(\bDELETE\b)|(\bUPDATE\b)", re.IGNORECASE)
+
+def validate_no_sql_injection(value: str, field_name: str) -> str:
+    """Valider qu'une chaîne ne contient pas de caractères d'injection SQL"""
+    if SQL_INJECTION_PATTERN.search(value):
+        raise ValueError(f"Le champ {field_name} contient des caractères non autorisés")
+    return value
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=100, description="Mot de passe (minimum 6 caractères)")
+    first_name: str = Field(min_length=2, max_length=50)
+    last_name: str = Field(min_length=2, max_length=50)
+    phone: str
+    user_type: UserType
+    country: Country
+    preferred_language: Language
+    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité et des conditions d’utilisation")
+    legal_documents_accepted_at: Optional[datetime] = None
+    legal_documents_version: str = Field(min_length=5, max_length=120)
+    
+    @field_validator('password')
+    @classmethod
+    def password_must_be_strong(cls, v):
+        if not v or len(v.strip()) < 6:
+            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        return v
+    
+    @field_validator('email')
+    @classmethod
+    def email_no_injection(cls, v):
+        # Vérifier que l'email ne contient pas de tentatives d'injection
+        email_str = str(v)
+        if SQL_INJECTION_PATTERN.search(email_str):
+            raise ValueError("L'adresse email contient des caractères non autorisés")
+        return v
+    
+    @field_validator('first_name', 'last_name')
+    @classmethod
+    def names_no_injection(cls, v):
+        if SQL_INJECTION_PATTERN.search(v):
+            raise ValueError("Le nom contient des caractères non autorisés")
+        return v
+
+    @field_validator('legal_documents_accepted')
+    @classmethod
+    def legal_documents_must_be_accepted(cls, v):
+        if v is not True:
+            raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d’utilisation est obligatoire")
+        return v
+
+class PaymentAccount(BaseModel):
+    orange_money: Optional[str] = None     # Numéro de téléphone Orange Money
+    wave: Optional[str] = None            # Numéro de téléphone Wave  
+    bank_account: Optional[dict] = None   # Informations complètes de compte bancaire
+    # Détails du compte bancaire:
+    # {
+    #   "account_number": "1234567890",
+    #   "bank_name": "Banque Atlantique",
+    #   "account_holder": "Nom du titulaire",
+    #   "bank_code": "BK001",
+    #   "branch": "Dakar Plateau",
+    #   "iban": "SN12 K011 2345 6789 0123 4567 89" (optionnel)
+    # }
+
+class UserWithPayment(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=100, description="Mot de passe (minimum 6 caractères)")
+    first_name: str = Field(min_length=2, max_length=50)
+    last_name: str = Field(min_length=2, max_length=50)
+    phone: str
+    user_type: UserType
+    country: Country
+    preferred_language: Language
+    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité et des conditions d’utilisation")
+    legal_documents_accepted_at: Optional[datetime] = None
+    legal_documents_version: str = Field(min_length=5, max_length=120)
+    payment_accounts: PaymentAccount
+    email_verification_token: Optional[str] = None
+    
+    @field_validator('password')
+    @classmethod
+    def password_must_be_strong(cls, v):
+        if not v or len(v.strip()) < 6:
+            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        return v
+
+    @field_validator('legal_documents_accepted')
+    @classmethod
+    def legal_documents_must_be_accepted(cls, v):
+        if v is not True:
+            raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d’utilisation est obligatoire")
+        return v
+    # Informations spécifiques aux travailleurs (optionnelles)
+    worker_specialties: Optional[List[str]] = None
+    worker_experience_years: Optional[int] = None
+
+    # Photo de profil optionnelle pour tous
+    profile_photo_base64: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class EmailOtpRequest(BaseModel):
+    email: EmailStr
+    purpose: str = Field(default="signup", pattern=r'^(signup|password_reset)$')
+
+class EmailOtpVerifyRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=4, max_length=8, pattern=r'^\d{4,8}$')
+    purpose: str = Field(default="signup", pattern=r'^(signup|password_reset)$')
+
+class EmailOtpResendRequest(BaseModel):
+    email: EmailStr
+    purpose: str = Field(default="signup", pattern=r'^(signup|password_reset)$')
+
+class PasswordResetConfirmRequest(BaseModel):
+    email: EmailStr
+    verification_token: str = Field(min_length=20)
+    new_password: str = Field(min_length=6, max_length=128)
+
+    @field_validator('new_password')
+    @classmethod
+    def password_must_be_strong(cls, v):
+        if not v or len(v.strip()) < 6:
+            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        return v
+
+class JobCreate(BaseModel):
+    title: str = Field(min_length=5, max_length=200)
+    description: str = Field(min_length=20, max_length=5000)
+    category: str = Field(min_length=3, max_length=50)
+    budget_min: float = Field(ge=0.0, le=10000000.0)
+    budget_max: float = Field(ge=0.0, le=10000000.0)
+    location: dict = Field(...)
+    required_skills: List[str] = Field(default=[], max_length=20)
+    estimated_duration: Optional[str] = Field(None, max_length=100)
+    deadline: Optional[datetime] = None
+    # Nouvelles informations pour mécaniciens avec validation
+    mechanic_must_bring_parts: bool = False
+    mechanic_must_bring_tools: bool = False
+    parts_and_tools_notes: Optional[str] = Field(None, max_length=1000)
+    
+    @field_validator('budget_max')
+    @classmethod
+    def budget_max_must_be_greater_than_min(cls, v, info):
+        if 'budget_min' in info.data and v < info.data['budget_min']:
+            raise ValueError('budget_max must be greater than or equal to budget_min')
+        return v
+
+class ProposalCreate(BaseModel):
+    proposed_amount: float = Field(gt=0.0, le=10000000.0)
+    estimated_completion_time: str = Field(min_length=1, max_length=100)
+    message: str = Field(min_length=10, max_length=2000)
+
+class MessageCreate(BaseModel):
+    receiver_id: str
+    content: str = Field(min_length=1, max_length=5000)
+    # Optionnel: le frontend l'envoie déjà depuis la page d'un job
+    # (sendProposalConversationMessage) mais ce champ était jusqu'ici
+    # silencieusement ignoré par Pydantic, ce qui cassait complètement le
+    # filtrage par job côté JobDetails.js (le panneau de discussion
+    # affichait 0 message, tout le temps).
+    job_id: Optional[str] = None
+
+class PushTokenCreate(BaseModel):
+    user_id: str = Field(min_length=1, max_length=100)
+    push_token: str = Field(min_length=10, max_length=500)
+    device_type: str = Field(min_length=2, max_length=50, pattern=r'^(ios|android|web)$')
+    device_id: Optional[str] = Field(None, max_length=200)
+
+# ============================================================================
+# NOTIFICATION SERVICE — stockage in-app + envoi Web Push (VAPID)
+# ============================================================================
+
+async def store_notification(
+    user_id: str,
+    title: str,
+    body: str,
+    notif_type: NotificationType = NotificationType.GENERAL,
+    related_id: Optional[str] = None,
+    related_type: Optional[str] = None,
+) -> Notification:
+    """Persiste une notification en base et retourne l'objet créé."""
+    notif = Notification(
+        user_id=user_id,
+        title=title,
+        body=body,
+        type=notif_type,
+        related_id=related_id,
+        related_type=related_type,
+    )
+    await db.notifications.insert_one(notif.model_dump())
+    return notif
+
+
+async def send_web_push_to_user(user_id: str, title: str, body: str, data: Optional[dict] = None):
+    """Envoie une notification Web Push à tous les appareils actifs d'un utilisateur."""
+    if not WEBPUSH_AVAILABLE:
+        logger.debug("pywebpush non disponible, push ignoré")
+        return
+
+    if not VAPID_PRIVATE_KEY or not VAPID_PUBLIC_KEY:
+        logger.debug("Clés VAPID non configurées, push ignoré")
+        return
+
+    tokens = await db.push_tokens.find(
+        {"user_id": user_id, "active": True, "device_type": "web"}
+    ).to_list(length=None)
+
+    if not tokens:
+        return
+
+    payload_dict = {"title": title, "body": body}
+    if data:
+        payload_dict["data"] = data
+    payload_str = _json.dumps(payload_dict, ensure_ascii=False)
+
+    failed_token_ids = []
+    for token_doc in tokens:
+        subscription_info = token_doc.get("push_token")
+        if not subscription_info:
+            continue
+
+        # Le push_token pour le web est stocké comme une chaîne JSON
+        # représentant l'objet PushSubscription (endpoint + keys)
+        if isinstance(subscription_info, str):
+            try:
+                subscription_info = _json.loads(subscription_info)
+            except Exception:
+                logger.warning(f"Token push invalide pour user {user_id}, ignoré")
+                failed_token_ids.append(token_doc["id"])
+                continue
+
+        try:
+            webpush(
+                subscription_info=subscription_info,
+                data=payload_str,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={
+                    "sub": VAPID_CLAIMS_EMAIL,
+                    "exp": int((datetime.now(timezone.utc) + timedelta(hours=12)).timestamp()),
+                },
+            )
+        except WebPushException as exc:
+            status_code = getattr(exc.response, "status_code", None) if exc.response else None
+            if status_code in (404, 410):
+                # Token expiré / révoqué par le navigateur
+                failed_token_ids.append(token_doc["id"])
+                logger.info(f"Token push expiré pour user {user_id}, désactivé")
+            else:
+                logger.warning(f"WebPushException pour user {user_id}: {exc}")
+        except Exception as exc:
+            logger.warning(f"Erreur push pour user {user_id}: {exc}")
+
+    # Désactiver les tokens expirés
+    for tid in failed_token_ids:
+        await db.push_tokens.update_one(
+            {"id": tid},
+            {"$set": {"active": False, "updated_at": datetime.now(timezone.utc)}}
+        )
+
+
+async def notify_user(
+    user_id: str,
+    title: str,
+    body: str,
+    notif_type: NotificationType = NotificationType.GENERAL,
+    related_id: Optional[str] = None,
+    related_type: Optional[str] = None,
+    push_data: Optional[dict] = None,
+):
+    """
+    Fonction principale : stocke la notification en base ET envoie le push Web.
+    Silencieuse en cas d'erreur pour ne jamais bloquer un flux métier.
+    """
+    try:
+        await store_notification(
+            user_id=user_id,
+            title=title,
+            body=body,
+            notif_type=notif_type,
+            related_id=related_id,
+            related_type=related_type,
+        )
+    except Exception as exc:
+        logger.error(f"Erreur stockage notification pour {user_id}: {exc}")
+
+    try:
+        await send_web_push_to_user(
+            user_id=user_id,
+            title=title,
+            body=body,
+            data=push_data or ({"job_id": related_id} if related_id else None),
+        )
+    except Exception as exc:
+        logger.error(f"Erreur envoi push pour {user_id}: {exc}")
+
+
+# Utility Functions
+# Validation functions
+def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) -> dict:
+    """Valide les comptes de paiement selon le type d'utilisateur"""
+    
+    # Compter le nombre de comptes liés
+    linked_accounts = 0
+    account_details = {}
+    
+    if payment_accounts.orange_money:
+        if not validate_orange_money_number(payment_accounts.orange_money):
+            raise HTTPException(status_code=400, detail="Numéro Orange Money invalide")
+        linked_accounts += 1
+        account_details['orange_money'] = payment_accounts.orange_money
+    
+    if payment_accounts.wave:
+        if not validate_wave_number(payment_accounts.wave):
+            raise HTTPException(status_code=400, detail="Numéro Wave invalide")
+        linked_accounts += 1
+        account_details['wave'] = payment_accounts.wave
+    
+    if payment_accounts.bank_account:
+        if not validate_bank_account(payment_accounts.bank_account):
+            raise HTTPException(status_code=400, detail="Informations de compte bancaire invalides")
+        linked_accounts += 1
+        account_details['bank_account'] = mask_bank_account_info(payment_accounts.bank_account)
+    
+    # Validation selon le type d'utilisateur
+    if user_type == "client":
+        if linked_accounts < 1:
+            raise HTTPException(
+                status_code=400, 
+                detail="Les clients doivent lier au moins 1 moyen de paiement (Orange Money, Wave ou Compte bancaire)"
+            )
+    elif user_type == "worker":
+        if linked_accounts < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Les travailleurs doivent lier au minimum 2 moyens de paiement sur 3 disponibles (Orange Money, Wave, Compte bancaire)"
+            )
+    
+    return {
+        "linked_accounts_count": linked_accounts,
+        "account_details": account_details,
+        "is_verified": True
+    }
+
+# Préfixes mobiles pour validation Orange Money et Wave
+ALL_PREFIXES_70_99 = [str(i) for i in range(70, 100)]
+
+# Côte d'Ivoire a des préfixes spécifiques (01, 05, 07, 08, 09 + 40-59 pour MTN + 70-99 pour Orange)
+COTE_DIVOIRE_ALL_MOBILE_PREFIXES = (
+    ['01', '05', '07', '08', '09'] +  # Nouveaux préfixes 10 chiffres
+    [str(i).zfill(2) for i in range(40, 60)] +  # MTN 40-59
+    [str(i) for i in range(70, 100)]  # Orange 70-99
+)
+
+# Mobile Number Validation - 4 PAYS PRIORITAIRES KOJO
+KOJO_PRIORITY_COUNTRIES = {
+    # Sénégal (+221) - Pays principal
+    '221': {
+        'country': 'Sénégal',
+        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Sénégal - tous préfixes 70-99
+        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Sénégal - tous préfixes 70-99
+        'other_operators': ['76', '75', '33'],  # Tigo, Expresso
+        'currency': 'FCFA',
+        'primary_language': 'français'
+    },
+    # Mali (+223) - Pays prioritaire  
+    '223': {
+        'country': 'Mali',
+        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Mali - tous préfixes 70-99
+        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Mali - tous préfixes 70-99
+        'other_operators': ['65', '66', '67', '68'],  # Malitel
+        'currency': 'FCFA',
+        'primary_language': 'français'
+    },
+    # Côte d'Ivoire (+225) - Pays prioritaire avec tous les préfixes mobiles
+    '225': {
+        'country': "Côte d'Ivoire", 
+        'orange_prefixes': COTE_DIVOIRE_ALL_MOBILE_PREFIXES,  # Orange + tous préfixes mobiles CI
+        'wave_prefixes': COTE_DIVOIRE_ALL_MOBILE_PREFIXES,  # Wave + tous préfixes mobiles CI
+        'other_operators': ['58', '59', '48', '49'],  # MTN
+        'currency': 'FCFA',
+        'primary_language': 'français'
+    },
+    # Burkina Faso (+226) - Pays prioritaire
+    '226': {
+        'country': 'Burkina Faso',
+        'orange_prefixes': ALL_PREFIXES_70_99,  # Orange Burkina Faso - tous préfixes 70-99
+        'wave_prefixes': ALL_PREFIXES_70_99,  # Wave Burkina Faso - tous préfixes 70-99
+        'other_operators': ['70', '71', '51', '52'],  # Telmob
+        'currency': 'FCFA',
+        'primary_language': 'français'
+    }
+}
+
+def validate_orange_money_number(number: str) -> bool:
+    """Valide un numéro Orange Money avec précision par pays"""
+    try:
+        if not number or not isinstance(number, str):
+            logger.warning(f"Invalid Orange Money number format: {number}")
+            return False
+            
+        # Nettoyage et validation basique
+        clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
+        logger.debug(f"Orange Money validation - Original: {number}, Cleaned: {clean_number}")
+        
+        if len(clean_number) < 11 or len(clean_number) > 12:
+            logger.info(f"Orange Money number length invalid: {len(clean_number)} digits for {clean_number}")
+            return False
+        
+        country_code = clean_number[:3]
+        operator_prefix = clean_number[3:5]
+        logger.debug(f"Orange Money validation - Country: {country_code}, Prefix: {operator_prefix}")
+        
+        if country_code not in KOJO_PRIORITY_COUNTRIES:
+            logger.info(f"Orange Money not supported for country code: {country_code}")
+            return False
+            
+        # Vérification sécurisée des préfixes
+        country_data = KOJO_PRIORITY_COUNTRIES.get(country_code, {})
+        valid_prefixes = country_data.get('orange_prefixes', [])
+        
+        if not valid_prefixes:
+            logger.error(f"No Orange Money prefixes defined for country {country_code}")
+            return False
+            
+        is_valid = operator_prefix in valid_prefixes
+        
+        if not is_valid:
+            logger.info(f"Invalid Orange Money prefix {operator_prefix} for country {country_code}. Valid: {valid_prefixes[:5]}...")
+        else:
+            logger.info(f"✅ Valid Orange Money number validated for {country_data.get('country', country_code)}")
+            
+        return is_valid
+        
+    except KeyError as e:
+        logger.error(f"KeyError in Orange Money validation: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error validating Orange Money number: {e}")
+        return False
+
+def validate_wave_number(number: str) -> bool:
+    """Valide un numéro Wave - 4 pays prioritaires Kojo"""
+    try:
+        if not number or not isinstance(number, str):
+            logger.warning(f"Invalid Wave number format: {number}")
+            return False
+            
+        # Nettoyage et validation basique
+        clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
+        
+        if len(clean_number) < 11 or len(clean_number) > 12:
+            logger.info(f"Wave number length invalid: {len(clean_number)} digits")
+            return False
+        
+        country_code = clean_number[:3]
+        operator_prefix = clean_number[3:5]
+        
+        if country_code not in KOJO_PRIORITY_COUNTRIES:
+            logger.info(f"Wave not supported for country code: {country_code}")
+            return False
+            
+        valid_prefixes = KOJO_PRIORITY_COUNTRIES[country_code]['wave_prefixes']
+        is_valid = operator_prefix in valid_prefixes
+        
+        if not is_valid:
+            logger.info(f"Invalid Wave prefix {operator_prefix} for country {country_code}")
+        else:
+            logger.info(f"Valid Wave number validated for {KOJO_PRIORITY_COUNTRIES[country_code]['country']}")
+            
+        return is_valid
+        
+    except Exception as e:
+        logger.error(f"Error validating Wave number: {e}")
+        return False
+
+def validate_bank_card(card_number: str) -> bool:
+    """Valide basiquement un numéro de carte bancaire"""
+    # Supprimer les espaces et tirets
+    clean_card = ''.join(filter(str.isdigit, card_number))
+    
+    # Vérifier la longueur (16 chiffres généralement)
+    if len(clean_card) not in [15, 16]:
+        return False
+    
+    # Algorithme de Luhn simplifié
+    return luhn_check(clean_card)
+
+def luhn_check(card_number: str) -> bool:
+    """Algorithme de Luhn pour validation carte bancaire"""
+    def digits_of(n):
+        return [int(d) for d in str(n)]
+    
+    digits = digits_of(card_number)
+    odd_digits = digits[-1::-2]
+    even_digits = digits[-2::-2]
+    checksum = sum(odd_digits)
+    for d in even_digits:
+        checksum += sum(digits_of(d*2))
+    return checksum % 10 == 0
+
+def mask_bank_card(card_number: str) -> str:
+    """Masque le numéro de carte bancaire"""
+    clean_card = ''.join(filter(str.isdigit, card_number))
+    if len(clean_card) >= 16:
+        return f"****-****-****-{clean_card[-4:]}"
+    elif len(clean_card) >= 15:
+        return f"****-****-***-{clean_card[-4:]}"
+    return "****-****-****"
+
+def validate_bank_account(bank_account: dict) -> bool:
+    """Valide les informations de compte bancaire"""
+    if not isinstance(bank_account, dict):
+        return False
+    
+    # Vérifier les champs obligatoires
+    required_fields = ["account_number", "bank_name", "account_holder"]
+    for field in required_fields:
+        if not bank_account.get(field):
+            return False
+    
+    # Valider le numéro de compte (au moins 8 chiffres)
+    account_number = ''.join(filter(str.isdigit, bank_account["account_number"]))
+    if len(account_number) < 8:
+        return False
+    
+    # Valider le nom de la banque (au moins 3 caractères)
+    if len(bank_account["bank_name"].strip()) < 3:
+        return False
+    
+    # Valider le nom du titulaire (au moins 2 caractères)
+    if len(bank_account["account_holder"].strip()) < 2:
+        return False
+    
+    return True
+
+def mask_bank_account_info(bank_account: dict) -> dict:
+    """Masque les informations sensibles du compte bancaire"""
+    if not isinstance(bank_account, dict):
+        return {}
+    
+    masked_account = bank_account.copy()
+    
+    # Masquer le numéro de compte
+    account_number = bank_account.get("account_number", "")
+    clean_account = ''.join(filter(str.isdigit, account_number))
+    if len(clean_account) >= 8:
+        masked_account["account_number"] = f"****{clean_account[-4:]}"
+    else:
+        masked_account["account_number"] = "****"
+    
+    # Garder les autres informations non sensibles
+    return {
+        "account_number": masked_account["account_number"],
+        "bank_name": bank_account.get("bank_name", ""),
+        "account_holder": bank_account.get("account_holder", ""),
+        "bank_code": bank_account.get("bank_code", ""),
+        "branch": bank_account.get("branch", "")
+    }
+    
+def log_and_raise_http_exception(status_code: int, detail: str, logger_instance=None):
+    """Enregistre l'erreur et lève une HTTPException de manière centralisée"""
+    if logger_instance is None:
+        logger_instance = logger
+    
+    logger_instance.error(f"HTTP {status_code}: {detail}")
+    raise HTTPException(status_code=status_code, detail=detail)
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def sanitize_email(email: str) -> str:
+    """Sanitize email to prevent injection attacks"""
+    if not email:
+        raise ValueError("Email cannot be empty")
+    
+    # Remove potentially dangerous characters
+    dangerous_chars = ['*', '/', '\\', '$', '{', '}', '[', ']', '(', ')', '#', '&', '|', '<', '>']
+    for char in dangerous_chars:
+        if char in email:
+            raise ValueError(f"Email contains invalid character: {char}")
+    
+    # Additional check for SQL injection patterns (with word boundaries to avoid false positives)
+    # Check for SQL keywords as complete words, not substrings
+    import re
+    sql_keywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'UNION', 'EXEC', 'EXECUTE']
+    email_upper = email.upper()
+    
+    # Check for SQL keywords as standalone words (not part of other words)
+    for keyword in sql_keywords:
+        if re.search(r'\b' + keyword + r'\b', email_upper):
+            raise ValueError(f"Email contains prohibited SQL keyword: {keyword}")
+    
+    # Check for SQL comment patterns
+    if '--' in email or '/*' in email or '*/' in email:
+        raise ValueError("Email contains prohibited SQL comment pattern")
+    
+    return email.lower().strip()
+
+def sanitize_input_string(input_str: str, field_name: str = "field") -> str:
+    """Sanitize general string inputs"""
+    if not input_str:
+        return ""
+    
+    # Remove control characters
+    sanitized = ''.join(char for char in input_str if ord(char) >= 32 or char in '\n\t')
+    
+    # Limit length to prevent buffer overflow attacks
+    if len(sanitized) > 1000:
+        raise ValueError(f"{field_name} is too long (max 1000 characters)")
+    
+    return sanitized.strip()
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
+    # jti = identifiant unique du token, nécessaire pour pouvoir le révoquer
+    # individuellement (ex: au logout) sans invalider tous les autres tokens
+    # de l'utilisateur ni changer JWT_SECRET.
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+async def revoke_token(jti: str, expire_at: datetime):
+    """Ajoute un token à la liste noire jusqu'à sa date d'expiration naturelle."""
+    if not jti:
+        return
+    try:
+        await db.revoked_tokens.update_one(
+            {"jti": jti},
+            {"$set": {"jti": jti, "expire_at": expire_at, "revoked_at": datetime.now(timezone.utc)}},
+            upsert=True
+        )
+    except Exception as e:
+        logger.error(f"⚠️ Impossible d'enregistrer la révocation du token: {e}")
+
+async def is_token_revoked(jti: Optional[str]) -> bool:
+    if not jti:
+        return False
+    try:
+        revoked = await db.revoked_tokens.find_one({"jti": jti}, {"_id": 1})
+        return revoked is not None
+    except Exception as e:
+        # En cas de panne de la vérification de révocation, on choisit de ne
+        # PAS bloquer tous les utilisateurs (fail-open) - la vérification de
+        # signature/expiration JWT reste, elle, toujours appliquée.
+        logger.error(f"⚠️ Erreur vérification révocation token: {e}")
+        return False
+
+def gmail_is_configured() -> bool:
+    return all([
+        GMAIL_CLIENT_ID,
+        GMAIL_CLIENT_SECRET,
+        GMAIL_REFRESH_TOKEN,
+        GMAIL_SENDER_EMAIL
+    ])
+
+def get_missing_gmail_env_vars() -> List[str]:
+    missing = []
+    if not GMAIL_CLIENT_ID:
+        missing.append("GMAIL_CLIENT_ID")
+    if not GMAIL_CLIENT_SECRET:
+        missing.append("GMAIL_CLIENT_SECRET")
+    if not GMAIL_REFRESH_TOKEN:
+        missing.append("GMAIL_REFRESH_TOKEN")
+    if not GMAIL_SENDER_EMAIL:
+        missing.append("GMAIL_SENDER_EMAIL")
+    return missing
+
+def generate_email_otp_code(length: int = 6) -> str:
+    return ''.join(secrets.choice('0123456789') for _ in range(length))
+
+def hash_email_otp(email: str, purpose: str, otp_code: str) -> str:
+    payload = f"{EMAIL_OTP_SECRET}:{purpose}:{email.lower().strip()}:{otp_code}"
+    return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+def mask_email_address(email: str) -> str:
+    if '@' not in email:
+        return email
+    local, domain = email.split('@', 1)
+    masked_local = local[:2] + ('*' * max(1, len(local) - 2)) if len(local) > 2 else local[0] + '*'
+    domain_name, *domain_parts = domain.split('.')
+    masked_domain = domain_name[:1] + ('*' * max(1, len(domain_name) - 1))
+    return f"{masked_local}@{'.'.join([masked_domain] + domain_parts)}"
+
+def create_email_verification_token(email: str, purpose: str = "signup") -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=EMAIL_VERIFICATION_TOKEN_MINUTES)
+    payload = {
+        "sub": email.lower().strip(),
+        "purpose": purpose,
+        "type": "email_verification",
+        "exp": expire
+    }
+    return jwt.encode(payload, EMAIL_OTP_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_email_verification_token(token: str, email: str, purpose: str = "signup") -> dict:
+    try:
+        payload = jwt.decode(token, EMAIL_OTP_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "email_verification":
+            raise HTTPException(status_code=401, detail="Jeton de vérification invalide")
+        if payload.get("sub") != email.lower().strip():
+            raise HTTPException(status_code=401, detail="Jeton de vérification non valide pour cet email")
+        if payload.get("purpose") != purpose:
+            raise HTTPException(status_code=401, detail="Jeton de vérification non valide pour cette opération")
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="La vérification email a expiré. Veuillez demander un nouveau code.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Jeton de vérification email invalide")
+
+def invalidate_gmail_access_token_cache():
+    GMAIL_ACCESS_TOKEN_CACHE["access_token"] = ""
+    GMAIL_ACCESS_TOKEN_CACHE["expires_at"] = 0.0
+
+
+def get_gmail_access_token(force_refresh: bool = False) -> str:
+    now_ts = time.time()
+    cached_token = GMAIL_ACCESS_TOKEN_CACHE.get("access_token", "")
+    cached_expires_at = float(GMAIL_ACCESS_TOKEN_CACHE.get("expires_at", 0.0) or 0.0)
+
+    if cached_token and not force_refresh and now_ts < (cached_expires_at - GMAIL_ACCESS_TOKEN_SAFETY_SECONDS):
+        return cached_token
+
+    last_error = ""
+
+    for attempt in range(1, GMAIL_TOKEN_REFRESH_RETRIES + 1):
+        try:
+            token_response = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": GMAIL_CLIENT_ID,
+                    "client_secret": GMAIL_CLIENT_SECRET,
+                    "refresh_token": GMAIL_REFRESH_TOKEN,
+                    "grant_type": "refresh_token"
+                },
+                timeout=15
+            )
+
+            if token_response.ok:
+                token_payload = token_response.json()
+                access_token = token_payload.get("access_token")
+                expires_in = int(token_payload.get("expires_in") or 3600)
+                if access_token:
+                    GMAIL_ACCESS_TOKEN_CACHE["access_token"] = access_token
+                    GMAIL_ACCESS_TOKEN_CACHE["expires_at"] = time.time() + max(300, expires_in)
+                    return access_token
+                last_error = "Réponse OAuth Gmail invalide: access_token manquant"
+            else:
+                last_error = token_response.text or f"HTTP {token_response.status_code}"
+        except requests.RequestException as exc:
+            last_error = str(exc)
+
+        if attempt < GMAIL_TOKEN_REFRESH_RETRIES:
+            sleep_seconds = GMAIL_TOKEN_REFRESH_BACKOFF_SECONDS * attempt
+            logger.warning(
+                "⚠️ Gmail token refresh attempt %s/%s failed, retrying in %.1fs",
+                attempt,
+                GMAIL_TOKEN_REFRESH_RETRIES,
+                sleep_seconds
+            )
+            time.sleep(sleep_seconds)
+
+    invalidate_gmail_access_token_cache()
+    logger.error("❌ Gmail token refresh failed after %s attempts: %s", GMAIL_TOKEN_REFRESH_RETRIES, last_error)
+    raise HTTPException(status_code=502, detail="Impossible d'obtenir un accès Gmail après plusieurs tentatives. Vérifiez la configuration OAuth Google sur Render.")
+
+
+
+
+def brevo_is_configured() -> bool:
+    return all([
+        BREVO_API_KEY,
+        BREVO_SENDER_EMAIL,
+    ])
+
+
+def get_missing_brevo_env_vars() -> List[str]:
+    missing = []
+    if not BREVO_API_KEY:
+        missing.append('BREVO_API_KEY')
+    if not BREVO_SENDER_EMAIL:
+        missing.append('BREVO_SENDER_EMAIL')
+    return missing
+
+
+def send_email_via_brevo_api(to_email: str, subject: str, text_body: str, html_body: Optional[str] = None):
+    if not brevo_is_configured():
+        missing = ', '.join(get_missing_brevo_env_vars())
+        raise HTTPException(status_code=503, detail=f"Configuration Brevo incomplète: {missing}")
+
+    sender_email = PASSWORD_RESET_FROM_EMAIL or BREVO_SENDER_EMAIL
+    payload = {
+        'sender': {
+            'email': sender_email,
+            'name': BREVO_SENDER_NAME,
+        },
+        'to': [
+            {
+                'email': to_email,
+            }
+        ],
+        'subject': subject,
+        'htmlContent': html_body or f'<pre>{text_body}</pre>',
+        'textContent': text_body,
+    }
+
+    try:
+        brevo_response = requests.post(
+            BREVO_API_URL,
+            headers={
+                'accept': 'application/json',
+                'content-type': 'application/json',
+                'api-key': BREVO_API_KEY,
+            },
+            json=payload,
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        logger.error('❌ Brevo send transport error: %s', exc)
+        raise HTTPException(status_code=502, detail='Transport Brevo indisponible. Réessayez dans un instant.')
+
+    if not brevo_response.ok:
+        logger.error('❌ Brevo send failed: %s', brevo_response.text)
+        raise HTTPException(status_code=502, detail="Échec d'envoi Brevo. Vérifiez BREVO_API_KEY et l'expéditeur sur Render.")
+
+    return brevo_response.json()
+
+def send_email_via_gmail_api(to_email: str, subject: str, text_body: str, html_body: Optional[str] = None):
+    if not gmail_is_configured():
+        missing = ', '.join(get_missing_gmail_env_vars())
+        raise HTTPException(status_code=503, detail=f"Configuration Gmail incomplète: {missing}")
+
+    if html_body:
+        message = MIMEMultipart('alternative')
+        message.attach(MIMEText(text_body, 'plain', 'utf-8'))
+        message.attach(MIMEText(html_body, 'html', 'utf-8'))
+    else:
+        message = MIMEText(text_body, 'plain', 'utf-8')
+
+    message['to'] = to_email
+    message['from'] = formataddr((GMAIL_SENDER_NAME, GMAIL_SENDER_EMAIL))
+    message['subject'] = subject
+
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+
+    def perform_send(access_token: str):
+        return requests.post(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            },
+            json={"raw": raw_message},
+            timeout=20
+        )
+
+    try:
+        gmail_response = perform_send(get_gmail_access_token())
+    except requests.RequestException as exc:
+        logger.error("❌ Gmail send transport error: %s", exc)
+        raise HTTPException(status_code=502, detail="Transport Gmail indisponible. Réessayez dans un instant.")
+
+    if gmail_response.status_code in (401, 403):
+        logger.warning("⚠️ Gmail send rejected cached token, forcing refresh")
+        invalidate_gmail_access_token_cache()
+        try:
+            gmail_response = perform_send(get_gmail_access_token(force_refresh=True))
+        except requests.RequestException as exc:
+            logger.error("❌ Gmail retry transport error: %s", exc)
+            raise HTTPException(status_code=502, detail="Transport Gmail indisponible. Réessayez dans un instant.")
+
+    if not gmail_response.ok:
+        logger.error(f"❌ Gmail send failed: {gmail_response.text}")
+        raise HTTPException(status_code=502, detail="Échec d'envoi Gmail. Vérifiez le compte expéditeur, les scopes OAuth et le refresh token sur Render.")
+
+    return gmail_response.json()
+
+def build_email_otp_email(purpose: str, otp_code: str) -> dict:
+    if purpose == "password_reset":
+        subject = "Réinitialisation du mot de passe KOJO"
+        text_body = (
+            f"Bonjour,\n\n"
+            f"Voici votre code KOJO pour réinitialiser votre mot de passe : {otp_code}\n\n"
+            f"Ce code expire dans {EMAIL_OTP_EXPIRY_MINUTES} minutes.\n"
+            f"Ne partagez jamais ce code avec qui que ce soit.\n\n"
+            f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.\n\n"
+            f"Équipe KOJO"
+        )
+        html_body = f"""
+        <div style=\"font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#eff6ff;border:1px solid #93c5fd;border-radius:16px;\">
+          <div style=\"text-align:center;margin-bottom:24px;\">
+            <div style=\"display:inline-block;background:#2563eb;color:#ffffff;border-radius:999px;padding:14px 18px;font-weight:700;font-size:20px;\">KOJO</div>
+          </div>
+          <h2 style=\"color:#1d4ed8;margin-bottom:8px;\">Réinitialisation de votre mot de passe</h2>
+          <p style=\"color:#1e3a8a;font-size:15px;line-height:1.6;\">Utilisez ce code pour définir un nouveau mot de passe KOJO.</p>
+          <div style=\"margin:24px 0;padding:20px;background:#ffffff;border:1px dashed #60a5fa;border-radius:12px;text-align:center;\">
+            <div style=\"font-size:34px;letter-spacing:8px;font-weight:700;color:#2563eb;\">{otp_code}</div>
+          </div>
+          <p style=\"color:#1e3a8a;font-size:14px;line-height:1.6;\">Ce code expire dans <strong>{EMAIL_OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+          <p style=\"color:#1e3a8a;font-size:14px;line-height:1.6;\">Ne partagez jamais ce code. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>
+          <p style=\"color:#1d4ed8;font-size:13px;margin-top:24px;\">Équipe KOJO</p>
+        </div>
+        """
+    else:
+        subject = "Votre code de vérification KOJO"
+        text_body = (
+            f"Bonjour,\n\n"
+            f"Voici votre code de vérification KOJO : {otp_code}\n\n"
+            f"Ce code expire dans {EMAIL_OTP_EXPIRY_MINUTES} minutes.\n"
+            f"Ne partagez jamais ce code avec qui que ce soit.\n\n"
+            f"Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.\n\n"
+            f"Équipe KOJO"
+        )
+        html_body = f"""
+        <div style=\"font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#fff7ed;border:1px solid #fdba74;border-radius:16px;\">
+          <div style=\"text-align:center;margin-bottom:24px;\">
+            <div style=\"display:inline-block;background:#ea580c;color:#ffffff;border-radius:999px;padding:14px 18px;font-weight:700;font-size:20px;\">KOJO</div>
+          </div>
+          <h2 style=\"color:#9a3412;margin-bottom:8px;\">Vérification de votre email</h2>
+          <p style=\"color:#7c2d12;font-size:15px;line-height:1.6;\">Voici votre code de vérification KOJO.</p>
+          <div style=\"margin:24px 0;padding:20px;background:#ffffff;border:1px dashed #fb923c;border-radius:12px;text-align:center;\">
+            <div style=\"font-size:34px;letter-spacing:8px;font-weight:700;color:#ea580c;\">{otp_code}</div>
+          </div>
+          <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ce code expire dans <strong>{EMAIL_OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+          <p style=\"color:#7c2d12;font-size:14px;line-height:1.6;\">Ne partagez jamais ce code. Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email.</p>
+          <p style=\"color:#9a3412;font-size:13px;margin-top:24px;\">Équipe KOJO</p>
+        </div>
+        """
+
+    return {
+        "subject": subject,
+        "text_body": text_body,
+        "html_body": html_body
+    }
+
+async def issue_email_otp(email: str, purpose: str = "signup") -> dict:
+    now = datetime.now(timezone.utc)
+    existing_otp = await db.email_otps.find_one({"email": email, "purpose": purpose})
+
+    if existing_otp and existing_otp.get("last_sent_at"):
+        last_sent_at = existing_otp["last_sent_at"]
+        if last_sent_at.tzinfo is None:
+            last_sent_at = last_sent_at.replace(tzinfo=timezone.utc)
+
+        elapsed = (now - last_sent_at).total_seconds()
+        if elapsed < EMAIL_OTP_RESEND_COOLDOWN_SECONDS:
+            remaining = max(1, int(EMAIL_OTP_RESEND_COOLDOWN_SECONDS - elapsed + 0.999))
+            raise HTTPException(
+                status_code=429,
+                detail=f"Veuillez patienter {remaining}s avant de renvoyer un autre code.",
+                headers={"Retry-After": str(remaining)}
+            )
+
+    otp_code = generate_email_otp_code()
+    otp_hash = hash_email_otp(email, purpose, otp_code)
+    expires_at = now + timedelta(minutes=EMAIL_OTP_EXPIRY_MINUTES)
+    email_content = build_email_otp_email(purpose, otp_code)
+    send_email_via_brevo_api(email, email_content["subject"], email_content["text_body"], email_content["html_body"])
+
+    await db.email_otps.update_one(
+        {"email": email, "purpose": purpose},
+        {
+            "$set": {
+                "otp_hash": otp_hash,
+                "attempt_count": 0,
+                "verified_at": None,
+                "last_sent_at": now,
+                "expires_at": expires_at,
+                "updated_at": now,
+                "status": "pending"
+            },
+            "$setOnInsert": {
+                "created_at": now
+            },
+            "$inc": {
+                "send_count": 1
+            }
+        },
+        upsert=True
+    )
+
+    return {
+        "message": "Code de vérification envoyé par email.",
+        "masked_email": mask_email_address(email),
+        "expires_in_seconds": EMAIL_OTP_EXPIRY_MINUTES * 60,
+        "cooldown_seconds": EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+    }
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        if await is_token_revoked(payload.get("jti")):
+            raise HTTPException(status_code=401, detail="Token revoked")
+
+        user = await db.users.find_one({"id": user_id})
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return User(**user)
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+# Authentication Routes
+# Authentication Routes
+@api_router.post("/auth/email/check-availability")
+async def check_signup_email_availability(payload: EmailOtpRequest):
+    clean_email = sanitize_email(payload.email)
+    existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
+
+    return {
+        "email": clean_email,
+        "available": existing_user is None,
+        "message": "Adresse email disponible" if not existing_user else "Cette adresse email est déjà utilisée"
+    }
+
+@api_router.post("/auth/email/send-otp")
+async def send_signup_email_otp(payload: EmailOtpRequest):
+    clean_email = sanitize_email(payload.email)
+
+    existing_user = await db.users.find_one({"email": clean_email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Cette adresse email est déjà utilisée")
+
+    return await issue_email_otp(clean_email, payload.purpose)
+
+@api_router.post("/auth/email/resend-otp")
+async def resend_signup_email_otp(payload: EmailOtpResendRequest):
+    clean_email = sanitize_email(payload.email)
+
+    existing_user = await db.users.find_one({"email": clean_email})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Cette adresse email est déjà utilisée")
+
+    return await issue_email_otp(clean_email, payload.purpose)
+
+@api_router.post("/auth/email/verify-otp")
+async def verify_signup_email_otp(payload: EmailOtpVerifyRequest):
+    clean_email = sanitize_email(payload.email)
+    now = datetime.now(timezone.utc)
+
+    otp_record = await db.email_otps.find_one({"email": clean_email, "purpose": payload.purpose})
+    if not otp_record:
+        raise HTTPException(status_code=404, detail="Aucun code OTP actif pour cet email. Demandez un nouveau code.")
+
+    expires_at = otp_record.get("expires_at")
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if not expires_at or expires_at <= now:
+        await db.email_otps.delete_one({"email": clean_email, "purpose": payload.purpose})
+        raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau code.")
+
+    if otp_record.get("attempt_count", 0) >= EMAIL_OTP_MAX_ATTEMPTS:
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": payload.purpose},
+            {
+                "$set": {
+                    "status": "locked",
+                    "updated_at": now
+                }
+            }
+        )
+        raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
+
+    candidate_hash = hash_email_otp(clean_email, payload.purpose, payload.otp)
+    if candidate_hash != otp_record.get("otp_hash"):
+        new_attempt_count = otp_record.get("attempt_count", 0) + 1
+        new_status = "locked" if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS else "pending"
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": payload.purpose},
+            {
+                "$set": {
+                    "attempt_count": new_attempt_count,
+                    "updated_at": now,
+                    "last_attempt_at": now,
+                    "status": new_status
+                }
+            }
+        )
+        if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
+        remaining = max(0, EMAIL_OTP_MAX_ATTEMPTS - new_attempt_count)
+        raise HTTPException(status_code=400, detail=f"Code invalide. Tentatives restantes: {remaining}.")
+
+    verification_token = create_email_verification_token(clean_email, payload.purpose)
+    await db.email_otps.update_one(
+        {"email": clean_email, "purpose": payload.purpose},
+        {
+            "$set": {
+                "verified_at": now,
+                "updated_at": now,
+                "status": "verified"
+            }
+        }
+    )
+
+    return {
+        "message": "Email vérifié avec succès.",
+        "verification_token": verification_token,
+        "masked_email": mask_email_address(clean_email),
+        "verified": True
+    }
+
+@api_router.post("/auth/password/forgot/request")
+async def request_password_reset_otp(payload: EmailOtpRequest):
+    clean_email = sanitize_email(payload.email)
+    existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
+
+    if not existing_user:
+        return {
+            "message": "Si cette adresse email existe, un code de réinitialisation a été envoyé.",
+            "masked_email": mask_email_address(clean_email),
+            "expires_in_seconds": EMAIL_OTP_EXPIRY_MINUTES * 60,
+            "cooldown_seconds": EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+        }
+
+    otp_result = await issue_email_otp(clean_email, "password_reset")
+    otp_result["message"] = "Si cette adresse email existe, un code de réinitialisation a été envoyé."
+    return otp_result
+
+@api_router.post("/auth/password/forgot/resend")
+async def resend_password_reset_otp(payload: EmailOtpResendRequest):
+    clean_email = sanitize_email(payload.email)
+    existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
+
+    if not existing_user:
+        return {
+            "message": "Si cette adresse email existe, un code de réinitialisation a été envoyé.",
+            "masked_email": mask_email_address(clean_email),
+            "expires_in_seconds": EMAIL_OTP_EXPIRY_MINUTES * 60,
+            "cooldown_seconds": EMAIL_OTP_RESEND_COOLDOWN_SECONDS
+        }
+
+    otp_result = await issue_email_otp(clean_email, "password_reset")
+    otp_result["message"] = "Si cette adresse email existe, un code de réinitialisation a été envoyé."
+    return otp_result
+
+@api_router.post("/auth/password/forgot/verify")
+async def verify_password_reset_otp(payload: EmailOtpVerifyRequest):
+    clean_email = sanitize_email(payload.email)
+    now = datetime.now(timezone.utc)
+
+    otp_record = await db.email_otps.find_one({"email": clean_email, "purpose": "password_reset"})
+    if not otp_record:
+        raise HTTPException(status_code=404, detail="Aucun code actif pour cette adresse email. Demandez un nouveau code.")
+
+    expires_at = otp_record.get("expires_at")
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if not expires_at or expires_at <= now:
+        await db.email_otps.delete_one({"email": clean_email, "purpose": "password_reset"})
+        raise HTTPException(status_code=400, detail="Le code a expiré. Demandez un nouveau code.")
+
+    if otp_record.get("attempt_count", 0) >= EMAIL_OTP_MAX_ATTEMPTS:
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": "password_reset"},
+            {"$set": {"status": "locked", "updated_at": now}}
+        )
+        raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
+
+    candidate_hash = hash_email_otp(clean_email, "password_reset", payload.otp)
+    if candidate_hash != otp_record.get("otp_hash"):
+        new_attempt_count = otp_record.get("attempt_count", 0) + 1
+        new_status = "locked" if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS else "pending"
+        await db.email_otps.update_one(
+            {"email": clean_email, "purpose": "password_reset"},
+            {
+                "$set": {
+                    "attempt_count": new_attempt_count,
+                    "updated_at": now,
+                    "last_attempt_at": now,
+                    "status": new_status
+                }
+            }
+        )
+        if new_attempt_count >= EMAIL_OTP_MAX_ATTEMPTS:
+            raise HTTPException(status_code=429, detail="Trop de tentatives. Demandez un nouveau code email.")
+        remaining = max(0, EMAIL_OTP_MAX_ATTEMPTS - new_attempt_count)
+        raise HTTPException(status_code=400, detail=f"Code invalide. Tentatives restantes: {remaining}.")
+
+    verification_token = create_email_verification_token(clean_email, "password_reset")
+    await db.email_otps.update_one(
+        {"email": clean_email, "purpose": "password_reset"},
+        {
+            "$set": {
+                "verified_at": now,
+                "updated_at": now,
+                "status": "verified"
+            }
+        }
+    )
+
+    return {
+        "message": "Code vérifié avec succès.",
+        "verification_token": verification_token,
+        "masked_email": mask_email_address(clean_email),
+        "verified": True
+    }
+
+@api_router.post("/auth/password/reset")
+async def reset_password_with_verified_token(payload: PasswordResetConfirmRequest):
+    clean_email = sanitize_email(payload.email)
+    verify_email_verification_token(payload.verification_token, clean_email, purpose="password_reset")
+
+    user = await db.users.find_one({"email": clean_email})
+    if not user:
+        raise HTTPException(status_code=404, detail="Adresse email introuvable.")
+
+    now = datetime.now(timezone.utc)
+    await db.users.update_one(
+        {"email": clean_email},
+        {
+            "$set": {
+                "password_hash": hash_password(payload.new_password),
+                "updated_at": now
+            }
+        }
+    )
+    await db.email_otps.delete_one({"email": clean_email, "purpose": "password_reset"})
+
+    return {
+        "message": "Mot de passe réinitialisé avec succès.",
+        "email": clean_email,
+        "password_reset": True
+    }
+
+@api_router.post("/auth/register-verified")
+async def register_user_verified(user_data: UserWithPayment):
+    """Inscription avec vérification optionnelle de l'email et validation obligatoire des comptes de paiement"""
+    
+    try:
+        # Sanitize email input to prevent injection
+        clean_email = sanitize_email(user_data.email)
+        email_verified = False
+        email_verified_at = None
+
+        if user_data.email_verification_token:
+            verify_email_verification_token(user_data.email_verification_token, clean_email, "signup")
+            email_verified = True
+            email_verified_at = datetime.now(timezone.utc)
+        
+        # Check if email already exists
+        existing_user = await db.users.find_one({"email": clean_email})
+        if existing_user:
+            log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
+        
+        # Valider les comptes de paiement selon le type d'utilisateur
+        try:
+            payment_validation = validate_payment_accounts(user_data.payment_accounts, user_data.user_type)
+        except HTTPException as e:
+            raise e
+        
+                # Gérer la photo de profil si fournie
+        profile_photo_path = None
+        user_id = str(uuid.uuid4())  # Generate user ID first
+
+        if user_data.profile_photo_base64:
+            try:
+                image_data = base64.b64decode(
+                    user_data.profile_photo_base64.split(',')[1]
+                    if ',' in user_data.profile_photo_base64
+                    else user_data.profile_photo_base64
+                )
+
+                upload_result = cloudinary_uploader.upload(
+                    io.BytesIO(image_data),
+                    folder="kojo/profile_photos",
+                    public_id=f"register_{user_id}_{uuid.uuid4().hex}",
+                    resource_type="image"
+                )
+
+                profile_photo_path = upload_result.get("secure_url") or upload_result.get("url")
+                logger.info(f"✅ Photo de profil Cloudinary sauvegardée: {profile_photo_path}")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Erreur sauvegarde photo profil Cloudinary: {e}")
+
+        # Create user with payment verification - avec gestion d'erreur complète
+        try:
+            user = User(
+                id=user_id,
+                email=clean_email,
+                password_hash=hash_password(user_data.password),
+                first_name=user_data.first_name,
+                last_name=user_data.last_name,
+                phone=user_data.phone,
+                user_type=user_data.user_type,
+                country=user_data.country,
+                preferred_language=user_data.preferred_language,
+                legal_documents_accepted=user_data.legal_documents_accepted,
+                legal_documents_accepted_at=user_data.legal_documents_accepted_at,
+                legal_documents_version=user_data.legal_documents_version,
+                profile_photo=profile_photo_path,  # Ajouter le chemin de la photo
+                is_verified=payment_validation["is_verified"],
+                email_verified=email_verified,
+                email_verified_at=email_verified_at,
+                payment_accounts=payment_validation["account_details"],
+                payment_accounts_count=payment_validation["linked_accounts_count"],
+                created_at=datetime.now(timezone.utc).isoformat(),
+                updated_at=datetime.now(timezone.utc).isoformat()
+            )
+        except ValidationError as ve:
+            # Gestion spécifique des erreurs de validation Pydantic
+            validation_errors = []
+            for error in ve.errors():
+                field = error.get('loc', [''])[0] if error.get('loc') else 'unknown'
+                message = error.get('msg', 'Erreur de validation')
+                
+                # Messages d'erreur en français
+                if 'string_too_short' in error.get('type', ''):
+                    if field == 'first_name':
+                        message = "Le prénom doit contenir au moins 2 caractères"
+                    elif field == 'last_name':
+                        message = "Le nom de famille doit contenir au moins 2 caractères"
+                    else:
+                        message = f"Le champ {field} doit contenir au moins 2 caractères"
+                elif 'string_pattern_mismatch' in error.get('type', ''):
+                    if field in ['first_name', 'last_name']:
+                        message = f"Le {field} contient des caractères non autorisés"
+                    elif field == 'phone':
+                        message = "Le numéro de téléphone n'est pas au bon format"
+                    else:
+                        message = f"Le format du champ {field} est incorrect"
+                
+                validation_errors.append(f"{message}")
+            
+            error_message = "; ".join(validation_errors)
+            logger.warning(f"❌ Erreur validation utilisateur: {error_message}")
+            log_and_raise_http_exception(422, f"Erreur de validation: {error_message}")
+        
+        except Exception as e:
+            logger.error(f"❌ Erreur création utilisateur: {str(e)}")
+            log_and_raise_http_exception(500, "Erreur lors de la création du compte utilisateur")
+        
+        await db.users.insert_one(user.model_dump())
+        await db.email_otps.delete_one({"email": clean_email, "purpose": "signup"})
+        
+        # Créer le profil travailleur si c'est un travailleur avec des informations supplémentaires
+        worker_profile_created = False
+        if user_data.user_type == "worker" and (
+            user_data.worker_specialties or 
+            user_data.worker_experience_years is not None
+        ):
+            worker_profile = WorkerProfile(
+                user_id=user.id,
+                specialties=user_data.worker_specialties or [],
+                experience_years=user_data.worker_experience_years or 0,
+
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc)
+            )
+            
+            await db.worker_profiles.insert_one(worker_profile.model_dump())
+            worker_profile_created = True
+            logger.info(f"✅ Profil travailleur créé pour {user.email}")
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": user.id, "email": user.email})
+        
+        response_data = {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user.model_dump(exclude={"password_hash"}),
+            "payment_verification": {
+                "linked_accounts": payment_validation["linked_accounts_count"],
+                "required_minimum": 2 if user_data.user_type == "worker" else 1,
+                "is_verified": payment_validation["is_verified"],
+                "message": f"Compte vérifié avec {payment_validation['linked_accounts_count']} moyen(s) de paiement lié(s)"
+            }
+        }
+        
+        # Ajouter les informations du profil travailleur si créé
+        if worker_profile_created:
+            response_data["worker_profile"] = {
+                "specialties": user_data.worker_specialties or [],
+                "experience_years": user_data.worker_experience_years or 0,
+
+            }
+        
+        return response_data
+
+    except HTTPException:
+        # Re-raise HTTPException (comme les erreurs de validation 422)
+        raise
+    except Exception as e:
+        # Gestion globale des erreurs non capturées
+        logger.error(f"❌ Erreur inattendue lors de l'inscription: {str(e)}")
+        log_and_raise_http_exception(500, "Une erreur inattendue s'est produite lors de l'inscription. Veuillez réessayer.")
+
+@api_router.post("/auth/register")
+async def register_user(user_data: UserRegister):
+    try:
+        # Sanitize email input to prevent injection
+        clean_email = sanitize_email(user_data.email)
+        
+        # Check if user exists
+        existing_user = await db.users.find_one({"email": clean_email})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Create new user with sanitized email
+        hashed_password = hash_password(user_data.password)
+        user_dict = user_data.model_dump(exclude={"password"})
+        user_dict["email"] = clean_email  # Use sanitized email
+        user = User(
+            **user_dict,
+            password_hash=hashed_password
+        )
+        
+        await db.users.insert_one(user.model_dump())
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": user.id, "email": user.email})
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user.model_dump(exclude={"password_hash"})
+        }
+    
+    except ValidationError as e:
+        logger.warning(f"❌ Erreur validation utilisateur: {e}")
+        # Extraire le premier message d'erreur de validation
+        first_error = e.errors()[0]
+        field = first_error['loc'][0] if first_error['loc'] else 'field'
+        
+        if field == 'first_name':
+            if 'pattern' in first_error.get('type', ''):
+                error_msg = "Le prénom contient des caractères non autorisés"
+            else:
+                error_msg = "Le prénom doit contenir au moins 2 caractères"
+        elif field == 'last_name':
+            if 'pattern' in first_error.get('type', ''):
+                error_msg = "Le nom de famille contient des caractères non autorisés"
+            else:
+                error_msg = "Le nom doit contenir au moins 2 caractères"
+        elif field == 'email':
+            error_msg = "L'adresse email n'est pas valide"
+        elif field == 'phone':
+            error_msg = "Le numéro de téléphone n'est pas au bon format"
+        else:
+            error_msg = f"Erreur de validation: {first_error.get('msg', 'Erreur inconnue')}"
+        
+        log_and_raise_http_exception(422, f"Erreur de validation: {error_msg}")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur inattendue lors de l'inscription: {str(e)}")
+        log_and_raise_http_exception(500, "Une erreur inattendue s'est produite lors de l'inscription. Veuillez réessayer.")
+
+@api_router.post("/auth/login")
+async def login_user(credentials: UserLogin):
+    try:
+        # Sanitize email input
+        clean_email = sanitize_email(credentials.email)
+        user = await db.users.find_one({"email": clean_email})
+    except ValueError as e:
+        # sanitize_email() lève ValueError pour des raisons lisibles par un
+        # humain ("Email too long", "Invalid characters"...) sans détail
+        # d'infra. On le logue quand même pour tracer les tentatives
+        # suspectes, mais on renvoie un message générique au client.
+        logger.warning(f"Tentative de login avec email invalide: {e}")
+        raise HTTPException(status_code=400, detail="Adresse email invalide")
+    if not user or not verify_password(credentials.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    access_token = create_access_token(data={"sub": user["id"], "email": user["email"]})
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": User(**user).model_dump(exclude={"password_hash"})
+    }
+
+@api_router.post("/auth/logout")
+async def logout_user(
+    current_user: User = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Déconnexion de l'utilisateur.
+    Le token présenté est ajouté à une liste noire (db.revoked_tokens) jusqu'à
+    sa date d'expiration naturelle, afin qu'il ne puisse plus être réutilisé
+    même s'il a été intercepté avant le logout.
+    """
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        jti = payload.get("jti")
+        exp_timestamp = payload.get("exp")
+        if jti and exp_timestamp:
+            expire_at = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+            await revoke_token(jti, expire_at)
+    except jwt.InvalidTokenError:
+        pass  # token déjà invalide/expiré, rien à révoquer
+
+    logger.info(f"User {current_user.email} logged out")
+    return {"message": "Logout successful", "status": "success"}
+
+# User Routes
+@api_router.get("/auth/me")
+async def get_current_user_auth(current_user: User = Depends(get_current_user)):
+    return current_user.model_dump(exclude={"password_hash"})
+
+@api_router.get("/users/profile")
+async def get_profile(current_user: User = Depends(get_current_user)):
+    return current_user.model_dump(exclude={"password_hash"})
+
+@api_router.put("/users/profile")
+async def update_profile(
+    user_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    # Remove fields that shouldn't be updated via this endpoint
+    forbidden_fields = {"id", "email", "password_hash", "created_at"}
+    update_data = {k: v for k, v in user_data.items() if k not in forbidden_fields}
+    update_data["updated_at"] = datetime.now(timezone.utc)
+    
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Profile updated successfully"}
+
+class CountryUpdate(BaseModel):
+    country: Country
+
+@api_router.patch("/auth/me/country")
+async def update_user_country(
+    country_update: CountryUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if is_owner_user:
+        return {"message": "Owner accounts have access to all countries. Country change bypassed.", "country": current_user.country}
+        
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"country": country_update.country.value, "updated_at": datetime.now(timezone.utc)}}
+    )
+    return {"message": "Country updated successfully", "country": country_update.country.value}
+
+# Profile Photo Routes
+@api_router.post("/users/profile-photo")
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    file_content = await file.read()
+    file_size = len(file_content)
+
+    if file_size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
+
+    try:
+        upload_result = upload_profile_photo_to_cloudinary(
+            io.BytesIO(file_content),
+            str(current_user.id)
+        )
+
+        photo_url = upload_result["photo_url"]
+
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"profile_photo": photo_url, "updated_at": datetime.now(timezone.utc)}}
+        )
+
+        return {
+            "message": "Profile photo uploaded successfully",
+            "photo_url": photo_url
+        }
+
+    except Exception as e:
+        # Détail complet loggé côté serveur uniquement - on ne renvoie jamais
+        # le message d'erreur brut d'un service tiers (Cloudinary) au client,
+        # ça peut exposer des détails d'infra/config non destinés au public.
+        logger.error(f"Erreur upload photo Cloudinary: {e}")
+        raise HTTPException(status_code=500, detail="Échec de l'envoi de la photo. Veuillez réessayer.")
+
+@api_router.get("/users/profile-photo")
+async def get_current_user_profile_photo(current_user: User = Depends(get_current_user)):
+    """Get current user's profile photo"""
+    # Pas de photo = etat normal (compte sans photo), pas une erreur.
+    # On renvoie 200 avec photo_url: null plutot qu'un 404 pour eviter
+    # de polluer la console navigateur sur chaque page qui verifie la photo.
+    return {
+        "photo_url": current_user.profile_photo,
+        "user_id": current_user.id
+    }
+
+@api_router.get("/users/{user_id}/profile-photo")
+async def get_user_profile_photo(user_id: str):
+    """Get any user's profile photo (public endpoint for shared viewing)"""
+    try:
+        user = await db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Pas de photo = etat normal, pas une erreur (voir commentaire ci-dessus).
+        return {
+            "photo_url": user.get("profile_photo"),
+            "user_id": user_id
+        }
+    except Exception as e:
+        logger.error(f"Error fetching profile photo for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@api_router.delete("/users/profile-photo")
+async def delete_profile_photo(current_user: User = Depends(get_current_user)):
+    if not current_user.profile_photo:
+        raise HTTPException(status_code=404, detail="No profile photo to delete")
+    
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"profile_photo": None, "updated_at": datetime.now(timezone.utc)}}
+    )
+    
+    return {"message": "Profile photo deleted successfully"}
+
+# ============================================================================
+# SUPPORT - page "Nous contacter" (remplace l'affichage permanent des
+# coordonnées en pied de page). Route de creation publique (accessible sans
+# connexion, comme le pied de page l'etait), consultation/gestion reservee
+# a l'owner.
+# ============================================================================
+
+@api_router.post("/support/tickets")
+async def create_support_ticket(ticket_data: SupportTicketCreate):
+    ticket = SupportTicket(
+        full_name=ticket_data.full_name.strip(),
+        phone=ticket_data.phone.strip(),
+        email=ticket_data.email,
+        reason=ticket_data.reason.strip(),
+        message=ticket_data.message.strip(),
+        channel=ticket_data.channel,
+    )
+    await db.support_tickets.insert_one(ticket.model_dump())
+    return {
+        "message": "Merci, votre demande a bien été envoyée. Notre équipe vous répondra dans les meilleurs délais.",
+        "ticket_id": ticket.id,
+    }
+
+@api_router.get("/support/tickets")
+async def list_support_tickets(
+    status_filter: Optional[str] = None,
+    owner_user = Depends(verify_owner_access)
+):
+    query = {}
+    if status_filter:
+        query["status"] = status_filter
+    tickets = await db.support_tickets.find(query).sort("created_at", -1).to_list(500)
+    return [SupportTicket(**t).model_dump() for t in tickets]
+
+@api_router.patch("/support/tickets/{ticket_id}/status")
+async def update_support_ticket_status(
+    ticket_id: str,
+    status_update: SupportTicketStatusUpdate,
+    owner_user = Depends(verify_owner_access)
+):
+    result = await db.support_tickets.update_one(
+        {"id": ticket_id},
+        {"$set": {
+            "status": status_update.status.value,
+            "updated_at": datetime.now(timezone.utc)
+        }}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Demande de support introuvable")
+    updated = await db.support_tickets.find_one({"id": ticket_id})
+    return SupportTicket(**updated).model_dump()
+
+# Push Token Routes - For Mobile Notifications
+@api_router.post("/users/push-token")
+async def register_push_token(
+    token_data: PushTokenCreate,
+    current_user: User = Depends(get_current_user)
+):
+    """Register push notification token for mobile app"""
+    try:
+        logger.info(f"Registering push token for user: {current_user.id}")
+        
+        # Verify user_id matches current user (security check)
+        if token_data.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403, 
+                detail="Cannot register push token for different user"
+            )
+        
+        # Check if token already exists for this user and device
+        existing_token = await db.push_tokens.find_one({
+            "user_id": current_user.id,
+            "device_type": token_data.device_type,
+            "device_id": token_data.device_id
+        })
+        
+        if existing_token:
+            # Update existing token
+            await db.push_tokens.update_one(
+                {"id": existing_token["id"]},
+                {
+                    "$set": {
+                        "push_token": token_data.push_token,
+                        "active": True,
+                        "updated_at": datetime.now(timezone.utc)
+                    }
+                }
+            )
+            logger.info(f"Updated existing push token for user: {current_user.id}")
+            return {
+                "message": "Push token updated successfully",
+                "token_id": existing_token["id"],
+                "action": "updated"
+            }
+        else:
+            # Create new token
+            push_token = PushToken(
+                user_id=current_user.id,
+                push_token=token_data.push_token,
+                device_type=token_data.device_type,
+                device_id=token_data.device_id
+            )
+            
+            await db.push_tokens.insert_one(push_token.model_dump())
+            logger.info(f"Created new push token for user: {current_user.id}")
+            
+            return {
+                "message": "Push token registered successfully",
+                "token_id": push_token.id,
+                "action": "created"
+            }
+            
+    except ValidationError as e:
+        # Détail Pydantic loggé côté serveur uniquement - exposer la structure
+        # interne du modèle push token au client n'apporte rien à l'utilisateur
+        # final et donne des informations inutiles sur l'implémentation backend.
+        logger.error(f"Validation error in push token registration: {e}")
+        raise HTTPException(status_code=422, detail="Données de token invalides")
+    except Exception as e:
+        logger.error(f"Error registering push token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to register push token")
+
+@api_router.get("/users/push-tokens")
+async def get_user_push_tokens(current_user: User = Depends(get_current_user)):
+    """Get all push tokens for current user"""
+    try:
+        tokens = await db.push_tokens.find(
+            {"user_id": current_user.id, "active": True}
+        ).to_list(length=None)
+        
+        return {
+            "tokens": [
+                {
+                    "id": token["id"],
+                    "device_type": token["device_type"], 
+                    "device_id": token.get("device_id"),
+                    "created_at": token["created_at"],
+                    "updated_at": token["updated_at"]
+                } 
+                for token in tokens
+            ],
+            "count": len(tokens)
+        }
+    except Exception as e:
+        logger.error(f"Error getting push tokens: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get push tokens")
+
+@api_router.delete("/users/push-token/{token_id}")
+async def delete_push_token(
+    token_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete/deactivate a push token"""
+    try:
+        # Find token and verify ownership
+        token = await db.push_tokens.find_one({"id": token_id, "user_id": current_user.id})
+        if not token:
+            raise HTTPException(status_code=404, detail="Push token not found")
+        
+        # Deactivate token instead of deleting (for audit trail)
+        await db.push_tokens.update_one(
+            {"id": token_id},
+            {
+                "$set": {
+                    "active": False,
+                    "updated_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+        
+        logger.info(f"Deactivated push token {token_id} for user: {current_user.id}")
+        return {"message": "Push token deactivated successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting push token: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete push token")
+
+# ============================================================================
+# NOTIFICATION ROUTES
+# ============================================================================
+
+@api_router.get("/notifications/vapid-public-key")
+async def get_vapid_public_key():
+    """Retourne la clé VAPID publique pour que le frontend puisse s'abonner."""
+    if not VAPID_PUBLIC_KEY:
+        raise HTTPException(status_code=503, detail="Notifications push non configurées sur ce serveur")
+    return {"vapid_public_key": VAPID_PUBLIC_KEY}
+
+
+@api_router.get("/notifications")
+async def get_notifications(
+    limit: int = Query(default=50, ge=1, le=100),
+    unread_only: bool = Query(default=False),
+    current_user: User = Depends(get_current_user)
+):
+    """Récupère les notifications de l'utilisateur connecté (les plus récentes en premier)."""
+    query: dict = {"user_id": current_user.id}
+    if unread_only:
+        query["is_read"] = False
+
+    notifications = await db.notifications.find(query).sort("created_at", -1).to_list(limit)
+    unread_count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
+
+    return {
+        "notifications": [Notification(**n).model_dump() for n in notifications],
+        "unread_count": unread_count,
+        "total": len(notifications),
+    }
+
+
+@api_router.get("/notifications/unread-count")
+async def get_unread_count(current_user: User = Depends(get_current_user)):
+    """Retourne uniquement le compteur de notifications non lues (polling léger)."""
+    count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
+    return {"unread_count": count}
+
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Marque une notification spécifique comme lue."""
+    result = await db.notifications.update_one(
+        {"id": notification_id, "user_id": current_user.id},
+        {"$set": {"is_read": True}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Notification introuvable")
+    return {"message": "Notification marquée comme lue"}
+
+
+@api_router.put("/notifications/mark-all-read")
+async def mark_all_notifications_read(current_user: User = Depends(get_current_user)):
+    """Marque toutes les notifications de l'utilisateur comme lues."""
+    result = await db.notifications.update_many(
+        {"user_id": current_user.id, "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": f"{result.modified_count} notification(s) marquée(s) comme lue(s)", "updated": result.modified_count}
+
+
+@api_router.delete("/notifications/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Supprime une notification de l'utilisateur."""
+    result = await db.notifications.delete_one({"id": notification_id, "user_id": current_user.id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Notification introuvable")
+    return {"message": "Notification supprimée"}
+
+
+@api_router.delete("/notifications")
+async def delete_all_notifications(current_user: User = Depends(get_current_user)):
+    """Supprime toutes les notifications de l'utilisateur."""
+    result = await db.notifications.delete_many({"user_id": current_user.id})
+    return {"message": f"{result.deleted_count} notification(s) supprimée(s)", "deleted": result.deleted_count}
+
+
+# Worker Profile Routes
+@api_router.post("/workers/profile")
+async def create_worker_profile(
+    profile_data: WorkerProfile,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create worker profiles")
+    
+    profile_data.user_id = current_user.id
+    await db.worker_profiles.insert_one(profile_data.model_dump())
+    return {"message": "Worker profile created successfully"}
+
+@api_router.get("/workers/profile")
+async def get_worker_profile(current_user: User = Depends(get_current_user)):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    profile = await db.worker_profiles.find_one({"user_id": current_user.id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Worker profile not found")
+    
+    return WorkerProfile(**profile)
+
+# Job Routes
+@api_router.post("/jobs", response_model=Job)
+async def create_job(
+    job_data: dict,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        if current_user.user_type != UserType.CLIENT:
+            raise HTTPException(status_code=403, detail="Only clients can create jobs")
+
+        incoming = dict(job_data or {})
+
+        def _text(value):
+            return str(value).strip() if value is not None else ""
+
+        def _number(value):
+            if value in (None, ""):
+                return None
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        def _ensure_min_description(description, title, location_payload):
+            raw = _text(description)
+            if len(raw) >= 20:
+                return raw
+
+            location_text = _text(location_payload.get("fullAddress") or location_payload.get("address"))
+            title_text = _text(title) or "Job"
+            fallback = f"Besoin: {title_text}"
+            if location_text:
+                fallback += f" à {location_text}"
+            fallback += "."
+            if len(fallback) >= 20:
+                return fallback
+            return fallback + " Détails à confirmer."
+
+        raw_location = incoming.get("location")
+        if isinstance(raw_location, str):
+            location_payload = {
+                "address": raw_location.strip(),
+                "fullAddress": raw_location.strip(),
+                "city": "",
+                "district": "",
+                "country": "",
+                "countryCode": "",
+                "latitude": None,
+                "longitude": None,
+                "coordinates": None,
+            }
+        elif isinstance(raw_location, dict):
+            location_payload = {
+                "address": _text(raw_location.get("address") or raw_location.get("fullAddress")),
+                "fullAddress": _text(raw_location.get("fullAddress") or raw_location.get("address")),
+                "city": _text(raw_location.get("city")),
+                "district": _text(raw_location.get("district")),
+                "country": _text(raw_location.get("country")),
+                "countryCode": _text(raw_location.get("countryCode")),
+                "latitude": raw_location.get("latitude"),
+                "longitude": raw_location.get("longitude"),
+                "coordinates": raw_location.get("coordinates"),
+            }
+        else:
+            location_payload = {
+                "address": "",
+                "fullAddress": "",
+                "city": "",
+                "district": "",
+                "country": "",
+                "countryCode": "",
+                "latitude": None,
+                "longitude": None,
+                "coordinates": None,
+            }
+
+        budget_min = _number(incoming.get("budget_min"))
+        budget_max = _number(incoming.get("budget_max"))
+        if budget_min is None and budget_max is not None:
+            budget_min = budget_max
+        if budget_max is None and budget_min is not None:
+            budget_max = budget_min
+
+        incoming["title"] = _text(incoming.get("title"))
+        incoming["category"] = _text(incoming.get("category")) or "general"
+        incoming["location"] = location_payload
+        incoming["budget_min"] = budget_min
+        incoming["budget_max"] = budget_max
+        incoming["description"] = _ensure_min_description(incoming.get("description"), incoming["title"], location_payload)
+        incoming["required_skills"] = incoming.get("required_skills") if isinstance(incoming.get("required_skills"), list) else []
+        incoming["estimated_duration"] = _text(incoming.get("estimated_duration")) or None
+        incoming["parts_and_tools_notes"] = _text(incoming.get("parts_and_tools_notes"))
+        incoming["urgency"] = _text(incoming.get("urgency")) or "normal"
+        incoming["mechanic_must_bring_parts"] = bool(incoming.get("mechanic_must_bring_parts"))
+        incoming["mechanic_must_bring_tools"] = bool(incoming.get("mechanic_must_bring_tools"))
+        incoming["deadline"] = incoming.get("deadline") or None
+
+        if not incoming["title"]:
+            raise HTTPException(status_code=422, detail="title is required")
+        if not (location_payload.get("address") or location_payload.get("fullAddress")):
+            raise HTTPException(status_code=422, detail="location is required")
+        if incoming["budget_min"] is None and incoming["budget_max"] is None:
+            raise HTTPException(status_code=422, detail="price is required")
+        if incoming["budget_min"] > incoming["budget_max"]:
+            raise HTTPException(status_code=400, detail="budget_min cannot be greater than budget_max")
+
+        try:
+            # JobCreate ne connaît qu'un sous-ensemble de champs. Le frontend
+            # peut envoyer des champs supplémentaires (job_type, location_text,
+            # urgency, etc.) que Pydantic rejetterait avec une 422 si on les
+            # passe tels quels. On ne garde que les champs reconnus par le modèle.
+            jobcreate_fields = set(JobCreate.model_fields.keys())
+            filtered_for_validation = {k: v for k, v in incoming.items() if k in jobcreate_fields}
+            validated_input = JobCreate(**filtered_for_validation)
+        except Exception as validation_error:
+            raise HTTPException(status_code=422, detail=str(validation_error))
+
+        job = Job(**validated_input.model_dump(), client_id=current_user.id, country=current_user.country)
+        result = await db.jobs.insert_one(job.model_dump())
+
+        if not result.inserted_id:
+            raise HTTPException(status_code=500, detail="Failed to create job")
+
+        logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
+        return job
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to create job: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error creating job")
+
+@api_router.get("/jobs", response_model=List[Job])
+async def get_jobs(
+    status: Optional[JobStatus] = None,
+    category: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        query = {}
+        if status:
+            query["status"] = status
+        if category:
+            query["category"] = category
+        
+        query["deleted"] = {"$ne": True}
+        
+        is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+        if not is_owner_user:
+            query["$or"] = [
+                {"country": current_user.country},
+                {"country": {"$exists": False}},
+                {"country": None}
+            ]
+
+        jobs = await db.jobs.find(query).sort("created_at", -1).to_list(limit)
+        
+        logger.info(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
+        return [Job(**job) for job in jobs]
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to retrieve jobs: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
+
+@api_router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    job_country = job.get("country")
+    if not is_owner_user and job_country and job_country != current_user.country:
+        raise HTTPException(status_code=403, detail="Ce job n'appartient pas à votre pays.")
+        
+    return Job(**job)
+
+
+@api_router.delete("/jobs/{job_id}")
+async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if job.get("client_id") != current_user.id and not is_owner_user:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.jobs.update_one(
+        {"id": job_id},
+        {
+            "$set": {
+                "deleted": True,
+                "status": "cancelled",
+                "deleted_at": now_iso,
+                "deleted_by": current_user.id,
+                "updated_at": now_iso
+            }
+        }
+    )
+
+    try:
+        await db.job_proposals.delete_many({"job_id": job_id})
+    except Exception:
+        pass
+
+    try:
+        await db.proposals.delete_many({"job_id": job_id})
+    except Exception:
+        pass
+
+    return {"message": "Job deleted successfully", "job_id": job_id}
+
+# Job Proposal Routes
+@api_router.post("/jobs/{job_id}/proposals")
+async def create_proposal(
+    job_id: str,
+    proposal_data: ProposalCreate,
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can create proposals")
+    
+    # Check if job exists
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Check if worker already proposed
+    existing_proposal = await db.job_proposals.find_one({
+        "job_id": job_id,
+        "worker_id": current_user.id
+    })
+    if existing_proposal:
+        raise HTTPException(status_code=400, detail="You have already proposed for this job")
+    
+    proposal = JobProposal(
+        **proposal_data.model_dump(),
+        job_id=job_id,
+        worker_id=current_user.id
+    )
+    
+    await db.job_proposals.insert_one(proposal.model_dump())
+
+    # Notifier le client qu'une nouvelle proposition est arrivée
+    client_id = job.get("client_id")
+    if client_id:
+        worker_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Un travailleur"
+        asyncio.create_task(notify_user(
+            user_id=client_id,
+            title="Nouvelle proposition reçue",
+            body=f"{worker_name} a soumis une proposition pour « {job.get('title', 'votre mission')} »",
+            notif_type=NotificationType.PROPOSAL_RECEIVED,
+            related_id=job_id,
+            related_type="job",
+        ))
+
+    return {"message": "Proposal submitted successfully"}
+
+class ProposalAcceptLocation(BaseModel):
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    accuracy: Optional[float] = None
+
+class ProposalAcceptRequest(BaseModel):
+    location: Optional[ProposalAcceptLocation] = None
+
+@api_router.post("/jobs/{job_id}/proposals/{proposal_id}/accept")
+async def accept_job_proposal(
+    job_id: str,
+    proposal_id: str,
+    accept_data: ProposalAcceptRequest = ProposalAcceptRequest(),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Accepte une proposition de travailleur pour un job :
+    - Attribue le job au travailleur (assigned_worker_id, status -> in_progress)
+    - Marque cette proposition "accepted" et les autres "rejected"
+    - Si une position GPS est fournie (capturee cote client au moment du
+      clic), elle est enregistree sur le job ET envoyee automatiquement au
+      travailleur via un message dans la discussion, sans action manuelle
+      supplementaire.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if job.get("client_id") != current_user.id and not is_owner_user:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    proposal = await db.job_proposals.find_one({"id": proposal_id, "job_id": job_id})
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    worker_id = proposal.get("worker_id")
+    worker = await db.users.find_one({"id": worker_id})
+    if not worker:
+        raise HTTPException(status_code=404, detail="Worker not found")
+
+    # Empeche d'ecraser accidentellement une mission deja attribuee a un
+    # AUTRE travailleur (mais permet de re-confirmer le meme travailleur).
+    existing_assigned = job.get("assigned_worker_id")
+    if existing_assigned and existing_assigned != worker_id:
+        raise HTTPException(
+            status_code=409,
+            detail="Ce job a déjà été attribué à un autre travailleur"
+        )
+
+    now = datetime.now(timezone.utc)
+
+    shared_location = None
+    loc = accept_data.location
+    if loc and loc.latitude is not None and loc.longitude is not None:
+        shared_location = {
+            "latitude": loc.latitude,
+            "longitude": loc.longitude,
+            "accuracy": loc.accuracy,
+            "shared_at": now.isoformat(),
+            "maps_url": f"https://www.google.com/maps?q={loc.latitude},{loc.longitude}"
+        }
+
+    job_update = {
+        "assigned_worker_id": worker_id,
+        "accepted_proposal_id": proposal_id,
+        "status": JobStatus.IN_PROGRESS.value,
+    }
+    if shared_location:
+        job_update["shared_location"] = shared_location
+
+    await db.jobs.update_one({"id": job_id}, {"$set": job_update})
+
+    await db.job_proposals.update_one(
+        {"id": proposal_id},
+        {"$set": {"status": "accepted"}}
+    )
+    await db.job_proposals.update_many(
+        {"job_id": job_id, "id": {"$ne": proposal_id}},
+        {"$set": {"status": "rejected"}}
+    )
+
+    # Message automatique au travailleur — adresse conditionnelle au paiement.
+    # Si le client a déjà payé : on envoie l'adresse immédiatement.
+    # Si le client n'a pas encore payé : on prévient le travailleur d'attendre.
+    # (L'adresse sera envoyée automatiquement via l'IPN PayDunya dès confirmation.)
+    payment_completed = await db.payments.find_one({
+        "job_id": job_id,
+        "status": "completed",
+    })
+
+    # Rechargement du job pour avoir shared_location si elle vient d'être ajoutée
+    updated_job = await db.jobs.find_one({"id": job_id}) or {**job, **job_update}
+    if shared_location:
+        updated_job["shared_location"] = shared_location
+
+    if payment_completed:
+        await _dispatch_address_to_worker(
+            job=updated_job,
+            worker_id=worker_id,
+            sender_id=current_user.id,
+            phase="accepted",
+        )
+    else:
+        # Envoie d'abord le message de félicitations sans adresse
+        message_lines = [f"✅ Votre proposition a été acceptée pour « {job.get('title', 'la mission')} »."]
+        conversation_id = f"{min(current_user.id, worker_id)}_{max(current_user.id, worker_id)}"
+        try:
+            await db.messages.insert_one(Message(
+                conversation_id=conversation_id,
+                sender_id=current_user.id,
+                receiver_id=worker_id,
+                content="\n".join(message_lines),
+                job_id=job_id,
+            ).model_dump())
+        except Exception as exc:
+            logger.error(f"⚠️ Échec du message d'acceptation: {exc}")
+
+        # Puis le message d'attente de paiement dans la langue du travailleur
+        await _send_payment_pending_to_worker(
+            job=updated_job,
+            worker_id=worker_id,
+            sender_id=current_user.id,
+        )
+
+    # Notifier le travailleur que sa proposition a été acceptée
+    client_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Le client"
+    asyncio.create_task(notify_user(
+        user_id=worker_id,
+        title="Proposition acceptée ! 🎉",
+        body=f"{client_name} a accepté votre proposition pour « {job.get('title', 'la mission')} »",
+        notif_type=NotificationType.PROPOSAL_ACCEPTED,
+        related_id=job_id,
+        related_type="job",
+    ))
+
+    updated_job = await db.jobs.find_one({"id": job_id})
+    return {
+        "message": "Proposition acceptée avec succès",
+        "job": Job(**updated_job).model_dump(),
+    }
+
+
+@api_router.post("/jobs/{job_id}/complete")
+async def complete_job_and_release_payment(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Bouton "Travail Termine" : cloture la mission et declenche le versement
+    (decaissement PayDunya) du montant sequestre vers le travailleur.
+
+    Le paiement collecte reste "sequestre" (payout_status='held') tant que
+    cette route n'a pas ete appelee : c'est ca, l'escrow, dans ce systeme.
+    Si le decaissement automatique echoue (pas de compte mobile money
+    valide, panne PayDunya, etc.), la mission est quand meme cloturee mais
+    le paiement reste marque a traiter manuellement (payout_status=
+    'release_failed') plutot que de bloquer le client indefiniment.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if job.get("client_id") != current_user.id and not is_owner_user:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    worker_id = job.get("assigned_worker_id")
+    if not worker_id:
+        raise HTTPException(status_code=400, detail="Aucun travailleur attribué à cette mission")
+
+    if job.get("status") == JobStatus.COMPLETED.value:
+        raise HTTPException(status_code=409, detail="Cette mission est déjà marquée comme terminée")
+
+    # Trouver le paiement collecte et sequestre pour ce job (le plus recent)
+    payment_record = await db.payments.find_one(
+        {"job_id": job_id, "status": "completed"},
+        sort=[("created_at", -1)]
+    )
+    if not payment_record:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun paiement confirmé trouvé pour cette mission. Le client doit d'abord payer."
+        )
+
+    # Idempotence : si deja libere ou en cours de liberation, ne pas relancer
+    current_payout_status = payment_record.get("payout_status") or "held"
+    if current_payout_status == "released":
+        # Deja verse : on se contente de cloturer le job si ce n'est pas fait
+        await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {"message": "Mission déjà clôturée et paiement déjà versé", "job": Job(**updated_job).model_dump(), "payout_status": "released"}
+    if current_payout_status == "releasing":
+        raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
+
+    # Verrou : marquer "releasing" seulement si toujours "held", pour eviter
+    # un double-versement en cas de double-clic/appel concurrent.
+    lock_result = await db.payments.update_one(
+        {"id": payment_record["id"], "payout_status": current_payout_status},
+        {"$set": {"payout_status": "releasing", "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if lock_result.matched_count == 0:
+        raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
+
+    worker = await db.users.find_one({"id": worker_id})
+    worker_payment_accounts = (worker or {}).get("payment_accounts") or {}
+    worker_amount = payment_record.get("worker_amount") or 0
+
+    # On choisit Orange Money en priorite, sinon Wave (le compte bancaire
+    # n'est pas un mode de decaissement automatique supporte par PayDunya
+    # actuellement : dans ce cas on reste en versement manuel).
+    payout_method = None
+    payout_phone = None
+    if worker_payment_accounts.get("orange_money"):
+        payout_method = "orange_money"
+        payout_phone = worker_payment_accounts["orange_money"]
+    elif worker_payment_accounts.get("wave"):
+        payout_method = "wave"
+        payout_phone = worker_payment_accounts["wave"]
+
+    async def _mark_release_failed(reason: str):
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "payout_status": "release_failed",
+                "payout_failure_reason": reason,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+
+    if not payout_method or not payout_phone:
+        await _mark_release_failed("Le travailleur n'a pas de compte Orange Money ou Wave configuré")
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {
+            "message": "Mission clôturée, mais le versement automatique est impossible : le travailleur n'a pas de compte Orange Money ou Wave enregistré. Un versement manuel est nécessaire.",
+            "job": Job(**updated_job).model_dump(),
+            "payout_status": "release_failed",
+        }
+
+    withdraw_mode = get_paydunya_withdraw_mode(payout_method, worker.get("country"))
+    account_alias = strip_country_code_for_disburse(payout_phone)
+
+    try:
+        invoice = create_paydunya_disburse_invoice(
+            account_alias=account_alias,
+            amount=worker_amount,
+            withdraw_mode=withdraw_mode,
+            callback_url=build_disburse_callback_url(),
+        )
+        disburse_token = invoice.get("disburse_token")
+
+        submit_result = submit_paydunya_disburse_invoice(disburse_token, disburse_id=payment_record["id"])
+        provider_status = str(submit_result.get("status") or ("success" if str(submit_result.get("response_code")) == "00" else "failed"))
+
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "disburse_token": disburse_token,
+                "disburse_provider_response": submit_result,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+
+        if provider_status == "success":
+            final_payout_status = "released"
+        elif provider_status == "pending":
+            # Statut definitif inconnu pour l'instant (ex: Orange Money Mali
+            # repond toujours "pending") : le callback ou un check-status
+            # ulterieur confirmera. On garde "releasing" pour que le suivi
+            # sache qu'il faut verifier plus tard.
+            final_payout_status = "releasing"
+        else:
+            final_payout_status = "release_failed"
+            await db.payments.update_one(
+                {"id": payment_record["id"]},
+                {"$set": {"payout_failure_reason": submit_result.get("response_text") or "Échec du versement PayDunya"}}
+            )
+
+        await db.payments.update_one({"id": payment_record["id"]}, {"$set": {"payout_status": final_payout_status}})
+
+    except HTTPException as exc:
+        await _mark_release_failed(str(exc.detail))
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {
+            "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
+            "job": Job(**updated_job).model_dump(),
+            "payout_status": "release_failed",
+        }
+
+    await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+
+    # Notifier le travailleur et confirmer au client via le chat (canal
+    # fiable existant, pas de vrai systeme de notifications push).
+    conversation_id = f"{min(current_user.id, worker_id)}_{max(current_user.id, worker_id)}"
+    if final_payout_status == "released":
+        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA a été envoyé."
+    elif final_payout_status == "releasing":
+        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA est en cours de traitement."
+    else:
+        worker_message = f"✅ Mission « {job.get('title', '')} » terminée. Votre paiement de {worker_amount} FCFA sera versé manuellement, contactez le support si besoin."
+
+    try:
+        await db.messages.insert_one(Message(
+            conversation_id=conversation_id,
+            sender_id=current_user.id,
+            receiver_id=worker_id,
+            content=worker_message,
+            job_id=job_id
+        ).model_dump())
+    except Exception as exc:
+        logger.error(f"⚠️ Échec de l'envoi du message automatique de fin de mission: {exc}")
+
+    # Notifier le travailleur via push selon le statut du versement
+    if final_payout_status == "released":
+        push_body = f"Votre paiement de {worker_amount} FCFA pour « {job.get('title', 'la mission')} » a été envoyé."
+    elif final_payout_status == "releasing":
+        push_body = f"Votre paiement de {worker_amount} FCFA pour « {job.get('title', 'la mission')} » est en cours de traitement."
+    else:
+        push_body = f"Mission « {job.get('title', 'la mission')} » terminée. Versement à traiter manuellement."
+
+    asyncio.create_task(notify_user(
+        user_id=worker_id,
+        title="Mission terminée — Paiement en route 💰",
+        body=push_body,
+        notif_type=NotificationType.PAYMENT_RECEIVED,
+        related_id=job_id,
+        related_type="job",
+    ))
+
+    # Notifier le client que la mission est bien clôturée
+    asyncio.create_task(notify_user(
+        user_id=current_user.id,
+        title="Mission clôturée ✅",
+        body=f"La mission « {job.get('title', 'la mission')} » a été marquée comme terminée.",
+        notif_type=NotificationType.JOB_COMPLETED,
+        related_id=job_id,
+        related_type="job",
+    ))
+
+    updated_job = await db.jobs.find_one({"id": job_id})
+    return {
+        "message": "Mission clôturée avec succès",
+        "job": Job(**updated_job).model_dump(),
+        "payout_status": final_payout_status,
+    }
+
+
+@api_router.post('/payments/disburse-ipn')
+async def paydunya_disburse_ipn(request: Request):
+    """Callback asynchrone PayDunya pour confirmer le statut final d'un
+    versement (utile notamment quand submit-invoice a renvoye 'pending').
+
+    SECURITE: comme pour l'IPN de collecte, on ne fait pas confiance au
+    statut envoyé dans le payload du callback - on reconfirme auprès de
+    PayDunya via check-status, en utilisant le disburse_token retrouvé côté
+    serveur (jamais celui du payload) pour identifier quel enregistrement
+    mettre à jour.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    disburse_token_hint = payload.get('token') or payload.get('disburse_invoice')
+    if not disburse_token_hint:
+        return {'status': 'ignored'}
+
+    payment_record = await db.payments.find_one({'disburse_token': disburse_token_hint})
+    if not payment_record:
+        return {'status': 'ignored'}
+
+    # Le disburse_token utilisé pour la vérification vient TOUJOURS de
+    # l'enregistrement trouvé en base, pas du payload reçu.
+    real_disburse_token = payment_record.get('disburse_token')
+    try:
+        check_result = check_paydunya_disburse_status(real_disburse_token)
+    except Exception as exc:
+        logger.error(f"⚠️ Échec de vérification IPN décaissement PayDunya: {exc}")
+        return {'status': 'error', 'detail': 'verification failed'}
+
+    # Meme convention de parsing que submit_paydunya_disburse_invoice (deja
+    # utilisee ailleurs dans ce fichier pour cette meme famille d'API PayDunya).
+    provider_status = str(
+        check_result.get("status")
+        or ("success" if str(check_result.get("response_code")) == "00" else "")
+    ).strip().lower()
+
+    if provider_status == 'success':
+        payout_status = 'released'
+    elif provider_status == 'pending':
+        payout_status = 'releasing'
+    elif provider_status:
+        payout_status = 'release_failed'
+    else:
+        # Reponse PayDunya inattendue/non concluante: on ne change rien
+        # plutot que de deviner, un prochain check-status/IPN confirmera.
+        return {'status': 'inconclusive'}
+
+    await db.payments.update_one(
+        {'id': payment_record['id']},
+        {'$set': {
+            'payout_status': payout_status,
+            'disburse_callback_payload': payload,
+            'disburse_verified_payload': check_result,
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    return {'status': 'ok'}
+
+
+@api_router.get("/proposals/mine")
+async def get_my_proposals(current_user: User = Depends(get_current_user)):
+    """
+    Liste des propositions envoyées par le travailleur connecté, tous jobs
+    confondus - permet au frontend d'afficher fiablement "déjà postulé" en
+    se basant sur des données serveur, au lieu d'un simple marqueur
+    localStorage (qui se perd en changeant d'appareil/navigateur ou en
+    vidant le cache, ce qui laissait l'utilisateur postuler une 2e fois et
+    tomber sur une erreur "vous avez déjà postulé").
+    """
+    if current_user.user_type != UserType.WORKER:
+        return []
+
+    proposals = await db.job_proposals.find(
+        {"worker_id": current_user.id},
+        {"_id": 0, "job_id": 1, "status": 1, "proposed_amount": 1, "created_at": 1}
+    ).to_list(500)
+    return proposals
+
+@api_router.get("/jobs/{job_id}/proposals")
+async def get_job_proposals(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # Check if user is the job owner
+    job = await db.jobs.find_one({"id": job_id, "client_id": current_user.id})
+    if not job:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    proposals = await db.job_proposals.find({"job_id": job_id}).to_list(100)
+
+    # Enrichir chaque proposition avec le nom et la photo du travailleur.
+    # Sans ca, le frontend n'a que worker_id (aucun nom, aucune photo) et
+    # retombe systematiquement sur "Travailleur" generique sans image.
+    worker_ids = list({p.get("worker_id") for p in proposals if p.get("worker_id")})
+    workers_by_id = {}
+    if worker_ids:
+        workers_cursor = db.users.find(
+            {"id": {"$in": worker_ids}},
+            {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "profile_photo": 1, "rating": 1, "total_reviews": 1}
+        )
+        async for w in workers_cursor:
+            workers_by_id[w["id"]] = w
+
+    enriched = []
+    for p in proposals:
+        proposal_out = JobProposal(**p).model_dump()
+        worker = workers_by_id.get(p.get("worker_id"))
+        if worker:
+            full_name = f"{worker.get('first_name', '')} {worker.get('last_name', '')}".strip()
+            proposal_out["worker_name"] = full_name or None
+            proposal_out["worker_photo"] = worker.get("profile_photo")
+            proposal_out["worker"] = {
+                "id": worker.get("id"),
+                "first_name": worker.get("first_name"),
+                "last_name": worker.get("last_name"),
+                "profile_photo": worker.get("profile_photo"),
+                "rating": worker.get("rating"),
+                "total_reviews": worker.get("total_reviews"),
+            }
+        enriched.append(proposal_out)
+
+    return enriched
+
+@api_router.get("/jobs/{job_id}/payment-status")
+async def get_job_payment_status(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Statut REEL du paiement d'un job, base uniquement sur ce qui existe
+    en base de donnees (jamais devine a partir du statut du job). Sert de
+    source de verite unique pour l'affichage cote client ET travailleur,
+    afin d'eviter d'afficher "argent sequestre" quand rien n'a ete paye.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    allowed = (
+        job.get("client_id") == current_user.id
+        or job.get("assigned_worker_id") == current_user.id
+        or is_owner_user
+    )
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    payment_record = await db.payments.find_one(
+        {"job_id": job_id},
+        sort=[("created_at", -1)]
+    )
+
+    if not payment_record:
+        return {"has_payment": False, "payment_status": None, "payout_status": None, "amount": None}
+
+    return {
+        "has_payment": True,
+        "payment_status": payment_record.get("status"),
+        "payout_status": payment_record.get("payout_status"),
+        "amount": payment_record.get("amount"),
+        "worker_amount": payment_record.get("worker_amount"),
+        "created_at": payment_record.get("created_at"),
+        "completed_at": payment_record.get("completed_at"),
+    }
+
+# Messaging Routes
+@api_router.post("/messages")
+async def send_message(
+    message_data: MessageCreate,
+    current_user: User = Depends(get_current_user)
+):
+    # Generate conversation ID
+    conversation_id = f"{min(current_user.id, message_data.receiver_id)}_{max(current_user.id, message_data.receiver_id)}"
+
+    message = Message(
+        conversation_id=conversation_id,
+        sender_id=current_user.id,
+        receiver_id=message_data.receiver_id,
+        content=message_data.content,
+        job_id=message_data.job_id
+    )
+
+    await db.messages.insert_one(message.model_dump())
+    return message.model_dump()
+
+@api_router.get("/messages")
+async def get_all_messages(current_user: User = Depends(get_current_user)):
+    """Récupérer tous les messages de l'utilisateur connecté"""
+    messages = await db.messages.find({
+        "$or": [
+            {"sender_id": current_user.id},
+            {"receiver_id": current_user.id}
+        ]
+    }, {"_id": 0}).sort("timestamp", -1).to_list(100)
+    return messages
+
+@api_router.get("/messages/conversations")
+async def get_conversations(current_user: User = Depends(get_current_user)):
+    # Get unique conversation partners with other user info
+    pipeline = [
+        {"$match": {
+            "$or": [
+                {"sender_id": current_user.id},
+                {"receiver_id": current_user.id}
+            ]
+        }},
+        # IMPORTANT: $group avec $last/$first dépend de l'ORDRE dans lequel
+        # les documents arrivent au stage - sans ce $sort explicite juste
+        # avant, MongoDB ne garantit PAS que "$last" corresponde réellement
+        # au message le plus récent (l'aperçu affiché pouvait donc être un
+        # message au hasard, pas le dernier envoyé).
+        {"$sort": {"timestamp": 1}},
+        {"$group": {
+            "_id": "$conversation_id",
+            "last_message": {"$last": "$content"},
+            "last_timestamp": {"$last": "$timestamp"},
+            "sender_ids": {"$addToSet": "$sender_id"},
+            "receiver_ids": {"$addToSet": "$receiver_id"}
+        }},
+        {"$sort": {"last_timestamp": -1}}
+    ]
+
+    conversations = await db.messages.aggregate(pipeline).to_list(100)
+
+    # Get other user info for each conversation
+    result = []
+    for conv in conversations:
+        # Extract other user ID from conversation
+        conv_parts = conv["_id"].split("_")
+        other_user_id = None
+
+        # Find the ID that is not current user
+        for uid in conv_parts:
+            if uid != current_user.id:
+                other_user_id = uid
+                break
+
+        # Fetch other user data
+        if other_user_id:
+            other_user = await db.users.find_one({"id": other_user_id})
+            if other_user:
+                other_user_dict = {k: v for k, v in other_user.items() if k != "_id"}
+                conv["other_user"] = User(**other_user_dict).model_dump(exclude={"password_hash"})
+                first_name = other_user.get("first_name", "").strip()
+                last_name = other_user.get("last_name", "").strip()
+                full_name = f"{first_name} {last_name}".strip()
+                conv["other_user_name"] = full_name or other_user.get("email") or "Unknown"
+            else:
+                conv["other_user"] = None
+                conv["other_user_name"] = "Unknown"
+
+        result.append(conv)
+
+    return result
+
+@api_router.get("/messages/{conversation_id}")
+async def get_conversation_messages(
+    conversation_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    # Verify user is part of conversation. conversation_id est formaté
+    # "{id1}_{id2}" - on compare les IDs exacts après split, pas une
+    # recherche de sous-chaîne ("in") qui pouvait matcher par accident si
+    # l'ID d'un utilisateur apparaissait comme fragment d'un autre.
+    participant_ids = conversation_id.split("_")
+    if current_user.id not in participant_ids:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    messages = await db.messages.find({
+        "conversation_id": conversation_id
+    }).sort("timestamp", 1).to_list(100)
+    
+    return [Message(**message) for message in messages]
+
+# Basic health check routes
+@api_router.get("/")
+async def root():
+    return {"message": "Kojo API - Connecting Mali & Senegal", "status": "running"}
+
+@api_router.get("/health")
+async def health_check():
+    db_available = await is_database_available()
+
+    return {
+        "status": "healthy" if db_available else "degraded",
+        "timestamp": datetime.now(timezone.utc),
+        "database": "connected" if db_available else "unavailable",
+        "version": "1.0.0",
+        "environment": os.environ.get("APP_ENV", "production")
+    }
+
+# ============================================
+# GÉOLOCALISATION - Détection automatique du pays
+# ============================================
+
+# Données des pays d'Afrique de l'Ouest supportés
+WEST_AFRICA_COUNTRIES = {
+    "senegal": {
+        "code": "senegal",
+        "name": "Sénégal",
+        "nameFrench": "Sénégal",
+        "nameEnglish": "Senegal",
+        "flag": "🇸🇳",
+        "phonePrefix": "+221",
+        "phonePrefixes": ["+221"],
+        "currency": "XOF",
+        "currencySymbol": "FCFA",
+        "capital": "Dakar",
+        "languages": ["fr", "wo"],
+        "primaryLanguage": "fr",
+        "localLanguage": "wo",
+        "timezone": "Africa/Dakar",
+        "coordinates": {"lat": 14.6928, "lng": -17.4467}
+    },
+    "mali": {
+        "code": "mali",
+        "name": "Mali",
+        "nameFrench": "Mali",
+        "nameEnglish": "Mali",
+        "flag": "🇲🇱",
+        "phonePrefix": "+223",
+        "phonePrefixes": ["+223"],
+        "currency": "XOF",
+        "currencySymbol": "FCFA",
+        "capital": "Bamako",
+        "languages": ["fr", "bm"],
+        "primaryLanguage": "fr",
+        "localLanguage": "bm",
+        "timezone": "Africa/Bamako",
+        "coordinates": {"lat": 12.6392, "lng": -8.0029}
+    },
+    "burkina_faso": {
+        "code": "burkina_faso",
+        "name": "Burkina Faso",
+        "nameFrench": "Burkina Faso",
+        "nameEnglish": "Burkina Faso",
+        "flag": "🇧🇫",
+        "phonePrefix": "+226",
+        "phonePrefixes": ["+226"],
+        "currency": "XOF",
+        "currencySymbol": "FCFA",
+        "capital": "Ouagadougou",
+        "languages": ["fr", "mos"],
+        "primaryLanguage": "fr",
+        "localLanguage": "mos",
+        "timezone": "Africa/Ouagadougou",
+        "coordinates": {"lat": 12.3714, "lng": -1.5197}
+    },
+    "cote_divoire": {
+        "code": "cote_divoire",
+        "name": "Côte d'Ivoire",
+        "nameFrench": "Côte d'Ivoire",
+        "nameEnglish": "Ivory Coast",
+        "flag": "🇨🇮",
+        "phonePrefix": "+225",
+        "phonePrefixes": ["+225"],
+        "currency": "XOF",
+        "currencySymbol": "FCFA",
+        "capital": "Abidjan",
+        "languages": ["fr", "en"],
+        "primaryLanguage": "fr",
+        "localLanguage": "fr",
+        "timezone": "Africa/Abidjan",
+        "coordinates": {"lat": 5.3600, "lng": -4.0083}
+    }
+}
+
+# Mapping des IP ranges vers les pays (simplifiée - en production, utiliser une base GeoIP)
+IP_COUNTRY_HINTS = {
+    # Sénégal ISPs
+    "41.82.": "senegal", "41.83.": "senegal", "196.1.": "senegal", "196.206.": "senegal",
+    # Mali ISPs
+    "41.73.": "mali", "217.64.": "mali", "196.200.": "mali",
+    # Burkina Faso ISPs
+    "41.78.": "burkina_faso", "196.28.": "burkina_faso", "41.203.": "burkina_faso",
+    # Côte d'Ivoire ISPs
+    "41.66.": "cote_divoire", "196.180.": "cote_divoire", "41.207.": "cote_divoire"
+}
+
+def detect_country_from_ip(ip_address: str) -> Optional[str]:
+    """Détecter le pays à partir de l'adresse IP"""
+    if not ip_address or ip_address in ["127.0.0.1", "localhost", "::1"]:
+        return None
+    
+    # Vérifier les préfixes IP connus
+    for prefix, country in IP_COUNTRY_HINTS.items():
+        if ip_address.startswith(prefix):
+            return country
+    
+    return None
+
+def detect_country_from_phone(phone: str) -> Optional[str]:
+    """Détecter le pays à partir du numéro de téléphone"""
+    if not phone:
+        return None
+    
+    phone = phone.strip().replace(" ", "")
+    
+    phone_to_country = {
+        "+221": "senegal",
+        "+223": "mali",
+        "+226": "burkina_faso",
+        "+225": "cote_divoire"
+    }
+    
+    for prefix, country in phone_to_country.items():
+        if phone.startswith(prefix):
+            return country
+    
+    return None
+
+@api_router.get("/geolocation/available-countries")
+async def get_available_countries():
+    return {
+        "countries": [
+            {"id": "mali", "name": "Mali", "flag": "🇲🇱", "languages": ["fr", "en", "bm"]},
+            {"id": "senegal", "name": "Sénégal", "flag": "🇸🇳", "languages": ["fr", "en", "wo"]},
+            {"id": "cote_divoire", "name": "Côte d'Ivoire", "flag": "🇨🇮", "languages": ["fr", "en"]},
+            {"id": "burkina_faso", "name": "Burkina Faso", "flag": "🇧🇫", "languages": ["fr", "en", "mos"]}
+        ]
+    }
+
+@api_router.get("/geolocation/detect")
+async def detect_geolocation(request: Request, phone: Optional[str] = None):
+    """
+    Détecter automatiquement le pays de l'utilisateur.
+    
+    Méthodes de détection (par ordre de priorité):
+    1. Numéro de téléphone (si fourni)
+    2. Adresse IP
+    3. Défaut: Sénégal (hub principal)
+    
+    Returns:
+        - detected: bool - Si la détection a réussi
+        - method: str - Méthode utilisée (phone, ip, default)
+        - country: dict - Informations complètes du pays
+        - supported_countries: list - Liste des pays supportés
+    """
+    detected_country = None
+    detection_method = "default"
+    
+    # 1. Détection via numéro de téléphone
+    if phone:
+        detected_country = detect_country_from_phone(phone)
+        if detected_country:
+            detection_method = "phone"
+    
+    # 2. Détection via IP
+    if not detected_country:
+        # Obtenir l'IP du client
+        client_ip = request.client.host if request.client else None
+        
+        # Vérifier les headers de proxy
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+        
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            client_ip = real_ip
+        
+        if client_ip:
+            detected_country = detect_country_from_ip(client_ip)
+            if detected_country:
+                detection_method = "ip"
+    
+    # 3. Défaut: Sénégal
+    if not detected_country:
+        detected_country = "senegal"
+        detection_method = "default"
+    
+    country_info = WEST_AFRICA_COUNTRIES.get(detected_country, WEST_AFRICA_COUNTRIES["senegal"])
+    
+    return {
+        "detected": detection_method != "default",
+        "method": detection_method,
+        "country": country_info,
+        "supported_countries": list(WEST_AFRICA_COUNTRIES.values()),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@api_router.get("/geolocation/countries")
+async def get_supported_countries():
+    """
+    Obtenir la liste des pays supportés par Kojo.
+    
+    Returns:
+        - countries: list - Liste complète des pays avec leurs informations
+        - total: int - Nombre total de pays
+    """
+    return {
+        "countries": list(WEST_AFRICA_COUNTRIES.values()),
+        "total": len(WEST_AFRICA_COUNTRIES),
+        "default_country": "senegal"
+    }
+
+class PhoneValidationRequest(BaseModel):
+    phone: str = Field(..., description="Numéro de téléphone à valider")
+    country: Optional[str] = Field(None, description="Code du pays à vérifier (optionnel)")
+
+@api_router.post("/geolocation/validate-phone")
+async def validate_phone_for_country(request: PhoneValidationRequest):
+    """
+    Valider un numéro de téléphone et détecter/vérifier le pays.
+    
+    Args:
+        phone: Numéro de téléphone à valider
+        country: Code du pays à vérifier (optionnel)
+    
+    Returns:
+        - valid: bool - Si le numéro est valide
+        - detected_country: str - Pays détecté
+        - matches_country: bool - Si le numéro correspond au pays spécifié
+        - formatted: str - Numéro formaté
+    """
+    phone = request.phone
+    country = request.country
+    
+    if not phone:
+        raise HTTPException(status_code=400, detail="Numéro de téléphone requis")
+    
+    phone = phone.strip().replace(" ", "").replace("-", "")
+    detected = detect_country_from_phone(phone)
+    
+    # Validation du format
+    is_valid = False
+    if detected:
+        # Vérifier la longueur (préfixe + 8-10 chiffres selon le pays)
+        country_info = WEST_AFRICA_COUNTRIES.get(detected)
+        if country_info:
+            prefix = country_info["phonePrefix"]
+            local_number = phone[len(prefix):]
+            # Côte d'Ivoire a 10 chiffres, autres pays 8-9
+            if detected == "cote_divoire":
+                is_valid = len(local_number) >= 8 and len(local_number) <= 10 and local_number.isdigit()
+            else:
+                is_valid = len(local_number) >= 8 and len(local_number) <= 9 and local_number.isdigit()
+    
+    matches = True
+    if country and detected:
+        matches = detected == country
+    
+    return {
+        "valid": is_valid,
+        "phone": phone,
+        "detected_country": detected,
+        "country_info": WEST_AFRICA_COUNTRIES.get(detected) if detected else None,
+        "matches_country": matches,
+        "formatted": phone if is_valid else None
+    }
+
+@api_router.get("/stats")
+async def get_system_stats():
+    """Statistics endpoint for monitoring"""
+    db_available = await is_database_available()
+
+    if not db_available:
+        return {
+            "total_users": 0,
+            "total_jobs": 0,
+            "total_workers": 0,
+            "total_clients": 0,
+            "supported_countries": ["senegal", "mali", "cote_divoire", "burkina_faso"],
+            "supported_languages": ["fr", "en", "wo", "bm"],
+            "database": "unavailable",
+            "timestamp": datetime.now(timezone.utc)
+        }
+
+    total_users = await db.users.count_documents({})
+    total_jobs = await db.jobs.count_documents({})
+    total_workers = await db.users.count_documents({"user_type": "worker"})
+    total_clients = await db.users.count_documents({"user_type": "client"})
+    
+    return {
+        "total_users": total_users,
+        "total_jobs": total_jobs,
+        "total_workers": total_workers,
+        "total_clients": total_clients,
+        "supported_countries": ["senegal", "mali", "cote_divoire", "burkina_faso"],
+        "supported_languages": ["fr", "en", "wo", "bm"],
+        "database": "connected",
+        "timestamp": datetime.now(timezone.utc)
+    }
+
+# ============================================================================
+# ENDPOINTS PROTÉGÉS PROPRIÉTAIRE - ACCÈS RESTREINT
+# ============================================================================
+
+
+# ============================================================================
+# REAL PAYMENTS - PAYDUNYA FOUNDATION (PACK 2)
+# ============================================================================
+
+PAYDUNYA_CHANNELS = {
+    "orange_money": {
+        "senegal": "orange-money-senegal",
+        "mali": "orange-money-mali",
+        "burkina_faso": "orange-money-burkina",
+        "cote_divoire": "orange-money-ci"
+    },
+    "wave": {
+        "senegal": "wave-senegal",
+        "cote_divoire": "wave-ci"
+    },
+    "bank_card": {
+        "default": "card"
+    }
+}
+
+def normalize_payment_country(country: Optional[str]) -> str:
+    value = (country or 'senegal').strip().lower()
+    aliases = {
+        'senegal': 'senegal',
+        'sénégal': 'senegal',
+        'mali': 'mali',
+        'burkina': 'burkina_faso',
+        'burkina-faso': 'burkina_faso',
+        'burkina faso': 'burkina_faso',
+        'burkina_faso': 'burkina_faso',
+        'ivory coast': 'cote_divoire',
+        'cote divoire': 'cote_divoire',
+        "côte d'ivoire": 'cote_divoire',
+        "cote d'ivoire": 'cote_divoire',
+        'cote_d_ivoire': 'cote_divoire',
+        'ivory_coast': 'cote_divoire'
+    }
+    return aliases.get(value, value.replace('-', '_').replace(' ', '_'))
+
+def is_paydunya_configured() -> bool:
+    return bool(PAYDUNYA_MASTER_KEY and PAYDUNYA_PRIVATE_KEY and PAYDUNYA_TOKEN)
+
+def get_paydunya_base_url() -> str:
+    if PAYDUNYA_MODE == 'live':
+        return 'https://app.paydunya.com/api/v1'
+    return 'https://app.paydunya.com/sandbox-api/v1'
+
+def get_paydunya_headers() -> Dict[str, str]:
+    return {
+        'Content-Type': 'application/json',
+        'PAYDUNYA-MASTER-KEY': PAYDUNYA_MASTER_KEY,
+        'PAYDUNYA-PRIVATE-KEY': PAYDUNYA_PRIVATE_KEY,
+        'PAYDUNYA-TOKEN': PAYDUNYA_TOKEN,
+    }
+
+def calculate_payment_breakdown(amount: float) -> Dict[str, Any]:
+    commission_amount = round(amount * PAYMENT_COMMISSION_RATE)
+    worker_amount = round(amount - commission_amount)
+    return {
+        'total_amount': round(amount),
+        'commission_amount': commission_amount,
+        'worker_amount': worker_amount,
+        'commission_rate': round(PAYMENT_COMMISSION_RATE * 100, 2)
+    }
+
+def get_paydunya_channel(payment_method: str, country: Optional[str]) -> str:
+    payment_method = str(payment_method)
+    normalized_country = normalize_payment_country(country)
+    country_map = PAYDUNYA_CHANNELS.get(payment_method, {})
+
+    if payment_method == 'bank_card':
+        return country_map.get('default', 'card')
+
+    channel = country_map.get(normalized_country)
+    if channel:
+        return channel
+
+    supported = ', '.join(sorted(country_map.keys())) or 'none'
+    raise HTTPException(
+        status_code=400,
+        detail=f"Méthode {payment_method} non disponible pour {normalized_country}. Pays supportés: {supported}"
+    )
+
+def build_checkout_redirect_url(fallback_path: str, explicit_url: Optional[str] = None) -> str:
+    if explicit_url and explicit_url.strip():
+        return explicit_url.strip()
+    if FRONTEND_APP_URL:
+        return f"{FRONTEND_APP_URL}{fallback_path}"
+    return fallback_path
+
+def build_payment_callback_url() -> str:
+    if BACKEND_PUBLIC_URL:
+        return f"{BACKEND_PUBLIC_URL}/api/payments/ipn/paydunya"
+    return '/api/payments/ipn/paydunya'
+
+def build_disburse_callback_url() -> str:
+    if BACKEND_PUBLIC_URL:
+        return f"{BACKEND_PUBLIC_URL}/api/payments/disburse-ipn"
+    return '/api/payments/disburse-ipn'
+
+def serialize_payment_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    serialized = dict(record)
+    serialized.pop('_id', None)
+    return serialized
+
+def create_paydunya_invoice(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    endpoint = f"{get_paydunya_base_url()}/checkout-invoice/create"
+    try:
+        response = requests.post(endpoint, headers=get_paydunya_headers(), json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya create invoice error: {exc}")
+        raise HTTPException(status_code=502, detail='Impossible de créer la session de paiement PayDunya')
+
+    if str(data.get('response_code')) != '00':
+        logger.error(f"PayDunya create invoice failed: {data}")
+        response_text = data.get('response_text') or ''
+        # Traduit les messages d'erreur PayDunya courants en messages
+        # lisibles par l'utilisateur (plutôt que des messages techniques anglais).
+        if 'Minimum checkout amount' in response_text or 'Total Amount' in response_text:
+            user_message = "Le montant est trop faible pour être traité par PayDunya (minimum 200 FCFA)."
+        elif 'Invalid' in response_text:
+            user_message = "Données de paiement invalides. Vérifiez les informations et réessayez."
+        elif response_text:
+            user_message = f"Paiement refusé : {response_text}"
+        else:
+            user_message = "Création de paiement refusée par PayDunya."
+        raise HTTPException(status_code=400, detail=user_message)
+
+    return data
+
+def confirm_paydunya_invoice(invoice_token: str) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    endpoint = f"{get_paydunya_base_url()}/checkout-invoice/confirm/{invoice_token}"
+    try:
+        response = requests.get(endpoint, headers=get_paydunya_headers(), timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya confirm invoice error: {exc}")
+        raise HTTPException(status_code=502, detail='Impossible de vérifier le statut du paiement PayDunya')
+
+def map_paydunya_status(raw_status: Optional[str]) -> str:
+    normalized = str(raw_status or '').strip().lower()
+    mapping = {
+        'pending': 'pending',
+        'created': 'pending',
+        'completed': 'completed',
+        'success': 'completed',
+        'cancelled': 'cancelled',
+        'canceled': 'cancelled',
+        'failed': 'failed'
+    }
+    return mapping.get(normalized, 'pending')
+
+async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> Dict[str, Any]:
+    invoice_token = payment_record.get('invoice_token')
+    if not invoice_token or not is_paydunya_configured():
+        return payment_record
+
+    payload = confirm_paydunya_invoice(invoice_token)
+    invoice_data = payload.get('invoice', {}) if isinstance(payload, dict) else {}
+    provider_status = invoice_data.get('status') or payload.get('status')
+    local_status = map_paydunya_status(provider_status)
+
+    update_fields = {
+        'status': local_status,
+        'provider_status': provider_status,
+        'provider_confirm_payload': payload,
+        'updated_at': datetime.now(timezone.utc).isoformat()
+    }
+
+    if local_status == 'completed' and not payment_record.get('completed_at'):
+        update_fields['completed_at'] = datetime.now(timezone.utc).isoformat()
+        # payout_status suit l'etat du versement au TRAVAILLEUR, separement du
+        # statut de la collecte. Initialise seulement s'il n'a jamais ete
+        # defini, pour ne pas ecraser 'released'/'releasing' en cas de
+        # reconfirmation d'un paiement deja traite plus loin dans le flux.
+        if not payment_record.get('payout_status'):
+            update_fields['payout_status'] = 'held'
+
+    await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
+    latest = await db.payments.find_one({'id': payment_record['id']})
+    return latest or payment_record
+
+# ============================================================================
+# PAYDUNYA DISBURSEMENT (PER / decaissement) - versement au TRAVAILLEUR
+# une fois la mission marquee terminee. API distincte de la collecte,
+# doc: https://developers.paydunya.com/doc/EN/api_deboursement
+# ============================================================================
+
+PAYDUNYA_DISBURSE_BASE_URL = "https://app.paydunya.com/api/v2/disburse"
+
+def get_paydunya_withdraw_mode(payment_method: str, country: Optional[str]) -> str:
+    """Reutilise exactement le meme mapping canal que la collecte : les
+    valeurs (ex: 'orange-money-mali', 'wave-senegal') sont identiques cote
+    PayDunya pour encaisser ET decaisser."""
+    return get_paydunya_channel(payment_method, country)
+
+def strip_country_code_for_disburse(phone: Optional[str]) -> str:
+    """PayDunya attend le numero beneficiaire SANS indicatif pays pour le
+    decaissement (ex: '771111111', pas '+221771111111')."""
+    if not phone:
+        return ""
+    digits = re.sub(r'\D', '', str(phone))
+    # Indicatifs des 4 pays prioritaires Kojo (Senegal, Mali, Burkina, CI)
+    for code in ('221', '223', '226', '225'):
+        if digits.startswith(code) and len(digits) > len(code):
+            return digits[len(code):]
+    # Deja sans indicatif, ou indicatif non reconnu : on renvoie tel quel
+    return digits
+
+def create_paydunya_disburse_invoice(account_alias: str, amount: float, withdraw_mode: str, callback_url: str) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    payload = {
+        "account_alias": account_alias,
+        "amount": round(amount),
+        "withdraw_mode": withdraw_mode,
+        "callback_url": callback_url,
+    }
+    try:
+        response = requests.post(
+            f"{PAYDUNYA_DISBURSE_BASE_URL}/get-invoice",
+            headers=get_paydunya_headers(),
+            json=payload,
+            timeout=30
+        )
+        data = response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya disburse get-invoice error: {exc}")
+        raise HTTPException(status_code=502, detail="Impossible de préparer le versement PayDunya")
+    except ValueError:
+        logger.error("PayDunya disburse get-invoice: reponse non-JSON")
+        raise HTTPException(status_code=502, detail="Réponse invalide de PayDunya lors de la préparation du versement")
+
+    if str(data.get('response_code')) != '00' or not data.get('disburse_token'):
+        logger.error(f"PayDunya disburse get-invoice failed: {data}")
+        raise HTTPException(status_code=502, detail=data.get('response_text') or "Préparation du versement refusée par PayDunya")
+
+    return data
+
+def submit_paydunya_disburse_invoice(disburse_token: str, disburse_id: Optional[str] = None) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    payload = {"disburse_invoice": disburse_token}
+    if disburse_id:
+        payload["disburse_id"] = disburse_id
+
+    try:
+        response = requests.post(
+            f"{PAYDUNYA_DISBURSE_BASE_URL}/submit-invoice",
+            headers=get_paydunya_headers(),
+            json=payload,
+            timeout=30
+        )
+        data = response.json()
+    except requests.RequestException as exc:
+        logger.error(f"PayDunya disburse submit-invoice error: {exc}")
+        raise HTTPException(status_code=502, detail="Impossible d'exécuter le versement PayDunya")
+    except ValueError:
+        logger.error("PayDunya disburse submit-invoice: reponse non-JSON")
+        raise HTTPException(status_code=502, detail="Réponse invalide de PayDunya lors du versement")
+
+    return data
+
+def check_paydunya_disburse_status(disburse_token: str) -> Dict[str, Any]:
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
+
+    try:
+        response = requests.post(
+            f"{PAYDUNYA_DISBURSE_BASE_URL}/check-status",
+            headers=get_paydunya_headers(),
+            json={"disburse_invoice": disburse_token},
+            timeout=30
+        )
+        return response.json()
+    except (requests.RequestException, ValueError) as exc:
+        logger.error(f"PayDunya disburse check-status error: {exc}")
+        raise HTTPException(status_code=502, detail="Impossible de vérifier le statut du versement PayDunya")
+
+@api_router.get('/payments/config')
+async def get_real_payments_config():
+    return {
+        'provider': 'paydunya',
+        'configured': is_paydunya_configured(),
+        'mode': PAYDUNYA_MODE,
+        'commission_rate_percent': round(PAYMENT_COMMISSION_RATE * 100, 2),
+        'supported_channels': {
+            'orange_money': list(PAYDUNYA_CHANNELS['orange_money'].keys()),
+            'wave': list(PAYDUNYA_CHANNELS['wave'].keys()),
+            'bank_card': ['all']
+        }
+    }
+
+@api_router.post('/payments/quote')
+async def get_payment_quote(request: PaymentQuoteRequest):
+    channel = get_paydunya_channel(request.payment_method.value, request.country)
+    breakdown = calculate_payment_breakdown(request.amount)
+    return {
+        'provider': 'paydunya',
+        'configured': is_paydunya_configured(),
+        'channel': channel,
+        'country': normalize_payment_country(request.country),
+        'payment_method': request.payment_method.value,
+        **breakdown
+    }
+
+@api_router.post('/payments/checkout')
+async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_user: User = Depends(get_current_user)):
+    if not is_paydunya_configured():
+        raise HTTPException(status_code=503, detail="PayDunya n'est pas encore configuré en production")
+
+    # SECURITE: le montant, le job et le travailleur ne sont plus pris tels
+    # quels depuis la requête client (n'importe quel utilisateur pouvait
+    # auparavant envoyer un montant arbitraire, sans rapport avec le prix
+    # réellement convenu sur la mission). Si un job_id est fourni, tout est
+    # dérivé côté serveur à partir du job et de sa proposition acceptée :
+    # - seul le client propriétaire du job peut lancer un paiement pour lui
+    # - le montant est celui de la proposition acceptée (proposed_amount),
+    #   pas une valeur libre envoyée par le front-end
+    # - le worker_id est celui réellement assigné à la mission
+    job = None
+    resolved_amount = request.amount
+    resolved_worker_id = request.worker_id or ''
+
+    if request.job_id:
+        job = await db.jobs.find_one({"id": request.job_id, "deleted": {"$ne": True}})
+        if not job:
+            raise HTTPException(status_code=404, detail="Mission introuvable")
+
+        is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+        if job.get("client_id") != current_user.id and not is_owner_user:
+            raise HTTPException(status_code=403, detail="Seul le client à l'origine de cette mission peut lancer son paiement")
+
+        assigned_worker_id = job.get("assigned_worker_id")
+        if not assigned_worker_id:
+            raise HTTPException(status_code=400, detail="Aucun travailleur n'a encore été attribué à cette mission")
+        resolved_worker_id = assigned_worker_id
+
+        accepted_proposal_id = job.get("accepted_proposal_id")
+        accepted_proposal = (
+            await db.job_proposals.find_one({"id": accepted_proposal_id, "job_id": request.job_id})
+            if accepted_proposal_id else None
+        )
+        # Supporte les deux noms de champ utilisés selon les versions :
+        # "proposed_amount" (nouveau) et "amount" (ancien format).
+        proposal_amount = None
+        if accepted_proposal:
+            raw = accepted_proposal.get("proposed_amount") or accepted_proposal.get("amount")
+            if raw:
+                try:
+                    proposal_amount = float(raw)
+                except (TypeError, ValueError):
+                    pass
+
+        if proposal_amount and proposal_amount > 0:
+            resolved_amount = proposal_amount
+        elif job.get("budget_max") or job.get("budget_min"):
+            # Filet de sécurité : pas de proposition trouvée ou montant invalide →
+            # on utilise le budget du job plutôt que l'input client.
+            resolved_amount = float(job.get("budget_max") or job.get("budget_min"))
+        elif resolved_amount and resolved_amount >= 200:
+            # Dernier recours : le frontend a passé un montant valide, on l'accepte
+            # uniquement s'il est >= 200 FCFA (minimum PayDunya).
+            pass
+        else:
+            raise HTTPException(status_code=400, detail="Impossible de déterminer le montant à payer pour cette mission. Vérifiez que la proposition a bien un montant.")
+
+    normalized_country = normalize_payment_country(request.country or current_user.country)
+    channel = get_paydunya_channel(request.payment_method.value, normalized_country)
+    breakdown = calculate_payment_breakdown(resolved_amount)
+
+    # Validation du montant minimum PayDunya (200 FCFA) AVANT de créer
+    # l'enregistrement en base et d'appeler l'API — évite de créer un
+    # payment_record "pending" orphelin qu'on ne pourra jamais compléter,
+    # et renvoie un 400 lisible au lieu d'un 502 cryptique.
+    PAYDUNYA_MINIMUM_AMOUNT = 200
+    if round(resolved_amount) < PAYDUNYA_MINIMUM_AMOUNT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Le montant minimum pour un paiement est de {PAYDUNYA_MINIMUM_AMOUNT} FCFA "
+                   f"(montant envoyé : {round(resolved_amount)} FCFA)."
+        )
+
+    payment_record = {
+        'id': str(uuid.uuid4()),
+        'job_id': request.job_id or '',
+        'payer_id': current_user.id,
+        'receiver_id': resolved_worker_id,
+        'amount': round(resolved_amount),
+        'payment_method': request.payment_method.value,
+        'status': 'pending',
+        'country': normalized_country,
+        'provider': 'paydunya',
+        'provider_channel': channel,
+        'commission_amount': breakdown['commission_amount'],
+        'worker_amount': breakdown['worker_amount'],
+        'created_at': datetime.now(timezone.utc).isoformat(),
+        'updated_at': datetime.now(timezone.utc).isoformat(),
+    }
+
+    await db.payments.insert_one(payment_record)
+
+    return_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}", request.return_url)
+    cancel_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}&cancelled=1", request.cancel_url)
+    callback_url = build_payment_callback_url()
+
+    payload = {
+        'invoice': {
+            'total_amount': payment_record['amount'],
+            'description': f"Paiement KOJO {payment_record['id']}",
+            'channels': [channel],
+            'customer': {
+                'name': f"{current_user.first_name} {current_user.last_name}".strip(),
+                'email': current_user.email,
+                'phone': current_user.phone
+            }
+        },
+        'store': {
+            'name': PAYDUNYA_STORE_NAME
+        },
+        'actions': {
+            'cancel_url': cancel_url,
+            'return_url': return_url,
+            'callback_url': callback_url
+        },
+        'custom_data': {
+            'payment_id': payment_record['id'],
+            'job_id': payment_record['job_id'],
+            'worker_id': payment_record['receiver_id'],
+            'payer_id': payment_record['payer_id'],
+            'selected_method': payment_record['payment_method']
+        }
+    }
+
+    invoice_data = create_paydunya_invoice(payload)
+    invoice_token = invoice_data.get('token')
+    checkout_url = invoice_data.get('response_text')
+
+    await db.payments.update_one(
+        {'id': payment_record['id']},
+        {'$set': {
+            'invoice_token': invoice_token,
+            'checkout_url': checkout_url,
+            'provider_response_code': invoice_data.get('response_code'),
+            'provider_response_text': invoice_data.get('response_text'),
+            'updated_at': datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    return {
+        'status': 'success',
+        'provider': 'paydunya',
+        'payment_id': payment_record['id'],
+        'invoice_token': invoice_token,
+        'checkout_url': checkout_url,
+        'payment_method': payment_record['payment_method'],
+        'channel': channel,
+        **breakdown
+    }
+
+@api_router.get('/payments/status/{payment_id}')
+async def get_payment_status(payment_id: str, current_user: User = Depends(get_current_user)):
+    payment_record = await db.payments.find_one({'id': payment_id})
+    if not payment_record:
+        raise HTTPException(status_code=404, detail='Paiement introuvable')
+
+    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip():
+        raise HTTPException(status_code=403, detail='Accès interdit à ce paiement')
+
+    payment_record = await sync_payment_status_with_paydunya(payment_record)
+    return serialize_payment_record(payment_record)
+
+@api_router.get('/payments/status/token/{invoice_token}')
+async def get_payment_status_by_token(invoice_token: str, current_user: User = Depends(get_current_user)):
+    payment_record = await db.payments.find_one({'invoice_token': invoice_token})
+    if not payment_record:
+        raise HTTPException(status_code=404, detail='Paiement introuvable')
+
+    if current_user.id not in {payment_record.get('payer_id'), payment_record.get('receiver_id')} and current_user.email != os.environ.get('FAMAKAN_OWNER_EMAIL', '').strip():
+        raise HTTPException(status_code=403, detail='Accès interdit à ce paiement')
+
+    payment_record = await sync_payment_status_with_paydunya(payment_record)
+    return serialize_payment_record(payment_record)
+
+@api_router.get('/payments/my')
+async def get_my_payments(current_user: User = Depends(get_current_user)):
+    cursor = db.payments.find({'$or': [{'payer_id': current_user.id}, {'receiver_id': current_user.id}]}).sort('created_at', -1).limit(50)
+    payments = [serialize_payment_record(item) async for item in cursor]
+    return {'payments': payments}
+
+@api_router.post('/payments/ipn/paydunya')
+async def paydunya_payment_ipn(request: Request):
+    """
+    Callback IPN PayDunya (endpoint public, non authentifié - c'est le
+    fonctionnement normal d'un webhook).
+
+    SECURITE: on ne fait JAMAIS confiance au statut envoyé dans le payload
+    reçu ici - n'importe qui connaissant/obtenant un payment_id ou
+    invoice_token (ex: le payeur lui-même, à qui ces valeurs sont
+    légitimement renvoyées lors du checkout) pourrait sinon forger une
+    requête déclarant un paiement "completed" sans jamais avoir payé, ce
+    qui débloquerait ensuite un vrai décaissement vers le travailleur.
+    Le payload ne sert donc qu'à IDENTIFIER quel paiement re-vérifier ; le
+    statut réel est systématiquement reconfirmé auprès de l'API PayDunya
+    elle-même via sync_payment_status_with_paydunya(), à partir du
+    invoice_token stocké côté serveur (jamais celui du payload).
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    invoice_data = payload.get('invoice', {}) if isinstance(payload, dict) else {}
+    custom_data = payload.get('custom_data', {}) if isinstance(payload, dict) else {}
+    payment_id = custom_data.get('payment_id') or payload.get('payment_id')
+    invoice_token_hint = invoice_data.get('token') or payload.get('token')
+
+    query = {'id': payment_id} if payment_id else ({'invoice_token': invoice_token_hint} if invoice_token_hint else None)
+    payment_record = await db.payments.find_one(query) if query else None
+    if not payment_record:
+        return {'status': 'ignored'}
+
+    previous_status = payment_record.get('status')
+
+    try:
+        payment_record = await sync_payment_status_with_paydunya(payment_record)
+    except Exception as exc:
+        logger.error(f"⚠️ Échec de vérification IPN PayDunya auprès du serveur: {exc}")
+        return {'status': 'error', 'detail': 'verification failed'}
+
+    local_status = payment_record.get('status')
+
+    # Notifications push seulement lors de la transition VERS completed, pas
+    # à chaque IPN en double (PayDunya peut renvoyer plusieurs callbacks
+    # pour le même événement).
+    if local_status == 'completed' and previous_status != 'completed':
+        job_id_for_notif = payment_record.get('job_id') or ''
+        amount_for_notif = int(payment_record.get('amount', 0) or 0)
+        payer_id = payment_record.get('payer_id')
+        receiver_id = payment_record.get('receiver_id')
+
+        # Récupérer le titre du job si disponible
+        job_title = "la mission"
+        if job_id_for_notif:
+            job_doc = await db.jobs.find_one({"id": job_id_for_notif}, {"title": 1})
+            if job_doc:
+                job_title = job_doc.get("title", "la mission")
+
+        if payer_id:
+            asyncio.create_task(notify_user(
+                user_id=payer_id,
+                title="Paiement confirmé ✅",
+                body=f"Votre paiement de {amount_for_notif} FCFA pour « {job_title} » a bien été reçu.",
+                notif_type=NotificationType.PAYMENT_CONFIRMED,
+                related_id=job_id_for_notif or None,
+                related_type="job" if job_id_for_notif else None,
+            ))
+        if receiver_id:
+            asyncio.create_task(notify_user(
+                user_id=receiver_id,
+                title="Paiement sécurisé 🔒",
+                body=f"Le client a payé {amount_for_notif} FCFA pour « {job_title} ». Fonds sécurisés jusqu'à la fin de la mission.",
+                notif_type=NotificationType.PAYMENT_RECEIVED,
+                related_id=job_id_for_notif or None,
+                related_type="job" if job_id_for_notif else None,
+            ))
+
+        # Envoi automatique de l'adresse au travailleur après confirmation du
+        # paiement. Si la proposition avait déjà été acceptée avant le paiement,
+        # le travailleur a reçu un message "veuillez attendre le paiement" — ici
+        # on lui envoie maintenant l'adresse réelle du chantier dans sa langue.
+        if job_id_for_notif and receiver_id:
+            job_doc_full = await db.jobs.find_one({"id": job_id_for_notif})
+            if job_doc_full and job_doc_full.get("assigned_worker_id") == receiver_id:
+                payer_doc = await db.users.find_one({"id": payer_id}, {"id": 1}) if payer_id else None
+                dispatch_sender = (payer_doc or {}).get("id") or payer_id or receiver_id
+                await _dispatch_address_to_worker(
+                    job=job_doc_full,
+                    worker_id=receiver_id,
+                    sender_id=dispatch_sender,
+                    phase="payment_done",
+                )
+
+    return {'status': 'ok'}
+
+# ---------------------------------------------------------------------------
+# Envoi conditionnel de l'adresse au travailleur selon statut du paiement
+# ---------------------------------------------------------------------------
+
+_ADDRESS_MSG: Dict[str, Dict[str, str]] = {
+    "fr": {
+        "accepted_with_address": "\u2705 Votre proposition a \u00e9t\u00e9 accept\u00e9e pour \u00ab {title} \u00bb.\n\ud83d\udccd Adresse du chantier : {address}",
+        "accepted_with_gps":     "\u2705 Votre proposition a \u00e9t\u00e9 accept\u00e9e pour \u00ab {title} \u00bb.\n\ud83d\udccd Position GPS du client : {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Paiement confirm\u00e9 pour \u00ab {title} \u00bb.\n\ud83d\udccd Adresse du chantier : {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Paiement confirm\u00e9 pour \u00ab {title} \u00bb.\n\ud83d\udccd Position GPS du client : {maps_url}",
+        "wait_payment":          "\u23f3 Votre proposition pour \u00ab {title} \u00bb a bien \u00e9t\u00e9 accept\u00e9e, mais le paiement du client n'a pas encore \u00e9t\u00e9 effectu\u00e9. L'adresse vous sera communiqu\u00e9e automatiquement d\u00e8s que le paiement sera confirm\u00e9.",
+    },
+    "en": {
+        "accepted_with_address": "\u2705 Your proposal was accepted for \u00ab {title} \u00bb.\n\ud83d\udccd Job address: {address}",
+        "accepted_with_gps":     "\u2705 Your proposal was accepted for \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS location: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Payment confirmed for \u00ab {title} \u00bb.\n\ud83d\udccd Job address: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Payment confirmed for \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS location: {maps_url}",
+        "wait_payment":          "\u23f3 Your proposal for \u00ab {title} \u00bb has been accepted, but the client has not yet completed the payment. The job address will be sent to you automatically once payment is confirmed.",
+    },
+    "wo": {
+        "accepted_with_address": "\u2705 Y\u00e9gg na ci kow \u00ab {title} \u00bb.\n\ud83d\udccd Aadreesa bopp bii: {address}",
+        "accepted_with_gps":     "\u2705 Y\u00e9gg na ci kow \u00ab {title} \u00bb.\n\ud83d\udccd Dem xam ci carte bi: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Ligg\u00e9eyukaay bi dafay d\u00ebkk \u00ab {title} \u00bb.\n\ud83d\udccd Aadreesa bopp bii: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Ligg\u00e9eyukaay bi dafay d\u00ebkk \u00ab {title} \u00bb.\n\ud83d\udccd Dem xam ci carte bi: {maps_url}",
+        "wait_payment":          "\u23f3 B\u00ebgg\u00ebl bi ak \u00ab {title} \u00bb y\u00e9gg na, waaye jaamu gu customer bii dafa s\u00e0nni. Aadreesa bi dinañu la y\u00f3nnee d\u00ebgg rekk jant bi payer bi dafa yokku.",
+    },
+    "bm": {
+        "accepted_with_address": "\u2705 I latig\u025b ye ka sigi \u00ab {title} \u00bb kan.\n\ud83d\udccd Liganbo y\u0254r\u0254 \u0254: {address}",
+        "accepted_with_gps":     "\u2705 I latig\u025b ye ka sigi \u00ab {title} \u00bb kan.\n\ud83d\udccd Customer GPS y\u0254r\u0254: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Sarabu ka k\u025b \u00ab {title} \u00bb k\u0254f\u025b.\n\ud83d\udccd Liganbo y\u0254r\u0254 \u0254: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Sarabu ka k\u025b \u00ab {title} \u00bb k\u0254f\u025b.\n\ud83d\udccd Customer GPS y\u0254r\u0254: {maps_url}",
+        "wait_payment":          "\u23f3 I latig\u025bra \u00ab {title} \u00bb kan, nga customer ma saraba t\u025b k\u025b fo. Liganbo y\u0254r\u0254 \u0254 b\u025bna i g\u025bn sarabu ka s\u0254r\u0254.",
+    },
+    "mos": {
+        "accepted_with_address": "\u2705 Y wilg n bees n \u00ab {title} \u00bb.\n\ud83d\udccd Liggdi t\u1ebd\u014bgo: {address}",
+        "accepted_with_gps":     "\u2705 Y wilg n bees n \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS t\u1ebd\u014bgo: {maps_url}",
+        "payment_done_address":  "\ud83d\udcb0 Cobd-k\u00e3ab paas la \u00ab {title} \u00bb.\n\ud83d\udccd Liggdi t\u1ebd\u014bgo: {address}",
+        "payment_done_gps":      "\ud83d\udcb0 Cobd-k\u00e3ab paas la \u00ab {title} \u00bb.\n\ud83d\udccd Client GPS t\u1ebd\u014bgo: {maps_url}",
+        "wait_payment":          "\u23f3 Y wilg bees la \u00ab {title} \u00bb zugu, la b\u00e3an n client soab n k\u00f5 cobd-k\u00e3ab. T\u1ebd\u014bgo la n t\u0169 ne fo n cobd-k\u00e3ab paasame.",
+    },
+}
+def _get_address_msg(lang: str, key: str, **kwargs) -> str:
+    texts = _ADDRESS_MSG.get(lang) or _ADDRESS_MSG["fr"]
+    template = texts.get(key) or _ADDRESS_MSG["fr"][key]
+    return template.format(**kwargs)
+
+
+async def _dispatch_address_to_worker(
+    job: Dict[str, Any],
+    worker_id: str,
+    sender_id: str,
+    phase: str = "accepted",
+) -> None:
+    """Envoie l'adresse au travailleur dans sa langue (sans doublon)."""
+    if job.get("shared_address_sent"):
+        return
+
+    worker_doc = await db.users.find_one({"id": worker_id}, {"preferred_language": 1})
+    lang = (worker_doc or {}).get("preferred_language") or "fr"
+    if lang not in _ADDRESS_MSG:
+        lang = "fr"
+
+    job_title = job.get("title") or "la mission"
+    job_location = job.get("location") or {}
+    shared_location = job.get("shared_location")
+    address_text = (
+        job_location.get("fullAddress")
+        or job_location.get("address")
+        or job_location.get("text")
+    )
+
+    if shared_location and shared_location.get("maps_url"):
+        msg_key = "accepted_with_gps" if phase == "accepted" else "payment_done_gps"
+        content = _get_address_msg(lang, msg_key, title=job_title,
+                                   maps_url=shared_location["maps_url"])
+    elif address_text:
+        msg_key = "accepted_with_address" if phase == "accepted" else "payment_done_address"
+        content = _get_address_msg(lang, msg_key, title=job_title, address=address_text)
+    else:
+        return  # pas d'adresse disponible
+
+    conversation_id = f"{min(sender_id, worker_id)}_{max(sender_id, worker_id)}"
+    try:
+        await db.messages.insert_one(Message(
+            conversation_id=conversation_id,
+            sender_id=sender_id,
+            receiver_id=worker_id,
+            content=content,
+            job_id=job.get("id"),
+        ).model_dump())
+        await db.jobs.update_one(
+            {"id": job.get("id")},
+            {"$set": {"shared_address_sent": True}}
+        )
+        asyncio.create_task(notify_user(
+            user_id=worker_id,
+            title="📍 Adresse du chantier reçue",
+            body=f"L'adresse de « {job_title} » vous a été envoyée.",
+            notif_type=NotificationType.GENERAL,
+            related_id=job.get("id"),
+            related_type="job",
+        ))
+    except Exception as exc:
+        logger.error(f"⚠️ Échec envoi adresse au travailleur: {exc}")
+
+
+async def _send_payment_pending_to_worker(
+    job: Dict[str, Any],
+    worker_id: str,
+    sender_id: str,
+) -> None:
+    """Notifie le travailleur dans sa langue que le paiement est en attente."""
+    worker_doc = await db.users.find_one({"id": worker_id}, {"preferred_language": 1})
+    lang = (worker_doc or {}).get("preferred_language") or "fr"
+    if lang not in _ADDRESS_MSG:
+        lang = "fr"
+
+    job_title = job.get("title") or "la mission"
+    content = _get_address_msg(lang, "wait_payment", title=job_title)
+    conversation_id = f"{min(sender_id, worker_id)}_{max(sender_id, worker_id)}"
+    try:
+        await db.messages.insert_one(Message(
+            conversation_id=conversation_id,
+            sender_id=sender_id,
+            receiver_id=worker_id,
+            content=content,
+            job_id=job.get("id"),
+        ).model_dump())
+    except Exception as exc:
+        logger.error(f"⚠️ Échec envoi message attente paiement: {exc}")
+
+
+async def compute_real_commission_stats() -> Dict[str, Any]:
+    completed_payments = [item async for item in db.payments.find({'status': 'completed'}).sort('created_at', -1)]
+    now = datetime.now(timezone.utc)
+    today = now.date()
+
+    total_transactions = len(completed_payments)
+    total_commission_earned = sum(int(item.get('commission_amount', 0) or 0) for item in completed_payments)
+    total_volume = sum(int(item.get('amount', 0) or 0) for item in completed_payments)
+
+    daily_commission = 0
+    monthly_commission = 0
+    method_totals: Dict[str, Dict[str, int]] = {}
+    recent_transactions = []
+
+    for item in completed_payments:
+        created_raw = item.get('completed_at') or item.get('updated_at') or item.get('created_at')
+        try:
+            created_dt = datetime.fromisoformat(str(created_raw).replace('Z', '+00:00'))
+            if created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            created_dt = now
+
+        if created_dt.date() == today:
+            daily_commission += int(item.get('commission_amount', 0) or 0)
+        if created_dt.year == now.year and created_dt.month == now.month:
+            monthly_commission += int(item.get('commission_amount', 0) or 0)
+
+        method = item.get('payment_method', 'unknown')
+        bucket = method_totals.setdefault(method, {'volume': 0, 'commission': 0})
+        bucket['volume'] += int(item.get('amount', 0) or 0)
+        bucket['commission'] += int(item.get('commission_amount', 0) or 0)
+
+        if len(recent_transactions) < 10:
+            recent_transactions.append({
+                'id': item.get('id'),
+                'amount': int(item.get('amount', 0) or 0),
+                'commission': int(item.get('commission_amount', 0) or 0),
+                'worker_amount': int(item.get('worker_amount', 0) or 0),
+                'method': method,
+                'paymentMethod': method,
+                'date': created_dt.isoformat(),
+                'timestamp': created_dt.isoformat()
+            })
+
+    top_payment_methods = [
+        {'method': method, 'volume': data['volume'], 'commission': data['commission']}
+        for method, data in sorted(method_totals.items(), key=lambda item: item[1]['volume'], reverse=True)
+    ]
+
+    return {
+        'total_transactions': total_transactions,
+        'total_commission_earned': total_commission_earned,
+        'commission_rate': round(PAYMENT_COMMISSION_RATE * 100),
+        'total_volume': total_volume,
+        'daily_commission': daily_commission,
+        'monthly_commission': monthly_commission,
+        'top_payment_methods': top_payment_methods,
+        'recent_transactions': recent_transactions
+    }
+
+@api_router.get("/owner/commission-stats")
+async def get_commission_stats(owner_user = Depends(verify_owner_access)):
+    """Statistiques des commissions - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        stats = await compute_real_commission_stats()
+        return {
+            "status": "success",
+            "owner_email": owner_user["email"],
+            "stats": stats
+        }
+    except Exception as e:
+        logging.error(f"Error getting commission stats: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@api_router.get("/owner/debug-info")
+async def get_debug_info(owner_user = Depends(verify_owner_access)):
+    """Informations de debug - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        # Compter les utilisateurs
+        total_users = await db.users.count_documents({})
+        clients = await db.users.count_documents({"user_type": "client"})
+        workers = await db.users.count_documents({"user_type": "worker"})
+        
+        # Compter les jobs
+        total_jobs = await db.jobs.count_documents({})
+        active_jobs = await db.jobs.count_documents({"status": "open"})
+        
+        debug_info = {
+            "system_status": "running",
+            "database_connected": True,
+            "total_users": total_users,
+            "user_breakdown": {
+                "clients": clients,
+                "workers": workers,
+                "owner": 1
+            },
+            "jobs_stats": {
+                "total_jobs": total_jobs,
+                "active_jobs": active_jobs
+            },
+            "server_info": {
+                "jwt_algorithm": JWT_ALGORITHM,
+                "cors_enabled": True,
+                "uploads_enabled": True
+            },
+            "owner_permissions": owner_user.get("permissions", [])
+        }
+        
+        return {
+            "status": "success",
+            "debug_info": debug_info,
+            "access_level": "OWNER_FULL_ACCESS"
+        }
+        
+    except Exception as e:
+        logging.error(f"Error getting debug info: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@api_router.get("/owner/users-management")
+async def get_users_management(owner_user = Depends(verify_owner_access)):
+    """Gestion des utilisateurs - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        # Récupérer tous les utilisateurs (sauf le propriétaire)
+        users_cursor = db.users.find(
+            {"user_type": {"$ne": "owner"}},
+            {"password_hash": 0, "_id": 0}  # Exclure les mots de passe et _id
+        )
+        users = await users_cursor.to_list(length=None)
+        
+        # Statistiques des utilisateurs
+        user_stats = {
+            "total_users": len(users),
+            "clients": len([u for u in users if u.get("user_type") == "client"]),
+            "workers": len([u for u in users if u.get("user_type") == "worker"]),
+            "by_country": {}
+        }
+        
+        # Compter par pays
+        for user in users:
+            country = user.get("country", "unknown")
+            user_stats["by_country"][country] = user_stats["by_country"].get(country, 0) + 1
+        
+        return {
+            "status": "success",
+            "users": users,
+            "stats": user_stats,
+            "access_level": "OWNER_FULL_ACCESS"
+        }
+        
+    except Exception as e:
+        logging.error(f"Error getting users management: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@api_router.post("/owner/update-commission-settings")
+async def update_commission_settings(
+    settings: dict,
+    owner_user = Depends(verify_owner_access)
+):
+    """Mettre à jour les paramètres de commission - PROPRIÉTAIRE UNIQUEMENT"""
+    try:
+        # Valider les paramètres
+        commission_rate = settings.get("commission_rate", 14)
+        if not 0 <= commission_rate <= 50:
+            raise HTTPException(status_code=400, detail="Taux de commission invalide (0-50%)")
+        
+        # Sauvegarder les paramètres en base
+        await db.settings.update_one(
+            {"type": "commission"},
+            {
+                "$set": {
+                    "commission_rate": commission_rate,
+                    "owner_accounts": settings.get("owner_accounts", {}),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_by": owner_user["id"]
+                }
+            },
+            upsert=True
+        )
+        
+        return {
+            "status": "success",
+            "message": "Paramètres de commission mis à jour",
+            "new_settings": settings
+        }
+        
+    except Exception as e:
+        logging.error(f"Error updating commission settings: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@api_router.get("/users/payment-accounts")
+async def get_user_payment_accounts(current_user: User = Depends(get_current_user)):
+    """Obtenir les comptes de paiement de l'utilisateur connecté"""
+    
+    user_data = await db.users.find_one({"id": current_user.id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "user_id": current_user.id,
+        "user_type": user_data["user_type"],
+        "payment_accounts": user_data.get("payment_accounts", {}),
+        "payment_accounts_count": user_data.get("payment_accounts_count", 0),
+        "is_verified": user_data.get("is_verified", False),
+        "minimum_required": 2 if user_data["user_type"] == "worker" else 1
+    }
+
+@api_router.put("/users/payment-accounts")
+async def update_user_payment_accounts(
+    payment_data: PaymentAccount,
+    current_user: User = Depends(get_current_user)
+):
+    """Mettre à jour les comptes de paiement de l'utilisateur"""
+    
+    user_data = await db.users.find_one({"id": current_user.id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Valider les nouveaux comptes de paiement
+    try:
+        payment_validation = validate_payment_accounts(payment_data, user_data["user_type"])
+    except HTTPException as e:
+        raise e
+    
+    # Mettre à jour en base de données
+    await db.users.update_one(
+        {"id": current_user.id},
+        {
+            "$set": {
+                "payment_accounts": payment_validation["account_details"],
+                "payment_accounts_count": payment_validation["linked_accounts_count"],
+                "is_verified": payment_validation["is_verified"],
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+    )
+    
+    return {
+        "message": "Comptes de paiement mis à jour avec succès",
+        "payment_verification": {
+            "linked_accounts": payment_validation["linked_accounts_count"],
+            "required_minimum": 2 if user_data["user_type"] == "worker" else 1,
+            "is_verified": payment_validation["is_verified"],
+            "accounts": payment_validation["account_details"]
+        }
+    }
+
+@api_router.post("/users/verify-payment-access")
+async def verify_payment_access(current_user: User = Depends(get_current_user)):
+    """Vérifier si l'utilisateur peut accéder aux fonctionnalités de paiement"""
+    
+    user_data = await db.users.find_one({"id": current_user.id})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    payment_count = user_data.get("payment_accounts_count", 0)
+    user_type = user_data["user_type"]
+    is_verified = user_data.get("is_verified", False)
+    
+    # Vérifier les conditions d'accès
+    if user_type == "client" and payment_count < 1:
+        return {
+            "access_granted": False,
+            "message": "Les clients doivent lier au moins 1 moyen de paiement",
+            "required_minimum": 1,
+            "current_count": payment_count,
+            "user_type": user_type
+        }
+    elif user_type == "worker" and payment_count < 2:
+        return {
+            "access_granted": False,
+            "message": "Les travailleurs doivent lier au minimum 2 moyens de paiement",
+            "required_minimum": 2,
+            "current_count": payment_count,
+            "user_type": user_type
+        }
+    
+    return {
+        "access_granted": True,
+        "message": "Accès autorisé aux fonctionnalités de paiement",
+        "is_verified": is_verified,
+        "payment_accounts_count": payment_count,
+        "user_type": user_type
+    }
+
+# ============================================================================
+
+# Root path, for infrastructure probes (Render's default health check hits "/"
+# directly, distinct from the app's API root at "/api/"). Methods declared
+# explicitly (GET + HEAD) so uptime monitors using HEAD requests aren't
+# rejected with 405 Method Not Allowed.
+@app.api_route("/", methods=["GET", "HEAD"])
+async def app_root():
+    return {"message": "Kojo API - Connecting Mali & Senegal", "status": "running"}
+
+# Health check at the root path (no /api prefix), for infrastructure monitors
+# (Render health checks, UptimeRobot, etc.) that ping "/health" directly.
+# This mirrors /api/health below; keep both in sync if the logic changes.
+# Methods declared explicitly (GET + HEAD) for the same reason as above.
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def root_health_check():
+    db_available = await is_database_available()
+
+    return {
+        "status": "healthy" if db_available else "degraded",
+        "timestamp": datetime.now(timezone.utc),
+        "database": "connected" if db_available else "unavailable",
+        "version": "1.0.0",
+        "environment": os.environ.get("APP_ENV", "production")
+    }
+
+# Favicon & root routes - this API has no frontend to serve, but browsers/bots/
+# uptime monitors (e.g. Render health pings) request GET /favicon.ico and GET /
+# by default. Without an explicit handler these show up as noisy 404s in the
+# Render logs. Returning 204 (no content) for the favicon keeps logs clean and
+# is the standard fix; a simple JSON message on "/" avoids the same issue there.
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return JSONResponse({"service": "Kojo API", "status": "ok"})
+
+# Include the router in the main app
+app.include_router(api_router)
+
+# Serve uploaded files under /api prefix for proper Kubernetes ingress routing
+from fastapi.staticfiles import StaticFiles
+# Le dossier doit exister AVANT le mount, car StaticFiles() vérifie sa présence
+# immédiatement au chargement du module (avant même l'événement de démarrage
+# de l'app) - sur un déploiement Render tout frais / après un git-filter-repo,
+# le dossier n'existe plus dans le repo cloné, donc on le (re)crée ici.
+os.makedirs("uploads", exist_ok=True)
+app.mount("/api/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# CORS Configuration optimized for West Africa
+WEST_AFRICA_ORIGINS = [
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://kojo-work.preview.emergentagent.com",
+]
+
+# Get additional origins from environment
+env_origins = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', '').split(',') if origin.strip()]
+allowed_origins = WEST_AFRICA_ORIGINS + env_origins
+
+# Support public Vercel deployments and common development/private network origins.
+# Exact origins from CORS_ORIGINS remain supported via allow_origins.
+TRUSTED_HOSTS = build_trusted_hosts()
+# Activé par défaut désormais: build_trusted_hosts() couvre déjà localhost,
+# *.onrender.com, *.vercel.app et toute origine dérivée de FRONTEND_APP_URL /
+# BACKEND_PUBLIC_URL / CORS_ORIGINS / TRUSTED_HOSTS, donc le risque de casser
+# l'auth Render/Vercel est faible. Garde-fou de secours: mettre
+# DISABLE_TRUSTED_HOST_MIDDLEWARE=true sur Render pour revenir à l'ancien
+# comportement (désactivé) sans toucher au code, en cas de souci imprévu.
+ENABLE_TRUSTED_HOST_MIDDLEWARE = os.environ.get('DISABLE_TRUSTED_HOST_MIDDLEWARE', '').strip().lower() not in {'1', 'true', 'yes', 'on'}
+# VERCEL_PROJECT_NAME (recommandé): si défini, restreint le CORS aux seules
+# preview/production deployments DU PROJET Vercel de Kojo
+# (ex: kojo-frontend-*.vercel.app), au lieu d'accepter N'IMPORTE QUEL
+# sous-domaine *.vercel.app - y compris ceux d'un projet Vercel gratuit
+# créé par un tiers. allow_credentials=True + un motif aussi large que
+# *.vercel.app est une surface d'attaque évitable. Tant que la variable
+# n'est pas configurée sur Render, on retombe sur l'ancien motif large
+# (pas de régression fonctionnelle immédiate) mais un avertissement est loggé.
+_vercel_project_name = os.environ.get('VERCEL_PROJECT_NAME', '').strip()
+if _vercel_project_name:
+    _vercel_origin_pattern = rf"^https://{re.escape(_vercel_project_name)}(-[a-z0-9-]+)?\.vercel\.app$"
+else:
+    _vercel_origin_pattern = r"^https://.*\.vercel\.app$"
+    logger.warning(
+        "⚠️ VERCEL_PROJECT_NAME non défini - CORS accepte tout sous-domaine "
+        "*.vercel.app (pas seulement ceux du projet Kojo). Définir "
+        "VERCEL_PROJECT_NAME sur Render pour restreindre correctement."
+    )
+
+allowed_origin_regex = (
+    _vercel_origin_pattern
+    + r"|^http://localhost(:\d+)?$"
+    r"|^https://localhost(:\d+)?$"
+    r"|^http://127\.0\.0\.1(:\d+)?$"
+    r"|^http://192\.168\.\d+\.\d+(:\d+)?$"
+    r"|^http://10\.\d+\.\d+\.\d+(:\d+)?$"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_origin_regex=allowed_origin_regex,
+    allow_methods=["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "X-CSRFToken",
+        "Cache-Control"
+    ],
+    expose_headers=["Content-Range", "X-Content-Range"],
+    max_age=86400,
+)
+
+# Trusted Host Middleware can break Render/Vercel auth flows when platform hostnames rotate.
+# Keep it opt-in via environment flag so production can enable it deliberately.
+if ENABLE_TRUSTED_HOST_MIDDLEWARE:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=TRUSTED_HOSTS
+    )
+
+# Add custom security middleware
+app.add_middleware(WestAfricaSecurityMiddleware)
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """
+    Gestionnaire de cycle de vie de l'application (remplace les anciens
+    @app.on_event('startup') / @app.on_event('shutdown') dépréciés depuis
+    FastAPI 0.93 / Starlette 0.27). Tout ce qui est avant le `yield` s'exécute
+    au démarrage, tout ce qui est après au shutdown.
+    """
+    # ---- STARTUP ----
+    logger.info("🚀 Démarrage de l'API Kojo...")
+
+    try:
+        await ensure_owner_exists()
+    except Exception as exc:
+        logger.error(f"⚠️ ensure_owner_exists() a échoué, démarrage poursuivi quand même: {exc}")
+
+    try:
+        await create_database_indexes()
+    except Exception as exc:
+        logger.error(f"⚠️ create_database_indexes() a échoué, démarrage poursuivi quand même: {exc}")
+
+    Path("uploads").mkdir(exist_ok=True)
+    logger.info("📁 Dossier uploads créé/vérifié")
+
+    asyncio.create_task(_rate_limit_cleanup_loop())
+    logger.info("✅ API Kojo prête!")
+
+    yield  # l'application tourne ici
+
+    # ---- SHUTDOWN ----
+    client.close()
+
+
+app.add_middleware(RateLimitMiddleware)
