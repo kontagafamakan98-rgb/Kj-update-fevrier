@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -26,11 +25,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     ],
-    resolve: {
-      alias: {
-        '@': path.resolve(process.cwd(), 'src'),
-      },
-    },
+    // NOTE: l'alias '@' (shadcn/ui) a été supprimé avec les composants ui/
+    // inutilisés — plus rien ne l'importe dans src/. jsconfig.json le garde
+    // uniquement pour l'éditeur ; ne pas le réintroduire dans Vite sans besoin.
     define: {
       'process.env': publicEnv,
     },

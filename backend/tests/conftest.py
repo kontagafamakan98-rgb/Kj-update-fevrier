@@ -1,9 +1,25 @@
 """
 Fixtures partagées pour la suite de tests Kojo.
+
+DEUX MODES DE BASE DE DONNÉES :
+
+1. Par défaut (local, sans Docker) : une fausse base en mémoire (FakeDB) qui
+   reproduit un sous-ensemble de l'API Motor. Rapide et hermétic.
+
+2. Vrai MongoDB : définir la variable d'environnement TEST_MONGO_URL
+   (ex: mongodb://localhost:27017) pour exécuter la SUITE COMPLÈTE contre une
+   vraie instance Mongo (mode utilisé en CI via un service container, et
+   recommandé localement avec Docker : `docker run -d -p 27017:27017 mongo`).
+
+Le but du mode réel : éviter les faux positifs de la FakeDB (atomicité,
+indexes, opérateurs $inc/$push, tri, agrégations réels). Les helpers
+`db_insert` / `db_find` abstraient la différence pour les tests qui
+manipulent des documents directement.
 """
 import asyncio
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -14,15 +30,29 @@ from httpx import AsyncClient, ASGITransport
 # ---------------------------------------------------------------------------
 # Variables d'env AVANT tout import de server.py
 # ---------------------------------------------------------------------------
+TEST_MONGO_URL = os.environ.get("TEST_MONGO_URL", "").strip()
+USE_REAL_MONGO = bool(TEST_MONGO_URL)
+
 os.environ["JWT_SECRET"] = "test-secret-kojo-pytest-only-32chars!!"
-os.environ["MONGO_URL"] = "mongodb://localhost:27017"
+os.environ["EMAIL_OTP_SECRET"] = "test-otp-secret-kojo-pytest-32chars!!"
+if USE_REAL_MONGO:
+    os.environ["MONGO_URL"] = TEST_MONGO_URL
+else:
+    os.environ["MONGO_URL"] = "mongodb://localhost:27017"
 os.environ["DB_NAME"] = "kojo_test"
 os.environ["APP_ENV"] = "test"
 os.environ["REDIS_URL"] = ""
 os.environ["DISABLE_TRUSTED_HOST_MIDDLEWARE"] = "true"
+# Aucun envoi d'email réel pendant les tests (code OTP généré mais non envoyé).
+os.environ["EMAIL_PROVIDER"] = "none"
+
+# Code OTP déterministe utilisé par les tests (le backend estime que le code
+# a été envoyé par email ; ici on le connaît d'avance).
+TEST_OTP_CODE = "123456"
+
 
 # ---------------------------------------------------------------------------
-# FakeCollection et FakeDB
+# FakeCollection et FakeDB (mode local sans MongoDB)
 # ---------------------------------------------------------------------------
 
 class FakeCollection:
@@ -199,10 +229,36 @@ fake_db = FakeDB()
 # ---------------------------------------------------------------------------
 # Import de server.py (après les env vars)
 # ---------------------------------------------------------------------------
-with patch("motor.motor_asyncio.AsyncIOMotorClient"):
+if USE_REAL_MONGO:
+    # Vrai MongoDB : aucun patch Motor, la connexion pointe sur la vraie base.
     import server as _srv
+else:
+    # Mode FakeDB : on importe kojo_core AVANT server et on remplace db par la
+    # fake avant que les routers ne fassent `from kojo_core import db` (sinon
+    # ils garderaient la vraie référence au client Motor patché).
+    with patch("motor.motor_asyncio.AsyncIOMotorClient"):
+        import kojo_core as _core
+        _core.db = fake_db
+        import server as _srv
 
-_srv.db = fake_db
+# ---------------------------------------------------------------------------
+# Helpers d'accès DB (compatibles FakeDB / vrai MongoDB)
+# ---------------------------------------------------------------------------
+
+async def db_insert(collection: str, doc: Dict):
+    """Insère un document dans la collection donnée (mode indifférent)."""
+    if USE_REAL_MONGO:
+        await _srv.db[collection].insert_one(dict(doc))
+    else:
+        getattr(fake_db, collection)._docs.append(dict(doc))
+
+
+async def db_find_one(collection: str, query: Dict) -> Optional[Dict]:
+    """find_one dans la collection donnée (mode indifférent)."""
+    if USE_REAL_MONGO:
+        return await _srv.db[collection].find_one(query)
+    return await getattr(fake_db, collection).find_one(query)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -210,9 +266,14 @@ _srv.db = fake_db
 
 @pytest_asyncio.fixture(autouse=True)
 async def reset_state():
-    fake_db.reset_all()
-    _srv.request_counts.clear()
+    if USE_REAL_MONGO:
+        await _srv.db.client.drop_database(_srv.db.name)
+    else:
+        fake_db.reset_all()
+        _srv.request_counts.clear()
     yield
+    if USE_REAL_MONGO:
+        await _srv.db.client.drop_database(_srv.db.name)
 
 
 @pytest_asyncio.fixture
@@ -247,12 +308,22 @@ BASE_USER = {
     "preferred_language": "fr",
     "legal_documents_accepted": True,
     "legal_documents_version": "v1.0.0-2024",
+    # L'inscription exige désormais la vérification email ET au moins un
+    # moyen de paiement pour un client.
+    "payment_accounts": {
+        "orange_money": "+221771234567",
+    },
 }
 
 WORKER_USER = {
     **BASE_USER,
     "email": "worker@kojo.sn",
     "user_type": "worker",
+    # Un travailleur doit lier au moins 2 moyens de paiement.
+    "payment_accounts": {
+        "orange_money": "+221771234567",
+        "wave": "+221771234568",
+    },
 }
 
 BASE_JOB = {
@@ -271,9 +342,42 @@ BASE_JOB = {
 AUTH_REQUIRED_STATUS = (401, 403)
 
 
+async def issue_email_verification_token(client: AsyncClient, email: str) -> str:
+    """Crée un OTP vérifié pour `email` (sans envoi réel) et retourne le
+    jeton de vérification à passer à /auth/register-verified.
+
+    Reproduit le flux produit : send-otp → verify-otp → jeton. Ici l'OTP est
+    inséré directement en base avec un code connu pour rester déterministe.
+    """
+    otp_hash = _srv.hash_email_otp(email, "signup", TEST_OTP_CODE)
+    await _srv.db.email_otps.update_one(
+        {"email": email.lower().strip(), "purpose": "signup"},
+        {"$set": {
+            "otp_hash": otp_hash,
+            "attempt_count": 0,
+            "status": "pending",
+            "last_sent_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10),
+            "updated_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+    )
+    resp = await client.post("/api/auth/email/verify-otp", json={
+        "email": email,
+        "otp": TEST_OTP_CODE,
+        "purpose": "signup",
+    })
+    assert resp.status_code == 200, f"verify-otp failed: {resp.text}"
+    return resp.json()["verification_token"]
+
+
 async def register_and_login(client: AsyncClient, user_data: dict = None) -> dict:
-    data = user_data or BASE_USER
-    resp = await client.post("/api/auth/register", json=data)
+    """Inscription via le flux vérifié (OTP + comptes de paiement), puis
+    retourne la réponse (access_token + user)."""
+    data = dict(user_data or BASE_USER)
+    token = await issue_email_verification_token(client, data["email"])
+    payload = {**data, "email_verification_token": token}
+    resp = await client.post("/api/auth/register-verified", json=payload)
     assert resp.status_code == 200, f"Register failed: {resp.text}"
     return resp.json()
 

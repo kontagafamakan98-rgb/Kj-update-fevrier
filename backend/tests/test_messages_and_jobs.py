@@ -8,7 +8,7 @@ from httpx import AsyncClient
 
 from tests.conftest import (
     BASE_USER, WORKER_USER, BASE_JOB, AUTH_REQUIRED_STATUS,
-    auth_headers, fake_db, register_and_login
+    auth_headers, register_and_login, db_insert, db_find_one
 )
 
 
@@ -93,7 +93,7 @@ class TestSendMessage:
             "job_id": job_id,
         })
         assert resp.status_code == 200
-        msg = await fake_db.messages.find_one({"job_id": job_id})
+        msg = await db_find_one("messages", {"job_id": job_id})
         assert msg is not None
         assert msg["job_id"] == job_id
 
@@ -140,9 +140,11 @@ class TestConversationOrdering:
         conversation_id = f"{id1}_{id2}"
         now = datetime.now(timezone.utc)
 
-        # Insère 3 messages dans le désordre (offsets 2, 0, 1 minutes)
-        for content, offset in [("Premier", 0), ("Deuxième", 1), ("Troisième", 2)]:
-            fake_db.messages._docs.append({
+        # Insère 3 messages dans le désordre (offsets 2, 0, 1 minutes) :
+        # l'ordre d'insertion ne correspond PAS à l'ordre chronologique, ce qui
+        # force le tri côté endpoint (Mongo sans tri renverrait l'ordre naturel).
+        for content, offset in reversed([("Premier", 0), ("Deuxième", 1), ("Troisième", 2)]):
+            await db_insert("messages", {
                 "id": str(uuid.uuid4()),
                 "conversation_id": conversation_id,
                 "sender_id": user_a["user"]["id"],
@@ -151,8 +153,6 @@ class TestConversationOrdering:
                 "timestamp": (now + timedelta(minutes=offset)).isoformat(),
                 "read": False,
             })
-        # On les réordonne aléatoirement pour tester le tri
-        fake_db.messages._docs = list(reversed(fake_db.messages._docs))
 
         headers = {"Authorization": f"Bearer {user_a['access_token']}"}
         resp = await client.get(f"/api/messages/{conversation_id}", headers=headers)
@@ -178,7 +178,7 @@ class TestMyProposals:
     async def test_worker_gets_own_proposals(self, client: AsyncClient):
         worker = await register_and_login(client, WORKER_USER)
         job_id = str(uuid.uuid4())
-        fake_db.job_proposals._docs.append({
+        await db_insert("job_proposals", {
             "id": str(uuid.uuid4()),
             "job_id": job_id,
             "worker_id": worker["user"]["id"],
@@ -186,7 +186,7 @@ class TestMyProposals:
             "status": "pending",
         })
         # Proposition d'un autre worker - ne doit pas apparaître
-        fake_db.job_proposals._docs.append({
+        await db_insert("job_proposals", {
             "id": str(uuid.uuid4()),
             "job_id": str(uuid.uuid4()),
             "worker_id": "other-worker-id",
