@@ -266,12 +266,17 @@ async def db_find_one(collection: str, query: Dict) -> Optional[Dict]:
 
 @pytest_asyncio.fixture(autouse=True)
 async def reset_state():
+    # Le rate-limiter (mémoire, REDIS_URL vide) est partagé sur toute la
+    # session ; on vide ses compteurs à chaque test pour éviter des 429
+    # fantômes (buckets auth-otp 12/5min et auth-session 20/5min) en mode
+    # réel comme en mode FakeDB.
+    _srv.request_counts.clear()
     if USE_REAL_MONGO:
         await _srv.db.client.drop_database(_srv.db.name)
     else:
         fake_db.reset_all()
-        _srv.request_counts.clear()
     yield
+    _srv.request_counts.clear()
     if USE_REAL_MONGO:
         await _srv.db.client.drop_database(_srv.db.name)
 
