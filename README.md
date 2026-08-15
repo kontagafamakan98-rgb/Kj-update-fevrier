@@ -112,13 +112,14 @@ cd frontend && npm test
   General → Root Directory). ⚠️ **Ce n'est PAS une clé valide de `vercel.json`**
   : l'ajouter au fichier casse le déploiement avec l'erreur de schéma
   *« should NOT have additional property `rootDirectory` »*.
-- **`vercel.json`** (à la racine du repo — lu même avec Root Directory défini) :
+- **`vercel.json` = `frontend/vercel.json`** : Vercel le lit **depuis le Root
+  Directory** (`frontend/`), pas depuis la racine du repo. Le fichier à la
+  racine du repo n'est qu'un filet de sécurité si le Root Directory est vidé.
 
 ```json
+// frontend/vercel.json (lu par Vercel avec Root Directory = frontend)
 {
   "framework": "vite",
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
   "outputDirectory": "build",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
@@ -130,13 +131,20 @@ cd frontend && npm test
 **Pièges à connaître (leçons du terrain)** :
 
 - ⚠️ **Ne pas mettre `--prefix frontend`** dans `installCommand`/
-  `buildCommand` : le Root Directory `frontend` du dashboard y est déjà
-  appliqué → le préfixe crée le chemin doublé `frontend/frontend` et l'échec
-  `ENOENT .../frontend/frontend/package.json`.
-- ⚠️ **Le script `vercel-build` n'existe pas** — utiliser `npm run build`
-  (alias de `vite build`).
+  `buildCommand` **dans `frontend/vercel.json`** : les commandes s'exécutent
+  déjà dans le Root Directory `frontend` → le préfixe crée le chemin doublé
+  `frontend/frontend` et l'échec `ENOENT .../frontend/frontend/package.json`.
+  (Le `--prefix frontend` n'est valable que dans le `vercel.json` à la racine
+  du repo, utilisé uniquement si le Root Directory est vide.)
+- ⚠️ **Le script `vercel-build` n'existe pas** — ne pas l'utiliser en
+  `buildCommand` (utiliser `npm run build`, alias de `vite build`).
 - ⚠️ `rootDirectory` n'est pas accepté par le schéma `vercel.json` (voir
   ci-dessus).
+- ⚠️ **Le catch-all `rewrites` est indispensable** : sans lui, tout
+  chargement direct d'une route SPA (`/payment`, `/register`, … retour du
+  back bouton depuis PayDunya) renvoie un 404 `x-vercel-error: NOT_FOUND`.
+  C'est le bug rencontré : le fichier de la racine n'était pas lu, donc le
+  rewrite n'était jamais dans les métadonnées de routage.
 
 ### Vérification post-déploiement
 
