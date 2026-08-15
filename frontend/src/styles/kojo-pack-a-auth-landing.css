@@ -1,0 +1,424 @@
+:root {
+  --kojo-premium-bg: #0f172a;
+  --kojo-premium-surface: #111827;
+  --kojo-premium-surface-2: #0b1220;
+  --kojo-premium-stroke: rgba(15, 23, 42, 0.10);
+  --kojo-premium-text: #e5e7eb;
+  --kojo-premium-text-dark: #111827;
+  --kojo-premium-muted: #64748b;
+  --kojo-premium-red: #a61616;
+  --kojo-premium-red-2: #e34444;
+  --kojo-premium-gold: #f0c26a;
+  --kojo-premium-shadow: 0 20px 60px rgba(2, 6, 23, 0.22);
+  --kojo-premium-shadow-soft: 0 12px 28px rgba(2, 6, 23, 0.12);
+  --kojo-premium-radius: 20px;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="landing"],
+  [data-screen="home"],
+  [data-screen="login"],
+  [data-screen="register"]
+) {
+  color: inherit;
+}
+
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) h1,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) h1 {
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+}
+
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) .card,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) .card,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) .auth-card,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) form {
+  border-radius: var(--kojo-premium-radius);
+  box-shadow: var(--kojo-premium-shadow-soft);
+}
+
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) input,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) select,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) textarea {
+  min-height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  color: var(--kojo-premium-text-dark);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) input::placeholder,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) textarea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) select,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) option {
+  color: var(--kojo-premium-text-dark);
+  background: #ffffff;
+}
+
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) input:focus,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) select:focus,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) textarea:focus {
+  outline: none;
+  border-color: rgba(166, 22, 22, 0.45);
+  box-shadow: 0 0 0 4px rgba(166, 22, 22, 0.12);
+}
+
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) button,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) .btn,
+:is(
+  .auth-page,
+  .login-page,
+  .register-page,
+  .signup-page,
+  .signin-page,
+  .sign-in-page,
+  .sign-up-page,
+  [data-screen="login"],
+  [data-screen="register"]
+) [type="submit"] {
+  min-height: 48px;
+  border-radius: 16px;
+  font-weight: 700;
+}
+
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) .btn-primary,
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) .primary-btn,
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) [class*="primary"] {
+  background: linear-gradient(135deg, var(--kojo-premium-red), var(--kojo-premium-red-2));
+  color: #ffffff;
+  border-radius: 16px;
+  box-shadow: var(--kojo-premium-shadow);
+}
+
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) .btn-secondary,
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) .secondary-btn,
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) [class*="secondary"] {
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: #ffffff;
+  color: var(--kojo-premium-text-dark);
+  box-shadow: var(--kojo-premium-shadow-soft);
+}
+
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) .hero-subtitle,
+:is(
+  .landing-page,
+  .landing,
+  .home-page,
+  .homepage,
+  .hero-section,
+  .hero,
+  [data-screen="landing"],
+  [data-screen="home"]
+) p {
+  line-height: 1.65;
+}
+
+@media (max-width: 768px) {
+  :is(
+    .landing-page,
+    .landing,
+    .home-page,
+    .homepage,
+    .hero-section,
+    .hero,
+    .auth-page,
+    .login-page,
+    .register-page,
+    .signup-page,
+    .signin-page,
+    .sign-in-page,
+    .sign-up-page,
+    [data-screen="landing"],
+    [data-screen="home"],
+    [data-screen="login"],
+    [data-screen="register"]
+  ) .card,
+  :is(
+    .landing-page,
+    .landing,
+    .home-page,
+    .homepage,
+    .hero-section,
+    .hero,
+    .auth-page,
+    .login-page,
+    .register-page,
+    .signup-page,
+    .signin-page,
+    .sign-in-page,
+    .sign-up-page,
+    [data-screen="landing"],
+    [data-screen="home"],
+    [data-screen="login"],
+    [data-screen="register"]
+  ) form {
+    border-radius: 18px;
+  }
+}

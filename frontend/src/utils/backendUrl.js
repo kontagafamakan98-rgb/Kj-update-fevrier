@@ -1,0 +1,53 @@
+﻿const trimTrailingSlashes = (value = '') => String(value || '').replace(/\/+$/, '');
+const PROD_ENV_BACKEND_URL = (
+  import.meta.env.VITE_API_URL
+  || import.meta.env.VITE_API_BASE_URL
+  || import.meta.env.VITE_BACKEND_URL
+  || ''
+).trim();
+const DEFAULT_REMOTE_BACKEND_URL = PROD_ENV_BACKEND_URL || 'https://kojo-backend-03az.onrender.com';
+const ensureLeadingSlash = (value = '') => {
+  if (!value) return '';
+  return value.startsWith('/') ? value : `/${value}`;
+};
+
+export const getBackendBaseUrl = () => {
+  const envUrl = trimTrailingSlashes(process.env.REACT_APP_BACKEND_URL || '');
+  if (envUrl) {
+    return envUrl;
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    const { protocol, hostname, port } = window.location;
+    const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    if (isLocalHost && port && port !== '8000') {
+      return `${protocol}//${hostname}:8000`;
+    }
+
+    return DEFAULT_REMOTE_BACKEND_URL;
+  }
+
+  return DEFAULT_REMOTE_BACKEND_URL;
+};
+
+export const buildBackendUrl = (path = '') => {
+  const baseUrl = getBackendBaseUrl();
+  const normalizedPath = ensureLeadingSlash(path);
+
+  if (!baseUrl) {
+    return normalizedPath || '';
+  }
+
+  return `${baseUrl}${normalizedPath}`;
+};
+
+export const buildApiUrl = (path = '') => {
+  const normalizedPath = ensureLeadingSlash(path);
+  if (normalizedPath.startsWith('/api/')) {
+    return buildBackendUrl(normalizedPath);
+  }
+
+  return buildBackendUrl(`/api${normalizedPath}`);
+};
+
