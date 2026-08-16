@@ -48,6 +48,9 @@ venv/
 .vercel/
 *.tsbuildinfo
 
+# Freebuff (état interne de l'outil)
+.freebuff/
+
 # Archives / binaries
 *.zip
 *.tar
