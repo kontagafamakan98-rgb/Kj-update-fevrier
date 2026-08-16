@@ -50,7 +50,9 @@ export default defineConfig(({ mode }) => {
             "font-src 'self' data:",
             "object-src 'none'",
             "base-uri 'self'",
-            "frame-ancestors 'none'",
+            // frame-ancestors est IGNORÉ dans une balise <meta> (navigateurs) et
+            // provoque un warning console à chaque chargement de page. Il est
+            // envoyé comme véritable en-tête HTTP dans frontend/vercel.json.
             "worker-src 'self'",
             "manifest-src 'self'",
           ].join('; ')
