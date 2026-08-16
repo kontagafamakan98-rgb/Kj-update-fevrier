@@ -103,6 +103,13 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined
+            // @sentry/* AVANT la règle '/react/' : le chemin de '@sentry/react'
+            // contient '/react/' et serait sinon aspiré dans vendor-react, ce
+            // qui séparait @sentry/core dans un AUTRE chunk (vendor, avec
+            // react-router) et créait un cycle d'imports entre chunks → au
+            // chargement, React était encore undefined quand react-router
+            // exécutait createContext → page blanche en production.
+            if (id.includes('@sentry')) return 'vendor-sentry'
             if (id.includes('/react-dom/')) return 'vendor-react-dom'
             if (id.includes('/react-router-dom/')) return 'vendor-router'
             if (id.includes('/react/')) return 'vendor-react'
