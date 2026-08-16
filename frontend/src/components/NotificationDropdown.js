@@ -78,7 +78,20 @@ export default function NotificationDropdown() {
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e) => {
+      // La Navbar rend DEUX instances du dropdown (desktop + mobile, l'une
+      // masquée par CSS). Chaque instance écoute mousedown sur le document :
+      // quand on clique la cloche de l'instance VISIBLE, le mousedown de
+      // l'instance CACHÉE considérait la cible comme extérieure et fermait
+      // le panneau (isOpen=false), puis le click de l'instance visible
+      // exécutait togglePanel avec isOpen désormais false → réouverture
+      // immédiate : impossible de fermer le panneau. On ignore donc tout
+      // clic dont la cible est une cloche de notifications, quelle que soit
+      // l'instance.
+      const isBellClick = !!(
+        e.target && e.target.closest && e.target.closest('button[aria-label^="Notifications"]')
+      );
       if (
+        !isBellClick &&
         panelRef.current && !panelRef.current.contains(e.target) &&
         buttonRef.current && !buttonRef.current.contains(e.target)
       ) {
