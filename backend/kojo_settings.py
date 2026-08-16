@@ -100,7 +100,7 @@ JWT_ALGORITHM = "HS256"
 
 JWT_EXPIRATION_HOURS = 24
 
-JWT_REFRESH_EXPIRATION_DAYS = 7# Gmail OTP settings
+# --- Vérification email (OTP) ---
 _env_email_otp_secret = os.environ.get('EMAIL_OTP_SECRET', '').strip()
 if _env_email_otp_secret:
     EMAIL_OTP_SECRET = _env_email_otp_secret

@@ -41,6 +41,62 @@ class Country(str, Enum):
     COTE_DIVOIRE = "cote_divoire"  # 🇨🇮 Pays prioritaire - Abidjan hub économique
     BURKINA_FASO = "burkina_faso"  # 🇧🇫 Pays prioritaire - Ouagadougou
 
+# ---------------------------------------------------------------------------
+# Règles téléphone par pays (4 pays prioritaires Kojo).
+# La Côte d'Ivoire accepte aussi le nouveau format à 10 chiffres (01-09...).
+# ---------------------------------------------------------------------------
+WA_PHONE_RULES = {
+    "221": {
+        "name": "Sénégal", "local_min": 8, "local_max": 9,
+        "prefixes": [str(i) for i in range(70, 100)] + ['65', '66', '67', '68', '58', '59', '48', '49', '51', '52', '33', '75', '76'],
+    },
+    "223": {
+        "name": "Mali", "local_min": 8, "local_max": 9,
+        "prefixes": [str(i) for i in range(70, 100)] + ['65', '66', '67', '68', '58', '59', '48', '49', '51', '52', '33', '75', '76'],
+    },
+    "226": {
+        "name": "Burkina Faso", "local_min": 8, "local_max": 9,
+        "prefixes": [str(i) for i in range(70, 100)] + ['65', '66', '67', '68', '58', '59', '48', '49', '51', '52', '33', '75', '76'],
+    },
+    "225": {
+        "name": "Côte d'Ivoire", "local_min": 8, "local_max": 10,
+        "prefixes": ['01', '05', '07', '08', '09'] + [str(i).zfill(2) for i in range(40, 60)] + [str(i) for i in range(70, 100)],
+    },
+}
+
+
+def validate_west_africa_phone(phone: str) -> str:
+    """Valide un numéro de téléphone des 4 pays prioritaires Kojo.
+
+    Retourne le numéro nettoyé (format international '+...'). Lève ValueError
+    avec un message français lisible par l'utilisateur.
+    """
+    if not phone:
+        raise ValueError("Le numéro de téléphone est requis")
+
+    clean_phone = re.sub(r'[\s\-\(\)]', '', phone)
+    if not clean_phone.startswith('+'):
+        raise ValueError("Le numéro de téléphone doit commencer par +")
+
+    digits_only = ''.join(filter(str.isdigit, clean_phone))
+    for code, rules in WA_PHONE_RULES.items():
+        if digits_only.startswith(code):
+            local = digits_only[len(code):]
+            if not (rules["local_min"] <= len(local) <= rules["local_max"]):
+                raise ValueError(
+                    f"Numéro +{code} doit contenir {rules['local_min']}-{rules['local_max']} "
+                    f"chiffres après l'indicatif pays"
+                )
+            if len(local) >= 2 and local[:2] not in rules["prefixes"]:
+                raise ValueError(f"Préfixe opérateur {local[:2]} non supporté pour +{code}")
+            return clean_phone
+
+    raise ValueError(
+        "Seuls les numéros du Sénégal (+221), Mali (+223), Côte d'Ivoire (+225) "
+        "et Burkina Faso (+226) sont supportés"
+    )
+
+
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
@@ -77,44 +133,7 @@ class User(BaseModel):
     @classmethod
     def validate_phone(cls, v):
         """Nettoie et valide le numéro de téléphone pour l'Afrique de l'Ouest"""
-        if not v:
-            raise ValueError("Le numéro de téléphone est requis")
-        
-        # Nettoyer le numéro - supprimer espaces, tirets, parenthèses
-        clean_phone = re.sub(r'[\s\-\(\)]', '', v)
-        
-        # Vérifier le format international de base
-        if not clean_phone.startswith('+'):
-            raise ValueError("Le numéro de téléphone doit commencer par +")
-        
-        # Extraire les chiffres seulement
-        digits_only = ''.join(filter(str.isdigit, clean_phone))
-        
-        # Vérifier que c'est un pays ouest-africain supporté
-        west_african_codes = ['221', '223', '225', '226']  # Sénégal, Mali, Côte d'Ivoire, Burkina Faso
-        
-        valid_country = False
-        for code in west_african_codes:
-            if digits_only.startswith(code):
-                valid_country = True
-                # Vérifier la longueur totale (code pays + numéro)
-                if len(digits_only) < 11 or len(digits_only) > 12:
-                    raise ValueError(f"Numéro {code} doit contenir 8-9 chiffres après l'indicatif pays")
-                
-                # Vérifier que le préfixe opérateur est valide (70-99 pour Orange/Wave)
-                if len(digits_only) >= 5:
-                    operator_prefix = digits_only[3:5]
-                    if not (70 <= int(operator_prefix) <= 99):
-                        # Autoriser aussi quelques autres préfixes connus
-                        other_valid = ['65', '66', '67', '68', '58', '59', '48', '49', '51', '52', '33', '75', '76']
-                        if operator_prefix not in other_valid:
-                            raise ValueError(f"Préfixe opérateur {operator_prefix} non supporté pour +{code}")
-                break
-        
-        if not valid_country:
-            raise ValueError("Seuls les numéros du Sénégal (+221), Mali (+223), Côte d'Ivoire (+225) et Burkina Faso (+226) sont supportés")
-        
-        return clean_phone
+        return validate_west_africa_phone(v)
     profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
     is_verified: bool = False
     email_verified: bool = False
@@ -221,6 +240,22 @@ class PaymentCheckoutRequest(PaymentQuoteRequest):
     return_url: Optional[str] = Field(default=None, max_length=500)
     cancel_url: Optional[str] = Field(default=None, max_length=500)
 
+class Review(BaseModel):
+    """Avis / note laissé par un participant sur l'autre partie d'une mission terminée."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str
+    reviewer_id: str
+    reviewee_id: str
+    rating: int = Field(ge=1, le=5)  # 1-5 étoiles
+    comment: Optional[str] = Field(None, max_length=1000)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ReviewCreate(BaseModel):
+    rating: int = Field(ge=1, le=5, description="Note de 1 à 5 étoiles")
+    comment: Optional[str] = Field(None, max_length=1000, description="Commentaire optionnel (max 1000 caractères)")
+
+
 class PushToken(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     user_id: str
@@ -284,17 +319,9 @@ class Notification(BaseModel):
 class MarkReadRequest(BaseModel):
     notification_ids: Optional[List[str]] = None  # None = marquer tout
 
-SQL_INJECTION_PATTERN = re.compile(r"['\";#\-\-]|(/\*)|(\*/)|(\bOR\b)|(\bAND\b)|(\bUNION\b)|(\bSELECT\b)|(\bDROP\b)|(\bINSERT\b)|(\bDELETE\b)|(\bUPDATE\b)", re.IGNORECASE)
-
-def validate_no_sql_injection(value: str, field_name: str) -> str:
-    """Valider qu'une chaîne ne contient pas de caractères d'injection SQL"""
-    if SQL_INJECTION_PATTERN.search(value):
-        raise ValueError(f"Le champ {field_name} contient des caractères non autorisés")
-    return value
-
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=100, description="Mot de passe (minimum 6 caractères)")
+    password: str = Field(min_length=6, max_length=72, description="Mot de passe (6-72 caractères — limite bcrypt de 72 octets)")
     first_name: str = Field(min_length=2, max_length=50)
     last_name: str = Field(min_length=2, max_length=50)
     phone: str
@@ -312,22 +339,6 @@ class UserRegister(BaseModel):
             raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
         return v
     
-    @field_validator('email')
-    @classmethod
-    def email_no_injection(cls, v):
-        # Vérifier que l'email ne contient pas de tentatives d'injection
-        email_str = str(v)
-        if SQL_INJECTION_PATTERN.search(email_str):
-            raise ValueError("L'adresse email contient des caractères non autorisés")
-        return v
-    
-    @field_validator('first_name', 'last_name')
-    @classmethod
-    def names_no_injection(cls, v):
-        if SQL_INJECTION_PATTERN.search(v):
-            raise ValueError("Le nom contient des caractères non autorisés")
-        return v
-
     @field_validator('legal_documents_accepted')
     @classmethod
     def legal_documents_must_be_accepted(cls, v):
@@ -342,7 +353,7 @@ class PaymentAccount(BaseModel):
 
 class UserWithPayment(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=100, description="Mot de passe (minimum 6 caractères)")
+    password: str = Field(min_length=6, max_length=72, description="Mot de passe (6-72 caractères — limite bcrypt de 72 octets)")
     first_name: str = Field(min_length=2, max_length=50)
     last_name: str = Field(min_length=2, max_length=50)
     phone: str
@@ -377,7 +388,9 @@ class UserWithPayment(BaseModel):
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    # Plafond généreux (128) : garde-fou anti-DoS mémoire, sans casser les
+    # comptes hérités créés avant le plafond d'inscription à 72 caractères.
+    password: str = Field(max_length=128)
 
 class EmailOtpRequest(BaseModel):
     email: EmailStr
@@ -395,7 +408,8 @@ class EmailOtpResendRequest(BaseModel):
 class PasswordResetConfirmRequest(BaseModel):
     email: EmailStr
     verification_token: str = Field(min_length=20)
-    new_password: str = Field(min_length=6, max_length=128)
+    # 72 = limite bcrypt (au-delà, le hash tronque silencieusement)
+    new_password: str = Field(min_length=6, max_length=72)
 
     @field_validator('new_password')
     @classmethod

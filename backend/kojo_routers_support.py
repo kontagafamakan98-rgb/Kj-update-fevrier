@@ -4,12 +4,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from kojo_core import db
+from kojo_email import send_email_via_brevo_api
 from kojo_models import (
-    SupportTicket, SupportTicketCreate, SupportTicketStatusUpdate,
+    NotificationType, SupportTicket, SupportTicketCreate, SupportTicketStatusUpdate,
 )
 from kojo_core import (
     verify_owner_access,
 )
+from kojo_settings import OWNER_EMAIL, OWNER_USER_ID, logger
+from kojo_shared import notify_user
 
 router = APIRouter()
 
@@ -24,6 +27,30 @@ async def create_support_ticket(ticket_data: SupportTicketCreate):
         channel=ticket_data.channel,
     )
     await db.support_tickets.insert_one(ticket.model_dump())
+
+    # Notifier le propriétaire (in-app + email, best-effort) : sans ça,
+    # aucun canal ne signalait l'arrivée d'un ticket (l'équipe devait poller).
+    if OWNER_USER_ID:
+        try:
+            await notify_user(
+                user_id=OWNER_USER_ID,
+                title="Nouveau ticket support",
+                body=f"{ticket_data.full_name} — {ticket_data.reason} : {ticket_data.message[:120]}",
+                notif_type=NotificationType.GENERAL,
+            )
+        except Exception as exc:
+            logger.warning(f"⚠️ Notification owner ticket échouée: {exc}")
+    if OWNER_EMAIL:
+        try:
+            send_email_via_brevo_api(
+                OWNER_EMAIL,
+                f"KOJO — Nouveau ticket support ({ticket_data.reason})",
+                f"De: {ticket_data.full_name}\nEmail: {ticket_data.email}\n"
+                f"Téléphone: {ticket_data.phone}\n\n{ticket_data.message}",
+            )
+        except Exception as exc:
+            logger.warning(f"⚠️ Email owner ticket échoué: {exc}")
+
     return {
         "message": "Merci, votre demande a bien été envoyée. Notre équipe vous répondra dans les meilleurs délais.",
         "ticket_id": ticket.id,

@@ -5,6 +5,7 @@ import base64
 import hashlib
 import secrets
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -82,6 +83,10 @@ def create_email_verification_token(email: str, purpose: str = "signup") -> str:
         "sub": email.lower().strip(),
         "purpose": purpose,
         "type": "email_verification",
+        # jti : identifiant unique permettant de révoquer le jeton après usage
+        # (inscription ou réinitialisation de mot de passe) pour empêcher
+        # toute relecture dans sa fenêtre de validité.
+        "jti": str(uuid.uuid4()),
         "exp": expire
     }
     return jwt.encode(payload, EMAIL_OTP_SECRET, algorithm=JWT_ALGORITHM)

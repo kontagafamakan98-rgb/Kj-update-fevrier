@@ -14,6 +14,8 @@ python-multipart>=0.0.9,<0.1.0
 bcrypt>=4.0.0,<5.0.0
 cloudinary>=1.36.0,<2.0.0
 pywebpush==2.0.0
+# Monitoring d'erreurs production (optionnel — activé si SENTRY_DSN est défini)
+sentry-sdk>=2.0,<3.0
 # Optionnel - rate-limiter partagé entre workers Render (multi-instance safe).
 # Sans cette dépendance, le rate-limiter retombe silencieusement sur le
 # compteur en mémoire (par process). Activer en ajoutant REDIS_URL dans

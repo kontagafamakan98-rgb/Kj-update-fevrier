@@ -1,4 +1,5 @@
 import io
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -6,15 +7,19 @@ from pydantic import ValidationError
 
 from kojo_core import db
 from kojo_models import (
-    PaymentAccount, PushToken, PushTokenCreate,
-    User,
+    Country, Language, PaymentAccount, PushToken, PushTokenCreate,
+    User, validate_west_africa_phone,
 )
 from kojo_settings import (
     logger,
 )
 from kojo_core import (
-    get_current_user, upload_profile_photo_to_cloudinary, validate_payment_accounts,
+    get_current_user, is_valid_image_content, upload_profile_photo_to_cloudinary,
+    validate_payment_accounts,
 )
+
+# Même règle que le modèle User (prénom/nom).
+_NAME_PATTERN = re.compile(r"^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$")
 
 router = APIRouter()
 
@@ -47,8 +52,76 @@ async def update_profile(
     # Seuls les champs de la whitelist sont acceptés ; les autres sont ignorés
     # (jamais stockés), y compris les champs sensibles tentés par un client.
     update_data = {k: v for k, v in user_data.items() if k in EDITABLE_PROFILE_FIELDS}
+
+    # Re-validation des champs modifiables : le modèle User n'est pas
+    # reconstruit sur cette route, donc sans vérification explicite un
+    # pays/téléphone invalide corrompait le profil et faisait échouer TOUS
+    # les endpoints d'auth ensuite (ValidationError Pydantic en cascade).
+    if "country" in update_data:
+        country_value = str(update_data["country"]).strip().lower()
+        valid_countries = {c.value for c in Country}
+        if country_value not in valid_countries:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Pays invalide. Pays supportés: {', '.join(sorted(valid_countries))}"
+            )
+        update_data["country"] = country_value
+
+    if "preferred_language" in update_data:
+        lang_value = str(update_data["preferred_language"]).strip().lower()
+        valid_langs = {l.value for l in Language}
+        if lang_value not in valid_langs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Langue invalide. Langues supportées: {', '.join(sorted(valid_langs))}"
+            )
+        update_data["preferred_language"] = lang_value
+
+    if "phone" in update_data:
+        try:
+            update_data["phone"] = validate_west_africa_phone(str(update_data["phone"]))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    for name_field in ("first_name", "last_name"):
+        if name_field in update_data:
+            name_value = str(update_data[name_field] or "").strip()
+            if not (2 <= len(name_value) <= 50) or not _NAME_PATTERN.match(name_value):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{name_field}: 2-50 caractères, sans caractères spéciaux"
+                )
+            update_data[name_field] = name_value
+
+    if "bio" in update_data:
+        bio = str(update_data["bio"] or "").strip()
+        if len(bio) > 1000:
+            raise HTTPException(status_code=400, detail="La bio ne peut pas dépasser 1000 caractères")
+        update_data["bio"] = bio
+
+    if "skills" in update_data:
+        skills = update_data["skills"]
+        if not isinstance(skills, list):
+            raise HTTPException(status_code=400, detail="skills doit être une liste")
+        if len(skills) > 20:
+            raise HTTPException(status_code=400, detail="Maximum 20 compétences")
+        for skill in skills:
+            if not isinstance(skill, str) or not (1 <= len(skill) <= 100):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Compétence invalide (chaîne de 1 à 100 caractères)"
+                )
+
+    if "profile_photo" in update_data:
+        photo = update_data["profile_photo"]
+        if photo is not None:
+            photo = str(photo).strip()
+            if len(photo) > 500 or not photo.startswith(("http://", "https://")):
+                raise HTTPException(status_code=400, detail="URL de photo invalide")
+            update_data["profile_photo"] = photo
+
     update_data["updated_at"] = datetime.now(timezone.utc)
-    
+
     await db.users.update_one(
         {"id": current_user.id},
         {"$set": update_data}
@@ -69,6 +142,13 @@ async def upload_profile_photo(
 
     if file_size > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
+
+    # Le content-type est spoofable : vérifier la signature réelle du fichier.
+    if not is_valid_image_content(file_content):
+        raise HTTPException(
+            status_code=400,
+            detail="Fichier image invalide (JPEG, PNG, GIF ou WebP requis)"
+        )
 
     try:
         upload_result = upload_profile_photo_to_cloudinary(

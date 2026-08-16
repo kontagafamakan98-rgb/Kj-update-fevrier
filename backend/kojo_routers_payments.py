@@ -2,6 +2,7 @@ import asyncio
 import time
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -32,6 +33,20 @@ from kojo_payments import (
 )
 
 router = APIRouter()
+
+
+def _append_query_param(url: str, key: str, value: str) -> str:
+    """Ajoute un paramètre de requête à une URL sans écraser les existants."""
+    if not url:
+        return url
+    try:
+        parts = urlparse(url)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query[key] = value
+        return urlunparse(parts._replace(query=urlencode(query)))
+    except ValueError:
+        return url
+
 
 # Cache court du statut re-vérifié auprès de PayDunya : chaque GET
 # /payments/status/* déclenche un appel sortant coûteux — on ne le refait
@@ -247,6 +262,17 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
     return_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}", request.return_url)
     cancel_url = build_checkout_redirect_url(f"/payment?payment_id={payment_record['id']}&cancelled=1", request.cancel_url)
+
+    # UX : même quand le frontend fournit un return_url/cancel_url explicite
+    # (ex: `${origin}/payment`), on y ajoute payment_id (+ cancelled) pour
+    # que la page /payment puisse afficher le statut au retour de PayDunya.
+    # Sans ça, le return_url explicite écrasait l'identifiant ajouté par le
+    # backend et l'utilisateur atterrissait sur une page vide de statut.
+    return_url = _append_query_param(return_url, "payment_id", payment_record["id"])
+    cancel_url = _append_query_param(cancel_url, "payment_id", payment_record["id"])
+    if request.cancel_url:
+        cancel_url = _append_query_param(cancel_url, "cancelled", "1")
+
     callback_url = build_payment_callback_url()
 
     payload = {

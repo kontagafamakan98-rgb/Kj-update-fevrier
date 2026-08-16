@@ -8,6 +8,10 @@ from kojo_models import (
 from kojo_core import (
     get_current_user,
 )
+from kojo_settings import logger
+
+# Champs JAMAIS exposés quand on sérialise un AUTRE utilisateur (PII).
+SENSITIVE_OTHER_USER_FIELDS = {"password_hash", "payment_accounts", "email", "phone"}
 
 router = APIRouter()
 
@@ -54,35 +58,54 @@ async def get_all_messages(current_user: User = Depends(get_current_user)):
 
 @router.get("/messages/conversations")
 async def get_conversations(current_user: User = Depends(get_current_user)):
-    # Get unique conversation partners with other user info
-    pipeline = [
-        {"$match": {
-            "$or": [
-                {"sender_id": current_user.id},
-                {"receiver_id": current_user.id}
-            ]
-        }},
-        # IMPORTANT: $group avec $last/$first dépend de l'ORDRE dans lequel
-        # les documents arrivent au stage - sans ce $sort explicite juste
-        # avant, MongoDB ne garantit PAS que "$last" corresponde réellement
-        # au message le plus récent (l'aperçu affiché pouvait donc être un
-        # message au hasard, pas le dernier envoyé).
-        {"$sort": {"timestamp": 1}},
-        {"$group": {
-            "_id": "$conversation_id",
-            "last_message": {"$last": "$content"},
-            "last_timestamp": {"$last": "$timestamp"},
-            "sender_ids": {"$addToSet": "$sender_id"},
-            "receiver_ids": {"$addToSet": "$receiver_id"}
-        }},
-        {"$sort": {"last_timestamp": -1}}
-    ]
+    # Regroupement par conversation fait en Python (équivalent fonctionnel de
+    # l'ancien pipeline $match/$sort/$group de Mongo) : le dernier message est
+    # déterminé par comparaison de timestamp, donc PAS de dépendance à l'ordre
+    # d'arrivée des documents. Compatible avec la FakeDB de test.
+    messages = await db.messages.find({
+        "$or": [
+            {"sender_id": current_user.id},
+            {"receiver_id": current_user.id}
+        ]
+    }).to_list(length=None)
 
-    conversations = await db.messages.aggregate(pipeline).to_list(100)
+    grouped = {}
+    for msg in messages:
+        conv_id = msg.get("conversation_id")
+        if not conv_id:
+            continue
+        entry = grouped.setdefault(conv_id, {
+            "_id": conv_id,
+            "last_message": None,
+            "last_timestamp": None,
+            "sender_ids": set(),
+            "receiver_ids": set(),
+            "unread_count": 0,
+        })
+        ts = msg.get("timestamp")
+        if entry["last_timestamp"] is None or str(ts) > str(entry["last_timestamp"]):
+            entry["last_timestamp"] = ts
+            entry["last_message"] = msg.get("content")
+        if msg.get("sender_id"):
+            entry["sender_ids"].add(msg["sender_id"])
+        if msg.get("receiver_id"):
+            entry["receiver_ids"].add(msg["receiver_id"])
+            if msg["receiver_id"] == current_user.id and not msg.get("read"):
+                entry["unread_count"] += 1
+
+    conversations = []
+    for entry in grouped.values():
+        entry["sender_ids"] = sorted(entry["sender_ids"])
+        entry["receiver_ids"] = sorted(entry["receiver_ids"])
+        conversations.append(entry)
+
+    conversations.sort(key=lambda c: str(c["last_timestamp"] or ""), reverse=True)
+    conversations = conversations[:100]
 
     # Get other user info for each conversation
     result = []
     for conv in conversations:
+
         # Extract other user ID from conversation
         conv_parts = conv["_id"].split("_")
         other_user_id = None
@@ -98,7 +121,12 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
             other_user = await db.users.find_one({"id": other_user_id})
             if other_user:
                 other_user_dict = {k: v for k, v in other_user.items() if k != "_id"}
-                conv["other_user"] = User(**other_user_dict).model_dump(exclude={"password_hash"})
+                # SECURITE/PII : on n'expose JAMAIS les comptes de paiement,
+                # l'email ou le téléphone de l'interlocuteur — uniquement
+                # les données utiles à l'affichage (nom, photo, notation).
+                conv["other_user"] = User(**other_user_dict).model_dump(
+                    exclude=SENSITIVE_OTHER_USER_FIELDS
+                )
                 first_name = other_user.get("first_name", "").strip()
                 last_name = other_user.get("last_name", "").strip()
                 full_name = f"{first_name} {last_name}".strip()
@@ -127,5 +155,21 @@ async def get_conversation_messages(
     messages = await db.messages.find({
         "conversation_id": conversation_id
     }).sort("timestamp", 1).to_list(100)
-    
+
+    # Marquer comme lus les messages REÇUS par l'utilisateur qui ouvre la
+    # conversation (le flag read n'était jamais utilisé : aucun indicateur
+    # de non-lu n'était possible).
+    if messages:
+        try:
+            await db.messages.update_many(
+                {
+                    "conversation_id": conversation_id,
+                    "receiver_id": current_user.id,
+                    "read": False,
+                },
+                {"$set": {"read": True}}
+            )
+        except Exception as exc:
+            logger.error(f"⚠️ Échec du marquage des messages comme lus: {exc}")
+
     return [Message(**message) for message in messages]

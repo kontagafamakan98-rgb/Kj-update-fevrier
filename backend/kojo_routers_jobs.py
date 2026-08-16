@@ -239,6 +239,141 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
         raise HTTPException(status_code=403, detail="Access denied")
 
     now_iso = datetime.now(timezone.utc).isoformat()
+
+    # ------------------------------------------------------------------
+    # Annulation d'une mission PAYÉE : remboursement automatique du client
+    # ------------------------------------------------------------------
+    # Si un paiement confirmé existe (fonds séquestrés chez PayDunya), on
+    # rembourse le client via l'API de décaissement avant d'annuler. Sans
+    # ça, l'argent restait bloqué sans aucune voie de restitution (ni
+    # remboursement client, ni libération travailleur).
+    payment_record = await db.payments.find_one(
+        {"job_id": job_id, "status": "completed"},
+        sort=[("created_at", -1)]
+    )
+    refund_outcome = None
+    refunded_amount = None
+
+    if payment_record:
+        payout_status = payment_record.get("payout_status") or "held"
+
+        if payout_status in ("released", "releasing"):
+            raise HTTPException(
+                status_code=409,
+                detail="Cette mission a déjà un versement en cours ou effectué vers le travailleur : annulation impossible."
+            )
+
+        # Verrou atomique (CAS) : "held"/"release_failed" → "refunding".
+        lock_result = await db.payments.update_one(
+            {"id": payment_record["id"], "payout_status": payout_status},
+            {"$set": {
+                "payout_status": "refunding",
+                "payout_kind": "refund",
+                "updated_at": now_iso,
+            }}
+        )
+        if lock_result.matched_count == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="Un remboursement est déjà en cours pour cette mission"
+            )
+
+        payer = await db.users.find_one({"id": payment_record.get("payer_id")})
+        payer_accounts = (payer or {}).get("payment_accounts") or {}
+        refund_method = None
+        refund_phone = None
+        if payer_accounts.get("orange_money"):
+            refund_method, refund_phone = "orange_money", payer_accounts["orange_money"]
+        elif payer_accounts.get("wave"):
+            refund_method, refund_phone = "wave", payer_accounts["wave"]
+
+        if not refund_method or not refund_phone:
+            await db.payments.update_one(
+                {"id": payment_record["id"]},
+                {"$set": {
+                    "payout_status": "refund_failed",
+                    "payout_failure_reason": "Le client n'a pas de compte Orange Money ou Wave configuré",
+                    "updated_at": now_iso,
+                }}
+            )
+            refund_outcome = "refund_failed"
+        else:
+            try:
+                withdraw_mode = get_paydunya_withdraw_mode(
+                    refund_method, (payer or {}).get("country")
+                )
+                account_alias = strip_country_code_for_disburse(refund_phone)
+                invoice = create_paydunya_disburse_invoice(
+                    account_alias=account_alias,
+                    amount=payment_record.get("amount") or 0,
+                    withdraw_mode=withdraw_mode,
+                    callback_url=build_disburse_callback_url(),
+                )
+                disburse_token = invoice.get("disburse_token")
+                submit_result = submit_paydunya_disburse_invoice(
+                    disburse_token,
+                    disburse_id=f"refund_{payment_record['id']}",
+                )
+                provider_status = str(
+                    submit_result.get("status")
+                    or ("success" if str(submit_result.get("response_code")) == "00" else "failed")
+                )
+
+                await db.payments.update_one(
+                    {"id": payment_record["id"]},
+                    {"$set": {
+                        "disburse_token": disburse_token,
+                        "disburse_provider_response": submit_result,
+                        "payout_kind": "refund",
+                        "updated_at": now_iso,
+                    }}
+                )
+
+                if provider_status == "success":
+                    await db.payments.update_one(
+                        {"id": payment_record["id"]},
+                        {"$set": {"payout_status": "refunded"}}
+                    )
+                    refund_outcome = "refunded"
+                elif provider_status == "pending":
+                    await db.payments.update_one(
+                        {"id": payment_record["id"]},
+                        {"$set": {"payout_status": "refunding"}}
+                    )
+                    refund_outcome = "refunding"
+                else:
+                    await db.payments.update_one(
+                        {"id": payment_record["id"]},
+                        {"$set": {
+                            "payout_status": "refund_failed",
+                            "payout_failure_reason": submit_result.get("response_text") or "Échec du remboursement PayDunya",
+                        }}
+                    )
+                    refund_outcome = "refund_failed"
+            except HTTPException as exc:
+                await db.payments.update_one(
+                    {"id": payment_record["id"]},
+                    {"$set": {
+                        "payout_status": "refund_failed",
+                        "payout_failure_reason": str(exc.detail),
+                        "updated_at": now_iso,
+                    }}
+                )
+                refund_outcome = "refund_failed"
+            except Exception as exc:
+                logger.error(f"⚠️ Erreur inattendue lors du remboursement: {exc}")
+                await db.payments.update_one(
+                    {"id": payment_record["id"]},
+                    {"$set": {
+                        "payout_status": "refund_failed",
+                        "payout_failure_reason": "Erreur inattendue lors du remboursement",
+                        "updated_at": now_iso,
+                    }}
+                )
+                refund_outcome = "refund_failed"
+
+        refunded_amount = payment_record.get("amount")
+
     await db.jobs.update_one(
         {"id": job_id},
         {
@@ -262,7 +397,52 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     except Exception:
         pass
 
-    return {"message": "Job deleted successfully", "job_id": job_id}
+    # Notifications (best-effort) : informer le client du sort de son argent
+    # et le travailleur de l'annulation.
+    if payment_record:
+        worker_id_for_notif = job.get("assigned_worker_id")
+        job_title = job.get("title") or "la mission"
+        if refund_outcome == "refunded":
+            client_body = f"Votre paiement de {refunded_amount} FCFA pour « {job_title} » a été intégralement remboursé."
+        elif refund_outcome == "refunding":
+            client_body = f"Votre remboursement de {refunded_amount} FCFA pour « {job_title} » est en cours de traitement."
+        elif refund_outcome == "refund_failed":
+            client_body = f"Mission annulée, mais le remboursement automatique a échoué : contactez le support pour un remboursement manuel."
+        else:
+            client_body = f"La mission « {job_title} » a été annulée."
+        asyncio.create_task(notify_user(
+            user_id=payment_record.get("payer_id"),
+            title="Mission annulée",
+            body=client_body,
+            notif_type=NotificationType.GENERAL,
+            related_id=job_id,
+            related_type="job",
+        ))
+        if worker_id_for_notif:
+            asyncio.create_task(notify_user(
+                user_id=worker_id_for_notif,
+                title="Mission annulée",
+                body=f"La mission « {job_title} » a été annulée par le client.",
+                notif_type=NotificationType.GENERAL,
+                related_id=job_id,
+                related_type="job",
+            ))
+
+    if refund_outcome == "refunded":
+        message = "Mission annulée. Le paiement a été entièrement remboursé au client."
+    elif refund_outcome == "refunding":
+        message = "Mission annulée. Remboursement en cours de traitement (confirmation par PayDunya)."
+    elif refund_outcome == "refund_failed":
+        message = "Mission annulée, mais le remboursement automatique a échoué : un remboursement manuel est nécessaire."
+    else:
+        message = "Job deleted successfully"
+
+    return {
+        "message": message,
+        "job_id": job_id,
+        "refund_status": refund_outcome,
+        "refunded_amount": refunded_amount,
+    }
 
 @router.post("/jobs/{job_id}/proposals")
 async def create_proposal(
@@ -359,6 +539,13 @@ async def accept_job_proposal(
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
 
+    # Un job terminé/annulé n'accepte plus de propositions.
+    if job.get("status") in (JobStatus.COMPLETED.value, JobStatus.CANCELLED.value):
+        raise HTTPException(
+            status_code=409,
+            detail="Cette mission est déjà terminée ou annulée"
+        )
+
     # Empeche d'ecraser accidentellement une mission deja attribuee a un
     # AUTRE travailleur (mais permet de re-confirmer le meme travailleur).
     existing_assigned = job.get("assigned_worker_id")
@@ -389,7 +576,26 @@ async def accept_job_proposal(
     if shared_location:
         job_update["shared_location"] = shared_location
 
-    await db.jobs.update_one({"id": job_id}, {"$set": job_update})
+    # Attribution ATOMIQUE (compare-and-set) : évite la course entre deux
+    # acceptations concurrentes qui écraseraient assigned_worker_id (le
+    # simple update_one précédent n'était pas conditionnel).
+    claim_result = await db.jobs.update_one(
+        {
+            "id": job_id,
+            "status": {"$nin": [JobStatus.COMPLETED.value, JobStatus.CANCELLED.value]},
+            "$or": [
+                {"assigned_worker_id": None},
+                {"assigned_worker_id": {"$exists": False}},
+                {"assigned_worker_id": worker_id},
+            ],
+        },
+        {"$set": job_update}
+    )
+    if claim_result.matched_count == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Ce job a déjà été attribué à un autre travailleur"
+        )
 
     await db.job_proposals.update_one(
         {"id": proposal_id},

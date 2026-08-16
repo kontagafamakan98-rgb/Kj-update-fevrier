@@ -18,6 +18,7 @@ import os
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, FastAPI, Response
 from fastapi.middleware.gzip import GZipMiddleware
@@ -37,7 +38,33 @@ from kojo_core import (
     request_counts,
 )
 from kojo_email import generate_email_otp_code, hash_email_otp
-from kojo_settings import APP_ENV, APP_VERSION, logger
+from kojo_settings import APP_ENV, APP_VERSION, FRONTEND_APP_URL, logger
+
+
+# ---------------------------------------------------------------------------
+# Sentry (monitoring d'erreurs, OPTIONNEL — activé si SENTRY_DSN est défini)
+# ---------------------------------------------------------------------------
+def _init_sentry():
+    dsn = os.environ.get('SENTRY_DSN', '').strip()
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+        sentry_sdk.init(
+            dsn=dsn,
+            environment=APP_ENV,
+            traces_sample_rate=0.1,
+            # Ne jamais envoyer de PII (emails, téléphones) à Sentry par défaut
+            send_default_pii=False,
+        )
+        logger.info("✅ Sentry activé (backend)")
+    except Exception as exc:  # pragma: no cover - dépend de la config serveur
+        logger.warning(f"⚠️ Sentry non initialisé (backend): {exc}")
+
+
+_init_sentry()
 
 # Routers par domaine (chacun exporte `router`)
 from kojo_routers_auth import router as auth_router
@@ -47,6 +74,7 @@ from kojo_routers_messages import router as messages_router
 from kojo_routers_notifications import router as notifications_router
 from kojo_routers_owner import router as owner_router
 from kojo_routers_payments import router as payments_router
+from kojo_routers_reviews import router as reviews_router
 from kojo_routers_support import router as support_router
 from kojo_routers_users import router as users_router
 
@@ -110,6 +138,7 @@ api_router.include_router(jobs_router)
 api_router.include_router(messages_router)
 api_router.include_router(geo_router)
 api_router.include_router(payments_router)
+api_router.include_router(reviews_router)
 api_router.include_router(owner_router)
 
 
@@ -167,19 +196,46 @@ ENABLE_TRUSTED_HOST_MIDDLEWARE = os.environ.get('DISABLE_TRUSTED_HOST_MIDDLEWARE
 # (ex: kojo-frontend-*.vercel.app), au lieu d'accepter N'IMPORTE QUEL
 # sous-domaine *.vercel.app - y compris ceux d'un projet Vercel gratuit
 # créé par un tiers. allow_credentials=True + un motif aussi large que
-# *.vercel.app est une surface d'attaque évitable. Tant que la variable
-# n'est pas configurée sur Render, on retombe sur l'ancien motif large
-# (pas de régression fonctionnelle immédiate) mais un avertissement est loggé.
+# *.vercel.app est une surface d'attaque évitable.
+#
+# Ordre de résolution :
+#   1. VERCEL_PROJECT_NAME (explicite, recommandé)
+#   2. FRONTEND_APP_URL s'il pointe vers *.vercel.app (dérivation automatique)
+#   3. Hors production : ancien motif large *.vercel.app + avertissement
+#   4. Production sans rien : FAIL-CLOSED (aucun sous-domaine *.vercel.app
+#      accepté) plutôt que d'exposer un CORS credentialed ouvert — un
+#      message d'erreur explicite indique la variable à définir.
 _vercel_project_name = os.environ.get('VERCEL_PROJECT_NAME', '').strip()
 if _vercel_project_name:
     _vercel_origin_pattern = rf"^https://{re.escape(_vercel_project_name)}(-[a-z0-9-]+)?\.vercel\.app$"
+    logger.info(f"✅ CORS Vercel restreint au projet '{_vercel_project_name}'")
 else:
-    _vercel_origin_pattern = r"^https://.*\.vercel\.app$"
-    logger.warning(
-        "⚠️ VERCEL_PROJECT_NAME non défini - CORS accepte tout sous-domaine "
-        "*.vercel.app (pas seulement ceux du projet Kojo). Définir "
-        "VERCEL_PROJECT_NAME sur Render pour restreindre correctement."
-    )
+    _frontend_netloc = ""
+    if FRONTEND_APP_URL:
+        try:
+            _frontend_netloc = urlparse(FRONTEND_APP_URL).netloc or ""
+        except ValueError:
+            _frontend_netloc = ""
+    if _frontend_netloc.endswith(".vercel.app"):
+        _vercel_base = _frontend_netloc[: -len(".vercel.app")]
+        _vercel_origin_pattern = rf"^https://{re.escape(_vercel_base)}(-[a-z0-9-]+)?\.vercel\.app$"
+        logger.info(f"✅ CORS Vercel dérivé de FRONTEND_APP_URL ({_frontend_netloc})")
+    elif not _is_prod:
+        _vercel_origin_pattern = r"^https://.*\.vercel\.app$"
+        logger.warning(
+            "⚠️ VERCEL_PROJECT_NAME non défini - CORS accepte tout sous-domaine "
+            "*.vercel.app (mode non-production uniquement). Définir "
+            "VERCEL_PROJECT_NAME sur Render pour restreindre correctement."
+        )
+    else:
+        # Production : refuser plutôt que d'ouvrir un CORS credentialed large.
+        _vercel_origin_pattern = r"^(?!x)x$"
+        logger.error(
+            "🚨 CORS production : VERCEL_PROJECT_NAME non défini et FRONTEND_APP_URL "
+            "ne pointe pas vers *.vercel.app → sous-domaines Vercel REFUSÉS "
+            "(fail-closed). Définir VERCEL_PROJECT_NAME sur Render pour rétablir "
+            "l'accès du frontend."
+        )
 
 # Les IP privées LAN (192.168.x / 10.x) ne sont autorisées qu'hors production :
 # en prod elles élargiraient inutilement la surface CORS credentialed (réseau

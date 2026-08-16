@@ -20,8 +20,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from kojo_models import PaymentAccount, User
+from kojo_models import PaymentAccount, User, WA_PHONE_RULES
 from kojo_settings import (
+    APP_ENV,
     APP_VERSION,
     BACKEND_PUBLIC_URL,
     FRONTEND_APP_URL,
@@ -153,6 +154,13 @@ async def create_database_indexes():
         # TTL : suppression automatique des notifications après 90 jours
         await db.notifications.create_index("created_at", expireAfterSeconds=90 * 24 * 3600)
 
+        # Reviews (avis) collection indexes
+        await db.reviews.create_index("id", unique=True)
+        await db.reviews.create_index("job_id")
+        await db.reviews.create_index("reviewee_id")
+        await db.reviews.create_index([("job_id", 1), ("reviewer_id", 1)], unique=True)
+        await db.reviews.create_index([("created_at", -1)])
+
         # Push tokens collection indexes
         await db.push_tokens.create_index("id", unique=True)
         await db.push_tokens.create_index("user_id")
@@ -199,6 +207,18 @@ def _try_init_redis() -> Optional[Any]:
 _redis_client = _try_init_redis()
 
 _using_redis = _redis_client is not None
+
+if _redis_client is None and APP_ENV in ("production", "prod"):
+    # Sans Redis, le rate-limiting est en mémoire et PAR PROCESS : avec N
+    # workers uvicorn, les limites réelles sont multipliées par N et ne sont
+    # pas partagées. Ce n'est pas bloquant au lancement, mais c'est un écart
+    # à connaître et à corriger (définir REDIS_URL sur Render).
+    logger.warning(
+        "⚠️ REDIS_URL non défini en production : le rate-limiting est en mémoire, "
+        "par process uvicorn (limites effectives multipliées par le nombre de "
+        "workers, non partagées). Définir REDIS_URL (ex: Render Redis) pour un "
+        "rate-limiting partagé multi-workers."
+    )
 
 async def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: int = 1) -> bool:
     """Vérifie le rate limiting. Utilise Redis si disponible, sinon mémoire."""
@@ -587,6 +607,14 @@ KOJO_PRIORITY_COUNTRIES = {
     }
 }
 
+def _phone_local_digits_valid(country_code: str, local_digits: str) -> bool:
+    """Longueur du numéro local selon le pays (CI : 8-10, autres : 8-9)."""
+    rules = WA_PHONE_RULES.get(country_code)
+    if not rules:
+        return False
+    return rules["local_min"] <= len(local_digits) <= rules["local_max"]
+
+
 def validate_orange_money_number(number: str) -> bool:
     """Valide un numéro Orange Money avec précision par pays"""
     try:
@@ -598,16 +626,19 @@ def validate_orange_money_number(number: str) -> bool:
         clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
         logger.debug(f"Orange Money validation - Original: {number}, Cleaned: {clean_number}")
         
-        if len(clean_number) < 11 or len(clean_number) > 12:
-            logger.info(f"Orange Money number length invalid: {len(clean_number)} digits for {clean_number}")
-            return False
-        
         country_code = clean_number[:3]
-        operator_prefix = clean_number[3:5]
+        local_digits = clean_number[len(country_code):]
+        operator_prefix = local_digits[:2]
         logger.debug(f"Orange Money validation - Country: {country_code}, Prefix: {operator_prefix}")
         
         if country_code not in KOJO_PRIORITY_COUNTRIES:
             logger.info(f"Orange Money not supported for country code: {country_code}")
+            return False
+
+        # Longueur locale selon le pays (la Côte d'Ivoire utilise aussi le
+        # nouveau format à 10 chiffres : +225 + 10 chiffres = 13 au total).
+        if not _phone_local_digits_valid(country_code, local_digits):
+            logger.info(f"Orange Money number length invalid: {len(clean_number)} digits for {clean_number}")
             return False
             
         # Vérification sécurisée des préfixes
@@ -644,15 +675,17 @@ def validate_wave_number(number: str) -> bool:
         # Nettoyage et validation basique
         clean_number = ''.join(filter(str.isdigit, number.replace('+', '')))
         
-        if len(clean_number) < 11 or len(clean_number) > 12:
-            logger.info(f"Wave number length invalid: {len(clean_number)} digits")
-            return False
-        
         country_code = clean_number[:3]
-        operator_prefix = clean_number[3:5]
+        local_digits = clean_number[len(country_code):]
+        operator_prefix = local_digits[:2]
         
         if country_code not in KOJO_PRIORITY_COUNTRIES:
             logger.info(f"Wave not supported for country code: {country_code}")
+            return False
+
+        # Longueur locale selon le pays (CI : nouveau format 10 chiffres)
+        if not _phone_local_digits_valid(country_code, local_digits):
+            logger.info(f"Wave number length invalid: {len(clean_number)} digits")
             return False
             
         valid_prefixes = KOJO_PRIORITY_COUNTRIES[country_code]['wave_prefixes']
@@ -729,6 +762,25 @@ def validate_bank_account(bank_account: dict) -> bool:
     
     return True
 
+def is_valid_image_content(data: bytes) -> bool:
+    """Vérifie les magic bytes d'une image (JPEG/PNG/GIF/WebP).
+
+    Le content-type envoyé par le client est spoofable ; vérifier la signature
+    réelle du fichier évite de stocker/envoyer n'importe quel contenu vers
+    Cloudinary (coût/DoS).
+    """
+    if not isinstance(data, (bytes, bytearray)) or len(data) < 12:
+        return False
+    data = bytes(data)
+    return (
+        data.startswith(b'\xff\xd8\xff')                  # JPEG
+        or data.startswith(b'\x89PNG\r\n\x1a\n')          # PNG
+        or data.startswith(b'GIF87a')
+        or data.startswith(b'GIF89a')
+        or (data[:4] == b'RIFF' and data[8:12] == b'WEBP')  # WebP
+    )
+
+
 def mask_bank_account_info(bank_account: dict) -> dict:
     """Masque les informations sensibles du compte bancaire"""
     if not isinstance(bank_account, dict):
@@ -768,32 +820,25 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 def sanitize_email(email: str) -> str:
-    """Sanitize email to prevent injection attacks"""
+    """Nettoie une adresse email (minuscules, espaces, caractères de contrôle).
+
+    PAS de détection d'"injection SQL" ici : la base est MongoDB (pas de SQL),
+    et EmailStr valide déjà le format côté Pydantic. Les anciens filtres de
+    mots-clés SQL (SELECT, UNION, OR…) rejetaient des emails légitimes
+    (ex: union@example.com) sans aucun bénéfice de sécurité — ils ont été
+    retirés.
+    """
     if not email:
         raise ValueError("Email cannot be empty")
-    
-    # Remove potentially dangerous characters
-    dangerous_chars = ['*', '/', '\\', '$', '{', '}', '[', ']', '(', ')', '#', '&', '|', '<', '>']
-    for char in dangerous_chars:
-        if char in email:
-            raise ValueError(f"Email contains invalid character: {char}")
-    
-    # Additional check for SQL injection patterns (with word boundaries to avoid false positives)
-    # Check for SQL keywords as complete words, not substrings
-    import re
-    sql_keywords = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'UNION', 'EXEC', 'EXECUTE']
-    email_upper = email.upper()
-    
-    # Check for SQL keywords as standalone words (not part of other words)
-    for keyword in sql_keywords:
-        if re.search(r'\b' + keyword + r'\b', email_upper):
-            raise ValueError(f"Email contains prohibited SQL keyword: {keyword}")
-    
-    # Check for SQL comment patterns
-    if '--' in email or '/*' in email or '*/' in email:
-        raise ValueError("Email contains prohibited SQL comment pattern")
-    
-    return email.lower().strip()
+
+    clean = email.strip().lower()
+    if len(clean) > 254:
+        raise ValueError("Email too long")
+
+    if any(ord(char) < 32 for char in clean):
+        raise ValueError("Email contains invalid characters")
+
+    return clean
 
 def sanitize_input_string(input_str: str, field_name: str = "field") -> str:
     """Sanitize general string inputs"""

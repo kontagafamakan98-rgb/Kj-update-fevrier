@@ -24,9 +24,9 @@ from kojo_settings import (
     logger,
 )
 from kojo_core import (
-    create_access_token, get_current_user, hash_password, log_and_raise_http_exception,
-    revoke_token, sanitize_email, security,
-    validate_payment_accounts, verify_password,
+    create_access_token, get_current_user, hash_password, is_token_revoked,
+    is_valid_image_content, log_and_raise_http_exception, revoke_token,
+    sanitize_email, security, validate_payment_accounts, verify_password,
 )
 from kojo_email import (
     create_email_verification_token, hash_email_otp, issue_email_otp,
@@ -245,7 +245,19 @@ async def verify_password_reset_otp(payload: EmailOtpVerifyRequest):
 @router.post("/auth/password/reset")
 async def reset_password_with_verified_token(payload: PasswordResetConfirmRequest):
     clean_email = sanitize_email(payload.email)
-    verify_email_verification_token(payload.verification_token, clean_email, purpose="password_reset")
+    verification_payload = verify_email_verification_token(
+        payload.verification_token, clean_email, purpose="password_reset"
+    )
+
+    # Anti-replay : un jeton déjà utilisé ne peut pas réinitialiser à nouveau
+    # (le jeton est stateless et resterait sinon valide 30 min après usage).
+    _jti = verification_payload.get("jti")
+    _exp_ts = verification_payload.get("exp")
+    if _jti and await is_token_revoked(_jti):
+        raise HTTPException(
+            status_code=401,
+            detail="Ce jeton de vérification a déjà été utilisé. Demandez un nouveau code."
+        )
 
     user = await db.users.find_one({"email": clean_email})
     if not user:
@@ -262,6 +274,13 @@ async def reset_password_with_verified_token(payload: PasswordResetConfirmReques
         }
     )
     await db.email_otps.delete_one({"email": clean_email, "purpose": "password_reset"})
+
+    # Révoquer le jeton après usage (usage unique).
+    if _jti and _exp_ts:
+        try:
+            await revoke_token(_jti, datetime.fromtimestamp(_exp_ts, tz=timezone.utc))
+        except Exception as exc:
+            logger.warning(f"⚠️ Révocation du jeton de reset impossible: {exc}")
 
     return {
         "message": "Mot de passe réinitialisé avec succès.",
@@ -294,7 +313,9 @@ async def register_user_verified(user_data: UserWithPayment):
             )
 
         if user_data.email_verification_token:
-            verify_email_verification_token(user_data.email_verification_token, clean_email, "signup")
+            verification_payload = verify_email_verification_token(
+                user_data.email_verification_token, clean_email, "signup"
+            )
             email_verified = True
             email_verified_at = datetime.now(timezone.utc)
         
@@ -328,6 +349,14 @@ async def register_user_verified(user_data: UserWithPayment):
                     raise HTTPException(
                         status_code=400,
                         detail="Photo trop volumineuse. Taille maximale : 5 Mo"
+                    )
+
+                # Vérification des magic bytes (le client peut envoyer
+                # n'importe quel contenu sous couvert d'une "photo").
+                if not is_valid_image_content(image_data):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Fichier image invalide (JPEG, PNG, GIF ou WebP requis)"
                     )
 
                 upload_result = cloudinary_uploader.upload(
@@ -402,6 +431,16 @@ async def register_user_verified(user_data: UserWithPayment):
         
         await db.users.insert_one(user.model_dump())
         await db.email_otps.delete_one({"email": clean_email, "purpose": "signup"})
+
+        # Jeton de vérification à usage unique : révoqué après l'inscription
+        # pour empêcher toute relecture (replay) dans sa fenêtre de validité.
+        try:
+            _jti = verification_payload.get("jti")
+            _exp_ts = verification_payload.get("exp")
+            if _jti and _exp_ts:
+                await revoke_token(_jti, datetime.fromtimestamp(_exp_ts, tz=timezone.utc))
+        except Exception as exc:
+            logger.warning(f"⚠️ Révocation du jeton de vérification impossible: {exc}")
         
         # Créer le profil travailleur si c'est un travailleur avec des informations supplémentaires
         worker_profile_created = False
