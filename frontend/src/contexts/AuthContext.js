@@ -5,6 +5,7 @@ import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { registerPushSubscription, unregisterPushSubscription, isPushSupported } from '../utils/pushRegistration';
+import { setUser } from '../utils/sentry';
 
 const AuthContext = createContext();
 

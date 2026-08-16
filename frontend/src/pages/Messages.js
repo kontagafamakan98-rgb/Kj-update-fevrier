@@ -169,6 +169,11 @@ export default function Messages() {
                       <p className="text-sm font-semibold text-gray-900 truncate">{conversation.other_user_name || getOtherPersonName()}</p>
                       <p className="text-xs text-gray-500 truncate">{stripJobMarkerFromMessage(conversation.last_message)}</p>
                     </div>
+                    {Number(conversation.unread_count || 0) > 0 && (
+                      <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-600 text-white text-xs font-bold">
+                        {conversation.unread_count}
+                      </span>
+                    )}
                   </div>
                 </button>
               ))

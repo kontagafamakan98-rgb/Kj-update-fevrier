@@ -190,7 +190,9 @@ export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
 // Ces endpoints renvoient un 401 comme RÉSULTAT MÉTIER (identifiants
 // invalides, OTP refusé…) : il ne faut PAS les traiter comme une session
 // expirée (sinon déconnexion surprise pendant le login / la vérification).
-const BUSINESS_401_PREFIXES = ['/auth/login', '/auth/register', '/auth/email/', '/auth/password/'];
+// /auth/logout est inclus : un token déjà expiré au moment du logout ne doit
+// pas déclencher la redirection globale pendant la déconnexion.
+const BUSINESS_401_PREFIXES = ['/auth/login', '/auth/register', '/auth/email/', '/auth/password/', '/auth/logout'];
 
 let sessionRedirecting = false;
 
@@ -288,12 +290,14 @@ export const authAPI = {
   registerVerified: (userData) => api.post('/auth/register-verified', userData),
   login: (credentials) => api.post('/auth/login', credentials),
   signin: (credentials) => api.post('/auth/login', credentials),
-  logout: async () => ({ success: true }),
+  // Déconnexion RÉELLE : révoque le jeton côté serveur (blacklist jti).
+  // L'ancien stub `({ success: true })` ne contactait jamais /auth/logout,
+  // donc un token volé restait valide 24h même après déconnexion.
+  logout: async () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   getMe: () => api.get('/auth/me'),
   getProfile: () => api.get('/auth/me'),
   getCurrentUser: () => api.get('/auth/me'),
-  updateProfile: (payload) => api.put('/auth/me', payload),
   updateCountry: (payload) => api.patch('/auth/me/country', payload),
   // Email verification methods
   checkEmailAvailability: (payload) => api.post('/auth/email/check-availability', payload),
@@ -519,7 +523,14 @@ export const notificationAPI = {
   registerPushToken: (payload) => api.post('/users/push-token', payload),
 };
 export const notificationsAPI = notificationAPI;
-export const reviewAPI = createResourceApi('reviews');
+// Avis / notes : endpoints explicites (le proxy générique construisait des
+// URLs qui ne correspondent pas aux vraies routes backend).
+export const reviewAPI = {
+  create: (jobId, payload) => api.post(`/jobs/${jobId}/reviews`, payload),
+  getJobReviews: (jobId) => api.get(`/jobs/${jobId}/reviews`),
+  getUserReviews: (userId) => api.get(`/users/${userId}/reviews`),
+  remove: (reviewId) => api.delete(`/reviews/${reviewId}`),
+};
 export const reviewsAPI = reviewAPI;
 export const adminAPI = createResourceApi('admin');
 export const walletAPI = createResourceApi('wallet');

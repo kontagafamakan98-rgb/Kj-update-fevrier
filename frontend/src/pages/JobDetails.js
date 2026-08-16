@@ -9,6 +9,7 @@ import { safeLog } from '../utils/env';
 import { deleteJobWithFallbacks, ensureJobOwnerActionBar } from '../utils/jobOwnerDeleteRuntime';
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser, normalizeComparableId } from '../utils/jobPageSafeHelpers';
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
+import JobReviews from '../components/JobReviews';
 import { getJobProposalUiLabel } from '../utils/jobProposalLocale';
 import {
   extractProposalId,
@@ -811,6 +812,10 @@ export default function JobDetails() {
                 </div>
               </div>
             </div>
+          )}
+
+          {job.status === 'completed' && (isJobOwner || assignedToCurrentWorker) && (
+            <JobReviews jobId={job.id} />
           )}
         </div>
 

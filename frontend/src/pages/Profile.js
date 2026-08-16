@@ -14,7 +14,7 @@ import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
-import { usersAPI, getAuthToken } from '../services/api';
+import { usersAPI, reviewAPI, getAuthToken } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
@@ -39,6 +39,7 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
+  const [reviews, setReviews] = useState([]);
 
   const { user, loadUser } = useAuth();
   const { t, currentLanguage, getAvailableLanguagesForCountry } = useLanguage();
@@ -48,6 +49,14 @@ export default function Profile() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  // Avis reçus (reviews) : alimente la section « Mes avis »
+  useEffect(() => {
+    if (!user?.id) return;
+    reviewAPI.getUserReviews(user.id)
+      .then((data) => setReviews(Array.isArray(data?.reviews) ? data.reviews : []))
+      .catch(() => setReviews([]));
+  }, [user?.id]);
 
   const loadProfile = async () => {
     try {
@@ -140,8 +149,8 @@ export default function Profile() {
                 {user.user_type === 'client' ? t('client') : t('worker')} • <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
               </p>
               <div className="flex items-center mt-2">
-                <span className="text-yellow-300">★★★★☆</span>
-                <span className="text-orange-100 ml-2">{user.rating || 0}/5 ({user.total_reviews || 0})</span>
+                <span className="text-yellow-300">{'★'.repeat(Math.round(user.rating || 0))}{'☆'.repeat(Math.max(0, 5 - Math.round(user.rating || 0)))}</span>
+                <span className="text-orange-100 ml-2">{user.rating || 0}/5 ({user.total_reviews || 0} avis)</span>
               </div>
             </div>
           </div>
@@ -149,6 +158,31 @@ export default function Profile() {
 
         {error && <div className="mx-6 mt-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">{error}</div>}
         {success && <div className="mx-6 mt-6 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md">{success}</div>}
+
+        <div className="px-6 py-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">⭐ Mes avis reçus</h2>
+          {reviews.length === 0 ? (
+            <p className="text-sm text-gray-500">Aucun avis pour le moment. Les notes apparaîtront ici après vos missions terminées.</p>
+          ) : (
+            <div className="space-y-3">
+              {reviews.map((review) => (
+                <div key={review.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-gray-900 truncate">
+                      {review.reviewer_name || 'Auteur anonyme'}
+                    </span>
+                    <span className="text-yellow-400 text-sm">
+                      {'★'.repeat(Math.max(0, Math.min(5, review.rating)))}{'☆'.repeat(Math.max(0, 5 - Math.min(5, review.rating)))}
+                    </span>
+                  </div>
+                  {review.comment && (
+                    <p className="mt-1 text-sm text-gray-600 whitespace-pre-line">{review.comment}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="px-6 py-6 border-b border-gray-200">
           <div className="flex justify-between items-center mb-4">
