@@ -6,6 +6,7 @@ anti-énumération OTP, redirection ouverte du checkout.
 """
 import pytest
 from httpx import AsyncClient
+from unittest.mock import patch
 
 from tests.conftest import (
     BASE_USER, auth_headers, register_and_login, db_insert
@@ -91,6 +92,16 @@ class TestMessagesReceiverValidation:
 @pytest.mark.asyncio
 class TestCommissionRate:
     """Le taux effectif se lit en base (si présent), sinon dans l'env."""
+
+    @pytest.fixture(autouse=True)
+    def _neutralize_env_commission_rate(self):
+        """Neutralise PAYMENT_COMMISSION_RATE pour rendre le test hermétique :
+        kojo_settings charge un éventuel backend/.env local (load_dotenv, ex:
+        PAYMENT_COMMISSION_RATE=0.10) qui ferait échouer le test selon la
+        machine. On fige la constante utilisée par get_effective_commission_rate
+        sur le DÉFAUT du code (0.14) — ce que le test vérifie réellement."""
+        with patch("kojo_payments.PAYMENT_COMMISSION_RATE", 0.14):
+            yield
 
     async def test_falls_back_to_env_when_no_db_setting(self, client: AsyncClient):
         from kojo_payments import get_effective_commission_rate
