@@ -73,6 +73,103 @@ def _cache_payment_status(payment_id: str, record: dict):
             _payment_status_cache.pop(pid, None)
 
 
+async def _notify_refund_transition(payment_record: dict, previous_status, new_status):
+    """Notifie le client quand un remboursement en attente est tranché par
+    PayDunya (confirmé ou en échec). Utilisé par l'IPN disburse ET par la
+    re-vérification à la demande — les notifications envoyées au moment de
+    l'annulation ne couvrent que le départ, pas la confirmation finale."""
+    if payment_record.get("payout_kind") != "refund":
+        return
+    if new_status == previous_status or new_status not in ("refunded", "refund_failed"):
+        return
+    if new_status == "refunded" and previous_status not in ("refunding", "refund_failed"):
+        return
+    refund_amount = int(payment_record.get("amount", 0) or 0)
+    if new_status == "refunded":
+        title = "Remboursement confirmé ✅"
+        body = f"Votre remboursement de {refund_amount} FCFA a été confirmé par PayDunya."
+    else:
+        title = "Remboursement en échec ⚠️"
+        body = "Le remboursement automatique a échoué : contactez le support pour un remboursement manuel."
+    asyncio.create_task(notify_user(
+        user_id=payment_record.get("payer_id"),
+        title=title,
+        body=body,
+        notif_type=NotificationType.GENERAL,
+        related_id=payment_record.get("job_id") or None,
+        related_type="job" if payment_record.get("job_id") else None,
+    ))
+
+
+# Intervalle minimum entre deux re-vérifications PayDunya du MÊME décaissement
+# en attente (le GET /payments/status peut être pollé par le frontend).
+DISBURSE_RECHECK_INTERVAL_SECONDS = 60
+_disburse_recheck_at: dict = {}
+
+
+async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
+    """Best-effort : re-vérifie auprès de PayDunya le statut d'un décaissement
+    en attente (refunding/releasing). L'IPN peut ne jamais arriver (callback
+    manquant, erreur réseau) : sans cette relance, un remboursement ou un
+    versement "en cours" resterait bloqué indéfiniment côté suivi.
+
+    Même mapping que l'IPN disburse (payout_kind == "refund" → statuts
+    refunded/refunding/refund_failed, sinon released/releasing/release_failed).
+    Retourne le record éventuellement mis à jour."""
+    payout_status = payment_record.get("payout_status")
+    if payout_status not in ("refunding", "releasing"):
+        return payment_record
+    payment_id = payment_record.get("id")
+    if not payment_id:
+        return payment_record
+
+    now = time.time()
+    if _disburse_recheck_at.get(payment_id, 0) > now - DISBURSE_RECHECK_INTERVAL_SECONDS:
+        return payment_record
+    _disburse_recheck_at[payment_id] = now
+
+    disburse_token = payment_record.get("disburse_token")
+    if not disburse_token:
+        return payment_record
+    try:
+        check_result = check_paydunya_disburse_status(disburse_token)
+    except Exception as exc:
+        logger.warning(f"⚠️ Re-vérification décaissement impossible: {exc}")
+        return payment_record
+
+    provider_status = str(
+        check_result.get("status")
+        or ("success" if str(check_result.get("response_code")) == "00" else "")
+    ).strip().lower()
+    if not provider_status:
+        return payment_record
+
+    is_refund = payment_record.get("payout_kind") == "refund"
+    if provider_status == "success":
+        new_status = "refunded" if is_refund else "released"
+    elif provider_status == "pending":
+        new_status = "refunding" if is_refund else "releasing"
+    else:
+        new_status = "refund_failed" if is_refund else "release_failed"
+
+    if new_status == payout_status:
+        return payment_record
+
+    await db.payments.update_one(
+        {"id": payment_id},
+        {"$set": {
+            "payout_status": new_status,
+            "disburse_verified_payload": check_result,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    updated = await db.payments.find_one({"id": payment_id})
+    if updated:
+        await _notify_refund_transition(payment_record, payout_status, new_status)
+        return updated
+    return payment_record
+
+
 @router.post('/payments/disburse-ipn')
 async def paydunya_disburse_ipn(request: Request):
     """Callback asynchrone PayDunya pour confirmer le statut final d'un
@@ -113,17 +210,23 @@ async def paydunya_disburse_ipn(request: Request):
         or ("success" if str(check_result.get("response_code")) == "00" else "")
     ).strip().lower()
 
+    # Le meme endpoint IPN sert au versement TRAVAILLEUR et au REMBOURSEMENT
+    # client (meme API de decaissement PayDunya) : le mapping de statut doit
+    # dependre de payout_kind, sinon un remboursement en attente confirme ici
+    # serait marque 'released' (verse au travailleur) au lieu de 'refunded'.
+    is_refund = payment_record.get("payout_kind") == "refund"
     if provider_status == 'success':
-        payout_status = 'released'
+        payout_status = 'refunded' if is_refund else 'released'
     elif provider_status == 'pending':
-        payout_status = 'releasing'
+        payout_status = 'refunding' if is_refund else 'releasing'
     elif provider_status:
-        payout_status = 'release_failed'
+        payout_status = 'refund_failed' if is_refund else 'release_failed'
     else:
         # Reponse PayDunya inattendue/non concluante: on ne change rien
         # plutot que de deviner, un prochain check-status/IPN confirmera.
         return {'status': 'inconclusive'}
 
+    previous_payout_status = payment_record.get('payout_status')
     await db.payments.update_one(
         {'id': payment_record['id']},
         {'$set': {
@@ -133,6 +236,11 @@ async def paydunya_disburse_ipn(request: Request):
             'updated_at': datetime.now(timezone.utc).isoformat()
         }}
     )
+
+    # Notifier le client quand l'IPN tranche un remboursement en attente
+    # (les notifications de l'annulation ne couvrent que le depart).
+    await _notify_refund_transition(payment_record, previous_payout_status, payout_status)
+
     return {'status': 'ok'}
 
 @router.get('/payments/config')
@@ -340,10 +448,16 @@ async def get_payment_status(payment_id: str, current_user: User = Depends(get_c
 
     cached_record = _get_cached_payment_status(payment_record['id'])
     if cached_record is not None:
-        return serialize_payment_record(cached_record)
+        payment_record = cached_record
+    else:
+        payment_record = await sync_payment_status_with_paydunya(payment_record)
+        _cache_payment_status(payment_record['id'], payment_record)
 
-    payment_record = await sync_payment_status_with_paydunya(payment_record)
-    _cache_payment_status(payment_record['id'], payment_record)
+    # Relance des décaissements en attente : l'IPN peut ne jamais arriver
+    # (callback manquant), on re-vérifie donc le statut à la demande.
+    payment_record = await _maybe_recheck_disburse_status(payment_record)
+    if payment_record is not cached_record:
+        _cache_payment_status(payment_record['id'], payment_record)
     return serialize_payment_record(payment_record)
 
 @router.get('/payments/status/token/{invoice_token}')
@@ -357,10 +471,16 @@ async def get_payment_status_by_token(invoice_token: str, current_user: User = D
 
     cached_record = _get_cached_payment_status(payment_record['id'])
     if cached_record is not None:
-        return serialize_payment_record(cached_record)
+        payment_record = cached_record
+    else:
+        payment_record = await sync_payment_status_with_paydunya(payment_record)
+        _cache_payment_status(payment_record['id'], payment_record)
 
-    payment_record = await sync_payment_status_with_paydunya(payment_record)
-    _cache_payment_status(payment_record['id'], payment_record)
+    # Relance des décaissements en attente : l'IPN peut ne jamais arriver
+    # (callback manquant), on re-vérifie donc le statut à la demande.
+    payment_record = await _maybe_recheck_disburse_status(payment_record)
+    if payment_record is not cached_record:
+        _cache_payment_status(payment_record['id'], payment_record)
     return serialize_payment_record(payment_record)
 
 @router.get('/payments/my')

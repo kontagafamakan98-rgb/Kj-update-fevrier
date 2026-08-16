@@ -15,6 +15,7 @@ from kojo_core import (
     get_current_user, is_database_available, verify_owner_access,
 )
 from kojo_payments import get_effective_commission_rate
+from kojo_routers_jobs import execute_paydunya_refund
 
 router = APIRouter()
 
@@ -247,3 +248,43 @@ async def update_commission_settings(
     except Exception as e:
         logging.error(f"Error updating commission settings: {e}")
         raise HTTPException(status_code=500, detail="Erreur serveur")
+
+@router.post("/owner/payments/{payment_id}/retry-refund")
+async def retry_payment_refund(payment_id: str, owner_user = Depends(verify_owner_access)):
+    """Relance le remboursement automatique d'un paiement passé en
+    refund_failed (ex: le client n'avait pas de compte mobile money à
+    l'annulation, ou PayDunya l'a refusé). On réessaie avec les comptes
+    ACTUELS du payeur.
+
+    PROPRIÉTAIRE UNIQUEMENT. Un remboursement en cours (refunding) n'est
+    jamais relancé ici : il est tranché par l'IPN ou la re-vérification du
+    statut, pas par une seconde tentative (risque de double remboursement)."""
+    payment_record = await db.payments.find_one({"id": payment_id})
+    if not payment_record:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
+    if payment_record.get("payout_kind") != "refund":
+        raise HTTPException(status_code=400, detail="Ce paiement n'est pas un remboursement")
+    if payment_record.get("payout_status") != "refund_failed":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Remboursement non relançable (statut actuel : {payment_record.get('payout_status') or 'inconnu'})"
+        )
+
+    # Verrou CAS : relance uniquement depuis refund_failed.
+    lock_result = await db.payments.update_one(
+        {"id": payment_id, "payout_status": "refund_failed"},
+        {"$set": {
+            "payout_status": "refunding",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    if lock_result.matched_count == 0:
+        raise HTTPException(status_code=409, detail="Remboursement déjà en cours")
+
+    refund_status = await execute_paydunya_refund(payment_record)
+    return {
+        "payment_id": payment_id,
+        "job_id": payment_record.get("job_id"),
+        "refund_status": refund_status,
+        "refunded_amount": payment_record.get("amount"),
+    }

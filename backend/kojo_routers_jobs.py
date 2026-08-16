@@ -228,6 +228,148 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
         
     return Job(**job)
 
+async def execute_paydunya_refund(payment_record: dict) -> str:
+    """Exécute le remboursement d'un paiement séquestré vers le compte mobile
+    money du payeur (Orange Money en priorité, sinon Wave). Retourne le statut
+    final : "refunded", "refunding" ou "refund_failed".
+
+    Appelée par delete_job (annulation d'une mission payée) et par l'endpoint
+    owner de relance (kojo_routers_owner.retry_payment_refund). Le verrou CAS
+    (held/release_failed/refund_failed → refunding) est posé PAR LES APPELANTS
+    avant l'appel — cette fonction n'exécute que le versement et les mises à
+    jour de statut.
+
+    Anti double-remboursement :
+    - Un échec EXPLICITE (get-invoice refusé, réponse négative au submit) →
+      "refund_failed" : PayDunya n'a rien exécuté, une relance est sûre.
+    - Une réponse INCERTAINE (exception réseau pendant le submit) →
+      "refunding" : PayDunya a peut-être exécuté le versement ; seule l'IPN
+      ou un check-status pourra trancher. Marquer un échec définitif ici
+      permettrait une relance → double remboursement.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    payer = await db.users.find_one({"id": payment_record.get("payer_id")})
+    payer_accounts = (payer or {}).get("payment_accounts") or {}
+    refund_method = None
+    refund_phone = None
+    if payer_accounts.get("orange_money"):
+        refund_method, refund_phone = "orange_money", payer_accounts["orange_money"]
+    elif payer_accounts.get("wave"):
+        refund_method, refund_phone = "wave", payer_accounts["wave"]
+
+    if not refund_method or not refund_phone:
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "payout_status": "refund_failed",
+                "payout_failure_reason": "Le client n'a pas de compte Orange Money ou Wave configuré",
+                "updated_at": now_iso,
+            }}
+        )
+        return "refund_failed"
+
+    try:
+        withdraw_mode = get_paydunya_withdraw_mode(
+            refund_method, (payer or {}).get("country")
+        )
+        account_alias = strip_country_code_for_disburse(refund_phone)
+        invoice = create_paydunya_disburse_invoice(
+            account_alias=account_alias,
+            amount=payment_record.get("amount") or 0,
+            withdraw_mode=withdraw_mode,
+            callback_url=build_disburse_callback_url(),
+        )
+        disburse_token = invoice.get("disburse_token")
+    except HTTPException as exc:
+        # get-invoice REFUSÉ : PayDunya n'a rien exécuté → échec sûr, relançable.
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "payout_status": "refund_failed",
+                "payout_failure_reason": str(exc.detail),
+                "updated_at": now_iso,
+            }}
+        )
+        return "refund_failed"
+    except Exception as exc:
+        logger.error(f"⚠️ Erreur inattendue lors de la préparation du remboursement: {exc}")
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "payout_status": "refund_failed",
+                "payout_failure_reason": "Erreur inattendue lors de la préparation du remboursement",
+                "updated_at": now_iso,
+            }}
+        )
+        return "refund_failed"
+
+    # Token persisté AVANT le submit : si le submit lève (timeout réseau), le
+    # paiement reste identifiable et confirmable via l'IPN ou un check-status.
+    await db.payments.update_one(
+        {"id": payment_record["id"]},
+        {"$set": {
+            "disburse_token": disburse_token,
+            "payout_kind": "refund",
+            "updated_at": now_iso,
+        }}
+    )
+
+    try:
+        submit_result = submit_paydunya_disburse_invoice(
+            disburse_token,
+            disburse_id=f"refund_{payment_record['id']}",
+        )
+    except Exception as exc:
+        # Réponse INCERTAINE : on reste "refunding" (à confirmer par l'IPN ou
+        # check-status) plutôt que "refund_failed" — voir docstring.
+        logger.error(f"⚠️ Réponse incertaine du submit PayDunya (remboursement): {exc}")
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "payout_status": "refunding",
+                "disburse_error": f"Réponse incertaine du submit: {exc}",
+                "updated_at": now_iso,
+            }}
+        )
+        return "refunding"
+
+    provider_status = str(
+        submit_result.get("status")
+        or ("success" if str(submit_result.get("response_code")) == "00" else "failed")
+    ).strip().lower()
+
+    await db.payments.update_one(
+        {"id": payment_record["id"]},
+        {"$set": {
+            "disburse_provider_response": submit_result,
+            "updated_at": now_iso,
+        }}
+    )
+
+    if provider_status == "success":
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {"payout_status": "refunded"}}
+        )
+        return "refunded"
+    if provider_status == "pending":
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {"payout_status": "refunding"}}
+        )
+        return "refunding"
+
+    await db.payments.update_one(
+        {"id": payment_record["id"]},
+        {"$set": {
+            "payout_status": "refund_failed",
+            "payout_failure_reason": submit_result.get("response_text") or "Échec du remboursement PayDunya",
+        }}
+    )
+    return "refund_failed"
+
+
 @router.delete("/jobs/{job_id}")
 async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
@@ -278,100 +420,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
                 detail="Un remboursement est déjà en cours pour cette mission"
             )
 
-        payer = await db.users.find_one({"id": payment_record.get("payer_id")})
-        payer_accounts = (payer or {}).get("payment_accounts") or {}
-        refund_method = None
-        refund_phone = None
-        if payer_accounts.get("orange_money"):
-            refund_method, refund_phone = "orange_money", payer_accounts["orange_money"]
-        elif payer_accounts.get("wave"):
-            refund_method, refund_phone = "wave", payer_accounts["wave"]
-
-        if not refund_method or not refund_phone:
-            await db.payments.update_one(
-                {"id": payment_record["id"]},
-                {"$set": {
-                    "payout_status": "refund_failed",
-                    "payout_failure_reason": "Le client n'a pas de compte Orange Money ou Wave configuré",
-                    "updated_at": now_iso,
-                }}
-            )
-            refund_outcome = "refund_failed"
-        else:
-            try:
-                withdraw_mode = get_paydunya_withdraw_mode(
-                    refund_method, (payer or {}).get("country")
-                )
-                account_alias = strip_country_code_for_disburse(refund_phone)
-                invoice = create_paydunya_disburse_invoice(
-                    account_alias=account_alias,
-                    amount=payment_record.get("amount") or 0,
-                    withdraw_mode=withdraw_mode,
-                    callback_url=build_disburse_callback_url(),
-                )
-                disburse_token = invoice.get("disburse_token")
-                submit_result = submit_paydunya_disburse_invoice(
-                    disburse_token,
-                    disburse_id=f"refund_{payment_record['id']}",
-                )
-                provider_status = str(
-                    submit_result.get("status")
-                    or ("success" if str(submit_result.get("response_code")) == "00" else "failed")
-                )
-
-                await db.payments.update_one(
-                    {"id": payment_record["id"]},
-                    {"$set": {
-                        "disburse_token": disburse_token,
-                        "disburse_provider_response": submit_result,
-                        "payout_kind": "refund",
-                        "updated_at": now_iso,
-                    }}
-                )
-
-                if provider_status == "success":
-                    await db.payments.update_one(
-                        {"id": payment_record["id"]},
-                        {"$set": {"payout_status": "refunded"}}
-                    )
-                    refund_outcome = "refunded"
-                elif provider_status == "pending":
-                    await db.payments.update_one(
-                        {"id": payment_record["id"]},
-                        {"$set": {"payout_status": "refunding"}}
-                    )
-                    refund_outcome = "refunding"
-                else:
-                    await db.payments.update_one(
-                        {"id": payment_record["id"]},
-                        {"$set": {
-                            "payout_status": "refund_failed",
-                            "payout_failure_reason": submit_result.get("response_text") or "Échec du remboursement PayDunya",
-                        }}
-                    )
-                    refund_outcome = "refund_failed"
-            except HTTPException as exc:
-                await db.payments.update_one(
-                    {"id": payment_record["id"]},
-                    {"$set": {
-                        "payout_status": "refund_failed",
-                        "payout_failure_reason": str(exc.detail),
-                        "updated_at": now_iso,
-                    }}
-                )
-                refund_outcome = "refund_failed"
-            except Exception as exc:
-                logger.error(f"⚠️ Erreur inattendue lors du remboursement: {exc}")
-                await db.payments.update_one(
-                    {"id": payment_record["id"]},
-                    {"$set": {
-                        "payout_status": "refund_failed",
-                        "payout_failure_reason": "Erreur inattendue lors du remboursement",
-                        "updated_at": now_iso,
-                    }}
-                )
-                refund_outcome = "refund_failed"
-
+        refund_outcome = await execute_paydunya_refund(payment_record)
         refunded_amount = payment_record.get("amount")
 
     await db.jobs.update_one(
@@ -774,14 +823,61 @@ async def complete_job_and_release_payment(
             callback_url=build_disburse_callback_url(),
         )
         disburse_token = invoice.get("disburse_token")
+    except HTTPException as exc:
+        # get-invoice REFUSÉ : PayDunya n'a rien exécuté → échec sûr, relançable.
+        await _mark_release_failed(str(exc.detail))
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {
+            "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
+            "job": Job(**updated_job).model_dump(),
+            "payout_status": "release_failed",
+        }
+    except Exception as exc:
+        logger.error(f"⚠️ Erreur inattendue lors de la préparation du versement: {exc}")
+        await _mark_release_failed("Erreur inattendue lors de la préparation du versement")
+        updated_job = await db.jobs.find_one({"id": job_id})
+        return {
+            "message": "Mission clôturée, mais le versement automatique a échoué. Un versement manuel est nécessaire.",
+            "job": Job(**updated_job).model_dump(),
+            "payout_status": "release_failed",
+        }
 
+    # Token persisté AVANT le submit : si le submit lève (timeout réseau), le
+    # versement reste identifiable et confirmable via l'IPN ou un check-status.
+    await db.payments.update_one(
+        {"id": payment_record["id"]},
+        {"$set": {
+            "disburse_token": disburse_token,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+
+    try:
         submit_result = submit_paydunya_disburse_invoice(disburse_token, disburse_id=payment_record["id"])
-        provider_status = str(submit_result.get("status") or ("success" if str(submit_result.get("response_code")) == "00" else "failed"))
+    except Exception as exc:
+        # Réponse INCERTAINE (timeout réseau…) : PayDunya a peut-être exécuté
+        # le versement. On garde "releasing" (confirmation par l'IPN ou un
+        # check-status) au lieu de "release_failed" : un échec définitif
+        # permettrait une relance → risque de DOUBLE versement au travailleur.
+        logger.error(f"⚠️ Réponse incertaine du submit PayDunya (versement travailleur): {exc}")
+        await db.payments.update_one(
+            {"id": payment_record["id"]},
+            {"$set": {
+                "payout_status": "releasing",
+                "disburse_error": f"Réponse incertaine du submit: {exc}",
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        final_payout_status = "releasing"
+    else:
+        provider_status = str(
+            submit_result.get("status")
+            or ("success" if str(submit_result.get("response_code")) == "00" else "failed")
+        ).strip().lower()
 
         await db.payments.update_one(
             {"id": payment_record["id"]},
             {"$set": {
-                "disburse_token": disburse_token,
                 "disburse_provider_response": submit_result,
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
@@ -803,15 +899,6 @@ async def complete_job_and_release_payment(
             )
 
         await db.payments.update_one({"id": payment_record["id"]}, {"$set": {"payout_status": final_payout_status}})
-
-    except HTTPException as exc:
-        await _mark_release_failed(str(exc.detail))
-        updated_job = await db.jobs.find_one({"id": job_id})
-        return {
-            "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
-            "job": Job(**updated_job).model_dump(),
-            "payout_status": "release_failed",
-        }
 
     await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
 
