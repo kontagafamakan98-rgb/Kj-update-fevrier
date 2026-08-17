@@ -5,10 +5,20 @@ import { buildApiUrl } from '../utils/backendUrl';
 /**
  * SERVICE DE GÉOLOCALISATION ULTRA-PRÉCIS - 100% DE PRÉCISION
  * Système multi-méthodes pour une détection parfaite de la localisation en Afrique de l'Ouest
+ *
+ * Centralisé derrière le backend Kojo :
+ *  - La base géographique (villes/quartiers) est servie par
+ *    `/api/geolocation/cities` (source de vérité) et mise en cache localement.
+ *  - Le reverse geocoding passe par `/api/geolocation/reverse` (plus d'appel
+ *    direct à nominatim.openstreetmap.org).
+ *  - La détection IP passe par `/api/geolocation/detect` (plus d'appel direct
+ *    à ipapi.co / ipinfo.io). La CSP du navigateur est ainsi réduite.
  */
 
-// Base de données géographique ultra-précise des villes ouest-africaines
-const PRECISE_GEOGRAPHIC_DATABASE = {
+// Fallback compact (niveau pays) — utilisé uniquement si la base complète
+// n'a pas encore été chargée depuis le backend (premier rendu, hors-ligne).
+// Les villes/quartiers ne vivent que côté backend.
+const FALLBACK_COUNTRY_DATA = {
   mali: {
     country: 'Mali',
     nameFrench: 'Mali',
@@ -16,56 +26,8 @@ const PRECISE_GEOGRAPHIC_DATABASE = {
     phonePrefix: '+223',
     currency: 'XOF',
     language: 'fr',
-    bounds: {
-      north: 25.000000,
-      south: 10.159970,
-      east: 4.270000,
-      west: -12.242200
-    },
-    majorCities: [
-      {
-        name: 'Bamako',
-        coordinates: { lat: 12.6392, lng: -8.0029 },
-        districts: [
-          { name: 'Commune I (Centre)', coords: { lat: 12.6465, lng: -8.0038 }},
-          { name: 'Commune II (Badalabougou)', coords: { lat: 12.6528, lng: -7.9881 }},
-          { name: 'Commune III (Point G)', coords: { lat: 12.6683, lng: -7.9847 }},
-          { name: 'Commune IV (Lafiabougou)', coords: { lat: 12.6245, lng: -7.9532 }},
-          { name: 'Commune V (Baco-Djicoroni)', coords: { lat: 12.6089, lng: -8.0156 }},
-          { name: 'Commune VI (Sénou)', coords: { lat: 12.5338, lng: -7.9503 }},
-          { name: 'ACI 2000', coords: { lat: 12.6158, lng: -7.9922 }},
-          { name: 'Hippodrome', coords: { lat: 12.6347, lng: -8.0183 }},
-          { name: 'Plateau du Koulouba', coords: { lat: 12.6528, lng: -8.0094 }},
-          { name: 'Heremakono', coords: { lat: 12.6712, lng: -7.9623 }}
-        ]
-      },
-      {
-        name: 'Sikasso',
-        coordinates: { lat: 11.3176, lng: -5.6670 },
-        districts: [
-          { name: 'Centre-Ville', coords: { lat: 11.3198, lng: -5.6692 }},
-          { name: 'Médina', coords: { lat: 11.3234, lng: -5.6578 }},
-          { name: 'Lafiabougou', coords: { lat: 11.3089, lng: -5.6734 }}
-        ]
-      },
-      {
-        name: 'Ségou',
-        coordinates: { lat: 13.4317, lng: -6.2633 },
-        districts: [
-          { name: 'Centre', coords: { lat: 13.4317, lng: -6.2633 }},
-          { name: 'Pelengana', coords: { lat: 13.4256, lng: -6.2789 }}
-        ]
-      },
-      {
-        name: 'Mopti',
-        coordinates: { lat: 14.4843, lng: -4.1960 },
-        districts: [
-          { name: 'Centre', coords: { lat: 14.4843, lng: -4.1960 }},
-          { name: 'Komoguel', coords: { lat: 14.4912, lng: -4.1823 }},
-          { name: 'Sévaré', coords: { lat: 14.3937, lng: -4.1735 }}
-        ]
-      }
-    ]
+    bounds: { north: 25.0, south: 10.15997, east: 4.27, west: -12.2422 },
+    majorCities: []
   },
   senegal: {
     country: 'Senegal',
@@ -74,48 +36,8 @@ const PRECISE_GEOGRAPHIC_DATABASE = {
     phonePrefix: '+221',
     currency: 'XOF',
     language: 'fr',
-    bounds: {
-      north: 16.691700,
-      south: 12.307500,
-      east: -11.355700,
-      west: -17.535400
-    },
-    majorCities: [
-      {
-        name: 'Dakar',
-        coordinates: { lat: 14.6928, lng: -17.4467 },
-        districts: [
-          { name: 'Plateau', coords: { lat: 14.6928, lng: -17.4467 }},
-          { name: 'Médina', coords: { lat: 14.6789, lng: -17.4634 }},
-          { name: 'Grand Dakar', coords: { lat: 14.7167, lng: -17.4667 }},
-          { name: 'Parcelles Assainies', coords: { lat: 14.7645, lng: -17.3972 }},
-          { name: 'Liberté 6', coords: { lat: 14.7456, lng: -17.4728 }},
-          { name: 'Point E', coords: { lat: 14.7123, lng: -17.4689 }},
-          { name: 'Almadies', coords: { lat: 14.7456, lng: -17.5234 }},
-          { name: 'Ouakam', coords: { lat: 14.7389, lng: -17.4894 }},
-          { name: 'Yoff', coords: { lat: 14.7578, lng: -17.4711 }},
-          { name: 'Ngor', coords: { lat: 14.7622, lng: -17.5089 }}
-        ]
-      },
-      {
-        name: 'Thiès',
-        coordinates: { lat: 14.7886, lng: -16.9246 },
-        districts: [
-          { name: 'Centre', coords: { lat: 14.7886, lng: -16.9246 }},
-          { name: 'Randoulène', coords: { lat: 14.7967, lng: -16.9123 }},
-          { name: 'Hersent', coords: { lat: 14.7823, lng: -16.9389 }}
-        ]
-      },
-      {
-        name: 'Kaolack',
-        coordinates: { lat: 14.1514, lng: -16.0726 },
-        districts: [
-          { name: 'Médina Baye', coords: { lat: 14.1589, lng: -16.0678 }},
-          { name: 'Dialègne', coords: { lat: 14.1478, lng: -16.0823 }},
-          { name: 'Ndangane', coords: { lat: 14.1456, lng: -16.0634 }}
-        ]
-      }
-    ]
+    bounds: { north: 16.6917, south: 12.3075, east: -11.3557, west: -17.5354 },
+    majorCities: []
   },
   burkina_faso: {
     country: 'Burkina Faso',
@@ -124,95 +46,18 @@ const PRECISE_GEOGRAPHIC_DATABASE = {
     phonePrefix: '+226',
     currency: 'XOF',
     language: 'fr',
-    bounds: {
-      north: 15.084100,
-      south: 9.401100,
-      east: 2.405000,
-      west: -5.518900
-    },
-    majorCities: [
-      {
-        name: 'Ouagadougou',
-        coordinates: { lat: 12.3714, lng: -1.5197 },
-        districts: [
-          { name: 'Zone du Bois', coords: { lat: 12.3456, lng: -1.5089 }},
-          { name: 'Cissin', coords: { lat: 12.3534, lng: -1.5456 }},
-          { name: 'Gounghin', coords: { lat: 12.3823, lng: -1.5234 }},
-          { name: 'Kamsaoghin', coords: { lat: 12.3567, lng: -1.4967 }},
-          { name: 'Bogodogo', coords: { lat: 12.4012, lng: -1.4823 }},
-          { name: 'Dassasgho', coords: { lat: 12.3289, lng: -1.5378 }},
-          { name: 'Tampouy', coords: { lat: 12.4156, lng: -1.5089 }},
-          { name: 'Patte d\'Oie', coords: { lat: 12.3678, lng: -1.5456 }}
-        ]
-      },
-      {
-        name: 'Bobo-Dioulasso',
-        coordinates: { lat: 11.1781, lng: -4.2978 },
-        districts: [
-          { name: 'Secteur 1', coords: { lat: 11.1823, lng: -4.2934 }},
-          { name: 'Secteur 15', coords: { lat: 11.1689, lng: -4.3123 }},
-          { name: 'Koko', coords: { lat: 11.1756, lng: -4.2823 }}
-        ]
-      },
-      {
-        name: 'Koudougou',
-        coordinates: { lat: 12.2518, lng: -2.3648 },
-        districts: [
-          { name: 'Centre', coords: { lat: 12.2518, lng: -2.3648 }},
-          { name: 'Issouka', coords: { lat: 12.2456, lng: -2.3723 }},
-          { name: 'Dapoya', coords: { lat: 12.2589, lng: -2.3567 }}
-        ]
-      }
-    ]
+    bounds: { north: 15.0841, south: 9.4011, east: 2.405, west: -5.5189 },
+    majorCities: []
   },
   cote_divoire: {
     country: 'Ivory Coast',
-    nameFrench: 'Côte d\'Ivoire',
+    nameFrench: "Côte d'Ivoire",
     flag: '🇨🇮',
     phonePrefix: '+225',
     currency: 'XOF',
     language: 'fr',
-    bounds: {
-      north: 10.740200,
-      south: 4.357100,
-      east: -2.494700,
-      west: -8.602400
-    },
-    majorCities: [
-      {
-        name: 'Abidjan',
-        coordinates: { lat: 5.3600, lng: -4.0083 },
-        districts: [
-          { name: 'Plateau', coords: { lat: 5.3167, lng: -4.0333 }},
-          { name: 'Cocody', coords: { lat: 5.3578, lng: -3.9889 }},
-          { name: 'Marcory', coords: { lat: 5.2978, lng: -4.0156 }},
-          { name: 'Treichville', coords: { lat: 5.2856, lng: -4.0267 }},
-          { name: 'Yopougon', coords: { lat: 5.3556, lng: -4.0889 }},
-          { name: 'Adjamé', coords: { lat: 5.3678, lng: -4.0234 }},
-          { name: 'Abobo', coords: { lat: 5.4178, lng: -4.0156 }},
-          { name: 'Koumassi', coords: { lat: 5.2889, lng: -3.9767 }},
-          { name: 'Port-Bouët', coords: { lat: 5.2356, lng: -3.9234 }}
-        ]
-      },
-      {
-        name: 'Yamoussoukro',
-        coordinates: { lat: 6.8276, lng: -5.2893 },
-        districts: [
-          { name: 'Centre', coords: { lat: 6.8276, lng: -5.2893 }},
-          { name: 'Habitat', coords: { lat: 6.8234, lng: -5.2756 }},
-          { name: 'Millionnaire', coords: { lat: 6.8356, lng: -5.2967 }}
-        ]
-      },
-      {
-        name: 'Bouaké',
-        coordinates: { lat: 7.6906, lng: -5.0300 },
-        districts: [
-          { name: 'Centre', coords: { lat: 7.6906, lng: -5.0300 }},
-          { name: 'Air France 2', coords: { lat: 7.6834, lng: -5.0234 }},
-          { name: 'Koko', coords: { lat: 7.6978, lng: -5.0423 }}
-        ]
-      }
-    ]
+    bounds: { north: 10.7402, south: 4.3571, east: -2.4947, west: -8.6024 },
+    majorCities: []
   }
 };
 
@@ -233,9 +78,65 @@ const normalizeCountryCode = (code = '') => {
   return COUNTRY_CODE_ALIASES[value] || value;
 };
 
-// Services de géolocalisation IP - Utilisation du backend Kojo en priorité
+// ---------------------------------------------------------------------------
+// Base géographique chargée depuis le backend (source de vérité)
+// ---------------------------------------------------------------------------
+const DB_CACHE_KEY = 'kojo_geo_db';
+const DB_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours
+
+let geographicDatabase = null;
+let databaseLoadPromise = null;
+
+const hydrateDatabaseFromCache = () => {
+  try {
+    const cached = localStorage.getItem(DB_CACHE_KEY);
+    if (!cached) return;
+    const parsed = JSON.parse(cached);
+    if (parsed && parsed.data && parsed.timestamp && (Date.now() - parsed.timestamp) < DB_CACHE_TTL) {
+      geographicDatabase = parsed.data;
+      devLog.info('🗺️ Base géographique chargée depuis le cache local');
+    }
+  } catch (e) {
+    devLog.info('⚠️ Cache base géographique illisible:', e?.message);
+  }
+};
+
+const getDatabase = () => geographicDatabase || FALLBACK_COUNTRY_DATA;
+
+const loadGeographicDatabase = async () => {
+  if (databaseLoadPromise) return databaseLoadPromise;
+  databaseLoadPromise = (async () => {
+    try {
+      const response = await fetch(buildApiUrl('/geolocation/cities'), {
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      const countries = data?.countries || data?.database;
+      if (countries && typeof countries === 'object' && Object.keys(countries).length > 0) {
+        geographicDatabase = countries;
+        try {
+          localStorage.setItem(DB_CACHE_KEY, JSON.stringify({ data: countries, timestamp: Date.now() }));
+        } catch (e) {
+          devLog.info('⚠️ Impossible de mettre en cache la base géographique:', e?.message);
+        }
+        devLog.info('✅ Base géographique chargée depuis le backend');
+      }
+    } catch (error) {
+      safeLog.error('⚠️ Base géographique indisponible, fallback local:', error);
+    }
+    return getDatabase();
+  })();
+  return databaseLoadPromise;
+};
+
+hydrateDatabaseFromCache();
+
+// Services de géolocalisation IP — uniquement le backend Kojo (plus d'appels
+// directs à ipapi.co / ipinfo.io depuis le navigateur → CSP réduite).
 const IP_GEOLOCATION_SERVICES = [
-  // Service Kojo Backend (priorité maximale - pas d'erreurs CORS)
   {
     name: 'KojoBackend',
     url: buildApiUrl('/geolocation/detect'),
@@ -251,45 +152,6 @@ const IP_GEOLOCATION_SERVICES = [
         longitude: data.country.coordinates?.lng || -17.4467,
         accuracy: data.detected ? 95 : 80,
         timezone: data.country.timezone
-      };
-    }
-  },
-  // Service ipapi.co (fallback fiable)
-  {
-    name: 'ipapi.co',
-    url: 'https://ipapi.co/json/',
-    isBackend: false,
-    parser: (data) => {
-      if (!data.country_code) return null;
-      return {
-        country: data.country_code,
-        countryName: data.country_name || '',
-        city: data.city || '',
-        region: data.region || '',
-        latitude: data.latitude || 0,
-        longitude: data.longitude || 0,
-        accuracy: 85,
-        timezone: data.timezone || ''
-      };
-    }
-  },
-  // Service ipinfo.io (fallback tertiaire)
-  {
-    name: 'ipinfo.io',
-    url: 'https://ipinfo.io/json',
-    isBackend: false,
-    parser: (data) => {
-      if (!data.country) return null;
-      const [lat, lng] = (data.loc || '0,0').split(',').map(Number);
-      return {
-        country: data.country,
-        countryName: '',
-        city: data.city || '',
-        region: data.region || '',
-        latitude: lat,
-        longitude: lng,
-        accuracy: 75,
-        timezone: data.timezone || ''
       };
     }
   }
@@ -365,6 +227,10 @@ class PreciseGeolocationService {
     devLog.info('🎯 Démarrage détection géolocalisation ultra-précise...');
 
     const startTime = Date.now();
+
+    // La base géographique (villes/quartiers) doit être disponible pour
+    // identifier la localisation depuis les coordonnées GPS.
+    await loadGeographicDatabase();
 
     if (this.isDetecting) {
       devLog.info('⏳ Détection déjà en cours...');
@@ -572,12 +438,13 @@ class PreciseGeolocationService {
     });
   }
 
+  // Reverse geocoding via le backend Kojo (plus d'appel direct à Nominatim)
   async reverseGeocodePrecise(latitude, longitude) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
 
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=1`;
+      const url = buildApiUrl(`/geolocation/reverse?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`);
       const response = await fetch(url, {
         method: 'GET',
         signal: controller ? controller.signal : undefined,
@@ -593,7 +460,7 @@ class PreciseGeolocationService {
 
       return await response.json();
     } catch (error) {
-      devLog.info('⚠️ Reverse geocoding Nominatim échoué:', error.message);
+      devLog.info('⚠️ Reverse geocoding backend échoué:', error.message);
       return null;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
@@ -603,7 +470,7 @@ class PreciseGeolocationService {
   buildPreciseAddressFromReverseData(reverseData, fallbackLocationData, latitude, longitude) {
     const address = reverseData?.address || {};
     const countryCode = normalizeCountryCode(address.country_code || fallbackLocationData?.countryCode || '');
-    const countryData = PRECISE_GEOGRAPHIC_DATABASE[countryCode];
+    const countryData = getDatabase()[countryCode];
 
     const streetName = address.road || address.pedestrian || address.footway || address.street || address.path || '';
     const houseNumber = address.house_number || '';
@@ -679,18 +546,18 @@ class PreciseGeolocationService {
   }
 
   /**
-   * GÉOLOCALISATION IP MULTIPLE AVEC VALIDATION CROISÉE
+   * GÉOLOCALISATION IP (backend Kojo uniquement)
    */
   async getMultiIPGeolocation() {
-    devLog.info('🌐 Tentative géolocalisation IP multi-services...');
-    
+    devLog.info('🌐 Tentative géolocalisation IP via backend Kojo...');
+
     const results = [];
-    
+
     // Tester tous les services IP en parallèle
     const promises = IP_GEOLOCATION_SERVICES.map(async (service) => {
       try {
         devLog.info(`📡 Test service ${service.name}...`);
-        
+
         const response = await fetch(service.url, {
           method: 'GET',
           timeout: 5000,
@@ -706,9 +573,9 @@ class PreciseGeolocationService {
 
         const data = await response.json();
         const parsed = service.parser(data);
-        
+
         devLog.info(`✅ ${service.name} réponse:`, parsed);
-        
+
         // Accepter toute localisation valide (pas seulement Afrique de l'Ouest)
         if (parsed && parsed.latitude && parsed.longitude) {
           results.push({
@@ -731,7 +598,7 @@ class PreciseGeolocationService {
 
     // Validation croisée des résultats
     const validatedResult = this.crossValidateIPResults(results);
-    
+
     if (!validatedResult) {
       devLog.info('❌ Validation croisée IP échouée');
       return null;
@@ -739,7 +606,7 @@ class PreciseGeolocationService {
 
     // Identifier la localisation précise
     const locationData = this.identifyLocationFromCoordinates(
-      validatedResult.latitude, 
+      validatedResult.latitude,
       validatedResult.longitude
     );
 
@@ -821,8 +688,8 @@ class PreciseGeolocationService {
         return null;
       }
 
-      const countryData = PRECISE_GEOGRAPHIC_DATABASE[bestCountryGuess];
-      if (!countryData) {
+      const countryData = getDatabase()[bestCountryGuess];
+      if (!countryData || !countryData.majorCities?.length) {
         return null;
       }
 
@@ -865,16 +732,17 @@ class PreciseGeolocationService {
       return null;
     }
 
+    const database = getDatabase();
     let bestMatch = null;
     let minDistance = Infinity;
 
     // Parcourir tous les pays et villes
-    for (const [countryCode, countryData] of Object.entries(PRECISE_GEOGRAPHIC_DATABASE)) {
+    for (const [countryCode, countryData] of Object.entries(database)) {
       // Vérifier si dans les limites du pays
-      if (this.isWithinCountryBounds(latitude, longitude, countryData.bounds)) {
-        
+      if (countryData.bounds && this.isWithinCountryBounds(latitude, longitude, countryData.bounds)) {
+
         // Trouver la ville la plus proche
-        for (const city of countryData.majorCities) {
+        for (const city of countryData.majorCities || []) {
           const distance = this.calculateDistance(
             latitude, longitude,
             city.coordinates.lat, city.coordinates.lng
@@ -882,7 +750,7 @@ class PreciseGeolocationService {
 
           if (distance < minDistance) {
             minDistance = distance;
-            
+
             // Trouver le district le plus proche dans cette ville
             let closestDistrict = city.districts[0];
             let minDistrictDistance = Infinity;
@@ -1056,7 +924,8 @@ class PreciseGeolocationService {
    * OBTENIR SUGGESTIONS DE LOCALISATION POUR AUTOCOMPLÉTION
    */
   async getLocationSuggestions(countryCode, searchQuery = '') {
-    const countryData = PRECISE_GEOGRAPHIC_DATABASE[countryCode];
+    await loadGeographicDatabase();
+    const countryData = getDatabase()[countryCode];
     if (!countryData) {
       return [];
     }
@@ -1064,7 +933,7 @@ class PreciseGeolocationService {
     const suggestions = [];
 
     // Ajouter toutes les villes et districts
-    for (const city of countryData.majorCities) {
+    for (const city of countryData.majorCities || []) {
       // Ajouter la ville elle-même
       if (!searchQuery || city.name.toLowerCase().includes(searchQuery.toLowerCase())) {
         suggestions.push({
@@ -1079,8 +948,8 @@ class PreciseGeolocationService {
       }
 
       // Ajouter tous les districts
-      for (const district of city.districts) {
-        if (!searchQuery || 
+      for (const district of city.districts || []) {
+        if (!searchQuery ||
             district.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             city.name.toLowerCase().includes(searchQuery.toLowerCase())) {
           suggestions.push({
@@ -1128,7 +997,7 @@ class PreciseGeolocationService {
    * OBTENIR TOUS LES PAYS SUPPORTÉS
    */
   getSupportedCountries() {
-    return Object.entries(PRECISE_GEOGRAPHIC_DATABASE).map(([code, data]) => ({
+    return Object.entries(getDatabase()).map(([code, data]) => ({
       code,
       name: data.country,
       nameFrench: data.nameFrench,
@@ -1146,12 +1015,13 @@ export default preciseGeolocationService;
 
 // Export des fonctions utilitaires pour compatibilité
 export const detectUserCountry = async (options = {}) => {
+  await loadGeographicDatabase();
   const location = await preciseGeolocationService.detectPreciseLocation(options);
   if (!location) return null;
   if (location.isApproximate && !options.allowApproximate) return null;
 
   const normalizedCountryCode = normalizeCountryCode(location.countryCode || '');
-  const countryData = PRECISE_GEOGRAPHIC_DATABASE[normalizedCountryCode];
+  const countryData = getDatabase()[normalizedCountryCode];
   if (!countryData) {
     // Pays hors base de données - retourner des infos neutres sans biais Sénégal
     return {
@@ -1175,7 +1045,7 @@ export const detectUserCountry = async (options = {}) => {
   };
 };
 
-export const COUNTRIES = Object.entries(PRECISE_GEOGRAPHIC_DATABASE).reduce((acc, [code, data]) => {
+export const COUNTRIES = Object.entries(FALLBACK_COUNTRY_DATA).reduce((acc, [code, data]) => {
   acc[code.toUpperCase()] = {
     code,
     name: data.country,
@@ -1189,7 +1059,7 @@ export const COUNTRIES = Object.entries(PRECISE_GEOGRAPHIC_DATABASE).reduce((acc
 }, {});
 
 export const getCountriesList = () => {
-  return Object.entries(PRECISE_GEOGRAPHIC_DATABASE).map(([code, data]) => ({
+  return Object.entries(getDatabase()).map(([code, data]) => ({
     code,
     name: data.country,
     nameFrench: data.nameFrench,
@@ -1202,11 +1072,11 @@ export const getCountriesList = () => {
 
 export const getCountryByCode = (code) => {
   const normalizedCode = normalizeCountryCode(code);
-  const countryData = PRECISE_GEOGRAPHIC_DATABASE[normalizedCode];
+  const countryData = getDatabase()[normalizedCode];
   if (!countryData) {
     return null;
   }
-  
+
   return {
     code: normalizedCode,
     name: countryData.country,
@@ -1225,10 +1095,10 @@ export const getPhonePrefixByCountry = (countryCode) => {
 
 export const detectCountryFromPhone = (phoneNumber) => {
   if (!phoneNumber) return null;
-  
+
   const cleanPhone = phoneNumber.replace(/\s+/g, '');
-  
-  for (const [code, data] of Object.entries(PRECISE_GEOGRAPHIC_DATABASE)) {
+
+  for (const [code, data] of Object.entries(getDatabase())) {
     if (cleanPhone.startsWith(data.phonePrefix)) {
       return {
         code,
@@ -1246,7 +1116,7 @@ export const detectCountryFromPhone = (phoneNumber) => {
 
 export const formatPhoneNumber = (phone, countryCode) => {
   if (!phone) return '';
-  
+
   const country = getCountryByCode(countryCode);
   const cleanPhone = phone.replace(/[^\d]/g, '');
   const prefix = country?.phonePrefix || '';
@@ -1254,17 +1124,17 @@ export const formatPhoneNumber = (phone, countryCode) => {
   if (!prefix) {
     return phone.trim();
   }
-  
+
   // Si le numéro commence déjà par le préfixe, on le retourne tel quel
   if (phone.startsWith(prefix)) {
     return phone;
   }
-  
+
   // Si le numéro commence par 0, on le remplace par le préfixe
   if (cleanPhone.startsWith('0')) {
     return prefix + ' ' + cleanPhone.substring(1);
   }
-  
+
   // Sinon on ajoute juste le préfixe
   return prefix + ' ' + cleanPhone;
 };
@@ -1276,6 +1146,6 @@ export const getPhoneExampleForCountry = (country) => {
     'burkina_faso': '+226 70 12 34 56',
     'cote_divoire': '+225 07 12 34 56'
   };
-  
+
   return examples[normalizeCountryCode(country?.code || country)] || '+000 XX XXX XX XX';
 };

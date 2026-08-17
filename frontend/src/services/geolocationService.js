@@ -1,5 +1,6 @@
 import { devLog, safeLog } from '../utils/env';
 import geolocationMonitor from '../utils/geolocationMonitor';
+import { buildApiUrl } from '../utils/backendUrl';
 
 // Service de géolocalisation pour la PWA
 export const COUNTRIES = {
@@ -404,75 +405,61 @@ class GeolocationService {
     return R * c;
   }
 
-  // Détection par services IP - appels DIRECTS depuis le navigateur de l'utilisateur
+  // Détection par IP via le backend Kojo (plus d'appels directs ipapi/ipinfo)
   async detectByIPServices() {
-    devLog.info('🌐 Tentative détection IP directe depuis le navigateur...');
-    
-    // Services IP appelés DIRECTEMENT depuis le navigateur (pas via le backend)
-    const ipServices = [
-      {
-        name: 'ipapi.co',
-        url: 'https://ipapi.co/json/',
-        parse: (d) => ({ code: d.country_code, city: d.city, region: d.region, lat: d.latitude, lng: d.longitude, country_name: d.country_name })
-      },
-      {
-        name: 'ipinfo.io',
-        url: 'https://ipinfo.io/json',
-        parse: (d) => {
-          const [lat, lng] = (d.loc || '0,0').split(',').map(Number);
-          return { code: d.country, city: d.city, region: d.region, lat, lng, country_name: '' };
-        }
-      }
-    ];
+    devLog.info('🌐 Tentative détection IP via backend Kojo...');
 
-    for (const service of ipServices) {
-      try {
-        devLog.info(`📡 Test service IP: ${service.name}...`);
-        const response = await fetch(service.url, {
-          signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
-            ? AbortSignal.timeout(5000)
-            : undefined,
-          headers: { 'Accept': 'application/json' }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const parsed = service.parse(data);
-          
-          if (parsed.code && parsed.lat && parsed.lng) {
-            devLog.info(`✅ ${service.name}: ${parsed.city}, ${parsed.country_name} (${parsed.code})`);
-            
-            // Mapper vers les pays supportés par Kojo
-            const countryCodeMapping = {
-              'ML': 'MALI', 'SN': 'SENEGAL', 'BF': 'BURKINA_FASO', 'CI': 'COTE_DIVOIRE'
-            };
-            
-            const countryKey = countryCodeMapping[parsed.code];
-            const country = countryKey ? COUNTRIES[countryKey] : null;
-            
-            // Construire la localisation réelle basée sur l'IP
-            const locationResult = {
-              address: `${parsed.city || ''}, ${parsed.country_name || parsed.code}`,
-              fullAddress: `${parsed.city || ''}${parsed.region ? ', ' + parsed.region : ''}, ${parsed.country_name || parsed.code}`,
-              city: parsed.city || '',
-              district: parsed.region || '',
-              country: parsed.country_name || parsed.code,
-              countryCode: country ? countryKey.toLowerCase() : parsed.code.toLowerCase(),
-              coordinates: { lat: parsed.lat, lng: parsed.lng },
-              accuracy: 0,
-              timestamp: new Date().toISOString(),
-              method: 'ip',
-              confidence: 80
-            };
-            
-            return locationResult;
-          }
-        }
-      } catch (error) {
-        devLog.info(`⚠️ Service ${service.name} échoué: ${error.message}`);
+    try {
+      const response = await fetch(buildApiUrl('/geolocation/detect'), {
+        signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+          ? AbortSignal.timeout(5000)
+          : undefined,
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (!response.ok) {
+        devLog.info(`⚠️ Backend IP échoué: HTTP ${response.status}`);
+        return null;
       }
+
+      const data = await response.json();
+      const country = data?.country;
+      const parsedCode = country?.code || '';
+
+      if (parsedCode) {
+        devLog.info(`✅ Backend IP: ${country.nameFrench || country.name} (${parsedCode})`);
+
+        // Mapper vers les pays supportés par Kojo
+        const countryCodeMapping = {
+          'mali': 'MALI', 'senegal': 'SENEGAL', 'burkina_faso': 'BURKINA_FASO', 'cote_divoire': 'COTE_DIVOIRE'
+        };
+
+        const countryKey = countryCodeMapping[parsedCode];
+        const mapped = countryKey ? COUNTRIES[countryKey] : null;
+
+        // Construire la localisation basée sur le pays détecté
+        const locationResult = {
+          address: `${country.capital || ''}, ${country.nameFrench || country.name}`,
+          fullAddress: `${country.capital || ''}, ${country.nameFrench || country.name}`,
+          city: country.capital || '',
+          district: '',
+          country: country.nameFrench || country.name,
+          countryCode: mapped ? countryKey.toLowerCase() : parsedCode.toLowerCase(),
+          coordinates: country.coordinates
+            ? { lat: country.coordinates.lat, lng: country.coordinates.lng }
+            : null,
+          accuracy: 0,
+          timestamp: new Date().toISOString(),
+          method: 'ip',
+          confidence: 80
+        };
+
+        return locationResult;
+      }
+    } catch (error) {
+      devLog.info(`⚠️ Détection IP backend échouée: ${error.message}`);
     }
-    
+
     devLog.info('❌ Aucun service IP disponible');
     return null;
   }
@@ -764,55 +751,42 @@ export const detectUserCountry = async () => {
     detectionMethods.push('gps_failed');
   }
 
-  // ÉTAPE 3: Détection par IP avec services multiples
-  const ipServices = [
-    {
-      url: 'https://ipapi.co/json/',
-      parse: (d) => d.country_code
-    },
-    {
-      url: 'https://ipinfo.io/json',
-      parse: (d) => d.country
-    }
-  ];
+  // ÉTAPE 3: Détection par IP via le backend Kojo
+  try {
+    devLog.info('🌐 Détection IP via backend Kojo...');
+    const response = await fetch(buildApiUrl('/geolocation/detect'), {
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+        ? AbortSignal.timeout(3000)
+        : undefined,
+      headers: { 'Accept': 'application/json' }
+    });
 
-  for (const service of ipServices) {
-    try {
-      devLog.info(`🌐 Test service IP: ${service.url}`);
-      const response = await fetch(service.url, {
-        signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
-          ? AbortSignal.timeout(3000)
-          : undefined,
-        headers: { 'Accept': 'application/json' }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const countryCode = service.parse(data);
-        devLog.info(`✅ Pays détecté: ${countryCode}`);
-        detectionMethods.push('ip_' + service.url.split('/')[2]);
-        
-        const countryMapping = {
-          'ML': COUNTRIES.MALI,
-          'SN': COUNTRIES.SENEGAL,
-          'BF': COUNTRIES.BURKINA_FASO,
-          'CI': COUNTRIES.COTE_DIVOIRE
-        };
-        
-        if (countryMapping[countryCode]) {
-          const detectedCountry = countryMapping[countryCode];
-          devLog.info(`🎯 Pays confirmé par IP: ${detectedCountry.nameFrench}`);
-          localStorage.setItem('kojo_detected_country', JSON.stringify({
-            country: detectedCountry,
-            timestamp: Date.now(),
-            method: 'ip'
-          }));
-          return detectedCountry;
-        }
+    if (response.ok) {
+      const data = await response.json();
+      const countryCode = data?.country?.code || '';
+      devLog.info(`✅ Pays détecté: ${countryCode}`);
+      detectionMethods.push('ip_backend');
+
+      const countryMapping = {
+        'mali': COUNTRIES.MALI,
+        'senegal': COUNTRIES.SENEGAL,
+        'burkina_faso': COUNTRIES.BURKINA_FASO,
+        'cote_divoire': COUNTRIES.COTE_DIVOIRE
+      };
+
+      if (countryMapping[countryCode]) {
+        const detectedCountry = countryMapping[countryCode];
+        devLog.info(`🎯 Pays confirmé par IP: ${detectedCountry.nameFrench}`);
+        localStorage.setItem('kojo_detected_country', JSON.stringify({
+          country: detectedCountry,
+          timestamp: Date.now(),
+          method: 'ip'
+        }));
+        return detectedCountry;
       }
-    } catch (error) {
-      devLog.info(`⚠️ Service IP échoué: ${error.message}`);
     }
+  } catch (error) {
+    devLog.info(`⚠️ Détection IP backend échouée: ${error.message}`);
   }
 
   // ÉTAPE 4: Détection contextuelle (timezone + langue)

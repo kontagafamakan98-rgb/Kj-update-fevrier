@@ -1,3 +1,5 @@
+import { buildApiUrl } from './backendUrl';
+
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
 export const emptyJobLocation = () => ({
@@ -45,8 +47,9 @@ export const mergeManualAddress = (currentLocation, value) => {
   };
 };
 
+// Reverse geocoding via le backend Kojo (plus d'appel direct à Nominatim)
 const reverseGeocode = async (latitude, longitude) => {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+  const url = buildApiUrl(`/geolocation/reverse?lat=${latitude}&lng=${longitude}`);
   const response = await fetch(url, {
     headers: {
       Accept: 'application/json',

@@ -4,8 +4,92 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from kojo_geo_data import GEOGRAPHIC_DATABASE, find_nearest_location
+
 
 router = APIRouter()
+
+
+@router.get("/geolocation/cities")
+async def get_cities(country: Optional[str] = None):
+    """
+    Base géographique des villes/quartiers ouest-africains (source de vérité).
+
+    Le frontend charge cette base au démarrage (et la met en cache) au lieu
+    d'embarquer une copie complète dans le bundle. Le paramètre `country`
+    (code : mali, senegal, burkina_faso, cote_divoire) filtre sur un seul pays.
+
+    Returns:
+        - countries: dict code -> données complètes (bounds, majorCities,
+          districts avec coordonnées) — ou `data` si `country` est fourni.
+    """
+    if country:
+        code = country.strip().lower().replace(" ", "_")
+        data = GEOGRAPHIC_DATABASE.get(code)
+        if not data:
+            raise HTTPException(status_code=404, detail="Pays inconnu")
+        return {"country": code, "data": data}
+
+    return {
+        "countries": GEOGRAPHIC_DATABASE,
+        "total": len(GEOGRAPHIC_DATABASE),
+    }
+
+
+@router.get("/geolocation/reverse")
+async def reverse_geocode(lat: float, lng: float):
+    """
+    Reverse geocoding local (Afrique de l'Ouest) — remplace l'appel navigateur
+    à nominatim.openstreetmap.org.
+
+    Retourne une structure compatible avec ce que le frontend attendait de
+    Nominatim (display_name + address) pour que les parseurs frontend
+    (`buildPreciseAddressFromReverseData`, `jobLocationRuntime.reverseGeocode`)
+    fonctionnent sans changement.
+
+    Args:
+        lat: Latitude
+        lng: Longitude
+
+    Returns:
+        - display_name: str - Adresse formatée
+        - address: dict - Champs détaillés (suburb, city, country, country_code)
+        - lat/lon: float - Coordonnées écho
+    """
+    match = find_nearest_location(lat, lng)
+
+    if not match:
+        # Hors zone (hors Afrique de l'Ouest) : pas de ville connue, on
+        # retourne les coordonnées brutes — le frontend bascule alors sur
+        # son fallback (coordonnées ou pays du profil).
+        return {
+            "display_name": f"{lat:.6f}, {lng:.6f}",
+            "address": {},
+            "lat": lat,
+            "lon": lng,
+        }
+
+    district = match["district"]
+    city = match["city"]
+    country_name = match["country_name"]
+    if district:
+        display = f"{district}, {city}, {country_name}"
+    else:
+        display = f"{city}, {country_name}"
+
+    return {
+        "display_name": display,
+        "address": {
+            "road": "",
+            "suburb": district,
+            "city": city,
+            "country": country_name,
+            "country_code": match["country_code"],
+            "postcode": "",
+        },
+        "lat": lat,
+        "lon": lng,
+    }
 
 WEST_AFRICA_COUNTRIES = {
     "senegal": {

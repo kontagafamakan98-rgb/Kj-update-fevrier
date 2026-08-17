@@ -46,11 +46,13 @@ export default defineConfig(({ mode }) => {
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://res.cloudinary.com",
-            // Services de géolocalisation IP appelés DIRECTEMENT depuis le
-            // navigateur (geolocationService / preciseGeolocationService).
-            // Sans eux dans connect-src, la CSP bloque ces appels (erreurs
-            // console « Refused to connect »).
-            `connect-src 'self' ${apiOrigin} https://ipapi.co https://ipinfo.io https://nominatim.openstreetmap.org`,
+            // Géolocalisation 100% centralisée derrière le backend Kojo :
+            // détection IP (/geolocation/detect), reverse geocoding
+            // (/geolocation/reverse) et base villes/quartiers
+            // (/geolocation/cities) passent tous par apiOrigin. Plus aucun
+            // appel direct à ipapi.co / ipinfo.io / nominatim depuis le
+            // navigateur → connect-src réduit au strict minimum.
+            `connect-src 'self' ${apiOrigin}`,
             // Cartes : les aperçus de localisation sont des iframes
             // (CreateJob / JobCreateModal → buildMapEmbedUrl) Google Maps ou
             // OpenStreetMap. Sans frame-src, default-src 'self' les bloque

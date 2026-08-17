@@ -119,7 +119,7 @@ def test_no_undefined_names_in_split_modules():
             pass
 
     module_names = [
-        "kojo_core", "kojo_email", "kojo_models", "kojo_payments",
+        "kojo_core", "kojo_email", "kojo_geo_data", "kojo_models", "kojo_payments",
         "kojo_routers_auth", "kojo_routers_geo", "kojo_routers_jobs",
         "kojo_routers_messages", "kojo_routers_notifications",
         "kojo_routers_owner", "kojo_routers_payments", "kojo_routers_support",
