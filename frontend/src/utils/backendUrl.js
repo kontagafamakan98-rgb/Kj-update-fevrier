@@ -50,10 +50,16 @@ export const buildBackendUrl = (path = '') => {
 
 export const buildApiUrl = (path = '') => {
   const normalizedPath = ensureLeadingSlash(path);
+  // Base « nue » (origine sans suffixe /api) : REACT_APP_BACKEND_URL peut
+  // être défini avec OU sans /api (les deux conventions coexistent). On
+  // ajoute le préfixe /api exactement une fois — sinon double préfixe
+  // /api/api (bug réel : GET /api/api/users/payment-accounts → 404).
+  const bareBaseUrl = String(getBackendBaseUrl() || '').replace(/\/api$/i, '');
+
   if (normalizedPath.startsWith('/api/')) {
-    return buildBackendUrl(normalizedPath);
+    return `${bareBaseUrl}${normalizedPath}`;
   }
 
-  return buildBackendUrl(`/api${normalizedPath}`);
+  return `${bareBaseUrl}/api${normalizedPath}`;
 };
 
