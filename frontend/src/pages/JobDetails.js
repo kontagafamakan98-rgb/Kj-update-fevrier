@@ -458,8 +458,8 @@ export default function JobDetails() {
       setSelectedProposalId(proposalId);
       setMessageSuccess(
         location
-          ? 'Travailleur attribué. Votre position lui a été envoyée automatiquement. Redirection vers le paiement...'
-          : 'Travailleur attribué. L’adresse de la mission lui a été envoyée. Redirection vers le paiement...'
+          ? t('assignSuccessWithLocation')
+          : t('assignSuccessWithAddress')
       );
       await loadDiscussionMessages(workerId);
 
@@ -632,24 +632,24 @@ export default function JobDetails() {
               const missionDone = isCompletedJob;
 
               const steps = [
-                { key: 'assigned', label: 'Travailleur attribué', done: true },
-                { key: 'payment', label: 'Paiement effectué', done: paymentDone },
-                { key: 'completed', label: 'Mission terminée', done: missionDone },
+                { key: 'assigned', label: t('stepAssigned'), done: true },
+                { key: 'payment', label: t('stepPayment'), done: paymentDone },
+                { key: 'completed', label: t('stepCompleted'), done: missionDone },
               ];
 
               let statusBadge;
               if (paymentState === 'none') {
-                statusBadge = { text: '⏳ En attente de paiement', className: 'bg-gray-100 text-gray-600 border-gray-200' };
+                statusBadge = { text: t('payStatusNone'), className: 'bg-gray-100 text-gray-600 border-gray-200' };
               } else if (paymentState === 'pending') {
-                statusBadge = { text: '⏳ Paiement en cours de confirmation', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+                statusBadge = { text: t('payStatusPending'), className: 'bg-amber-50 text-amber-700 border-amber-200' };
               } else if (paymentState === 'failed' || paymentState === 'cancelled') {
-                statusBadge = { text: '❌ Paiement échoué', className: 'bg-red-50 text-red-700 border-red-200' };
+                statusBadge = { text: t('payStatusFailed'), className: 'bg-red-50 text-red-700 border-red-200' };
               } else if (paymentDone && payoutState === 'released') {
-                statusBadge = { text: '✅ Payé — versé au travailleur', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+                statusBadge = { text: t('payStatusPaid'), className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
               } else if (paymentDone) {
-                statusBadge = { text: '🔒 Payé — argent séquestré jusqu’à la fin de la mission', className: 'bg-orange-50 text-orange-700 border-orange-200' };
+                statusBadge = { text: t('payStatusEscrowed'), className: 'bg-orange-50 text-orange-700 border-orange-200' };
               } else {
-                statusBadge = { text: '⏳ En attente de paiement', className: 'bg-gray-100 text-gray-600 border-gray-200' };
+                statusBadge = { text: t('payStatusNone'), className: 'bg-gray-100 text-gray-600 border-gray-200' };
               }
 
               return (
@@ -671,7 +671,7 @@ export default function JobDetails() {
                   </div>
 
                   <div className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${statusBadge.className}`}>
-                    {paymentStatusLoading ? 'Vérification du statut de paiement...' : statusBadge.text}
+                    {paymentStatusLoading ? t('payStatusChecking') : statusBadge.text}
                   </div>
 
                   {isJobOwner && paymentState === 'none' && !isCompletedJob && (
@@ -690,7 +690,7 @@ export default function JobDetails() {
                         }}
                         className="rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
                       >
-                        Payer maintenant
+                        {t('payNow')}
                       </button>
                     </div>
                   )}
@@ -713,16 +713,15 @@ export default function JobDetails() {
             <div className="flex items-start gap-3">
               <span className="text-2xl">🛡️</span>
               <div>
-                <div className="font-semibold text-emerald-800">Paiement sécurisé Kojo</div>
+                <div className="font-semibold text-emerald-800">{t('escrowBannerTitle')}</div>
                 <p className="text-sm text-emerald-700 mt-1">
-                  L'argent est <strong>bloqué sur le compte séquestre</strong> jusqu'à la validation de la mission terminée,
-                  puis versé automatiquement au travailleur. Ni le client ni le travailleur ne peut y toucher avant la fin.
+                  {t('escrowBannerText')}
                 </p>
                 <Link
                   to="/how-it-works"
                   className="mt-2 inline-block text-sm font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-800"
                 >
-                  Comment ça marche ? →
+                  {t('howItWorksLink')}
                 </Link>
               </div>
             </div>

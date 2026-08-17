@@ -188,9 +188,9 @@ export default function Home() {
       <section className="py-12 md:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Comment ça marche ?</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">{t('howItWorksTitle')}</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              De la demande à la mission terminée, tout est sécurisé de bout en bout.
+              {t('homeHowItWorksSubtitle')}
             </p>
           </div>
 
@@ -199,9 +199,9 @@ export default function Home() {
               <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">1️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">Publiez ou postulez</h3>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t('homeStep1Title')}</h3>
               <p className="text-gray-600 text-sm">
-                Le client décrit sa mission, les travailleurs qualifiés postulent en quelques secondes depuis leur téléphone.
+                {t('homeStep1Desc')}
               </p>
             </div>
 
@@ -209,9 +209,9 @@ export default function Home() {
               <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">2️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">Payez en séquestre</h3>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t('homeStep2Title')}</h3>
               <p className="text-gray-600 text-sm">
-                L'argent est bloqué sur un compte sécurisé via Orange Money, Wave ou carte. Personne n'y touche avant la fin.
+                {t('homeStep2Desc')}
               </p>
             </div>
 
@@ -219,9 +219,9 @@ export default function Home() {
               <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">3️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">Validez et soyez payé</h3>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t('homeStep3Title')}</h3>
               <p className="text-gray-600 text-sm">
-                Mission terminée ? Le client valide et le travailleur est payé automatiquement. Simple, transparent, sans litige.
+                {t('homeStep3Desc')}
               </p>
             </div>
           </div>
@@ -235,21 +235,18 @@ export default function Home() {
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="text-5xl">🛡️</div>
               <div className="text-center md:text-left">
-                <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">Votre argent est protégé</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t('escrowTrustTitle')}</h2>
                 <p className="text-emerald-800">
-                  Kojo utilise un <strong>paiement séquestre</strong> : le client paie, Kojo bloque les fonds,
-                  et le travailleur n'est payé qu'après validation de la mission terminée.
-                  Ni l'un ni l'autre ne peut retirer l'argent avant la fin — c'est la garantie de confiance
-                  qui protège les deux côtés.
+                  {t('escrowTrustText')}
                 </p>
                 <p className="text-emerald-700 mt-3 text-sm">
-                  ✅ Mobile money (Orange Money, Wave) et carte bancaire &nbsp;•&nbsp; ✅ Versement automatique au travailleur
+                  {t('escrowTrustBullets')}
                 </p>
                 <Link
                   to="/how-it-works"
                   className="mt-4 inline-block rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
                 >
-                  En savoir plus →
+                  {t('learnMore')}
                 </Link>
               </div>
             </div>

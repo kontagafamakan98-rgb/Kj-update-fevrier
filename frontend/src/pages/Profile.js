@@ -154,10 +154,10 @@ export default function Profile() {
       formData.append('file', file);
       const data = await usersAPI.addPortfolioImage(formData);
       setPortfolioImages(Array.isArray(data?.portfolio_images) ? data.portfolio_images : []);
-      setSuccess('Photo de portfolio ajoutée ✅');
+      setSuccess(t('portfolioAdded'));
     } catch (uploadError) {
       safeLog.error('Portfolio upload error:', uploadError);
-      setError(uploadError?.response?.data?.detail || uploadError?.message || 'Échec de l’ajout de la photo.');
+      setError(uploadError?.response?.data?.detail || uploadError?.message || t('portfolioAddError'));
     } finally {
       setPortfolioUploading(false);
       if (event.target) event.target.value = '';
@@ -165,14 +165,14 @@ export default function Profile() {
   };
 
   const handlePortfolioRemove = async (index) => {
-    if (!window.confirm('Supprimer cette photo de portfolio ?')) return;
+    if (!window.confirm(t('portfolioRemoveConfirm'))) return;
     try {
       const data = await usersAPI.removePortfolioImage(index);
       setPortfolioImages(Array.isArray(data?.portfolio_images) ? data.portfolio_images : []);
-      setSuccess('Photo supprimée.');
+      setSuccess(t('portfolioRemoved'));
     } catch (removeError) {
       safeLog.error('Portfolio remove error:', removeError);
-      setError(removeError?.response?.data?.detail || removeError?.message || 'Suppression impossible.');
+      setError(removeError?.response?.data?.detail || removeError?.message || t('portfolioRemoveError'));
     }
   };
 
@@ -208,7 +208,7 @@ export default function Profile() {
               </p>
               <div className="flex items-center mt-2">
                 <span className="text-yellow-300">{'★'.repeat(Math.round(user.rating || 0))}{'☆'.repeat(Math.max(0, 5 - Math.round(user.rating || 0)))}</span>
-                <span className="text-orange-100 ml-2">{user.rating || 0}/5 ({user.total_reviews || 0} avis)</span>
+                <span className="text-orange-100 ml-2">{user.rating || 0}/5 ({t('reviewsCount').replace('{count}', user.total_reviews || 0)})</span>
               </div>
             </div>
           </div>
@@ -218,16 +218,16 @@ export default function Profile() {
         {success && <div className="mx-6 mt-6 bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md">{success}</div>}
 
         <div className="px-6 py-6 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">⭐ Mes avis reçus</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('myReviewsTitle')}</h2>
           {reviews.length === 0 ? (
-            <p className="text-sm text-gray-500">Aucun avis pour le moment. Les notes apparaîtront ici après vos missions terminées.</p>
+            <p className="text-sm text-gray-500">{t('noReviewsYet')}</p>
           ) : (
             <div className="space-y-3">
               {reviews.map((review) => (
                 <div key={review.id} className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-semibold text-gray-900 truncate">
-                      {review.reviewer_name || 'Auteur anonyme'}
+                      {review.reviewer_name || t('anonymousReviewer')}
                     </span>
                     <span className="text-yellow-400 text-sm">
                       {'★'.repeat(Math.max(0, Math.min(5, review.rating)))}{'☆'.repeat(Math.max(0, 5 - Math.min(5, review.rating)))}
@@ -277,19 +277,20 @@ export default function Profile() {
 
         {user.user_type === 'worker' && (
           <div className="px-6 py-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">🖼️ Mes réalisations (portfolio)</h2>
-            <p className="text-sm text-gray-500 mb-4">Montre tes travaux terminés pour rassurer les clients. Jusqu'à 10 photos.</p>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('portfolioTitle')}</h2>
+            <p className="text-sm text-gray-500 mb-4">{t('portfolioHelp')}</p>
             <PortfolioManager
               images={portfolioImages}
               uploading={portfolioUploading}
               onUpload={handlePortfolioUpload}
               onRemove={handlePortfolioRemove}
+              t={t}
             />
           </div>
         )}
 
         <div className="px-6 py-6 border-b border-gray-200">
-          <ReferralCard referral={referral} />
+          <ReferralCard referral={referral} t={t} />
         </div>
 
         <div className="px-6 py-6">
@@ -305,7 +306,7 @@ export default function Profile() {
             to="/support"
             className="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
           >
-            <span>Besoin d'aide ? Contactez le support Kojo</span>
+            <span>{t('supportHelp')}</span>
             <span className="text-orange-600">→</span>
           </Link>
         </div>
@@ -601,7 +602,7 @@ function WorkerProfileCreate({ onCreate, pageT }) {
   );
 }
 
-function PortfolioManager({ images, uploading, onUpload, onRemove }) {
+function PortfolioManager({ images, uploading, onUpload, onRemove, t }) {
   const inputRef = useRef(null);
   return (
     <div>
@@ -609,10 +610,10 @@ function PortfolioManager({ images, uploading, onUpload, onRemove }) {
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-4">
           {images.map((url, index) => (
             <div key={`${url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-gray-200 group">
-              <img src={url} alt={`Réalisation ${index + 1}`} className="h-full w-full object-cover" />
+              <img src={url} alt={`${t('portfolioPhotoAlt')} ${index + 1}`} className="h-full w-full object-cover" />
               <button
                 type="button"
-                aria-label={`Supprimer la réalisation ${index + 1}`}
+                aria-label={`${t('portfolioDeleteAria')} ${index + 1}`}
                 onClick={() => onRemove(index)}
                 className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity"
               >
@@ -622,7 +623,7 @@ function PortfolioManager({ images, uploading, onUpload, onRemove }) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500 mb-4">Aucune photo pour le moment.</p>
+        <p className="text-sm text-gray-500 mb-4">{t('portfolioEmpty')}</p>
       )}
       <input
         ref={inputRef}
@@ -637,13 +638,13 @@ function PortfolioManager({ images, uploading, onUpload, onRemove }) {
         onClick={() => inputRef.current?.click()}
         className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
       >
-        {uploading ? 'Ajout en cours...' : (images.length >= 10 ? 'Portfolio complet (10 max)' : '+ Ajouter une photo')}
+        {uploading ? t('portfolioUploading') : (images.length >= 10 ? t('portfolioFull') : t('portfolioAddPhoto'))}
       </button>
     </div>
   );
 }
 
-function ReferralCard({ referral }) {
+function ReferralCard({ referral, t }) {
   const [copied, setCopied] = useState(false);
   if (!referral?.referral_code) return null;
 
@@ -659,8 +660,8 @@ function ReferralCard({ referral }) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-900 mb-2">🎁 Parrainez un proche</h2>
-      <p className="text-sm text-gray-500 mb-4">Partagez votre code d'invitation : votre proche le saisit à l'inscription pour vous référencer comme parrain.</p>
+      <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('referralTitle')}</h2>
+      <p className="text-sm text-gray-500 mb-4">{t('referralText')}</p>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <code className="rounded-xl border border-dashed border-orange-300 bg-orange-50 px-4 py-2 font-mono text-lg font-bold tracking-widest text-orange-700">
           {referral.referral_code}
@@ -670,7 +671,7 @@ function ReferralCard({ referral }) {
           onClick={copyCode}
           className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
         >
-          {copied ? 'Copié ✓' : 'Copier le code'}
+          {copied ? t('referralCopied') : t('referralCopy')}
         </button>
         {referral.invite_url && (
           <a
@@ -679,7 +680,7 @@ function ReferralCard({ referral }) {
             rel="noreferrer"
             className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            Lien d'invitation ↗
+            {t('referralInviteLink')}
           </a>
         )}
       </div>

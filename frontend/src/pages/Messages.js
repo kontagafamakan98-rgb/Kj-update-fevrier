@@ -146,7 +146,7 @@ export default function Messages() {
             colonne fixe a partir de sm. */}
         <div className={`w-full sm:w-[320px] sm:flex-shrink-0 border-r border-gray-100 flex-col ${activeConversation ? 'hidden sm:flex' : 'flex'}`}>
           <div className="px-4 py-3 border-b border-gray-100">
-            <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Conversations</span>
+            <span className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{t('conversations')}</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -198,7 +198,7 @@ export default function Messages() {
                   type="button"
                   onClick={() => setActiveConversation(null)}
                   className="sm:hidden text-gray-500 hover:text-gray-700"
-                  aria-label="Retour aux conversations"
+                  aria-label={t('backToConversations')}
                 >
                   <ArrowLeft size={20} />
                 </button>
@@ -215,7 +215,7 @@ export default function Messages() {
               <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
                 {messages.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-sm text-gray-400">
-                    Aucun message pour l'instant. Écrivez le premier ci-dessous.
+                    {t('noMessagesYet')}
                   </div>
                 ) : (
                   messages.map((message) => (
@@ -237,7 +237,7 @@ export default function Messages() {
                         <p className={`text-[11px] mt-1 flex items-center justify-end gap-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-400'}`}>
                           {formatMessageTime(message.timestamp)}
                           {message.sender_id === user?.id && (
-                            <span title={message.read_at ? `Lu à ${formatMessageTime(message.read_at)}` : (message.read ? 'Lu' : 'Envoyé')}>
+                            <span title={message.read_at ? t('readReceiptReadAt').replace('{time}', formatMessageTime(message.read_at)) : (message.read ? t('readReceiptRead') : t('readReceiptSent'))}>
                               {message.read_at || message.read ? '✓✓' : '✓'}
                             </span>
                           )}

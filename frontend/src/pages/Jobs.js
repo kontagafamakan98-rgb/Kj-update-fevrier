@@ -16,8 +16,8 @@ import JobsMap from '../components/JobsMap';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 
-function JobCard({ job, user, userType, appliedJobIds }) {
-  const locationText = job.location_text || 'Localisation non précisée';
+function JobCard({ job, user, userType, appliedJobIds, t }) {
+  const locationText = job.location_text || t('locationNotSpecified');
   const jobId = job.id || job._id || job.job_id || job.jobId;
   // Source de vérité serveur (appliedJobIds) quand disponible ; retombe sur
   // le marqueur localStorage seulement si le chargement serveur a échoué,
@@ -49,12 +49,12 @@ function JobCard({ job, user, userType, appliedJobIds }) {
           {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{job.estimated_duration}</div>}
           {userType === 'worker' && job.status === 'open' && !hasApplied && (
             <div className="mt-2 inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 border border-green-200">
-              Postuler disponible
+              {t('applyAvailable')}
             </div>
           )}
           {hasApplied && (
             <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-              Proposition envoyée
+              {t('proposalSent')}
             </div>
           )}
         </div>
@@ -151,9 +151,8 @@ export default function Jobs() {
     });
   }, [jobs, filters, radiusKm, userCoords]);
 
-  const locateMe = () => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      window.alert("La géolocalisation n'est pas disponible sur cet appareil.");
+  const locateMe = () => {    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      window.alert(t('geoUnavailable'));
       return;
     }
     setLocating(true);
@@ -164,9 +163,10 @@ export default function Jobs() {
       },
       () => {
         setLocating(false);
-        window.alert("Impossible d'obtenir votre position. Vérifiez les permissions.");
+        window.alert(t('geoPermissionDenied'));
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 120000 }
+
     );
   };
 
@@ -213,13 +213,13 @@ export default function Jobs() {
               onClick={() => setViewMode('list')}
               className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
             >
-              ☰ Liste
+              ☰ {t('listView')}
             </button>
             <button
               onClick={() => setViewMode('map')}
               className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
             >
-              🗺️ Carte
+              🗺️ {t('mapView')}
             </button>
           </div>
           {user?.user_type === 'client' && (
@@ -261,14 +261,14 @@ export default function Jobs() {
           les jobs portant des coordonnées GPS — les autres sont exclus quand
           le filtre est actif). */}
       <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4">
-        <span className="text-sm font-semibold text-gray-700">📍 Près de moi</span>
+        <span className="text-sm font-semibold text-gray-700">{t('nearMe')}</span>
         <div className="flex items-center gap-2">
           <input
             type="number"
             min="1"
             value={radiusKm}
             onChange={(e) => setRadiusKm(e.target.value)}
-            placeholder="Rayon (km)"
+            placeholder={t('radiusKmPlaceholder')}
             className="w-32 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
           />
           <button
@@ -276,19 +276,19 @@ export default function Jobs() {
             disabled={locating}
             className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
           >
-            {locating ? 'Localisation...' : (userCoords ? 'Ma position ✓' : 'Utiliser ma position')}
+            {locating ? t('locating') : (userCoords ? t('myPosition') : t('useMyPosition'))}
           </button>
           {radiusKm && (
             <button
               onClick={() => { setRadiusKm(''); setUserCoords(null); }}
               className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
             >
-              Effacer
+              {t('clear')}
             </button>
           )}
         </div>
         {radiusKm && !userCoords && (
-          <span className="text-xs text-gray-500">Clique sur « Utiliser ma position » pour activer le rayon.</span>
+          <span className="text-xs text-gray-500">{t('radiusActivateHint')}</span>
         )}
       </div>
 
@@ -298,12 +298,12 @@ export default function Jobs() {
         </div>
       ) : filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-          {user?.user_type === 'client' ? 'Aucun job trouvé pour ce compte.' : 'Aucun job disponible pour le moment.'}
+          {user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {filteredJobs.map((job) => (
-            <JobCard key={job.id} job={job} user={user} userType={user?.user_type} appliedJobIds={appliedJobIds} />
+            <JobCard key={job.id} job={job} user={user} userType={user?.user_type} appliedJobIds={appliedJobIds} t={t} />
           ))}
         </div>
       )}

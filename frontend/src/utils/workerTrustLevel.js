@@ -9,11 +9,13 @@
 //   - Fiable    : note >= 3.5
 //   - Nouveau   : tout le reste (peu/pas d'avis)
 
+import { useLanguage } from '../contexts/LanguageContext';
+
 export const WORKER_LEVELS = {
-  expert: { label: 'Expert', rank: 4, badgeClass: 'bg-purple-100 text-purple-700 border-purple-200' },
-  confirmed: { label: 'Confirmé', rank: 3, badgeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  reliable: { label: 'Fiable', rank: 2, badgeClass: 'bg-blue-100 text-blue-700 border-blue-200' },
-  beginner: { label: 'Nouveau', rank: 1, badgeClass: 'bg-gray-100 text-gray-600 border-gray-200' },
+  expert: { key: 'levelExpert', rank: 4, badgeClass: 'bg-purple-100 text-purple-700 border-purple-200' },
+  confirmed: { key: 'levelConfirmed', rank: 3, badgeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  reliable: { key: 'levelReliable', rank: 2, badgeClass: 'bg-blue-100 text-blue-700 border-blue-200' },
+  beginner: { key: 'levelBeginner', rank: 1, badgeClass: 'bg-gray-100 text-gray-600 border-gray-200' },
 };
 
 const toNumber = (value, fallback = 0) => {
@@ -32,30 +34,45 @@ export const getWorkerLevel = (person = {}) => {
   return WORKER_LEVELS.beginner;
 };
 
-export const getWorkerLevelLabel = (person = {}) => getWorkerLevel(person).label;
+// Étiquette lisible d'un niveau (sans hook) — utilisée par les tests et les
+// contextes hors React. Retourne le libellé de la langue courante via
+// useLanguage quand disponible, sinon le français par défaut.
+export const getWorkerLevelLabel = (person = {}, lang = 'fr') => {
+  const level = getWorkerLevel(person);
+  const labels = {
+    levelExpert: { fr: 'Expert', en: 'Expert', wo: 'Expert', bm: 'Expert', mos: 'Expert' },
+    levelConfirmed: { fr: 'Confirmé', en: 'Confirmed', wo: 'Dëggal nañu ko', bm: 'Dafalila', mos: 'Yõg-m-meng' },
+    levelReliable: { fr: 'Fiable', en: 'Reliable', wo: 'Muy wóor', bm: 'Bɛ se ka dɛmɛ', mos: 'Sẽn tõe n dɩk' },
+    levelBeginner: { fr: 'Nouveau', en: 'New', wo: 'Bees', bm: 'Kura', mos: 'Pɑɑlɑ' },
+  };
+  return (labels[level.key] || {})[lang] || labels[level.key]?.fr || level.key;
+};
 
 // Badge réutilisable (JSX) — petits composants de présentation pur fonction :
 // à utiliser directement dans les cartes/propositions.
 export const WorkerTrustBadge = ({ person, className = '' }) => {
+  const { t } = useLanguage();
   const level = getWorkerLevel(person);
+  const label = t(level.key);
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${level.badgeClass} ${className}`}
-      title={`Niveau de confiance : ${level.label}`}
+      title={t('trustLevelTitle').replace('{level}', label)}
     >
-      {level.label}
+      {label}
     </span>
   );
 };
 
 export const VerifiedBadge = ({ verified, className = '' }) => {
+  const { t } = useLanguage();
   if (!verified) return null;
   return (
     <span
       className={`inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ${className}`}
-      title="Identité vérifiée (email)"
+      title={t('verifiedBadgeTitle')}
     >
-      ✓ Vérifié
+      ✓ {t('verifiedBadge')}
     </span>
   );
 };
