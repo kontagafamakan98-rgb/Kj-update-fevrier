@@ -675,6 +675,8 @@ function ReferralCard({ referral, t }) {
   const history = Array.isArray(referral.reward_history) ? referral.reward_history : [];
   const sponsorReward = Number(referral.sponsor_reward || 500);
   const filleulReward = Number(referral.filleul_reward || 500);
+  const welcomeSponsorReward = Number(referral.welcome_sponsor_reward || 250);
+  const welcomeFilleulReward = Number(referral.welcome_filleul_reward || 250);
 
   return (
     <div>
@@ -710,14 +712,21 @@ function ReferralCard({ referral, t }) {
           <p className="text-sm font-bold text-green-700">{balance.toLocaleString('fr-FR')} FCFA</p>
         </div>
         <p className="text-xs text-green-700 mt-1">{t('referralRewardBalance')}</p>
-        <p className="text-xs text-green-600 mt-2">{interpolate(t('referralRewardHint'), { amount: sponsorReward })}</p>
+        <p className="text-xs text-green-600 mt-2">
+          {interpolate(t('referralWelcomeHint'), { welcomeSponsor: welcomeSponsorReward, welcomeFilleul: welcomeFilleulReward })}
+        </p>
+        <p className="text-xs text-green-600 mt-1">{interpolate(t('referralRewardHint'), { amount: sponsorReward })}</p>
         {history.length > 0 && (
           <div className="mt-3 border-t border-green-200 pt-3">
             <p className="text-xs font-semibold text-green-800 mb-2">{t('referralRewardHistory')}</p>
             <ul className="space-y-1">
               {history.slice(-5).reverse().map((reward, idx) => (
                 <li key={idx} className="text-xs text-green-700 flex items-center justify-between">
-                  <span className="truncate mr-2">{reward.job_title || '—'}</span>
+                  <span className="truncate mr-2">
+                    {reward.type === 'welcome'
+                      ? (reward.role === 'parrain' ? t('referralWelcomeSponsorLabel') : t('referralWelcomeFilleulLabel'))
+                      : (reward.job_title || '—')}
+                  </span>
                   <span className="font-semibold whitespace-nowrap">+{Number(reward.amount || 0).toLocaleString('fr-FR')} FCFA</span>
                 </li>
               ))}

@@ -174,6 +174,7 @@ const pages = {
       welcomeToast: 'Bienvenue {firstName} ! Compte vérifié avec succès 🎉',
       dashboardMessage: 'Bienvenue {firstName} ! Votre compte est vérifié avec {count} moyen(s) de paiement.',
       referralAppliedToast: '🎁 Code de parrainage appliqué avec succès !',
+      referralAppliedWithBonusToast: '🎁 Code de parrainage appliqué ! +{amount} FCFA de bonus de bienvenue crédités.',
       duplicateEmailError: 'Cette adresse email est déjà utilisée'
     },
     en: {
@@ -203,6 +204,7 @@ const pages = {
       welcomeToast: 'Welcome {firstName}! Account verified successfully 🎉',
       dashboardMessage: 'Welcome {firstName}! Your account is verified with {count} payment method(s).',
       referralAppliedToast: '🎁 Referral code applied successfully!',
+      referralAppliedWithBonusToast: '🎁 Referral code applied! +{amount} FCFA welcome bonus credited.',
       duplicateEmailError: 'This email address is already in use'
     }
   },
@@ -580,6 +582,7 @@ pages.paymentVerification.wo = withBase(pages.paymentVerification.fr, {
   backToRegister: '← Dellu ci bind bi',
   securityTitle: 'Kaaraange ak sutura',
   referralAppliedToast: '🎁 Code de parrainage bi japp nañu ko!',
+  referralAppliedWithBonusToast: '🎁 Code de parrainage bi japp nañu ko! +{amount} FCFA ci bonus de bienvenue.',
   duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi'
 });
 pages.paymentVerification.bm = withBase(pages.paymentVerification.fr, {
@@ -593,6 +596,7 @@ pages.paymentVerification.bm = withBase(pages.paymentVerification.fr, {
   backToRegister: '← Segin ka taa inscrire',
   securityTitle: 'Lakanali ni dogoya',
   referralAppliedToast: '🎁 Parrain code tɔgɔ sɛbɛnnen don!',
+  referralAppliedWithBonusToast: '🎁 Parrain code tɔgɔ sɛbɛnnen don! +{amount} FCFA bonus de bienvenue.',
   duplicateEmailError: 'Email adɛrɛsi nin bɛ baara kɛ ka bɔyen'
 });
 pages.paymentVerification.mos = withBase(pages.paymentVerification.fr, {
@@ -606,6 +610,7 @@ pages.paymentVerification.mos = withBase(pages.paymentVerification.fr, {
   backToRegister: '← Lebg n kẽ bindgre',
   securityTitle: 'Pãnga la sutura',
   referralAppliedToast: '🎁 Togs code wã gʋlsame!',
+  referralAppliedWithBonusToast: '🎁 Togs code wã gʋlsame! +{amount} FCFA bonus de bienvenue.',
   duplicateEmailError: 'Email adres-kãngã yaa n beoogame'
 });
 

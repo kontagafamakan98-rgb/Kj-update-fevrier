@@ -253,14 +253,23 @@ async def test_referral_code_applied_at_registration(client):
     # 3. La réponse informe le frontend que le code a été appliqué
     #    (pour afficher le message de confirmation à l'inscription)
     assert resp.json().get("referral_applied") is True
+    assert resp.json().get("referral_welcome_bonus") > 0
 
     # 4. Le nouveau compte est bien rattaché au parrain
     created = await db_find_one("users", {"email": "referral-signup@example.com"})
     assert created, "Nouvel utilisateur introuvable"
     assert created.get("referred_by") == sponsor_code.upper()
 
-    # 5. Sans code (ou code invalide), referral_applied est False et le
-    #    compte reste valide (non bloquant)
+    # 5. Bonus de BIENVENUE crédité aux deux : le parrain et l'invité ont
+    #    reçu leur part dans referral_reward_balance + historique (type welcome)
+    sponsor = await db_find_one("users", {"email": BASE_USER["email"]})
+    assert sponsor["referral_reward_balance"] > 0
+    assert any(r["type"] == "welcome" and r["role"] == "parrain" for r in sponsor["referral_rewards"])
+    assert created["referral_reward_balance"] > 0
+    assert any(r["type"] == "welcome" and r["role"] == "filleul" for r in created["referral_rewards"])
+
+    # 6. Sans code (ou code invalide), referral_applied est False, aucun
+    #    bonus de bienvenue, et le compte reste valide (non bloquant)
     plain_user = dict(BASE_USER)
     plain_user["email"] = "referral-plain@example.com"
     token2 = await issue_email_verification_token(client, plain_user["email"])
@@ -270,6 +279,7 @@ async def test_referral_code_applied_at_registration(client):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json().get("referral_applied") is False
+    assert resp.json().get("referral_welcome_bonus") == 0
 
 
 @pytest.mark.asyncio
@@ -308,7 +318,8 @@ async def test_referral_filleuls_listed(client):
     for f in filleuls:
         assert f["first_name"]
         assert f["completed_first_job"] is False
-        assert f["reward_earned"] == 0
+        # Chaque filleul a déjà reçu son bonus de bienvenue à l'inscription
+        assert f["reward_earned"] > 0
 
     # 4. Un utilisateur sans filleul obtient une liste vide
     other_headers = await auth_headers(client, dict(WORKER_USER, email=f"noref-{_uuid.uuid4().hex[:8]}@example.com"))

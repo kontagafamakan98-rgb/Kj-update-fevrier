@@ -158,9 +158,13 @@ const PaymentVerificationPage = () => {
 
       toast.success(pageT('welcomeToast', { firstName: result.data.user.first_name }));
 
-      // Confirmation du code de parrainage appliqué à l'inscription.
+      // Confirmation du code de parrainage appliqué à l'inscription :
+      // le bonus de bienvenue (FCFA) est mentionné s'il a été crédité.
       if (result.data.referral_applied) {
-        toast.success(pageT('referralAppliedToast'));
+        const welcomeBonus = Number(result.data.referral_welcome_bonus || 0);
+        toast.success(welcomeBonus > 0
+          ? pageT('referralAppliedWithBonusToast', { amount: welcomeBonus })
+          : pageT('referralAppliedToast'));
       }
 
       navigate('/dashboard', {

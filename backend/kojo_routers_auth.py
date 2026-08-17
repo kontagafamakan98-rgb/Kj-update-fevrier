@@ -21,8 +21,12 @@ from kojo_settings import (
     JWT_ALGORITHM,
     JWT_SECRET,
     OWNER_EMAIL,
+    REFERRAL_WELCOME_FILLEUL_REWARD,
+    REFERRAL_WELCOME_SPONSOR_REWARD,
     logger,
 )
+from kojo_models import NotificationType
+from kojo_shared import notify_user
 from kojo_core import (
     create_access_token, get_current_user, hash_password, is_token_revoked,
     is_valid_image_content, log_and_raise_http_exception, revoke_token,
@@ -434,9 +438,12 @@ async def register_user_verified(user_data: UserWithPayment):
 
         # Parrainage : applique le code saisi à l'inscription (?ref=...).
         # Non bloquant : un code invalide est simplement ignoré, l'inscription
-        # reste valide (pas de crédit monétaire automatique à ce stade).
-        # Le booléen referral_applied est renvoyé au client pour afficher une
-        # confirmation à l'inscription quand le code a bien été appliqué.
+        # reste valide. Le booléen referral_applied est renvoyé au client pour
+        # afficher une confirmation à l'inscription quand le code a bien été
+        # appliqué.
+        # Bonus de BIENVENUE : quand le code est appliqué, le parrain ET
+        # l'invité reçoivent chacun un bonus (REFERRAL_WELCOME_*_REWARD),
+        # suivi dans referral_reward_balance / referral_rewards.
         referral_applied = False
         ref_code = str((user_data.referral_code or '').strip()).upper()
         if ref_code:
@@ -448,6 +455,55 @@ async def register_user_verified(user_data: UserWithPayment):
                         {"$set": {"referred_by": ref_code, "updated_at": datetime.now(timezone.utc)}},
                     )
                     referral_applied = True
+
+                    now = datetime.now(timezone.utc)
+                    welcome_record = {
+                        "type": "welcome",
+                        "created_at": now.isoformat(),
+                    }
+                    # Crédit du parrain
+                    await db.users.update_one(
+                        {"id": sponsor["id"]},
+                        {
+                            "$inc": {"referral_reward_balance": REFERRAL_WELCOME_SPONSOR_REWARD},
+                            "$push": {"referral_rewards": {
+                                **welcome_record,
+                                "role": "parrain",
+                                "amount": REFERRAL_WELCOME_SPONSOR_REWARD,
+                                "new_user_id": user_id,
+                            }},
+                        },
+                    )
+                    # Crédit de l'invité
+                    await db.users.update_one(
+                        {"id": user_id},
+                        {
+                            "$inc": {"referral_reward_balance": REFERRAL_WELCOME_FILLEUL_REWARD},
+                            "$push": {"referral_rewards": {
+                                **welcome_record,
+                                "role": "filleul",
+                                "amount": REFERRAL_WELCOME_FILLEUL_REWARD,
+                                "sponsor_id": sponsor["id"],
+                            }},
+                        },
+                    )
+
+                    # Notifications (best-effort, jamais bloquantes)
+                    try:
+                        await notify_user(
+                            user_id=sponsor["id"],
+                            title="🎁 Bonus de parrainage reçu",
+                            body=f"Un nouvel utilisateur s'est inscrit avec votre code : +{REFERRAL_WELCOME_SPONSOR_REWARD} FCFA de bonus.",
+                            notif_type=NotificationType.GENERAL,
+                        )
+                        await notify_user(
+                            user_id=user_id,
+                            title="🎁 Bonus de bienvenue",
+                            body=f"Bienvenue ! +{REFERRAL_WELCOME_FILLEUL_REWARD} FCFA de bonus de bienvenue crédités sur votre compte.",
+                            notif_type=NotificationType.GENERAL,
+                        )
+                    except Exception as exc:
+                        logger.warning(f"⚠️ Notification bonus de parrainage impossible: {exc}")
             except Exception as exc:
                 logger.warning(f"⚠️ Application du code de parrainage impossible: {exc}")
 
@@ -488,6 +544,7 @@ async def register_user_verified(user_data: UserWithPayment):
             "token_type": "bearer",
             "user": user.model_dump(exclude={"password_hash"}),
             "referral_applied": referral_applied,
+            "referral_welcome_bonus": REFERRAL_WELCOME_FILLEUL_REWARD if referral_applied else 0,
             "payment_verification": {
                 "linked_accounts": payment_validation["linked_accounts_count"],
                 "required_minimum": 2 if user_data.user_type == "worker" else 1,

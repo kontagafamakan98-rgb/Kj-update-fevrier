@@ -16,6 +16,8 @@ from kojo_settings import (
     FRONTEND_APP_URL,
     REFERRAL_FILLEUL_REWARD,
     REFERRAL_SPONSOR_REWARD,
+    REFERRAL_WELCOME_FILLEUL_REWARD,
+    REFERRAL_WELCOME_SPONSOR_REWARD,
     logger,
 )
 from kojo_core import (
@@ -588,6 +590,8 @@ async def get_referral(current_user: User = Depends(get_current_user)):
         "reward_history": (user_data or {}).get("referral_rewards") or [],
         "sponsor_reward": REFERRAL_SPONSOR_REWARD,
         "filleul_reward": REFERRAL_FILLEUL_REWARD,
+        "welcome_sponsor_reward": REFERRAL_WELCOME_SPONSOR_REWARD,
+        "welcome_filleul_reward": REFERRAL_WELCOME_FILLEUL_REWARD,
     }
 
 

@@ -135,6 +135,11 @@ PAYMENT_COMMISSION_RATE = float(os.environ.get('PAYMENT_COMMISSION_RATE', '0.14'
 REFERRAL_SPONSOR_REWARD = float(os.environ.get('REFERRAL_SPONSOR_REWARD', '500'))
 REFERRAL_FILLEUL_REWARD = float(os.environ.get('REFERRAL_FILLEUL_REWARD', '500'))
 
+# Bonus de BIENVENUE (FCFA) crédité dès l'inscription quand le code de
+# parrainage est appliqué : une part au parrain, une part à l'invité.
+REFERRAL_WELCOME_SPONSOR_REWARD = float(os.environ.get('REFERRAL_WELCOME_SPONSOR_REWARD', '250'))
+REFERRAL_WELCOME_FILLEUL_REWARD = float(os.environ.get('REFERRAL_WELCOME_FILLEUL_REWARD', '250'))
+
 PAYDUNYA_MODE = os.environ.get('PAYDUNYA_MODE', 'test').strip().lower()
 
 PAYDUNYA_MASTER_KEY = os.environ.get('PAYDUNYA_MASTER_KEY', '').strip()
