@@ -229,11 +229,11 @@ export function CountrySelect({
                 name={`${name || 'country'}_search`}
                 type="text"
                 autoComplete="off"
-                aria-label="Rechercher un pays"
+                aria-label={t('searchCountry')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Rechercher un pays..."
+                placeholder={t('searchCountry')}
                 autoFocus
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
@@ -262,7 +262,7 @@ export function CountrySelect({
                 </button>
               );
             }) : (
-              <div className="px-4 py-3 text-sm text-gray-500">Aucun pays trouvé</div>
+              <div className="px-4 py-3 text-sm text-gray-500">{t('noCountryFound')}</div>
             )}
           </div>
         </div>

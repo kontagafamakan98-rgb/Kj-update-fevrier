@@ -9,6 +9,7 @@ import profilePhotoService from '../services/ProfilePhotoService';
 import { devConsole } from '../utils/devLogger';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ProfilePhoto = ({ 
   user, 
@@ -23,6 +24,7 @@ const ProfilePhoto = ({
   const [loading, setLoading] = useState(false);
   const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const { t } = useLanguage();
 
   const userId = targetUserId || user?.id || user?._id || user?.user_id;
   const isCurrentUser = !targetUserId || targetUserId === user?.id;
@@ -92,7 +94,7 @@ const ProfilePhoto = ({
     }
 
     if (!userId) {
-      alert('Erreur: ID utilisateur manquant');
+      alert(t('userIdMissing'));
       return;
     }
 
@@ -152,7 +154,7 @@ const ProfilePhoto = ({
           setPreviewUrl(null);
         }
         
-        const errorMessage = error.message || 'Erreur lors de la sélection de l\'image';
+        const errorMessage = error.message || t('photoSelectError');
         alert(errorMessage);
       } finally {
         setLoading(false);
@@ -166,11 +168,11 @@ const ProfilePhoto = ({
     if (!editable || !profilePhoto || !isCurrentUser) return;
 
     if (!userId) {
-      alert('Erreur: ID utilisateur manquant');
+      alert(t('userIdMissing'));
       return;
     }
 
-    const confirmed = window.confirm('Êtes-vous sûr de vouloir supprimer votre photo de profil ?');
+    const confirmed = window.confirm(t('confirmDeletePhoto'));
     if (!confirmed) return;
 
     devLog.info('Deleting photo for user:', userId);
@@ -190,7 +192,7 @@ const ProfilePhoto = ({
       
     } catch (error) {
       safeLog.error('Error deleting photo:', error);
-      alert('Erreur lors de la suppression de la photo');
+      alert(t('photoDeleteError'));
     } finally {
       setLoading(false);
     }
@@ -314,7 +316,7 @@ const ProfilePhoto = ({
         ) : displayPhoto ? (
           <img 
             src={displayPhoto} 
-            alt={isCurrentUser ? "Votre photo de profil" : "Photo de profil"}
+            alt={isCurrentUser ? t('yourProfilePhoto') : t('profilePhoto')}
             style={photoStyle}
             onError={(e) => {
               safeLog.error('Image load error:', e);
@@ -344,10 +346,10 @@ const ProfilePhoto = ({
       {/* Bouton de suppression - Only for current user */}
       {editable && isCurrentUser && showDeleteButton && profilePhoto && !loading && (
         <button
-          aria-label="Supprimer la photo"
+          aria-label={t('deletePhoto')}
           onClick={handlePhotoDelete}
           style={deleteButtonStyle}
-          title="Supprimer la photo"
+          title={t('deletePhoto')}
         >
           <X size={12} color="white" />
         </button>

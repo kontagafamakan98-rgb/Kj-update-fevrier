@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import LoadingSpinner from './LoadingSpinner';
+import { useLanguage } from '../contexts/LanguageContext';
 
 /**
  * PageLoader Component
@@ -13,12 +14,14 @@ import LoadingSpinner from './LoadingSpinner';
  * @example
  * <PageLoader message="Chargement de votre dashboard..." />
  */
-const PageLoader = ({ message = 'Chargement...' }) => {
+const PageLoader = ({ message }) => {
+  const { t } = useLanguage();
+  const resolvedMessage = message || t('loading');
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       <div className="text-center space-y-4">
         <LoadingSpinner size="xl" color="orange" />
-        <p className="text-gray-600 text-lg font-medium">{message}</p>
+        <p className="text-gray-600 text-lg font-medium">{resolvedMessage}</p>
       </div>
     </div>
   );
@@ -29,7 +32,7 @@ PageLoader.propTypes = {
 };
 
 PageLoader.defaultProps = {
-  message: 'Chargement...'
+  message: ''
 };
 
 export default PageLoader;

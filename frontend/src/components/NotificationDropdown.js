@@ -45,14 +45,15 @@ const typeIcon = (type) => {
   return icons[type] || '🔔';
 };
 
-// Formater la date relative (ex: "il y a 3 min")
-const relativeTime = (isoDate) => {
+// Formater la date relative (ex: "il y a 3 min") — traduit selon la langue
+const relativeTime = (isoDate, t) => {
   if (!isoDate) return '';
   const diff = (Date.now() - new Date(isoDate).getTime()) / 1000;
-  if (diff < 60)    return 'à l\'instant';
-  if (diff < 3600)  return `il y a ${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
-  if (diff < 604800)return `il y a ${Math.floor(diff / 86400)} j`;
+  const interpolate = (template, vars = {}) => String(template || '').replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
+  if (diff < 60)    return t('notifJustNow');
+  if (diff < 3600)  return interpolate(t('notifMinAgo'), { n: Math.floor(diff / 60) });
+  if (diff < 86400) return interpolate(t('notifHourAgo'), { n: Math.floor(diff / 3600) });
+  if (diff < 604800)return interpolate(t('notifDayAgo'), { n: Math.floor(diff / 86400) });
   return new Date(isoDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 };
 
@@ -73,6 +74,7 @@ export default function NotificationDropdown() {
   const navigate = useNavigate();
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
+  const { t } = useLanguage();
 
   // Fermer en cliquant en dehors
   useEffect(() => {
@@ -124,7 +126,7 @@ export default function NotificationDropdown() {
       <button
         ref={buttonRef}
         onClick={togglePanel}
-        aria-label={`Notifications${unreadCount > 0 ? ` — ${unreadCount} non lue${unreadCount > 1 ? 's' : ''}` : ''}`}
+        aria-label={unreadCount > 0 ? `${t('notificationsTitle')} — ${t('notifUnreadCount').replace('{count}', String(unreadCount))}` : t('notificationsTitle')}
         aria-expanded={isOpen}
         aria-haspopup="true"
         className="relative p-2 rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
@@ -145,7 +147,7 @@ export default function NotificationDropdown() {
         <div
           ref={panelRef}
           role="dialog"
-          aria-label="Centre de notifications"
+          aria-label={t('notifCenterAria')}
           className="absolute right-0 mt-2 w-[340px] sm:w-[380px] max-h-[520px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden"
           style={{ maxHeight: 'calc(100vh - 80px)' }}
         >
@@ -153,10 +155,10 @@ export default function NotificationDropdown() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 flex-shrink-0">
             <div className="flex items-center gap-2">
               <BellIcon className="w-5 h-5 text-orange-600" />
-              <span className="font-semibold text-gray-800 text-sm">Notifications</span>
+              <span className="font-semibold text-gray-800 text-sm">{t('notificationsTitle')}</span>
               {unreadCount > 0 && (
                 <span className="bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">
-                  {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
+                  {t('notifUnreadCount').replace('{count}', String(unreadCount))}
                 </span>
               )}
             </div>
@@ -164,7 +166,7 @@ export default function NotificationDropdown() {
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  title="Tout marquer comme lu"
+                  title={t('markAllRead')}
                   className="p-1.5 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors"
                 >
                   <CheckAllIcon />
@@ -173,7 +175,7 @@ export default function NotificationDropdown() {
               {notifications.length > 0 && (
                 <button
                   onClick={deleteAll}
-                  title="Tout supprimer"
+                  title={t('deleteAll')}
                   className="p-1.5 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <TrashIcon />
@@ -181,7 +183,7 @@ export default function NotificationDropdown() {
               )}
               <button
                 onClick={closePanel}
-                aria-label="Fermer"
+                aria-label={t('closeNotif')}
                 className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 <XIcon />
@@ -198,8 +200,8 @@ export default function NotificationDropdown() {
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                 <div className="text-4xl mb-3">🔔</div>
-                <p className="text-gray-500 text-sm font-medium">Aucune notification</p>
-                <p className="text-gray-400 text-xs mt-1">Vous serez notifié ici des activités importantes.</p>
+                <p className="text-gray-500 text-sm font-medium">{t('noNotifications')}</p>
+                <p className="text-gray-400 text-xs mt-1">{t('notifEmptyHint')}</p>
               </div>
             ) : (
               <ul role="list" className="divide-y divide-gray-50">
@@ -241,14 +243,14 @@ export default function NotificationDropdown() {
                           {notif.body}
                         </p>
                         <p className="text-[11px] text-gray-400 mt-1">
-                          {relativeTime(notif.created_at)}
+                          {relativeTime(notif.created_at, t)}
                         </p>
                       </div>
 
                       {/* Bouton supprimer */}
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
-                        aria-label="Supprimer cette notification"
+                        aria-label={t('deleteNotification')}
                         className="flex-shrink-0 p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
                       >
                         <XIcon />

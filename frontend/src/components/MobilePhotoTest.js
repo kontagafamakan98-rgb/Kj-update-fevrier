@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const MobilePhotoTest = () => {
+  const { t } = useLanguage();
+  const interpolate = (template, vars = {}) => String(template || '').replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
   const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
 
@@ -105,7 +108,7 @@ const MobilePhotoTest = () => {
         </div>
         {selectedPhoto && (
           <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
-            Ajoutée le {selectedPhoto.timestamp}
+            {interpolate(t('addedOn'), { timestamp: selectedPhoto.timestamp })}
           </p>
         )}
       </div>

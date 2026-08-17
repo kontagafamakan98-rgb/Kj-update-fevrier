@@ -93,18 +93,18 @@ function ProposalCard({ proposal, ui, isSelected, isAccepted, onOpenDiscussion, 
         </div>
         <div className="text-right">
           <div className="text-lg font-bold text-orange-600">{formatBudgetRange(amount, null)}</div>
-          <div className="text-xs text-gray-500">{isAccepted ? 'Attribuée' : formatJobStatus(proposal.status || 'pending')}</div>
+          <div className="text-xs text-gray-500">{isAccepted ? ui.attributed : formatJobStatus(proposal.status || 'pending')}</div>
         </div>
       </div>
       {message && <p className="mt-3 text-sm text-gray-700 whitespace-pre-line">{message}</p>}
 
       <div className="mt-4 flex flex-wrap gap-3">
         <button onClick={onOpenDiscussion} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-          {isSelected ? 'Discussion ouverte' : 'Ouvrir la discussion'}
+          {isSelected ? ui.discussionOpen : ui.openDiscussion}
         </button>
         {canAccept && (
           <button onClick={onAccept} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-            {isAccepted ? 'Attribuée' : 'Accepter ce travailleur'}
+            {isAccepted ? ui.attributed : ui.acceptWorker}
           </button>
         )}
       </div>
@@ -347,7 +347,7 @@ export default function JobDetails() {
     } catch (messagesLoadError) {
       safeLog?.error?.('Error loading discussion messages:', messagesLoadError);
       setMessages([]);
-      setMessageError(asTextError(messagesLoadError?.response?.data?.detail, messagesLoadError?.message || 'Impossible de charger la discussion'));
+      setMessageError(asTextError(messagesLoadError?.response?.data?.detail, messagesLoadError?.message || pageT('loadDiscussionFailed')));
     } finally {
       setMessagesLoading(false);
     }
@@ -355,16 +355,16 @@ export default function JobDetails() {
 
   const handleDelete = async () => {
     if (!job) return;
-    const confirmed = window.confirm('Veux-tu vraiment supprimer ce job ?');
+    const confirmed = window.confirm(pageT('confirmDeleteJob'));
     if (!confirmed) return;
 
     setDeleting(true);
     try {
       await deleteJobWithFallbacks(job);
-      window.alert('Job supprimé avec succès');
+      window.alert(pageT('jobDeletedSuccess'));
       navigate('/jobs');
     } catch (deleteError) {
-      window.alert(deleteError?.message || 'Suppression impossible');
+      window.alert(deleteError?.message || pageT('deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -373,11 +373,11 @@ export default function JobDetails() {
   const handleSendMessage = async () => {
     const content = String(messageDraft || '').trim();
     if (!discussionTarget?.id) {
-      setMessageError('Destinataire introuvable.');
+      setMessageError(pageT('recipientNotFound'));
       return;
     }
     if (!content) {
-      setMessageError('Écris un message avant l’envoi.');
+      setMessageError(pageT('writeMessageBeforeSend'));
       return;
     }
 
@@ -392,10 +392,10 @@ export default function JobDetails() {
         content,
       });
       setMessageDraft('');
-      setMessageSuccess('Message envoyé.');
+      setMessageSuccess(pageT('messageSent'));
       await loadDiscussionMessages(discussionTarget.id);
     } catch (sendError) {
-      setMessageError(asTextError(sendError?.response?.data?.detail, sendError?.message || 'Envoi du message impossible'));
+      setMessageError(asTextError(sendError?.response?.data?.detail, sendError?.message || pageT('sendMessageFailed')));
     } finally {
       setSendingMessage(false);
     }
@@ -432,7 +432,7 @@ export default function JobDetails() {
     const workerId = extractProposalWorkerId(proposal);
     const proposalId = extractProposalId(proposal);
     if (!job?.id || !workerId || !proposalId) {
-      setMessageError('Impossible d’attribuer ce travailleur.');
+      setMessageError(pageT('assignFailed'));
       return;
     }
 
@@ -481,7 +481,7 @@ export default function JobDetails() {
     } catch (acceptError) {
       setMessageError(asTextError(
         acceptError?.response?.data?.detail,
-        acceptError?.message || 'Attribution impossible.'
+        acceptError?.message || pageT('acceptFailed')
       ));
     } finally {
       setAcceptingProposal(false);
@@ -490,7 +490,7 @@ export default function JobDetails() {
 
   const handleCompleteJob = async () => {
     if (!job?.id) return;
-    if (!window.confirm('Confirmer que le travail est terminé ? Le paiement séquestré sera versé au travailleur.')) {
+    if (!window.confirm(pageT('confirmCompleteJob'))) {
       return;
     }
 
@@ -506,17 +506,17 @@ export default function JobDetails() {
       setJob((previous) => (previous ? { ...previous, ...updatedJob } : updatedJob));
 
       if (payoutStatus === 'released') {
-        setMessageSuccess('Mission clôturée et paiement versé au travailleur avec succès.');
+        setMessageSuccess(pageT('missionClosedPaid'));
       } else if (payoutStatus === 'releasing') {
-        setMessageSuccess('Mission clôturée. Le versement au travailleur est en cours de traitement.');
+        setMessageSuccess(pageT('missionClosedProcessing'));
       } else {
-        setMessageSuccess(response?.data?.message || 'Mission clôturée. Le versement nécessite un suivi manuel.');
+        setMessageSuccess(response?.data?.message || pageT('missionClosedManual'));
       }
       await refreshPaymentStatus();
     } catch (completeError) {
       setMessageError(asTextError(
         completeError?.response?.data?.detail,
-        completeError?.message || 'Impossible de clôturer la mission.'
+        completeError?.message || pageT('closeMissionFailed')
       ));
     } finally {
       setCompletingJob(false);
@@ -561,7 +561,7 @@ export default function JobDetails() {
                   {(() => {
                     const isCompleted = job.status === 'completed';
                     const isInProgress = job.status === 'in_progress' && assignedWorkerId;
-                    const label = isCompleted ? 'Terminée' : isInProgress ? 'Attribuée' : formatJobStatus(job.status);
+                    const label = isCompleted ? pageT('missionDone') : isInProgress ? pageT('attributed') : formatJobStatus(job.status);
                     const badgeClass = isCompleted
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : isInProgress
@@ -576,12 +576,12 @@ export default function JobDetails() {
                   <span className="text-sm text-gray-500">{ui.publishedOnPrefix} {publishedLabel}</span>
                   {hasApplied && !isJobOwner && (
                     <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Proposition envoyée
+                      {pageT('proposalSentBadge')}
                     </span>
                   )}
                   {assignedToCurrentWorker && (
                     <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Vous êtes attribué sur cette mission
+                      {pageT('youAreAssigned')}
                     </span>
                   )}
                 </div>
@@ -603,7 +603,7 @@ export default function JobDetails() {
                   </button>
                   {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && (
                     <button onClick={handleCompleteJob} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
-                      {completingJob ? 'Clôture en cours...' : '✅ Travail terminé'}
+                      {completingJob ? pageT('closing') : pageT('workDone')}
                     </button>
                   )}
                 </>
@@ -618,7 +618,7 @@ export default function JobDetails() {
 
             {!canApply && hasApplied && !isJobOwner && (
               <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-800">
-                Votre proposition a déjà été envoyée. Le bouton « Postuler » reste masqué et la discussion avec le client est disponible plus bas.
+                {pageT('proposalAlreadySent')}
               </div>
             )}
 
@@ -737,7 +737,7 @@ export default function JobDetails() {
               <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.receivedProposals}</h2>
               {proposals.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
-                  Aucune proposition reçue pour le moment.
+                  {ui.noProposals}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -767,17 +767,15 @@ export default function JobDetails() {
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">
-                    {`Discussion avec ${discussionTarget.name || (isJobOwner ? 'le travailleur' : 'le client')}`}
+                    {pageT('discussionWith', { name: discussionTarget.name || (isJobOwner ? t('worker') : t('client')) })}
                   </h2>
                   <p className="text-sm text-gray-500">
-                    {isJobOwner
-                      ? 'Réponds directement à la proposition et attribue la mission quand tu es prêt.'
-                      : 'Tu peux échanger ici avec le client après l’envoi de ta proposition.'}
+                    {isJobOwner ? pageT('discussionOwnerHint') : pageT('discussionWorkerHint')}
                   </p>
                 </div>
                 {proposalAccepted && (
                   <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                    Proposition attribuée
+                    {pageT('proposalAssigned')}
                   </div>
                 )}
                 <button
@@ -798,10 +796,10 @@ export default function JobDetails() {
 
               <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 min-h-[180px] space-y-3">
                 {messagesLoading ? (
-                  <div className="text-sm text-gray-500">Chargement de la discussion...</div>
+                  <div className="text-sm text-gray-500">{pageT('loadingDiscussion')}</div>
                 ) : visibleMessages.length === 0 ? (
                   <div className="text-sm text-gray-500">
-                    Aucun message pour l’instant. Tu peux envoyer le premier message ici.
+                    {pageT('noMessagesInDiscussion')}
                   </div>
                 ) : (
                   visibleMessages.map((message) => {
@@ -811,7 +809,7 @@ export default function JobDetails() {
                       full_name: message?.sender_name || message?.senderName || message?.sender?.full_name,
                       name: message?.sender?.name,
                       email: message?.sender?.email,
-                    }, getParticipantNameFromIds(authorId, isCurrentUser ? currentUserDisplayName : (discussionTarget?.name || 'Interlocuteur')));
+                    }, getParticipantNameFromIds(authorId, isCurrentUser ? currentUserDisplayName : (discussionTarget?.name || pageT('interlocutorFallback'))));
 
                     return (
                       <MessageBubble
@@ -832,11 +830,11 @@ export default function JobDetails() {
                   value={messageDraft}
                   onChange={(event) => setMessageDraft(event.target.value)}
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                  placeholder="Écris ton message ici"
+                  placeholder={pageT('writeMessagePlaceholder')}
                 />
                 <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                   <button onClick={handleSendMessage} disabled={sendingMessage} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
-                    {sendingMessage ? 'Envoi...' : 'Envoyer le message'}
+                    {sendingMessage ? pageT('sending') : pageT('sendMessage')}
                   </button>
                 </div>
               </div>
@@ -854,7 +852,7 @@ export default function JobDetails() {
             <div className="space-y-3 text-gray-700">
               <div>{job.location_text}</div>
               {job.location_precision && <div className="text-sm text-gray-500">{job.location_precision}</div>}
-              {job.category && <div className="text-sm text-gray-500">Catégorie : {job.category}</div>}
+              {job.category && <div className="text-sm text-gray-500">{pageT('categoryLabel', { value: job.category })}</div>}
             </div>
           </div>
 
@@ -875,11 +873,11 @@ export default function JobDetails() {
 
           {!isJobOwner && currentUserProposal && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Votre proposition</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">{pageT('yourProposal')}</h2>
               <div className="space-y-2 text-sm text-gray-700">
-                {currentUserProposal?.proposed_amount && <div><span className="font-semibold">Montant :</span> {formatBudgetRange(currentUserProposal.proposed_amount, null)}</div>}
-                {currentUserProposal?.estimated_completion_time && <div><span className="font-semibold">Délai :</span> {currentUserProposal.estimated_completion_time}</div>}
-                {extractProposalMessage(currentUserProposal) && <div className="whitespace-pre-line"><span className="font-semibold">Message :</span> {extractProposalMessage(currentUserProposal)}</div>}
+                {currentUserProposal?.proposed_amount && <div><span className="font-semibold">{pageT('amountLabel')}</span> {formatBudgetRange(currentUserProposal.proposed_amount, null)}</div>}
+                {currentUserProposal?.estimated_completion_time && <div><span className="font-semibold">{pageT('deadlineLabel')}</span> {currentUserProposal.estimated_completion_time}</div>}
+                {extractProposalMessage(currentUserProposal) && <div className="whitespace-pre-line"><span className="font-semibold">{pageT('messageLabel')}</span> {extractProposalMessage(currentUserProposal)}</div>}
               </div>
             </div>
           )}
@@ -892,7 +890,7 @@ export default function JobDetails() {
           onClose={() => setShowProposalModal(false)}
           onProposalSubmitted={() => {
             setShowProposalModal(false);
-            setMessageSuccess('Proposition envoyée. La discussion avec le client est maintenant disponible.');
+            setMessageSuccess(pageT('proposalSentSuccess'));
             loadJobDetails();
           }}
         />

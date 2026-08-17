@@ -6,15 +6,99 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
   const [newSkill, setNewSkill] = useState('');
   const { t } = useLanguage();
 
+  // Chaque spécialité est référencée par une clé i18n (skill*) pour être
+  // traduite dans les 5 langues. La valeur STOCKÉE reste le libellé FR
+  // (source de vérité backend) : on garde une correspondance clé → libellé FR.
+  const SKILL_KEY_TO_FR = {
+    skillReparationMoteur: 'Réparation moteur',
+    skillDiagnosticAuto: 'Diagnostic automobile',
+    skillCarrosserie: 'Carrosserie',
+    skillElectriciteAuto: 'Électricité auto',
+    skillClimatisationAuto: 'Climatisation auto',
+    skillInstallationSanitaire: 'Installation sanitaire',
+    skillReparationFuites: 'Réparation fuites',
+    skillSoudure: 'Soudure',
+    skillDebouchage: 'Débouchage canalisations',
+    skillChauffeEau: 'Installation chauffe-eau',
+    skillInstallationElectrique: 'Installation électrique',
+    skillDepannageElectrique: 'Dépannage électrique',
+    skillCablage: 'Câblage',
+    skillTableauElectrique: 'Tableau électrique',
+    skillEclairage: 'Éclairage',
+    skillMaconnerie: 'Maçonnerie',
+    skillCarrelage: 'Carrelage',
+    skillPeinture: 'Peinture',
+    skillToiture: 'Toiture',
+    skillCoffrage: 'Coffrage',
+    skillFabricationMeubles: 'Fabrication de meubles',
+    skillPosePortes: 'Pose de portes',
+    skillPoseFenetres: 'Pose de fenêtres',
+    skillMenuiserieAlu: 'Menuiserie aluminium',
+    skillMenuiserieBois: 'Menuiserie bois',
+    skillPlacards: 'Placards et dressings',
+    skillCuisineSurMesure: 'Cuisine sur mesure',
+    skillEscaliersBois: 'Escaliers en bois',
+    skillFinitionVernissage: 'Finition et vernissage',
+    skillReparationMeubles: 'Réparation de meubles',
+    skillReparationPC: 'Réparation PC',
+    skillInstallationLogiciels: 'Installation logiciels',
+    skillReseaux: 'Réseaux',
+    skillMaintenance: 'Maintenance',
+    skillFormation: 'Formation',
+    skillReparationAndroid: 'Réparation téléphone Android',
+    skillReparationIphone: 'Réparation iPhone',
+    skillChangementEcran: 'Changement écran téléphone',
+    skillEntretienJardin: 'Entretien jardin',
+    skillElagage: 'Élagage',
+    skillPlantation: 'Plantation',
+    skillArrosageAuto: 'Arrosage automatique',
+    skillPaysagisme: 'Paysagisme',
+    skillMathematiques: 'Mathématiques',
+    skillFrancais: 'Français',
+    skillAnglais: 'Anglais',
+    skillSciences: 'Sciences',
+    skillHistoireGeo: 'Histoire-Géographie',
+    skillPhysiqueChimie: 'Physique-Chimie',
+    skillInformatiqueScolaire: 'Informatique scolaire',
+    skillAideDevoirs: 'Aide aux devoirs',
+    skillPreparationExamens: 'Préparation examens',
+    skillSoutienScolaire: 'Soutien scolaire',
+  };
+
+  // Libellé affiché (traduit) pour une clé de spécialité.
+  const translateSkill = (key) => {
+    const translated = t(key);
+    return typeof translated === 'string' && translated.trim() && translated !== key ? translated : (SKILL_KEY_TO_FR[key] || key);
+  };
+
+  // Libellé FR stocké (envoyé au backend) pour une clé de spécialité.
+  const skillKeyToStored = (key) => SKILL_KEY_TO_FR[key] || key;
+
+  // Mapping inverse libellé FR → clé i18n (pour traduire les chips déjà
+  // sélectionnées, qui stockent le libellé FR).
+  const SKILL_FR_TO_KEY = Object.fromEntries(
+    Object.entries(SKILL_KEY_TO_FR).map(([key, fr]) => [fr, key])
+  );
+
+  // Un libellé FR stocké peut provenir d'une liste prédéfinie (traduite à
+  // l'affichage) ou d'une compétence personnalisée : on affiche tel quel
+  // si ce n'est pas une clé i18n.
+  const displaySkill = (skill) => {
+    if (SKILL_KEY_TO_FR[skill]) return translateSkill(skill);
+    const key = SKILL_FR_TO_KEY[skill];
+    if (key) return translateSkill(key);
+    return skill;
+  };
+
   const predefinedSkillsData = {
-    mechanics: ['Réparation moteur', 'Diagnostic automobile', 'Carrosserie', 'Électricité auto', 'Climatisation auto'],
-    plumbing: ['Installation sanitaire', 'Réparation fuites', 'Soudure', 'Débouchage canalisations', 'Installation chauffe-eau'],
-    electrical: ['Installation électrique', 'Dépannage électrique', 'Câblage', 'Tableau électrique', 'Éclairage'],
-    construction: ['Maçonnerie', 'Carrelage', 'Peinture', 'Toiture', 'Coffrage'],
-    carpentry: ['Fabrication de meubles', 'Pose de portes', 'Pose de fenêtres', 'Menuiserie aluminium', 'Menuiserie bois', 'Placards et dressings', 'Cuisine sur mesure', 'Escaliers en bois', 'Finition et vernissage', 'Réparation de meubles'],
-    computing: ['Réparation PC', 'Installation logiciels', 'Réseaux', 'Maintenance', 'Formation', 'Réparation téléphone Android', 'Réparation iPhone', 'Changement écran téléphone'],
-    gardening: ['Entretien jardin', 'Élagage', 'Plantation', 'Arrosage automatique', 'Paysagisme'],
-    tutoring: ['Mathématiques', 'Français', 'Anglais', 'Sciences', 'Histoire-Géographie', 'Physique-Chimie', 'Informatique scolaire', 'Aide aux devoirs', 'Préparation examens', 'Soutien scolaire']
+    mechanics: ['skillReparationMoteur', 'skillDiagnosticAuto', 'skillCarrosserie', 'skillElectriciteAuto', 'skillClimatisationAuto'],
+    plumbing: ['skillInstallationSanitaire', 'skillReparationFuites', 'skillSoudure', 'skillDebouchage', 'skillChauffeEau'],
+    electrical: ['skillInstallationElectrique', 'skillDepannageElectrique', 'skillCablage', 'skillTableauElectrique', 'skillEclairage'],
+    construction: ['skillMaconnerie', 'skillCarrelage', 'skillPeinture', 'skillToiture', 'skillCoffrage'],
+    carpentry: ['skillFabricationMeubles', 'skillPosePortes', 'skillPoseFenetres', 'skillMenuiserieAlu', 'skillMenuiserieBois', 'skillPlacards', 'skillCuisineSurMesure', 'skillEscaliersBois', 'skillFinitionVernissage', 'skillReparationMeubles'],
+    computing: ['skillReparationPC', 'skillInstallationLogiciels', 'skillReseaux', 'skillMaintenance', 'skillFormation', 'skillReparationAndroid', 'skillReparationIphone', 'skillChangementEcran'],
+    gardening: ['skillEntretienJardin', 'skillElagage', 'skillPlantation', 'skillArrosageAuto', 'skillPaysagisme'],
+    tutoring: ['skillMathematiques', 'skillFrancais', 'skillAnglais', 'skillSciences', 'skillHistoireGeo', 'skillPhysiqueChimie', 'skillInformatiqueScolaire', 'skillAideDevoirs', 'skillPreparationExamens', 'skillSoutienScolaire']
   };
 
   const predefinedSkills = {};
@@ -66,8 +150,8 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
               <div className="flex flex-wrap gap-2">
                 {formData.worker_specialties.map((skill, index) => (
                   <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {skill}
-                    <button type="button" aria-label={`${t('remove')} ${skill}`} onClick={() => handleSpecialtyRemove(skill)} className="ml-2 text-green-600 hover:text-green-800">×</button>
+                    {displaySkill(skill)}
+                    <button type="button" aria-label={`${t('remove')} ${displaySkill(skill)}`} onClick={() => handleSpecialtyRemove(skill)} className="ml-2 text-green-600 hover:text-green-800">×</button>
                   </span>
                 ))}
               </div>
@@ -79,16 +163,17 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
               <div key={category} className="bg-white border border-blue-200 rounded-lg p-3">
                 <h4 className="font-medium text-blue-800 mb-2">{category}</h4>
                 <div className="flex flex-wrap gap-2">
-                  {skills.map((skill) => {
-                    const isSelected = formData.worker_specialties?.includes(skill);
+                  {skills.map((skillKey) => {
+                    const storedValue = skillKeyToStored(skillKey);
+                    const isSelected = formData.worker_specialties?.includes(storedValue);
                     return (
                       <button
-                        key={skill}
+                        key={skillKey}
                         type="button"
-                        onClick={() => (isSelected ? handleSpecialtyRemove(skill) : handleSpecialtyAdd(skill))}
+                        onClick={() => (isSelected ? handleSpecialtyRemove(storedValue) : handleSpecialtyAdd(storedValue))}
                         className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-blue-100'}`}
                       >
-                        {isSelected ? '✓ ' : ''}{skill}
+                        {isSelected ? '✓ ' : ''}{translateSkill(skillKey)}
                       </button>
                     );
                   })}

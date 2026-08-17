@@ -34,6 +34,9 @@ const COPY = {
     myPayments: 'Mes paiements récents',
     noPayments: 'Aucun paiement enregistré pour ce compte.',
     openCheckout: 'Ouvrir le checkout',
+    minPaymentAmount: 'Le montant minimum pour un paiement est de 200 FCFA.',
+    paymentForMissionDetail: '💼 Paiement pour la mission{jobTitle} — le montant a été rempli automatiquement suite à l’attribution du travailleur.',
+    minPaydunyaAmount: '⚠️ Le montant minimum accepté par PayDunya est de 200 FCFA.',
     countries: { senegal: 'Sénégal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Carte bancaire' }
   },
@@ -65,6 +68,9 @@ const COPY = {
     myPayments: 'My recent payments',
     noPayments: 'No payments recorded for this account yet.',
     openCheckout: 'Open checkout',
+    minPaymentAmount: 'The minimum amount for a payment is 200 FCFA.',
+    paymentForMissionDetail: '💼 Payment for the job{jobTitle} — the amount was filled automatically after the worker was assigned.',
+    minPaydunyaAmount: '⚠️ The minimum amount accepted by PayDunya is 200 FCFA.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Ivory Coast' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank card' }
   },
@@ -289,7 +295,7 @@ const Payment = () => {
     // Validation côté client — évite un aller-retour API inutile et donne
     // un retour immédiat si le montant est trop faible.
     if (!form.amount || form.amount < 200) {
-      setCheckoutError('Le montant minimum pour un paiement est de 200 FCFA.');
+      setCheckoutError(copy.minPaymentAmount);
       setProcessing(false);
       return;
     }
@@ -332,7 +338,7 @@ const Payment = () => {
           <p className="text-gray-600">{copy.subtitle}</p>
           {jobPaymentContext && (
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
-              💼 Paiement pour la mission{jobPaymentContext.jobTitle ? ` « ${jobPaymentContext.jobTitle} »` : ''} — le montant a été rempli automatiquement suite à l'attribution du travailleur.
+              {copy.paymentForMissionDetail.replace('{jobTitle}', jobPaymentContext.jobTitle ? ` « ${jobPaymentContext.jobTitle} »` : '')}
             </div>
           )}
         </div>
@@ -397,7 +403,7 @@ const Payment = () => {
                 />
                 {form.amount > 0 && form.amount < 200 && (
                   <p className="mt-1 text-sm text-red-600">
-                    ⚠️ Le montant minimum accepté par PayDunya est de 200 FCFA.
+                    {copy.minPaydunyaAmount}
                   </p>
                 )}
               </div>

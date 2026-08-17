@@ -13,7 +13,7 @@ import {
 } from '../utils/jobLocationRuntime';
 
 export default function JobCreateModal({ onClose, onJobCreated }) {
-  const { currentLanguage } = useLanguage();
+  const { currentLanguage, t } = useLanguage();
   const ui = getJobUiLabel(currentLanguage);
   const manualLocationEditedRef = useRef(false);
   const [autoLocationTried, setAutoLocationTried] = useState(false);
@@ -150,14 +150,14 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">{ui.category}</label>
               <select name="category" value={formData.category} onChange={handleChange} className={inputClass}>
-                <option value="general">Général</option>
-                <option value="plumbing">Plomberie</option>
-                <option value="electrical">Électricité</option>
-                <option value="construction">Construction</option>
-                <option value="cleaning">Nettoyage</option>
-                <option value="gardening">Jardinage</option>
-                <option value="tutoring">Cours</option>
-                <option value="mechanics">Mécanique</option>
+                <option value="general">{t('general')}</option>
+                <option value="plumbing">{t('plumbing')}</option>
+                <option value="electrical">{t('electrical')}</option>
+                <option value="construction">{t('construction')}</option>
+                <option value="cleaning">{t('cleaning')}</option>
+                <option value="gardening">{t('gardening')}</option>
+                <option value="tutoring">{t('tutoring')}</option>
+                <option value="mechanics">{t('mechanics')}</option>
               </select>
             </div>
             <div>
