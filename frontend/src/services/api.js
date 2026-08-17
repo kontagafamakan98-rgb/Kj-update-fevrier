@@ -473,6 +473,7 @@ export const usersAPI = {
   removePortfolioImage: (index) => api.delete(`/users/portfolio/${index}`),
   // Parrainage
   getReferral: () => api.get('/users/referral'),
+  getReferralFilleuls: () => api.get('/users/referral/filleuls'),
   applyReferral: (code) => api.post('/users/referral/apply', { code }),
 };
 export const profileAPI = userAPI;

@@ -43,6 +43,7 @@ export default function Profile() {
   const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
   const [reviews, setReviews] = useState([]);
   const [referral, setReferral] = useState(null);
+  const [filleuls, setFilleuls] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [portfolioUploading, setPortfolioUploading] = useState(false);
 
@@ -70,6 +71,14 @@ export default function Profile() {
     usersAPI.getReferral()
       .then((data) => setReferral(data))
       .catch(() => setReferral(null));
+  }, [user?.id]);
+
+  // Filleuls : comptes créés via mon code de parrainage
+  useEffect(() => {
+    if (!user?.id) return;
+    usersAPI.getReferralFilleuls()
+      .then((data) => setFilleuls(Array.isArray(data?.filleuls) ? data.filleuls : []))
+      .catch(() => setFilleuls([]));
   }, [user?.id]);
 
   // Portfolio travailleur : photos de réalisations (preuve sociale)
@@ -291,6 +300,7 @@ export default function Profile() {
 
         <div className="px-6 py-6 border-b border-gray-200">
           <ReferralCard referral={referral} t={t} />
+          <FilleulsCard filleuls={filleuls} t={t} />
         </div>
 
         <div className="px-6 py-6">
@@ -715,6 +725,72 @@ function ReferralCard({ referral, t }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function FilleulsCard({ filleuls, t }) {
+  if (!Array.isArray(filleuls) || filleuls.length === 0) return null;
+
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (_error) {
+      return '';
+    }
+  };
+
+  return (
+    <div className="mt-6">
+      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+        <span className="mr-2">👥</span>
+        {t('filleulsTitle')}
+        <span className="ml-2 rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
+          {filleuls.length}
+        </span>
+      </h3>
+      <ul className="space-y-2">
+        {filleuls.map((filleul) => (
+          <li
+            key={filleul.id}
+            className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3"
+          >
+            <div className="flex items-center min-w-0">
+              {filleul.profile_photo ? (
+                <img
+                  src={filleul.profile_photo}
+                  alt=""
+                  className="h-9 w-9 rounded-full object-cover mr-3"
+                />
+              ) : (
+                <div className="h-9 w-9 rounded-full bg-orange-100 flex items-center justify-center mr-3 text-orange-600 font-bold">
+                  {(filleul.first_name || '?')[0]?.toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {`${filleul.first_name || ''} ${filleul.last_name || ''}`.trim() || t('filleulAnonymous')}
+                </p>
+                {formatDate(filleul.created_at) && (
+                  <p className="text-xs text-gray-500">{formatDate(filleul.created_at)}</p>
+                )}
+              </div>
+            </div>
+            <div className="text-right shrink-0 ml-3">
+              {filleul.completed_first_job ? (
+                <span className="inline-flex items-center text-xs font-semibold text-green-700">
+                  ✅ {t('filleulFirstJobDone')}
+                </span>
+              ) : (
+                <span className="inline-flex items-center text-xs text-gray-400">
+                  {t('filleulFirstJobPending')}
+                </span>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

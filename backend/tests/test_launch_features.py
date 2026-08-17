@@ -272,6 +272,51 @@ async def test_referral_code_applied_at_registration(client):
     assert resp.json().get("referral_applied") is False
 
 
+@pytest.mark.asyncio
+async def test_referral_filleuls_listed(client):
+    """Le parrain voit la liste des comptes créés via son code (les filleuls),
+    avec leur statut de première mission et la récompense générée."""
+    import uuid as _uuid
+    from tests.conftest import BASE_USER, issue_email_verification_token
+
+    # 1. Le parrain (client) possède un code de parrainage
+    sponsor_headers = await auth_headers(client)
+    resp = await client.get("/api/users/referral", headers=sponsor_headers)
+    sponsor_code = resp.json()["referral_code"]
+
+    # 2. Deux filleuls s'inscrivent avec ce code
+    filleul_ids = []
+    for i in range(2):
+        data = dict(WORKER_USER)
+        data["email"] = f"filleul-list-{i}-{_uuid.uuid4().hex[:8]}@example.com"
+        data["referral_code"] = sponsor_code.lower()
+        token = await issue_email_verification_token(client, data["email"])
+        resp = await client.post(
+            "/api/auth/register-verified",
+            json={**data, "email_verification_token": token},
+        )
+        assert resp.status_code == 200, resp.text
+        filleul_ids.append(resp.json()["user"]["id"])
+
+    # 3. Le parrain liste ses filleuls
+    resp = await client.get("/api/users/referral/filleuls", headers=sponsor_headers)
+    assert resp.status_code == 200, resp.text
+    filleuls = resp.json()["filleuls"]
+    assert len(filleuls) == 2
+    listed_ids = {f["id"] for f in filleuls}
+    assert listed_ids == set(filleul_ids)
+    for f in filleuls:
+        assert f["first_name"]
+        assert f["completed_first_job"] is False
+        assert f["reward_earned"] == 0
+
+    # 4. Un utilisateur sans filleul obtient une liste vide
+    other_headers = await auth_headers(client, dict(WORKER_USER, email=f"noref-{_uuid.uuid4().hex[:8]}@example.com"))
+    resp = await client.get("/api/users/referral/filleuls", headers=other_headers)
+    assert resp.status_code == 200
+    assert resp.json()["filleuls"] == []
+
+
 # ---------------------------------------------------------------------------
 # Accusés de lecture (read_at)
 # ---------------------------------------------------------------------------

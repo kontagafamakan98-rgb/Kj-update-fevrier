@@ -591,6 +591,43 @@ async def get_referral(current_user: User = Depends(get_current_user)):
     }
 
 
+@router.get("/users/referral/filleuls")
+async def get_referral_filleuls(current_user: User = Depends(get_current_user)):
+    """Liste les comptes créés via le code de parrainage de l'utilisateur
+    (les filleuls). Chaque entrée contient les infos publiques du filleul et
+    son éventuelle contribution au parrainage (récompenses déjà générées)."""
+    code = await _ensure_referral_code(current_user.id)
+
+    filleuls = []
+    cursor = db.users.find(
+        {"referred_by": code},
+        {
+            "_id": 0,
+            "id": 1,
+            "first_name": 1,
+            "last_name": 1,
+            "profile_photo": 1,
+            "created_at": 1,
+            "referral_reward_balance": 1,
+            "referral_first_job_rewarded": 1,
+        },
+    )
+    async for f in cursor:
+        filleuls.append({
+            "id": f.get("id"),
+            "first_name": f.get("first_name"),
+            "last_name": f.get("last_name"),
+            "profile_photo": f.get("profile_photo"),
+            "created_at": f.get("created_at"),
+            "completed_first_job": bool(f.get("referral_first_job_rewarded")),
+            "reward_earned": float(f.get("referral_reward_balance") or 0),
+        })
+
+    # Plus récents d'abord
+    filleuls.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    return {"filleuls": filleuls}
+
+
 @router.post("/users/referral/apply")
 async def apply_referral(
     payload: dict = Body(...),
