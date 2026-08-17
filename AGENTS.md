@@ -15,6 +15,7 @@ Apprentissages non-obvies de session (pas récupérables en lisant le code seul)
 - `BACKEND_PUBLIC_URL` est OBLIGATOIRE hors Render : elle alimente à la fois la liste d'hôtes de confiance (TrustedHost) ET les URLs de callback IPN PayDunya (`build_payment_callback_url`/`build_disburse_callback_url`).
 - `APP_ENV` défaut = `production` (kojo_settings.py) : `/docs` désactivé et `JWT_SECRET` + `EMAIL_OTP_SECRET` requis en fail-fast, sauf si mis à `development`.
 - TrustedHostMiddleware activé par défaut ; le `.env` local de `backend/` pose `DISABLE_TRUSTED_HOST_MIDDLEWARE=true`, donc le local ne teste jamais les contrôles de Host actifs en prod.
+- La construction d'URL backend du frontend est CENTRALISÉE dans `frontend/src/utils/backendUrl.js` (`buildApiUrl`/`buildBackendUrl`) : `api.js` et `jobProposalWorkflow.js` l'importent — ne jamais réimplémenter la dérivation de base ailleurs (bug historique `/api/api`). Ordre de priorité des sources : `window.__KOJO_API_URL__`/`__API_URL__` → `VITE_API_URL`/`VITE_API_BASE_URL`/`VITE_BACKEND_URL` → `REACT_APP_BACKEND_URL`/`REACT_APP_API_URL` → localhost:8000 (dev) → `https://kojo-backend.fly.dev`. `photo_url` est toujours une URL Cloudinary absolue (les branches relatives de ces helpers ne servent qu'aux données legacy).
 
 ## Outillage local & vérification
 
