@@ -130,7 +130,19 @@ export async function registerPushSubscription(userId) {
     return subscription;
 
   } catch (err) {
-    safeLog.error('Erreur enregistrement push:', err);
+    // "AbortError: Registration failed - storage error" : contexte sans
+    // stockage Service Worker (navigation privée, iframe de preview,
+    // stockage partitionné). C'est un échec ENVIRONNEMENTAL attendu — on le
+    // logue en warning léger plutôt qu'en erreur pour ne pas alarmer la
+    // console, tout en gardant le comportement sûr (push désactivé).
+    const isStorageAbort =
+      (err && err.name === 'AbortError') ||
+      /storage|quota|partition/i.test(String((err && err.message) || ''));
+    if (isStorageAbort) {
+      devLog.info('Push désactivé : stockage Service Worker indisponible sur ce contexte (navigation privée / iframe).');
+    } else {
+      safeLog.error('Erreur enregistrement push:', err);
+    }
     return null;
   }
 }

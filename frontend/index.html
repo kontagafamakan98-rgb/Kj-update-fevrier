@@ -70,19 +70,11 @@
     <meta name="msapplication-tap-highlight" content="no" />
     <link rel="canonical" href="https://kj-update-fevrier.vercel.app/" />
 
-    <!-- Analytics Plausible (léger, sans cookies) — activé dès que
-         VITE_PLAUSIBLE_DOMAIN est défini dans les variables Vercel. -->
-    <script>
-      (function () {
-        var domain = "%VITE_PLAUSIBLE_DOMAIN%";
-        if (!domain) return;
-        var s = document.createElement("script");
-        s.defer = true;
-        s.setAttribute("data-domain", domain);
-        s.src = "https://plausible.io/js/script.js";
-        document.head.appendChild(s);
-      })();
-    </script>
+    <!-- Analytics Plausible : chargé depuis un module bundlé (src/utils/
+         analytics.js) et NON en script inline — la CSP production est
+         `script-src 'self'` (pas d'unsafe-inline) : un script inline serait
+         bloqué avec une erreur console. Le module injecte le script externe
+         (autorisé par script-src quand VITE_PLAUSIBLE_DOMAIN est défini). -->
 
     <!-- Données structurées (SEO) : organisation + site web -->
     <script type="application/ld+json">

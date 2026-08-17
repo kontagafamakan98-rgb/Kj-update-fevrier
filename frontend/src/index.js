@@ -4,9 +4,13 @@ import "./index.css";
 import App from "./App";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
 import { initSentry } from "./utils/sentry";
+import { initAnalytics } from "./utils/analytics";
 
 // Sentry en premier (no-op si non configuré via VITE_SENTRY_DSN)
 initSentry();
+// Analytics (no-op si VITE_PLAUSIBLE_DOMAIN non défini — script externe
+// chargé via src, compatible CSP script-src 'self')
+initAnalytics();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(

@@ -41,9 +41,16 @@ export default defineConfig(({ mode }) => {
         name: 'inject-production-csp',
         transformIndexHtml(html) {
           if (mode !== 'production') return html
+          // Le script Plausible est chargé via src depuis un module bundlé ;
+          // son domaine n'est autorisé dans script-src QUE si l'analytics est
+          // réellement configurée (sinon surface d'attaque inutile).
+          const plausibleDomain = (env.VITE_PLAUSIBLE_DOMAIN || '').trim()
+          const scriptSrc = plausibleDomain
+            ? "script-src 'self' https://plausible.io"
+            : "script-src 'self'"
           const csp = [
             "default-src 'self'",
-            "script-src 'self'",
+            scriptSrc,
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://res.cloudinary.com https://tile.openstreetmap.org",
             // Géolocalisation 100% centralisée derrière le backend Kojo :
