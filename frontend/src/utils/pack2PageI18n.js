@@ -41,7 +41,7 @@ const pages = {
       categoryMechanics: '🔩 Mécanique',
       locationLabel: 'Localisation *',
       locationPlaceholder: 'Ex: Plateau, Dakar, Sénégal',
-      locationHelp: 'ou utilisez le bouton GPS pour détecter automatiquement',
+      locationHelp: 'ou utilisez le bouton GPS pour détecter automatiquement votre position',
       preciseLocationReady: 'Localisation GPS prête pour le travailleur',
       preciseLocationHelp: 'La carte et les coordonnées seront enregistrées pour ouvrir directement Google Maps ou Plans.',
       mapPreviewTitle: 'Aperçu de la localisation du job',
@@ -171,8 +171,8 @@ const pages = {
       autoLoginError: 'Erreur lors de la connexion automatique',
       genericError: 'Erreur lors de la finalisation du compte',
       emailStepNotice: 'Votre email est déjà vérifié. Il ne reste plus qu’à lier vos moyens de paiement pour finaliser le compte.',
-      welcomeToast: 'Bienvenue {firstName}! Compte vérifié avec succès 🎉',
-      dashboardMessage: 'Bienvenue {firstName}! Votre compte est vérifié avec {count} moyen(s) de paiement.',
+      welcomeToast: 'Bienvenue {firstName} ! Compte vérifié avec succès 🎉',
+      dashboardMessage: 'Bienvenue {firstName} ! Votre compte est vérifié avec {count} moyen(s) de paiement.',
       duplicateEmailError: 'Cette adresse email est déjà utilisée'
     },
     en: {
@@ -229,8 +229,8 @@ const pages = {
       codeSentToast: 'Code Gmail envoyé ✅',
       codeResentToast: 'Nouveau code Gmail envoyé ✅',
       emailVerified: 'Email vérifié. Passage aux moyens de paiement...',
-      welcomeToast: 'Bienvenue {firstName}! Ton email et tes paiements sont validés 🎉',
-      dashboardMessage: 'Bienvenue {firstName}! Email confirmé et {count} moyen(s) de paiement validé(s).',
+      welcomeToast: 'Bienvenue {firstName} ! Ton email et tes paiements sont validés 🎉',
+      dashboardMessage: 'Bienvenue {firstName} ! Email confirmé et {count} moyen(s) de paiement validé(s).',
       stepPersonal: 'Informations personnelles',
       stepPayments: 'Comptes de paiement',
       stepEmail: 'Vérification email',
@@ -388,7 +388,7 @@ const pages = {
       standardUser: 'Utilisateur standard',
       back: '← Retour',
       title: '💼 Tableau de bord - commissions propriétaire',
-      subtitle: 'Suivi de vos commissions automatiques de 14% sur tous les paiements',
+      subtitle: 'Suivi de vos commissions automatiques de 14 % sur tous les paiements',
       totalCommissions: 'Total commissions',
       totalVolume: 'Volume total',
       transactions: 'Transactions',
@@ -408,8 +408,8 @@ const pages = {
       noTransactionsHelp: 'Les commissions apparaîtront ici après les premiers paiements',
       transaction: 'Transaction',
       totalAmount: 'Montant total',
-      yourCommission: 'Votre commission (14%)',
-      workerAmount: 'Travailleur (86%)',
+      yourCommission: 'Votre commission (14 %)',
+      workerAmount: 'Travailleur (86 %)',
       method: 'Méthode',
       date: 'Date',
       bankCard: 'Carte bancaire'
@@ -1280,7 +1280,7 @@ pages.photoTest.mos = withBase(pages.photoTest.fr, {
 
 pages.mobileTest = {
   fr: {
-    backToDashboard: 'Retour au dashboard',
+    backToDashboard: 'Retour au tableau de bord',
     title: 'Test mobile Kojo',
     appInfo: '📱 Informations sur l\'application mobile',
     featuresImplemented: '✅ Fonctionnalités implémentées',

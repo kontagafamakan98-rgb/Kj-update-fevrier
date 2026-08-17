@@ -52,7 +52,7 @@ export default function Login() {
     if (result.success) {
       clearRegistrationFlow();
       if (requiresRegistrationCompletion(result.user)) {
-        toast.success('Termine dabord l’étape 3 pour activer complètement ton compte.');
+        toast.success('Termine d’abord l’étape 3 pour activer complètement ton compte.');
         navigate('/payment-verification', {
           state: {
             userData: result.user,

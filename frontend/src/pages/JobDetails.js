@@ -603,7 +603,7 @@ export default function JobDetails() {
                   </button>
                   {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && (
                     <button onClick={handleCompleteJob} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
-                      {completingJob ? 'Clôture en cours...' : '✅ Travail Terminé'}
+                      {completingJob ? 'Clôture en cours...' : '✅ Travail terminé'}
                     </button>
                   )}
                 </>
