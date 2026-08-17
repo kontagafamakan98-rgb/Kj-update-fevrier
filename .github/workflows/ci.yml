@@ -154,3 +154,52 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+
+  # ─── Backend : déploiement Fly.io (verrouillé sur les tests backend) ─────
+  # Déployé à chaque push sur main qui touche backend/ — MAIS uniquement si
+  # le job backend-tests passe. Un échec frontend/mobile ne bloque PAS le
+  # déploiement backend (needs: backend-tests uniquement).
+  #
+  # Prérequis (une seule fois) :
+  #   1. fly tokens create deploy -n "GitHub Actions"
+  #   2. Ajouter le token comme secret du dépôt nommé FLY_API_TOKEN
+  #      (Settings → Secrets and variables → Actions).
+  deploy-fly:
+    name: Deploy backend to Fly.io
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    # Jamais depuis un PR ; déploiement uniquement sur la branche main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Pas d'annulation en plein vol : un déploiement est étatique (machines
+    # Fly) ; les pushes successifs attendent leur tour.
+    concurrency:
+      group: deploy-fly
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Filtre les changements : pas de re-déploiement du backend pour un
+      # push qui ne touche que le frontend/docs.
+      - name: Detect backend changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+
+      - name: Setup flyctl
+        if: steps.changes.outputs.backend == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # --remote-only : le build se fait sur les builders distants de Fly
+      # (Depot), pas de Docker nécessaire sur le runner. fly.toml et
+      # Dockerfile sont lus depuis backend/ (working-directory).
+      - name: Deploy to Fly.io
+        if: steps.changes.outputs.backend == 'true'
+        working-directory: backend
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

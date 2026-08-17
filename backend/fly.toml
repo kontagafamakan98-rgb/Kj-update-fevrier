@@ -1,0 +1,50 @@
+# fly.toml app configuration file generated for kojo-backend on 2026-08-17T01:22:23+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'kojo-backend'
+primary_region = 'fra'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[env]
+  APP_ENV = 'production'
+  DB_NAME = 'kojo_db'
+  FRONTEND_APP_URL = 'https://kj-update-fevrier.vercel.app'
+  VERCEL_PROJECT_NAME = 'kj-update-fevrier'
+  # URL publique du backend → callbacks IPN PayDunya (et hôtes de confiance si
+  # le TrustedHostMiddleware reste activé)
+  BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev'
+  # Le Host des health checks Fly ne correspond à aucun motif fiable (IP
+  # interne) : sur Fly, désactiver le TrustedHostMiddleware via le secret
+  # DISABLE_TRUSTED_HOST_MIDDLEWARE=true (le proxy Fly valide déjà le routage
+  # par Host ; CORS et auth restent actifs).
+  TRUSTED_HOSTS = '*.internal'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 50
+    soft_limit = 20
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '30s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpus = 1
+  memory_mb = 512

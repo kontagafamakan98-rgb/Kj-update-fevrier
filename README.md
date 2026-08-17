@@ -71,6 +71,12 @@ cd frontend && npm test
 
 ## Déploiement
 
+> **Alternative Fly.io (recommandée si le free tier Render est épuisé)** :
+> un Dockerfile (`backend/Dockerfile`), une config (`backend/fly.toml`) et un
+> guide pas à pas (`backend/DEPLOY_FLYIO.md`) sont prêts — pas de spin-down,
+> pas de limite d'heures, ~0–3 $/mois. La variable `BACKEND_PUBLIC_URL` y est
+> **obligatoire** (TrustedHost + callbacks IPN PayDunya).
+
 ### Backend — Render (Web Service Python)
 
 - **Service** : `kojo-backend-03az` — `https://kojo-backend-03az.onrender.com`
