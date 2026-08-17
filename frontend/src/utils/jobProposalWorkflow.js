@@ -69,7 +69,7 @@ const getRuntimeApiBaseUrl = () => {
     }
   }
 
-  return 'https://kojo-backend-03az.onrender.com';
+  return 'https://kojo-backend.fly.dev';
 };
 
 const getPossibleTokenKeys = () => ([

@@ -14,9 +14,9 @@ export default defineConfig(({ mode }) => {
   // Origin du backend (pour la CSP connect-src en prod) — dynamique selon
   // VITE_API_URL, avec repli sur l'URL Render par défaut de l'app.
   const rawApiUrl = (env.VITE_API_URL || env.VITE_API_BASE_URL || env.VITE_BACKEND_URL || '').trim()
-  let apiOrigin = 'https://kojo-backend-03az.onrender.com'
+  let apiOrigin = 'https://kojo-backend.fly.dev'
   try {
-    apiOrigin = new URL(rawApiUrl || 'https://kojo-backend-03az.onrender.com/api').origin
+    apiOrigin = new URL(rawApiUrl || 'https://kojo-backend.fly.dev/api').origin
   } catch (_error) {
     // URL invalide : on garde l'origin par défaut
   }

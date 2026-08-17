@@ -4,7 +4,7 @@
 // Laisser cette valeur en dur est acceptable en tant que dernier recours
 // (l'URL Render ne change pas souvent), mais la var d'env est préférable
 // car elle permet de changer de backend sans modifier le code.
-const DEFAULT_API_BASE_URL = 'https://kojo-backend-03az.onrender.com/api';
+const DEFAULT_API_BASE_URL = 'https://kojo-backend.fly.dev/api';
 
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 

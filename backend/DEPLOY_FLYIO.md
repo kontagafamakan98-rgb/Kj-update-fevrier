@@ -3,6 +3,9 @@
 Guide de migration depuis Render. Fly.io : pas de spin-down, pas de limite
 d'heures d'instance, facture prévisible (~0–3 $/mois pour Kojo).
 
+> 🎯 **Bascule définitive** (suppression de Render, UptimeRobot, checklist de
+> validation) : voir [`SWITCHOVER_CHECKLIST.md`](./SWITCHOVER_CHECKLIST.md).
+
 ## Prérequis
 
 - Compte [Fly.io](https://fly.io) + **carte bancaire** (vérification à

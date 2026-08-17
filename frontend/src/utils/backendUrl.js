@@ -11,7 +11,7 @@ const PROD_ENV_BACKEND_URL = (
 // buildApiUrl ne produisent jamais un double préfixe /api/api (bug réel :
 // GET /api/api/users/payment-accounts → 404).
 const stripApiSuffix = (value = '') => String(value || '').replace(/\/api$/i, '');
-const DEFAULT_REMOTE_BACKEND_URL = stripApiSuffix(PROD_ENV_BACKEND_URL) || 'https://kojo-backend-03az.onrender.com';
+const DEFAULT_REMOTE_BACKEND_URL = stripApiSuffix(PROD_ENV_BACKEND_URL) || 'https://kojo-backend.fly.dev';
 const ensureLeadingSlash = (value = '') => {
   if (!value) return '';
   return value.startsWith('/') ? value : `/${value}`;
