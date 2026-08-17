@@ -29,4 +29,13 @@
     <mobile:mobile/>
   </url>
   
+  <!-- How it works (SEO long-tail : escrow + FAQ) -->
+  <url>
+    <loc>https://kj-update-fevrier.vercel.app/how-it-works</loc>
+    <lastmod>2026-08-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <mobile:mobile/>
+  </url>
+  
 </urlset>

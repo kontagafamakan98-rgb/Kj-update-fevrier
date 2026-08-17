@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageTitle } from '../utils/seo';
@@ -48,7 +49,32 @@ const FAQ = [
 
 export default function HowItWorks() {
   const { t } = useLanguage();
-  usePageTitle('Comment ça marche — Kojo');
+  usePageTitle('Comment ça marche — Kojo', {
+    description:
+      'Découvrez comment Kojo fonctionne : trouvez un travailleur ou une mission en Afrique de l’Ouest, payez en séquestre sécurisé (Orange Money, Wave, carte) et validez pour libérer le paiement.',
+  });
+
+  // JSON-LD FAQPage injecté dynamiquement (les crawlers qui exécutent le JS,
+  // comme Google, peuvent lire les données structurées injectées) — c'est le
+  // format recommandé pour les pages FAQ en SEO long-tail.
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.setAttribute('data-kojo', 'faq');
+    script.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: FAQ.map((item) => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: { '@type': 'Answer', text: item.a },
+      })),
+    });
+    document.head.appendChild(script);
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen">
