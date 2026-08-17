@@ -173,6 +173,7 @@ const pages = {
       emailStepNotice: 'Votre email est déjà vérifié. Il ne reste plus qu’à lier vos moyens de paiement pour finaliser le compte.',
       welcomeToast: 'Bienvenue {firstName} ! Compte vérifié avec succès 🎉',
       dashboardMessage: 'Bienvenue {firstName} ! Votre compte est vérifié avec {count} moyen(s) de paiement.',
+      referralAppliedToast: '🎁 Code de parrainage appliqué avec succès !',
       duplicateEmailError: 'Cette adresse email est déjà utilisée'
     },
     en: {
@@ -201,6 +202,7 @@ const pages = {
       emailStepNotice: 'Your email is already verified. Only payment linking remains to finalize the account.',
       welcomeToast: 'Welcome {firstName}! Account verified successfully 🎉',
       dashboardMessage: 'Welcome {firstName}! Your account is verified with {count} payment method(s).',
+      referralAppliedToast: '🎁 Referral code applied successfully!',
       duplicateEmailError: 'This email address is already in use'
     }
   },
@@ -577,6 +579,7 @@ pages.paymentVerification.wo = withBase(pages.paymentVerification.fr, {
   checkingAccounts: 'Mi ngi saytu kontu fey yi',
   backToRegister: '← Dellu ci bind bi',
   securityTitle: 'Kaaraange ak sutura',
+  referralAppliedToast: '🎁 Code de parrainage bi japp nañu ko!',
   duplicateEmailError: 'Adresse email bii jëfandikoo nañu ko ba noppi'
 });
 pages.paymentVerification.bm = withBase(pages.paymentVerification.fr, {
@@ -589,6 +592,7 @@ pages.paymentVerification.bm = withBase(pages.paymentVerification.fr, {
   checkingAccounts: 'Bɛ sara kontow lakɔlɔsi',
   backToRegister: '← Segin ka taa inscrire',
   securityTitle: 'Lakanali ni dogoya',
+  referralAppliedToast: '🎁 Parrain code tɔgɔ sɛbɛnnen don!',
   duplicateEmailError: 'Email adɛrɛsi nin bɛ baara kɛ ka bɔyen'
 });
 pages.paymentVerification.mos = withBase(pages.paymentVerification.fr, {
@@ -601,6 +605,7 @@ pages.paymentVerification.mos = withBase(pages.paymentVerification.fr, {
   checkingAccounts: 'A gese yaool konto-rãmba',
   backToRegister: '← Lebg n kẽ bindgre',
   securityTitle: 'Pãnga la sutura',
+  referralAppliedToast: '🎁 Togs code wã gʋlsame!',
   duplicateEmailError: 'Email adres-kãngã yaa n beoogame'
 });
 

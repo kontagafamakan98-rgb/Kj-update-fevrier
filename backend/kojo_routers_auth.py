@@ -435,6 +435,9 @@ async def register_user_verified(user_data: UserWithPayment):
         # Parrainage : applique le code saisi à l'inscription (?ref=...).
         # Non bloquant : un code invalide est simplement ignoré, l'inscription
         # reste valide (pas de crédit monétaire automatique à ce stade).
+        # Le booléen referral_applied est renvoyé au client pour afficher une
+        # confirmation à l'inscription quand le code a bien été appliqué.
+        referral_applied = False
         ref_code = str((user_data.referral_code or '').strip()).upper()
         if ref_code:
             try:
@@ -444,6 +447,7 @@ async def register_user_verified(user_data: UserWithPayment):
                         {"id": user_id},
                         {"$set": {"referred_by": ref_code, "updated_at": datetime.now(timezone.utc)}},
                     )
+                    referral_applied = True
             except Exception as exc:
                 logger.warning(f"⚠️ Application du code de parrainage impossible: {exc}")
 
@@ -483,6 +487,7 @@ async def register_user_verified(user_data: UserWithPayment):
             "access_token": access_token,
             "token_type": "bearer",
             "user": user.model_dump(exclude={"password_hash"}),
+            "referral_applied": referral_applied,
             "payment_verification": {
                 "linked_accounts": payment_validation["linked_accounts_count"],
                 "required_minimum": 2 if user_data.user_type == "worker" else 1,

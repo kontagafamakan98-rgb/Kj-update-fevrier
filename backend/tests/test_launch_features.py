@@ -135,10 +135,26 @@ async def test_referral_code_applied_at_registration(client):
     resp = await client.post("/api/auth/register-verified", json=payload)
     assert resp.status_code == 200, resp.text
 
-    # 3. Le nouveau compte est bien rattaché au parrain
+    # 3. La réponse informe le frontend que le code a été appliqué
+    #    (pour afficher le message de confirmation à l'inscription)
+    assert resp.json().get("referral_applied") is True
+
+    # 4. Le nouveau compte est bien rattaché au parrain
     created = await db_find_one("users", {"email": "referral-signup@example.com"})
     assert created, "Nouvel utilisateur introuvable"
     assert created.get("referred_by") == sponsor_code.upper()
+
+    # 5. Sans code (ou code invalide), referral_applied est False et le
+    #    compte reste valide (non bloquant)
+    plain_user = dict(BASE_USER)
+    plain_user["email"] = "referral-plain@example.com"
+    token2 = await issue_email_verification_token(client, plain_user["email"])
+    resp = await client.post(
+        "/api/auth/register-verified",
+        json={**plain_user, "email_verification_token": token2},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json().get("referral_applied") is False
 
 
 # ---------------------------------------------------------------------------

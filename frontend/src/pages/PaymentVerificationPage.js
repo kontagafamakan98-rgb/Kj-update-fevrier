@@ -158,6 +158,11 @@ const PaymentVerificationPage = () => {
 
       toast.success(pageT('welcomeToast', { firstName: result.data.user.first_name }));
 
+      // Confirmation du code de parrainage appliqué à l'inscription.
+      if (result.data.referral_applied) {
+        toast.success(pageT('referralAppliedToast'));
+      }
+
       navigate('/dashboard', {
         state: {
           message: pageT('dashboardMessage', {
