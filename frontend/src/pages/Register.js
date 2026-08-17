@@ -20,6 +20,8 @@ export default function Register() {
   const { t, currentLanguage } = useLanguage();
   const defaultLanguage = currentLanguage || 'fr';
   
+  const initialReferralCode = (searchParams.get('ref') || '').trim();
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -30,6 +32,9 @@ export default function Register() {
     user_type: initialUserType,
     country: '', // Défini après détection ou choix manuel
     preferred_language: defaultLanguage, // Langue courante par défaut, peut être modifiée
+    // Code de parrainage : pré-rempli depuis l'URL d'invitation (?ref=CODE),
+    // modifiable par l'utilisateur. Envoyé au backend à l'inscription.
+    referral_code: initialReferralCode,
     // Champs spécifiques aux travailleurs
     worker_specialties: [],
     worker_experience_years: null,
@@ -621,6 +626,27 @@ export default function Register() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
               />
+            </div>
+
+            {/* Code de parrainage (optionnel) — saisi manuellement ou pré-rempli
+                depuis l'URL d'invitation ?ref=CODE. Le backend l'applique à la
+                création du compte (non bloquant si invalide). */}
+            <div>
+              <label htmlFor="referral_code" className="block text-sm font-medium text-gray-700 mb-2">
+                🎁 {pageT('referralCodeLabel')}
+              </label>
+              <input
+                id="referral_code"
+                name="referral_code"
+                type="text"
+                autoComplete="off"
+                maxLength="40"
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder={pageT('referralCodePlaceholder')}
+                value={formData.referral_code || ''}
+                onChange={handleChange}
+              />
+              <p className="mt-1 text-xs text-gray-500">{pageT('referralCodeHelp')}</p>
             </div>
           </div>
 

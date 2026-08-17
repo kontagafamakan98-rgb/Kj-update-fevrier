@@ -886,7 +886,10 @@ pages.register = {
     legalConsentLink: 'Lire la politique de confidentialité',
     legalConsentLabel: 'J’ai lu et j’accepte la Politique de confidentialité et les conditions d’utilisation de KOJO avant de créer mon compte.',
     legalConsentRequired: 'Vous devez accepter la Politique de confidentialité et les conditions d’utilisation pour vous inscrire',
-    legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+    legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
+    referralCodeLabel: 'Code de parrainage (optionnel)',
+    referralCodePlaceholder: 'Ex: ABC123XYZ0',
+    referralCodeHelp: 'Un ami vous a invité ? Saisissez son code pour le référencer comme parrain.'
   },
   en: {
     title: 'Create an account',
@@ -912,7 +915,10 @@ pages.register = {
     legalConsentLink: 'Read the privacy policy',
     legalConsentLabel: 'I have read and accept KOJO’s Privacy Policy and Terms before creating my account.',
     legalConsentRequired: 'You must accept the Privacy Policy and Terms to sign up',
-    legalContactLine: 'KOJO contact: +18193003507 · Email: Kojoapp98@gmail.com · Address: Hamdallaye Aci 2000 Bamako Mali'
+    legalContactLine: 'KOJO contact: +18193003507 · Email: Kojoapp98@gmail.com · Address: Hamdallaye Aci 2000 Bamako Mali',
+    referralCodeLabel: 'Referral code (optional)',
+    referralCodePlaceholder: 'e.g. ABC123XYZ0',
+    referralCodeHelp: 'Did a friend invite you? Enter their code to list them as your referrer.'
   }
 };
 pages.register.wo = withBase(pages.register.fr, {
@@ -937,7 +943,10 @@ pages.register.wo = withBase(pages.register.fr, {
   legalConsentLink: 'Jàng Politique de confidentialité',
   legalConsentLabel: 'Jàng naa te nangu naa Politique de confidentialité ak conditions d’utilisation yu KOJO bala ma sos sama konto.',
   legalConsentRequired: 'War nga nangu Politique de confidentialité ak conditions d’utilisation ngir bindu',
-  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
+  referralCodeLabel: 'Code de parrainage (optionnel)',
+  referralCodePlaceholder: 'Misal: ABC123XYZ0',
+  referralCodeHelp: 'Sa xarit mooy la tedd? Bindal sa code ngir mu la tànn ni nga koy wax.'
 });
 pages.register.bm = withBase(pages.register.fr, {
   title: 'Konto da',
@@ -961,7 +970,10 @@ pages.register.bm = withBase(pages.register.fr, {
   legalConsentLink: 'Politique de confidentialité kalan',
   legalConsentLabel: 'N b’a kalan k’a sɔn ko KOJO ka Politique de confidentialité ani conditions d’utilisation ye sani n ka n konto da.',
   legalConsentRequired: 'I ka kan ka Politique de confidentialité ani conditions d’utilisation sɔn walasa ka tɔgɔ sɛbɛn',
-  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
+  referralCodeLabel: 'Code de parrainage (optionnel)',
+  referralCodePlaceholder: 'Misali: ABC123XYZ0',
+  referralCodeHelp: 'I ka terikɛ dɔ bɛ i wele? I ka a ka code sɛbɛn walasa i ka a dɔn i ka terikɛ ye.'
 });
 pages.register.mos = withBase(pages.register.fr, {
   title: 'Ning konto',
@@ -985,7 +997,10 @@ pages.register.mos = withBase(pages.register.fr, {
   legalConsentLink: 'Karem Politique de confidentialité',
   legalConsentLabel: 'M karame la m sakame KOJO Politique de confidentialité ne conditions d’utilisation yĩnga bala m maan konto.',
   legalConsentRequired: 'F segd n sak Politique de confidentialité ne conditions d’utilisation yĩnga f n gʋls konto',
-  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali'
+  legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
+  referralCodeLabel: 'Code de parrainage (optionnel)',
+  referralCodePlaceholder: 'Misaal: ABC123XYZ0',
+  referralCodeHelp: 'F tom n bool foom? Gʋls a code wã tɩ b bãng tɩ yaa a n togs foom.'
 });
 
 pages.paymentDemo = {

@@ -113,6 +113,34 @@ async def test_referral_code_generated_and_applied(client):
     assert resp.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_referral_code_applied_at_registration(client):
+    """Le code de parrainage saisi dans le formulaire d'inscription (champ
+    referral_code, pré-rempli depuis ?ref=) est appliqué au compte créé via
+    register-verified : referred_by est enregistré côté nouveau user."""
+    from tests.conftest import BASE_USER, db_find_one, issue_email_verification_token
+
+    # 1. Un utilisateur existant possède un code de parrainage
+    headers = await auth_headers(client)
+    resp = await client.get("/api/users/referral", headers=headers)
+    sponsor_code = resp.json()["referral_code"]
+
+    # 2. Un nouvel utilisateur s'inscrit avec ce code dans referral_code
+    new_user = dict(BASE_USER)
+    new_user["email"] = "referral-signup@example.com"
+    new_user["referral_code"] = sponsor_code.lower()  # insensible à la casse
+
+    token = await issue_email_verification_token(client, new_user["email"])
+    payload = {**new_user, "email_verification_token": token}
+    resp = await client.post("/api/auth/register-verified", json=payload)
+    assert resp.status_code == 200, resp.text
+
+    # 3. Le nouveau compte est bien rattaché au parrain
+    created = await db_find_one("users", {"email": "referral-signup@example.com"})
+    assert created, "Nouvel utilisateur introuvable"
+    assert created.get("referred_by") == sponsor_code.upper()
+
+
 # ---------------------------------------------------------------------------
 # Accusés de lecture (read_at)
 # ---------------------------------------------------------------------------
