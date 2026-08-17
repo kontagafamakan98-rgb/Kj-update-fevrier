@@ -13,16 +13,23 @@ import { devLog, safeLog } from './env';
 const PUSH_SW_PATH = '/push-sw.js';
 const PUSH_SW_SCOPE = '/';
 
-/** Convertit une clé VAPID base64url → Uint8Array (requis par pushManager) */
+/** Convertit une clé VAPID base64url → Uint8Array (requis par pushManager).
+ *  Renvoie null si la clé n'est pas un base64url valide (au lieu de jeter
+ *  une InvalidCharacterError d'atob) : l'appelant désactive alors le push
+ *  proprement. */
 function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const output = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    output[i] = rawData.charCodeAt(i);
+  try {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const output = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      output[i] = rawData.charCodeAt(i);
+    }
+    return output;
+  } catch (_error) {
+    return null;
   }
-  return output;
 }
 
 /** Vérifie si le navigateur supporte les push */
@@ -97,9 +104,14 @@ export async function registerPushSubscription(userId) {
     let subscription = await reg.pushManager.getSubscription();
 
     if (!subscription) {
+      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
+      if (!applicationServerKey) {
+        safeLog.error('Clé VAPID invalide (base64url mal formé) — push désactivé');
+        return null;
+      }
       subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+        applicationServerKey,
       });
       devLog.info('✅ Nouvelle subscription push créée');
     }

@@ -5,7 +5,13 @@ const PROD_ENV_BACKEND_URL = (
   || import.meta.env.VITE_BACKEND_URL
   || ''
 ).trim();
-const DEFAULT_REMOTE_BACKEND_URL = PROD_ENV_BACKEND_URL || 'https://kojo-backend-03az.onrender.com';
+// VITE_API_URL peut être défini avec OU sans le suffixe /api (les deux
+// conventions coexistent : api.js l'attend avec /api, buildApiUrl l'ajoute
+// lui-même). On normalise vers l'ORIGINE nue pour que buildBackendUrl /
+// buildApiUrl ne produisent jamais un double préfixe /api/api (bug réel :
+// GET /api/api/users/payment-accounts → 404).
+const stripApiSuffix = (value = '') => String(value || '').replace(/\/api$/i, '');
+const DEFAULT_REMOTE_BACKEND_URL = stripApiSuffix(PROD_ENV_BACKEND_URL) || 'https://kojo-backend-03az.onrender.com';
 const ensureLeadingSlash = (value = '') => {
   if (!value) return '';
   return value.startsWith('/') ? value : `/${value}`;

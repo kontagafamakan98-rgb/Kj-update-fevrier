@@ -46,7 +46,11 @@ export default defineConfig(({ mode }) => {
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://res.cloudinary.com",
-            `connect-src 'self' ${apiOrigin}`,
+            // Services de géolocalisation IP appelés DIRECTEMENT depuis le
+            // navigateur (geolocationService / preciseGeolocationService).
+            // Sans eux dans connect-src, la CSP bloque ces appels (erreurs
+            // console « Refused to connect »).
+            `connect-src 'self' ${apiOrigin} https://ipapi.co https://ipinfo.io`,
             "font-src 'self' data:",
             "object-src 'none'",
             "base-uri 'self'",
