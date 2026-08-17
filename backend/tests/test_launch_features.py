@@ -19,6 +19,121 @@ from tests.conftest import (
 
 
 # ---------------------------------------------------------------------------
+# Récompense de parrainage (première mission du filleul)
+# ---------------------------------------------------------------------------
+
+async def _complete_job_with_payout(client, client_headers, job_id):
+    """Clôture une mission avec décaissement PayDunya simulé (comme le test
+    d'intégration). Retourne la réponse de /complete."""
+    with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-referral"}), \
+         patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_routers_jobs.notify_user", AsyncMock()):
+        return await client.post(f"/api/jobs/{job_id}/complete", headers=client_headers)
+
+
+async def _run_job_to_completion(client, client_headers, worker_headers):
+    """Crée un job, le fait proposer/accepter, paie (checkout+IPN simulés) et
+    le clôture. Retourne (job_id, worker_user_id)."""
+    resp = await client.post("/api/jobs", headers=client_headers, json=BASE_JOB)
+    assert resp.status_code == 200, resp.text
+    job = resp.json()
+    job_id = job["id"]
+
+    resp = await client.post(
+        f"/api/jobs/{job_id}/proposals",
+        headers=worker_headers,
+        json={
+            "proposed_amount": 25000,
+            "estimated_completion_time": "2 jours",
+            "message": "Je suis disponible immédiatement pour cette mission.",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    proposal = (await client.get(f"/api/jobs/{job_id}/proposals", headers=client_headers)).json()[0]
+
+    resp = await client.post(
+        f"/api/jobs/{job_id}/proposals/{proposal['id']}/accept",
+        headers=client_headers,
+        json={"location": {"latitude": 14.69, "longitude": -17.44}},
+    )
+    assert resp.status_code == 200, resp.text
+
+    mock_invoice = {"token": "invoice-token-referral", "response_code": "00"}
+    with patch("kojo_routers_payments.is_paydunya_configured", return_value=True), \
+         patch("kojo_routers_payments.create_paydunya_invoice", return_value=mock_invoice), \
+         patch("kojo_routers_payments.notify_user", AsyncMock()):
+        resp = await client.post("/api/payments/checkout", headers=client_headers, json={
+            "job_id": job_id,
+            "amount": 25000,
+            "payment_method": "orange_money",
+            "country": "senegal",
+        })
+    assert resp.status_code == 200, resp.text
+    payment_id = resp.json()["payment_id"]
+
+    with patch("kojo_payments.is_paydunya_configured", return_value=True), \
+         patch("kojo_payments.confirm_paydunya_invoice",
+               return_value={"invoice": {"status": "completed"}}), \
+         patch("kojo_routers_payments.notify_user", AsyncMock()):
+        resp = await client.post("/api/payments/ipn/paydunya", json={
+            "invoice": {"token": mock_invoice["token"], "status": "completed"},
+            "custom_data": {"payment_id": payment_id},
+        })
+    assert resp.status_code == 200
+
+    resp = await _complete_job_with_payout(client, client_headers, job_id)
+    assert resp.status_code == 200, resp.text
+    return job_id
+
+
+@pytest.mark.asyncio
+async def test_referral_reward_credited_on_filleul_first_job(client):
+    """Quand le filleul termine sa première mission, le parrain ET le filleul
+    reçoivent leur récompense (referral_reward_balance) et un historique est
+    enregistré. Une seconde mission ne crédite plus (idempotent)."""
+    import uuid as _uuid
+    from tests.conftest import BASE_USER
+
+    # 1. Le parrain (client) possède un code de parrainage
+    sponsor_headers = await auth_headers(client)
+    resp = await client.get("/api/users/referral", headers=sponsor_headers)
+    sponsor_code = resp.json()["referral_code"]
+    sponsor_user = (await db_find_one("users", {"email": BASE_USER["email"]}))
+
+    # 2. Le filleul (travailleur) s'inscrit avec le code du parrain
+    filleul_data = dict(WORKER_USER)
+    filleul_data["email"] = f"filleul-{_uuid.uuid4().hex[:8]}@example.com"
+    filleul_data["referral_code"] = sponsor_code.lower()
+    filleul_headers = await auth_headers(client, filleul_data)
+    filleul_user = (await db_find_one("users", {"email": filleul_data["email"]}))
+    assert filleul_user.get("referred_by") == sponsor_code.upper()
+
+    # 3. Le parrain crée un job, le filleul le réalise → 1ère mission terminée
+    await _run_job_to_completion(client, sponsor_headers, filleul_headers)
+
+    # 4. Les deux ont reçu leur récompense + historique
+    sponsor_after = await db_find_one("users", {"id": sponsor_user["id"]})
+    filleul_after = await db_find_one("users", {"id": filleul_user["id"]})
+    assert sponsor_after["referral_reward_balance"] > 0
+    assert filleul_after["referral_reward_balance"] > 0
+    assert any(r["role"] == "parrain" for r in sponsor_after["referral_rewards"])
+    assert any(r["role"] == "filleul" for r in filleul_after["referral_rewards"])
+    assert filleul_after["referral_first_job_rewarded"] is True
+
+    # 5. Le endpoint /users/referral expose le solde
+    resp = await client.get("/api/users/referral", headers=filleul_headers)
+    assert resp.json()["reward_balance"] == filleul_after["referral_reward_balance"]
+
+    # 6. Une seconde mission ne crédite plus rien (idempotent)
+    balance_before = sponsor_after["referral_reward_balance"]
+    await _run_job_to_completion(client, sponsor_headers, filleul_headers)
+    sponsor_after2 = await db_find_one("users", {"id": sponsor_user["id"]})
+    assert sponsor_after2["referral_reward_balance"] == balance_before
+
+
+# ---------------------------------------------------------------------------
 # Portfolio travailleur
 # ---------------------------------------------------------------------------
 

@@ -15,6 +15,8 @@ from kojo_models import (
 )
 from kojo_settings import (
     OWNER_EMAIL,
+    REFERRAL_FILLEUL_REWARD,
+    REFERRAL_SPONSOR_REWARD,
     logger,
 )
 from kojo_core import (
@@ -28,6 +30,80 @@ from kojo_payments import (
 )
 
 router = APIRouter()
+
+
+async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, job_title: str) -> None:
+    """Crédite la récompense de parrainage quand le filleul termine sa PREMIÈRE
+    mission : le parrain reçoit REFERRAL_SPONSOR_REWARD et le filleul reçoit
+    REFERRAL_FILLEUL_REWARD (FCFA).
+
+    Idempotent : un compte ne touche sa récompense qu'une seule fois (le flag
+    referral_first_job_rewarded est posé à la première mission terminée), et
+    un code invalide/absent est ignoré silencieusement (non bloquant).
+    """
+    try:
+        worker = await db.users.find_one({"id": worker_id}, {"referred_by": 1, "referral_first_job_rewarded": 1})
+        if not worker:
+            return
+        if worker.get("referral_first_job_rewarded"):
+            return
+        ref_code = str((worker.get("referred_by") or '').strip()).upper()
+        if not ref_code:
+            return
+
+        sponsor = await db.users.find_one({"referral_code": ref_code}, {"id": 1})
+        if not sponsor or sponsor.get("id") == worker_id:
+            return
+
+        now = datetime.now(timezone.utc)
+        reward_record = {
+            "type": "first_job",
+            "job_id": job_id,
+            "job_title": job_title,
+            "created_at": now.isoformat(),
+        }
+
+        # Crédit du filleul + pose du flag (même update, atomique)
+        await db.users.update_one(
+            {"id": worker_id},
+            {
+                "$set": {"referral_first_job_rewarded": True, "updated_at": now},
+                "$inc": {"referral_reward_balance": REFERRAL_FILLEUL_REWARD},
+                "$push": {"referral_rewards": {**reward_record, "role": "filleul", "amount": REFERRAL_FILLEUL_REWARD}},
+            },
+        )
+
+        # Crédit du parrain
+        await db.users.update_one(
+            {"id": sponsor["id"]},
+            {
+                "$inc": {"referral_reward_balance": REFERRAL_SPONSOR_REWARD},
+                "$push": {"referral_rewards": {**reward_record, "role": "parrain", "amount": REFERRAL_SPONSOR_REWARD}},
+            },
+        )
+
+        # Notifications pour les deux
+        asyncio.create_task(notify_user(
+            user_id=worker_id,
+            title="🎁 Bonus de parrainage débloqué",
+            body=f"Votre première mission « {job_title} » est terminée : +{REFERRAL_FILLEUL_REWARD} FCFA de bonus vous ont été crédités.",
+            notif_type=NotificationType.GENERAL,
+            related_id=job_id,
+            related_type="job",
+        ))
+        asyncio.create_task(notify_user(
+            user_id=sponsor["id"],
+            title="🎁 Votre filleul a terminé sa première mission",
+            body=f"« {job_title} » est terminée : +{REFERRAL_SPONSOR_REWARD} FCFA de récompense de parrainage crédités.",
+            notif_type=NotificationType.GENERAL,
+            related_id=job_id,
+            related_type="job",
+        ))
+    except Exception as exc:
+        # Non bloquant : une erreur de récompense ne doit jamais casser la
+        # clôture de mission ni le versement au travailleur.
+        logger.error(f"⚠️ Attribution de la récompense de parrainage impossible: {exc}")
+
 
 @router.post("/workers/profile")
 async def create_worker_profile(
@@ -876,6 +952,7 @@ async def complete_job_and_release_payment(
     if current_payout_status == "released":
         # Deja verse : on se contente de cloturer le job si ce n'est pas fait
         await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
         updated_job = await db.jobs.find_one({"id": job_id})
         return {"message": "Mission déjà clôturée et paiement déjà versé", "job": Job(**updated_job).model_dump(), "payout_status": "released"}
     if current_payout_status == "releasing":
@@ -916,6 +993,7 @@ async def complete_job_and_release_payment(
             }}
         )
         await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
 
     if not payout_method or not payout_phone:
         await _mark_release_failed("Le travailleur n'a pas de compte Orange Money ou Wave configuré")
@@ -1015,6 +1093,7 @@ async def complete_job_and_release_payment(
         await db.payments.update_one({"id": payment_record["id"]}, {"$set": {"payout_status": final_payout_status}})
 
     await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+    await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
 
     # Notifier le travailleur et confirmer au client via le chat (canal
     # fiable existant, pas de vrai systeme de notifications push).

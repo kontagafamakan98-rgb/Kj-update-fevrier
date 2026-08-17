@@ -153,6 +153,9 @@ class FakeCollection:
             if self._match(query, doc):
                 if "$set" in update:
                     doc.update(update["$set"])
+                if "$inc" in update:
+                    for k, v in update["$inc"].items():
+                        doc[k] = float(doc.get(k, 0)) + float(v)
                 if "$push" in update:
                     for k, v in update["$push"].items():
                         doc.setdefault(k, []).append(v)
@@ -165,6 +168,9 @@ class FakeCollection:
             new_doc.update(query)
             if "$set" in update:
                 new_doc.update(update["$set"])
+            if "$inc" in update:
+                for k, v in update["$inc"].items():
+                    new_doc[k] = float(v)
             self._docs.append(new_doc)
         result = MagicMock()
         result.matched_count = 0
@@ -192,6 +198,9 @@ class FakeCollection:
             matched += 1
             if "$set" in update:
                 doc.update(update["$set"])
+            if "$inc" in update:
+                for k, v in update["$inc"].items():
+                    doc[k] = float(doc.get(k, 0)) + float(v)
             if "$push" in update:
                 for k, v in update["$push"].items():
                     doc.setdefault(k, []).append(v)

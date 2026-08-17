@@ -14,6 +14,8 @@ from kojo_models import (
 )
 from kojo_settings import (
     FRONTEND_APP_URL,
+    REFERRAL_FILLEUL_REWARD,
+    REFERRAL_SPONSOR_REWARD,
     logger,
 )
 from kojo_core import (
@@ -572,11 +574,20 @@ async def _ensure_referral_code(user_id: str) -> str:
 
 @router.get("/users/referral")
 async def get_referral(current_user: User = Depends(get_current_user)):
-    """Retourne le code de parrainage de l'utilisateur (le génère si absent)."""
+    """Retourne le code de parrainage de l'utilisateur (le génère si absent),
+    ainsi que le solde de récompense de parrainage et son historique."""
     code = await _ensure_referral_code(current_user.id)
+    user_data = await db.users.find_one(
+        {"id": current_user.id},
+        {"referral_reward_balance": 1, "referral_rewards": 1},
+    )
     return {
         "referral_code": code,
         "invite_url": f"{FRONTEND_APP_URL}/register?ref={code}",
+        "reward_balance": float((user_data or {}).get("referral_reward_balance") or 0),
+        "reward_history": (user_data or {}).get("referral_rewards") or [],
+        "sponsor_reward": REFERRAL_SPONSOR_REWARD,
+        "filleul_reward": REFERRAL_FILLEUL_REWARD,
     }
 
 

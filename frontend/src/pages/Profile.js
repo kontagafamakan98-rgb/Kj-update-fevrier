@@ -648,6 +648,9 @@ function ReferralCard({ referral, t }) {
   const [copied, setCopied] = useState(false);
   if (!referral?.referral_code) return null;
 
+  // t() ne fait pas d'interpolation — on remplace {amount} à la main.
+  const interpolate = (template, vars = {}) => String(template || '').replace(/\{(\w+)\}/g, (_, key) => String(vars[key] ?? ''));
+
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(referral.referral_code);
@@ -657,6 +660,11 @@ function ReferralCard({ referral, t }) {
       // Presse-papiers indisponible : l'utilisateur peut copier à la main.
     }
   };
+
+  const balance = Number(referral.reward_balance || 0);
+  const history = Array.isArray(referral.reward_history) ? referral.reward_history : [];
+  const sponsorReward = Number(referral.sponsor_reward || 500);
+  const filleulReward = Number(referral.filleul_reward || 500);
 
   return (
     <div>
@@ -682,6 +690,29 @@ function ReferralCard({ referral, t }) {
           >
             {t('referralInviteLink')}
           </a>
+        )}
+      </div>
+
+      {/* Récompense de parrainage : solde + historique */}
+      <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-green-800">{t('referralRewardTitle')}</p>
+          <p className="text-sm font-bold text-green-700">{balance.toLocaleString('fr-FR')} FCFA</p>
+        </div>
+        <p className="text-xs text-green-700 mt-1">{t('referralRewardBalance')}</p>
+        <p className="text-xs text-green-600 mt-2">{interpolate(t('referralRewardHint'), { amount: sponsorReward })}</p>
+        {history.length > 0 && (
+          <div className="mt-3 border-t border-green-200 pt-3">
+            <p className="text-xs font-semibold text-green-800 mb-2">{t('referralRewardHistory')}</p>
+            <ul className="space-y-1">
+              {history.slice(-5).reverse().map((reward, idx) => (
+                <li key={idx} className="text-xs text-green-700 flex items-center justify-between">
+                  <span className="truncate mr-2">{reward.job_title || '—'}</span>
+                  <span className="font-semibold whitespace-nowrap">+{Number(reward.amount || 0).toLocaleString('fr-FR')} FCFA</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </div>

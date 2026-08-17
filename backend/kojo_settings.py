@@ -130,6 +130,11 @@ EMAIL_OTP_MAX_ATTEMPTS = int(os.environ.get('EMAIL_OTP_MAX_ATTEMPTS', '5'))
 
 PAYMENT_COMMISSION_RATE = float(os.environ.get('PAYMENT_COMMISSION_RATE', '0.14'))
 
+# Récompense de parrainage (FCFA) créditée quand le filleul termine sa
+# PREMIÈRE mission : une part au parrain, une part au filleul.
+REFERRAL_SPONSOR_REWARD = float(os.environ.get('REFERRAL_SPONSOR_REWARD', '500'))
+REFERRAL_FILLEUL_REWARD = float(os.environ.get('REFERRAL_FILLEUL_REWARD', '500'))
+
 PAYDUNYA_MODE = os.environ.get('PAYDUNYA_MODE', 'test').strip().lower()
 
 PAYDUNYA_MASTER_KEY = os.environ.get('PAYDUNYA_MASTER_KEY', '').strip()

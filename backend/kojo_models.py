@@ -142,6 +142,11 @@ class User(BaseModel):
     # saisi à l'inscription (référence croisée, pas de crédit monétaire auto).
     referral_code: Optional[str] = Field(None, max_length=40)
     referred_by: Optional[str] = Field(None, max_length=40)
+    # Récompense de parrainage (FCFA) : solde accumulé + historique. Créditée
+    # au parrain ET au filleul quand le filleul termine sa première mission.
+    referral_reward_balance: float = Field(default=0.0, ge=0)
+    referral_rewards: List[dict] = Field(default_factory=list)
+    referral_first_job_rewarded: bool = False
     payment_accounts: Optional[dict] = Field(None)  # Payment methods dict
     payment_accounts_count: int = Field(default=0, ge=0, le=10)  # Non-negative, max 10
     rating: float = Field(default=0.0, ge=0.0, le=5.0)  # Rating between 0-5
