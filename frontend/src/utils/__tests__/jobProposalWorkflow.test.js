@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   stripJobMarkerFromMessage,
   getJobMarker,
@@ -97,5 +97,40 @@ describe('extractProposalId / extractProposalWorkerId', () => {
   it('gère un objet vide sans planter', () => {
     expect(extractProposalId({})).toBeFalsy();
     expect(extractProposalWorkerId({})).toBeFalsy();
+  });
+});
+
+describe('fetchApiJson — construction d’URL via buildApiUrl', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_URL', 'https://stub.example');
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '[]',
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('charge les messages via base + /api + chemin', async () => {
+    const { loadProposalConversationMessages } = await import('../jobProposalWorkflow');
+    await loadProposalConversationMessages();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://stub.example/api/messages',
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('base configurée avec /api → un seul /api', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://stub.example/api');
+    const { loadProposalConversationMessages } = await import('../jobProposalWorkflow');
+    await loadProposalConversationMessages();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://stub.example/api/messages',
+      expect.objectContaining({ method: 'GET' })
+    );
   });
 });

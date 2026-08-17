@@ -1,4 +1,9 @@
 import { getStoredSessionUser, normalizeComparableId } from './jobPageSafeHelpers';
+// Construction d'URL : source de vérité unique (backendUrl.buildApiUrl).
+// Ne PAS réimplémenter la dérivation de base ici — bug réel historique de
+// double préfixe /api/api quand deux helpers normalisent différemment la
+// même variable d'environnement.
+import { buildApiUrl } from './backendUrl';
 
 const STORAGE_KEY = 'kojo_job_applications_v1';
 const ACCEPTED_STORAGE_KEY = 'kojo_job_accepted_v1';
@@ -50,26 +55,6 @@ const persistAcceptedMap = (value) => {
       bucket.setItem(ACCEPTED_STORAGE_KEY, serialized);
     } catch (_error) {}
   }
-};
-
-const trimSlashes = (value) => String(value || '').replace(/\/+$/, '');
-
-const getRuntimeApiBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    const fromWindow = window.__KOJO_API_URL__ || window.__API_URL__;
-    if (typeof fromWindow === 'string' && fromWindow.trim()) {
-      return trimSlashes(fromWindow.trim()).replace(/\/api$/i, '');
-    }
-  }
-
-  if (typeof import.meta !== 'undefined' && import.meta?.env) {
-    const fromEnv = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
-    if (typeof fromEnv === 'string' && fromEnv.trim()) {
-      return trimSlashes(fromEnv.trim()).replace(/\/api$/i, '');
-    }
-  }
-
-  return 'https://kojo-backend.fly.dev';
 };
 
 const getPossibleTokenKeys = () => ([
@@ -136,11 +121,6 @@ const getAuthToken = () => {
   return '';
 };
 
-const toApiPath = (path) => {
-  const normalizedPath = String(path || '').startsWith('/') ? String(path || '') : `/${String(path || '')}`;
-  return `${getRuntimeApiBaseUrl()}/api${normalizedPath}`;
-};
-
 const extractApiErrorMessage = (payload, fallback) => {
   if (typeof payload === 'string' && payload.trim()) return payload.trim();
   if (Array.isArray(payload)) {
@@ -174,7 +154,7 @@ const fetchApiJson = async (path, options = {}) => {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(toApiPath(path), {
+  const response = await fetch(buildApiUrl(path), {
     ...options,
     headers,
   });

@@ -1,40 +1,8 @@
-// URL de fallback — utilisée SEULEMENT si aucune variable d'environnement
-// n'est définie. En production Vercel, définir VITE_API_URL dans les
-// variables d'environnement Vercel pour pointer vers le bon backend Render.
-// Laisser cette valeur en dur est acceptable en tant que dernier recours
-// (l'URL Render ne change pas souvent), mais la var d'env est préférable
-// car elle permet de changer de backend sans modifier le code.
-const DEFAULT_API_BASE_URL = 'https://kojo-backend.fly.dev/api';
-
-const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
-
-const normalizeApiBaseUrl = (value) => {
-  const trimmed = trimTrailingSlash(String(value || '').trim());
-  if (!trimmed) return '';
-  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
-};
-
-const detectApiBaseUrl = () => {
-  const envBase = (() => {
-    if (typeof import.meta !== 'undefined' && import.meta?.env) {
-      return import.meta.env.VITE_API_URL
-        || import.meta.env.VITE_API_BASE_URL
-        || import.meta.env.VITE_BACKEND_URL
-        || '';
-    }
-    return '';
-  })();
-
-  const reactEnvBase = typeof process !== 'undefined' && process.env
-    ? process.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_API_URL || ''
-    : '';
-
-  const runtimeBase = typeof window !== 'undefined' && window.__KOJO_API_URL__
-    ? window.__KOJO_API_URL__
-    : '';
-
-  return normalizeApiBaseUrl(envBase || reactEnvBase || runtimeBase) || DEFAULT_API_BASE_URL;
-};
+// Construction d'URL : source de vérité unique dans ../utils/backendUrl
+// (buildApiUrl). Ne PAS réimplémenter la dérivation de base ici — bug réel
+// historique de double préfixe /api/api quand deux helpers normalisent
+// différemment la même variable d'environnement.
+import { buildApiUrl } from '../utils/backendUrl';
 
 const getStorageBuckets = () => {
   if (typeof window === 'undefined') return [];
@@ -226,7 +194,7 @@ const handleUnauthorized = (path) => {
 
 const request = async (method, path, { params, data, headers } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
-  const url = `${detectApiBaseUrl()}${normalizedPath}${buildQueryString(params)}`;
+  const url = `${buildApiUrl(normalizedPath)}${buildQueryString(params)}`;
   const token = getAuthToken();
   const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
 
