@@ -31,12 +31,9 @@ const COPY = {
     failed: 'Paiement échoué',
     unknown: 'Statut inconnu',
     refreshStatus: 'Actualiser le statut',
-    supportTitle: 'Canaux confirmés par la doc officielle',
-    supportText: 'PayDunya documente Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire, et le paiement carte. Le check status se fait avec le token de facture et l’IPN confirme les paiements.',
     myPayments: 'Mes paiements récents',
     noPayments: 'Aucun paiement enregistré pour ce compte.',
     openCheckout: 'Ouvrir le checkout',
-    needAccounts: 'Pense aussi à lier les comptes de paiement côté profil pour les encaissements.',
     countries: { senegal: 'Sénégal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Carte bancaire' }
   },
@@ -65,12 +62,9 @@ const COPY = {
     failed: 'Payment failed',
     unknown: 'Unknown status',
     refreshStatus: 'Refresh status',
-    supportTitle: 'Officially documented channels',
-    supportText: 'PayDunya officially documents Orange Money for Senegal / Mali / Burkina / Côte d’Ivoire, Wave for Senegal / Côte d’Ivoire, plus card payments. Invoice tokens are used for status checks and IPN confirms payments.',
     myPayments: 'My recent payments',
     noPayments: 'No payments recorded for this account yet.',
     openCheckout: 'Open checkout',
-    needAccounts: 'Also link payment accounts in the profile for future collections and payouts.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Ivory Coast' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank card' }
   },
@@ -99,12 +93,9 @@ const COPY = {
     failed: 'Fey gi antuwul',
     unknown: 'Status xamul',
     refreshStatus: 'Yeesal status',
-    supportTitle: 'Canaux yi doc bi wone',
-    supportText: 'PayDunya wax na Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire ak kart bank. Tokenu invoice mooy seetal status, IPN mooy dëggal fey gi.',
     myPayments: 'Samay paiements yu mujj',
     noPayments: 'Amul paiement bu ñu bindal account bii.',
     openCheckout: 'Ubbi checkout',
-    needAccounts: 'Bul fàtte boole comptes de paiement yi ci profil bi.',
     countries: { senegal: 'Senegaal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Kot Divwaar' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Kart bank' }
   },
@@ -133,12 +124,9 @@ const COPY = {
     failed: 'Sariya-faga ma se ka kɛ',
     unknown: 'Status min tɛ se ka dɔn',
     refreshStatus: 'Status kura',
-    supportTitle: 'Canaux minnu bɛ doc la',
-    supportText: 'PayDunya bɛ Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire ani bank karti jira. Invoice token bɛ status lajɛ, IPN bɛ sariya-faga tabali kɔrɔsiya.',
     myPayments: 'Ne ka paiements kura',
     noPayments: 'Paiement si tɛ account nin kama fɔlɔ.',
     openCheckout: 'Checkout da yɔrɔ',
-    needAccounts: 'Payment accounts fara profil la fana.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank karti' }
   },
@@ -167,12 +155,9 @@ const COPY = {
     failed: 'Paoongo ka paam',
     unknown: 'Status ka dɔk ye',
     refreshStatus: 'Status taaba',
-    supportTitle: 'Canaux doc yeta',
-    supportText: 'PayDunya goma Orange Money Sénégal / Mali / Burkina / Côte d’Ivoire, Wave Sénégal / Côte d’Ivoire la bank carte. Invoice token nonga status yɩɩme, IPN paamda paoongo tabga.',
     myPayments: 'Mam paiements kɩtã',
     noPayments: 'Paiement baa ka be account yɩnga ye.',
     openCheckout: 'Checkout yɔk',
-    needAccounts: 'Tɩ payment accounts profile pʋgẽ fana.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank carte' }
   }
@@ -499,12 +484,6 @@ const Payment = () => {
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">{copy.supportTitle}</h3>
-              <p className="text-sm text-gray-600">{copy.supportText}</p>
-              <p className="text-sm text-gray-500 mt-3">{copy.needAccounts}</p>
-            </div>
-
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">{copy.myPayments}</h3>
               {payments.length === 0 ? (
