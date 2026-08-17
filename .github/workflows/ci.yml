@@ -89,7 +89,7 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
-          VITE_API_URL: https://kojo-backend-03az.onrender.com/api
+          VITE_API_URL: https://kojo-backend.fly.dev/api
         run: npm run build
 
       - name: Check bundle size

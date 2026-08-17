@@ -182,15 +182,23 @@ export default function Dashboard() {
           <p className="text-sm text-orange-800 mb-4">{t('famakanDescription')}</p>
 
           <div className="flex flex-wrap gap-3">
-            <Link to="/mobile-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors shadow-md">
-              📱 {t('testMobileFeatures')}
-            </Link>
+            {/* Liens de test réservés au dev : les routes /mobile-test et
+                /photo-test ne sont enregistrées qu'en développement
+                (import.meta.env.DEV dans App.js) — en prod elles 404.
+                /photo-debug est l'équivalent prod (owner-only). */}
+            {import.meta.env.DEV && (
+              <Link to="/mobile-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors shadow-md">
+                📱 {t('testMobileFeatures')}
+              </Link>
+            )}
             <Link to="/create-job" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
               🚀 {t('createJobGPS')}
             </Link>
-            <Link to="/photo-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-md">
-              📷 {t('debugPhotos')}
-            </Link>
+            {import.meta.env.DEV && (
+              <Link to="/photo-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-md">
+                📷 {t('debugPhotos')}
+              </Link>
+            )}
             <Link to="/commission-dashboard" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
               💼 {t('commissionDashboard')}
             </Link>

@@ -456,7 +456,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
         elif refund_outcome == "refunding":
             client_body = f"Votre remboursement de {refunded_amount} FCFA pour « {job_title} » est en cours de traitement."
         elif refund_outcome == "refund_failed":
-            client_body = f"Mission annulée, mais le remboursement automatique a échoué : contactez le support pour un remboursement manuel."
+            client_body = "Mission annulée, mais le remboursement automatique a échoué : contactez le support pour un remboursement manuel."
         else:
             client_body = f"La mission « {job_title} » a été annulée."
         asyncio.create_task(notify_user(

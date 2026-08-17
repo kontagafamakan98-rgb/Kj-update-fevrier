@@ -50,7 +50,12 @@ export default defineConfig(({ mode }) => {
             // navigateur (geolocationService / preciseGeolocationService).
             // Sans eux dans connect-src, la CSP bloque ces appels (erreurs
             // console « Refused to connect »).
-            `connect-src 'self' ${apiOrigin} https://ipapi.co https://ipinfo.io`,
+            `connect-src 'self' ${apiOrigin} https://ipapi.co https://ipinfo.io https://nominatim.openstreetmap.org`,
+            // Cartes : les aperçus de localisation sont des iframes
+            // (CreateJob / JobCreateModal → buildMapEmbedUrl) Google Maps ou
+            // OpenStreetMap. Sans frame-src, default-src 'self' les bloque
+            // (console : « Refused to frame »).
+            "frame-src 'self' https://www.google.com https://www.openstreetmap.org",
             "font-src 'self' data:",
             "object-src 'none'",
             "base-uri 'self'",

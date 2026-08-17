@@ -13,12 +13,15 @@ from dotenv import load_dotenv
 import cloudinary
 
 # Web Push (VAPID) - Sans Firebase
+# Détection de disponibilité SANS importer de noms inutilisés (l'usage réel
+# de pywebpush vit dans kojo_shared.py). find_spec évite un ImportError au
+# module importé mais jamais utilisé ici.
 try:
-    from pywebpush import webpush, WebPushException
-    import json as _json
-    WEBPUSH_AVAILABLE = True
-except ImportError:
+    import importlib.util as _importlib_util
+    WEBPUSH_AVAILABLE = _importlib_util.find_spec("pywebpush") is not None
+except Exception:
     WEBPUSH_AVAILABLE = False
+if not WEBPUSH_AVAILABLE:
     # logger n'est pas encore initialisé ici — on utilise print()
     # Le message sera répété via logger une fois le logging configuré.
     print("⚠️ pywebpush non installé - notifications push désactivées")
