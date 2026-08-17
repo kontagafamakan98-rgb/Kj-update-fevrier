@@ -72,6 +72,7 @@ from kojo_routers_messages import router as messages_router
 from kojo_routers_notifications import router as notifications_router
 from kojo_routers_owner import router as owner_router
 from kojo_routers_payments import router as payments_router
+from kojo_routers_public import router as public_router
 from kojo_routers_reviews import router as reviews_router
 from kojo_routers_support import router as support_router
 from kojo_routers_users import router as users_router
@@ -138,6 +139,7 @@ api_router.include_router(geo_router)
 api_router.include_router(payments_router)
 api_router.include_router(reviews_router)
 api_router.include_router(owner_router)
+api_router.include_router(public_router)
 
 
 # ---------------------------------------------------------------------------

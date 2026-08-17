@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => {
             "default-src 'self'",
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob: https://res.cloudinary.com",
+            "img-src 'self' data: blob: https://res.cloudinary.com https://tile.openstreetmap.org",
             // Géolocalisation 100% centralisée derrière le backend Kojo :
             // détection IP (/geolocation/detect), reverse geocoding
             // (/geolocation/reverse) et base villes/quartiers

@@ -170,6 +170,9 @@ class Job(BaseModel):
     budget_min: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
     budget_max: float = Field(ge=0.0, le=10000000.0)  # Min 0, max 10M FCFA
     location: dict = Field(...)  # Location structure
+    # Point GeoJSON [lng, lat] pour la recherche par rayon côté serveur
+    # (index 2dsphere). Dérivé de location.latitude/longitude à la création.
+    geo: Optional[dict] = None
     country: Optional[str] = None
     status: JobStatus = JobStatus.OPEN
     required_skills: List[str] = Field(default=[], max_length=20)  # Max 20 skills

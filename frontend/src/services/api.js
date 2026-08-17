@@ -544,4 +544,9 @@ export const geolocationAPI = {
   getAvailableCountries: () => api.get('/geolocation/available-countries'),
 };
 
+export const publicAPI = {
+  // Chiffres réels de la landing (compteurs agrégés, sans auth)
+  getStats: () => api.get('/public/stats'),
+};
+
 export default api;

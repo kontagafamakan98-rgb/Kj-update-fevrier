@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import ProposalModal from '../components/ProposalModal';
@@ -718,6 +718,12 @@ export default function JobDetails() {
                   L'argent est <strong>bloqué sur le compte séquestre</strong> jusqu'à la validation de la mission terminée,
                   puis versé automatiquement au travailleur. Ni le client ni le travailleur ne peut y toucher avant la fin.
                 </p>
+                <Link
+                  to="/how-it-works"
+                  className="mt-2 inline-block text-sm font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-800"
+                >
+                  Comment ça marche ? →
+                </Link>
               </div>
             </div>
           </div>

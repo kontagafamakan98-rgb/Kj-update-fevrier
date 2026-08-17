@@ -12,6 +12,7 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobList } from '../utils/jobDisplayBridge';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import CountrySelector from '../components/CountrySelector';
+import JobsMap from '../components/JobsMap';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 
@@ -70,6 +71,7 @@ export default function Jobs() {
   const [radiusKm, setRadiusKm] = useState('');
   const [userCoords, setUserCoords] = useState(null);
   const [locating, setLocating] = useState(false);
+  const [viewMode, setViewMode] = useState('list');
   // null = pas encore chargé (JobCard retombe alors sur localStorage) ;
   // Set (même vide) = donnée serveur fiable disponible.
   const [appliedJobIds, setAppliedJobIds] = useState(null);
@@ -205,6 +207,21 @@ export default function Jobs() {
         <div className="flex items-center gap-3">
           {/* Sélecteur de pays — visible uniquement sur cette page */}
           <CountrySelector />
+          {/* Bascule liste / carte */}
+          <div className="flex rounded-xl border border-gray-200 bg-white p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              ☰ Liste
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              🗺️ Carte
+            </button>
+          </div>
           {user?.user_type === 'client' && (
             <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
               {jobUi.createJob}
@@ -275,7 +292,11 @@ export default function Jobs() {
         )}
       </div>
 
-      {filteredJobs.length === 0 ? (
+      {viewMode === 'map' ? (
+        <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
+          <JobsMap jobs={filteredJobs} />
+        </div>
+      ) : filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
           {user?.user_type === 'client' ? 'Aucun job trouvé pour ce compte.' : 'Aucun job disponible pour le moment.'}
         </div>

@@ -1,14 +1,32 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
 import FlagIcon from '../components/FlagIcon';
 import { usePageTitle } from '../utils/seo';
+import { publicAPI } from '../services/api';
+import { safeLog } from '../utils/env';
 
 export default function Home() {
   const { t } = useLanguage();
   const { user } = useAuth();
   usePageTitle('Kojo — Services et travailleurs en Afrique de l\'Ouest');
+
+  // Chiffres réels depuis /public/stats (repli sur des valeurs génériques
+  // si l'appel échoue, pour ne jamais bloquer l'affichage de la landing).
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    publicAPI.getStats()
+      .then((data) => { if (!cancelled) setStats(data); })
+      .catch((err) => { safeLog.error('Stats load error', err); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const statWorkers = stats?.workers != null ? stats.workers : 1000;
+  const statCompleted = stats?.completed_jobs != null ? stats.completed_jobs : 500;
+  const statCountries = stats?.countries != null ? stats.countries : 4;
 
   const categories = [
     { key: 'plumbing', icon: '🔧' },
@@ -227,6 +245,12 @@ export default function Home() {
                 <p className="text-emerald-700 mt-3 text-sm">
                   ✅ Mobile money (Orange Money, Wave) et carte bancaire &nbsp;•&nbsp; ✅ Versement automatique au travailleur
                 </p>
+                <Link
+                  to="/how-it-works"
+                  className="mt-4 inline-block rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700"
+                >
+                  En savoir plus →
+                </Link>
               </div>
             </div>
           </div>
@@ -267,15 +291,15 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">1000+</div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statWorkers.toLocaleString()}+</div>
               <div className="text-sm md:text-base text-gray-600">{t('activeWorkers')}</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">500+</div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statCompleted.toLocaleString()}+</div>
               <div className="text-sm md:text-base text-gray-600">{t('completedProjects')}</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">4</div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statCountries}</div>
               <div className="text-sm md:text-base text-gray-600">{t('countriesCovered')}</div>
             </div>
             <div>

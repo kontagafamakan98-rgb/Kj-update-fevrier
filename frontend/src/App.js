@@ -24,6 +24,7 @@ import { useNotifications } from './contexts/NotificationContext';
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import HowItWorks from "./pages/HowItWorks";
 
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -216,6 +217,7 @@ function AppRoutes() {
           <Routes>
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />

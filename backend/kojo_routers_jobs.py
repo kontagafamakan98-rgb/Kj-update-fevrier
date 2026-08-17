@@ -249,6 +249,17 @@ async def create_job(
             raise HTTPException(status_code=422, detail=str(validation_error))
 
         job = Job(**validated_input.model_dump(), client_id=current_user.id, country=current_user.country)
+
+        # Point GeoJSON pour la recherche par rayon (index 2dsphere). Un job
+        # sans coordonnées GPS n'a pas de geo → exclu quand un rayon est actif.
+        lat = location_payload.get("latitude")
+        lng = location_payload.get("longitude")
+        if lat is not None and lng is not None:
+            try:
+                job.geo = {"type": "Point", "coordinates": [float(lng), float(lat)]}
+            except (TypeError, ValueError):
+                job.geo = None
+
         result = await db.jobs.insert_one(job.model_dump())
 
         if not result.inserted_id:
@@ -275,6 +286,12 @@ async def get_jobs(
     status: Optional[JobStatus] = None,
     category: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=100),
+    # Recherche par rayon côté serveur : seuls les jobs portant un point
+    # GeoJSON (geo) dans le rayon entrent en compte. Sans lat/lng/radius_km
+    # complets, le filtre ne s'applique pas (comportement inchangé).
+    lat: Optional[float] = Query(default=None, ge=-90, le=90),
+    lng: Optional[float] = Query(default=None, ge=-180, le=180),
+    radius_km: Optional[float] = Query(default=None, ge=0.1, le=2000),
     current_user: User = Depends(get_current_user)
 ):
     try:
@@ -283,7 +300,16 @@ async def get_jobs(
             query["status"] = status
         if category:
             query["category"] = category
-        
+
+        # Rayon : $geoWithin + $centerSphere (rayon en radians = km / 6371).
+        # Nécessite l'index 2dsphere sur jobs.geo (créé au boot).
+        if lat is not None and lng is not None and radius_km is not None:
+            query["geo"] = {
+                "$geoWithin": {
+                    "$centerSphere": [[lng, lat], float(radius_km) / 6371.0]
+                }
+            }
+
         query["deleted"] = {"$ne": True}
         
         is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL

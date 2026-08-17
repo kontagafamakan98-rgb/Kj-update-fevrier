@@ -116,6 +116,33 @@ async def create_database_indexes():
         await db.jobs.create_index("country")
         await db.jobs.create_index([("status", 1), ("category", 1)])
         await db.jobs.create_index([("created_at", -1)])  # For sorting by date
+        # Géospatial : recherche par rayon (GET /jobs?lat=&lng=&radius_km=)
+        await db.jobs.create_index([("geo", "2dsphere")])
+
+        # Backfill best-effort des jobs existants : certains ont des
+        # coordonnées dans location.latitude/longitude mais pas de point
+        # GeoJSON (ajouté à la création depuis cette fonctionnalité). On les
+        # met à jour pour que la recherche par rayon fonctionne sur les
+        # données historiques. Borné et non bloquant.
+        try:
+            cursor = db.jobs.find(
+                {"geo": {"$exists": False}, "location.latitude": {"$ne": None}, "location.longitude": {"$ne": None}},
+                {"_id": 0, "id": 1, "location": 1},
+            ).limit(500)
+            async for job_doc in cursor:
+                loc = job_doc.get("location") or {}
+                try:
+                    lat = float(loc.get("latitude"))
+                    lng = float(loc.get("longitude"))
+                    if lat is not None and lng is not None:
+                        await db.jobs.update_one(
+                            {"id": job_doc.get("id")},
+                            {"$set": {"geo": {"type": "Point", "coordinates": [lng, lat]}}},
+                        )
+                except (TypeError, ValueError):
+                    continue
+        except Exception as exc:
+            logger.warning(f"⚠️ Backfill geo jobs impossible: {exc}")
         
         # Proposals collection indexes
         await db.proposals.create_index("id", unique=True)

@@ -81,6 +81,28 @@ class FakeCollection:
                             return False
                         if not op_val and key in doc:
                             return False
+                    elif op == "$geoWithin":
+                        # Implémentation haversine de $centerSphere pour la
+                        # FakeDB (le vrai Mongo utilise l'index 2dsphere).
+                        center_sphere = op_val.get("$centerSphere") if isinstance(op_val, dict) else None
+                        if not center_sphere or len(center_sphere) != 2:
+                            return False
+                        center, radius_radians = center_sphere
+                        doc_geo = doc.get(key) if isinstance(doc.get(key), dict) else None
+                        doc_coords = doc_geo.get("coordinates") if isinstance(doc_geo, dict) else None
+                        if not doc_coords or len(doc_coords) != 2:
+                            return False
+                        import math
+                        lat1, lng1 = float(center[1]), float(center[0])
+                        lat2, lng2 = float(doc_coords[1]), float(doc_coords[0])
+                        def _hav(lat_a, lng_a, lat_b, lng_b):
+                            to_rad = lambda d: d * math.pi / 180.0
+                            d_lat = to_rad(lat_b - lat_a)
+                            d_lng = to_rad(lng_b - lng_a)
+                            a = math.sin(d_lat / 2) ** 2 + math.cos(to_rad(lat_a)) * math.cos(to_rad(lat_b)) * math.sin(d_lng / 2) ** 2
+                            return 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+                        if _hav(lat1, lng1, lat2, lng2) > radius_radians * 6371.0:
+                            return False
             else:
                 if doc.get(key) != value:
                     return False
