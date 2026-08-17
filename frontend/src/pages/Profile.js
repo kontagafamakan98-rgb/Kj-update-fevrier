@@ -18,6 +18,8 @@ import { usersAPI, reviewAPI, getAuthToken } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
+import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
+import { usePageTitle } from '../utils/seo';
 
 const getLanguageLabel = (languageCode, t) => {
   const languageMap = {
@@ -40,11 +42,15 @@ export default function Profile() {
   const [success, setSuccess] = useState('');
   const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
   const [reviews, setReviews] = useState([]);
+  const [referral, setReferral] = useState(null);
+  const [portfolioImages, setPortfolioImages] = useState([]);
+  const [portfolioUploading, setPortfolioUploading] = useState(false);
 
   const { user, loadUser } = useAuth();
   const { t, currentLanguage, getAvailableLanguagesForCountry } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'profile');
   const toast = useToast();
+  usePageTitle('Mon profil — Kojo');
 
   useEffect(() => {
     loadProfile();
@@ -57,6 +63,22 @@ export default function Profile() {
       .then((data) => setReviews(Array.isArray(data?.reviews) ? data.reviews : []))
       .catch(() => setReviews([]));
   }, [user?.id]);
+
+  // Parrainage : le code d'invitation est généré à la demande par le backend
+  useEffect(() => {
+    if (!user?.id) return;
+    usersAPI.getReferral()
+      .then((data) => setReferral(data))
+      .catch(() => setReferral(null));
+  }, [user?.id]);
+
+  // Portfolio travailleur : photos de réalisations (preuve sociale)
+  useEffect(() => {
+    if (user?.user_type !== 'worker') return;
+    usersAPI.getPortfolio()
+      .then((data) => setPortfolioImages(Array.isArray(data?.portfolio_images) ? data.portfolio_images : []))
+      .catch(() => setPortfolioImages([]));
+  }, [user?.user_type, user?.id]);
 
   const loadProfile = async () => {
     try {
@@ -122,6 +144,38 @@ export default function Profile() {
     }
   };
 
+  const handlePortfolioUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPortfolioUploading(true);
+    setError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const data = await usersAPI.addPortfolioImage(formData);
+      setPortfolioImages(Array.isArray(data?.portfolio_images) ? data.portfolio_images : []);
+      setSuccess('Photo de portfolio ajoutée ✅');
+    } catch (uploadError) {
+      safeLog.error('Portfolio upload error:', uploadError);
+      setError(uploadError?.response?.data?.detail || uploadError?.message || 'Échec de l’ajout de la photo.');
+    } finally {
+      setPortfolioUploading(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
+  const handlePortfolioRemove = async (index) => {
+    if (!window.confirm('Supprimer cette photo de portfolio ?')) return;
+    try {
+      const data = await usersAPI.removePortfolioImage(index);
+      setPortfolioImages(Array.isArray(data?.portfolio_images) ? data.portfolio_images : []);
+      setSuccess('Photo supprimée.');
+    } catch (removeError) {
+      safeLog.error('Portfolio remove error:', removeError);
+      setError(removeError?.response?.data?.detail || removeError?.message || 'Suppression impossible.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -144,7 +198,11 @@ export default function Profile() {
               className="border-2 border-white"
             />
             <div className="ml-6">
-              <h1 className="text-2xl font-bold text-white">{user.first_name} {user.last_name}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl font-bold text-white">{user.first_name} {user.last_name}</h1>
+                <VerifiedBadge verified={user.is_verified} />
+                {user.user_type === 'worker' && <WorkerTrustBadge person={user} />}
+              </div>
               <p className="text-orange-100">
                 {user.user_type === 'client' ? t('client') : t('worker')} • <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
               </p>
@@ -216,6 +274,23 @@ export default function Profile() {
             )}
           </div>
         )}
+
+        {user.user_type === 'worker' && (
+          <div className="px-6 py-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">🖼️ Mes réalisations (portfolio)</h2>
+            <p className="text-sm text-gray-500 mb-4">Montre tes travaux terminés pour rassurer les clients. Jusqu'à 10 photos.</p>
+            <PortfolioManager
+              images={portfolioImages}
+              uploading={portfolioUploading}
+              onUpload={handlePortfolioUpload}
+              onRemove={handlePortfolioRemove}
+            />
+          </div>
+        )}
+
+        <div className="px-6 py-6 border-b border-gray-200">
+          <ReferralCard referral={referral} />
+        </div>
 
         <div className="px-6 py-6">
           <PaymentAccountsManager
@@ -522,6 +597,92 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
         <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-md">{pageT('createWorkerProfile')}</button>
       </form>
+    </div>
+  );
+}
+
+function PortfolioManager({ images, uploading, onUpload, onRemove }) {
+  const inputRef = useRef(null);
+  return (
+    <div>
+      {images.length > 0 ? (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-4">
+          {images.map((url, index) => (
+            <div key={`${url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-gray-200 group">
+              <img src={url} alt={`Réalisation ${index + 1}`} className="h-full w-full object-cover" />
+              <button
+                type="button"
+                aria-label={`Supprimer la réalisation ${index + 1}`}
+                onClick={() => onRemove(index)}
+                className="absolute top-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500 mb-4">Aucune photo pour le moment.</p>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onUpload}
+      />
+      <button
+        type="button"
+        disabled={uploading || images.length >= 10}
+        onClick={() => inputRef.current?.click()}
+        className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+      >
+        {uploading ? 'Ajout en cours...' : (images.length >= 10 ? 'Portfolio complet (10 max)' : '+ Ajouter une photo')}
+      </button>
+    </div>
+  );
+}
+
+function ReferralCard({ referral }) {
+  const [copied, setCopied] = useState(false);
+  if (!referral?.referral_code) return null;
+
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(referral.referral_code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (_error) {
+      // Presse-papiers indisponible : l'utilisateur peut copier à la main.
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-gray-900 mb-2">🎁 Parrainez un proche</h2>
+      <p className="text-sm text-gray-500 mb-4">Partagez votre code d'invitation : votre proche le saisit à l'inscription pour vous référencer comme parrain.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <code className="rounded-xl border border-dashed border-orange-300 bg-orange-50 px-4 py-2 font-mono text-lg font-bold tracking-widest text-orange-700">
+          {referral.referral_code}
+        </code>
+        <button
+          type="button"
+          onClick={copyCode}
+          className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+        >
+          {copied ? 'Copié ✓' : 'Copier le code'}
+        </button>
+        {referral.invite_url && (
+          <a
+            href={referral.invite_url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Lien d'invitation ↗
+          </a>
+        )}
+      </div>
     </div>
   );
 }

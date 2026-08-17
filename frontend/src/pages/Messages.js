@@ -7,6 +7,7 @@ import { ListSkeleton } from '../components/SkeletonLoader';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
 import { stripJobMarkerFromMessage } from '../utils/jobProposalWorkflow';
+import { usePageTitle } from '../utils/seo';
 
 export default function Messages() {
   const [conversations, setConversations] = useState([]);
@@ -21,6 +22,7 @@ export default function Messages() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'messages');
+  usePageTitle('Messages — Kojo');
 
   useEffect(() => {
     loadConversations();
@@ -232,8 +234,13 @@ export default function Messages() {
                             il est désormais stocké dans un champ séparé,
                             mais on garde ce nettoyage par sécurité). */}
                         <p className="whitespace-pre-line">{stripJobMarkerFromMessage(message.content)}</p>
-                        <p className={`text-[11px] mt-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-400'}`}>
+                        <p className={`text-[11px] mt-1 flex items-center justify-end gap-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-400'}`}>
                           {formatMessageTime(message.timestamp)}
+                          {message.sender_id === user?.id && (
+                            <span title={message.read_at ? `Lu à ${formatMessageTime(message.read_at)}` : (message.read ? 'Lu' : 'Envoyé')}>
+                              {message.read_at || message.read ? '✓✓' : '✓'}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>

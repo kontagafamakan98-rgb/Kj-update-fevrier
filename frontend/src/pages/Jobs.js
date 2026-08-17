@@ -12,6 +12,8 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobList } from '../utils/jobDisplayBridge';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import CountrySelector from '../components/CountrySelector';
+import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
+import { usePageTitle } from '../utils/seo';
 
 function JobCard({ job, user, userType, appliedJobIds }) {
   const locationText = job.location_text || 'Localisation non précisée';
@@ -65,6 +67,9 @@ export default function Jobs() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filters, setFilters] = useState({ category: '', status: '', search: '' });
+  const [radiusKm, setRadiusKm] = useState('');
+  const [userCoords, setUserCoords] = useState(null);
+  const [locating, setLocating] = useState(false);
   // null = pas encore chargé (JobCard retombe alors sur localStorage) ;
   // Set (même vide) = donnée serveur fiable disponible.
   const [appliedJobIds, setAppliedJobIds] = useState(null);
@@ -74,6 +79,7 @@ export default function Jobs() {
   const jobUi = getJobUiLabel(currentLanguage);
   const [searchParams] = useSearchParams();
   const locale = getLocaleForLanguage(currentLanguage);
+  usePageTitle('Emplois disponibles — Kojo');
 
   useEffect(() => {
     const categoryParam = searchParams.get('category');
@@ -119,6 +125,9 @@ export default function Jobs() {
   };
 
   const filteredJobs = useMemo(() => {
+    const radius = Number(radiusKm);
+    const radiusActive = Number.isFinite(radius) && radius > 0 && Boolean(userCoords);
+
     return jobs.filter((job) => {
       if (filters.category && job.category !== filters.category) return false;
       if (filters.status && job.status !== filters.status) return false;
@@ -126,9 +135,38 @@ export default function Jobs() {
         const haystack = `${job.title || ''} ${job.description || ''} ${job.location_text || ''}`.toLowerCase();
         if (!haystack.includes(filters.search.toLowerCase())) return false;
       }
+      // Recherche par rayon : le job est retenu seulement s'il a des
+      // coordonnées ET est dans le rayon demandé. Sans coordonnées, il est
+      // exclu (impossible de calculer la distance) — le filtre est donc
+      // volontairement strict.
+      if (radiusActive) {
+        const coords = getJobCoordinates(job);
+        if (!coords) return false;
+        const distance = haversineKm(userCoords.latitude, userCoords.longitude, coords.latitude, coords.longitude);
+        if (distance > radius) return false;
+      }
       return true;
     });
-  }, [jobs, filters]);
+  }, [jobs, filters, radiusKm, userCoords]);
+
+  const locateMe = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      window.alert("La géolocalisation n'est pas disponible sur cet appareil.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserCoords({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setLocating(false);
+      },
+      () => {
+        setLocating(false);
+        window.alert("Impossible d'obtenir votre position. Vérifiez les permissions.");
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 120000 }
+    );
+  };
 
   const categories = [
     { value: '', label: pageT('allCategories') || 'Toutes les catégories' },
@@ -200,6 +238,41 @@ export default function Jobs() {
             <option key={status.value} value={status.value}>{status.label}</option>
           ))}
         </select>
+      </div>
+
+      {/* Recherche par rayon : trouve les jobs proches de toi (uniquement
+          les jobs portant des coordonnées GPS — les autres sont exclus quand
+          le filtre est actif). */}
+      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4">
+        <span className="text-sm font-semibold text-gray-700">📍 Près de moi</span>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min="1"
+            value={radiusKm}
+            onChange={(e) => setRadiusKm(e.target.value)}
+            placeholder="Rayon (km)"
+            className="w-32 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+          />
+          <button
+            onClick={locateMe}
+            disabled={locating}
+            className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
+          >
+            {locating ? 'Localisation...' : (userCoords ? 'Ma position ✓' : 'Utiliser ma position')}
+          </button>
+          {radiusKm && (
+            <button
+              onClick={() => { setRadiusKm(''); setUserCoords(null); }}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              Effacer
+            </button>
+          )}
+        </div>
+        {radiusKm && !userCoords && (
+          <span className="text-xs text-gray-500">Clique sur « Utiliser ma position » pour activer le rayon.</span>
+        )}
       </div>
 
       {filteredJobs.length === 0 ? (

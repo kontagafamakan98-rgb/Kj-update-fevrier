@@ -1,8 +1,10 @@
 import io
 import re
+import secrets
+import string
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 from pydantic import ValidationError
 
 from kojo_core import db
@@ -11,11 +13,12 @@ from kojo_models import (
     User, validate_west_africa_phone,
 )
 from kojo_settings import (
+    FRONTEND_APP_URL,
     logger,
 )
 from kojo_core import (
-    get_current_user, is_valid_image_content, upload_profile_photo_to_cloudinary,
-    validate_payment_accounts,
+    get_current_user, is_valid_image_content, upload_image_to_cloudinary,
+    upload_profile_photo_to_cloudinary, validate_payment_accounts,
 )
 
 # Même règle que le modèle User (prénom/nom).
@@ -450,3 +453,152 @@ async def verify_payment_access(current_user: User = Depends(get_current_user)):
         "payment_accounts_count": payment_count,
         "user_type": user_type
     }
+
+
+# ---------------------------------------------------------------------------
+# Portfolio travailleur (photos de réalisations) — preuve sociale
+# ---------------------------------------------------------------------------
+
+@router.post("/users/portfolio")
+async def add_portfolio_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Ajoute une photo au portfolio du travailleur (max 10)."""
+    if current_user.user_type != "worker":
+        raise HTTPException(status_code=403, detail="Réservé aux travailleurs")
+
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    file_content = await file.read()
+    if len(file_content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB")
+    if not is_valid_image_content(file_content):
+        raise HTTPException(status_code=400, detail="Fichier image invalide (JPEG, PNG, GIF ou WebP requis)")
+
+    try:
+        upload_result = upload_image_to_cloudinary(
+            io.BytesIO(file_content),
+            str(current_user.id),
+            "kojo/portfolio",
+            "portfolio",
+        )
+    except Exception as exc:
+        logger.error(f"Erreur upload portfolio Cloudinary: {exc}")
+        raise HTTPException(status_code=500, detail="Échec de l'envoi de la photo. Veuillez réessayer.")
+
+    profile = await db.worker_profiles.find_one({"user_id": current_user.id})
+    images = list((profile or {}).get("portfolio_images") or [])
+    if len(images) >= 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 portfolio images")
+
+    images.append(upload_result["photo_url"])
+    if profile:
+        await db.worker_profiles.update_one(
+            {"user_id": current_user.id},
+            {"$set": {"portfolio_images": images, "updated_at": datetime.now(timezone.utc)}},
+        )
+    else:
+        await db.worker_profiles.insert_one(
+            {"user_id": current_user.id, "portfolio_images": images, "created_at": datetime.now(timezone.utc)}
+        )
+
+    return {"portfolio_images": images}
+
+
+@router.get("/users/portfolio")
+async def get_portfolio(current_user: User = Depends(get_current_user)):
+    """Retourne le portfolio du travailleur courant (liste d'URLs)."""
+    profile = await db.worker_profiles.find_one({"user_id": current_user.id})
+    return {"portfolio_images": list((profile or {}).get("portfolio_images") or [])}
+
+
+@router.delete("/users/portfolio/{index}")
+async def remove_portfolio_image(
+    index: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Supprime la photo de portfolio à l'index donné."""
+    if current_user.user_type != "worker":
+        raise HTTPException(status_code=403, detail="Réservé aux travailleurs")
+
+    profile = await db.worker_profiles.find_one({"user_id": current_user.id})
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    images = list(profile.get("portfolio_images") or [])
+    if index < 0 or index >= len(images):
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    images.pop(index)
+    await db.worker_profiles.update_one(
+        {"user_id": current_user.id},
+        {"$set": {"portfolio_images": images, "updated_at": datetime.now(timezone.utc)}},
+    )
+    return {"portfolio_images": images}
+
+
+# ---------------------------------------------------------------------------
+# Parrainage — code d'invitation à partager
+# ---------------------------------------------------------------------------
+
+_REFERRAL_ALPHABET = string.ascii_uppercase + string.digits
+
+
+def _generate_referral_code(length: int = 10) -> str:
+    return ''.join(secrets.choice(_REFERRAL_ALPHABET) for _ in range(length))
+
+
+async def _ensure_referral_code(user_id: str) -> str:
+    """Retourne le code de parrainage de l'utilisateur, en le générant (unique)
+    s'il n'en a pas encore."""
+    user_data = await db.users.find_one({"id": user_id}, {"referral_code": 1})
+    existing = (user_data or {}).get("referral_code")
+    if existing:
+        return existing
+
+    for _ in range(10):
+        code = _generate_referral_code()
+        clash = await db.users.find_one({"referral_code": code}, {"id": 1})
+        if not clash:
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {"referral_code": code, "updated_at": datetime.now(timezone.utc)}},
+            )
+            return code
+    raise HTTPException(status_code=500, detail="Impossible de générer un code de parrainage")
+
+
+@router.get("/users/referral")
+async def get_referral(current_user: User = Depends(get_current_user)):
+    """Retourne le code de parrainage de l'utilisateur (le génère si absent)."""
+    code = await _ensure_referral_code(current_user.id)
+    return {
+        "referral_code": code,
+        "invite_url": f"{FRONTEND_APP_URL}/register?ref={code}",
+    }
+
+
+@router.post("/users/referral/apply")
+async def apply_referral(
+    payload: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Enregistre le code du parrain saisi à l'inscription (référence croisée,
+    pas de crédit monétaire automatique)."""
+    code = str((payload or {}).get("code") or '').strip().upper()
+    if not code:
+        raise HTTPException(status_code=422, detail="Code de parrainage requis")
+
+    sponsor = await db.users.find_one({"referral_code": code}, {"id": 1})
+    if not sponsor:
+        raise HTTPException(status_code=404, detail="Code de parrainage invalide")
+    if sponsor["id"] == current_user.id:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas vous parrainer vous-même")
+
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"referred_by": code, "updated_at": datetime.now(timezone.utc)}},
+    )
+    return {"message": "Code de parrainage appliqué", "referred_by": code}

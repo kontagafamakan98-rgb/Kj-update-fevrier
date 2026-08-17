@@ -69,6 +69,46 @@
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
     <link rel="canonical" href="https://kj-update-fevrier.vercel.app/" />
+
+    <!-- Analytics Plausible (léger, sans cookies) — activé dès que
+         VITE_PLAUSIBLE_DOMAIN est défini dans les variables Vercel. -->
+    <script>
+      (function () {
+        var domain = "%VITE_PLAUSIBLE_DOMAIN%";
+        if (!domain) return;
+        var s = document.createElement("script");
+        s.defer = true;
+        s.setAttribute("data-domain", domain);
+        s.src = "https://plausible.io/js/script.js";
+        document.head.appendChild(s);
+      })();
+    </script>
+
+    <!-- Données structurées (SEO) : organisation + site web -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Kojo",
+        "url": "https://kj-update-fevrier.vercel.app/",
+        "logo": "https://kj-update-fevrier.vercel.app/icons/icon-512x512.png",
+        "description": "Kojo connecte clients et travailleurs en Afrique de l'Ouest : plomberie, électricité, mécanique, construction au Mali, Sénégal, Burkina Faso et Côte d'Ivoire.",
+        "areaServed": ["Mali", "Sénégal", "Burkina Faso", "Côte d'Ivoire"]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Kojo",
+        "url": "https://kj-update-fevrier.vercel.app/",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://kj-update-fevrier.vercel.app/jobs?search={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
   </head>
   <body>
     <noscript>Vous devez activer JavaScript pour utiliser cette application.</noscript>

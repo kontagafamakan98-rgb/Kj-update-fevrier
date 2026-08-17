@@ -13,7 +13,7 @@ Kojo connecte clients et artisans en Afrique de l'Ouest (Sénégal, Mali, Côte 
 | Photos | Cloudinary |
 | Emails | Brevo / Gmail OAuth2 (ou `EMAIL_PROVIDER=none`) |
 | Notifications push | VAPID (pywebpush) |
-| Déploiement | Render (backend) + Vercel (frontend) |
+| Déploiement | Fly.io (backend, ~0 $/mois) + Vercel (frontend) |
 
 ## Setup local
 
@@ -71,41 +71,63 @@ cd frontend && npm test
 
 ## Déploiement
 
-> **Alternative Fly.io (recommandée si le free tier Render est épuisé)** :
-> un Dockerfile (`backend/Dockerfile`), une config (`backend/fly.toml`) et un
-> guide pas à pas (`backend/DEPLOY_FLYIO.md`) sont prêts — pas de spin-down,
-> pas de limite d'heures, ~0–3 $/mois. La variable `BACKEND_PUBLIC_URL` y est
-> **obligatoire** (TrustedHost + callbacks IPN PayDunya).
+### Backend — Fly.io (production actuelle, ~0 $/mois)
 
-### Backend — Render (Web Service Python)
-
-- **Service** : `kojo-backend-03az` — `https://kojo-backend-03az.onrender.com`
-- **Start command** : `uvicorn server:app --host 0.0.0.0 --port $PORT`
-- **Source** : lié à GitHub (branche `main`) — chaque push déclenche un
-  déploiement automatique ; en cas d'échec au boot, **l'ancienne version reste
-  servie** (vérifier le statut du déploiement, pas seulement le health check).
+- **App** : `kojo-backend` — `https://kojo-backend.fly.dev`
+- **Config** : `backend/fly.toml` (machine `shared-cpu-1x`, **256 Mo** — dans
+  l'allocation gratuite de 3 VMs 256 Mo ; le backend tient en ~21 Mo RSS).
+- **Déploiement** : poussé par la CI (`.github/workflows/ci.yml`, job
+  `deploy-fly`) via `flyctl deploy --remote-only` — **uniquement quand le
+  job `backend-tests` passe et que le push touche `backend/**`**.
+- **Secret** : `FLY_API_TOKEN` (jeton deploy, généré par
+  `flyctl tokens create deploy -n "GitHub Actions"`) dans les secrets GitHub.
+- Guide pas à pas complet : `backend/DEPLOY_FLYIO.md`.
 
 | Variable | Obligatoire ? | Notes |
 |---|---|---|
 | `MONGO_URL` | ✅ | URI Atlas/auto-hébergé (le boot échoue sans elle) |
 | `JWT_SECRET` | ✅ en prod | Fail-fast : le serveur refuse de démarrer sans lui |
-| `EMAIL_OTP_SECRET` | ✅ en prod | **Ajoutée par l'audit** : fail-fast identique à `JWT_SECRET` |
+| `EMAIL_OTP_SECRET` | ✅ en prod | Fail-fast identique à `JWT_SECRET` |
 | `APP_ENV` | ✅ | `production` (désactive `/docs`, active HSTS, CORS strict) |
+| `BACKEND_PUBLIC_URL` | ✅ | **`https://kojo-backend.fly.dev`** — TrustedHost + callbacks IPN PayDunya |
 | `DB_NAME` | | défaut `kojo_db` |
-| `RENDER_EXTERNAL_HOSTNAME` | 🔄 auto | Injecté par Render ; ajouté aux hôtes de confiance au boot |
-| `VERCEL_PROJECT_NAME` | recommandé | **`kj-update-fevrier`** — restreint le CORS aux seuls domaines du projet Vercel Kojo (`kj-update-fevrier*.vercel.app`) au lieu de tout `*.vercel.app` (surface d'attaque évitable) |
+| `VERCEL_PROJECT_NAME` | recommandé | **`kj-update-fevrier`** — restreint le CORS aux seuls domaines du projet Vercel Kojo |
+| `REDIS_URL` | | Rate-limiting partagé multi-workers (optionnel, 1 worker = mémoire suffit) |
+| `VAPID_PRIVATE_KEY` / `VAPID_PUBLIC_KEY` | ✅ | Push notifications web (les deux doivent correspondre) |
 
 **Pièges à connaître (leçons du terrain)** :
 
-- `EMAIL_OTP_SECRET` est **indispensable en prod depuis l'audit** — l'ancien
-  code utilisait un fallback silencieux sur `JWT_SECRET` (faille corrigée).
-  Erreur typique au déploiement : `RuntimeError: EMAIL_OTP_SECRET
-  environment variable is not set. Refusing to start in production...`.
-  Générer : `python -c "import secrets; print(secrets.token_hex(32))"`.
+- ⚠️ **`flyctl` n'est pas dans le PATH** après l'installation winget : il est
+  dans `$LOCALAPPDATA/Microsoft/WinGet/Links/flyctl.exe`.
+- ⚠️ **Le health check exige que `/health` réponde 200** — un `/health` qui
+  renvoie 400 fait échouer le déploiement (`timeout reached waiting for
+  health checks`). Vérifier que l'endpoint renvoie bien 200 avant de déployer.
+- ⚠️ **Le compte trial Fly s'arrête après 5 min** tant qu'aucune carte n'est
+  ajoutée — l'ajout d'une carte (même sans facturation) est requis pour
+  garder la machine allumée.
+- `EMAIL_OTP_SECRET` est **indispensable en prod** — l'ancien code utilisait
+  un fallback silencieux sur `JWT_SECRET` (faille corrigée). Erreur typique :
+  `RuntimeError: EMAIL_OTP_SECRET environment variable is not set...`.
 - **Ne jamais changer (roter) `EMAIL_OTP_SECRET`** : il signe les jetons de
   vérification email et les hashes OTP — le changer invalide tous les jetons
-  déjà émis. Le conserver avec les autres secrets du gestionnaire de mots de
-  passe.
+  déjà émis.
+- Le conteneur `python:3.11-slim` n'a **ni `free`, ni `pgrep`, ni `ps`** :
+  pour surveiller la mémoire via `flyctl ssh console`, lire `/proc/meminfo`
+  et `/proc/<pid>/status` (le console `-C` exécute sans shell — envelopper
+  dans `sh -c` pour les globs/pipes).
+
+### Backend — Render (LEGACY, à supprimer)
+
+> ⚠️ **Ancien hébergement, en cours de retrait.** L'app Render
+> `kojo-backend-03az` (`https://kojo-backend-03az.onrender.com`) est
+> **payante** et doit être supprimée une fois la bascule Fly.io validée
+> (UptimeRobot pointé sur la nouvelle URL). Ne pas la réutiliser pour de
+> nouveaux déploiements. Les leçons ci-dessous restent utiles en cas de
+> retour arrière :
+
+- **Start command** : `uvicorn server:app --host 0.0.0.0 --port $PORT`
+- En cas d'échec au boot, **l'ancienne version reste servie** (vérifier le
+  statut du déploiement, pas seulement le health check).
 - `RENDER_EXTERNAL_HOSTNAME` étant injecté automatiquement, `build_trusted_hosts`
   s'exécute avec une URL non vide au boot : tout import manquant dans un
   module découpé (`kojo_*`) crashe le démarrage. Garde-fou : l'étape pyflakes
@@ -132,7 +154,7 @@ cd frontend && npm test
 ```
 
 - **Variables d'env** (dashboard, onglet Settings → Environment Variables) :
-  `VITE_API_URL=https://kojo-backend-03az.onrender.com/api`
+  `VITE_API_URL=https://kojo-backend.fly.dev/api`
 
 **Pièges à connaître (leçons du terrain)** :
 
@@ -156,9 +178,9 @@ cd frontend && npm test
 
 ```bash
 # Backend — le nouveau code est en prod si :
-curl -s https://kojo-backend-03az.onrender.com/api/health   # PAS de champ "environment"
-curl -s -o /dev/null -w '%{http_code}' https://kojo-backend-03az.onrender.com/docs   # 404
-curl -s -o /dev/null -w '%{http_code}' https://kojo-backend-03az.onrender.com/api/stats  # 403/401 sans token
+curl -s https://kojo-backend.fly.dev/health   # {"status":"healthy","database":"connected",...}
+curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/docs   # 404
+curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/api/stats  # 403/401 sans token
 
 # Frontend
 curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 200

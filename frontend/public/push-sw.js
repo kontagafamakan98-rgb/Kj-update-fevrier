@@ -1,17 +1,74 @@
 /* eslint-disable no-restricted-globals */
 // ============================================================
-// KOJO — Service Worker dédié aux Push Notifications (VAPID)
-// Ce fichier NE gère PAS le cache de l'application.
-// Son seul rôle : recevoir les push et les afficher.
+// KOJO — Service Worker : Push Notifications (VAPID) + cache offline
+// - Push : recevoir les notifications et les afficher.
+// - Cache : app shell + assets statiques pour un mode hors-ligne lisible
+//   (connexions instables en Afrique de l'Ouest). Les requêtes API ne sont
+//   JAMAIS mises en cache (données utilisateur sensibles).
 // ============================================================
+
+const CACHE_NAME = 'kojo-shell-v1';
+const APP_SHELL_URLS = ['/', '/index.html', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
 self.addEventListener('install', (event) => {
   // Prise de contrôle immédiate sans attendre les onglets ouverts
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_URLS)).catch(() => {})
+  );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+// Cache stratégie :
+//  - Navigation (document) : réseau d'abord, repli sur l'app shell cachée.
+//  - Assets statiques same-origin (js/css/icônes) : cache d'abord, puis
+//    mise à jour en arrière-plan (stale-while-revalidate).
+//  - API (/api) : réseau uniquement (données sensibles, jamais en cache).
+//  - Cross-origin : laisser passer.
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+
+  if (request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Navigation → réseau d'abord, fallback offline
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy)).catch(() => {});
+          return response;
+        })
+        .catch(() => caches.match('/index.html').then((cached) => cached || caches.match('/')))
+    );
+    return;
+  }
+
+  // Assets statiques → cache d'abord, mise à jour en arrière-plan
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      const networkFetch = fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || networkFetch;
+    })
+  );
 });
 
 // ------ Réception d'un push ------

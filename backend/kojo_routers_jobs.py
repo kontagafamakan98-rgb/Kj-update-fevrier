@@ -1,4 +1,5 @@
 import asyncio
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -50,6 +51,86 @@ async def get_worker_profile(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Worker profile not found")
     
     return WorkerProfile(**profile)
+
+
+@router.put("/workers/profile")
+async def update_worker_profile(
+    profile_data: WorkerProfile,
+    current_user: User = Depends(get_current_user)
+):
+    """Met à jour le profil travailleur (spécialités, portfolio, description…).
+
+    Le frontend gère le portfolio (ajout/suppression de photos) via
+    /users/portfolio ; ce PUT sert à la mise à jour globale du profil.
+    """
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Only workers can update worker profiles")
+
+    profile_data.user_id = current_user.id
+    existing = await db.worker_profiles.find_one({"user_id": current_user.id})
+    if not existing:
+        await db.worker_profiles.insert_one(profile_data.model_dump())
+    else:
+        await db.worker_profiles.update_one(
+            {"user_id": current_user.id},
+            {"$set": profile_data.model_dump(exclude={"created_at"})},
+        )
+    return profile_data.model_dump()
+
+
+async def _notify_matching_workers(job: Job):
+    """Notifie par push les travailleurs dont les spécialités correspondent à la
+    catégorie du job (repli : travailleurs du même pays). Fire-and-forget : une
+    erreur ici ne doit jamais faire échouer la création du job.
+    """
+    try:
+        category = (job.category or '').strip().lower()
+        if not category:
+            return
+
+        # 1) Travailleurs dont une spécialité = catégorie du job (insensible à la casse)
+        profiles = await db.worker_profiles.find({
+            "specialties": {"$regex": f"^{re.escape(category)}$", "$options": "i"},
+        }).to_list(50)
+        worker_ids = [p.get("user_id") for p in profiles if p.get("user_id")]
+        method = "spécialité"
+
+        # 2) Repli : travailleurs du même pays (borné) si aucun match de spécialité
+        if not worker_ids:
+            country = (job.country or '').strip().lower()
+            if country:
+                same_country_users = await db.users.find(
+                    {"country": country, "user_type": "worker"},
+                    {"id": 1},
+                ).to_list(200)
+                country_ids = [u.get("id") for u in same_country_users if u.get("id")]
+                if country_ids:
+                    profiles = await db.worker_profiles.find(
+                        {"user_id": {"$in": country_ids}}
+                    ).to_list(30)
+                    worker_ids = [p.get("user_id") for p in profiles if p.get("user_id")]
+                    method = "pays"
+
+        if not worker_ids:
+            return
+
+        logger.info(f"🔔 Push matching {method} : {len(worker_ids)} travailleurs pour « {job.title} »")
+        for uid in worker_ids[:30]:
+            try:
+                await notify_user(
+                    user_id=uid,
+                    title="🔔 Nouveau job dans votre domaine",
+                    body=job.title,
+                    notif_type=NotificationType.GENERAL,
+                    related_id=job.id,
+                    related_type="job",
+                    push_data={"job_id": job.id},
+                )
+            except Exception:
+                continue
+    except Exception as exc:
+        logger.warning(f"⚠️ Push matching échoué (non bloquant): {exc}")
+
 
 @router.post("/jobs", response_model=Job)
 async def create_job(
@@ -174,6 +255,13 @@ async def create_job(
             raise HTTPException(status_code=500, detail="Failed to create job")
 
         logger.info(f"✅ Job created successfully: {job.id} by user {current_user.id}")
+
+        # Alertes push de matching (fire-and-forget : ne bloque jamais la réponse)
+        try:
+            asyncio.create_task(_notify_matching_workers(job))
+        except Exception as exc:
+            logger.warning(f"⚠️ Impossible de lancer le push matching: {exc}")
+
         return job
 
     except HTTPException:

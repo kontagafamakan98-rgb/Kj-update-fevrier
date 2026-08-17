@@ -138,6 +138,10 @@ class User(BaseModel):
     is_verified: bool = False
     email_verified: bool = False
     email_verified_at: Optional[datetime] = None
+    # Parrainage : code unique à partager (invitation), et code du parrain
+    # saisi à l'inscription (référence croisée, pas de crédit monétaire auto).
+    referral_code: Optional[str] = Field(None, max_length=40)
+    referred_by: Optional[str] = Field(None, max_length=40)
     payment_accounts: Optional[dict] = Field(None)  # Payment methods dict
     payment_accounts_count: int = Field(default=0, ge=0, le=10)  # Non-negative, max 10
     rating: float = Field(default=0.0, ge=0.0, le=5.0)  # Rating between 0-5
@@ -211,6 +215,9 @@ class Message(BaseModel):
     job_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     read: bool = False
+    # Horodatage de lecture (accusé de réception « Lu ») — défini quand le
+    # destinataire ouvre la conversation et que read passe à True.
+    read_at: Optional[datetime] = None
 
 class PaymentStatus(str, Enum):
     PENDING = "pending"
@@ -365,6 +372,8 @@ class UserWithPayment(BaseModel):
     legal_documents_version: str = Field(min_length=5, max_length=120)
     payment_accounts: PaymentAccount
     email_verification_token: Optional[str] = None
+    # Code de parrainage saisi à l'inscription (via ?ref= dans l'URL)
+    referral_code: Optional[str] = Field(None, max_length=40)
     
     @field_validator('password')
     @classmethod

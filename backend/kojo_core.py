@@ -61,17 +61,29 @@ except Exception as e:
 
 
 
-def upload_profile_photo_to_cloudinary(file_obj, user_identifier: str):
+def upload_image_to_cloudinary(file_obj, user_identifier: str, folder: str, public_prefix: str):
+    """Upload générique Cloudinary avec format auto (WebP/AVIF) pour le réseau
+    mobile ouest-africain. `folder` : sous-dossier Cloudinary ;
+    `public_prefix` : préfixe du public_id."""
     result = cloudinary_uploader.upload(
         file_obj,
-        folder="kojo/profile_photos",
-        public_id=f"profile_{user_identifier}_{uuid.uuid4().hex}",
-        resource_type="image"
+        folder=folder,
+        public_id=f"{public_prefix}_{user_identifier}_{uuid.uuid4().hex}",
+        resource_type="image",
+        # Optimisation bande passante : Cloudinary convertit/redimensionne et
+        # sert le meilleur format (WebP/AVIF) selon le navigateur.
+        transformation=[{"fetch_format": "auto", "quality": "auto"}],
     )
     return {
         "photo_url": result.get("secure_url") or result.get("url"),
         "public_id": result.get("public_id")
     }
+
+
+def upload_profile_photo_to_cloudinary(file_obj, user_identifier: str):
+    return upload_image_to_cloudinary(
+        file_obj, user_identifier, "kojo/profile_photos", "profile"
+    )
 
 async def is_database_available() -> bool:
     """Return True when MongoDB is reachable, otherwise False."""

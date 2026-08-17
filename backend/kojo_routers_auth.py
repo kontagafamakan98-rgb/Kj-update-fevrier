@@ -432,6 +432,21 @@ async def register_user_verified(user_data: UserWithPayment):
         await db.users.insert_one(user.model_dump())
         await db.email_otps.delete_one({"email": clean_email, "purpose": "signup"})
 
+        # Parrainage : applique le code saisi à l'inscription (?ref=...).
+        # Non bloquant : un code invalide est simplement ignoré, l'inscription
+        # reste valide (pas de crédit monétaire automatique à ce stade).
+        ref_code = str((user_data.referral_code or '').strip()).upper()
+        if ref_code:
+            try:
+                sponsor = await db.users.find_one({"referral_code": ref_code}, {"id": 1})
+                if sponsor and sponsor.get("id") != user_id:
+                    await db.users.update_one(
+                        {"id": user_id},
+                        {"$set": {"referred_by": ref_code, "updated_at": datetime.now(timezone.utc)}},
+                    )
+            except Exception as exc:
+                logger.warning(f"⚠️ Application du code de parrainage impossible: {exc}")
+
         # Jeton de vérification à usage unique : révoqué après l'inscription
         # pour empêcher toute relecture (replay) dans sa fenêtre de validité.
         try:

@@ -11,6 +11,8 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
 import { getJobProposalUiLabel } from '../utils/jobProposalLocale';
+import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
+import { usePageTitle } from '../utils/seo';
 import {
   extractProposalId,
   extractProposalMessage,
@@ -65,6 +67,9 @@ function ProposalCard({ proposal, ui, isSelected, isAccepted, onOpenDiscussion, 
   const workerPhoto = proposal?.worker_photo || proposal?.worker?.profile_photo || null;
   const amount = proposal.proposed_amount ?? proposal.amount ?? null;
   const message = extractProposalMessage(proposal);
+  // Données de confiance du travailleur (best-effort : disponibles quand le
+  // backend les joint à la proposition).
+  const workerPerson = proposal?.worker || proposal?.worker_profile || proposal;
 
   return (
     <div className={`rounded-xl border p-4 shadow-sm ${isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-gray-100 bg-white'}`}>
@@ -78,7 +83,11 @@ function ProposalCard({ proposal, ui, isSelected, isAccepted, onOpenDiscussion, 
             )}
           </div>
           <div>
-            <div className="font-semibold text-gray-900">{workerName}</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="font-semibold text-gray-900">{workerName}</div>
+              <VerifiedBadge verified={workerPerson?.is_verified} />
+              <WorkerTrustBadge person={workerPerson} />
+            </div>
             <div className="text-sm text-gray-500">{formatJobDate(proposal.created_at)}</div>
           </div>
         </div>
@@ -146,6 +155,7 @@ export default function JobDetails() {
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
   const ui = getJobProposalUiLabel(currentLanguage);
   const navigate = useNavigate();
+  usePageTitle(job?.title ? `${job.title} — Kojo` : 'Détail du job — Kojo');
 
   useEffect(() => {
     loadJobDetails();
@@ -698,6 +708,20 @@ export default function JobDetails() {
             )}
           </div>
 
+          {/* Bandeau de confiance : le paiement séquestré est LE différenciateur */}
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">🛡️</span>
+              <div>
+                <div className="font-semibold text-emerald-800">Paiement sécurisé Kojo</div>
+                <p className="text-sm text-emerald-700 mt-1">
+                  L'argent est <strong>bloqué sur le compte séquestre</strong> jusqu'à la validation de la mission terminée,
+                  puis versé automatiquement au travailleur. Ni le client ni le travailleur ne peut y toucher avant la fin.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.description}</h2>
             <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
@@ -830,13 +854,15 @@ export default function JobDetails() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.client}</h2>
-            <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.client}</h2>              <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
                 {String(job.client_name || 'C').charAt(0).toUpperCase()}
               </div>
               <div>
-                <div className="font-medium text-gray-900">{job.client_name}</div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="font-medium text-gray-900">{job.client_name}</div>
+                  <VerifiedBadge verified={job?.client_is_verified || job?.client?.is_verified} />
+                </div>
                 <div className="text-sm text-gray-500">{job.client_email || 'Profil client'}</div>
               </div>
             </div>

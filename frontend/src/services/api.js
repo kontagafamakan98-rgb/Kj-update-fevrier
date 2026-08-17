@@ -467,11 +467,22 @@ export const usersAPI = {
   deleteProfilePhoto: () => api.delete('/users/profile-photo'),
   // Profile update
   updateProfile: (payload) => api.put('/users/profile', payload),
+  // Portfolio travailleur (photos de réalisations)
+  getPortfolio: () => api.get('/users/portfolio'),
+  addPortfolioImage: (formData) => api.uploadFile('/users/portfolio', formData),
+  removePortfolioImage: (index) => api.delete(`/users/portfolio/${index}`),
+  // Parrainage
+  getReferral: () => api.get('/users/referral'),
+  applyReferral: (code) => api.post('/users/referral/apply', { code }),
 };
 export const profileAPI = userAPI;
 export const profilesAPI = userAPI;
 export const workerAPI = createResourceApi('workers');
 export const workersAPI = workerAPI;
+export const workerProfileAPI = {
+  get: () => api.get('/workers/profile'),
+  update: (payload) => api.put('/workers/profile', payload),
+};
 export const notificationAPI = {
   // Récupérer toutes les notifications (+ unread_count)
   getAll: (params = {}) => api.get('/notifications', { params }),

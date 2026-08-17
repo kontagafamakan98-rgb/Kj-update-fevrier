@@ -1,4 +1,6 @@
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from kojo_core import db
@@ -158,17 +160,25 @@ async def get_conversation_messages(
 
     # Marquer comme lus les messages REÇUS par l'utilisateur qui ouvre la
     # conversation (le flag read n'était jamais utilisé : aucun indicateur
-    # de non-lu n'était possible).
+    # de non-lu n'était possible). read_at alimente l'accusé de réception
+    # « Lu » côté frontend (horodatage unique pour le lot).
     if messages:
         try:
+            read_at = datetime.now(timezone.utc)
             await db.messages.update_many(
                 {
                     "conversation_id": conversation_id,
                     "receiver_id": current_user.id,
                     "read": False,
                 },
-                {"$set": {"read": True}}
+                {"$set": {"read": True, "read_at": read_at}}
             )
+            # Réflète le marquage dans la réponse renvoyée (sinon le client
+            # voit read=False sur les messages qu'il vient d'ouvrir).
+            for message in messages:
+                if message.get("receiver_id") == current_user.id:
+                    message["read"] = True
+                    message["read_at"] = read_at
         except Exception as exc:
             logger.error(f"⚠️ Échec du marquage des messages comme lus: {exc}")
 
