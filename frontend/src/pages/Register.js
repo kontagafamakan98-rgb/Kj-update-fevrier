@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCountryFromPhone, detectUserCountry, getPhoneExampleForCountry } from '../services/preciseGeolocationService';
+import { getCountriesList, getPhonePrefixByCountry, formatPhoneNumber, detectCountryFromPhone, detectUserCountry, getPhoneExampleForCountry } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import WorkerRegistrationFields from '../components/WorkerRegistrationFields';

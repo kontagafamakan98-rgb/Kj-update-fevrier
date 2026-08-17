@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import preciseGeolocationService from '../services/preciseGeolocationService';
+import preciseGeolocationService from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { devLog } from '../utils/env';
 

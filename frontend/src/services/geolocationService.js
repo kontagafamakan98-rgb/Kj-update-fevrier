@@ -2,66 +2,82 @@ import { devLog, safeLog } from '../utils/env';
 import geolocationMonitor from '../utils/geolocationMonitor';
 import { buildApiUrl } from '../utils/backendUrl';
 
-// Service de géolocalisation pour la PWA
-export const COUNTRIES = {
-  MALI: {
-    code: 'mali',
-    name: 'Mali',
+/**
+ * MODULE DE GÉOLOCALISATION UNIQUE (fusion de geolocationService.js et
+ * preciseGeolocationService.js).
+ *
+ * L'ancien geolocationService.js dupliquait COUNTRIES, les méthodes GPS
+ * (reverse geocoding, identifyLocationFromCoordinates, détection IP/context)
+ * et les helpers téléphone avec des bases de villes inline qui doublonnaient
+ * la base backend. Tout vit désormais ici :
+ *  - La base géographique (villes/quartiers) est servie par
+ *    `/api/geolocation/cities` (source de vérité) et mise en cache localement.
+ *  - Le reverse geocoding passe par `/api/geolocation/reverse` (plus d'appel
+ *    direct à nominatim.openstreetmap.org).
+ *  - La détection IP passe par `/api/geolocation/detect` (plus d'appel direct
+ *    à ipapi.co / ipinfo.io). La CSP du navigateur est ainsi réduite.
+ *
+ * Exports : service par défaut (détection précise), detectUserCountry,
+ * helpers pays/téléphone (getCountriesList, getCountryByCode, formatPhoneNumber…),
+ * banques (getPopularBanksByCountry) et langues (AVAILABLE_LANGUAGES, …).
+ */
+
+// Fallback compact (niveau pays) — utilisé uniquement si la base complète
+// n'a pas encore été chargée depuis le backend (premier rendu, hors-ligne).
+// Les villes/quartiers ne vivent que côté backend.
+const FALLBACK_COUNTRY_DATA = {
+  mali: {
+    country: 'Mali',
     nameFrench: 'Mali',
     flag: '🇲🇱',
-    color: '#009639',
     phonePrefix: '+223',
     currency: 'XOF',
     language: 'fr',
-    majorCities: ['Bamako', 'Sikasso', 'Mopti', 'Koutiala', 'Kayes', 'Ségou', 'Gao', 'Tombouctou'],
-    timeZone: 'GMT+0',
-    internetPenetration: '23%'
+    bounds: { north: 25.0, south: 10.15997, east: 4.27, west: -12.2422 },
+    majorCities: []
   },
-  SENEGAL: {
-    code: 'senegal',
-    name: 'Senegal',
+  senegal: {
+    country: 'Senegal',
     nameFrench: 'Sénégal',
     flag: '🇸🇳',
-    color: '#00853f',
     phonePrefix: '+221',
     currency: 'XOF',
     language: 'fr',
-    majorCities: ['Dakar', 'Thiès', 'Kaolack', 'Saint-Louis', 'Ziguinchor', 'Diourbel', 'Rufisque', 'Mbour'],
-    timeZone: 'GMT+0',
-    internetPenetration: '58%'
+    bounds: { north: 16.6917, south: 12.3075, east: -11.3557, west: -17.5354 },
+    majorCities: []
   },
-  BURKINA_FASO: {
-    code: 'burkina_faso',
-    name: 'Burkina Faso',
+  burkina_faso: {
+    country: 'Burkina Faso',
     nameFrench: 'Burkina Faso',
     flag: '🇧🇫',
-    color: '#009639',
     phonePrefix: '+226',
     currency: 'XOF',
     language: 'fr',
-    majorCities: ['Ouagadougou', 'Bobo-Dioulasso', 'Koudougou', 'Ouahigouya', 'Banfora', 'Kaya', 'Tenkodogo', 'Fada N\'Gourma'],
-    timeZone: 'GMT+0',
-    internetPenetration: '22%'
+    bounds: { north: 15.0841, south: 9.4011, east: 2.405, west: -5.5189 },
+    majorCities: []
   },
-  COTE_DIVOIRE: {
-    code: 'cote_divoire',
-    name: 'Ivory Coast',
-    nameFrench: 'Côte d\'Ivoire',
+  cote_divoire: {
+    country: 'Ivory Coast',
+    nameFrench: "Côte d'Ivoire",
     flag: '🇨🇮',
-    color: '#ff8200',
     phonePrefix: '+225',
     currency: 'XOF',
     language: 'fr',
-    majorCities: ['Abidjan', 'Bouaké', 'Daloa', 'Yamoussoukro', 'San-Pédro', 'Korhogo', 'Man', 'Divo'], 
-    timeZone: 'GMT+0',
-    internetPenetration: '47%'
+    bounds: { north: 10.7402, south: 4.3571, east: -2.4947, west: -8.6024 },
+    majorCities: []
   }
 };
 
 const COUNTRY_CODE_ALIASES = {
   ivory_coast: 'cote_divoire',
   cote_divoire: 'cote_divoire',
-  ci: 'cote_divoire'
+  ci: 'cote_divoire',
+  mali: 'mali',
+  ml: 'mali',
+  senegal: 'senegal',
+  sn: 'senegal',
+  burkina_faso: 'burkina_faso',
+  bf: 'burkina_faso'
 };
 
 const normalizeCountryCode = (code = '') => {
@@ -69,331 +85,805 @@ const normalizeCountryCode = (code = '') => {
   return COUNTRY_CODE_ALIASES[value] || value;
 };
 
-export const getCountriesList = () => {
-  return Object.values(COUNTRIES);
+// ---------------------------------------------------------------------------
+// Base géographique chargée depuis le backend (source de vérité)
+// ---------------------------------------------------------------------------
+const DB_CACHE_KEY = 'kojo_geo_db';
+const DB_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours
+
+let geographicDatabase = null;
+let databaseLoadPromise = null;
+
+const hydrateDatabaseFromCache = () => {
+  try {
+    const cached = localStorage.getItem(DB_CACHE_KEY);
+    if (!cached) return;
+    const parsed = JSON.parse(cached);
+    if (parsed && parsed.data && parsed.timestamp && (Date.now() - parsed.timestamp) < DB_CACHE_TTL) {
+      geographicDatabase = parsed.data;
+      devLog.info('🗺️ Base géographique chargée depuis le cache local');
+    }
+  } catch (e) {
+    devLog.info('⚠️ Cache base géographique illisible:', e?.message);
+  }
 };
 
-export const getCountryByCode = (code) => {
-  const normalizedCode = normalizeCountryCode(code);
-  const upperCode = String(code || '').toUpperCase();
-  return Object.values(COUNTRIES).find(country => 
-    country.code === normalizedCode || country.code === code || country.code === upperCode
-  ) || COUNTRIES.MALI;
+const getDatabase = () => geographicDatabase || FALLBACK_COUNTRY_DATA;
+
+const loadGeographicDatabase = async () => {
+  if (databaseLoadPromise) return databaseLoadPromise;
+  databaseLoadPromise = (async () => {
+    try {
+      const response = await fetch(buildApiUrl('/geolocation/cities'), {
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      const countries = data?.countries || data?.database;
+      if (countries && typeof countries === 'object' && Object.keys(countries).length > 0) {
+        geographicDatabase = countries;
+        try {
+          localStorage.setItem(DB_CACHE_KEY, JSON.stringify({ data: countries, timestamp: Date.now() }));
+        } catch (e) {
+          devLog.info('⚠️ Impossible de mettre en cache la base géographique:', e?.message);
+        }
+        devLog.info('✅ Base géographique chargée depuis le backend');
+      }
+    } catch (error) {
+      safeLog.error('⚠️ Base géographique indisponible, fallback local:', error);
+    }
+    return getDatabase();
+  })();
+  return databaseLoadPromise;
 };
 
-export const getPhonePrefixByCountry = (countryCode) => {
-  const country = getCountryByCode(countryCode);
-  return country.phonePrefix;
-};
+hydrateDatabaseFromCache();
 
-export const detectCountryFromPhone = (phoneNumber) => {
-  if (!phoneNumber) return null;
-  
-  const cleanPhone = phoneNumber.replace(/\s+/g, '');
-  
-  for (const country of Object.values(COUNTRIES)) {
-    if (cleanPhone.startsWith(country.phonePrefix)) {
-      return country;
+// Services de géolocalisation IP — uniquement le backend Kojo (plus d'appels
+// directs à ipapi.co / ipinfo.io depuis le navigateur → CSP réduite).
+const IP_GEOLOCATION_SERVICES = [
+  {
+    name: 'KojoBackend',
+    url: buildApiUrl('/geolocation/detect'),
+    isBackend: true,
+    parser: (data) => {
+      if (!data.country) return null;
+      return {
+        country: data.country.code?.toUpperCase() || 'SN',
+        countryName: data.country.name,
+        city: data.country.capital || '',
+        region: '',
+        latitude: data.country.coordinates?.lat || 14.6928,
+        longitude: data.country.coordinates?.lng || -17.4467,
+        accuracy: data.detected ? 95 : 80,
+        timezone: data.country.timezone
+      };
     }
   }
-  return null;
-};
+];
 
-export const formatPhoneNumber = (phone, countryCode) => {
-  if (!phone) return '';
-  
-  const country = getCountryByCode(countryCode);
-  const cleanPhone = phone.replace(/[^\d]/g, '');
-  
-  // Si le numéro commence déjà par le préfixe, on le retourne tel quel
-  if (phone.startsWith(country.phonePrefix)) {
-    return phone;
-  }
-  
-  // Si le numéro commence par 0, on le remplace par le préfixe
-  if (cleanPhone.startsWith('0')) {
-    return country.phonePrefix + ' ' + cleanPhone.substring(1);
-  }
-  
-  // Sinon on ajoute juste le préfixe
-  return country.phonePrefix + ' ' + cleanPhone;
-};
-
-// Service de géolocalisation GPS pour PWA - AMÉLIORÉ 100% FIABILITÉ AFRIQUE DE L'OUEST
-class GeolocationService {
+class PreciseGeolocationService {
   constructor() {
     this.isDetecting = false;
+    this.lastKnownLocation = null;
+    this.detectionAccuracy = 0;
     this.cachedLocation = null;
     this.cacheTimestamp = null;
-    this.CACHE_DURATION = 2 * 60 * 1000; // 2 minutes pour limiter les localisations obsolètes
-    this.detectionMethods = [];
+    this.CACHE_DURATION = 60 * 1000; // 60 secondes pour éviter les localisations obsolètes
+    this.TARGET_GPS_ACCURACY = 12;
+    this.MIN_CACHEABLE_GPS_ACCURACY = 35;
+    this.MAX_ACCEPTABLE_GPS_ACCURACY = 120;
     this.loadCachedLocation();
   }
 
   // Charger la dernière position depuis localStorage
   loadCachedLocation() {
     try {
-      const cached = localStorage.getItem('kojo_last_location');
+      const cached = localStorage.getItem('kojo_precise_location');
       if (cached) {
         const data = JSON.parse(cached);
         if (Date.now() - data.timestamp < this.CACHE_DURATION) {
           this.cachedLocation = data.location;
           this.cacheTimestamp = data.timestamp;
-          devLog.info('📍 Position cachée chargée:', this.cachedLocation);
+          devLog.info('📍 Position précise cachée chargée:', this.cachedLocation);
         } else {
-          localStorage.removeItem('kojo_last_location');
+          localStorage.removeItem('kojo_precise_location');
         }
       }
     } catch (e) {
-      devLog.info('⚠️ Erreur chargement cache position:', e);
+      devLog.info('⚠️ Erreur chargement cache position précise:', e);
     }
   }
 
   // Sauvegarder la position dans le cache
   saveCachedLocation(location) {
-    if (!location || location.isApproximate || location.method === 'default') {
-      devLog.info('ℹ️ Position approximative non sauvegardée dans le cache');
+    const gpsAccuracy = Number(location?.gpsAccuracy ?? location?.accuracy);
+    const isCacheableGps = Boolean(
+      location?.coordinates &&
+      Number.isFinite(gpsAccuracy) &&
+      gpsAccuracy > 0 &&
+      gpsAccuracy <= this.MIN_CACHEABLE_GPS_ACCURACY &&
+      !location?.isApproximate
+    );
+
+    if (!isCacheableGps) {
+      devLog.info('ℹ️ Position non assez précise pour le cache persistant');
       return;
     }
 
     try {
-      localStorage.setItem('kojo_last_location', JSON.stringify({
+      localStorage.setItem('kojo_precise_location', JSON.stringify({
         location,
         timestamp: Date.now()
       }));
       this.cachedLocation = location;
       this.cacheTimestamp = Date.now();
-      devLog.info('✅ Position sauvegardée dans le cache');
+      devLog.info('✅ Position précise sauvegardée dans le cache');
     } catch (e) {
-      devLog.info('⚠️ Erreur sauvegarde cache position:', e);
+      devLog.info('⚠️ Erreur sauvegarde cache position précise:', e);
     }
   }
 
-  async detectUserLocation(userCountry = 'mali', options = {}) {
-    if (this.isDetecting) return this.cachedLocation;
-    
+  /**
+   * DÉTECTION ULTRA-PRÉCISE DE LA LOCALISATION
+   * Utilise multiple méthodes pour une précision de 100%
+   */
+  async detectPreciseLocation(options = {}) {
+    devLog.info('🎯 Démarrage détection géolocalisation ultra-précise...');
+
     const startTime = Date.now();
+
+    // La base géographique (villes/quartiers) doit être disponible pour
+    // identifier la localisation depuis les coordonnées GPS.
+    await loadGeographicDatabase();
+
+    if (this.isDetecting) {
+      devLog.info('⏳ Détection déjà en cours...');
+      return this.lastKnownLocation;
+    }
+
+    if (!options.forceRefresh && this.cachedLocation && this.cacheTimestamp) {
+      const age = Date.now() - this.cacheTimestamp;
+      const cachedGpsAccuracy = Number(this.cachedLocation?.gpsAccuracy ?? this.cachedLocation?.accuracy);
+      const canReuseCache = (
+        age < this.CACHE_DURATION &&
+        this.cachedLocation?.coordinates &&
+        Number.isFinite(cachedGpsAccuracy) &&
+        cachedGpsAccuracy > 0 &&
+        cachedGpsAccuracy <= this.MIN_CACHEABLE_GPS_ACCURACY
+      );
+
+      if (canReuseCache) {
+        const detectionTime = Date.now() - startTime;
+        devLog.info('📦 Utilisation position précise cachée (age: ' + Math.round(age / 1000) + 's)');
+
+        const cachedResult = {
+          ...this.cachedLocation,
+          method: 'cache',
+          fromCache: true,
+          isPrecise: true,
+          isApproximate: false,
+          confidence: this.calculateDetectionAccuracy(cachedGpsAccuracy, 'gps')
+        };
+
+        geolocationMonitor.recordDetection(cachedResult, detectionTime, true);
+        devLog.info(`✅ Géolocalisation précise depuis cache en ${detectionTime}ms`);
+
+        return cachedResult;
+      }
+    }
+
     this.isDetecting = true;
-    this.detectionMethods = [];
-    
+
     try {
-      // MÉTHODE 1: Position cachée récente (priorité maximale)
-      if (!options.forceRefresh && this.cachedLocation && this.cacheTimestamp) {
-        const age = Date.now() - this.cacheTimestamp;
-        if (age < this.CACHE_DURATION) {
-          const detectionTime = Date.now() - startTime;
-          devLog.info('📦 Utilisation position cachée (age: ' + Math.round(age / 1000) + 's)');
-          this.isDetecting = false;
-          this.detectionMethods.push('cache');
-          
-          const cachedResult = { ...this.cachedLocation, method: 'cache', fromCache: true };
-          
-          // Enregistrer dans le moniteur avec le vrai temps du cache
-          geolocationMonitor.recordDetection(cachedResult, detectionTime, true);
-          
-          devLog.info(`✅ Géolocalisation depuis cache en ${detectionTime}ms`);
-          
-          return cachedResult;
-        }
-      }
-
-      // MÉTHODE 2: Géolocalisation GPS native du navigateur
-      if (navigator.geolocation) {
-        try {
-          devLog.info('📡 Tentative GPS haute précision...');
-          const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 8000,
-              maximumAge: 60000
-            });
-          });
-
-          const { latitude, longitude, accuracy } = position.coords;
-          devLog.info(`✅ GPS réussi: ${latitude}, ${longitude} (précision: ${accuracy}m)`);
-          
-          const detectedLocation = await this.reverseGeocode(latitude, longitude, userCountry);
-          
-          if (detectedLocation) {
-            detectedLocation.gpsAccuracy = accuracy;
-            detectedLocation.confidence = 95;
-            this.saveCachedLocation(detectedLocation);
-            this.detectionMethods.push('gps');
-            this.isDetecting = false;
-            return detectedLocation;
-          }
-        } catch (geoError) {
-          devLog.info('⚠️ GPS échoué:', geoError.message);
-          this.detectionMethods.push('gps_failed');
-        }
-      }
-
-      // MÉTHODE 3: Détection par IP avec services multiples
-      const ipLocation = await this.detectByIPServices();
-      if (ipLocation) {
-        devLog.info('✅ Détection IP réussie:', ipLocation.city);
-        this.saveCachedLocation(ipLocation);
-        this.detectionMethods.push('ip');
+      const gpsLocation = await this.getHighPrecisionGPSLocation();
+      if (gpsLocation && gpsLocation.coordinates) {
+        devLog.info('✅ Localisation GPS obtenue:', gpsLocation);
+        this.lastKnownLocation = gpsLocation;
+        this.detectionAccuracy = gpsLocation.confidence || 0;
+        this.saveCachedLocation(gpsLocation);
         this.isDetecting = false;
+
+        const detectionTime = Date.now() - startTime;
+        geolocationMonitor.recordDetection(gpsLocation, detectionTime, true);
+        devLog.info(`✅ Géolocalisation GPS complétée en ${detectionTime}ms`);
+
+        return gpsLocation;
+      }
+
+      const ipLocation = await this.getMultiIPGeolocation();
+      if (ipLocation) {
+        devLog.info('⚠️ Fallback localisation IP utilisé:', ipLocation);
+        this.lastKnownLocation = ipLocation;
+        this.detectionAccuracy = ipLocation.confidence || 0;
+        this.isDetecting = false;
+
+        const detectionTime = Date.now() - startTime;
+        geolocationMonitor.recordDetection(ipLocation, detectionTime, true);
+        devLog.info(`ℹ️ Géolocalisation IP complétée en ${detectionTime}ms`);
+
         return ipLocation;
       }
 
-      // MÉTHODE 4: Détection contextuelle (timezone + langue + network)
-      const contextLocation = await this.detectByContext();
+      const contextLocation = await this.getContextualLocation();
       if (contextLocation) {
-        devLog.info('ℹ️ Détection contextuelle approximative:', contextLocation.country);
-        this.detectionMethods.push('context');
+        devLog.info('ℹ️ Localisation contextuelle approximative obtenue:', contextLocation);
+        this.lastKnownLocation = contextLocation;
+        this.detectionAccuracy = contextLocation.confidence || 0;
         this.isDetecting = false;
+
+        const detectionTime = Date.now() - startTime;
+        geolocationMonitor.recordDetection(contextLocation, detectionTime, true);
+        devLog.info(`ℹ️ Géolocalisation contextuelle complétée en ${detectionTime}ms`);
+
         return contextLocation;
       }
 
-      // MÉTHODE 5: Fallback pays uniquement, sans inventer une ville précise
-      devLog.info('📍 Aucun signal précis disponible, fallback au pays du profil uniquement...');
-
-      const selectedCountry = userCountry && getCountryByCode(userCountry) ? userCountry : null;
-      const country = selectedCountry ? getCountryByCode(selectedCountry) : null;
-
-      this.detectionMethods.push('default');
-      this.isDetecting = false;
-
-      if (!country) {
-        const detectionTime = Date.now() - startTime;
-        geolocationMonitor.recordDetection(null, detectionTime, false);
-        return null;
-      }
-
-      const fallbackLocation = {
-        address: country.nameFrench,
-        fullAddress: country.nameFrench,
-        city: '',
-        district: '',
-        country: country.nameFrench,
-        countryCode: selectedCountry,
-        coordinates: null,
-        accuracy: 0,
-        timestamp: new Date().toISOString(),
-        method: 'country_fallback',
-        confidence: 15,
-        isApproximate: true,
-        detectionMethods: this.detectionMethods.join(' → ')
-      };
-
-      const detectionTime = Date.now() - startTime;
-      geolocationMonitor.recordDetection(fallbackLocation, detectionTime, true);
-      return fallbackLocation;
-      
-    } catch (error) {
       this.isDetecting = false;
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(null, detectionTime, false);
-      devLog.error('❌ Échec géolocalisation:', error.message);
-      throw new Error('Impossible de détecter votre position: ' + error.message);
+      devLog.info('⚠️ Aucune localisation suffisamment fiable trouvée');
+      return null;
+
+    } catch (error) {
+      safeLog.error('❌ Erreur détection géolocalisation:', error);
+      this.isDetecting = false;
+
+      const detectionTime = Date.now() - startTime;
+      geolocationMonitor.recordDetection(null, detectionTime, false);
+
+      return this.lastKnownLocation && !this.lastKnownLocation.isApproximate ? this.lastKnownLocation : null;
     }
   }
 
-  async reverseGeocode(lat, lng, userCountry) {
-    // Géocodage inverse réel - cherche dans TOUS les pays
-    
-    // Base de données des villes avec coordonnées
-    const cityMappings = {
-      'mali': [
-        { name: 'Bamako', lat: 12.6392, lng: -8.0029, districts: [
-          { name: 'ACI 2000', lat: 12.6158, lng: -7.9922 },
-          { name: 'Hippodrome', lat: 12.6347, lng: -8.0183 },
-          { name: 'Plateau', lat: 12.6465, lng: -8.0038 },
-          { name: 'Badalabougou', lat: 12.6528, lng: -7.9881 },
-          { name: 'Lafiabougou', lat: 12.6245, lng: -7.9532 }
-        ]},
-        { name: 'Sikasso', lat: 11.3176, lng: -5.6670, districts: [
-          { name: 'Centre', lat: 11.3198, lng: -5.6692 },
-          { name: 'Médina', lat: 11.3234, lng: -5.6578 }
-        ]},
-        { name: 'Mopti', lat: 14.4843, lng: -4.1960, districts: [
-          { name: 'Centre', lat: 14.4843, lng: -4.1960 },
-          { name: 'Komoguel', lat: 14.4900, lng: -4.1880 }
-        ]}
-      ],
-      'senegal': [
-        { name: 'Dakar', lat: 14.6928, lng: -17.4467, districts: [
-          { name: 'Plateau', lat: 14.6694, lng: -17.4380 },
-          { name: 'Médina', lat: 14.6840, lng: -17.4490 },
-          { name: 'Parcelles Assainies', lat: 14.7630, lng: -17.4180 },
-          { name: 'Grand Dakar', lat: 14.6920, lng: -17.4560 }
-        ]},
-        { name: 'Thiès', lat: 14.7886, lng: -16.9246, districts: [
-          { name: 'Centre', lat: 14.7886, lng: -16.9246 },
-          { name: 'Randoulène', lat: 14.7950, lng: -16.9300 }
-        ]}
-      ],
-      'burkina_faso': [
-        { name: 'Ouagadougou', lat: 12.3714, lng: -1.5197, districts: [
-          { name: 'Zone du Bois', lat: 12.3730, lng: -1.5150 },
-          { name: 'Cissin', lat: 12.3540, lng: -1.5080 },
-          { name: 'Gounghin', lat: 12.3680, lng: -1.5350 }
-        ]},
-        { name: 'Bobo-Dioulasso', lat: 11.1781, lng: -4.2978, districts: [
-          { name: 'Secteur 1', lat: 11.1781, lng: -4.2978 },
-          { name: 'Secteur 15', lat: 11.1850, lng: -4.3050 }
-        ]}
-      ],
-      'cote_divoire': [
-        { name: 'Abidjan', lat: 5.3600, lng: -4.0083, districts: [
-          { name: 'Plateau', lat: 5.3200, lng: -4.0200 },
-          { name: 'Cocody', lat: 5.3500, lng: -3.9800 },
-          { name: 'Marcory', lat: 5.3100, lng: -4.0000 }
-        ]},
-        { name: 'Yamoussoukro', lat: 6.8276, lng: -5.2893, districts: [
-          { name: 'Centre', lat: 6.8276, lng: -5.2893 }
-        ]}
-      ]
+  /**
+   * GÉOLOCALISATION GPS HAUTE PRÉCISION
+   */
+  async getGeolocationPermissionState() {
+    try {
+      if (!navigator.permissions || !navigator.permissions.query) {
+        return 'unknown';
+      }
+
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
+      return permissionStatus?.state || 'unknown';
+    } catch (error) {
+      devLog.info('⚠️ Permissions API indisponible:', error.message);
+      return 'unknown';
+    }
+  }
+
+  async getCurrentPositionWithOptions(options = {}) {
+    return await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+  }
+
+  async getBestAvailableGpsPosition() {
+    const permissionState = await this.getGeolocationPermissionState();
+    devLog.info(`🔐 Permission géolocalisation: ${permissionState}`);
+
+    const baseOptions = {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 0
     };
 
-    // Chercher dans TOUS les pays, pas seulement le pays du profil
-    let closestCity = null;
-    let closestCountryCode = userCountry;
+    const firstPosition = await this.getCurrentPositionWithOptions(baseOptions);
+    const firstAccuracy = firstPosition?.coords?.accuracy ?? Number.POSITIVE_INFINITY;
+
+    if (!navigator.geolocation?.watchPosition || firstAccuracy <= this.TARGET_GPS_ACCURACY) {
+      return firstPosition;
+    }
+
+    devLog.info(`📡 Premier fix GPS à ${Math.round(firstAccuracy)}m, lancement d'un warm-up précision...`);
+
+    const watchDurationMs = firstAccuracy <= 25 ? 6000 : 10000;
+
+    return await new Promise((resolve) => {
+      let bestPosition = firstPosition;
+      let settled = false;
+      let watchId = null;
+      let timerId = null;
+
+      const finalize = () => {
+        if (settled) return;
+        settled = true;
+
+        if (timerId) {
+          clearTimeout(timerId);
+        }
+
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+        }
+
+        resolve(bestPosition);
+      };
+
+      const evaluatePosition = (position) => {
+        if (!position?.coords) return;
+
+        const candidateAccuracy = position.coords.accuracy ?? Number.POSITIVE_INFINITY;
+        const currentBestAccuracy = bestPosition?.coords?.accuracy ?? Number.POSITIVE_INFINITY;
+
+        if (candidateAccuracy < currentBestAccuracy) {
+          bestPosition = position;
+        }
+
+        if (candidateAccuracy <= this.TARGET_GPS_ACCURACY) {
+          finalize();
+        }
+      };
+
+      timerId = setTimeout(finalize, watchDurationMs);
+
+      try {
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            evaluatePosition(position);
+          },
+          (error) => {
+            devLog.info('⚠️ Warm-up GPS interrompu:', error.message);
+            finalize();
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: watchDurationMs,
+            maximumAge: 0
+          }
+        );
+      } catch (error) {
+        devLog.info('⚠️ watchPosition indisponible:', error.message);
+        finalize();
+        return;
+      }
+
+      evaluatePosition(firstPosition);
+    });
+  }
+
+  // Reverse geocoding via le backend Kojo (plus d'appel direct à Nominatim)
+  async reverseGeocodePrecise(latitude, longitude) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+
+    try {
+      const url = buildApiUrl(`/geolocation/reverse?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`);
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller ? controller.signal : undefined,
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Language': 'fr,en'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      devLog.info('⚠️ Reverse geocoding backend échoué:', error.message);
+      return null;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
+  buildPreciseAddressFromReverseData(reverseData, fallbackLocationData, latitude, longitude) {
+    const address = reverseData?.address || {};
+    const countryCode = normalizeCountryCode(address.country_code || fallbackLocationData?.countryCode || '');
+    const countryData = getDatabase()[countryCode];
+
+    const streetName = address.road || address.pedestrian || address.footway || address.street || address.path || '';
+    const houseNumber = address.house_number || '';
+    const streetLine = [houseNumber, streetName].filter(Boolean).join(' ').trim();
+    const district = address.suburb || address.neighbourhood || address.city_district || address.quarter || address.hamlet || fallbackLocationData?.district || '';
+    const city = address.city || address.town || address.village || address.municipality || address.county || fallbackLocationData?.city || '';
+    const state = address.state || address.region || '';
+    const country = address.country || fallbackLocationData?.country || countryData?.nameFrench || '';
+
+    const shortAddress = [streetLine, district || city].filter(Boolean).join(', ') || [district, city].filter(Boolean).join(', ') || fallbackLocationData?.address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    const fullAddress = reverseData?.display_name || [streetLine, district, city, state, country].filter(Boolean).join(', ') || shortAddress;
+
+    return {
+      address: shortAddress,
+      fullAddress,
+      city,
+      district,
+      country,
+      countryCode: countryCode || fallbackLocationData?.countryCode || '',
+      postalCode: address.postcode || '',
+      phonePrefix: countryData?.phonePrefix || fallbackLocationData?.phonePrefix || '',
+      flag: countryData?.flag || fallbackLocationData?.flag || '📍'
+    };
+  }
+
+  async getHighPrecisionGPSLocation() {
+    if (!navigator.geolocation) {
+      devLog.info('⚠️ Géolocalisation non supportée par le navigateur');
+      return null;
+    }
+
+    try {
+      devLog.info('📡 Tentative géolocalisation GPS haute précision...');
+
+      const position = await this.getBestAvailableGpsPosition();
+      const { latitude, longitude, accuracy } = position.coords;
+      const roundedAccuracy = Math.round(accuracy || 0);
+      devLog.info(`📍 Position GPS détectée: ${latitude}, ${longitude} (précision: ${roundedAccuracy}m)`);
+
+      const fallbackLocationData = this.identifyLocationFromCoordinates(latitude, longitude) || {};
+      const reverseData = await this.reverseGeocodePrecise(latitude, longitude);
+      const preciseAddressData = this.buildPreciseAddressFromReverseData(reverseData, fallbackLocationData, latitude, longitude);
+      const confidence = this.calculateDetectionAccuracy(roundedAccuracy, 'gps');
+
+      return {
+        ...fallbackLocationData,
+        ...preciseAddressData,
+        coordinates: { lat: latitude, lng: longitude },
+        latitude,
+        longitude,
+        accuracy: roundedAccuracy,
+        gpsAccuracy: roundedAccuracy,
+        confidence,
+        method: 'gps',
+        timestamp: new Date().toISOString(),
+        isApproximate: roundedAccuracy > this.MAX_ACCEPTABLE_GPS_ACCURACY,
+        isPrecise: roundedAccuracy <= this.MIN_CACHEABLE_GPS_ACCURACY,
+        precisionTier: roundedAccuracy <= 10
+          ? 'excellent'
+          : roundedAccuracy <= 25
+            ? 'high'
+            : roundedAccuracy <= 50
+              ? 'good'
+              : roundedAccuracy <= 100
+                ? 'fair'
+                : 'low'
+      };
+
+    } catch (error) {
+      devLog.info('⚠️ Géolocalisation GPS échouée:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * GÉOLOCALISATION IP (backend Kojo uniquement)
+   */
+  async getMultiIPGeolocation() {
+    devLog.info('🌐 Tentative géolocalisation IP via backend Kojo...');
+
+    const results = [];
+
+    // Tester tous les services IP en parallèle
+    const promises = IP_GEOLOCATION_SERVICES.map(async (service) => {
+      try {
+        devLog.info(`📡 Test service ${service.name}...`);
+
+        const response = await fetch(service.url, {
+          method: 'GET',
+          timeout: 5000,
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; KojoApp/1.0)'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const parsed = service.parser(data);
+
+        devLog.info(`✅ ${service.name} réponse:`, parsed);
+
+        // Accepter toute localisation valide (pas seulement Afrique de l'Ouest)
+        if (parsed && parsed.latitude && parsed.longitude) {
+          results.push({
+            service: service.name,
+            ...parsed
+          });
+        }
+
+      } catch (error) {
+        devLog.info(`⚠️ Service ${service.name} échoué:`, error.message);
+      }
+    });
+
+    await Promise.allSettled(promises);
+
+    if (results.length === 0) {
+      devLog.info('❌ Aucun service IP n\'a fourni de localisation valide');
+      return null;
+    }
+
+    // Validation croisée des résultats
+    const validatedResult = this.crossValidateIPResults(results);
+
+    if (!validatedResult) {
+      devLog.info('❌ Validation croisée IP échouée');
+      return null;
+    }
+
+    // Identifier la localisation précise
+    const locationData = this.identifyLocationFromCoordinates(
+      validatedResult.latitude,
+      validatedResult.longitude
+    );
+
+    const detectionAccuracy = this.calculateDetectionAccuracy(100, 'ip', results.length);
+
+    if (locationData) {
+      return {
+        ...locationData,
+        coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
+        accuracy: 0,
+        confidence: detectionAccuracy,
+        method: 'ip',
+        ipServices: results.length,
+        consensus: validatedResult.consensus,
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    // Hors Afrique de l'Ouest - retourner les vraies données IP
+    devLog.info('📍 IP hors zone Afrique de l\'Ouest - position réelle retournée');
+    const firstResult = results[0];
+    return {
+      country: firstResult.countryName || firstResult.country || 'Détecté par IP',
+      countryCode: (firstResult.country || '').toLowerCase(),
+      city: firstResult.city || '',
+      district: firstResult.region || '',
+      fullAddress: `${firstResult.city || ''}${firstResult.region ? ', ' + firstResult.region : ''}, ${firstResult.countryName || firstResult.country || ''}`,
+      phonePrefix: '',
+      flag: '🌍',
+      coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
+      accuracy: 0,
+      confidence: detectionAccuracy,
+      method: 'ip',
+      ipServices: results.length,
+      consensus: validatedResult.consensus,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * GÉOLOCALISATION CONTEXTUELLE (fuseau horaire + langue)
+   */
+  async getContextualLocation() {
+    devLog.info('🧠 Analyse contextuelle (fuseau horaire + langue)...');
+
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const userLanguages = navigator.languages || [navigator.language];
+
+      devLog.info(`🕐 Fuseau horaire: ${timezone}`);
+      devLog.info(`🗣️ Langues navigateur:`, userLanguages);
+
+      const timezoneMapping = {
+        'Africa/Bamako': 'mali',
+        'Africa/Dakar': 'senegal',
+        'Africa/Ouagadougou': 'burkina_faso',
+        'Africa/Abidjan': 'cote_divoire'
+      };
+
+      const languageHints = {
+        'wo': ['senegal'],
+        'bm': ['mali']
+      };
+
+      let bestCountryGuess = timezoneMapping[timezone];
+
+      if (!bestCountryGuess) {
+        for (const lang of userLanguages) {
+          const langCode = lang.split('-')[0].toLowerCase();
+          if (languageHints[langCode]) {
+            bestCountryGuess = languageHints[langCode][0];
+            break;
+          }
+        }
+      }
+
+      if (!bestCountryGuess) {
+        devLog.info('⚠️ Impossible de déterminer le pays par le contexte');
+        return null;
+      }
+
+      const countryData = getDatabase()[bestCountryGuess];
+      if (!countryData || !countryData.majorCities?.length) {
+        return null;
+      }
+
+      const mainCity = countryData.majorCities[0];
+      const detectionAccuracy = this.calculateDetectionAccuracy(50, 'contextual');
+
+      return {
+        address: `${mainCity.name}, ${countryData.nameFrench}`,
+        fullAddress: `${mainCity.name}, ${countryData.nameFrench}`,
+        city: mainCity.name,
+        district: '',
+        country: countryData.nameFrench,
+        countryCode: bestCountryGuess,
+        phonePrefix: countryData.phonePrefix,
+        coordinates: mainCity.coordinates,
+        accuracy: 0,
+        confidence: Math.min(detectionAccuracy, 45),
+        method: 'contextual',
+        timezone: timezone,
+        languages: userLanguages,
+        isApproximate: true,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      devLog.info('⚠️ Analyse contextuelle échouée:', error.message);
+      return null;
+    }
+  }
+
+  /**
+   * IDENTIFICATION PRÉCISE DE LOCALISATION À PARTIR DE COORDONNÉES
+   */
+  identifyLocationFromCoordinates(latitude, longitude) {
+    devLog.info(`🎯 Identification précise pour: ${latitude}, ${longitude}`);
+
+    // Vérifier d'abord si c'est en Afrique de l'Ouest
+    if (!this.isWestAfricaCoordinates(latitude, longitude)) {
+      devLog.info('⚠️ Coordonnées hors Afrique de l\'Ouest');
+      return null;
+    }
+
+    const database = getDatabase();
+    let bestMatch = null;
     let minDistance = Infinity;
 
-    for (const [countryCode, cities] of Object.entries(cityMappings)) {
-      for (const city of cities) {
-        const distance = this.calculateDistance(lat, lng, city.lat, city.lng);
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestCity = city;
-          closestCountryCode = countryCode;
+    // Parcourir tous les pays et villes
+    for (const [countryCode, countryData] of Object.entries(database)) {
+      // Vérifier si dans les limites du pays
+      if (countryData.bounds && this.isWithinCountryBounds(latitude, longitude, countryData.bounds)) {
+
+        // Trouver la ville la plus proche
+        for (const city of countryData.majorCities || []) {
+          const distance = this.calculateDistance(
+            latitude, longitude,
+            city.coordinates.lat, city.coordinates.lng
+          );
+
+          if (distance < minDistance) {
+            minDistance = distance;
+
+            // Trouver le district le plus proche dans cette ville
+            let closestDistrict = city.districts[0];
+            let minDistrictDistance = Infinity;
+
+            for (const district of city.districts) {
+              const districtDistance = this.calculateDistance(
+                latitude, longitude,
+                district.coords.lat, district.coords.lng
+              );
+
+              if (districtDistance < minDistrictDistance) {
+                minDistrictDistance = districtDistance;
+                closestDistrict = district;
+              }
+            }
+
+            bestMatch = {
+              address: `${closestDistrict.name}, ${city.name}`,
+              fullAddress: `${closestDistrict.name}, ${city.name}, ${countryData.nameFrench}`,
+              city: city.name,
+              district: closestDistrict.name,
+              country: countryData.nameFrench,
+              countryCode: countryCode,
+              phonePrefix: countryData.phonePrefix,
+              distance: minDistance,
+              districtDistance: minDistrictDistance
+            };
+          }
         }
       }
     }
 
-    if (!closestCity) return null;
+    if (bestMatch) {
+      devLog.info(`✅ Localisation identifiée: ${bestMatch.fullAddress} (${bestMatch.distance.toFixed(2)}km)`);
+    } else {
+      devLog.info('❌ Aucune localisation précise trouvée');
+    }
 
-    const country = getCountryByCode(closestCountryCode);
-    
-    // Trouver le quartier le plus proche
-    let closestDistrict = closestCity.districts[0];
-    let minDistrictDistance = this.calculateDistance(lat, lng, closestDistrict.lat, closestDistrict.lng);
-    
-    for (const district of closestCity.districts) {
-      const distance = this.calculateDistance(lat, lng, district.lat, district.lng);
-      if (distance < minDistrictDistance) {
-        minDistrictDistance = distance;
-        closestDistrict = district;
+    return bestMatch;
+  }
+
+  /**
+   * VALIDATION CROISÉE DES RÉSULTATS IP
+   */
+  crossValidateIPResults(results) {
+    if (results.length === 0) return null;
+    if (results.length === 1) return { ...results[0], consensus: 1 };
+
+    devLog.info(`🔍 Validation croisée de ${results.length} résultats IP...`);
+
+    // Grouper par pays
+    const countryGroups = {};
+    for (const result of results) {
+      const country = result.country;
+      if (!countryGroups[country]) {
+        countryGroups[country] = [];
+      }
+      countryGroups[country].push(result);
+    }
+
+    // Trouver le consensus majoritaire
+    let majorityCountry = null;
+    let maxCount = 0;
+
+    for (const [country, group] of Object.entries(countryGroups)) {
+      if (group.length > maxCount) {
+        maxCount = group.length;
+        majorityCountry = country;
       }
     }
-    
+
+    if (!majorityCountry) {
+      devLog.info('❌ Pas de consensus sur le pays');
+      return null;
+    }
+
+    // Calculer la moyenne des coordonnées pour le pays majoritaire
+    const majorityResults = countryGroups[majorityCountry];
+    const avgLat = majorityResults.reduce((sum, r) => sum + r.latitude, 0) / majorityResults.length;
+    const avgLng = majorityResults.reduce((sum, r) => sum + r.longitude, 0) / majorityResults.length;
+
+    const consensus = majorityResults.length / results.length;
+
+    devLog.info(`✅ Consensus ${(consensus * 100).toFixed(1)}% pour ${majorityCountry}`);
+
     return {
-      address: `${closestDistrict.name}, ${closestCity.name}`,
-      fullAddress: `${closestDistrict.name}, ${closestCity.name}, ${country.nameFrench}`,
-      city: closestCity.name,
-      district: closestDistrict.name,
-      country: country.nameFrench,
-      countryCode: closestCountryCode,
-      coordinates: { lat, lng },
-      accuracy: Math.round(minDistrictDistance * 1000),
-      timestamp: new Date().toISOString(),
-      method: 'gps'
+      country: majorityCountry,
+      countryName: majorityResults[0].countryName,
+      latitude: avgLat,
+      longitude: avgLng,
+      consensus: consensus,
+      services: majorityResults.length
     };
   }
 
+  /**
+   * FALLBACK DÉSACTIVÉ POUR ÉVITER LES LOCALISATIONS FAUSSES
+   */
+  getIntelligentFallback() {
+    return null;
+  }
+
+  /**
+   * VÉRIFIER SI LES COORDONNÉES SONT EN AFRIQUE DE L'OUEST
+   */
+  isWestAfricaCoordinates(latitude, longitude) {
+    // Zone géographique étendue de l'Afrique de l'Ouest
+    return (
+      latitude >= 4.0 && latitude <= 25.0 &&    // Latitude: du Golfe de Guinée au Sahara
+      longitude >= -18.0 && longitude <= 5.0     // Longitude: de l'Atlantique au centre de l'Afrique
+    );
+  }
+
+  /**
+   * VÉRIFIER SI LES COORDONNÉES SONT DANS LES LIMITES D'UN PAYS
+   */
+  isWithinCountryBounds(latitude, longitude, bounds) {
+    return (
+      latitude >= bounds.south && latitude <= bounds.north &&
+      longitude >= bounds.west && longitude <= bounds.east
+    );
+  }
+
+  /**
+   * CALCULER LA DISTANCE ENTRE DEUX POINTS (Haversine)
+   */
   calculateDistance(lat1, lng1, lat2, lng2) {
     const R = 6371; // Rayon de la Terre en km
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -405,462 +895,257 @@ class GeolocationService {
     return R * c;
   }
 
-  // Détection par IP via le backend Kojo (plus d'appels directs ipapi/ipinfo)
-  async detectByIPServices() {
-    devLog.info('🌐 Tentative détection IP via backend Kojo...');
+  /**
+   * CALCULER LA PRÉCISION DE DÉTECTION
+   */
+  calculateDetectionAccuracy(baseAccuracy, method, extraFactor = 1) {
+    if (method === 'gps') {
+      const meters = Number(baseAccuracy);
 
-    try {
-      const response = await fetch(buildApiUrl('/geolocation/detect'), {
-        signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
-          ? AbortSignal.timeout(5000)
-          : undefined,
-        headers: { 'Accept': 'application/json' }
-      });
-
-      if (!response.ok) {
-        devLog.info(`⚠️ Backend IP échoué: HTTP ${response.status}`);
-        return null;
+      if (!Number.isFinite(meters) || meters <= 0) {
+        return 0;
       }
 
-      const data = await response.json();
-      const country = data?.country;
-      const parsedCode = country?.code || '';
-
-      if (parsedCode) {
-        devLog.info(`✅ Backend IP: ${country.nameFrench || country.name} (${parsedCode})`);
-
-        // Mapper vers les pays supportés par Kojo
-        const countryCodeMapping = {
-          'mali': 'MALI', 'senegal': 'SENEGAL', 'burkina_faso': 'BURKINA_FASO', 'cote_divoire': 'COTE_DIVOIRE'
-        };
-
-        const countryKey = countryCodeMapping[parsedCode];
-        const mapped = countryKey ? COUNTRIES[countryKey] : null;
-
-        // Construire la localisation basée sur le pays détecté
-        const locationResult = {
-          address: `${country.capital || ''}, ${country.nameFrench || country.name}`,
-          fullAddress: `${country.capital || ''}, ${country.nameFrench || country.name}`,
-          city: country.capital || '',
-          district: '',
-          country: country.nameFrench || country.name,
-          countryCode: mapped ? countryKey.toLowerCase() : parsedCode.toLowerCase(),
-          coordinates: country.coordinates
-            ? { lat: country.coordinates.lat, lng: country.coordinates.lng }
-            : null,
-          accuracy: 0,
-          timestamp: new Date().toISOString(),
-          method: 'ip',
-          confidence: 80
-        };
-
-        return locationResult;
-      }
-    } catch (error) {
-      devLog.info(`⚠️ Détection IP backend échouée: ${error.message}`);
+      if (meters <= 5) return 100;
+      if (meters <= 10) return 99;
+      if (meters <= 20) return 96;
+      if (meters <= 35) return 93;
+      if (meters <= 50) return 88;
+      if (meters <= 100) return 78;
+      if (meters <= 200) return 65;
+      return 50;
     }
 
-    devLog.info('❌ Aucun service IP disponible');
-    return null;
+    if (method === 'ip') {
+      return Math.min(40 + Math.round(extraFactor * 8), 68);
+    }
+
+    if (method === 'contextual') {
+      return 35;
+    }
+
+    return 0;
   }
 
   /**
-   * Détection via géolocalisation GPS (HTML5 Geolocation API)
+   * OBTENIR SUGGESTIONS DE LOCALISATION POUR AUTOCOMPLÉTION
    */
-  async detectByGPS() {
-    devLog.info('📍 Tentative détection GPS...');
-    
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) {
-        devLog.info('❌ Géolocalisation non supportée');
-        resolve(null);
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          devLog.info(`✅ Position GPS: ${latitude}, ${longitude}`);
-          
-          // Identifier le pays à partir des coordonnées
-          const location = this.identifyLocationFromCoordinates(latitude, longitude);
-          if (location) {
-            location.confidence = 100;
-            location.method = 'gps';
-          }
-          resolve(location);
-        },
-        (error) => {
-          devLog.info(`⚠️ Erreur GPS: ${error.message}`);
-          resolve(null);
-        },
-        { 
-          enableHighAccuracy: true, 
-          timeout: 8000,
-          maximumAge: 300000 // 5 minutes cache
-        }
-      );
-    });
-  }
-
-  // NOUVELLE MÉTHODE: Détection contextuelle avancée
-  async detectByContext() {
-    devLog.info('🧠 Analyse contextuelle avancée...');
-
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const languages = navigator.languages || [navigator.language];
-      const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-
-      devLog.info(`🕐 Timezone: ${timezone}`);
-      devLog.info(`🗣️ Langues:`, languages);
-
-      const timezoneMap = {
-        'Africa/Bamako': 'mali',
-        'Africa/Dakar': 'senegal',
-        'Africa/Ouagadougou': 'burkina_faso',
-        'Africa/Abidjan': 'cote_divoire'
-      };
-
-      let detectedCountry = timezoneMap[timezone];
-
-      if (!detectedCountry) {
-        for (const lang of languages) {
-          const langCode = lang.split('-')[0].toLowerCase();
-          if (langCode === 'wo') detectedCountry = 'senegal';
-          else if (langCode === 'bm') detectedCountry = 'mali';
-
-          if (detectedCountry) break;
-        }
-      }
-
-      if (connection) {
-        const effectiveType = connection.effectiveType;
-        devLog.info(`📶 Connexion: ${effectiveType}`);
-      }
-
-      if (!detectedCountry) {
-        devLog.info('⚠️ Impossible de déterminer le pays par contexte');
-        return null;
-      }
-
-      const country = getCountryByCode(detectedCountry);
-      const locationMappings = {
-        'mali': { city: 'Bamako' },
-        'senegal': { city: 'Dakar' },
-        'burkina_faso': { city: 'Ouagadougou' },
-        'cote_divoire': { city: 'Abidjan' }
-      };
-
-      const mapping = locationMappings[detectedCountry];
-
-      return {
-        address: `${mapping.city}, ${country.nameFrench}`,
-        fullAddress: `${mapping.city}, ${country.nameFrench}`,
-        city: mapping.city,
-        district: '',
-        country: country.nameFrench,
-        countryCode: detectedCountry,
-        coordinates: null,
-        accuracy: 35,
-        timestamp: new Date().toISOString(),
-        method: 'contextual',
-        confidence: 35,
-        isApproximate: true,
-        timezone: timezone,
-        languages: languages
-      };
-
-    } catch (e) {
-      devLog.info('⚠️ Analyse contextuelle échouée:', e.message);
-      return null;
-    }
-  }
-
-  // MÉTHODE AMÉLIORÉE: Identifier localisation depuis coordonnées avec meilleure précision
-  identifyLocationFromCoordinates(lat, lng, preferredCountry) {
-    const countryData = getCountryByCode(preferredCountry);
-    
-    // Base de données simplifiée des principales villes
-    const cities = {
-      'mali': [
-        { name: 'Bamako', lat: 12.6392, lng: -8.0029, districts: ['ACI 2000', 'Hippodrome', 'Plateau', 'Badalabougou'] },
-        { name: 'Sikasso', lat: 11.3176, lng: -5.6670, districts: ['Centre', 'Médina'] },
-        { name: 'Mopti', lat: 14.4843, lng: -4.1960, districts: ['Centre', 'Komoguel', 'Sévaré'] }
-      ],
-      'senegal': [
-        { name: 'Dakar', lat: 14.6928, lng: -17.4467, districts: ['Plateau', 'Médina', 'Parcelles Assainies', 'Liberté 6'] },
-        { name: 'Thiès', lat: 14.7886, lng: -16.9246, districts: ['Centre', 'Randoulène'] },
-        { name: 'Kaolack', lat: 14.1514, lng: -16.0726, districts: ['Médina Baye', 'Dialègne'] }
-      ],
-      'burkina_faso': [
-        { name: 'Ouagadougou', lat: 12.3714, lng: -1.5197, districts: ['Zone du Bois', 'Cissin', 'Gounghin', 'Bogodogo'] },
-        { name: 'Bobo-Dioulasso', lat: 11.1781, lng: -4.2978, districts: ['Secteur 1', 'Secteur 15'] },
-        { name: 'Koudougou', lat: 12.2518, lng: -2.3648, districts: ['Centre', 'Issouka'] }
-      ],
-      'cote_divoire': [
-        { name: 'Abidjan', lat: 5.3600, lng: -4.0083, districts: ['Plateau', 'Cocody', 'Marcory', 'Yopougon'] },
-        { name: 'Yamoussoukro', lat: 6.8276, lng: -5.2893, districts: ['Centre', 'Habitat'] },
-        { name: 'Bouaké', lat: 7.6906, lng: -5.0300, districts: ['Centre', 'Air France 2'] }
-      ]
-    };
-
-    const countryCities = cities[preferredCountry] || cities['senegal'];
-    
-    // Trouver la ville la plus proche
-    let closestCity = countryCities[0];
-    let minDistance = this.calculateDistance(lat, lng, closestCity.lat, closestCity.lng);
-    
-    for (const city of countryCities) {
-      const distance = this.calculateDistance(lat, lng, city.lat, city.lng);
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestCity = city;
-      }
-    }
-
-    return {
-      address: `${closestCity.name}, ${countryData.nameFrench}`,
-      fullAddress: `${closestCity.name}, ${countryData.nameFrench}`,
-      city: closestCity.name,
-      district: '',
-      country: countryData.nameFrench,
-      countryCode: preferredCountry,
-      coordinates: { lat, lng },
-      accuracy: 80,
-      timestamp: new Date().toISOString(),
-      method: 'geocoded',
-      isApproximate: true,
-      distance: minDistance
-    };
-  }
-
   async getLocationSuggestions(countryCode, searchQuery = '') {
-    const suggestions = {
-      'mali': [
-        'Bamako, ACI 2000', 'Bamako, Hippodrome', 'Bamako, Plateau', 'Bamako, Badalabougou',
-        'Bamako, Heremakono', 'Bamako, Point G', 'Sikasso', 'Mopti', 'Ségou', 'Kayes',
-        'Gao', 'Tombouctou', 'Koutiala', 'Djenné'
-      ],
-      'senegal': [
-        'Dakar, Plateau', 'Dakar, Médina', 'Dakar, Parcelles Assainies', 'Dakar, Liberté 6',
-        'Dakar, Almadies', 'Thiès', 'Kaolack', 'Saint-Louis', 'Ziguinchor', 'Diourbel',
-        'Fatick', 'Tambacounda', 'Kolda'
-      ],
-      'burkina_faso': [
-        'Ouagadougou, Zone du Bois', 'Ouagadougou, Cissin', 'Ouagadougou, Gounghin',
-        'Ouagadougou, Kamsaoghin', 'Bobo-Dioulasso', 'Koudougou', 'Ouahigouya',
-        'Banfora', 'Dédougou', 'Fada N\'Gourma', 'Gaoua'
-      ],
-      'cote_divoire': [
-        'Abidjan, Plateau', 'Abidjan, Cocody', 'Abidjan, Marcory', 'Abidjan, Treichville',
-        'Abidjan, Yopougon', 'Yamoussoukro', 'Bouaké', 'Daloa', 'Korhogo',
-        'San-Pédro', 'Man', 'Gagnoa', 'Divo'
-      ]
-    };
-
-    let results = suggestions[countryCode] || suggestions['mali'];
-    
-    if (searchQuery.trim()) {
-      results = results.filter(location =>
-        location.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    await loadGeographicDatabase();
+    const countryData = getDatabase()[countryCode];
+    if (!countryData) {
+      return [];
     }
 
-    return results.map((location, index) => ({
-      id: `${countryCode}_${index}`,
-      name: location.split(', ')[1] || location,
-      fullName: location,
-      country: getCountryByCode(countryCode).nameFrench,
-      countryCode: countryCode
+    const suggestions = [];
+
+    // Ajouter toutes les villes et districts
+    for (const city of countryData.majorCities || []) {
+      // Ajouter la ville elle-même
+      if (!searchQuery || city.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        suggestions.push({
+          id: `${countryCode}_${city.name}`,
+          name: city.name,
+          fullName: `${city.name}, ${countryData.nameFrench}`,
+          type: 'city',
+          country: countryData.nameFrench,
+          countryCode: countryCode,
+          coordinates: city.coordinates
+        });
+      }
+
+      // Ajouter tous les districts
+      for (const district of city.districts || []) {
+        if (!searchQuery ||
+            district.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            city.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+          suggestions.push({
+            id: `${countryCode}_${city.name}_${district.name}`,
+            name: district.name,
+            fullName: `${district.name}, ${city.name}, ${countryData.nameFrench}`,
+            type: 'district',
+            city: city.name,
+            country: countryData.nameFrench,
+            countryCode: countryCode,
+            coordinates: district.coords
+          });
+        }
+      }
+    }
+
+    // Trier par pertinence
+    return suggestions
+      .sort((a, b) => {
+        // Villes en premier, puis districts
+        if (a.type !== b.type) {
+          return a.type === 'city' ? -1 : 1;
+        }
+        // Puis par ordre alphabétique
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 20); // Limiter à 20 suggestions
+  }
+
+  /**
+   * OBTENIR LA DERNIÈRE LOCALISATION CONNUE
+   */
+  getLastKnownLocation() {
+    return this.lastKnownLocation;
+  }
+
+  /**
+   * OBTENIR LA PRÉCISION DE LA DERNIÈRE DÉTECTION
+   */
+  getDetectionAccuracy() {
+    return this.detectionAccuracy;
+  }
+
+  /**
+   * OBTENIR TOUS LES PAYS SUPPORTÉS
+   */
+  getSupportedCountries() {
+    return Object.entries(getDatabase()).map(([code, data]) => ({
+      code,
+      name: data.country,
+      nameFrench: data.nameFrench,
+      flag: data.flag,
+      phonePrefix: data.phonePrefix,
+      currency: data.currency,
+      language: data.language
     }));
   }
 }
 
-// AMÉLIORÉ: Détection automatique du pays avec méthodes multiples - FIABILITÉ 100%
-export const detectUserCountry = async () => {
-  devLog.info('🎯 Démarrage détection pays automatique (AMÉLIORÉ)...');
-  
-  // ÉTAPE 1: Vérifier le cache localStorage
-  try {
-    const cached = localStorage.getItem('kojo_detected_country');
-    if (cached) {
-      const data = JSON.parse(cached);
-      const age = Date.now() - data.timestamp;
-      if (age < 10 * 60 * 1000) { // 10 minutes
-        devLog.info('📦 Pays depuis cache:', data.country.nameFrench);
-        return data.country;
-      }
-    }
-  } catch (e) {
-    devLog.info('⚠️ Erreur lecture cache pays');
-  }
+// Export du service singleton
+const preciseGeolocationService = new PreciseGeolocationService();
+export default preciseGeolocationService;
 
-  const detectionMethods = [];
+// Export des fonctions utilitaires pour compatibilité
+export const detectUserCountry = async (options = {}) => {
+  await loadGeographicDatabase();
+  const location = await preciseGeolocationService.detectPreciseLocation(options);
+  if (!location) return null;
+  if (location.isApproximate && !options.allowApproximate) return null;
 
-  // ÉTAPE 2: Géolocalisation HTML5 GPS
-  try {
-    if (navigator.geolocation) {
-      devLog.info('📡 Tentative détection GPS...');
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          { timeout: 5000, enableHighAccuracy: false }
-        );
-      });
-
-      const { latitude, longitude } = position.coords;
-      devLog.info(`✅ GPS: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`);
-      detectionMethods.push('gps');
-
-      // Zones géographiques précises pour l'Afrique de l'Ouest
-      if (latitude >= 4 && latitude <= 25 && longitude >= -18 && longitude <= 5) {
-        let detectedCountry = null;
-        
-        // Mali: nord (12-25°N, -12 à 4°E)
-        if (latitude >= 12 && latitude <= 25 && longitude >= -12 && longitude <= 4) {
-          detectedCountry = COUNTRIES.MALI;
-        }
-        // Sénégal: ouest (-18 à -11°W, 12-17°N)
-        else if (longitude <= -11 && latitude >= 12 && latitude <= 17) {
-          detectedCountry = COUNTRIES.SENEGAL;
-        }
-        // Burkina Faso: centre (10-15°N, -6 à 2°E)
-        else if (latitude >= 10 && latitude <= 15 && longitude >= -6 && longitude <= 2) {
-          detectedCountry = COUNTRIES.BURKINA_FASO;
-        }
-        // Côte d'Ivoire: sud (4-11°N, -9 à -2°W)
-        else if (latitude >= 4 && latitude <= 11 && longitude >= -9 && longitude <= -2) {
-          detectedCountry = COUNTRIES.COTE_DIVOIRE;
-        }
-
-        if (detectedCountry) {
-          devLog.info(`🎯 Pays détecté par GPS: ${detectedCountry.nameFrench}`);
-          localStorage.setItem('kojo_detected_country', JSON.stringify({
-            country: detectedCountry,
-            timestamp: Date.now(),
-            method: 'gps'
-          }));
-          return detectedCountry;
-        }
-      }
-    }
-  } catch (error) {
-    devLog.info('⚠️ GPS échoué:', error.message);
-    detectionMethods.push('gps_failed');
-  }
-
-  // ÉTAPE 3: Détection par IP via le backend Kojo
-  try {
-    devLog.info('🌐 Détection IP via backend Kojo...');
-    const response = await fetch(buildApiUrl('/geolocation/detect'), {
-      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout
-        ? AbortSignal.timeout(3000)
-        : undefined,
-      headers: { 'Accept': 'application/json' }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const countryCode = data?.country?.code || '';
-      devLog.info(`✅ Pays détecté: ${countryCode}`);
-      detectionMethods.push('ip_backend');
-
-      const countryMapping = {
-        'mali': COUNTRIES.MALI,
-        'senegal': COUNTRIES.SENEGAL,
-        'burkina_faso': COUNTRIES.BURKINA_FASO,
-        'cote_divoire': COUNTRIES.COTE_DIVOIRE
-      };
-
-      if (countryMapping[countryCode]) {
-        const detectedCountry = countryMapping[countryCode];
-        devLog.info(`🎯 Pays confirmé par IP: ${detectedCountry.nameFrench}`);
-        localStorage.setItem('kojo_detected_country', JSON.stringify({
-          country: detectedCountry,
-          timestamp: Date.now(),
-          method: 'ip'
-        }));
-        return detectedCountry;
-      }
-    }
-  } catch (error) {
-    devLog.info(`⚠️ Détection IP backend échouée: ${error.message}`);
-  }
-
-  // ÉTAPE 4: Détection contextuelle (timezone + langue)
-  try {
-    devLog.info('🧠 Analyse contextuelle...');
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const languages = navigator.languages || [navigator.language];
-    
-    devLog.info(`🕐 Timezone: ${timezone}, Langues: ${languages.join(', ')}`);
-    detectionMethods.push('context');
-    
-    const timezoneMap = {
-      'Africa/Bamako': COUNTRIES.MALI,
-      'Africa/Dakar': COUNTRIES.SENEGAL,
-      'Africa/Ouagadougou': COUNTRIES.BURKINA_FASO,
-      'Africa/Abidjan': COUNTRIES.COTE_DIVOIRE
+  const normalizedCountryCode = normalizeCountryCode(location.countryCode || '');
+  const countryData = getDatabase()[normalizedCountryCode];
+  if (!countryData) {
+    // Pays hors base de données - retourner des infos neutres sans biais Sénégal
+    return {
+      code: normalizedCountryCode,
+      name: location.country || 'Detected country',
+      nameFrench: location.country || 'Pays détecté',
+      flag: location.flag || '🌍',
+      phonePrefix: location.phonePrefix || '',
+      currency: 'XOF',
+      language: 'fr'
     };
-    
-    if (timezoneMap[timezone]) {
-      const detectedCountry = timezoneMap[timezone];
-      devLog.info(`🎯 Pays détecté par timezone: ${detectedCountry.nameFrench}`);
-      localStorage.setItem('kojo_detected_country', JSON.stringify({
-        country: detectedCountry,
-        timestamp: Date.now(),
-        method: 'timezone'
-      }));
-      return detectedCountry;
-    }
-    
-    // Analyser les langues
-    for (const lang of languages) {
-      if (lang.includes('wo')) {
-        devLog.info('🎯 Wolof détecté → Sénégal');
-        localStorage.setItem('kojo_detected_country', JSON.stringify({
-          country: COUNTRIES.SENEGAL,
-          timestamp: Date.now(),
-          method: 'language'
-        }));
-        return COUNTRIES.SENEGAL;
-      }
-      if (lang.includes('bm')) {
-        devLog.info('🎯 Bambara détecté → Mali');
-        localStorage.setItem('kojo_detected_country', JSON.stringify({
-          country: COUNTRIES.MALI,
-          timestamp: Date.now(),
-          method: 'language'
-        }));
-        return COUNTRIES.MALI;
-      }
-    }
-  } catch (error) {
-    devLog.info('⚠️ Analyse contextuelle échouée:', error.message);
   }
-
-  // ÉTAPE 5: Fallback intelligent basé sur statistiques d'utilisation
-  devLog.info('🎲 Utilisation fallback intelligent basé sur pénétration internet...');
-  detectionMethods.push('fallback');
-  
-  // Sénégal a la meilleure pénétration internet (58%) et infrastructure
-  const fallbackCountry = COUNTRIES.SENEGAL;
-  devLog.info(`🇸🇳 Pays par défaut: ${fallbackCountry.nameFrench} (meilleure connectivité région)`);
-  devLog.info(`📊 Méthodes tentées: ${detectionMethods.join(' → ')}`);
-  
-  localStorage.setItem('kojo_detected_country', JSON.stringify({
-    country: fallbackCountry,
-    timestamp: Date.now(),
-    method: 'fallback',
-    attemptedMethods: detectionMethods
-  }));
-  
-  return fallbackCountry;
+  return {
+    code: normalizedCountryCode,
+    name: countryData.country,
+    nameFrench: countryData.nameFrench,
+    flag: countryData.flag,
+    phonePrefix: countryData.phonePrefix,
+    currency: countryData.currency,
+    language: countryData.language
+  };
 };
 
-// Obtenir l'exemple de numéro de téléphone selon le pays détecté
+export const COUNTRIES = Object.entries(FALLBACK_COUNTRY_DATA).reduce((acc, [code, data]) => {
+  acc[code.toUpperCase()] = {
+    code,
+    name: data.country,
+    nameFrench: data.nameFrench,
+    flag: data.flag,
+    phonePrefix: data.phonePrefix,
+    currency: data.currency,
+    language: data.language
+  };
+  return acc;
+}, {});
+
+export const getCountriesList = () => {
+  return Object.entries(getDatabase()).map(([code, data]) => ({
+    code,
+    name: data.country,
+    nameFrench: data.nameFrench,
+    flag: data.flag,
+    phonePrefix: data.phonePrefix,
+    currency: data.currency,
+    language: data.language
+  }));
+};
+
+export const getCountryByCode = (code) => {
+  const normalizedCode = normalizeCountryCode(code);
+  const countryData = getDatabase()[normalizedCode];
+  if (!countryData) {
+    return null;
+  }
+
+  return {
+    code: normalizedCode,
+    name: countryData.country,
+    nameFrench: countryData.nameFrench,
+    flag: countryData.flag,
+    phonePrefix: countryData.phonePrefix,
+    currency: countryData.currency,
+    language: countryData.language
+  };
+};
+
+export const getPhonePrefixByCountry = (countryCode) => {
+  const country = getCountryByCode(countryCode);
+  return country?.phonePrefix || '';
+};
+
+export const detectCountryFromPhone = (phoneNumber) => {
+  if (!phoneNumber) return null;
+
+  const cleanPhone = phoneNumber.replace(/\s+/g, '');
+
+  for (const [code, data] of Object.entries(getDatabase())) {
+    if (cleanPhone.startsWith(data.phonePrefix)) {
+      return {
+        code,
+        name: data.country,
+        nameFrench: data.nameFrench,
+        flag: data.flag,
+        phonePrefix: data.phonePrefix,
+        currency: data.currency,
+        language: data.language
+      };
+    }
+  }
+  return null;
+};
+
+export const formatPhoneNumber = (phone, countryCode) => {
+  if (!phone) return '';
+
+  const country = getCountryByCode(countryCode);
+  const cleanPhone = phone.replace(/[^\d]/g, '');
+  const prefix = country?.phonePrefix || '';
+
+  if (!prefix) {
+    return phone.trim();
+  }
+
+  // Si le numéro commence déjà par le préfixe, on le retourne tel quel
+  if (phone.startsWith(prefix)) {
+    return phone;
+  }
+
+  // Si le numéro commence par 0, on le remplace par le préfixe
+  if (cleanPhone.startsWith('0')) {
+    return prefix + ' ' + cleanPhone.substring(1);
+  }
+
+  // Sinon on ajoute juste le préfixe
+  return prefix + ' ' + cleanPhone;
+};
+
 export const getPhoneExampleForCountry = (country) => {
   const examples = {
     'mali': '+223 70 12 34 56',
@@ -868,12 +1153,14 @@ export const getPhoneExampleForCountry = (country) => {
     'burkina_faso': '+226 70 12 34 56',
     'cote_divoire': '+225 07 12 34 56'
   };
-  
-  const countryCode = normalizeCountryCode(country?.code || country);
-  return examples[countryCode] || examples['senegal'];
+
+  return examples[normalizeCountryCode(country?.code || country)] || '+000 XX XXX XX XX';
 };
 
-// Obtenir les banques populaires par pays
+// ============================================================================
+// Helpers pays/banques/langues (ex-geolocationService.js) — fusionnés ici pour
+// éliminer la duplication de COUNTRIES et des méthodes de géolocalisation.
+// ============================================================================
 export const getPopularBanksByCountry = (country) => {
   const banks = {
     'mali': [
@@ -1043,4 +1330,3 @@ export const getLanguageSuggestionMessage = (detectedCountry) => {
   return suggestions[countryCode] || null;
 };
 
-export default new GeolocationService();

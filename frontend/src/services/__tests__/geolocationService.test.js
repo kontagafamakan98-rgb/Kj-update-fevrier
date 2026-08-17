@@ -5,9 +5,15 @@ import {
   detectCountryFromPhone,
   formatPhoneNumber,
   getPhoneExampleForCountry,
-} from '../preciseGeolocationService';
+  getPopularBanksByCountry,
+  AVAILABLE_LANGUAGES,
+  getPrimaryLanguageForCountry,
+  getLocalLanguageForCountry,
+  getOrderedLanguagesForCountry,
+  getLanguageSuggestionMessage,
+} from '../geolocationService';
 
-describe('preciseGeolocationService (fallback pays)', () => {
+describe('geolocationService (fallback pays)', () => {
   it('fournit les 4 pays ouest-africains avec leurs préfixes téléphoniques', () => {
     const countries = getCountriesList();
     expect(countries).toHaveLength(4);
@@ -51,5 +57,37 @@ describe('preciseGeolocationService (fallback pays)', () => {
   it('fournit un exemple de numéro par pays', () => {
     expect(getPhoneExampleForCountry({ code: 'senegal' })).toBe('+221 70 12 34 56');
     expect(getPhoneExampleForCountry('mali')).toBe('+223 70 12 34 56');
+  });
+});
+
+describe('geolocationService — helpers fusionnés (banques + langues)', () => {
+  it('fournit les banques populaires par pays (ex-geolocationService.js)', () => {
+    const banks = getPopularBanksByCountry({ code: 'senegal' });
+    expect(banks).toContain('Société Générale Sénégal');
+    expect(getPopularBanksByCountry('mali')).toContain('Bank of Africa Mali');
+    expect(getPopularBanksByCountry('CI')).toContain('Ecobank Côte d\'Ivoire');
+  });
+
+  it('expose les langues disponibles et la langue primaire par pays', () => {
+    expect(Object.keys(AVAILABLE_LANGUAGES)).toEqual(expect.arrayContaining(['fr', 'en', 'wo', 'bm', 'mos']));
+    expect(getPrimaryLanguageForCountry({ code: 'senegal' })).toBe('fr');
+    expect(getLocalLanguageForCountry({ code: 'senegal' })).toBe('wo');
+    expect(getLocalLanguageForCountry({ code: 'mali' })).toBe('bm');
+    expect(getLocalLanguageForCountry({ code: 'cote_divoire' })).toBeNull();
+  });
+
+  it('ordonne les langues recommandées en premier selon le pays', () => {
+    const ordered = getOrderedLanguagesForCountry({ code: 'senegal' });
+    expect(ordered[0].code).toBe('fr');
+    expect(ordered[1].code).toBe('wo');
+    expect(ordered.find((l) => l.code === 'wo').isCountryLanguage).toBe(true);
+    expect(ordered.find((l) => l.code === 'fr').isPrimary).toBe(true);
+  });
+
+  it('fournit un message de suggestion de langue par pays', () => {
+    const suggestion = getLanguageSuggestionMessage({ code: 'mali' });
+    expect(suggestion).not.toBeNull();
+    expect(suggestion.localLang).toBe('Bambara');
+    expect(getLanguageSuggestionMessage(null)).toBeNull();
   });
 });
