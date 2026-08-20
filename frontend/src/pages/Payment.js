@@ -219,9 +219,14 @@ const Payment = () => {
     setLoading(true);
     setError('');
     try {
+      // Sans montant valide (> 0), on n'appelle pas le quote (le backend
+      // rejette un montant nul en 422) : la répartition n'apparaît qu'une
+      // fois un montant saisi.
       const [config, liveQuote] = await Promise.all([
         CommissionService.getProviderConfig(),
-        CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country })
+        form.amount > 0
+          ? CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country })
+          : Promise.resolve(null)
       ]);
       setProviderConfig(config);
       setQuote(liveQuote);
@@ -248,6 +253,12 @@ const Payment = () => {
   useEffect(() => {
     let cancelled = false;
     const refreshQuote = async () => {
+      // Montant nul (page ouverte sans contexte de mission) : pas d'appel
+      // quote, la répartition reste masquée plutôt que d'afficher une erreur.
+      if (!form.amount || form.amount <= 0) {
+        if (!cancelled) setQuote(null);
+        return;
+      }
       try {
         const liveQuote = await CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country });
         if (!cancelled) setQuote(liveQuote);

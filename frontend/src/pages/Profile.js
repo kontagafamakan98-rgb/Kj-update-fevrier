@@ -65,21 +65,22 @@ export default function Profile() {
       .catch(() => setReviews([]));
   }, [user?.id]);
 
-  // Parrainage : le code d'invitation est généré à la demande par le backend
+  // Parrainage : réservé aux travailleurs (pas aux clients). Le code
+  // d'invitation est généré à la demande par le backend.
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || user?.user_type !== 'worker') return;
     usersAPI.getReferral()
       .then((data) => setReferral(data))
       .catch(() => setReferral(null));
-  }, [user?.id]);
+  }, [user?.id, user?.user_type]);
 
-  // Filleuls : comptes créés via mon code de parrainage
+  // Filleuls : comptes créés via mon code de parrainage (travailleurs uniquement)
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || user?.user_type !== 'worker') return;
     usersAPI.getReferralFilleuls()
       .then((data) => setFilleuls(Array.isArray(data?.filleuls) ? data.filleuls : []))
       .catch(() => setFilleuls([]));
-  }, [user?.id]);
+  }, [user?.id, user?.user_type]);
 
   // Portfolio travailleur : photos de réalisations (preuve sociale)
   useEffect(() => {
@@ -298,10 +299,12 @@ export default function Profile() {
           </div>
         )}
 
-        <div className="px-6 py-6 border-b border-gray-200">
-          <ReferralCard referral={referral} t={t} />
-          <FilleulsCard filleuls={filleuls} t={t} />
-        </div>
+        {user.user_type === 'worker' && (
+          <div className="px-6 py-6 border-b border-gray-200">
+            <ReferralCard referral={referral} t={t} referredBy={user?.referred_by} />
+            <FilleulsCard filleuls={filleuls} t={t} />
+          </div>
+        )}
 
         <div className="px-6 py-6">
           <PaymentAccountsManager
@@ -654,8 +657,11 @@ function PortfolioManager({ images, uploading, onUpload, onRemove, t }) {
   );
 }
 
-function ReferralCard({ referral, t }) {
+function ReferralCard({ referral, t, referredBy }) {
   const [copied, setCopied] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawMsg, setWithdrawMsg] = useState(null); // { type, text }
+  const [balance, setBalance] = useState(() => Number(referral?.reward_balance || 0));
   if (!referral?.referral_code) return null;
 
   // t() ne fait pas d'interpolation — on remplace {amount} à la main.
@@ -671,65 +677,123 @@ function ReferralCard({ referral, t }) {
     }
   };
 
-  const balance = Number(referral.reward_balance || 0);
   const history = Array.isArray(referral.reward_history) ? referral.reward_history : [];
   const sponsorReward = Number(referral.sponsor_reward || 500);
-  const filleulReward = Number(referral.filleul_reward || 500);
-  const welcomeSponsorReward = Number(referral.welcome_sponsor_reward || 250);
-  const welcomeFilleulReward = Number(referral.welcome_filleul_reward || 250);
+  const withdrawMin = Number(referral.withdraw_minimum || 200);
+
+  // Retrait du solde de récompense via PayDunya (décaissement mobile money).
+  const handleWithdraw = async () => {
+    if (withdrawing) return;
+    if (!window.confirm(interpolate(t('referralWithdrawConfirm'), { amount: balance.toLocaleString('fr-FR') }))) return;
+    setWithdrawing(true);
+    setWithdrawMsg(null);
+    try {
+      const { data } = await usersAPI.withdrawReferral();
+      setBalance(Number(data?.reward_balance ?? 0));
+      if (data?.status === 'released') {
+        setWithdrawMsg({ type: 'success', text: t('referralWithdrawSuccess') });
+      } else if (data?.status === 'releasing') {
+        setWithdrawMsg({ type: 'info', text: t('referralWithdrawPending') });
+      } else {
+        setWithdrawMsg({ type: 'error', text: t('referralWithdrawError') });
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      let text = t('referralWithdrawError');
+      if (status === 409) {
+        text = t('referralWithdrawInProgress');
+      } else if (typeof detail === 'string' && detail.includes('Solde insuffisant')) {
+        text = t('referralWithdrawMin');
+      } else if (typeof detail === 'string' && detail.includes('Aucun compte')) {
+        text = t('referralWithdrawNoAccount');
+      } else if (status === 403) {
+        text = t('referralWorkerOnly');
+      }
+      setWithdrawMsg({ type: 'error', text });
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   return (
     <div>
       <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('referralTitle')}</h2>
       <p className="text-sm text-gray-500 mb-4">{t('referralText')}</p>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <code className="rounded-xl border border-dashed border-orange-300 bg-orange-50 px-4 py-2 font-mono text-lg font-bold tracking-widest text-orange-700">
-          {referral.referral_code}
-        </code>
-        <button
-          type="button"
-          onClick={copyCode}
-          className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-        >
-          {copied ? t('referralCopied') : t('referralCopy')}
-        </button>
-        {referral.invite_url && (
-          <a
-            href={referral.invite_url}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+      {referredBy ? (
+        <p className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+          {t('referralReferredNote')}
+        </p>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <code className="rounded-xl border border-dashed border-orange-300 bg-orange-50 px-4 py-2 font-mono text-lg font-bold tracking-widest text-orange-700">
+            {referral.referral_code}
+          </code>
+          <button
+            type="button"
+            onClick={copyCode}
+            className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
           >
-            {t('referralInviteLink')}
+            {copied ? t('referralCopied') : t('referralCopy')}
+          </button>
+          {referral.invite_url && (
+            <a
+              href={referral.invite_url}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              {t('referralInviteLink')}
           </a>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* Récompense de parrainage : solde + historique */}
+      {/* Récompense de parrainage : solde + retrait + historique */}
       <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-green-800">{t('referralRewardTitle')}</p>
           <p className="text-sm font-bold text-green-700">{balance.toLocaleString('fr-FR')} FCFA</p>
         </div>
         <p className="text-xs text-green-700 mt-1">{t('referralRewardBalance')}</p>
-        <p className="text-xs text-green-600 mt-2">
-          {interpolate(t('referralWelcomeHint'), { welcomeSponsor: welcomeSponsorReward, welcomeFilleul: welcomeFilleulReward })}
-        </p>
         <p className="text-xs text-green-600 mt-1">{interpolate(t('referralRewardHint'), { amount: sponsorReward })}</p>
+        {balance > 0 && balance < withdrawMin && (
+          <p className="text-xs text-green-600 mt-1">
+            {interpolate(t('referralWithdrawMinHint'), { amount: withdrawMin.toLocaleString('fr-FR') })}
+          </p>
+        )}
+        {balance >= withdrawMin && (
+          <button
+            type="button"
+            onClick={handleWithdraw}
+            disabled={withdrawing}
+            className="mt-3 w-full rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+          >
+            {withdrawing ? t('referralWithdrawing') : t('referralWithdraw')}
+          </button>
+        )}
+        {withdrawMsg && (
+          <p className={`mt-2 text-xs ${withdrawMsg.type === 'error' ? 'text-red-600' : withdrawMsg.type === 'success' ? 'text-green-700' : 'text-green-600'}`}>
+            {withdrawMsg.text}
+          </p>
+        )}
         {history.length > 0 && (
           <div className="mt-3 border-t border-green-200 pt-3">
             <p className="text-xs font-semibold text-green-800 mb-2">{t('referralRewardHistory')}</p>
             <ul className="space-y-1">
-              {history.slice(-5).reverse().map((reward, idx) => (
-                <li key={idx} className="text-xs text-green-700 flex items-center justify-between">
-                  <span className="truncate mr-2">
-                    {reward.type === 'welcome'
-                      ? (reward.role === 'parrain' ? t('referralWelcomeSponsorLabel') : t('referralWelcomeFilleulLabel'))
-                      : (reward.job_title || '—')}
-                  </span>
-                  <span className="font-semibold whitespace-nowrap">+{Number(reward.amount || 0).toLocaleString('fr-FR')} FCFA</span>
-                </li>
-              ))}
+              {history.slice(-5).reverse().map((reward, idx) => {
+                const amount = Number(reward.amount || 0);
+                return (
+                  <li key={idx} className="text-xs text-green-700 flex items-center justify-between">
+                    <span className="truncate mr-2">
+                      {reward.type === 'withdrawal' ? t('referralWithdrawalLabel') : (reward.job_title || '—')}
+                    </span>
+                    <span className="font-semibold whitespace-nowrap">
+                      {amount < 0 ? '' : '+'}{amount.toLocaleString('fr-FR')} FCFA
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

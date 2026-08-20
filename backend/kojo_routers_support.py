@@ -12,7 +12,7 @@ from kojo_core import (
     verify_owner_access,
 )
 from kojo_settings import OWNER_EMAIL, OWNER_USER_ID, logger
-from kojo_shared import notify_user
+from kojo_shared import notify_user_localized
 
 router = APIRouter()
 
@@ -32,11 +32,11 @@ async def create_support_ticket(ticket_data: SupportTicketCreate):
     # aucun canal ne signalait l'arrivée d'un ticket (l'équipe devait poller).
     if OWNER_USER_ID:
         try:
-            await notify_user(
+            await notify_user_localized(
                 user_id=OWNER_USER_ID,
-                title="Nouveau ticket support",
-                body=f"{ticket_data.full_name} — {ticket_data.reason} : {ticket_data.message[:120]}",
+                key="new_ticket_support",
                 notif_type=NotificationType.GENERAL,
+                ticket_text=f"{ticket_data.full_name} — {ticket_data.reason} : {ticket_data.message[:120]}",
             )
         except Exception as exc:
             logger.warning(f"⚠️ Notification owner ticket échouée: {exc}")

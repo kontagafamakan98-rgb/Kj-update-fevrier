@@ -33,7 +33,8 @@ const getTranslatedCountryName = (countryCode, t) => {
 };
 
 const RegistrationLanguageSelector = ({ 
-  detectedCountry, 
+  country, 
+  isManualSelection = false, 
   selectedLanguage, 
   onLanguageSelect, 
   isLoading = false 
@@ -41,23 +42,25 @@ const RegistrationLanguageSelector = ({
   const [orderedLanguages, setOrderedLanguages] = useState([]);
   const [suggestionMessage, setSuggestionMessage] = useState(null);
   const { changeLanguage, t, getAvailableLanguagesForCountry } = useLanguage(); // Utiliser le contexte de langue
-  const normalizedCountryCode = normalizeCountryCode(detectedCountry?.code || '');
+  const normalizedCountryCode = normalizeCountryCode(country?.code || '');
 
   useEffect(() => {
-    if (detectedCountry) {
-      // Filtrer les langues selon le pays détecté
-      const allowedLangCodes = getAvailableLanguagesForCountry(detectedCountry.code);
-      const languages = allowedLangCodes.map(code => AVAILABLE_LANGUAGES[code]).filter(Boolean);
+    if (country) {
+      // Filtrer les langues selon le pays (détecté par géolocalisation OU
+      // choisi manuellement par l'utilisateur)
+      const allowedLangCodes = getAvailableLanguagesForCountry(country.code);
+      const languages = getOrderedLanguagesForCountry(country)
+        .filter(language => allowedLangCodes.includes(language.code));
       setOrderedLanguages(languages);
       
       // Obtenir le message de suggestion
-      const suggestion = getLanguageSuggestionMessage(detectedCountry);
+      const suggestion = getLanguageSuggestionMessage(country);
       setSuggestionMessage(suggestion);
       
       // Si aucune langue n'est sélectionnée, suggérer la langue locale du pays
       if (!selectedLanguage) {
-        const localLang = getLocalLanguageForCountry(detectedCountry);
-        devLog.info(`💬 Suggestion de langue pour ${detectedCountry.nameFrench}: ${localLang}`);
+        const localLang = getLocalLanguageForCountry(country);
+        devLog.info(`💬 Suggestion de langue pour ${country.nameFrench}: ${localLang}`);
       }
     } else {
       // Ordre par défaut sans géolocalisation
@@ -66,7 +69,7 @@ const RegistrationLanguageSelector = ({
         AVAILABLE_LANGUAGES['en']
       ]);
     }
-  }, [detectedCountry, selectedLanguage, getAvailableLanguagesForCountry]);
+  }, [country, selectedLanguage, getAvailableLanguagesForCountry]);
 
   const handleLanguageSelect = (languageCode) => {
     devLog.info(`🔄 Changement de langue: ${languageCode}`);
@@ -98,14 +101,14 @@ const RegistrationLanguageSelector = ({
         </h3>
       </div>
 
-      {/* Message de suggestion basé sur la géolocalisation */}
-      {detectedCountry && (
+      {/* Message de suggestion basé sur la géolocalisation ou le pays choisi */}
+      {country && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start">
             <span className="text-blue-500 text-lg mr-2">💡</span>
             <div className="flex-1">
               <p className="text-sm text-blue-800 font-medium">
-                📍 {t('basedOnLocation')} (<span className="inline-flex items-center gap-2"><FlagIcon country={normalizedCountryCode || detectedCountry.code} className="w-5 h-4" showEmoji={false} /><span>{getTranslatedCountryName(normalizedCountryCode, t) || stripLeadingFlag(detectedCountry.nameFrench || detectedCountry.name || '')}</span></span>)
+                📍 {isManualSelection ? (t('basedOnSelectedCountry') || 'Basé sur le pays sélectionné') : (t('basedOnLocation') || 'Basé sur votre position')} (<span className="inline-flex items-center gap-2"><FlagIcon country={normalizedCountryCode || country.code} className="w-5 h-4" showEmoji={false} /><span>{getTranslatedCountryName(normalizedCountryCode, t) || stripLeadingFlag(country.nameFrench || country.name || '')}</span></span>)
               </p>
               <p className="text-xs text-blue-700 mt-1">
                 {COUNTRY_PREFERENCE_KEYS[normalizedCountryCode]

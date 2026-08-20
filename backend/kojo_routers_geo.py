@@ -224,12 +224,14 @@ async def detect_geolocation(request: Request, phone: Optional[str] = None):
     Méthodes de détection (par ordre de priorité):
     1. Numéro de téléphone (si fourni)
     2. Adresse IP
-    3. Défaut: Sénégal (hub principal)
-    
+
+    Aucune détection fiable : on ne force pas un pays par défaut — le client
+    (page d'inscription) laisse alors l'utilisateur choisir son pays.
+
     Returns:
         - detected: bool - Si la détection a réussi
-        - method: str - Méthode utilisée (phone, ip, default)
-        - country: dict - Informations complètes du pays
+        - method: str - Méthode utilisée (phone, ip, none)
+        - country: dict|None - Informations complètes du pays (None si non détecté)
         - supported_countries: list - Liste des pays supportés
     """
     detected_country = None
@@ -260,15 +262,20 @@ async def detect_geolocation(request: Request, phone: Optional[str] = None):
             if detected_country:
                 detection_method = "ip"
     
-    # 3. Défaut: Sénégal
+    # 3. Aucune détection fiable : ne pas inventer de pays (ex. Sénégal)
     if not detected_country:
-        detected_country = "senegal"
-        detection_method = "default"
-    
-    country_info = WEST_AFRICA_COUNTRIES.get(detected_country, WEST_AFRICA_COUNTRIES["senegal"])
-    
+        return {
+            "detected": False,
+            "method": "none",
+            "country": None,
+            "supported_countries": list(WEST_AFRICA_COUNTRIES.values()),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    country_info = WEST_AFRICA_COUNTRIES.get(detected_country)
+
     return {
-        "detected": detection_method != "default",
+        "detected": True,
         "method": detection_method,
         "country": country_info,
         "supported_countries": list(WEST_AFRICA_COUNTRIES.values()),

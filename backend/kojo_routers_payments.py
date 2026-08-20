@@ -21,7 +21,7 @@ from kojo_settings import (
 from kojo_core import (
     get_current_user,
 )
-from kojo_shared import notify_user, _dispatch_address_to_worker
+from kojo_shared import notify_user_localized, _dispatch_address_to_worker
 from kojo_payments import (
     PAYDUNYA_CHANNELS,
     build_checkout_redirect_url, build_payment_callback_url,
@@ -86,18 +86,64 @@ async def _notify_refund_transition(payment_record: dict, previous_status, new_s
         return
     refund_amount = int(payment_record.get("amount", 0) or 0)
     if new_status == "refunded":
-        title = "Remboursement confirmé ✅"
-        body = f"Votre remboursement de {refund_amount} FCFA a été confirmé par PayDunya."
+        refund_key = "refund_confirmed"
     else:
-        title = "Remboursement en échec ⚠️"
-        body = "Le remboursement automatique a échoué : contactez le support pour un remboursement manuel."
-    asyncio.create_task(notify_user(
+        refund_key = "refund_failed"
+    asyncio.create_task(notify_user_localized(
         user_id=payment_record.get("payer_id"),
-        title=title,
-        body=body,
+        key=refund_key,
         notif_type=NotificationType.GENERAL,
         related_id=payment_record.get("job_id") or None,
         related_type="job" if payment_record.get("job_id") else None,
+        amount=refund_amount,
+    ))
+
+
+async def _apply_referral_payout_confirmed(payment_record: dict) -> None:
+    """Applique la confirmation d'un retrait de récompenses de parrainage
+    (payout_kind == "referral") : décrémente le solde du travailleur et trace
+    le retrait dans son historique. Idempotent (flag referral_balance_applied
+    posé sur l'enregistrement de paiement) — appelé par l'IPN disburse ET par
+    la re-vérification check-status quand le décaissement passe "released"."""
+    if payment_record.get("payout_kind") != "referral":
+        return
+    if payment_record.get("payout_status") != "released":
+        return
+    if payment_record.get("referral_balance_applied"):
+        return
+
+    user_id = payment_record.get("payer_id")
+    amount = int(payment_record.get("amount", 0) or 0)
+    if not user_id or amount <= 0:
+        return
+
+    user = await db.users.find_one({"id": user_id}, {"referral_reward_balance": 1})
+    if not user:
+        return
+    current_balance = float(user.get("referral_reward_balance") or 0)
+    new_balance = max(0.0, current_balance - amount)
+
+    await db.users.update_one(
+        {"id": user_id},
+        {
+            "$set": {"referral_reward_balance": new_balance, "updated_at": datetime.now(timezone.utc)},
+            "$push": {"referral_rewards": {
+                "type": "withdrawal",
+                "amount": -amount,
+                "payment_id": payment_record.get("id"),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        },
+    )
+    await db.payments.update_one(
+        {"id": payment_record["id"]},
+        {"$set": {"referral_balance_applied": True}},
+    )
+    asyncio.create_task(notify_user_localized(
+        user_id=user_id,
+        key="referral_withdraw_success",
+        notif_type=NotificationType.GENERAL,
+        amount=amount,
     ))
 
 
@@ -166,6 +212,8 @@ async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
     updated = await db.payments.find_one({"id": payment_id})
     if updated:
         await _notify_refund_transition(payment_record, payout_status, new_status)
+        # Retrait de récompenses confirmé par check-status → décrémenter le solde.
+        await _apply_referral_payout_confirmed(updated)
         return updated
     return payment_record
 
@@ -240,6 +288,12 @@ async def paydunya_disburse_ipn(request: Request):
     # Notifier le client quand l'IPN tranche un remboursement en attente
     # (les notifications de l'annulation ne couvrent que le depart).
     await _notify_refund_transition(payment_record, previous_payout_status, payout_status)
+
+    # Retrait de récompenses confirmé par l'IPN → décrémenter le solde du
+    # travailleur (idempotent, voir _apply_referral_payout_confirmed).
+    updated_record = await db.payments.find_one({'id': payment_record['id']})
+    if updated_record:
+        await _apply_referral_payout_confirmed(updated_record)
 
     return {'status': 'ok'}
 
@@ -548,22 +602,24 @@ async def paydunya_payment_ipn(request: Request):
                 job_title = job_doc.get("title", "la mission")
 
         if payer_id:
-            asyncio.create_task(notify_user(
+            asyncio.create_task(notify_user_localized(
                 user_id=payer_id,
-                title="Paiement confirmé ✅",
-                body=f"Votre paiement de {amount_for_notif} FCFA pour « {job_title} » a bien été reçu.",
+                key="payment_confirmed_client",
                 notif_type=NotificationType.PAYMENT_CONFIRMED,
                 related_id=job_id_for_notif or None,
                 related_type="job" if job_id_for_notif else None,
+                job_title=job_title,
+                amount=amount_for_notif,
             ))
         if receiver_id:
-            asyncio.create_task(notify_user(
+            asyncio.create_task(notify_user_localized(
                 user_id=receiver_id,
-                title="Paiement sécurisé 🔒",
-                body=f"Le client a payé {amount_for_notif} FCFA pour « {job_title} ». Fonds sécurisés jusqu'à la fin de la mission.",
+                key="payment_received_worker",
                 notif_type=NotificationType.PAYMENT_RECEIVED,
                 related_id=job_id_for_notif or None,
                 related_type="job" if job_id_for_notif else None,
+                job_title=job_title,
+                amount=amount_for_notif,
             ))
 
         # Envoi automatique de l'adresse au travailleur après confirmation du

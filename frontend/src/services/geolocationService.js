@@ -149,14 +149,17 @@ const IP_GEOLOCATION_SERVICES = [
     url: buildApiUrl('/geolocation/detect'),
     isBackend: true,
     parser: (data) => {
-      if (!data.country) return null;
+      // Ne jamais inventer un pays par défaut : si le backend n'a pas pu
+      // détecter (detected: false / country: null), la détection a échoué
+      // et l'utilisateur devra choisir son pays manuellement.
+      if (!data.country || data.detected === false) return null;
       return {
-        country: data.country.code?.toUpperCase() || 'SN',
+        country: data.country.code?.toUpperCase(),
         countryName: data.country.name,
         city: data.country.capital || '',
         region: '',
-        latitude: data.country.coordinates?.lat || 14.6928,
-        longitude: data.country.coordinates?.lng || -17.4467,
+        latitude: data.country.coordinates?.lat,
+        longitude: data.country.coordinates?.lng,
         accuracy: data.detected ? 95 : 80,
         timezone: data.country.timezone
       };

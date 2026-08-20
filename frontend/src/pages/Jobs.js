@@ -33,7 +33,7 @@ function JobCard({ job, user, userType, appliedJobIds, t }) {
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
             <span className="px-2 py-1 text-xs rounded-full bg-orange-50 text-orange-700 border border-orange-200">
-              {formatJobStatus(job.status)}
+              {formatJobStatus(job.status, t)}
             </span>
           </div>
           <p className="text-gray-600 line-clamp-2 mb-4">{job.description}</p>
@@ -171,24 +171,24 @@ export default function Jobs() {
   };
 
   const categories = [
-    { value: '', label: pageT('allCategories') || 'Toutes les catégories' },
-    { value: 'plumbing', label: 'Plomberie' },
-    { value: 'electrical', label: 'Électricité' },
-    { value: 'construction', label: 'Construction' },
-    { value: 'cleaning', label: 'Nettoyage' },
-    { value: 'gardening', label: 'Jardinage' },
-    { value: 'tutoring', label: 'Cours' },
-    { value: 'mechanics', label: 'Mécanique' },
-    { value: 'general', label: 'Général' },
+    { value: '', label: pageT('allCategories') || t('allCategories') || 'Toutes les catégories' },
+    { value: 'plumbing', label: t('plumbing') },
+    { value: 'electrical', label: t('electrical') },
+    { value: 'construction', label: t('construction') },
+    { value: 'cleaning', label: t('cleaning') },
+    { value: 'gardening', label: t('gardening') },
+    { value: 'tutoring', label: t('tutoring') },
+    { value: 'mechanics', label: t('mechanics') },
+    { value: 'general', label: t('general') },
   ];
 
   const statuses = [
     { value: '', label: pageT('allStatuses') || 'Tous les statuts' },
-    { value: 'open', label: 'Ouvert' },
-    { value: 'in_progress', label: 'En cours' },
-    { value: 'completed', label: 'Terminé' },
-    { value: 'cancelled', label: 'Annulé' },
-    { value: 'pending', label: 'En attente' },
+    { value: 'open', label: t('open') },
+    { value: 'in_progress', label: t('inProgress') },
+    { value: 'completed', label: t('completed') },
+    { value: 'cancelled', label: t('cancelled') },
+    { value: 'pending', label: t('pending') },
   ];
 
   if (loading) {

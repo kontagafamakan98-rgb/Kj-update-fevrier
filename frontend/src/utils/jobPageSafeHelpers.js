@@ -24,22 +24,46 @@ export const getLocationPrecisionMeta = (precision) => {
   return { label: 'Localisation non précisée', color: 'muted' };
 };
 
-export const formatJobStatus = (status) => {
+const JOB_STATUS_KEYS = {
+  open: 'open',
+  published: 'published',
+  active: 'active',
+  pending: 'pending',
+  assigned: 'assigned',
+  in_progress: 'inProgress',
+  completed: 'completed',
+  closed: 'closed',
+  cancelled: 'cancelled',
+  canceled: 'cancelled',
+  draft: 'draft',
+};
+
+const JOB_STATUS_FR = {
+  open: 'Ouvert',
+  published: 'Publié',
+  active: 'Actif',
+  pending: 'En attente',
+  assigned: 'Attribué',
+  inProgress: 'En cours',
+  completed: 'Terminé',
+  closed: 'Fermé',
+  cancelled: 'Annulé',
+  draft: 'Brouillon',
+};
+
+// Clé i18n du statut (ou null si inconnu) — pour l'affichage via t().
+export const jobStatusKey = (status) => {
   const normalized = String(status || '').trim().toLowerCase();
-  const map = {
-    open: 'Ouvert',
-    published: 'Publié',
-    active: 'Actif',
-    pending: 'En attente',
-    assigned: 'Attribué',
-    in_progress: 'En cours',
-    completed: 'Terminé',
-    closed: 'Fermé',
-    cancelled: 'Annulé',
-    canceled: 'Annulé',
-    draft: 'Brouillon',
-  };
-  return map[normalized] || 'Non précisé';
+  return JOB_STATUS_KEYS[normalized] || null;
+};
+
+// Libellé du statut : traduit si un translateur est fourni, sinon repli français.
+export const formatJobStatus = (status, t) => {
+  const key = jobStatusKey(status);
+  if (typeof t === 'function') {
+    return t(key || 'statusUnknown');
+  }
+  return (key && JOB_STATUS_FR[key]) || 'Non précisé';
 };
 
 export const formatJobDate = (value) => {

@@ -71,7 +71,7 @@ export default function Navbar() {
                   {t('messages')}
                 </Link>
                 <Link to="/support" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                  Support
+                  {t('support')}
                 </Link>
               </>
             )}
@@ -167,7 +167,7 @@ export default function Navbar() {
                     {t('profile')}
                   </Link>
                   <Link to="/support" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
-                    Support
+                    {t('support')}
                   </Link>
                   <div className="pt-2">
                     <button onClick={handleLogout} className="w-full rounded-2xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors">

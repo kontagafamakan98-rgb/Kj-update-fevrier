@@ -283,7 +283,7 @@ const PaymentVerificationPage = () => {
 
             <div className="text-sm text-blue-800 space-y-2">
               <p>
-                <strong>{t('lastStep')}:</strong> {isAccountCompletionMode ? 'termine ta configuration de paiement pour débloquer l’accès complet.' : t('linkAccountsToComplete')}
+                <strong>{t('lastStep')}:</strong> {isAccountCompletionMode ? t('completePaymentSetupToUnlock') : t('linkAccountsToComplete')}
               </p>
               <p>
                 🎯 {effectiveUser.user_type === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}

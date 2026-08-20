@@ -16,7 +16,9 @@ import { authAPI } from '../services/api';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
-  const initialUserType = searchParams.get('type') || 'client';
+  // Le parrainage est réservé aux travailleurs : un lien d'invitation
+  // (?ref=CODE) ouvre le formulaire directement en mode travailleur.
+  const initialUserType = searchParams.get('type') || (searchParams.get('ref') ? 'worker' : 'client');
   const { t, currentLanguage } = useLanguage();
   const defaultLanguage = currentLanguage || 'fr';
   
@@ -628,26 +630,29 @@ export default function Register() {
               />
             </div>
 
-            {/* Code de parrainage (optionnel) — saisi manuellement ou pré-rempli
-                depuis l'URL d'invitation ?ref=CODE. Le backend l'applique à la
-                création du compte (non bloquant si invalide). */}
-            <div>
-              <label htmlFor="referral_code" className="block text-sm font-medium text-gray-700 mb-2">
-                🎁 {pageT('referralCodeLabel')}
-              </label>
-              <input
-                id="referral_code"
-                name="referral_code"
-                type="text"
-                autoComplete="off"
-                maxLength="40"
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                placeholder={pageT('referralCodePlaceholder')}
-                value={formData.referral_code || ''}
-                onChange={handleChange}
-              />
-              <p className="mt-1 text-xs text-gray-500">{pageT('referralCodeHelp')}</p>
-            </div>
+            {/* Code de parrainage (optionnel) — réservé aux TRAVAILLEURS :
+                saisi manuellement ou pré-rempli depuis l'URL d'invitation
+                ?ref=CODE. Masqué pour les clients (le backend l'ignore pour
+                eux de toute façon). */}
+            {formData.user_type === 'worker' && (
+              <div>
+                <label htmlFor="referral_code" className="block text-sm font-medium text-gray-700 mb-2">
+                  🎁 {pageT('referralCodeLabel')}
+                </label>
+                <input
+                  id="referral_code"
+                  name="referral_code"
+                  type="text"
+                  autoComplete="off"
+                  maxLength="40"
+                  className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder={pageT('referralCodePlaceholder')}
+                  value={formData.referral_code || ''}
+                  onChange={handleChange}
+                />
+                <p className="mt-1 text-xs text-gray-500">{pageT('referralCodeHelp')}</p>
+              </div>
+            )}
           </div>
 
           {/* Photo de profil pour tous les utilisateurs */}
@@ -657,9 +662,10 @@ export default function Register() {
             userType={formData.user_type}
           />
 
-          {/* Sélecteur de langue géolocalisé */}
+          {/* Sélecteur de langue : pays détecté OU choisi manuellement */}
           <RegistrationLanguageSelector
-            detectedCountry={detectedCountry}
+            country={activeCountry}
+            isManualSelection={manualCountrySelection}
             selectedLanguage={userSelectedLanguage}
             onLanguageSelect={setUserSelectedLanguage}
             isLoading={geoLoading}

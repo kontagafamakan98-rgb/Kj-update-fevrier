@@ -224,7 +224,7 @@ class TestCancellationRefund:
                    return_value={"disburse_token": "refund-token-abc", "response_code": "00"}), \
              patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_jobs.notify_user", AsyncMock()):
+             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
             resp = await client.delete(f"/api/jobs/{job_id}", headers=headers)
 
         assert resp.status_code == 200
@@ -256,7 +256,7 @@ class TestCancellationRefund:
                    return_value={"disburse_token": "refund-token-fail", "response_code": "00"}), \
              patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
                    return_value={"status": "failed", "response_code": "01", "response_text": "Compte invalide"}), \
-             patch("kojo_routers_jobs.notify_user", AsyncMock()):
+             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
             resp = await client.delete(f"/api/jobs/{job_id}", headers=headers)
 
         assert resp.status_code == 200
@@ -339,7 +339,7 @@ class TestProposalAcceptGuards:
             "status": "pending",
         })
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
-        with patch("kojo_routers_jobs.notify_user", AsyncMock()), \
+        with patch("kojo_routers_jobs.notify_user_localized", AsyncMock()), \
              patch("kojo_routers_jobs._send_payment_pending_to_worker", AsyncMock()):
             resp = await client.post(
                 f"/api/jobs/{job_id}/proposals/{proposal_id}/accept",
@@ -594,7 +594,7 @@ class TestReviews:
     async def test_client_reviews_worker_updates_rating(self, client: AsyncClient):
         client_user, worker_user, job_id = await self._completed_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
-        with patch("kojo_routers_reviews.notify_user", AsyncMock()):
+        with patch("kojo_routers_reviews.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/jobs/{job_id}/reviews", headers=headers, json={
                 "rating": 5,
                 "comment": "Excellent travail, ponctuel et soigné.",
@@ -634,7 +634,7 @@ class TestReviews:
     async def test_duplicate_review_rejected(self, client: AsyncClient):
         client_user, worker_user, job_id = await self._completed_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
-        with patch("kojo_routers_reviews.notify_user", AsyncMock()):
+        with patch("kojo_routers_reviews.notify_user_localized", AsyncMock()):
             resp1 = await client.post(f"/api/jobs/{job_id}/reviews", headers=headers, json={"rating": 5})
             assert resp1.status_code == 200
             resp2 = await client.post(f"/api/jobs/{job_id}/reviews", headers=headers, json={"rating": 1})
@@ -643,7 +643,7 @@ class TestReviews:
     async def test_worker_reviews_client(self, client: AsyncClient):
         client_user, worker_user, job_id = await self._completed_job(client)
         headers = {"Authorization": f"Bearer {worker_user['access_token']}"}
-        with patch("kojo_routers_reviews.notify_user", AsyncMock()):
+        with patch("kojo_routers_reviews.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/jobs/{job_id}/reviews", headers=headers, json={
                 "rating": 4,
                 "comment": "Client sérieux, paiement rapide.",
@@ -657,7 +657,7 @@ class TestReviews:
     async def test_get_job_reviews_participants_only(self, client: AsyncClient):
         client_user, worker_user, job_id = await self._completed_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
-        with patch("kojo_routers_reviews.notify_user", AsyncMock()):
+        with patch("kojo_routers_reviews.notify_user_localized", AsyncMock()):
             await client.post(f"/api/jobs/{job_id}/reviews", headers=headers, json={
                 "rating": 4, "comment": "Très bien.",
             })
@@ -681,7 +681,7 @@ class TestReviews:
     async def test_get_user_reviews(self, client: AsyncClient):
         client_user, worker_user, job_id = await self._completed_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
-        with patch("kojo_routers_reviews.notify_user", AsyncMock()):
+        with patch("kojo_routers_reviews.notify_user_localized", AsyncMock()):
             await client.post(f"/api/jobs/{job_id}/reviews", headers=headers, json={"rating": 5})
 
         resp = await client.get(f"/api/users/{worker_user['user']['id']}/reviews", headers=headers)
@@ -695,7 +695,7 @@ class TestReviews:
     async def test_delete_review_recomputes_rating(self, client: AsyncClient):
         client_user, worker_user, job_id = await self._completed_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
-        with patch("kojo_routers_reviews.notify_user", AsyncMock()):
+        with patch("kojo_routers_reviews.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/jobs/{job_id}/reviews", headers=headers, json={"rating": 4})
         review_id = resp.json()["review"]["id"]
 

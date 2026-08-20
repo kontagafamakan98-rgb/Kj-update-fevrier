@@ -10,7 +10,6 @@ import { deleteJobWithFallbacks, ensureJobOwnerActionBar } from '../utils/jobOwn
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser, normalizeComparableId } from '../utils/jobPageSafeHelpers';
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
-import { getJobProposalUiLabel } from '../utils/jobProposalLocale';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 import {
@@ -62,8 +61,9 @@ const getReadableUserName = (person, fallback) => {
   return fallback;
 };
 
-function ProposalCard({ proposal, ui, isSelected, isAccepted, onOpenDiscussion, onAccept, canAccept }) {
-  const workerName = extractProposalWorkerName(proposal, ui.workerFallback || 'Travailleur');
+function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAccept, canAccept }) {
+  const { t } = useLanguage();
+  const workerName = extractProposalWorkerName(proposal, t('worker'));
   const workerPhoto = proposal?.worker_photo || proposal?.worker?.profile_photo || null;
   const amount = proposal.proposed_amount ?? proposal.amount ?? null;
   const message = extractProposalMessage(proposal);
@@ -93,18 +93,18 @@ function ProposalCard({ proposal, ui, isSelected, isAccepted, onOpenDiscussion, 
         </div>
         <div className="text-right">
           <div className="text-lg font-bold text-orange-600">{formatBudgetRange(amount, null)}</div>
-          <div className="text-xs text-gray-500">{isAccepted ? ui.attributed : formatJobStatus(proposal.status || 'pending')}</div>
+          <div className="text-xs text-gray-500">{isAccepted ? t('jobUiAttributed') : formatJobStatus(proposal.status || 'pending', t)}</div>
         </div>
       </div>
       {message && <p className="mt-3 text-sm text-gray-700 whitespace-pre-line">{message}</p>}
 
       <div className="mt-4 flex flex-wrap gap-3">
         <button onClick={onOpenDiscussion} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-          {isSelected ? ui.discussionOpen : ui.openDiscussion}
+          {isSelected ? t('jobUiDiscussionOpen') : t('jobUiOpenDiscussion')}
         </button>
         {canAccept && (
           <button onClick={onAccept} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
-            {isAccepted ? ui.attributed : ui.acceptWorker}
+            {isAccepted ? t('jobUiAttributed') : t('jobUiAcceptWorker')}
           </button>
         )}
       </div>
@@ -153,9 +153,8 @@ export default function JobDetails() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
-  const ui = getJobProposalUiLabel(currentLanguage);
   const navigate = useNavigate();
-  usePageTitle(job?.title ? `${job.title} — Kojo` : 'Détail du job — Kojo');
+  usePageTitle(job?.title ? `${job.title} — Kojo` : t('jobDetailsTitleFallback'));
 
   useEffect(() => {
     loadJobDetails();
@@ -215,12 +214,12 @@ export default function JobDetails() {
       if (!selectedProposal) return null;
       return {
         id: extractProposalWorkerId(selectedProposal),
-        name: extractProposalWorkerName(selectedProposal, ui.workerFallback || 'Travailleur'),
+        name: extractProposalWorkerName(selectedProposal, t('worker')),
       };
     }
     if (!hasApplied) return null;
     return getCounterpartForWorker(job);
-  }, [job, isJobOwner, selectedProposal, hasApplied, ui.workerFallback]);
+  }, [job, isJobOwner, selectedProposal, hasApplied]);
 
   const getParticipantNameFromIds = (authorId, fallback) => {
     const normalizedAuthorId = normalizeComparableId(authorId);
@@ -232,16 +231,16 @@ export default function JobDetails() {
         full_name: job?.client_name || job?.client?.full_name,
         name: job?.client?.name,
         email: job?.client_email || job?.client?.email,
-      }, 'Client');
+      }, t('client'));
     }
 
     const matchedProposal = (Array.isArray(proposals) ? proposals : []).find((proposal) => extractProposalWorkerId(proposal) === normalizedAuthorId);
     if (matchedProposal) {
-      return extractProposalWorkerName(matchedProposal, fallback || 'Travailleur');
+      return extractProposalWorkerName(matchedProposal, fallback || t('worker'));
     }
 
     if (selectedProposal && extractProposalWorkerId(selectedProposal) === normalizedAuthorId) {
-      return extractProposalWorkerName(selectedProposal, fallback || 'Travailleur');
+      return extractProposalWorkerName(selectedProposal, fallback || t('worker'));
     }
 
     return fallback;
@@ -250,7 +249,7 @@ export default function JobDetails() {
   const openDiscussionForProposal = (proposalId) => {
     const proposal = proposals.find((item) => extractProposalId(item) === proposalId) || selectedProposal;
     const workerId = extractProposalWorkerId(proposal);
-    const workerName = extractProposalWorkerName(proposal, 'Travailleur');
+    const workerName = extractProposalWorkerName(proposal, t('worker'));
     setSelectedProposalId(proposalId);
 
     const params = new URLSearchParams();
@@ -275,7 +274,7 @@ export default function JobDetails() {
     return filterMessagesForPair(messages, user, discussionTarget.id, job?.id);
   }, [messages, user, discussionTarget?.id, job?.id]);
 
-  const currentUserDisplayName = useMemo(() => getReadableUserName(user, 'Vous'), [user]);
+  const currentUserDisplayName = useMemo(() => getReadableUserName(user, t('you')), [user]);
 
   const canApply = user?.user_type === 'worker' && (job?.status === 'open' || !job?.status) && !assignedWorkerId && !hasApplied;
 
@@ -331,7 +330,7 @@ export default function JobDetails() {
       }
     } catch (jobError) {
       safeLog?.error?.('Error loading job details:', jobError);
-      setError(asTextError(jobError?.response?.data?.detail, jobError?.message || pageT('loadError') || 'Impossible de charger ce job'));
+      setError(asTextError(jobError?.response?.data?.detail, jobError?.message || pageT('loadError') || t('loadJobFailed')));
     } finally {
       setLoading(false);
     }
@@ -535,7 +534,7 @@ export default function JobDetails() {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
-          {error || pageT('notFound') || 'Job introuvable'}
+          {error || pageT('notFound') || t('jobNotFound')}
         </div>
       </div>
     );
@@ -561,7 +560,7 @@ export default function JobDetails() {
                   {(() => {
                     const isCompleted = job.status === 'completed';
                     const isInProgress = job.status === 'in_progress' && assignedWorkerId;
-                    const label = isCompleted ? pageT('missionDone') : isInProgress ? pageT('attributed') : formatJobStatus(job.status);
+                    const label = isCompleted ? pageT('missionDone') : isInProgress ? pageT('attributed') : formatJobStatus(job.status, t);
                     const badgeClass = isCompleted
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : isInProgress
@@ -573,7 +572,7 @@ export default function JobDetails() {
                       </span>
                     );
                   })()}
-                  <span className="text-sm text-gray-500">{ui.publishedOnPrefix} {publishedLabel}</span>
+                  <span className="text-sm text-gray-500">{t('jobUiPublishedOnPrefix')} {publishedLabel}</span>
                   {hasApplied && !isJobOwner && (
                     <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {pageT('proposalSentBadge')}
@@ -596,10 +595,10 @@ export default function JobDetails() {
               {isJobOwner && (
                 <>
                   <button onClick={() => navigate('/jobs')} className="rounded-xl border border-gray-200 px-4 py-3 font-semibold text-gray-700 hover:bg-gray-50">
-                    {ui.myJobs}
+                    {t('jobUiMyJobs')}
                   </button>
                   <button onClick={handleDelete} disabled={deleting} className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
-                    {deleting ? ui.deleting : ui.deleteJob}
+                    {deleting ? t('jobUiDeleting') : t('jobUiDeleteJob')}
                   </button>
                   {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && (
                     <button onClick={handleCompleteJob} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
@@ -611,7 +610,7 @@ export default function JobDetails() {
 
               {canApply && (
                 <button onClick={() => setShowProposalModal(true)} className="rounded-xl bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
-                  {ui.apply}
+                  {t('jobUiApply')}
                 </button>
               )}
             </div>
@@ -700,9 +699,9 @@ export default function JobDetails() {
 
             {job.shared_location?.maps_url && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
-                <span className="text-sm text-orange-800">📍 Position partagée avec le travailleur au moment de l'attribution</span>
+                <span className="text-sm text-orange-800">📍 {t('sharedPositionText')}</span>
                 <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
-                  Voir sur la carte
+                  {t('viewOnMap')}
                 </a>
               </div>
             )}
@@ -728,16 +727,16 @@ export default function JobDetails() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.description}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiDescription')}</h2>
             <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
           </div>
 
           {isJobOwner && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.receivedProposals}</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiReceivedProposals')}</h2>
               {proposals.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
-                  {ui.noProposals}
+                  {t('jobUiNoProposals')}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -748,7 +747,6 @@ export default function JobDetails() {
                       <ProposalCard
                         key={proposalId || `${extractProposalWorkerId(proposal) || 'proposal'}-${proposal.created_at || Math.random()}`}
                         proposal={proposal}
-                        ui={ui}
                         isSelected={proposalId === extractProposalId(selectedProposal)}
                         isAccepted={isAccepted}
                         onOpenDiscussion={() => openDiscussionForProposal(proposalId)}
@@ -783,7 +781,7 @@ export default function JobDetails() {
                   onClick={() => navigate('/messages')}
                   className="text-sm font-medium text-orange-600 hover:text-orange-700 whitespace-nowrap"
                 >
-                  Ouvrir dans Messages →
+                  {t('openInMessages')} →
                 </button>
               </div>
 
@@ -848,7 +846,7 @@ export default function JobDetails() {
 
         <div className="space-y-6">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.information}</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiInformation')}</h2>
             <div className="space-y-3 text-gray-700">
               <div>{job.location_text}</div>
               {job.location_precision && <div className="text-sm text-gray-500">{job.location_precision}</div>}
@@ -857,7 +855,7 @@ export default function JobDetails() {
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{ui.client}</h2>              <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiClient')}</h2>              <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
                 {String(job.client_name || 'C').charAt(0).toUpperCase()}
               </div>
@@ -866,7 +864,7 @@ export default function JobDetails() {
                   <div className="font-medium text-gray-900">{job.client_name}</div>
                   <VerifiedBadge verified={job?.client_is_verified || job?.client?.is_verified} />
                 </div>
-                <div className="text-sm text-gray-500">{job.client_email || 'Profil client'}</div>
+                <div className="text-sm text-gray-500">{job.client_email || t('clientProfile')}</div>
               </div>
             </div>
           </div>

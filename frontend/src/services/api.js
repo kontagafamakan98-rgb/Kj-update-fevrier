@@ -475,6 +475,7 @@ export const usersAPI = {
   getReferral: () => api.get('/users/referral'),
   getReferralFilleuls: () => api.get('/users/referral/filleuls'),
   applyReferral: (code) => api.post('/users/referral/apply', { code }),
+  withdrawReferral: () => api.post('/users/referral/withdraw'),
 };
 export const profileAPI = userAPI;
 export const profilesAPI = userAPI;

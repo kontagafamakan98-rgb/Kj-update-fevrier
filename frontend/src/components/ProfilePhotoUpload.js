@@ -202,7 +202,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
             <div className="flex-shrink-0">
               <img
                 src={photoData.base64}
-                alt="Aperçu"
+                alt={t('preview')}
                 className="w-20 h-20 object-cover rounded-full border-2 border-gray-300"
               />
             </div>

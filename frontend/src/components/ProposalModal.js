@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { jobsAPI } from '../services/api';
-import { getJobProposalUiLabel } from '../utils/jobProposalLocale';
 import {
   buildInitialProposalConversationMessage,
   getCounterpartForWorker,
@@ -9,18 +8,18 @@ import {
   sendProposalConversationMessage,
 } from '../utils/jobProposalWorkflow';
 
-const normalizeProposalApiError = (submitError, ui) => {
+const normalizeProposalApiError = (submitError, t) => {
   const detail = submitError?.response?.data?.detail;
 
   if (Array.isArray(detail) && detail.length > 0) {
     const messages = detail.map((item) => {
       const field = Array.isArray(item?.loc) ? item.loc[item.loc.length - 1] : '';
-      if (field === 'proposed_amount') return ui.invalidAmount;
-      if (field === 'estimated_completion_time') return ui.estimatedCompletionTimeRequired;
+      if (field === 'proposed_amount') return t('jobUiInvalidAmount');
+      if (field === 'estimated_completion_time') return t('jobUiEstimatedCompletionTimeRequired');
       if (field === 'message') {
-        return String(item?.msg || '').includes('10') ? ui.messageTooShort : ui.messageRequired;
+        return String(item?.msg || '').includes('10') ? t('jobUiMessageTooShort') : t('jobUiMessageRequired');
       }
-      return item?.msg || ui.submitError;
+      return item?.msg || t('jobUiSubmitError');
     }).filter(Boolean);
 
     return messages.join(' ');
@@ -31,15 +30,14 @@ const normalizeProposalApiError = (submitError, ui) => {
   }
 
   if (detail && typeof detail === 'object') {
-    return detail.msg || detail.message || ui.submitError;
+    return detail.msg || detail.message || t('jobUiSubmitError');
   }
 
-  return submitError?.message || ui.submitError;
+  return submitError?.message || t('jobUiSubmitError');
 };
 
 export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
-  const { currentLanguage } = useLanguage();
-  const ui = getJobProposalUiLabel(currentLanguage);
+  const { t } = useLanguage();
   const [formData, setFormData] = useState({
     proposed_amount: '',
     estimated_completion_time: '',
@@ -48,7 +46,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const title = useMemo(() => job?.title || 'ce job', [job]);
+  const title = useMemo(() => job?.title || t('thisJob'), [job, t]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -61,32 +59,32 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
     setError('');
 
     const amount = Number(formData.proposed_amount);
-    const estimatedCompletionTime = String(formData.estimated_completion_time || '').trim() || ui.toBeAgreed;
+    const estimatedCompletionTime = String(formData.estimated_completion_time || '').trim() || t('jobUiToBeAgreed');
     const message = String(formData.message || '').trim();
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError(ui.invalidAmount);
+      setError(t('jobUiInvalidAmount'));
       return;
     }
 
     if (!estimatedCompletionTime) {
-      setError(ui.estimatedCompletionTimeRequired);
+      setError(t('jobUiEstimatedCompletionTimeRequired'));
       return;
     }
 
     if (!message) {
-      setError(ui.messageRequired);
+      setError(t('jobUiMessageRequired'));
       return;
     }
 
     if (message.length < 10) {
-      setError(ui.messageTooShort);
+      setError(t('jobUiMessageTooShort'));
       return;
     }
 
     const jobId = job?.id || job?._id || job?.job_id || job?.jobId;
     if (!jobId) {
-      setError(ui.missingJobId);
+      setError(t('jobUiMissingJobId'));
       return;
     }
 
@@ -139,7 +137,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
         onProposalSubmitted(normalizedCreatedProposal);
       }
     } catch (submitError) {
-      setError(normalizeProposalApiError(submitError, ui));
+      setError(normalizeProposalApiError(submitError, t));
     } finally {
       setLoading(false);
     }
@@ -150,8 +148,8 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
       <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-gray-100">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{ui.applyTitle}</h2>
-            <p className="text-sm text-gray-500">{ui.applySubtitlePrefix} {title}</p>
+            <h2 className="text-xl font-bold text-gray-900">{t('jobUiApplyTitle')}</h2>
+            <p className="text-sm text-gray-500">{t('jobUiApplySubtitlePrefix')} {title}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
         </div>
@@ -163,7 +161,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.proposedAmount}</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">{t('jobUiProposedAmount')}</label>
               <input
                 type="number"
                 min="0"
@@ -176,36 +174,36 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">{ui.estimatedCompletionTime}</label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">{t('jobUiEstimatedCompletionTime')}</label>
               <input
                 type="text"
                 name="estimated_completion_time"
                 value={formData.estimated_completion_time}
                 onChange={handleChange}
                 className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-                placeholder={ui.estimatedCompletionPlaceholder}
+                placeholder={t('jobUiEstimatedCompletionPlaceholder')}
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">{ui.message}</label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">{t('jobUiMessage')}</label>
             <textarea
               name="message"
               rows="6"
               value={formData.message}
               onChange={handleChange}
               className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-              placeholder={ui.messagePlaceholder}
+              placeholder={t('jobUiMessagePlaceholder')}
             />
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
             <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">
-              {ui.cancel}
+              {t('jobUiCancel')}
             </button>
             <button type="submit" disabled={loading} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
-              {loading ? ui.sending : ui.submitProposal}
+              {loading ? t('jobUiSending') : t('jobUiSubmitProposal')}
             </button>
           </div>
         </form>

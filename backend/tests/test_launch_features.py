@@ -29,7 +29,7 @@ async def _complete_job_with_payout(client, client_headers, job_id):
                return_value={"disburse_token": "disburse-token-referral"}), \
          patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
-         patch("kojo_routers_jobs.notify_user", AsyncMock()):
+         patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
         return await client.post(f"/api/jobs/{job_id}/complete", headers=client_headers)
 
 
@@ -63,7 +63,7 @@ async def _run_job_to_completion(client, client_headers, worker_headers):
     mock_invoice = {"token": "invoice-token-referral", "response_code": "00"}
     with patch("kojo_routers_payments.is_paydunya_configured", return_value=True), \
          patch("kojo_routers_payments.create_paydunya_invoice", return_value=mock_invoice), \
-         patch("kojo_routers_payments.notify_user", AsyncMock()):
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/payments/checkout", headers=client_headers, json={
             "job_id": job_id,
             "amount": 25000,
@@ -76,7 +76,7 @@ async def _run_job_to_completion(client, client_headers, worker_headers):
     with patch("kojo_payments.is_paydunya_configured", return_value=True), \
          patch("kojo_payments.confirm_paydunya_invoice",
                return_value={"invoice": {"status": "completed"}}), \
-         patch("kojo_routers_payments.notify_user", AsyncMock()):
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/payments/ipn/paydunya", json={
             "invoice": {"token": mock_invoice["token"], "status": "completed"},
             "custom_data": {"payment_id": payment_id},
@@ -90,17 +90,24 @@ async def _run_job_to_completion(client, client_headers, worker_headers):
 
 @pytest.mark.asyncio
 async def test_referral_reward_credited_on_filleul_first_job(client):
-    """Quand le filleul termine sa première mission, le parrain ET le filleul
-    reçoivent leur récompense (referral_reward_balance) et un historique est
-    enregistré. Une seconde mission ne crédite plus (idempotent)."""
+    """Quand le filleul (travailleur) termine sa première mission, le parrain
+    ET le filleul reçoivent leur récompense (referral_reward_balance) et un
+    historique est enregistré. Aucun crédit n'est fait à l'inscription (le
+    bonus n'est débloqué que par la première mission). Une seconde mission
+    ne crédite plus (idempotent)."""
     import uuid as _uuid
     from tests.conftest import BASE_USER
 
-    # 1. Le parrain (client) possède un code de parrainage
-    sponsor_headers = await auth_headers(client)
+    # 1. Le parrain (TRAVAILLEUR) possède un code de parrainage
+    sponsor_email = f"sponsor-{_uuid.uuid4().hex[:8]}@example.com"
+    sponsor_headers = await auth_headers(client, dict(WORKER_USER, email=sponsor_email))
     resp = await client.get("/api/users/referral", headers=sponsor_headers)
+    assert resp.status_code == 200, resp.text
     sponsor_code = resp.json()["referral_code"]
-    sponsor_user = (await db_find_one("users", {"email": BASE_USER["email"]}))
+    sponsor_user = (await db_find_one("users", {"email": sponsor_email}))
+    assert sponsor_user["user_type"] == "worker"
+    # Aucun crédit à l'inscription : le solde du parrain est à zéro
+    assert float(sponsor_user.get("referral_reward_balance") or 0) == 0
 
     # 2. Le filleul (travailleur) s'inscrit avec le code du parrain
     filleul_data = dict(WORKER_USER)
@@ -109,9 +116,12 @@ async def test_referral_reward_credited_on_filleul_first_job(client):
     filleul_headers = await auth_headers(client, filleul_data)
     filleul_user = (await db_find_one("users", {"email": filleul_data["email"]}))
     assert filleul_user.get("referred_by") == sponsor_code.upper()
+    # Le filleul n'a encore rien reçu (récompense débloquée à la 1ère mission)
+    assert float(filleul_user.get("referral_reward_balance") or 0) == 0
 
-    # 3. Le parrain crée un job, le filleul le réalise → 1ère mission terminée
-    await _run_job_to_completion(client, sponsor_headers, filleul_headers)
+    # 3. Un client crée un job, le filleul le réalise → 1ère mission terminée
+    client_headers = await auth_headers(client)
+    await _run_job_to_completion(client, client_headers, filleul_headers)
 
     # 4. Les deux ont reçu leur récompense + historique
     sponsor_after = await db_find_one("users", {"id": sponsor_user["id"]})
@@ -128,7 +138,7 @@ async def test_referral_reward_credited_on_filleul_first_job(client):
 
     # 6. Une seconde mission ne crédite plus rien (idempotent)
     balance_before = sponsor_after["referral_reward_balance"]
-    await _run_job_to_completion(client, sponsor_headers, filleul_headers)
+    await _run_job_to_completion(client, client_headers, filleul_headers)
     sponsor_after2 = await db_find_one("users", {"id": sponsor_user["id"]})
     assert sponsor_after2["referral_reward_balance"] == balance_before
 
@@ -190,26 +200,46 @@ async def test_portfolio_upload_get_remove(client):
 
 @pytest.mark.asyncio
 async def test_referral_code_generated_and_applied(client):
-    headers = await auth_headers(client)
+    import uuid as _uuid
+
+    # 1. Le parrainage est réservé aux TRAVAILLEURS : un client n'a pas de code
+    client_headers = await auth_headers(client)
+    resp = await client.get("/api/users/referral", headers=client_headers)
+    assert resp.status_code == 403
+
+    # 2. Un travailleur possède un code de parrainage (généré à la demande)
+    sponsor_email = f"sponsor-{_uuid.uuid4().hex[:8]}@example.com"
+    headers = await auth_headers(client, dict(WORKER_USER, email=sponsor_email))
     resp = await client.get("/api/users/referral", headers=headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["referral_code"]
     assert len(body["referral_code"]) == 10
     assert "register?ref=" in body["invite_url"]
+    assert body["withdraw_minimum"] == 200
 
     # Le même code est stable
     resp2 = await client.get("/api/users/referral", headers=headers)
     assert resp2.json()["referral_code"] == body["referral_code"]
 
-    # Un autre utilisateur applique le code
-    worker_headers = await auth_headers(client, WORKER_USER)
+    # 3. Un autre travailleur applique le code
+    worker_email = f"worker-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
     resp = await client.post(
         "/api/users/referral/apply",
         json={"code": body["referral_code"].lower()},  # insensible à la casse
         headers=worker_headers,
     )
     assert resp.status_code == 200, resp.text
+
+    # 4. Un CLIENT ne peut pas appliquer de code (parrainage réservé aux
+    #    travailleurs)
+    resp = await client.post(
+        "/api/users/referral/apply",
+        json={"code": body["referral_code"]},
+        headers=client_headers,
+    )
+    assert resp.status_code == 403
 
     # Auto-parrainage interdit
     resp = await client.post(
@@ -227,21 +257,44 @@ async def test_referral_code_generated_and_applied(client):
     )
     assert resp.status_code == 404
 
+    # 5. Un travailleur DÉJÀ PARRAINÉ ne peut plus servir de parrain : son
+    #    code n'est plus applicable (400).
+    resp = await client.get("/api/users/referral", headers=worker_headers)
+    referred_code = resp.json()["referral_code"]
+    other_email = f"other-{_uuid.uuid4().hex[:8]}@example.com"
+    other_headers = await auth_headers(client, dict(WORKER_USER, email=other_email))
+    resp = await client.post(
+        "/api/users/referral/apply",
+        json={"code": referred_code},
+        headers=other_headers,
+    )
+    assert resp.status_code == 400
+    assert "déjà été parrainé" in resp.json()["detail"]
+    # Le code n'a pas été appliqué
+    other_user = await db_find_one("users", {"email": other_email})
+    assert not other_user.get("referred_by")
+
 
 @pytest.mark.asyncio
 async def test_referral_code_applied_at_registration(client):
     """Le code de parrainage saisi dans le formulaire d'inscription (champ
     referral_code, pré-rempli depuis ?ref=) est appliqué au compte créé via
-    register-verified : referred_by est enregistré côté nouveau user."""
-    from tests.conftest import BASE_USER, db_find_one, issue_email_verification_token
+    register-verified : referred_by est enregistré côté nouveau user.
 
-    # 1. Un utilisateur existant possède un code de parrainage
-    headers = await auth_headers(client)
+    Réservé aux travailleurs : un CLIENT qui saisit un code ne l'attache pas.
+    Aucun crédit n'est fait à l'inscription (le bonus est débloqué quand le
+    filleul termine sa première mission)."""
+    import uuid as _uuid
+    from tests.conftest import BASE_USER, WORKER_USER, db_find_one, issue_email_verification_token
+
+    # 1. Un travailleur existant possède un code de parrainage
+    sponsor_email = f"sponsor-{_uuid.uuid4().hex[:8]}@example.com"
+    headers = await auth_headers(client, dict(WORKER_USER, email=sponsor_email))
     resp = await client.get("/api/users/referral", headers=headers)
     sponsor_code = resp.json()["referral_code"]
 
-    # 2. Un nouvel utilisateur s'inscrit avec ce code dans referral_code
-    new_user = dict(BASE_USER)
+    # 2. Un nouvel utilisateur TRAVAILLEUR s'inscrit avec ce code
+    new_user = dict(WORKER_USER)
     new_user["email"] = "referral-signup@example.com"
     new_user["referral_code"] = sponsor_code.lower()  # insensible à la casse
 
@@ -251,27 +304,28 @@ async def test_referral_code_applied_at_registration(client):
     assert resp.status_code == 200, resp.text
 
     # 3. La réponse informe le frontend que le code a été appliqué
-    #    (pour afficher le message de confirmation à l'inscription)
     assert resp.json().get("referral_applied") is True
-    assert resp.json().get("referral_welcome_bonus") > 0
+    # Plus de bonus de bienvenue à l'inscription
+    assert resp.json().get("referral_welcome_bonus") == 0
 
     # 4. Le nouveau compte est bien rattaché au parrain
     created = await db_find_one("users", {"email": "referral-signup@example.com"})
     assert created, "Nouvel utilisateur introuvable"
     assert created.get("referred_by") == sponsor_code.upper()
 
-    # 5. Bonus de BIENVENUE crédité aux deux : le parrain et l'invité ont
-    #    reçu leur part dans referral_reward_balance + historique (type welcome)
-    sponsor = await db_find_one("users", {"email": BASE_USER["email"]})
-    assert sponsor["referral_reward_balance"] > 0
-    assert any(r["type"] == "welcome" and r["role"] == "parrain" for r in sponsor["referral_rewards"])
-    assert created["referral_reward_balance"] > 0
-    assert any(r["type"] == "welcome" and r["role"] == "filleul" for r in created["referral_rewards"])
+    # 5. AUCUN crédit à l'inscription : ni le parrain ni l'invité n'ont reçu
+    #    de bonus (récompense débloquée uniquement à la 1ère mission du filleul)
+    sponsor = await db_find_one("users", {"email": sponsor_email})
+    assert float(sponsor.get("referral_reward_balance") or 0) == 0
+    assert float(created.get("referral_reward_balance") or 0) == 0
+    assert not any(r.get("type") == "welcome" for r in (sponsor.get("referral_rewards") or []))
+    assert not any(r.get("type") == "welcome" for r in (created.get("referral_rewards") or []))
 
-    # 6. Sans code (ou code invalide), referral_applied est False, aucun
-    #    bonus de bienvenue, et le compte reste valide (non bloquant)
+    # 6. Un CLIENT qui saisit un code ne l'attache pas (parrainage réservé
+    #    aux travailleurs)
     plain_user = dict(BASE_USER)
     plain_user["email"] = "referral-plain@example.com"
+    plain_user["referral_code"] = sponsor_code.lower()
     token2 = await issue_email_verification_token(client, plain_user["email"])
     resp = await client.post(
         "/api/auth/register-verified",
@@ -279,7 +333,36 @@ async def test_referral_code_applied_at_registration(client):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json().get("referral_applied") is False
-    assert resp.json().get("referral_welcome_bonus") == 0
+    plain_created = await db_find_one("users", {"email": "referral-plain@example.com"})
+    assert not plain_created.get("referred_by")
+
+    # 7. Un travailleur DÉJÀ PARRAINÉ ne peut pas parrainer à son tour :
+    #    son code n'est pas applicable à l'inscription d'un nouvel invité.
+    referred_email = f"referred-{_uuid.uuid4().hex[:8]}@example.com"
+    referred_headers = await auth_headers(client, dict(WORKER_USER, email=referred_email))
+    # Ce travailleur applique le code du sponsor → il devient parrainé
+    resp = await client.post(
+        "/api/users/referral/apply",
+        json={"code": sponsor_code},
+        headers=referred_headers,
+    )
+    assert resp.status_code == 200, resp.text
+    resp = await client.get("/api/users/referral", headers=referred_headers)
+    referred_code = resp.json()["referral_code"]
+
+    # Un nouvel invité s'inscrit avec le code du travailleur déjà parrainé
+    new_invite = dict(WORKER_USER)
+    new_invite["email"] = "referral-invite@example.com"
+    new_invite["referral_code"] = referred_code.lower()
+    token3 = await issue_email_verification_token(client, new_invite["email"])
+    resp = await client.post(
+        "/api/auth/register-verified",
+        json={**new_invite, "email_verification_token": token3},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json().get("referral_applied") is False
+    invite_created = await db_find_one("users", {"email": "referral-invite@example.com"})
+    assert not invite_created.get("referred_by")
 
 
 @pytest.mark.asyncio
@@ -289,12 +372,13 @@ async def test_referral_filleuls_listed(client):
     import uuid as _uuid
     from tests.conftest import BASE_USER, issue_email_verification_token
 
-    # 1. Le parrain (client) possède un code de parrainage
-    sponsor_headers = await auth_headers(client)
+    # 1. Le parrain (TRAVAILLEUR) possède un code de parrainage
+    sponsor_email = f"sponsor-{_uuid.uuid4().hex[:8]}@example.com"
+    sponsor_headers = await auth_headers(client, dict(WORKER_USER, email=sponsor_email))
     resp = await client.get("/api/users/referral", headers=sponsor_headers)
     sponsor_code = resp.json()["referral_code"]
 
-    # 2. Deux filleuls s'inscrivent avec ce code
+    # 2. Deux filleuls (travailleurs) s'inscrivent avec ce code
     filleul_ids = []
     for i in range(2):
         data = dict(WORKER_USER)
@@ -318,14 +402,196 @@ async def test_referral_filleuls_listed(client):
     for f in filleuls:
         assert f["first_name"]
         assert f["completed_first_job"] is False
-        # Chaque filleul a déjà reçu son bonus de bienvenue à l'inscription
-        assert f["reward_earned"] > 0
+        # Aucune récompense avant la première mission du filleul
+        assert f["reward_earned"] == 0
 
-    # 4. Un utilisateur sans filleul obtient une liste vide
+    # 4. Un client ne peut pas lister de filleuls (parrainage réservé aux
+    #    travailleurs)
+    client_headers = await auth_headers(client)
+    resp = await client.get("/api/users/referral/filleuls", headers=client_headers)
+    assert resp.status_code == 403
+
+    # 5. Un travailleur sans filleul obtient une liste vide
     other_headers = await auth_headers(client, dict(WORKER_USER, email=f"noref-{_uuid.uuid4().hex[:8]}@example.com"))
     resp = await client.get("/api/users/referral/filleuls", headers=other_headers)
     assert resp.status_code == 200
     assert resp.json()["filleuls"] == []
+
+
+# ---------------------------------------------------------------------------
+# Retrait du solde de récompenses de parrainage (décaissement PayDunya)
+# ---------------------------------------------------------------------------
+
+async def _credit_referral_balance(client, user_id, amount):
+    import server as srv
+    await srv.db.users.update_one(
+        {"id": user_id},
+        {"$set": {"referral_reward_balance": float(amount)}},
+    )
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_success(client):
+    """Un travailleur retire ses récompenses via PayDunya : le décaissement est
+    préparé/soumis, le solde passe à 0 et un historique de retrait est
+    enregistré."""
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-withdraw"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "released"
+    assert body["reward_balance"] == 0
+
+    worker_after = await db_find_one("users", {"id": worker["id"]})
+    assert float(worker_after["referral_reward_balance"]) == 0
+    assert any(r.get("type") == "withdrawal" and r.get("amount") == -1500
+               for r in worker_after["referral_rewards"])
+
+    import server as srv
+    payment = await srv.db.payments.find_one({"payout_kind": "referral"})
+    assert payment is not None
+    assert payment["payout_status"] == "released"
+    assert payment["amount"] == 1500
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_insufficient_balance(client):
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-low-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 50)
+
+    resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 400
+    assert "Solde insuffisant" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_client_forbidden(client):
+    client_headers = await auth_headers(client)
+    resp = await client.post("/api/users/referral/withdraw", headers=client_headers)
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_no_account(client):
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-noacc-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    # On retire les comptes de paiement directement en base (l'inscription
+    # exige 2 moyens de paiement pour un travailleur).
+    import server as srv
+    await srv.db.users.update_one(
+        {"id": worker["id"]}, {"$set": {"payment_accounts": {}}}
+    )
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 400
+    assert "Aucun compte" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_pending_blocks_second(client):
+    """Quand le décaissement est en attente (releasing), le solde reste intact
+    et un second retrait est bloqué (409) pour éviter un double-décaissement."""
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-pend-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-pending"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "pending"}), \
+         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "releasing"
+    # Solde intact tant que le décaissement n'est pas confirmé
+    assert float((await db_find_one("users", {"id": worker["id"]}))["referral_reward_balance"]) == 1500
+
+    # Un second retrait est bloqué tant que le premier est en cours
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-2"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "success"}):
+        resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_ipn_confirms_and_decrements(client):
+    """Un décaissement en attente confirmé par l'IPN disburse décrémente le
+    solde et trace le retrait (idempotent)."""
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-ipn-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-ipn"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "pending"}), \
+         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "releasing"
+    assert float((await db_find_one("users", {"id": worker["id"]}))["referral_reward_balance"]) == 1500
+
+    import server as srv
+    payment = await srv.db.payments.find_one({"payout_kind": "referral"})
+    disburse_token = payment["disburse_token"]
+
+    # L'IPN disburse confirme le décaissement → solde décrémenté
+    with patch("kojo_routers_payments.check_paydunya_disburse_status",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/payments/disburse-ipn", json={
+            "token": disburse_token,
+            "disburse_invoice": disburse_token,
+        })
+    assert resp.status_code == 200, resp.text
+
+    worker_after = await db_find_one("users", {"id": worker["id"]})
+    assert float(worker_after["referral_reward_balance"]) == 0
+    assert any(r.get("type") == "withdrawal" and r.get("amount") == -1500
+               for r in worker_after["referral_rewards"])
+    # Re-confirmation d'un retrait déjà appliqué → idempotent (pas de double
+    # décrément)
+    with patch("kojo_routers_payments.check_paydunya_disburse_status",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/payments/disburse-ipn", json={
+            "token": disburse_token,
+            "disburse_invoice": disburse_token,
+        })
+    assert resp.status_code == 200
+    assert float((await db_find_one("users", {"id": worker["id"]}))["referral_reward_balance"]) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +649,7 @@ async def test_push_matching_notifies_workers_with_matching_specialty(client):
         location={"address": "Dakar Plateau"},
     )
 
-    with patch("kojo_routers_jobs.notify_user", new=AsyncMock()) as mock_notify:
+    with patch("kojo_routers_jobs.notify_user_localized", new=AsyncMock()) as mock_notify:
         await _notify_matching_workers(job)
         mock_notify.assert_awaited()
         # le travailleur plombier reçoit une notification

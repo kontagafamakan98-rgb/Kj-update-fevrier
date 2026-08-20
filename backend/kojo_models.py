@@ -25,7 +25,8 @@ class JobStatus(str, Enum):
 class PaymentMethod(str, Enum):
     ORANGE_MONEY = "orange_money"  
     WAVE = "wave"
-    BANK_ACCOUNT = "bank_account"
+    BANK_CARD = "bank_card"  # Carte bancaire (canal PayDunya "card")
+    BANK_ACCOUNT = "bank_account"  # Conservé pour compatibilité (déprécié)
 
 class Language(str, Enum):
     FRENCH = "fr"

@@ -87,7 +87,7 @@ class TestIPNSecurity:
         with patch("kojo_payments.is_paydunya_configured", return_value=True), \
              patch("kojo_payments.confirm_paydunya_invoice",
                    return_value={"invoice": {"status": "completed"}, "response_code": "00"}), \
-             patch("kojo_routers_payments.notify_user", AsyncMock()):
+             patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
             resp = await client.post("/api/payments/ipn/paydunya", json={
                 "invoice": {"token": invoice_token, "status": "pending"},
                 "custom_data": {"payment_id": payment_id},

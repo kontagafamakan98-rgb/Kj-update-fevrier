@@ -85,7 +85,7 @@ class TestDisburseIpnRefundAware:
     async def _send_ipn(self, client, token="tok-ipn", check_result=None):
         with patch("kojo_routers_payments.check_paydunya_disburse_status",
                    return_value=check_result or {"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_payments.notify_user", AsyncMock()):
+             patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
             return await client.post("/api/payments/disburse-ipn", json={"token": token})
 
     async def test_refund_pending_confirmed_becomes_refunded(self, client: AsyncClient):
@@ -147,7 +147,7 @@ class TestRefundAmbiguousSubmit:
                    return_value={"disburse_token": "refund-token-ambig", "response_code": "00"}), \
              patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
                    side_effect=HTTPException(status_code=502, detail="timeout réseau")), \
-             patch("kojo_routers_jobs.notify_user", AsyncMock()):
+             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
             resp = await client.delete(f"/api/jobs/{job_id}", headers=headers)
 
         assert resp.status_code == 200, resp.text
@@ -172,7 +172,7 @@ class TestWorkerPayoutAmbiguousSubmit:
                    return_value={"disburse_token": "worker-token-ambig", "response_code": "00"}), \
              patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
                    side_effect=HTTPException(status_code=502, detail="timeout réseau")), \
-             patch("kojo_routers_jobs.notify_user", AsyncMock()):
+             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/jobs/{job_id}/complete", headers=headers)
 
         assert resp.status_code == 200, resp.text
@@ -202,7 +202,7 @@ class TestPaymentStatusRecheck:
 
         with patch("kojo_routers_payments.check_paydunya_disburse_status",
                    return_value={"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_payments.notify_user", AsyncMock()):
+             patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
             resp = await client.get(f"/api/payments/status/{payment_id}", headers=headers)
 
         assert resp.status_code == 200
@@ -251,7 +251,7 @@ class TestOwnerRetryRefund:
                    return_value={"disburse_token": "retry-token", "response_code": "00"}), \
              patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_jobs.notify_user", AsyncMock()):
+             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/owner/payments/{payment_id}/retry-refund", headers=headers)
 
         assert resp.status_code == 200

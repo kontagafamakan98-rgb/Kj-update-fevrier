@@ -1,7 +1,9 @@
+import asyncio
 import io
 import re
 import secrets
 import string
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
@@ -9,20 +11,25 @@ from pydantic import ValidationError
 
 from kojo_core import db
 from kojo_models import (
-    Country, Language, PaymentAccount, PushToken, PushTokenCreate,
-    User, validate_west_africa_phone,
+    Country, Language, NotificationType, PaymentAccount, PushToken,
+    PushTokenCreate, User, UserType, validate_west_africa_phone,
 )
 from kojo_settings import (
     FRONTEND_APP_URL,
     REFERRAL_FILLEUL_REWARD,
     REFERRAL_SPONSOR_REWARD,
-    REFERRAL_WELCOME_FILLEUL_REWARD,
-    REFERRAL_WELCOME_SPONSOR_REWARD,
     logger,
 )
 from kojo_core import (
     get_current_user, is_valid_image_content, upload_image_to_cloudinary,
     upload_profile_photo_to_cloudinary, validate_payment_accounts,
+)
+from kojo_shared import apply_referral_payout_confirmed, notify_user_localized
+from kojo_payments import (
+    build_disburse_callback_url,
+    create_paydunya_disburse_invoice, get_mobile_money_account,
+    get_paydunya_withdraw_mode, strip_country_code_for_disburse,
+    submit_paydunya_disburse_invoice,
 )
 
 # Même règle que le modèle User (prénom/nom).
@@ -577,7 +584,11 @@ async def _ensure_referral_code(user_id: str) -> str:
 @router.get("/users/referral")
 async def get_referral(current_user: User = Depends(get_current_user)):
     """Retourne le code de parrainage de l'utilisateur (le génère si absent),
-    ainsi que le solde de récompense de parrainage et son historique."""
+    ainsi que le solde de récompense de parrainage et son historique.
+
+    Le parrainage est réservé aux TRAVAILLEURS (pas aux clients)."""
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Le parrainage est réservé aux travailleurs")
     code = await _ensure_referral_code(current_user.id)
     user_data = await db.users.find_one(
         {"id": current_user.id},
@@ -590,8 +601,7 @@ async def get_referral(current_user: User = Depends(get_current_user)):
         "reward_history": (user_data or {}).get("referral_rewards") or [],
         "sponsor_reward": REFERRAL_SPONSOR_REWARD,
         "filleul_reward": REFERRAL_FILLEUL_REWARD,
-        "welcome_sponsor_reward": REFERRAL_WELCOME_SPONSOR_REWARD,
-        "welcome_filleul_reward": REFERRAL_WELCOME_FILLEUL_REWARD,
+        "withdraw_minimum": 200,
     }
 
 
@@ -599,7 +609,11 @@ async def get_referral(current_user: User = Depends(get_current_user)):
 async def get_referral_filleuls(current_user: User = Depends(get_current_user)):
     """Liste les comptes créés via le code de parrainage de l'utilisateur
     (les filleuls). Chaque entrée contient les infos publiques du filleul et
-    son éventuelle contribution au parrainage (récompenses déjà générées)."""
+    son éventuelle contribution au parrainage (récompenses déjà générées).
+
+    Réservé aux travailleurs (le parrainage ne concerne pas les clients)."""
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Le parrainage est réservé aux travailleurs")
     code = await _ensure_referral_code(current_user.id)
 
     filleuls = []
@@ -638,19 +652,246 @@ async def apply_referral(
     current_user: User = Depends(get_current_user),
 ):
     """Enregistre le code du parrain saisi à l'inscription (référence croisée,
-    pas de crédit monétaire automatique)."""
+    pas de crédit monétaire automatique). Réservé aux travailleurs : un
+    client ne peut ni parrainer ni être parrainé (il ne réalise pas de
+    mission, donc aucune récompense ne peut être débloquée)."""
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Le parrainage est réservé aux travailleurs")
     code = str((payload or {}).get("code") or '').strip().upper()
     if not code:
         raise HTTPException(status_code=422, detail="Code de parrainage requis")
 
-    sponsor = await db.users.find_one({"referral_code": code}, {"id": 1})
+    sponsor = await db.users.find_one(
+        {"referral_code": code}, {"id": 1, "user_type": 1, "referred_by": 1}
+    )
     if not sponsor:
         raise HTTPException(status_code=404, detail="Code de parrainage invalide")
+    if sponsor.get("user_type") != UserType.WORKER.value:
+        raise HTTPException(status_code=400, detail="Ce code de parrainage n'est pas valide")
     if sponsor["id"] == current_user.id:
         raise HTTPException(status_code=400, detail="Vous ne pouvez pas vous parrainer vous-même")
+    # Un travailleur déjà parrainé ne peut pas servir de parrain à son tour :
+    # son code n'est plus applicable (il continue à gagner ses récompenses
+    # en tant que filleul, mais ne peut plus en générer).
+    if sponsor.get("referred_by"):
+        raise HTTPException(status_code=400, detail="Ce code de parrainage n'est plus actif : son propriétaire a déjà été parrainé")
 
     await db.users.update_one(
         {"id": current_user.id},
         {"$set": {"referred_by": code, "updated_at": datetime.now(timezone.utc)}},
     )
     return {"message": "Code de parrainage appliqué", "referred_by": code}
+
+
+# ---------------------------------------------------------------------------
+# Retrait du solde de récompense de parrainage (décaissement PayDunya)
+# ---------------------------------------------------------------------------
+
+# Minimum PayDunya pour un décaissement (même règle que la collecte).
+REFERRAL_WITHDRAW_MINIMUM = 200.0
+
+
+@router.post("/users/referral/withdraw")
+async def withdraw_referral_rewards(current_user: User = Depends(get_current_user)):
+    """Retire le solde de récompenses de parrainage (bonus + récompenses)
+    vers le compte mobile money du travailleur, via le décaissement PayDunya
+    (même mécanisme que les versements travailleurs).
+
+    - Réservé aux travailleurs.
+    - Solde minimum : 200 FCFA (minimum PayDunya).
+    - Un seul retrait en cours à la fois (verrou CAS anti double-décaissement,
+      concurrent ou en attente de confirmation PayDunya).
+    - Le solde n'est décrémenté qu'à la CONFIRMATION du décaissement (submit
+      "success" ou IPN/check-status ultérieur) : en cas d'échec le solde
+      reste intact et le travailleur peut réessayer.
+    """
+    if current_user.user_type != UserType.WORKER:
+        raise HTTPException(status_code=403, detail="Le retrait des récompenses est réservé aux travailleurs")
+
+    user = await db.users.find_one({"id": current_user.id})
+    balance = float((user or {}).get("referral_reward_balance") or 0)
+
+    if balance < REFERRAL_WITHDRAW_MINIMUM:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Solde insuffisant : le retrait minimum est de {int(REFERRAL_WITHDRAW_MINIMUM)} FCFA (solde : {int(balance)} FCFA)",
+        )
+
+    # Verrou CAS anti double-retrait (même esprit que le verrou "releasing"
+    # des versements travailleurs) : posé atomiquement, levé uniquement au
+    # statut terminal (released via apply_referral_payout_confirmed, ou
+    # release_failed ci-dessous). Tant qu'un retrait est en cours ou en
+    # attente de confirmation PayDunya, un nouveau retrait est refusé.
+    lock = await db.users.update_one(
+        {"id": current_user.id, "referral_withdrawal_in_progress": {"$ne": True}},
+        {"$set": {"referral_withdrawal_in_progress": True, "updated_at": datetime.now(timezone.utc)}},
+    )
+    if lock.matched_count == 0:
+        raise HTTPException(status_code=409, detail="Un retrait de récompenses est déjà en cours, réessayez dans un instant")
+
+    withdraw_method, withdraw_phone = get_mobile_money_account((user or {}).get("payment_accounts"))
+    if not withdraw_method or not withdraw_phone:
+        await db.users.update_one(
+            {"id": current_user.id},
+            {"$set": {"referral_withdrawal_in_progress": False, "updated_at": datetime.now(timezone.utc)}},
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun compte Orange Money ou Wave configuré : ajoutez un moyen de paiement pour retirer vos récompenses",
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    payment_id = str(uuid.uuid4())
+    withdraw_mode = get_paydunya_withdraw_mode(withdraw_method, (user or {}).get("country"))
+    account_alias = strip_country_code_for_disburse(withdraw_phone)
+    amount = int(balance)
+
+    # Préparation du décaissement. Un échec EXPLICITE ici (get-invoice refusé)
+    # est sûr : PayDunya n'a rien exécuté, le solde reste intact.
+    try:
+        invoice = create_paydunya_disburse_invoice(
+            account_alias=account_alias,
+            amount=amount,
+            withdraw_mode=withdraw_mode,
+            callback_url=build_disburse_callback_url(),
+        )
+        disburse_token = invoice.get("disburse_token")
+    except HTTPException as exc:
+        raise HTTPException(status_code=502, detail=f"Retrait impossible pour le moment : {exc.detail}")
+    except Exception as exc:
+        logger.error(f"⚠️ Erreur inattendue lors de la préparation du retrait de récompenses: {exc}")
+        raise HTTPException(status_code=502, detail="Retrait impossible pour le moment, réessayez plus tard")
+
+    if not disburse_token:
+        raise HTTPException(status_code=502, detail="Retrait impossible pour le moment : réponse PayDunya invalide")
+
+    # Enregistrement du retrait AVANT le submit : si le submit lève (timeout
+    # réseau), le retrait reste identifiable et confirmable via l'IPN ou un
+    # check-status (même convention que les versements travailleurs).
+    await db.payments.insert_one({
+        "id": payment_id,
+        "job_id": "referral_withdrawal",
+        "payer_id": current_user.id,
+        "receiver_id": current_user.id,
+        "amount": amount,
+        "payment_method": withdraw_method,
+        "status": "completed",
+        "country": (user or {}).get("country"),
+        "provider": "paydunya",
+        "provider_channel": withdraw_mode,
+        "payout_kind": "referral",
+        "payout_status": "releasing",
+        "disburse_token": disburse_token,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    })
+
+    try:
+        submit_result = submit_paydunya_disburse_invoice(disburse_token, disburse_id=f"referral_{payment_id}")
+    except Exception as exc:
+        # Réponse INCERTAINE (timeout réseau…) : PayDunya a peut-être exécuté
+        # le décaissement. On reste "releasing" (confirmation par l'IPN ou un
+        # check-status) au lieu de marquer un échec définitif : un échec
+        # permettrait de relancer → risque de DOUBLE retrait.
+        logger.error(f"⚠️ Réponse incertaine du submit PayDunya (retrait récompenses): {exc}")
+        await db.payments.update_one(
+            {"id": payment_id},
+            {"$set": {
+                "disburse_error": f"Réponse incertaine du submit: {exc}",
+                "updated_at": now_iso,
+            }},
+        )
+        asyncio.create_task(notify_user_localized(
+            user_id=current_user.id,
+            key="referral_withdraw_pending",
+            notif_type=NotificationType.GENERAL,
+            amount=amount,
+        ))
+        return {
+            "status": "releasing",
+            "payment_id": payment_id,
+            "reward_balance": balance,
+            "message": "Retrait en cours de traitement, vous serez notifié à la confirmation.",
+        }
+
+    provider_status = str(
+        submit_result.get("status")
+        or ("success" if str(submit_result.get("response_code")) == "00" else "failed")
+    ).strip().lower()
+
+    if provider_status == "success":
+        # Décaissement confirmé : on décrémente le solde et on trace le retrait.
+        await db.users.update_one(
+            {"id": current_user.id},
+            {
+                "$set": {"referral_reward_balance": 0.0, "updated_at": datetime.now(timezone.utc)},
+                "$push": {"referral_rewards": {
+                    "type": "withdrawal",
+                    "amount": -amount,
+                    "payment_id": payment_id,
+                    "created_at": now_iso,
+                }},
+            },
+        )
+        await db.payments.update_one(
+            {"id": payment_id},
+            {"$set": {
+                "payout_status": "released",
+                "referral_balance_applied": True,
+                "disburse_provider_response": submit_result,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+        )
+        asyncio.create_task(notify_user_localized(
+            user_id=current_user.id,
+            key="referral_withdraw_success",
+            notif_type=NotificationType.GENERAL,
+            amount=amount,
+        ))
+        return {
+            "status": "released",
+            "payment_id": payment_id,
+            "reward_balance": 0.0,
+            "message": f"Retrait de {amount} FCFA confirmé : le montant a été envoyé sur votre compte mobile money.",
+        }
+
+    if provider_status == "pending":
+        await db.payments.update_one(
+            {"id": payment_id},
+            {"$set": {"payout_status": "releasing", "disburse_provider_response": submit_result}},
+        )
+        asyncio.create_task(notify_user_localized(
+            user_id=current_user.id,
+            key="referral_withdraw_pending",
+            notif_type=NotificationType.GENERAL,
+            amount=amount,
+        ))
+        return {
+            "status": "releasing",
+            "payment_id": payment_id,
+            "reward_balance": balance,
+            "message": "Retrait en cours de traitement, vous serez notifié à la confirmation.",
+        }
+
+    # Échec explicite : PayDunya n'a rien exécuté, solde intact, réessayable.
+    await db.payments.update_one(
+        {"id": payment_id},
+        {"$set": {
+            "payout_status": "release_failed",
+            "payout_failure_reason": submit_result.get("response_text") or "Échec du retrait PayDunya",
+            "disburse_provider_response": submit_result,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
+    asyncio.create_task(notify_user_localized(
+        user_id=current_user.id,
+        key="referral_withdraw_failed",
+        notif_type=NotificationType.GENERAL,
+        amount=amount,
+    ))
+    return {
+        "status": "release_failed",
+        "payment_id": payment_id,
+        "reward_balance": balance,
+        "message": "Le retrait a échoué : votre solde est intact, vous pouvez réessayer.",
+    }

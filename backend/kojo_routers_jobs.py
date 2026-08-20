@@ -22,7 +22,7 @@ from kojo_settings import (
 from kojo_core import (
     get_current_user,
 )
-from kojo_shared import notify_user, _dispatch_address_to_worker
+from kojo_shared import notify_user_localized, _dispatch_address_to_worker
 from kojo_payments import (
     build_disburse_callback_url,
     create_paydunya_disburse_invoice, get_paydunya_withdraw_mode,
@@ -51,8 +51,20 @@ async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, jo
         if not ref_code:
             return
 
-        sponsor = await db.users.find_one({"referral_code": ref_code}, {"id": 1})
+        # Le parrainage est réservé aux travailleurs : un parrain client ne
+        # peut pas recevoir de récompense (le code n'est d'ailleurs plus
+        # applicable à un compte client à l'inscription).
+        # Un travailleur déjà parrainé ne peut pas servir de parrain à son
+        # tour : son code n'est plus applicable, donc aucune récompense de
+        # parrainage pour lui.
+        sponsor = await db.users.find_one(
+            {"referral_code": ref_code}, {"id": 1, "user_type": 1, "referred_by": 1}
+        )
         if not sponsor or sponsor.get("id") == worker_id:
+            return
+        if sponsor.get("user_type") != "worker":
+            return
+        if sponsor.get("referred_by"):
             return
 
         now = datetime.now(timezone.utc)
@@ -82,22 +94,24 @@ async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, jo
             },
         )
 
-        # Notifications pour les deux
-        asyncio.create_task(notify_user(
+        # Notifications pour les deux (dans leur langue préférée)
+        asyncio.create_task(notify_user_localized(
             user_id=worker_id,
-            title="🎁 Bonus de parrainage débloqué",
-            body=f"Votre première mission « {job_title} » est terminée : +{REFERRAL_FILLEUL_REWARD} FCFA de bonus vous ont été crédités.",
+            key="bonus_filleul_first_mission",
             notif_type=NotificationType.GENERAL,
             related_id=job_id,
             related_type="job",
+            job_title=job_title,
+            amount=REFERRAL_FILLEUL_REWARD,
         ))
-        asyncio.create_task(notify_user(
+        asyncio.create_task(notify_user_localized(
             user_id=sponsor["id"],
-            title="🎁 Votre filleul a terminé sa première mission",
-            body=f"« {job_title} » est terminée : +{REFERRAL_SPONSOR_REWARD} FCFA de récompense de parrainage crédités.",
+            key="bonus_sponsor_first_mission",
             notif_type=NotificationType.GENERAL,
             related_id=job_id,
             related_type="job",
+            job_title=job_title,
+            amount=REFERRAL_SPONSOR_REWARD,
         ))
     except Exception as exc:
         # Non bloquant : une erreur de récompense ne doit jamais casser la
@@ -193,14 +207,14 @@ async def _notify_matching_workers(job: Job):
         logger.info(f"🔔 Push matching {method} : {len(worker_ids)} travailleurs pour « {job.title} »")
         for uid in worker_ids[:30]:
             try:
-                await notify_user(
+                await notify_user_localized(
                     user_id=uid,
-                    title="🔔 Nouveau job dans votre domaine",
-                    body=job.title,
+                    key="new_job_matching",
                     notif_type=NotificationType.GENERAL,
                     related_id=job.id,
                     related_type="job",
                     push_data={"job_id": job.id},
+                    job_title=job.title,
                 )
             except Exception:
                 continue
@@ -642,29 +656,30 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
         worker_id_for_notif = job.get("assigned_worker_id")
         job_title = job.get("title") or "la mission"
         if refund_outcome == "refunded":
-            client_body = f"Votre paiement de {refunded_amount} FCFA pour « {job_title} » a été intégralement remboursé."
+            cancel_key = "mission_cancelled_client_refunded"
         elif refund_outcome == "refunding":
-            client_body = f"Votre remboursement de {refunded_amount} FCFA pour « {job_title} » est en cours de traitement."
+            cancel_key = "mission_cancelled_client_refunding"
         elif refund_outcome == "refund_failed":
-            client_body = "Mission annulée, mais le remboursement automatique a échoué : contactez le support pour un remboursement manuel."
+            cancel_key = "mission_cancelled_client_refund_failed"
         else:
-            client_body = f"La mission « {job_title} » a été annulée."
-        asyncio.create_task(notify_user(
+            cancel_key = "mission_cancelled_client"
+        asyncio.create_task(notify_user_localized(
             user_id=payment_record.get("payer_id"),
-            title="Mission annulée",
-            body=client_body,
+            key=cancel_key,
             notif_type=NotificationType.GENERAL,
             related_id=job_id,
             related_type="job",
+            job_title=job_title,
+            amount=refunded_amount,
         ))
         if worker_id_for_notif:
-            asyncio.create_task(notify_user(
+            asyncio.create_task(notify_user_localized(
                 user_id=worker_id_for_notif,
-                title="Mission annulée",
-                body=f"La mission « {job_title} » a été annulée par le client.",
+                key="mission_cancelled_worker",
                 notif_type=NotificationType.GENERAL,
                 related_id=job_id,
                 related_type="job",
+                job_title=job_title,
             ))
 
     if refund_outcome == "refunded":
@@ -726,13 +741,14 @@ async def create_proposal(
     client_id = job.get("client_id")
     if client_id:
         worker_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Un travailleur"
-        asyncio.create_task(notify_user(
+        asyncio.create_task(notify_user_localized(
             user_id=client_id,
-            title="Nouvelle proposition reçue",
-            body=f"{worker_name} a soumis une proposition pour « {job.get('title', 'votre mission')} »",
+            key="proposal_received",
             notif_type=NotificationType.PROPOSAL_RECEIVED,
             related_id=job_id,
             related_type="job",
+            worker_name=worker_name,
+            job_title=job.get("title") or "",
         ))
 
     return {"message": "Proposal submitted successfully"}
@@ -888,15 +904,16 @@ async def accept_job_proposal(
             sender_id=current_user.id,
         )
 
-    # Notifier le travailleur que sa proposition a été acceptée
+    # Notifier le travailleur que sa proposition a été acceptée (sa langue)
     client_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Le client"
-    asyncio.create_task(notify_user(
+    asyncio.create_task(notify_user_localized(
         user_id=worker_id,
-        title="Proposition acceptée ! 🎉",
-        body=f"{client_name} a accepté votre proposition pour « {job.get('title', 'la mission')} »",
+        key="proposal_accepted",
         notif_type=NotificationType.PROPOSAL_ACCEPTED,
         related_id=job_id,
         related_type="job",
+        client_name=client_name,
+        job_title=job.get("title") or "",
     ))
 
     updated_job = await db.jobs.find_one({"id": job_id})
@@ -1116,31 +1133,32 @@ async def complete_job_and_release_payment(
     except Exception as exc:
         logger.error(f"⚠️ Échec de l'envoi du message automatique de fin de mission: {exc}")
 
-    # Notifier le travailleur via push selon le statut du versement
+    # Notifier le travailleur via push selon le statut du versement (sa langue)
     if final_payout_status == "released":
-        push_body = f"Votre paiement de {worker_amount} FCFA pour « {job.get('title', 'la mission')} » a été envoyé."
+        payment_key = "payment_sent_worker"
     elif final_payout_status == "releasing":
-        push_body = f"Votre paiement de {worker_amount} FCFA pour « {job.get('title', 'la mission')} » est en cours de traitement."
+        payment_key = "payment_releasing_worker"
     else:
-        push_body = f"Mission « {job.get('title', 'la mission')} » terminée. Versement à traiter manuellement."
+        payment_key = "payment_manual_worker"
 
-    asyncio.create_task(notify_user(
+    asyncio.create_task(notify_user_localized(
         user_id=worker_id,
-        title="Mission terminée — Paiement en route 💰",
-        body=push_body,
+        key=payment_key,
         notif_type=NotificationType.PAYMENT_RECEIVED,
         related_id=job_id,
         related_type="job",
+        job_title=job.get("title") or "",
+        amount=worker_amount,
     ))
 
     # Notifier le client que la mission est bien clôturée
-    asyncio.create_task(notify_user(
+    asyncio.create_task(notify_user_localized(
         user_id=current_user.id,
-        title="Mission clôturée ✅",
-        body=f"La mission « {job.get('title', 'la mission')} » a été marquée comme terminée.",
+        key="mission_closed",
         notif_type=NotificationType.JOB_COMPLETED,
         related_id=job_id,
         related_type="job",
+        job_title=job.get("title") or "",
     ))
 
     updated_job = await db.jobs.find_one({"id": job_id})

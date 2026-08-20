@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useCountry } from '../contexts/CountryContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import FlagIcon from './FlagIcon';
 
 const COUNTRIES = [
@@ -11,6 +12,7 @@ const COUNTRIES = [
 
 export default function CountrySelector({ className = '' }) {
   const { currentCountry, changeUserCountry, isOwner } = useCountry();
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving]  = useState(false);
   const wrapperRef           = useRef(null);
@@ -61,7 +63,7 @@ export default function CountrySelector({ className = '' }) {
         ) : (
           <FlagIcon country={current.id} className="w-5 h-4" showEmoji={false} />
         )}
-        <span className="text-sm font-medium">{isOwner ? 'Tous les pays' : current.name}</span>
+        <span className="text-sm font-medium">{isOwner ? t('allCountries') : current.name}</span>
         {!isOwner && (
           <svg
             className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}

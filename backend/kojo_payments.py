@@ -248,6 +248,21 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
     latest = await db.payments.find_one({'id': payment_record['id']})
     return latest or payment_record
 
+def get_mobile_money_account(payment_accounts: Optional[Dict]) -> tuple:
+    """Retourne (méthode, numéro) du compte mobile money à utiliser pour un
+    décaissement PayDunya : Orange Money en priorité, sinon Wave (le compte
+    bancaire n'est pas un mode de décaissement automatique supporté).
+
+    Convention partagée par les versements travailleurs, les remboursements
+    et les retraits de récompenses de parrainage."""
+    accounts = payment_accounts or {}
+    if accounts.get("orange_money"):
+        return "orange_money", accounts["orange_money"]
+    if accounts.get("wave"):
+        return "wave", accounts["wave"]
+    return None, None
+
+
 def get_paydunya_withdraw_mode(payment_method: str, country: Optional[str]) -> str:
     """Reutilise exactement le meme mapping canal que la collecte : les
     valeurs (ex: 'orange-money-mali', 'wave-senegal') sont identiques cote

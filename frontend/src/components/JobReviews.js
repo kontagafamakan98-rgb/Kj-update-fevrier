@@ -143,7 +143,7 @@ export default function JobReviews({ jobId }) {
               <button
                 key={value}
                 type="button"
-                aria-label={`${value} étoiles`}
+                aria-label={`${value} ${t('stars')}`}
                 onClick={() => {
                   setRating(value);
                   setError('');

@@ -67,8 +67,8 @@ const CountryChangePopup = () => {
           {t('detectedViaGeolocation') || 'Nouveau pays détecté'}
         </h3>
         <p style={styles.text}>
-          Il semble que vous soyez en <strong>{detectedCountry.name}</strong> {detectedCountry.flag}.
-          Voulez-vous basculer vers Kojo {detectedCountry.name} pour voir les annonces locales ?
+          {t('popupDetectedIn')} <strong>{detectedCountry.name}</strong> {detectedCountry.flag}.
+          {t('popupSwitchQuestion')}
         </p>
         <div style={styles.buttons}>
           <button style={styles.acceptButton} onClick={handleAccept}>
@@ -79,7 +79,7 @@ const CountryChangePopup = () => {
           </button>
         </div>
         <button style={styles.neverShowButton} onClick={handleNeverShow}>
-          Ne plus me demander
+          {t('neverAskAgain')}
         </button>
       </div>
     </div>

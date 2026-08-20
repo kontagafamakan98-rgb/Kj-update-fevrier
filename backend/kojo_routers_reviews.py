@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from kojo_core import db, get_current_user
 from kojo_models import NotificationType, Review, ReviewCreate, User
 from kojo_settings import OWNER_EMAIL, logger
-from kojo_shared import notify_user
+from kojo_shared import notify_user_localized
 
 router = APIRouter()
 
@@ -130,13 +130,14 @@ async def create_review(
     rating, total = await _recompute_user_rating(reviewee_id)
 
     if reviewee_id != current_user.id:
-        asyncio.create_task(notify_user(
+        asyncio.create_task(notify_user_localized(
             user_id=reviewee_id,
-            title="Nouvel avis reçu ⭐",
-            body=f"Vous avez reçu une note de {review.rating}/5 sur « {job.get('title', 'la mission')} ».",
+            key="new_review",
             notif_type=NotificationType.GENERAL,
             related_id=job_id,
             related_type="job",
+            rating=review.rating,
+            job_title=job.get('title') or '',
         ))
 
     return {
