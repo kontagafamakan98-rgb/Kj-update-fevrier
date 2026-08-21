@@ -2,6 +2,13 @@
   "framework": "vite",
   "outputDirectory": "build",
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://kojo-backend.fly.dev/api/:path*",
+      "headers": [
+        { "key": "X-Forwarded-Host", "value": "$host" }
+      ]
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

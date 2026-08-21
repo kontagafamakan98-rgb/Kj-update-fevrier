@@ -17,11 +17,14 @@ primary_region = 'fra'
   # URL publique du backend → callbacks IPN PayDunya (et hôtes de confiance si
   # le TrustedHostMiddleware reste activé)
   BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev'
-  # Le Host des health checks Fly ne correspond à aucun motif fiable (IP
-  # interne) : sur Fly, désactiver le TrustedHostMiddleware via le secret
-  # DISABLE_TRUSTED_HOST_MIDDLEWARE=true (le proxy Fly valide déjà le routage
-  # par Host ; CORS et auth restent actifs).
-  TRUSTED_HOSTS = '*.internal'
+  # Le TrustedHostMiddleware est désormais ACTIVÉ sur Fly : build_trusted_hosts()
+  # couvre par défaut les motifs Fly (*.internal, *.flycast.internal, *.fly.dev)
+  # plus les hôtes dérivés de FRONTEND_APP_URL/BACKEND_PUBLIC_URL. Le Host des
+  # health checks Fly (*.internal) est couvert → le middleware ne bloque plus
+  # les sondes de santé. Action manuelle (une fois) : retirer le secret
+  # `fly secrets unset DISABLE_TRUSTED_HOST_MIDDLEWARE` pour le réactiver ;
+  # tant qu'il vaut 'true' le middleware reste désactivé par surcharge.
+  TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev'
 
 [http_service]
   internal_port = 8080

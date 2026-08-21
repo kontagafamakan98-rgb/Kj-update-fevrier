@@ -10,9 +10,11 @@ export const ValidationRules = {
   },
   
   password: {
-    minLength: 6,
-    pattern: /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/,
-    message: 'Le mot de passe doit contenir au moins 6 caractères avec des lettres et des chiffres'
+    // Aligné sur le backend (kojo_models : min_length=8) pour éviter qu'un
+    // mot de passe accepté côté client soit refusé côté serveur.
+    minLength: 8,
+    pattern: /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/,
+    message: 'Le mot de passe doit contenir au moins 8 caractères avec des lettres et des chiffres'
   },
   
   phone: {

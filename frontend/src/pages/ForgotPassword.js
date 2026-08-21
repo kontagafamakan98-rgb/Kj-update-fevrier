@@ -33,7 +33,7 @@ const COPY = {
     genericRequestMessage: 'Si cette adresse email existe, un code de réinitialisation a été envoyé.',
     invalidOtpLength: 'Le code doit contenir 6 chiffres.',
     passwordsDontMatch: 'Les mots de passe ne correspondent pas.',
-    passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères.',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères.',
     errors: {
       noActiveCode: 'Aucun code actif. Demandez un nouveau code.',
       codeExpired: 'Le code a expiré. Demandez un nouveau code.',
@@ -71,7 +71,7 @@ const COPY = {
     genericRequestMessage: 'If this email exists, a reset code has been sent.',
     invalidOtpLength: 'The code must contain 6 digits.',
     passwordsDontMatch: 'Passwords do not match.',
-    passwordTooShort: 'Password must be at least 6 characters long.',
+    passwordTooShort: 'Password must be at least 8 characters long.',
     errors: {
       noActiveCode: 'No active code. Request a new code.',
       codeExpired: 'The code expired. Request a new one.',
@@ -109,7 +109,7 @@ const COPY = {
     genericRequestMessage: 'Su email bii amee, yónnee nañu code bu reset.',
     invalidOtpLength: 'Code bi dafa wara am 6 chiffres.',
     passwordsDontMatch: 'Baatu jàll yi bokkul.',
-    passwordTooShort: 'Baatu jàll bi war na am lu néew néew 6 caractères.',
+    passwordTooShort: 'Baatu jàll bi war na am lu néew néew 8 caractères.',
     errors: {
       noActiveCode: 'Amul code buy dox. Laajal beneen code.',
       codeExpired: 'Code bi jeex na. Laajal beneen code.',
@@ -147,7 +147,7 @@ const COPY = {
     genericRequestMessage: 'Ni email in bɛ yen, reset code dɔ ciyɔrɔra.',
     invalidOtpLength: 'Code ka kan ka kɛ chiffres 6.',
     passwordsDontMatch: 'Mot de passew ma kelen ye.',
-    passwordTooShort: 'Mot de passe ka kan ka bɔ caractères 6 kan.',
+    passwordTooShort: 'Mot de passe ka kan ka bɔ caractères 8 kan.',
     errors: {
       noActiveCode: 'Code ka tɛ sen. Code kura dɔ ɲini.',
       codeExpired: 'Code banna. Code kura dɔ ɲini.',
@@ -185,7 +185,7 @@ const COPY = {
     genericRequestMessage: 'Bala email kaya be, reset code tʋmsa n yɩta.',
     invalidOtpLength: 'Code wã moet n be chiffres 6.',
     passwordsDontMatch: 'Mot de passe yaa ka kẽnd ye.',
-    passwordTooShort: 'Mot de passe wã moet n bɔr karakter 6.',
+    passwordTooShort: 'Mot de passe wã moet n bɔr karakter 8.',
     errors: {
       noActiveCode: 'Code sẽn be n tʋʋm ka be ye. Sõsg code beogo.',
       codeExpired: 'Code saame. Sõsg code beogo.',
@@ -349,7 +349,7 @@ const ForgotPassword = () => {
   const handleResetPassword = async (event) => {
     event.preventDefault();
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       setError(copy.passwordTooShort);
       toast.error(copy.passwordTooShort);
       return;

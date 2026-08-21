@@ -232,3 +232,32 @@ class TestPaymentStatus:
                    AsyncMock(side_effect=lambda p: p)):
             resp = await client.get(f"/api/payments/status/{payment_id}", headers=headers)
         assert resp.status_code == 200
+
+    async def test_payment_status_strips_provider_payloads(self, client: AsyncClient):
+        """Les payloads fournisseurs bruts (jetons, réponses PayDunya, données
+        client) ne sont JAMAIS exposés via /payments/status : seuls les champs
+        métier le sont."""
+        result = await register_and_login(client, BASE_USER)
+        payment_id = str(uuid.uuid4())
+        await db_insert("payments", {
+            "id": payment_id,
+            "payer_id": result["user"]["id"],
+            "status": "completed",
+            "amount": 15000,
+            "disburse_token": "secret-disburse-token",
+            "disburse_provider_response": {"status": "success"},
+            "provider_confirm_payload": {"customer": {"email": "x@y.z"}},
+            "disburse_error": "réponse incertaine",
+        })
+        headers = {"Authorization": f"Bearer {result['access_token']}"}
+        with patch("kojo_routers_payments.sync_payment_status_with_paydunya",
+                   AsyncMock(side_effect=lambda p: p)):
+            resp = await client.get(f"/api/payments/status/{payment_id}", headers=headers)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "completed"
+        assert body["amount"] == 15000
+        assert "disburse_token" not in body
+        assert "disburse_provider_response" not in body
+        assert "provider_confirm_payload" not in body
+        assert "disburse_error" not in body

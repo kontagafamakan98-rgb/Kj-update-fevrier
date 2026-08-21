@@ -1,11 +1,11 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI, handleApiError } from '../services/api';
+import { authAPI, handleApiError, hasSessionCookie } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { registerPushSubscription, unregisterPushSubscription, isPushSupported } from '../utils/pushRegistration';
-import { setUser } from '../utils/sentry';
+import { setUser as setSentryUser } from '../utils/sentry';
 
 const AuthContext = createContext();
 
@@ -17,16 +17,16 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Durée de vie du token côté client (doit rester <= JWT_EXPIRATION_HOURS
-  // configuré sur le backend, ici 24h). Si un token volé parvient à
-  // bypasser la révocation serveur (ex: serveur temporairement indisponible),
-  // cette expiration client l'invalide localement sans attendre le backend.
-  const TOKEN_CLIENT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
-
-  const saveToken = (token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('token_expires_at', String(Date.now() + TOKEN_CLIENT_TTL_MS));
-  };
+  // NOTE AUTH : le JWT vit désormais dans un cookie httpOnly (kojo_session)
+  // posé par le backend — il n'est plus stocké en localStorage (protection
+  // XSS : un script injecté ne peut plus voler le token). Le navigateur
+  // l'envoie automatiquement (credentials: 'include' dans api.js).
+  // Le backend renvoie toujours access_token dans le corps (compat mobile /
+  // legacy), mais on NE le persiste plus sur le web.
+  //
+  // Migration : un éventuel ancien token en localStorage reste envoyé via
+  // l'en-tête Authorization (cf. getAuthToken dans api.js) tant qu'il n'est
+  // pas purgé — l'auth dual-mode du backend l'accepte.
 
   const clearToken = () => {
     localStorage.removeItem('token');
@@ -41,7 +41,11 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    // Check if user is logged in on app start
+    // Amorçage de session au démarrage de l'app.
+    // 1) ancien token localStorage non expiré (migration) → loadUser (header)
+    // 2) cookie de session httpOnly présent (détecté via le cookie CSRF
+    //    associé, lisible en JS) → loadUser (cookie)
+    // 3) sinon → visiteur anonyme
     const token = localStorage.getItem('token');
     if (token) {
       if (isTokenExpiredLocally()) {
@@ -51,9 +55,12 @@ export function AuthProvider({ children }) {
       } else {
         loadUser();
       }
+    } else if (hasSessionCookie()) {
+      loadUser();
     } else {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadUser = async () => {
@@ -99,27 +106,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Établit la session après une auth réussie (cookie httpOnly posé par le
+  // backend ; on ne stocke que le profil en localStorage, jamais le token).
+  const establishSession = (user, cacheHours = 24) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    setUser(user);
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, user, cacheHours * 60 * 60 * 1000);
+    if (isPushSupported()) {
+      registerPushSubscription(user.id).catch(() => {});
+    }
+  };
+
   const login = async (email, password) => {
     try {
       const response = await authAPI.login({ email, password });
-      const { access_token, user } = response;
-      
-      saveToken(access_token);
-      localStorage.setItem('user', JSON.stringify(user));
-      setUser(user);
-      
-      // Cache user data
-      kojoCache.set(CACHE_KEYS.USER_PROFILE, user, 24 * 60 * 60 * 1000); // 24 hours
-      
+      const { user } = response;
+      // Le token vit dans le cookie httpOnly posé par le backend (kojo_session).
+      // On ne le persiste plus en localStorage (protection XSS).
+      establishSession(user);
       devLog.info('✅ User logged in successfully');
-
-      // Enregistrer la subscription push en arrière-plan (silencieux)
-      if (isPushSupported()) {
-        registerPushSubscription(user.id).catch(() => {});
-      }
-
       return { success: true, user };
-      
     } catch (error) {
       const errorMessage = handleApiError(error);
       safeLog.error('Login failed:', errorMessage);
@@ -140,10 +146,65 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Connexion / inscription via Google. `profile` contient les choix de
+  // création (user_type, country, preferred_language, legal_documents_accepted)
+  // utilisés uniquement si le compte est créé.
+  const loginWithGoogle = async (profile = {}) => {
+    try {
+      const { getGoogleAuthCode } = await import('../utils/googleAuth');
+      const code = await getGoogleAuthCode();
+      if (!code) return { success: false, cancelled: true };
+
+      const response = await authAPI.googleAuth({
+        code,
+        ...profile,
+      });
+
+      // Compte existant avec le même email (non lié à Google) : le frontend
+      // doit proposer la fusion sécurisée (mot de passe).
+      if (response.status === 'email_exists') {
+        return { success: false, emailExists: true, email: response.email, message: response.message };
+      }
+
+      if (response.status === 'success' && response.user) {
+        establishSession(response.user);
+        return {
+          success: true,
+          user: response.user,
+          needsOnboarding: Boolean(response.needs_onboarding),
+        };
+      }
+
+      return { success: false, error: response.message || 'Échec de la connexion Google' };
+    } catch (error) {
+      const errorMessage = handleApiError(error);
+      safeLog.error('Google login failed:', error);
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Fusion : lie un compte Google au compte actuellement connecté, en
+  // vérifiant le mot de passe (preuve de propriété).
+  const linkGoogleAccount = async (password) => {
+    try {
+      const { getGoogleAuthCode } = await import('../utils/googleAuth');
+      const code = await getGoogleAuthCode();
+      if (!code) return { success: false, cancelled: true };
+      await authAPI.googleLink({ code, password });
+      return { success: true };
+    } catch (error) {
+      const errorMessage = handleApiError(error);
+      safeLog.error('Google link failed:', error);
+      return { success: false, error: errorMessage };
+    }
+  };
+
   // Nouvelle fonction pour connexion automatique après inscription
   const autoLoginAfterRegistration = (userData, token) => {
     try {
-      saveToken(token);
+      // Le token vit dans le cookie httpOnly posé par le backend sur
+      // /auth/register-verified ; on ne le persiste plus en localStorage.
+      // Le paramètre `token` est conservé pour la signature (compat).
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
       
@@ -170,9 +231,9 @@ export function AuthProvider({ children }) {
       // Toute inscription passe par register-verified (vérification email OTP
       // obligatoire côté backend). userData doit contenir email_verification_token.
       const response = await authAPI.registerVerified(userData);
-      const { access_token, user } = response;
-      
-      saveToken(access_token);
+      const { user } = response;
+      // Le token vit dans le cookie httpOnly posé par le backend ; on ne le
+      // persiste plus en localStorage (protection XSS).
       localStorage.setItem('user', JSON.stringify(user));
       setUser(user);
       
@@ -218,6 +279,8 @@ export function AuthProvider({ children }) {
     user,
     loading,
     login,
+    loginWithGoogle,
+    linkGoogleAccount,
     register,
     logout,
     loadUser,

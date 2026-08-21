@@ -162,12 +162,22 @@ export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
 // pas déclencher la redirection globale pendant la déconnexion.
 const BUSINESS_401_PREFIXES = ['/auth/login', '/auth/register', '/auth/email/', '/auth/password/', '/auth/logout'];
 
+// Clés de session auth purgeables en cas de 401 — dans localStorage ET
+// sessionStorage (getAuthToken lit les deux buckets, la purge doit donc
+// couvrir les deux, sinon un token stocké en sessionStorage survivait au
+// 401 et l'app restait bloquée en boucle de redirection).
+const AUTH_STORAGE_KEYS = [
+  'token', 'token_expires_at', 'user',
+  'auth_token', 'access_token', 'accessToken', 'kojo_token', 'jwt',
+  'bearer_token', 'auth', 'auth_user', 'session_user', 'currentUser', 'kojo_user',
+];
+
 let sessionRedirecting = false;
 
 /**
- * Session expirée ou révoquée (401) : purge locale et redirection vers
- * /login. Garde-fou anti-boucle (une seule redirection) et anti-crash
- * (jsdom/tests).
+ * Session expirée ou révoquée (401) : purge locale (localStorage +
+ * sessionStorage) et redirection vers /login. Garde-fou anti-boucle (une
+ * seule redirection) et anti-crash (jsdom/tests).
  */
 const handleUnauthorized = (path) => {
   if (BUSINESS_401_PREFIXES.some((prefix) => path.startsWith(prefix))) return;
@@ -175,11 +185,15 @@ const handleUnauthorized = (path) => {
   sessionRedirecting = true;
 
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.removeItem('token');
-      window.localStorage.removeItem('token_expires_at');
-      window.localStorage.removeItem('user');
-    }
+    const purge = (bucketName) => {
+      const bucket = typeof window !== 'undefined' ? window[bucketName] : null;
+      if (!bucket) return;
+      AUTH_STORAGE_KEYS.forEach((key) => {
+        try { bucket.removeItem(key); } catch (_e) { /* clé absente */ }
+      });
+    };
+    purge('localStorage');
+    purge('sessionStorage');
   } catch (_error) {}
 
   try {
@@ -192,18 +206,44 @@ const handleUnauthorized = (path) => {
   }
 };
 
+// Session par cookie httpOnly (protection XSS) : le JWT vit dans le cookie
+// kojo_session posé par le backend sur login/register. Les requêtes web
+// envoient le cookie automatiquement (credentials: 'include'). Les
+// mutations (POST/PUT/PATCH/DELETE) authentifiées par cookie doivent
+// ré-échoquer le cookie CSRF kojo_csrf dans l'en-tête X-CSRFToken
+// (protection CSRF double-submit).
+const CSRF_COOKIE_NAME = 'kojo_csrf';
+
+const readCsrfCookie = () => {
+  if (typeof document === 'undefined' || !document.cookie) return '';
+  const match = document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${CSRF_COOKIE_NAME}=`));
+  return match ? decodeURIComponent(match.slice(CSRF_COOKIE_NAME.length + 1)) : '';
+};
+
+// Détection d'une session active pour l'amorçage au montage de l'app : le
+// cookie de session est httpOnly (non lisible en JS), mais le cookie CSRF
+// associé l'est → sa présence indique qu'une session existe.
+export const hasSessionCookie = () =>
+  typeof document !== 'undefined' && document.cookie.indexOf(`${CSRF_COOKIE_NAME}=`) !== -1;
+
 const request = async (method, path, { params, data, headers } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${buildApiUrl(normalizedPath)}${buildQueryString(params)}`;
   const token = getAuthToken();
   const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+  const isSafeMethod = ['GET', 'HEAD', 'OPTIONS'].includes(method);
+  const csrfToken = readCsrfCookie();
 
   const response = await fetch(url, {
     method,
+    credentials: 'include',
     headers: {
       Accept: 'application/json',
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(!isSafeMethod && csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
       ...(headers || {}),
     },
     body: data === undefined ? undefined : (isFormData ? data : JSON.stringify(data)),
@@ -267,6 +307,9 @@ export const authAPI = {
   getProfile: () => api.get('/auth/me'),
   getCurrentUser: () => api.get('/auth/me'),
   updateCountry: (payload) => api.patch('/auth/me/country', payload),
+  // Google SSO : le frontend envoie le code d'autorisation (jamais l'id_token).
+  googleAuth: (payload) => api.post('/auth/google', payload),
+  googleLink: (payload) => api.post('/auth/google/link', payload),
   // Email verification methods
   checkEmailAvailability: (payload) => api.post('/auth/email/check-availability', payload),
   sendEmailOtp: (payload) => api.post('/auth/email/send-otp', payload),
@@ -455,8 +498,6 @@ export const paymentAPI = {
   getMyPayments: () => api.get('/payments/my'),
 };
 export const paymentsAPI = paymentAPI;
-export const commissionAPI = createResourceApi('commissions');
-export const commissionsAPI = commissionAPI;
 export const userAPI = createResourceApi('users');
 export const usersAPI = {
   ...userAPI,
@@ -513,20 +554,13 @@ export const reviewAPI = {
   remove: (reviewId) => api.delete(`/reviews/${reviewId}`),
 };
 export const reviewsAPI = reviewAPI;
-export const adminAPI = createResourceApi('admin');
-export const walletAPI = createResourceApi('wallet');
 export const supportAPI = {
   createTicket: (payload) => api.post('/support/tickets', payload),
   listTickets: (statusFilter) => api.get('/support/tickets', { params: statusFilter ? { status_filter: statusFilter } : {} }),
   updateTicketStatus: (ticketId, status) => api.patch(`/support/tickets/${ticketId}/status`, { status }),
 };
-export const walletsAPI = walletAPI;
 export const proposalAPI = createResourceApi('proposals');
 export const proposalsAPI = proposalAPI;
-export const searchAPI = createResourceApi('search');
-export const statsAPI = createResourceApi('stats');
-export const dashboardAPI = createResourceApi('dashboard');
-export const settingsAPI = createResourceApi('settings');
 export const messageAPI = {
   list: (params = {}) => messagesAPI.list(params),
   getAll: (params = {}) => messagesAPI.list(params),

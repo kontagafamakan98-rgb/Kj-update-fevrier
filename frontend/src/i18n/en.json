@@ -368,7 +368,7 @@
   "actionButton": "Action button",
   "passwordMasked": "••••••••",
   "passwordsDontMatch": "Passwords do not match",
-  "passwordTooShort": "Password must contain at least 6 characters",
+  "passwordTooShort": "Password must contain at least 8 characters",
   "workersMustSelectSkills": "Workers must select at least one skill",
   "pleaseIndicateExperience": "Please indicate your years of experience",
   "pleaseIndicateValidRate": "Please indicate a valid hourly rate (minimum 500 FCFA)",

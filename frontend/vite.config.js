@@ -12,7 +12,11 @@ export default defineConfig(({ mode }) => {
   }
 
   // Origin du backend (pour la CSP connect-src en prod) — dynamique selon
-  // VITE_API_URL, avec repli sur l'URL Render par défaut de l'app.
+  // VITE_API_URL, avec repli sur l'URL Fly par défaut de l'app.
+  // En prod, le proxy Vercel (/api/* → Fly) rend l'API même-origine : les
+  // requêtes /api/... sont sur 'self'. On garde apiOrigin dans connect-src
+  // comme repli pour le mode direct (mobile Capacitor, debug, ou si le
+  // proxy est désactivé via VITE_USE_SAME_ORIGIN_API=false).
   const rawApiUrl = (env.VITE_API_URL || env.VITE_API_BASE_URL || env.VITE_BACKEND_URL || '').trim()
   let apiOrigin = 'https://kojo-backend.fly.dev'
   try {

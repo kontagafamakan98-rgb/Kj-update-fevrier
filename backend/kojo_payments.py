@@ -157,9 +157,27 @@ def build_disburse_callback_url() -> str:
         return f"{BACKEND_PUBLIC_URL}/api/payments/disburse-ipn"
     return '/api/payments/disburse-ipn'
 
+# Champs fournisseur/payloads bruts JAMAIS exposés via l'API : ils peuvent
+# contenir des données client (email, téléphone), du texte d'erreur interne
+# ou des jetons PayDunya. Les endpoints /payments/status/* et /payments/my
+# renvoient le statut métier (status, payout_status, montants...), pas ces
+# détails bruts — le serveur les lit toujours depuis la base (IPN, recheck).
+PROVIDER_SENSITIVE_FIELDS = {
+    "provider_confirm_payload",
+    "provider_response_text",
+    "disburse_token",
+    "disburse_provider_response",
+    "disburse_verified_payload",
+    "disburse_callback_payload",
+    "disburse_error",
+}
+
+
 def serialize_payment_record(record: Dict[str, Any]) -> Dict[str, Any]:
     serialized = dict(record)
     serialized.pop('_id', None)
+    for field in PROVIDER_SENSITIVE_FIELDS:
+        serialized.pop(field, None)
     return serialized
 
 def create_paydunya_invoice(payload: Dict[str, Any]) -> Dict[str, Any]:

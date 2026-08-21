@@ -3,7 +3,9 @@
 middlewares de sécurité, dépendances d'authentification et helpers."""
 
 import asyncio
+import hmac
 import os
+import secrets
 import time
 import uuid
 from collections import defaultdict
@@ -14,9 +16,10 @@ from urllib.parse import urlparse
 import bcrypt
 import jwt
 from cloudinary import uploader as cloudinary_uploader
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import ValidationError
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -24,7 +27,12 @@ from kojo_models import PaymentAccount, User, WA_PHONE_RULES
 from kojo_settings import (
     APP_ENV,
     APP_VERSION,
+    AUTH_COOKIE_MAX_AGE,
+    AUTH_COOKIE_NAME,
+    AUTH_COOKIE_SAMESITE,
+    AUTH_COOKIE_SECURE,
     BACKEND_PUBLIC_URL,
+    CSRF_COOKIE_NAME,
     FRONTEND_APP_URL,
     JWT_ALGORITHM,
     JWT_EXPIRATION_HOURS,
@@ -107,6 +115,10 @@ async def create_database_indexes():
         await db.users.create_index("user_type")
         await db.users.create_index("country")
         await db.users.create_index([("email", 1), ("password_hash", 1)])
+        # Comptes SSO Google : un sub Google est lié à AU PLUS UN compte Kojo.
+        # Sparse : les comptes mot-de-passe n'ont pas de google_sub et ne
+        # doivent pas être contraints par cet index.
+        await db.users.create_index("google_sub", unique=True, sparse=True)
         
         # Jobs collection indexes
         await db.jobs.create_index("id", unique=True)
@@ -144,11 +156,13 @@ async def create_database_indexes():
         except Exception as exc:
             logger.warning(f"⚠️ Backfill geo jobs impossible: {exc}")
         
-        # Proposals collection indexes
-        await db.proposals.create_index("id", unique=True)
-        await db.proposals.create_index("job_id")
-        await db.proposals.create_index("worker_id")
-        await db.proposals.create_index([("job_id", 1), ("worker_id", 1)])
+        # Proposals collection indexes — sur la VRAIE collection job_proposals
+        # (l'ancienne "proposals" n'est plus utilisée par aucun code ; les
+        # index y étaient créés à tort, laissant job_proposals sans index).
+        await db.job_proposals.create_index("id", unique=True)
+        await db.job_proposals.create_index("job_id")
+        await db.job_proposals.create_index("worker_id")
+        await db.job_proposals.create_index([("job_id", 1), ("worker_id", 1)])
         
         # Messages collection indexes
         # NOTE: les index précédents portaient sur "job_id" et "created_at",
@@ -247,6 +261,11 @@ _redis_client = _try_init_redis()
 
 _using_redis = _redis_client is not None
 
+# Garde-fou anti-boucle : si Redis est down au boot, on ne ré-essaie pas à
+# chaque requête (ça spammerait un Redis en panne), mais on ré-essaie au plus
+# une fois par minute via _get_redis_client().
+_redis_retry_after = 0.0
+
 if _redis_client is None and APP_ENV in ("production", "prod"):
     # Sans Redis, le rate-limiting est en mémoire et PAR PROCESS : avec N
     # workers uvicorn, les limites réelles sont multipliées par N et ne sont
@@ -259,9 +278,32 @@ if _redis_client is None and APP_ENV in ("production", "prod"):
         "rate-limiting partagé multi-workers."
     )
 
+async def _get_redis_client() -> Optional[Any]:
+    """Retourne le client Redis actif, en ré-essayant paresseusement s'il a
+    échoué au boot (REDIS_URL posé mais connexion momentanément indisponible).
+    Sans cette ré-init, un Redis down au démarrage laissait le rate-limiter en
+    mémoire pour TOUTE la vie du process, même après le retour de Redis —
+    l'écart multi-workers aurait persisté jusqu'au prochain redéploiement."""
+    global _redis_client, _using_redis, _redis_retry_after
+    if _redis_client is not None:
+        return _redis_client
+    if not os.environ.get('REDIS_URL', '').strip():
+        return None
+    now = time.monotonic()
+    if now < _redis_retry_after:
+        return None
+    _redis_retry_after = now + 60  # au plus une tentative par minute
+    client = _try_init_redis()
+    if client is not None:
+        _redis_client = client
+        _using_redis = True
+        logger.info("✅ Rate-limiter: Redis re-connecté (mode partagé repassé actif)")
+    return _redis_client
+
 async def rate_limit_check(client_ip: str, max_requests: int = 100, window_minutes: int = 1) -> bool:
-    """Vérifie le rate limiting. Utilise Redis si disponible, sinon mémoire."""
-    if _using_redis:
+    """Vérifie le rate limiting. Utilise Redis si disponible (ré-init
+    paresseuse si nécessaire), sinon mémoire."""
+    if await _get_redis_client() is not None:
         return await _rate_limit_check_redis(client_ip, max_requests, window_minutes)
     return _rate_limit_check_memory(client_ip, max_requests, window_minutes)
 
@@ -360,7 +402,15 @@ def build_trusted_hosts() -> List[str]:
         "127.0.0.1",
         "*.vercel.app",
         "*.onrender.com",
-        "onrender.com"
+        "onrender.com",
+        # Fly.io : le Host des health checks (et du trafic interne) est un
+        # nom DNS interne *.internal ; le trafic public arrive via le proxy
+        # Fly sur *.fly.dev / *.flycast.internal. Ces motifs rendent le
+        # TrustedHostMiddleware sûr à activer sur Fly SANS dépendre de la
+        # variable TRUSTED_HOSTS (défaut robuste, surchargable via l'env).
+        "*.internal",
+        "*.flycast.internal",
+        "*.fly.dev",
     }
 
     render_external_host = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '').strip()
@@ -391,7 +441,85 @@ def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
         return ("owner", 30, 1)
     return ("general-api", 240, 1)
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
+
+# --- Authentification dual-mode : Authorization: Bearer OU cookie httpOnly ---
+# Le JWT vit désormais aussi dans un cookie httpOnly (invisible pour
+# JavaScript → protection XSS). Le mode header historique reste (mobile /
+# Capacitor / intégrations / tests). Les routes n'ont rien à changer :
+# get_current_user et verify_owner_access lisent l'un ou l'autre.
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def _resolve_token(request: Request, credentials: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
+    """Source du token : Authorization: Bearer (header) puis cookie httpOnly."""
+    if credentials is not None and credentials.credentials:
+        return credentials.credentials
+    cookie_token = request.cookies.get(AUTH_COOKIE_NAME)
+    return cookie_token or None
+
+
+def _verify_csrf(request: Request) -> None:
+    """Protection CSRF (double-submit) pour les requêtes authentifiées PAR
+    COOKIE sur méthodes non sûres. Le navigateur envoie automatiquement le
+    cookie de session sur toute requête vers le backend (y compris forgée
+    depuis un site tiers) : un cookie CSRF lisible par JS doit alors être
+    ré-écho dans l'en-tête X-CSRFToken. Les requêtes authentifiées PAR HEADER
+    (Authorization: Bearer, ex: mobile) n'ont pas de cookies ambients → pas
+    de CSRF, pas de vérification."""
+    header_token = request.headers.get("X-CSRFToken", "").strip()
+    cookie_token = request.cookies.get(CSRF_COOKIE_NAME, "").strip()
+    if (
+        not header_token
+        or not cookie_token
+        or not hmac.compare_digest(header_token, cookie_token)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Validation CSRF échouée. Jeton manquant ou invalide.",
+        )
+
+
+def set_auth_cookies(response: Response, access_token: str) -> None:
+    """Pose le cookie de session httpOnly + un cookie CSRF lisible par JS
+    (valeur aléatoire, validée côté serveur sur les mutations via en-tête
+    X-CSRFToken). À appeler sur login / register."""
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=access_token,
+        max_age=AUTH_COOKIE_MAX_AGE,
+        expires=AUTH_COOKIE_MAX_AGE,
+        path="/",
+        domain=None,
+        secure=AUTH_COOKIE_SECURE,
+        httponly=True,
+        samesite=AUTH_COOKIE_SAMESITE,
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=csrf_token,
+        max_age=AUTH_COOKIE_MAX_AGE,
+        expires=AUTH_COOKIE_MAX_AGE,
+        path="/",
+        domain=None,
+        secure=AUTH_COOKIE_SECURE,
+        httponly=False,
+        samesite=AUTH_COOKIE_SAMESITE,
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Retire les cookies de session + CSRF (logout)."""
+    for name in (AUTH_COOKIE_NAME, CSRF_COOKIE_NAME):
+        response.delete_cookie(
+            key=name,
+            path="/",
+            domain=None,
+            secure=AUTH_COOKIE_SECURE,
+            samesite=AUTH_COOKIE_SAMESITE,
+            httponly=(name == AUTH_COOKIE_NAME),
+        )
 
 class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -402,7 +530,10 @@ class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
 
         response.headers["X-Kojo-Region"] = "west-africa"
         response.headers["X-Kojo-Version"] = APP_VERSION
-        response.headers["Vary"] = "Origin, Authorization, Accept-Encoding"
+        # Vary inclut Cookie : les réponses authentifiées dépendent du
+        # cookie de session httpOnly — un cache intermédiaire ne doit pas
+        # servir la réponse d'un utilisateur à un autre.
+        response.headers["Vary"] = "Origin, Authorization, Cookie, Accept-Encoding"
 
         path = request.url.path
         has_auth_header = bool(request.headers.get("authorization"))
@@ -452,10 +583,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-async def verify_owner_access(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Vérifie que seul le propriétaire peut accéder aux fonctionnalités sensibles"""
+async def verify_owner_access(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+):
+    """Vérifie que seul le propriétaire peut accéder aux fonctionnalités sensibles.
+    Dual-mode header/cookie (cf. get_current_user). Les mutations via cookie
+    exigent un jeton CSRF valide."""
     try:
-        token = credentials.credentials
+        token = _resolve_token(request, credentials)
+        if not token:
+            raise HTTPException(status_code=401, detail="Non authentifié")
+        if request.method not in _SAFE_METHODS and credentials is None:
+            _verify_csrf(request)
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
         email = payload.get("email")
@@ -855,7 +995,12 @@ def log_and_raise_http_exception(status_code: int, detail: str, logger_instance=
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-def verify_password(password: str, hashed: str) -> bool:
+def verify_password(password: str, hashed: Optional[str]) -> bool:
+    """Vérifie un mot de passe bcrypt. hashed=None (compte SSO Google, sans
+    mot de passe) → False proprement (le login classique est refusé), au lieu
+    d'un AttributeError qui remonterait en 500."""
+    if not hashed:
+        return False
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 def sanitize_email(email: str) -> str:
@@ -933,9 +1078,21 @@ request_counts: Dict[str, List[float]] = defaultdict(list)
 
 RATE_LIMIT_MAX_TRACKED_KEYS = 50_000  # garde-fou anti-DoS mémoire
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+):
     try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        token = _resolve_token(request, credentials)
+        if not token:
+            raise HTTPException(status_code=401, detail="Non authentifié")
+        # CSRF : une requête authentifiée PAR COOKIE sur une méthode non sûre
+        # (POST/PUT/PATCH/DELETE) doit présenter un jeton X-CSRFToken
+        # correspondant au cookie CSRF. Les requêtes authentifiées par header
+        # Bearer (mobile/legacy) sont exemptes (pas de cookies ambients).
+        if request.method not in _SAFE_METHODS and credentials is None:
+            _verify_csrf(request)
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -946,7 +1103,21 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user = await db.users.find_one({"id": user_id})
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
-        return User(**user)
+        try:
+            return User(**user)
+        except ValidationError as exc:
+            # Un document utilisateur legacy/corrompu qui ne valide plus le
+            # modèle User (téléphone invalide, champ manquant...) ne doit pas
+            # faire planter le serveur en 500 sur CHAQUE endpoint authentifié
+            # (le login fonctionnerait, mais /auth/me et tout le reste
+            # échoueraient en cascade). On renvoie un 401 clair : le compte
+            # nécessite une intervention support plutôt qu'une erreur serveur
+            # sans issue pour l'utilisateur.
+            logger.error(f"⚠️ Document utilisateur invalide (id={user_id}): {exc}")
+            raise HTTPException(
+                status_code=401,
+                detail="Compte utilisateur invalide. Veuillez contacter le support."
+            )
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:

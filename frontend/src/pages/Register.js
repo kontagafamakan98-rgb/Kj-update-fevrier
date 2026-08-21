@@ -8,6 +8,7 @@ import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
 import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
 import LoadingButton from '../components/LoadingButton';
+import GoogleButton from '../components/GoogleButton';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
 import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrationFlowStorage';
@@ -56,7 +57,7 @@ export default function Register() {
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [userSelectedLanguage, setUserSelectedLanguage] = useState(defaultLanguage); // Choix utilisateur pour profil
   
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const pageT = makeScopedTranslator(currentLanguage, t, 'register');
   const toast = useToast();
   const navigate = useNavigate();
@@ -210,7 +211,7 @@ export default function Register() {
       return;
     }
 
-    if (formData.password.length < 6) {
+    if (formData.password.length < 8) {
       const errorMsg = t('passwordTooShort');
       setError(errorMsg);
       toast.error(errorMsg);
@@ -275,6 +276,51 @@ export default function Register() {
     });
     
     setLoading(false);
+  };
+
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError('');
+    setErrorKey('');
+
+    if (!formData.legal_documents_accepted) {
+      const errorMsg = pageT('legalConsentRequired');
+      setError(errorMsg);
+      toast.error(errorMsg);
+      setLoading(false);
+      return;
+    }
+
+    const result = await loginWithGoogle({
+      user_type: formData.user_type || 'client',
+      country: formData.country || undefined,
+      preferred_language: userSelectedLanguage || defaultLanguage,
+      legal_documents_accepted: true,
+    });
+    setLoading(false);
+
+    if (result.success) {
+      clearRegistrationFlow();
+      // Onboarding : le compte est créé mais les comptes de paiement doivent
+      // être ajoutés (l'auth Google saute l'OTP mais pas la vérification des
+      // moyens de paiement).
+      toast.success(pageT('googleSuccess'));
+      navigate('/payment-verification', {
+        state: {
+          userData: result.user,
+          resumeAfterLogin: true,
+          fromGoogle: true,
+        }
+      });
+      return;
+    }
+    if (result.cancelled) return;
+    if (result.emailExists) {
+      setError(pageT('googleEmailExists'));
+      return;
+    }
+    setError(result.error || t('registerFailed'));
+    toast.error(result.error || t('registerFailed'));
   };
 
   const handleChange = (e) => {
@@ -405,6 +451,23 @@ export default function Register() {
           )}
           
           <div className="space-y-6">
+            {/* Inscription via Google (SSO) : utilise les choix du formulaire
+                (type, pays, langue) + l'acceptation des conditions. */}
+            <GoogleButton
+              onClick={handleGoogle}
+              label={pageT('googleSignup')}
+              disabled={loading}
+            />
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="bg-white px-3 text-gray-400">{pageT('orSeparator') || 'ou'}</span>
+              </div>
+            </div>
+
             {/* User Type */}
             <fieldset>
               <legend className="block text-sm font-medium text-gray-700 mb-3">

@@ -37,6 +37,7 @@ const COPY = {
     minPaymentAmount: 'Le montant minimum pour un paiement est de 200 FCFA.',
     paymentForMissionDetail: '💼 Paiement pour la mission{jobTitle} — le montant a été rempli automatiquement suite à l’attribution du travailleur.',
     minPaydunyaAmount: '⚠️ Le montant minimum accepté par PayDunya est de 200 FCFA.',
+    rateChanged: 'Le taux de commission a changé : la répartition a été mise à jour. Cliquez à nouveau pour confirmer et payer.',
     countries: { senegal: 'Sénégal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Carte bancaire' }
   },
@@ -71,6 +72,7 @@ const COPY = {
     minPaymentAmount: 'The minimum amount for a payment is 200 FCFA.',
     paymentForMissionDetail: '💼 Payment for the job{jobTitle} — the amount was filled automatically after the worker was assigned.',
     minPaydunyaAmount: '⚠️ The minimum amount accepted by PayDunya is 200 FCFA.',
+    rateChanged: 'The commission rate has changed: the split has been updated. Click again to confirm and pay.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Ivory Coast' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank card' }
   },
@@ -102,6 +104,10 @@ const COPY = {
     myPayments: 'Samay paiements yu mujj',
     noPayments: 'Amul paiement bu ñu bindal account bii.',
     openCheckout: 'Ubbi checkout',
+    rateChanged: 'Fees bi soppi na: séddoo bi ñu ko yeesal. Dellu klik ngir dëggal te fey.',
+    minPaymentAmount: 'Sàntu fey gu digg la: 200 FCFA.',
+    paymentForMissionDetail: '💼 Fey bu mission bi{jobTitle} — sàntu bi ñu ko yombal ci saasi ñu jappale liggéeykat bi.',
+    minPaydunyaAmount: '⚠️ Sàntu gu digg gu PayDunya la: 200 FCFA.',
     countries: { senegal: 'Senegaal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Kot Divwaar' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Kart bank' }
   },
@@ -133,6 +139,10 @@ const COPY = {
     myPayments: 'Ne ka paiements kura',
     noPayments: 'Paiement si tɛ account nin kama fɔlɔ.',
     openCheckout: 'Checkout da yɔrɔ',
+    rateChanged: 'Commission rate yɛlɛma: jɛgɛnsira ladilanen don. I ka klik segin ka a sɔn ka sara.',
+    minPaymentAmount: 'Sariya-faga jate min: 200 FCFA.',
+    paymentForMissionDetail: '💼 Sariya-faga baaraw kama{jobTitle} — jate ladilanen ka bɔ otomatik ni barakɛla donnen ye.',
+    minPaydunyaAmount: '⚠️ Jate min PayDunya b’a sɔn: 200 FCFA.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank karti' }
   },
@@ -164,6 +174,10 @@ const COPY = {
     myPayments: 'Mam paiements kɩtã',
     noPayments: 'Paiement baa ka be account yɩnga ye.',
     openCheckout: 'Checkout yɔk',
+    rateChanged: 'Commission rate togame: yidgã manegame. Leeb n klik n kõ sɩda n yaool.',
+    minPaymentAmount: 'Paoongo sõor sẽn sõmb n yɩ: 200 FCFA.',
+    paymentForMissionDetail: '💼 Paoongo yĩnga tʋʋmã{jobTitle} — sõorã sigla ne a menga sẽn wa n paam barakɛda wã.',
+    minPaydunyaAmount: '⚠️ Sõor sẽn sõmb n yɩ PayDunya: 200 FCFA.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank carte' }
   }
@@ -312,6 +326,28 @@ const Payment = () => {
     }
 
     try {
+      // Re-fetch du quote à jour AVANT le checkout : si le taux de commission
+      // a changé en base depuis l'affichage, la répartition affichée est mise
+      // à jour et l'utilisateur doit confirmer AVANT la redirection (sinon il
+      // verrait l'ancienne répartition alors que le checkout applique la
+      // nouvelle — incohérence d'affichage). Le 2ème clic confirme : le quote
+      // affiché est alors à jour et le checkout se lance.
+      const freshQuote = await CommissionService.getQuote({
+        amount: Number(form.amount),
+        paymentMethod: form.method,
+        country: form.country,
+      });
+      const previousCommission = quote?.commission_amount;
+      setQuote(freshQuote);
+      if (
+        previousCommission !== undefined &&
+        Number(freshQuote?.commission_amount) !== Number(previousCommission)
+      ) {
+        setCheckoutError(copy.rateChanged);
+        setProcessing(false);
+        return;
+      }
+
       const checkout = await CommissionService.createCheckout({
         amount: Number(form.amount),
         paymentMethod: form.method,

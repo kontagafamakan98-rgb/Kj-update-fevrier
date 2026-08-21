@@ -38,7 +38,7 @@ const CommissionDashboard = () => {
   const loadOwnerData = async () => {
     try {
       CommissionService.loadOwnerAccounts();
-      setStats(CommissionService.getCommissionStats());
+      setStats(await CommissionService.getCommissionStats());
       setTransactions(CommissionService.getStoredTransactions());
       setOwnerAccounts(CommissionService.getOwnerAccounts());
 

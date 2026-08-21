@@ -645,11 +645,6 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     except Exception:
         pass
 
-    try:
-        await db.proposals.delete_many({"job_id": job_id})
-    except Exception:
-        pass
-
     # Notifications (best-effort) : informer le client du sort de son argent
     # et le travailleur de l'annulation.
     if payment_record:

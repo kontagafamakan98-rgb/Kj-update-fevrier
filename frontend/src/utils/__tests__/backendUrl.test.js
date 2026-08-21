@@ -121,4 +121,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
   delete window.__KOJO_API_URL__;
   delete window.__API_URL__;
+  delete window.__KOJO_USE_SAME_ORIGIN_API__;
+});
+
+// Proxy même-origine (production via rewrite Vercel /api/* → Fly) : en prod
+// sur une origine servie, getBackendBaseUrl renvoie '' (origine nue) et
+// buildApiUrl produit un chemin RELATIF /api/... → les cookies httpOnly
+// deviennent same-site (résout le blocage Safari ITP des cookies tiers).
+// Le mode direct vers Fly reste activable via window.__KOJO_USE_SAME_ORIGIN_API__ = false.
+describe('proxy même-origine (production)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    delete window.__KOJO_USE_SAME_ORIGIN_API__;
+  });
+
+  it('override runtime __KOJO_USE_SAME_ORIGIN_API__ = false → garde Fly direct', () => {
+    window.__KOJO_USE_SAME_ORIGIN_API__ = false;
+    vi.stubEnv('VITE_API_URL', '');
+    vi.stubEnv('VITE_API_BASE_URL', '');
+    vi.stubEnv('VITE_BACKEND_URL', '');
+    // En jsdom, window.location.hostname = 'localhost' → repli dev
+    // localhost:8000 (le proxy même-origine ne s'active que sur une origine
+    // servie hors localhost). On vérifie juste que l'override false court-
+    // circuitu le proxy et retombe sur le repli dev (comportement attendu).
+    expect(getBackendBaseUrl()).toBe('http://localhost:8000');
+    expect(buildApiUrl('/users')).toBe('http://localhost:8000/api/users');
+  });
 });

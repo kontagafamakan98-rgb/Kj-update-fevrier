@@ -140,6 +140,51 @@ REFERRAL_FILLEUL_REWARD = float(os.environ.get('REFERRAL_FILLEUL_REWARD', '500')
 REFERRAL_WELCOME_SPONSOR_REWARD = float(os.environ.get('REFERRAL_WELCOME_SPONSOR_REWARD', '250'))
 REFERRAL_WELCOME_FILLEUL_REWARD = float(os.environ.get('REFERRAL_WELCOME_FILLEUL_REWARD', '250'))
 
+# --- Session par cookie httpOnly (auth web, protection XSS) ---
+# Le JWT vit dans un cookie httpOnly (invisible pour JavaScript) en plus du
+# mode historique "Authorization: Bearer" (mobile/Capacitor, intégrations).
+# Le frontend web (Vercel) appelle le backend (Fly) en CROSS-SITE : un cookie
+# cross-site exige SameSite=None + Secure. En dev local (même origine
+# localhost), SameSite=Lax suffit et fonctionne en HTTP.
+_IS_PROD_ENV = APP_ENV in ("production", "prod")
+
+AUTH_COOKIE_NAME = os.environ.get('AUTH_COOKIE_NAME', 'kojo_session').strip()
+
+CSRF_COOKIE_NAME = os.environ.get('CSRF_COOKIE_NAME', 'kojo_csrf').strip()
+
+AUTH_COOKIE_SAMESITE = os.environ.get(
+    'AUTH_COOKIE_SAMESITE', 'none' if _IS_PROD_ENV else 'lax'
+).strip().lower()
+
+AUTH_COOKIE_SECURE = os.environ.get(
+    'AUTH_COOKIE_SECURE', 'true' if _IS_PROD_ENV else 'false'
+).strip().lower() in {'1', 'true', 'yes', 'on'}
+
+# Durée du cookie alignée sur le JWT (24h) : le cookie expire avec le token.
+AUTH_COOKIE_MAX_AGE = JWT_EXPIRATION_HOURS * 3600
+
+# --- Google Sign-In (SSO) ---
+# Flux serveur : le frontend reçoit un code d'autorisation Google (PKCE) et
+# le backend l'échange contre un id_token, dont il vérifie la signature et
+# l'audience (client_id). GOOGLE_CLIENT_ID est aussi utilisé côté frontend
+# (bouton Google Identity Services).
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
+
+# URL de callback déclarée dans la console Google Cloud (OAuth 2.0 Client IDs).
+# Pour Vercel : https://kj-update-fevrier.vercel.app/auth/google/callback
+# Pour le dev local : http://localhost:3000/auth/google/callback
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', '').strip()
+
+# Endpoints Google (tokeninfo pour la vérification de l'id_token).
+GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+
+# Les comptes créés via Google n'ont pas de mot de passe : ils se connectent
+# uniquement via Google. On ne peut PAS les laisser se connecter avec le flux
+# email/mot-de-passe (aucun hash stocké).
+GOOGLE_AUTH_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
 PAYDUNYA_MODE = os.environ.get('PAYDUNYA_MODE', 'test').strip().lower()
 
 PAYDUNYA_MASTER_KEY = os.environ.get('PAYDUNYA_MASTER_KEY', '').strip()

@@ -20,10 +20,51 @@
 // ou SANS le suffixe /api (les deux conventions coexistent). getBackendBaseUrl
 // renvoie la base telle quelle (avec /api si fourni) ; buildApiUrl normalise
 // vers l'origine nue puis ajoute /api exactement une fois.
+//
+// PROXY MÊME-ORIGINE (production) : en prod, les requêtes /api/* passent par
+// un rewrite Vercel (vercel.json) qui proxifie vers le backend Fly. Le
+// frontend envoie donc des requêtes RELATIVES (/api/...) sur SA PROPRE
+// origine → les cookies de session httpOnly deviennent same-site (plus de
+// blocage par Safari ITP / cookies tiers). Le mode "cross-site direct vers
+// Fly" reste disponible via VITE_USE_SAME_ORIGIN_API=false (ex: mobile
+// Capacitor, ou debug).
 // ============================================================================
 
 const trimTrailingSlashes = (value = '') => String(value || '').replace(/\/+$/, '');
 const DEFAULT_REMOTE_BACKEND_URL = 'https://kojo-backend.fly.dev';
+
+// En production, le proxy Vercel rend l'API même-origine par défaut. En dev
+// local, on garde le comportement cross-origin vers localhost:8000 (le dev
+// server Vite ne proxifie pas /api). Pilotable via VITE_USE_SAME_ORIGIN_API
+// pour débogage ou mobile Capacitor.
+const isSameOriginApiProd = () => {
+  // Runtime override explicite prioritaire
+  if (typeof window !== 'undefined') {
+    const flag = window.__KOJO_USE_SAME_ORIGIN_API__;
+    if (typeof flag === 'boolean') return flag;
+  }
+  const envFlag =
+    (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_USE_SAME_ORIGIN_API) ||
+    (typeof process !== 'undefined' && process.env?.VITE_USE_SAME_ORIGIN_API) ||
+    '';
+  const normalized = String(envFlag || '').trim().toLowerCase();
+  if (normalized === 'false' || normalized === '0') return false;
+  // Par défaut : actif en production build (mode production Vite), inactif
+  // en dev (le dev server ne proxifie pas /api).
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.PROD === true || import.meta.env.MODE === 'production';
+  }
+  return false;
+};
+
+// Détecte si on tourne sur une origine servie (https/http avec host réel),
+// i.e. pas un fichier local / Capacitor. Utilisé pour décider si l'origine
+// courante est un proxy Vercel valable.
+const hasServedOrigin = () => {
+  if (typeof window === 'undefined' || !window.location) return false;
+  const { hostname } = window.location;
+  return Boolean(hostname) && hostname !== 'localhost' && hostname !== '127.0.0.1';
+};
 
 const readRuntimeOverride = () => {
   if (typeof window !== 'undefined') {
@@ -53,6 +94,15 @@ const readEnvBackendUrl = () => {
 const resolveBackendBaseUrl = () => {
   const runtime = readRuntimeOverride();
   if (runtime) return trimTrailingSlashes(runtime);
+
+  // Proxy même-origine en production : on émet des requêtes RELATIVES sur
+  // l'origine courante (proxifiée par Vercel vers Fly). On ne retourne PAS
+  // une origine absolue ici ; buildApiUrl gérera le préfixe /api relatif.
+  // Ce chemin est court-circuité si une origine backend explicite (env) est
+  // fournie — utile pour le mobile Capacitor ou le debug direct vers Fly.
+  if (isSameOriginApiProd() && hasServedOrigin()) {
+    return '';
+  }
 
   const env = readEnvBackendUrl();
   if (env) return trimTrailingSlashes(env);

@@ -128,11 +128,22 @@ async def update_profile(
 
     if "profile_photo" in update_data:
         photo = update_data["profile_photo"]
-        if photo is not None:
+        if photo is None:
+            # null = suppression explicite de la photo (comportement historique).
+            update_data["profile_photo"] = None
+        else:
             photo = str(photo).strip()
-            if len(photo) > 500 or not photo.startswith(("http://", "https://")):
-                raise HTTPException(status_code=400, detail="URL de photo invalide")
-            update_data["profile_photo"] = photo
+            if not photo:
+                # Chaîne vide (formulaire sans photo) : on ne touche pas au
+                # champ existant plutôt que de stocker une chaîne vide.
+                update_data.pop("profile_photo", None)
+            elif len(photo) > 500 or not photo.startswith("https://res.cloudinary.com/"):
+                # La source de vérité des photos est Cloudinary (upload via
+                # /users/profile-photo). On refuse les URLs externes qui
+                # serviraient de pisteur (tracking) ou de lien arbitraire.
+                raise HTTPException(status_code=400, detail="URL de photo invalide (Cloudinary requis)")
+            else:
+                update_data["profile_photo"] = photo
 
     update_data["updated_at"] = datetime.now(timezone.utc)
 
@@ -691,6 +702,22 @@ async def apply_referral(
 REFERRAL_WITHDRAW_MINIMUM = 200.0
 
 
+async def _release_referral_withdraw_lock(user_id: str) -> None:
+    """Lève le verrou anti double-retrait (referral_withdrawal_in_progress).
+
+    À appeler sur TOUT chemin terminal du retrait qui n'a pas (ou plus)
+    d'opération en cours chez PayDunya : échec sûr (get-invoice refusé,
+    réponse négative au submit) ou succès. Le verrou ne reste posé que tant
+    qu'un décaissement est en attente de confirmation (releasing) — c'est
+    l'IPN ou le check-status qui le lève alors via
+    apply_referral_payout_confirmed (kojo_shared).
+    """
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"referral_withdrawal_in_progress": False, "updated_at": datetime.now(timezone.utc)}},
+    )
+
+
 @router.post("/users/referral/withdraw")
 async def withdraw_referral_rewards(current_user: User = Depends(get_current_user)):
     """Retire le solde de récompenses de parrainage (bonus + récompenses)
@@ -731,10 +758,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
 
     withdraw_method, withdraw_phone = get_mobile_money_account((user or {}).get("payment_accounts"))
     if not withdraw_method or not withdraw_phone:
-        await db.users.update_one(
-            {"id": current_user.id},
-            {"$set": {"referral_withdrawal_in_progress": False, "updated_at": datetime.now(timezone.utc)}},
-        )
+        await _release_referral_withdraw_lock(current_user.id)
         raise HTTPException(
             status_code=400,
             detail="Aucun compte Orange Money ou Wave configuré : ajoutez un moyen de paiement pour retirer vos récompenses",
@@ -757,12 +781,17 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
         )
         disburse_token = invoice.get("disburse_token")
     except HTTPException as exc:
+        # Échec SÛR : PayDunya n'a rien exécuté → on lève le verrou pour que
+        # le travailleur puisse réessayer (le solde est intact).
+        await _release_referral_withdraw_lock(current_user.id)
         raise HTTPException(status_code=502, detail=f"Retrait impossible pour le moment : {exc.detail}")
     except Exception as exc:
         logger.error(f"⚠️ Erreur inattendue lors de la préparation du retrait de récompenses: {exc}")
+        await _release_referral_withdraw_lock(current_user.id)
         raise HTTPException(status_code=502, detail="Retrait impossible pour le moment, réessayez plus tard")
 
     if not disburse_token:
+        await _release_referral_withdraw_lock(current_user.id)
         raise HTTPException(status_code=502, detail="Retrait impossible pour le moment : réponse PayDunya invalide")
 
     # Enregistrement du retrait AVANT le submit : si le submit lève (timeout
@@ -820,34 +849,20 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     ).strip().lower()
 
     if provider_status == "success":
-        # Décaissement confirmé : on décrémente le solde et on trace le retrait.
-        await db.users.update_one(
-            {"id": current_user.id},
-            {
-                "$set": {"referral_reward_balance": 0.0, "updated_at": datetime.now(timezone.utc)},
-                "$push": {"referral_rewards": {
-                    "type": "withdrawal",
-                    "amount": -amount,
-                    "payment_id": payment_id,
-                    "created_at": now_iso,
-                }},
-            },
-        )
+        # Décaissement confirmé : on marque le statut, puis on applique la
+        # confirmation via le point unique de vérité (kojo_shared.
+        # apply_referral_payout_confirmed) qui décrémente le solde, trace le
+        # retrait, notifie ET lève le verrou anti double-retrait
+        # (referral_withdrawal_in_progress).
         await db.payments.update_one(
             {"id": payment_id},
             {"$set": {
                 "payout_status": "released",
-                "referral_balance_applied": True,
                 "disburse_provider_response": submit_result,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }},
         )
-        asyncio.create_task(notify_user_localized(
-            user_id=current_user.id,
-            key="referral_withdraw_success",
-            notif_type=NotificationType.GENERAL,
-            amount=amount,
-        ))
+        await apply_referral_payout_confirmed({"id": payment_id})
         return {
             "status": "released",
             "payment_id": payment_id,
@@ -874,6 +889,10 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
         }
 
     # Échec explicite : PayDunya n'a rien exécuté, solde intact, réessayable.
+    # On marque le statut terminal, puis on applique l'issue via le point
+    # unique de vérité (kojo_shared.apply_referral_payout_confirmed) qui
+    # notifie l'échec ET lève le verrou anti double-retrait (idempotent via
+    # referral_lock_released) — même chemin que l'IPN / le check-status.
     await db.payments.update_one(
         {"id": payment_id},
         {"$set": {
@@ -883,12 +902,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }},
     )
-    asyncio.create_task(notify_user_localized(
-        user_id=current_user.id,
-        key="referral_withdraw_failed",
-        notif_type=NotificationType.GENERAL,
-        amount=amount,
-    ))
+    await apply_referral_payout_confirmed({"id": payment_id})
     return {
         "status": "release_failed",
         "payment_id": payment_id,

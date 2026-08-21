@@ -568,9 +568,11 @@ async def test_referral_withdraw_ipn_confirms_and_decrements(client):
     disburse_token = payment["disburse_token"]
 
     # L'IPN disburse confirme le décaissement → solde décrémenté
+    notify_mock = AsyncMock()
     with patch("kojo_routers_payments.check_paydunya_disburse_status",
                return_value={"status": "success", "response_code": "00"}), \
-         patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+         patch("kojo_shared.notify_user_localized", notify_mock):
         resp = await client.post("/api/payments/disburse-ipn", json={
             "token": disburse_token,
             "disburse_invoice": disburse_token,
@@ -579,19 +581,242 @@ async def test_referral_withdraw_ipn_confirms_and_decrements(client):
 
     worker_after = await db_find_one("users", {"id": worker["id"]})
     assert float(worker_after["referral_reward_balance"]) == 0
-    assert any(r.get("type") == "withdrawal" and r.get("amount") == -1500
-               for r in worker_after["referral_rewards"])
-    # Re-confirmation d'un retrait déjà appliqué → idempotent (pas de double
-    # décrément)
+    withdrawals = [r for r in worker_after["referral_rewards"]
+                   if r.get("type") == "withdrawal" and r.get("amount") == -1500]
+    assert len(withdrawals) == 1  # une seule trace
+    assert any(r.get("payment_id") == payment["id"] for r in withdrawals)
+    success_calls = [c for c in notify_mock.call_args_list
+                     if c.kwargs.get("key") == "referral_withdraw_success"]
+    assert len(success_calls) == 1  # une seule notification de succès
+
+    # DOUBLE-CALLBACK IPN : le même retrait est re-confirmé → idempotent.
+    # Le solde ne doit PAS être décrémenté une 2ème fois, la trace ne doit
+    # pas être dupliquée et aucune notification de succès redondante.
     with patch("kojo_routers_payments.check_paydunya_disburse_status",
                return_value={"status": "success", "response_code": "00"}), \
-         patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+         patch("kojo_shared.notify_user_localized", notify_mock):
         resp = await client.post("/api/payments/disburse-ipn", json={
             "token": disburse_token,
             "disburse_invoice": disburse_token,
         })
     assert resp.status_code == 200
-    assert float((await db_find_one("users", {"id": worker["id"]}))["referral_reward_balance"]) == 0
+
+    worker_double = await db_find_one("users", {"id": worker["id"]})
+    # Solde décrémenté UNE seule fois (pas -3000)
+    assert float(worker_double["referral_reward_balance"]) == 0
+    withdrawals = [r for r in worker_double["referral_rewards"]
+                   if r.get("type") == "withdrawal" and r.get("amount") == -1500]
+    assert len(withdrawals) == 1  # trace non dupliquée
+    # Toujours une seule notification de succès au total
+    success_calls = [c for c in notify_mock.call_args_list
+                     if c.kwargs.get("key") == "referral_withdraw_success"]
+    assert len(success_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_success_releases_lock(client):
+    """Après un retrait RÉUSSI, le verrou anti double-retrait est levé : le
+    travailleur peut relancer un retrait. Régression du bug où
+    referral_withdrawal_in_progress restait posé pour toujours → 409 à vie."""
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-lock-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-lock-1"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_shared.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "released"
+
+    # Le verrou est bien levé (flag False, pas True ni absent)
+    worker_after = await db_find_one("users", {"id": worker["id"]})
+    assert worker_after.get("referral_withdrawal_in_progress") is not True
+
+    # Nouveau crédit puis nouveau retrait : PAS de 409 (verrou libéré)
+    await _credit_referral_balance(client, worker["id"], 1500)
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-lock-2"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_shared.notify_user_localized", AsyncMock()):
+        resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp2.status_code == 200, resp2.text
+    assert resp2.json()["status"] == "released"
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_explicit_failure_releases_lock(client):
+    """Après un retrait en ÉCHEC EXPLICITE (submit refusé par PayDunya), le
+    verrou est levé : le solde est intact et le travailleur peut réessayer.
+    Régression du bug : le message promettait de pouvoir réessayer, mais le
+    flag restait posé → 409 à vie."""
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-fail-lock-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    notify_mock = AsyncMock()
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-fail"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "failed", "response_code": "01"}), \
+         patch("kojo_shared.notify_user_localized", notify_mock):
+        resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "release_failed"
+    assert resp.json()["reward_balance"] == 1500  # solde intact
+
+    # PAS de double notification : le chemin d'échec synchrone passe par le
+    # point unique de vérité (apply_referral_payout_confirmed) qui notifie
+    # EXACTEMENT une fois referral_withdraw_failed (plus d'appel direct).
+    failed_calls = [
+        c for c in notify_mock.call_args_list
+        if c.kwargs.get("key") == "referral_withdraw_failed"
+    ]
+    assert len(failed_calls) == 1, notify_mock.call_args_list
+
+    worker_after = await db_find_one("users", {"id": worker["id"]})
+    assert worker_after.get("referral_withdrawal_in_progress") is not True
+
+    # Le chemin d'échec passe par le point unique de vérité (kojo_shared) :
+    # le flag d'idempotence referral_lock_released est posé sur le paiement.
+    import server as srv
+    payment_after = await srv.db.payments.find_one({"id": resp.json()["payment_id"]})
+    assert payment_after.get("referral_lock_released") is True
+
+    # Relance possible : le verrou est libéré
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-fail-2"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_shared.notify_user_localized", AsyncMock()):
+        resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp2.status_code == 200, resp2.text
+    assert resp2.json()["status"] == "released"
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_ipn_confirmation_releases_lock(client):
+    """Un retrait en attente (releasing) confirmé par l'IPN disburse lève le
+    verrou anti double-retrait : un nouveau retrait devient possible."""
+    import uuid as _uuid
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-ipn-lock-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-ipn-lock"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "pending"}), \
+         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "releasing"
+
+    # Pendant l'attente, le verrou est posé (un second retrait est refusé)
+    worker_pending = await db_find_one("users", {"id": worker["id"]})
+    assert worker_pending.get("referral_withdrawal_in_progress") is True
+
+    import server as srv
+    payment = await srv.db.payments.find_one({"payout_kind": "referral"})
+    disburse_token = payment["disburse_token"]
+
+    # L'IPN confirme → le verrou est levé
+    with patch("kojo_routers_payments.check_paydunya_disburse_status",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+         patch("kojo_shared.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/payments/disburse-ipn", json={
+            "token": disburse_token,
+            "disburse_invoice": disburse_token,
+        })
+    assert resp.status_code == 200, resp.text
+
+    worker_after = await db_find_one("users", {"id": worker["id"]})
+    assert worker_after.get("referral_withdrawal_in_progress") is not True
+    assert float(worker_after["referral_reward_balance"]) == 0
+
+    # Nouveau crédit puis nouveau retrait : plus de 409
+    await _credit_referral_balance(client, worker["id"], 1500)
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-ipn-lock-2"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_shared.notify_user_localized", AsyncMock()):
+        resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp2.status_code == 200, resp2.text
+    assert resp2.json()["status"] == "released"
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_ipn_failure_releases_lock(client):
+    """Un retrait en attente (releasing) dont l'ÉCHEC est tranchée par l'IPN
+    disburse doit lever le verrou anti double-retrait (le solde est intact).
+    Régression du bug : apply_referral_payout_confirmed ne traitait que le
+    statut 'released' → un échec asynchrone laissait le verrou posé à vie."""
+    import uuid as _uuid
+    import server as srv
+    from tests.conftest import WORKER_USER
+
+    worker_email = f"withdraw-ipn-fail-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    await _credit_referral_balance(client, worker["id"], 1500)
+
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-ipn-fail"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "pending"}), \
+         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "releasing"
+
+    # Pendant l'attente, le verrou est posé
+    worker_pending = await db_find_one("users", {"id": worker["id"]})
+    assert worker_pending.get("referral_withdrawal_in_progress") is True
+
+    payment = await srv.db.payments.find_one({"payout_kind": "referral"})
+    disburse_token = payment["disburse_token"]
+
+    # L'IPN tranche en ÉCHEC → le verrou doit être levé (solde intact)
+    with patch("kojo_routers_payments.check_paydunya_disburse_status",
+               return_value={"status": "failed", "response_code": "01"}), \
+         patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+         patch("kojo_shared.notify_user_localized", AsyncMock()):
+        resp = await client.post("/api/payments/disburse-ipn", json={
+            "token": disburse_token,
+            "disburse_invoice": disburse_token,
+        })
+    assert resp.status_code == 200, resp.text
+
+    worker_after = await db_find_one("users", {"id": worker["id"]})
+    assert worker_after.get("referral_withdrawal_in_progress") is not True
+    assert float(worker_after["referral_reward_balance"]) == 1500  # solde intact
+
+    # Nouveau retrait possible : plus de 409
+    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+               return_value={"disburse_token": "disburse-token-ipn-fail-2"}), \
+         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+               return_value={"status": "success", "response_code": "00"}), \
+         patch("kojo_shared.notify_user_localized", AsyncMock()):
+        resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
+    assert resp2.status_code == 200, resp2.text
+    assert resp2.json()["status"] == "released"
 
 
 # ---------------------------------------------------------------------------

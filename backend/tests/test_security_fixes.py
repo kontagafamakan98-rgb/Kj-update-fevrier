@@ -55,6 +55,153 @@ class TestProfileMassAssignment:
         # Champ whitelisté (phone) bien appliqué
         assert me["phone"] == "+221771111111"
 
+    async def test_update_profile_rejects_external_photo_url(self, client: AsyncClient):
+        """La photo de profil ne peut être qu'une URL Cloudinary (la source de
+        vérité des photos) : une URL externe (pisteur/tracking) est refusée."""
+        headers = await auth_headers(client)
+        resp = await client.put("/api/users/profile", headers=headers, json={
+            "profile_photo": "https://evil.example/tracker.png",
+        })
+        assert resp.status_code == 400
+
+    async def test_update_profile_accepts_cloudinary_photo(self, client: AsyncClient):
+        headers = await auth_headers(client)
+        resp = await client.put("/api/users/profile", headers=headers, json={
+            "profile_photo": "https://res.cloudinary.com/kojo/image/upload/v1/profile_x.png",
+        })
+        assert resp.status_code == 200
+        me = (await client.get("/api/auth/me", headers=headers)).json()
+        assert me["profile_photo"] == "https://res.cloudinary.com/kojo/image/upload/v1/profile_x.png"
+
+    async def test_update_profile_empty_photo_is_noop(self, client: AsyncClient):
+        """Une chaîne vide (formulaire sans photo) ne doit pas être stockée ni
+        déclencher un 400 (bug latent : '' ne commençait pas par http/https)."""
+        headers = await auth_headers(client)
+        resp = await client.put("/api/users/profile", headers=headers, json={
+            "profile_photo": "",
+            "first_name": "SansPhoto",
+        })
+        assert resp.status_code == 200
+        me = (await client.get("/api/auth/me", headers=headers)).json()
+        assert me["first_name"] == "SansPhoto"
+        # La photo existante (aucune ici) n'a pas été corrompue en chaîne vide
+        assert me.get("profile_photo") is None
+
+
+@pytest.mark.asyncio
+class TestLegacyUserTolerance:
+    """Un document utilisateur legacy qui ne valide plus le modèle User (ex.
+    téléphone sans +) ne doit plus faire planter le serveur en 500 sur les
+    endpoints authentifiés : il renvoie un 401 clair (intervention support)."""
+
+    async def test_invalid_legacy_user_returns_401_not_500(self, client: AsyncClient):
+        import uuid as _uuid
+        from kojo_core import create_access_token
+        from tests.conftest import db_insert
+
+        user_id = str(_uuid.uuid4())
+        email = f"legacy-{_uuid.uuid4().hex[:8]}@example.com"
+        # Téléphone legacy invalide (sans '+') → ValidationError sur User(**doc)
+        await db_insert("users", {
+            "id": user_id,
+            "email": email,
+            "password_hash": "x" * 60,
+            "first_name": "Legacy",
+            "last_name": "User",
+            "phone": "771234567",
+            "user_type": "client",
+            "country": "senegal",
+            "preferred_language": "fr",
+        })
+        token = create_access_token({"sub": user_id, "email": email})
+        headers = {"Authorization": f"Bearer {token}"}
+
+        resp = await client.get("/api/auth/me", headers=headers)
+        assert resp.status_code == 401
+        assert "support" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+class TestHttpOnlyCookieAuth:
+    """Authentification par cookie httpOnly (protection XSS) + CSRF double-submit.
+    Le JWT vit dans un cookie non lisible par JS ; les mutations authentifiées
+    par cookie exigent un en-tête X-CSRFToken correspondant au cookie CSRF."""
+
+    async def test_login_sets_http_only_session_cookie(self, client: AsyncClient):
+        # Inscription puis login pour récupérer le cookie de session posé.
+        from tests.conftest import BASE_USER, issue_email_verification_token
+        data = dict(BASE_USER)
+        token = await issue_email_verification_token(client, data["email"])
+        reg = await client.post("/api/auth/register-verified", json={**data, "email_verification_token": token})
+        assert reg.status_code == 200
+
+        login = await client.post("/api/auth/login", json={
+            "email": data["email"], "password": data["password"]
+        })
+        assert login.status_code == 200
+        # httpx Cookies : l'itération rend les noms directement.
+        cookie_names = set(client.cookies.keys())
+        assert "kojo_session" in cookie_names
+        assert "kojo_csrf" in cookie_names
+
+    async def test_auth_me_via_cookie_without_header(self, client: AsyncClient):
+        # /auth/me doit fonctionner en n'envoyant QUE le cookie (pas de header).
+        result = await register_and_login(client)
+        # Re-login pour s'assurer que le cookie de session est posé sur le client.
+        login = await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        assert login.status_code == 200
+        # Le TestClient (httpx) persiste les cookies via client.cookies.
+        me = await client.get("/api/auth/me")  # pas d'en-tête Authorization
+        assert me.status_code == 200
+        assert me.json()["email"] == result["user"]["email"]
+
+    async def test_cookie_auth_post_requires_csrf_header(self, client: AsyncClient):
+        # Une mutation authentifiée par cookie SANS X-CSRFToken doit être rejetée (403).
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        # On retire explicitement tout header Authorization pour forcer le chemin cookie.
+        resp = await client.put("/api/users/profile", json={"first_name": "Cookie"})
+        assert resp.status_code == 403
+        assert "csrf" in resp.json()["detail"].lower()
+
+    async def test_cookie_auth_post_with_csrf_header_succeeds(self, client: AsyncClient):
+        # Avec le X-CSRFToken correspondant au cookie CSRF, la mutation passe.
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        csrf = client.cookies.get("kojo_csrf")
+        assert csrf, "le cookie CSRF devrait être posé au login"
+        resp = await client.put(
+            "/api/users/profile",
+            json={"first_name": "CookieOK"},
+            headers={"X-CSRFToken": csrf},
+        )
+        assert resp.status_code == 200
+        me = await client.get("/api/auth/me")
+        assert me.json()["first_name"] == "CookieOK"
+
+    async def test_header_auth_post_not_subject_to_csrf(self, client: AsyncClient):
+        # L'auth par header Bearer (mobile/legacy) ne doit PAS exiger CSRF.
+        headers = await auth_headers(client)
+        resp = await client.put("/api/users/profile", headers=headers, json={"first_name": "HeaderOK"})
+        assert resp.status_code == 200
+
+    async def test_logout_clears_session_cookie(self, client: AsyncClient):
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        csrf = client.cookies.get("kojo_csrf")
+        logout = await client.post("/api/auth/logout", headers={"X-CSRFToken": csrf})
+        assert logout.status_code == 200
+        # Le cookie de session doit être invalidé (max-age<=0 / supprimé).
+        assert not client.cookies.get("kojo_session")
+
 
 @pytest.mark.asyncio
 class TestMessagesReceiverValidation:

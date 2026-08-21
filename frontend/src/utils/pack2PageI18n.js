@@ -1025,7 +1025,12 @@ pages.register = {
     legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
     referralCodeLabel: 'Code de parrainage (optionnel)',
     referralCodePlaceholder: 'Ex: ABC123XYZ0',
-    referralCodeHelp: 'Un ami vous a invité ? Saisissez son code pour le référencer comme parrain.'
+    referralCodeHelp: 'Un ami vous a invité ? Saisissez son code pour le référencer comme parrain.',
+    googleSignup: 'S\'inscrire avec Google',
+    googleLogin: 'Continuer avec Google',
+    googleSuccess: 'Compte créé avec Google ✅',
+    onboardingNotice: 'Termine d’abord l’étape 3 pour activer complètement ton compte.',
+    googleEmailExists: 'Un compte existe déjà avec cet email. Connectez-vous pour lier votre compte Google.'
   },
   en: {
     title: 'Create an account',
@@ -1054,7 +1059,12 @@ pages.register = {
     legalContactLine: 'KOJO contact: +18193003507 · Email: Kojoapp98@gmail.com · Address: Hamdallaye Aci 2000 Bamako Mali',
     referralCodeLabel: 'Referral code (optional)',
     referralCodePlaceholder: 'e.g. ABC123XYZ0',
-    referralCodeHelp: 'Did a friend invite you? Enter their code to list them as your referrer.'
+    referralCodeHelp: 'Did a friend invite you? Enter their code to list them as your referrer.',
+    googleSignup: 'Sign up with Google',
+    googleLogin: 'Continue with Google',
+    googleSuccess: 'Account created with Google ✅',
+    onboardingNotice: 'First finish step 3 to fully activate your account.',
+    googleEmailExists: 'An account already exists with this email. Sign in to link your Google account.'
   }
 };
 pages.register.wo = withBase(pages.register.fr, {
@@ -1082,7 +1092,12 @@ pages.register.wo = withBase(pages.register.fr, {
   legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
   referralCodeLabel: 'Code de parrainage (optionnel)',
   referralCodePlaceholder: 'Misal: ABC123XYZ0',
-  referralCodeHelp: 'Sa xarit mooy la tedd? Bindal sa code ngir mu la tànn ni nga koy wax.'
+  referralCodeHelp: 'Sa xarit mooy la tedd? Bindal sa code ngir mu la tànn ni nga koy wax.',
+  googleSignup: 'Bindal ak Google',
+  googleLogin: 'Yokk ci Google',
+  googleSuccess: 'Konto sos nañu ko ak Google ✅',
+  onboardingNotice: 'Jëm bala ci étape 3 ngir yëngal sa konto ci yàgg.',
+  googleEmailExists: 'Konto am na ba noppi ci email bii. Bindu ngir yokk sa konto Google.'
 });
 pages.register.bm = withBase(pages.register.fr, {
   title: 'Konto da',
@@ -1109,7 +1124,12 @@ pages.register.bm = withBase(pages.register.fr, {
   legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
   referralCodeLabel: 'Code de parrainage (optionnel)',
   referralCodePlaceholder: 'Misali: ABC123XYZ0',
-  referralCodeHelp: 'I ka terikɛ dɔ bɛ i wele? I ka a ka code sɛbɛn walasa i ka a dɔn i ka terikɛ ye.'
+  referralCodeHelp: 'I ka terikɛ dɔ bɛ i wele? I ka a ka code sɛbɛn walasa i ka a dɔn i ka terikɛ ye.',
+  googleSignup: 'Tɔgɔ sɛbɛn ni Google ye',
+  googleLogin: 'Tɛmɛ ni Google ye',
+  googleSuccess: 'Konto dilannen ni Google ye ✅',
+  onboardingNotice: 'Ka tɛmɛ étape 3 fɔlɔ walasa i ka konto labɛn cogo bɛɛ la.',
+  googleEmailExists: 'Konto bɛ yen ni email nin ye. I ka jɛɲɔgɔn don walasa i ka Google konto fara a kan.'
 });
 pages.register.mos = withBase(pages.register.fr, {
   title: 'Ning konto',
@@ -1136,7 +1156,12 @@ pages.register.mos = withBase(pages.register.fr, {
   legalContactLine: 'Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali',
   referralCodeLabel: 'Code de parrainage (optionnel)',
   referralCodePlaceholder: 'Misaal: ABC123XYZ0',
-  referralCodeHelp: 'F tom n bool foom? Gʋls a code wã tɩ b bãng tɩ yaa a n togs foom.'
+  referralCodeHelp: 'F tom n bool foom? Gʋls a code wã tɩ b bãng tɩ yaa a n togs foom.',
+  googleSignup: 'Gʋls n tʋm Google',
+  googleLogin: 'Tʋm n tʋm Google',
+  googleSuccess: 'Konto maanegame ne Google ✅',
+  onboardingNotice: 'Dɑɑg étape 3 yɑɑngɑ n dɩ f konto wã sɩd yĩngɑ.',
+  googleEmailExists: 'Konto beeme ne email-kãngã. Bindu n nɑɑg f Google konto.'
 });
 
 pages.paymentDemo = {

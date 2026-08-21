@@ -78,7 +78,17 @@ fly secrets set \
 - ✅ **`BACKEND_PUBLIC_URL` est obligatoire** : sans elle, le
   TrustedHostMiddleware rejette les requêtes vers `*.fly.dev` (erreur 400) et
   les callbacks IPN PayDunya seraient construits sans domaine (donc cassés).
-- Optionnels : `SENTRY_DSN`, `REDIS_URL`, `PAYMENT_COMMISSION_RATE`,
+- **`REDIS_URL` (recommandé en prod)** : active un rate-limiting PARTAGÉ
+  multi-workers. Sans Redis, le rate-limiter reste en mémoire par process
+  (limites effectives × N workers, non partagées). Provisionner un Redis sur
+  Fly (`fly redis create` ou Upstash) puis :
+  ```bash
+  fly secrets set REDIS_URL="redis://default:<password>@<host>:6379"
+  fly deploy
+  ```
+  Le client Redis se ré-initialise paresseusement si Redis était brièvement
+  down au boot (plus besoin de redéployer pour le récupérer).
+- Optionnels : `SENTRY_DSN`, `PAYMENT_COMMISSION_RATE`,
   `EMAIL_OTP_*`, `CORS_ORIGINS`, `TRUSTED_HOSTS` (pour un domaine
   personnalisé type `api.kojo.app`).
 - `APP_ENV`, `DB_NAME`, `FRONTEND_APP_URL`, `VERCEL_PROJECT_NAME` sont déjà
@@ -170,14 +180,13 @@ Changer la RAM : éditer `memory` dans `backend/fly.toml`, puis `fly deploy`.
 ## Dépannage rapide
 
 - **Déploiement bloqué : `400 Bad Request` en boucle sur `/health` dans les
-  logs** → le TrustedHostMiddleware rejette le Host des health checks de Fly
-  (Host interne non fiable, souvent une IP). Le motif `*.internal` ne suffit
-  pas en pratique. **Correctif fiable** : désactiver le middleware sur Fly
-  (le proxy Fly valide déjà le routage par Host ; CORS + auth restent actifs) :
-  ```bash
-  fly secrets set DISABLE_TRUSTED_HOST_MIDDLEWARE=true
-  fly deploy
-  ```
+  logs** → le TrustedHostMiddleware rejette le Host des health checks de Fly.
+  `build_trusted_hosts()` couvre désormais par défaut `*.internal`,
+  `*.flycast.internal` et `*.fly.dev` → le Host des sondes Fly est accepté.
+  Si le symptôme persiste (Host attendu non couvert), vérifier qu'aucun secret
+  `DISABLE_TRUSTED_HOST_MIDDLEWARE=true` ne surcharge la config, puis
+  ajouter le motif exact via `fly secrets set TRUSTED_HOSTS='*.internal,...'`.
+  Re-désactiver en dernier recours : `fly secrets set DISABLE_TRUSTED_HOST_MIDDLEWARE=true`.
 - **Machine arrêtée après 5 min (`Trial machine stopping`)** → aucune carte
   bancaire sur le compte : ajouter la carte (Dashboard → Billing ou
   https://fly.io/trial) puis `fly deploy`.

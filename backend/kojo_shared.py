@@ -17,7 +17,15 @@ from kojo_settings import (
     WEBPUSH_AVAILABLE,
     logger,
 )
-from pywebpush import webpush, WebPushException
+# pywebpush est OPTIONNEL (WEBPUSH_AVAILABLE dans kojo_settings, détecté via
+# find_spec). L'import est donc conditionnel : si le paquet manque, le serveur
+# ne doit pas refuser de démarrer — send_web_push_to_user garde déjà un early
+# return quand WEBPUSH_AVAILABLE est False.
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:  # pragma: no cover - dépend de l'installation
+    webpush = None
+    WebPushException = None
 
 async def store_notification(
     user_id: str,
@@ -379,59 +387,96 @@ async def notify_user_localized(
 
 
 async def apply_referral_payout_confirmed(payment_record: dict) -> None:
-    """Applique la confirmation d'un retrait de récompenses de parrainage
-    (payout_kind == "referral") : décrémente le solde du travailleur, trace
-    le retrait dans son historique et lève le verrou anti double-retrait.
+    """Applique l'issue d'un retrait de récompenses de parrainage
+    (payout_kind == "referral") :
+    - "released" : décrémente le solde du travailleur, trace le retrait dans
+      son historique, notifie le succès ET lève le verrou anti double-retrait.
+    - "release_failed" : PayDunya n'a RIEN exécuté (le solde est intact) → on
+      lève juste le verrou pour que le travailleur puisse réessayer, et on
+      notifie l'échec. SANS ça, un retrait dont l'échec n'est tranché qu'à
+      l'IPN ou au check-status laissait le verrou posé à vie (le succès
+      synchrone le lève déjà, mais pas le chemin asynchrone en échec).
 
-    Idempotent (flag referral_balance_applied posé sur l'enregistrement de
-    paiement) — appelé quand le décaissement passe "released", que ce soit
-    de façon synchrone (submit-invoice "success") ou asynchrone (IPN disburse
-    ou check-status). Point unique de vérité du solde de récompenses."""
+    Idempotente (flags referral_balance_applied / referral_lock_released posés
+    sur l'enregistrement de paiement) — appelée que le décaissement passe
+    "released" de façon synchrone (submit-invoice "success") ou asynchrone
+    (IPN disburse ou check-status). Point unique de vérité du solde."""
     payment = await db.payments.find_one({"id": payment_record.get("id")})
     if not payment:
         return
-    if payment.get("payout_kind") != "referral" or payment.get("payout_status") != "released":
+    if payment.get("payout_kind") != "referral":
         return
-    if payment.get("referral_balance_applied"):
+    payout_status = payment.get("payout_status")
+
+    # --- Succès : décrément du solde + trace + notif (idempotent) ---
+    if payout_status == "released":
+        if payment.get("referral_balance_applied"):
+            return
+        user_id = payment.get("payer_id")
+        amount = int(payment.get("amount", 0) or 0)
+        if not user_id or amount <= 0:
+            return
+
+        user = await db.users.find_one({"id": user_id}, {"referral_reward_balance": 1})
+        if not user:
+            return
+        current_balance = float(user.get("referral_reward_balance") or 0)
+        new_balance = max(0.0, current_balance - amount)
+
+        await db.users.update_one(
+            {"id": user_id},
+            {
+                "$set": {
+                    "referral_reward_balance": new_balance,
+                    "referral_withdrawal_in_progress": False,
+                    "updated_at": datetime.now(timezone.utc),
+                },
+                "$push": {"referral_rewards": {
+                    "type": "withdrawal",
+                    "amount": -amount,
+                    "payment_id": payment.get("id"),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+            },
+        )
+        await db.payments.update_one(
+            {"id": payment["id"]},
+            {"$set": {"referral_balance_applied": True}},
+        )
+        asyncio.create_task(notify_user_localized(
+            user_id=user_id,
+            key="referral_withdraw_success",
+            notif_type=NotificationType.GENERAL,
+            amount=amount,
+        ))
         return
 
-    user_id = payment.get("payer_id")
-    amount = int(payment.get("amount", 0) or 0)
-    if not user_id or amount <= 0:
-        return
-
-    user = await db.users.find_one({"id": user_id}, {"referral_reward_balance": 1})
-    if not user:
-        return
-    current_balance = float(user.get("referral_reward_balance") or 0)
-    new_balance = max(0.0, current_balance - amount)
-
-    await db.users.update_one(
-        {"id": user_id},
-        {
-            "$set": {
-                "referral_reward_balance": new_balance,
+    # --- Échec : solde intact, on lève juste le verrou (idempotent) ---
+    if payout_status == "release_failed":
+        if payment.get("referral_lock_released"):
+            return
+        user_id = payment.get("payer_id")
+        if not user_id:
+            return
+        await db.users.update_one(
+            {"id": user_id},
+            {"$set": {
                 "referral_withdrawal_in_progress": False,
                 "updated_at": datetime.now(timezone.utc),
-            },
-            "$push": {"referral_rewards": {
-                "type": "withdrawal",
-                "amount": -amount,
-                "payment_id": payment.get("id"),
-                "created_at": datetime.now(timezone.utc).isoformat(),
             }},
-        },
-    )
-    await db.payments.update_one(
-        {"id": payment["id"]},
-        {"$set": {"referral_balance_applied": True}},
-    )
-    asyncio.create_task(notify_user_localized(
-        user_id=user_id,
-        key="referral_withdraw_success",
-        notif_type=NotificationType.GENERAL,
-        amount=amount,
-    ))
+        )
+        await db.payments.update_one(
+            {"id": payment["id"]},
+            {"$set": {"referral_lock_released": True}},
+        )
+        amount = int(payment.get("amount", 0) or 0)
+        asyncio.create_task(notify_user_localized(
+            user_id=user_id,
+            key="referral_withdraw_failed",
+            notif_type=NotificationType.GENERAL,
+            amount=amount,
+        ))
+        return
 
 async def _dispatch_address_to_worker(
     job: Dict[str, Any],

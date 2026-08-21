@@ -21,7 +21,9 @@ from kojo_settings import (
 from kojo_core import (
     get_current_user,
 )
-from kojo_shared import notify_user_localized, _dispatch_address_to_worker
+from kojo_shared import (
+    apply_referral_payout_confirmed, notify_user_localized, _dispatch_address_to_worker,
+)
 from kojo_payments import (
     PAYDUNYA_CHANNELS,
     build_checkout_redirect_url, build_payment_callback_url,
@@ -99,54 +101,6 @@ async def _notify_refund_transition(payment_record: dict, previous_status, new_s
     ))
 
 
-async def _apply_referral_payout_confirmed(payment_record: dict) -> None:
-    """Applique la confirmation d'un retrait de récompenses de parrainage
-    (payout_kind == "referral") : décrémente le solde du travailleur et trace
-    le retrait dans son historique. Idempotent (flag referral_balance_applied
-    posé sur l'enregistrement de paiement) — appelé par l'IPN disburse ET par
-    la re-vérification check-status quand le décaissement passe "released"."""
-    if payment_record.get("payout_kind") != "referral":
-        return
-    if payment_record.get("payout_status") != "released":
-        return
-    if payment_record.get("referral_balance_applied"):
-        return
-
-    user_id = payment_record.get("payer_id")
-    amount = int(payment_record.get("amount", 0) or 0)
-    if not user_id or amount <= 0:
-        return
-
-    user = await db.users.find_one({"id": user_id}, {"referral_reward_balance": 1})
-    if not user:
-        return
-    current_balance = float(user.get("referral_reward_balance") or 0)
-    new_balance = max(0.0, current_balance - amount)
-
-    await db.users.update_one(
-        {"id": user_id},
-        {
-            "$set": {"referral_reward_balance": new_balance, "updated_at": datetime.now(timezone.utc)},
-            "$push": {"referral_rewards": {
-                "type": "withdrawal",
-                "amount": -amount,
-                "payment_id": payment_record.get("id"),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }},
-        },
-    )
-    await db.payments.update_one(
-        {"id": payment_record["id"]},
-        {"$set": {"referral_balance_applied": True}},
-    )
-    asyncio.create_task(notify_user_localized(
-        user_id=user_id,
-        key="referral_withdraw_success",
-        notif_type=NotificationType.GENERAL,
-        amount=amount,
-    ))
-
-
 # Intervalle minimum entre deux re-vérifications PayDunya du MÊME décaissement
 # en attente (le GET /payments/status peut être pollé par le frontend).
 DISBURSE_RECHECK_INTERVAL_SECONDS = 60
@@ -212,8 +166,9 @@ async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
     updated = await db.payments.find_one({"id": payment_id})
     if updated:
         await _notify_refund_transition(payment_record, payout_status, new_status)
-        # Retrait de récompenses confirmé par check-status → décrémenter le solde.
-        await _apply_referral_payout_confirmed(updated)
+        # Retrait de récompenses confirmé par check-status → décrémenter le solde
+        # et lever le verrou anti double-retrait (point unique kojo_shared).
+        await apply_referral_payout_confirmed(updated)
         return updated
     return payment_record
 
@@ -290,10 +245,11 @@ async def paydunya_disburse_ipn(request: Request):
     await _notify_refund_transition(payment_record, previous_payout_status, payout_status)
 
     # Retrait de récompenses confirmé par l'IPN → décrémenter le solde du
-    # travailleur (idempotent, voir _apply_referral_payout_confirmed).
+    # travailleur et lever le verrou anti double-retrait (point unique
+    # kojo_shared.apply_referral_payout_confirmed, idempotent).
     updated_record = await db.payments.find_one({'id': payment_record['id']})
     if updated_record:
-        await _apply_referral_payout_confirmed(updated_record)
+        await apply_referral_payout_confirmed(updated_record)
 
     return {'status': 'ok'}
 
@@ -437,6 +393,18 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
     callback_url = build_payment_callback_url()
 
+    # Phone du customer PayDunya : le champ phone du User peut être vide pour
+    # un compte créé via Google (SSO — Google ne fournit pas de numéro). On
+    # retombe alors sur le numéro de son compte mobile money (orange_money ou
+    # wave) : PayDunya exige un numéro pour le customer, et le client vérifié
+    # a forcément un compte mobile money lié.
+    customer_phone = (current_user.phone or "").strip()
+    if not customer_phone:
+        accounts = (current_user.payment_accounts or {})
+        customer_phone = str(
+            accounts.get("orange_money") or accounts.get("wave") or ""
+        ).strip()
+
     payload = {
         'invoice': {
             'total_amount': payment_record['amount'],
@@ -445,7 +413,7 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
             'customer': {
                 'name': f"{current_user.first_name} {current_user.last_name}".strip(),
                 'email': current_user.email,
-                'phone': current_user.phone
+                'phone': customer_phone
             }
         },
         'store': {

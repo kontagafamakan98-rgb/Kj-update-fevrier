@@ -367,7 +367,7 @@
   "actionButton": "Bouton d\\'action",
   "passwordMasked": "••••••••",
   "passwordsDontMatch": "Les mots de passe ne correspondent pas",
-  "passwordTooShort": "Le mot de passe doit contenir au moins 6 caractères",
+  "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères",
   "workersMustSelectSkills": "Les travailleurs doivent sélectionner au moins une compétence",
   "pleaseIndicateExperience": "Veuillez indiquer vos années d\\'expérience",
   "pleaseIndicateValidRate": "Veuillez indiquer un taux horaire valide (minimum 500 FCFA)",

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
+import GoogleButton from '../components/GoogleButton';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 
@@ -25,7 +26,7 @@ export default function Login() {
   const [errorKey, setErrorKey] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const toast = useToast();
   const navigate = useNavigate();
@@ -52,7 +53,7 @@ export default function Login() {
     if (result.success) {
       clearRegistrationFlow();
       if (requiresRegistrationCompletion(result.user)) {
-        toast.success('Termine d’abord l’étape 3 pour activer complètement ton compte.');
+        toast.success(pageT('onboardingNotice'));
         navigate('/payment-verification', {
           state: {
             userData: result.user,
@@ -87,6 +88,38 @@ export default function Login() {
       ...prev,
       [e.target.name]: e.target.value
     }));
+  };
+
+  const handleGoogle = async () => {
+    setError('');
+    setErrorKey('');
+    const result = await loginWithGoogle();
+    if (result.success) {
+      clearRegistrationFlow();
+      if (requiresRegistrationCompletion(result.user)) {
+        toast.success(pageT('onboardingNotice'));
+        navigate('/payment-verification', {
+          state: {
+            userData: result.user,
+            resumeAfterLogin: true,
+            fromGoogle: true,
+          }
+        });
+      } else {
+        toast.success(t('loginSuccess') + ' 🎉');
+        navigate('/dashboard');
+      }
+      return;
+    }
+    if (result.cancelled) return; // l'utilisateur a fermé la popup Google
+    if (result.emailExists) {
+      // Un compte existe déjà avec cet email : inviter à se connecter puis
+      // lier Google depuis le profil (fusion sécurisée).
+      setError(pageT('googleEmailExists'));
+      return;
+    }
+    setError(result.error || t('loginFailed'));
+    toast.error(result.error || t('loginFailed'));
   };
 
   return (
@@ -169,6 +202,8 @@ export default function Login() {
               {t('login')}
             </LoadingButton>
           </div>
+
+          <GoogleButton onClick={handleGoogle} label={pageT('googleLogin')} />
 
           <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
             <p className="text-sm font-semibold text-orange-900">📜 {pageT('legalNoticeTitle')}</p>

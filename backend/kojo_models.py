@@ -101,10 +101,18 @@ def validate_west_africa_phone(phone: str) -> str:
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: EmailStr
-    password_hash: str = Field(min_length=60, max_length=100)  # bcrypt hash length
+    # Optionnel pour les comptes créés via Google (SSO) : aucun mot de
+    # passe n'est stocké (google_sub identifie le compte à la place). La
+    # validation min_length ne s'applique donc qu'aux comptes mot-de-passe.
+    password_hash: Optional[str] = Field(default=None, min_length=60, max_length=100)
+    # Identifiant Google (sub de l'id_token) pour les comptes SSO Google.
+    # None pour les comptes mot-de-passe classiques. Index unique côté DB.
+    google_sub: Optional[str] = Field(default=None, max_length=255)
     first_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$', description="Prénom")
     last_name: str = Field(min_length=2, max_length=50, pattern=r'^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$', description="Nom de famille")
-    phone: str = Field(description="Numéro de téléphone international")
+    # Optionnel pour les comptes Google (SSO) : Google ne fournit pas de
+    # téléphone. Rempli plus tard via l'onboarding / la mise à jour de profil.
+    phone: Optional[str] = Field(default=None, description="Numéro de téléphone international")
     user_type: UserType
     country: Country
     preferred_language: Language
@@ -133,7 +141,10 @@ class User(BaseModel):
     @field_validator('phone')
     @classmethod
     def validate_phone(cls, v):
-        """Nettoie et valide le numéro de téléphone pour l'Afrique de l'Ouest"""
+        """Nettoie et valide le numéro de téléphone pour l'Afrique de l'Ouest.
+        Vide/None autorisé pour les comptes Google (SSO) en attente d'onboarding."""
+        if not v:
+            return v
         return validate_west_africa_phone(v)
     profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
     is_verified: bool = False
@@ -228,23 +239,6 @@ class Message(BaseModel):
     # destinataire ouvre la conversation et que read passe à True.
     read_at: Optional[datetime] = None
 
-class PaymentStatus(str, Enum):
-    PENDING = "pending"
-    COMPLETED = "completed" 
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-class Payment(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    job_id: str
-    payer_id: str
-    receiver_id: str
-    amount: float = Field(gt=0.0, le=10000000.0)  # Positive amount, max 10M FCFA
-    payment_method: PaymentMethod
-    transaction_id: Optional[str] = Field(None, max_length=200)  # Transaction ID limit
-    status: PaymentStatus = PaymentStatus.PENDING  # Use enum for better validation
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
 class PaymentQuoteRequest(BaseModel):
     amount: float = Field(gt=0.0, le=10000000.0)
     payment_method: PaymentMethod
@@ -337,7 +331,7 @@ class MarkReadRequest(BaseModel):
 
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=72, description="Mot de passe (6-72 caractères — limite bcrypt de 72 octets)")
+    password: str = Field(min_length=8, max_length=72, description="Mot de passe (8-72 caractères — limite bcrypt de 72 octets)")
     first_name: str = Field(min_length=2, max_length=50)
     last_name: str = Field(min_length=2, max_length=50)
     phone: str
@@ -351,8 +345,8 @@ class UserRegister(BaseModel):
     @field_validator('password')
     @classmethod
     def password_must_be_strong(cls, v):
-        if not v or len(v.strip()) < 6:
-            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        if not v or len(v.strip()) < 8:
+            raise ValueError('Le mot de passe doit contenir au moins 8 caractères')
         return v
     
     @field_validator('legal_documents_accepted')
@@ -369,7 +363,7 @@ class PaymentAccount(BaseModel):
 
 class UserWithPayment(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6, max_length=72, description="Mot de passe (6-72 caractères — limite bcrypt de 72 octets)")
+    password: str = Field(min_length=8, max_length=72, description="Mot de passe (8-72 caractères — limite bcrypt de 72 octets)")
     first_name: str = Field(min_length=2, max_length=50)
     last_name: str = Field(min_length=2, max_length=50)
     phone: str
@@ -387,8 +381,8 @@ class UserWithPayment(BaseModel):
     @field_validator('password')
     @classmethod
     def password_must_be_strong(cls, v):
-        if not v or len(v.strip()) < 6:
-            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        if not v or len(v.strip()) < 8:
+            raise ValueError('Le mot de passe doit contenir au moins 8 caractères')
         return v
 
     @field_validator('legal_documents_accepted')
@@ -427,13 +421,13 @@ class PasswordResetConfirmRequest(BaseModel):
     email: EmailStr
     verification_token: str = Field(min_length=20)
     # 72 = limite bcrypt (au-delà, le hash tronque silencieusement)
-    new_password: str = Field(min_length=6, max_length=72)
+    new_password: str = Field(min_length=8, max_length=72)
 
     @field_validator('new_password')
     @classmethod
     def password_must_be_strong(cls, v):
-        if not v or len(v.strip()) < 6:
-            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        if not v or len(v.strip()) < 8:
+            raise ValueError('Le mot de passe doit contenir au moins 8 caractères')
         return v
 
 class JobCreate(BaseModel):
