@@ -71,7 +71,7 @@ export const isOwnedByCurrentUser = (job, currentUser) => {
 
 export const getPrimaryJobId = (job) => {
   if (!job) return '';
-  return normalizeComparableId(job._id || job.id || job.job_id || job.jobId || job.slug);
+  return normalizeComparableId(job.id || job.job_id || job.jobId || job._id || job.slug);
 };
 
 export const deleteJobWithFallbacks = async (job) => {

@@ -1,5 +1,6 @@
 import asyncio
 import re
+from bson import ObjectId
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -30,6 +31,14 @@ from kojo_payments import (
 )
 
 router = APIRouter()
+
+
+def _job_identifier_query(job_id: str) -> dict:
+    """Find current and legacy jobs regardless of the stored identifier field."""
+    candidates = [{"id": job_id}, {"job_id": job_id}]
+    if ObjectId.is_valid(job_id):
+        candidates.append({"_id": ObjectId(job_id)})
+    return {"$or": candidates}
 
 
 async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, job_title: str) -> None:
@@ -576,9 +585,16 @@ async def execute_paydunya_refund(payment_record: dict) -> str:
 
 @router.delete("/jobs/{job_id}")
 async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({
+        "$and": [
+            _job_identifier_query(job_id),
+            {"deleted": {"$ne": True}},
+        ]
+    })
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    stored_job_id = str(job.get("id") or job.get("job_id") or job.get("_id") or job_id)
 
     is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
     if job.get("client_id") != current_user.id and not is_owner_user:
@@ -594,7 +610,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     # ça, l'argent restait bloqué sans aucune voie de restitution (ni
     # remboursement client, ni libération travailleur).
     payment_record = await db.payments.find_one(
-        {"job_id": job_id, "status": "completed"},
+        {"job_id": stored_job_id, "status": "completed"},
         sort=[("created_at", -1)]
     )
     refund_outcome = None
@@ -628,7 +644,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
         refunded_amount = payment_record.get("amount")
 
     await db.jobs.update_one(
-        {"id": job_id},
+        _job_identifier_query(job_id),
         {
             "$set": {
                 "deleted": True,
@@ -641,7 +657,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     )
 
     try:
-        await db.job_proposals.delete_many({"job_id": job_id})
+        await db.job_proposals.delete_many({"job_id": stored_job_id})
     except Exception:
         pass
 
@@ -662,7 +678,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
             user_id=payment_record.get("payer_id"),
             key=cancel_key,
             notif_type=NotificationType.GENERAL,
-            related_id=job_id,
+            related_id=stored_job_id,
             related_type="job",
             job_title=job_title,
             amount=refunded_amount,
@@ -672,7 +688,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
                 user_id=worker_id_for_notif,
                 key="mission_cancelled_worker",
                 notif_type=NotificationType.GENERAL,
-                related_id=job_id,
+                related_id=stored_job_id,
                 related_type="job",
                 job_title=job_title,
             ))
@@ -688,7 +704,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
 
     return {
         "message": message,
-        "job_id": job_id,
+        "job_id": stored_job_id,
         "refund_status": refund_outcome,
         "refunded_amount": refunded_amount,
     }
