@@ -4,10 +4,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://kojo-backend.fly.dev/api/:path*",
-      "headers": [
-        { "key": "X-Forwarded-Host", "value": "$host" }
-      ]
+      "destination": "https://kojo-backend.fly.dev/api/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
