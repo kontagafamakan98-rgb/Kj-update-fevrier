@@ -1,22 +1,8 @@
 import { authAPI, api } from './api';
 import { devLog, safeLog } from '../utils/env';
-import { buildApiUrl } from '../utils/backendUrl';
 
 // Service de gestion des comptes de paiement pour la vérification
 class PaymentAccountService {
-  constructor() {
-    this.API_BASE = buildApiUrl('');
-  }
-
-  // Obtenir les headers d'autorisation
-  getAuthHeaders() {
-    const token = localStorage.getItem('token');
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-  }
-
   // Inscription finale avec vérification email + comptes de paiement
   async registerWithPaymentVerification(userData, paymentAccounts, emailVerificationToken) {
     try {
@@ -53,17 +39,7 @@ class PaymentAccountService {
     try {
       devLog.info('📋 Récupération comptes de paiement...');
 
-      const response = await fetch(`${this.API_BASE}/users/payment-accounts`, {
-        method: 'GET',
-        headers: this.getAuthHeaders()
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Erreur lors de la récupération');
-      }
-
-      const result = await response.json();
+      const result = await api.get('/users/payment-accounts');
       devLog.info('✅ Comptes de paiement récupérés:', result);
       
       return {
@@ -85,18 +61,7 @@ class PaymentAccountService {
     try {
       devLog.info('🔄 Mise à jour comptes de paiement...');
 
-      const response = await fetch(`${this.API_BASE}/users/payment-accounts`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(paymentAccounts)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Erreur lors de la mise à jour');
-      }
-
-      const result = await response.json();
+      const result = await api.put('/users/payment-accounts', paymentAccounts);
       devLog.info('✅ Comptes de paiement mis à jour:', result);
       
       return {
@@ -118,17 +83,7 @@ class PaymentAccountService {
     try {
       devLog.info('🔐 Vérification accès paiement...');
 
-      const response = await fetch(`${this.API_BASE}/users/verify-payment-access`, {
-        method: 'POST',
-        headers: this.getAuthHeaders()
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Erreur lors de la vérification');
-      }
-
-      const result = await response.json();
+      const result = await api.post('/users/verify-payment-access');
       devLog.info('✅ Vérification accès:', result);
       
       return {
