@@ -1,12 +1,16 @@
 import { devLog, safeLog } from '../utils/env';
-import { buildApiUrl } from '../utils/backendUrl';
+import { api, hasSessionCookie } from './api';
 
 // Service pour les fonctionnalités propriétaire - ACCÈS RESTREINT
+//
+// NOTE AUTH (migration cookie) : la session vit désormais dans le cookie
+// httpOnly kojo_session (plus aucun token en localStorage). La vérification
+// d'accès owner repose donc sur le profil chargé depuis /auth/me (user_type)
+// ET la présence du cookie de session (détectée via le cookie CSRF associé,
+// lisible en JS). Tous les appels API passent par le client partagé `api`
+// (credentials: 'include' + en-tête X-CSRFToken sur les mutations) — plus
+// aucun fetch manuel avec Bearer localStorage.
 class OwnerService {
-  constructor() {
-    this.API_BASE = buildApiUrl('/owner');
-  }
-
   getStoredUser() {
     try {
       const rawUser = localStorage.getItem('user');
@@ -17,72 +21,37 @@ class OwnerService {
     }
   }
 
-  hasActiveToken() {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return false;
-      const [, payloadSegment] = token.split('.');
-      if (!payloadSegment) return false;
-
-      const normalizedPayload = payloadSegment.replace(/-/g, '+').replace(/_/g, '/');
-      const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
-      const payload = JSON.parse(atob(paddedPayload));
-      if (!payload?.exp) return true;
-      return payload.exp * 1000 > Date.now();
-    } catch (error) {
-      safeLog.error('Impossible de vérifier le token propriétaire:', error);
-      return false;
-    }
+  isOwnerUser(userCandidate = null) {
+    return Boolean(
+      userCandidate?.user_type === 'owner'
+      || userCandidate?.is_owner === true
+      || (Array.isArray(userCandidate?.permissions) && userCandidate.permissions.includes('admin_access'))
+    );
   }
 
   isOwnerSessionValid(userCandidate = null) {
-    const user = userCandidate || this.getStoredUser();
-    if (!user || !this.hasActiveToken()) {
-      return false;
-    }
-
-    return user.user_type === 'owner'
-      || user.is_owner === true
-      || (Array.isArray(user.permissions) && user.permissions.includes('admin_access'));
+    // Deux conditions : le profil est bien un compte owner ET une session
+    // cookie active existe (sinon les appels /owner/* échoueraient en 401).
+    return this.isOwnerUser(userCandidate) && hasSessionCookie();
   }
 
-  // Vérifier les headers d'autorisation
-  getAuthHeaders() {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error("Token d'authentification manquant");
+  _translateOwnerError(error, fallback) {
+    if (error?.response?.status === 403) {
+      return new Error('Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement');
     }
-
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
+    return error instanceof Error ? error : new Error(fallback);
   }
 
   // Obtenir les statistiques de commission (propriétaire uniquement)
   async getCommissionStats() {
     try {
       devLog.info('🔐 Récupération stats commission (propriétaire)...');
-
-      const response = await fetch(`${this.API_BASE}/commission-stats`, {
-        method: 'GET',
-        headers: this.getAuthHeaders()
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement');
-        }
-        throw new Error(`Erreur serveur: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await api.get('/owner/commission-stats');
       devLog.info('✅ Stats commission récupérées:', data);
       return data;
-
     } catch (error) {
       safeLog.error('❌ Erreur stats commission:', error);
-      throw error;
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
     }
   }
 
@@ -90,26 +59,12 @@ class OwnerService {
   async getDebugInfo() {
     try {
       devLog.info('🔐 Récupération infos debug (propriétaire)...');
-
-      const response = await fetch(`${this.API_BASE}/debug-info`, {
-        method: 'GET',
-        headers: this.getAuthHeaders()
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement');
-        }
-        throw new Error(`Erreur serveur: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await api.get('/owner/debug-info');
       devLog.info('✅ Infos debug récupérées:', data);
       return data;
-
     } catch (error) {
       safeLog.error('❌ Erreur infos debug:', error);
-      throw error;
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
     }
   }
 
@@ -117,26 +72,12 @@ class OwnerService {
   async getUsersManagement() {
     try {
       devLog.info('🔐 Récupération gestion utilisateurs (propriétaire)...');
-
-      const response = await fetch(`${this.API_BASE}/users-management`, {
-        method: 'GET',
-        headers: this.getAuthHeaders()
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement');
-        }
-        throw new Error(`Erreur serveur: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await api.get('/owner/users-management');
       devLog.info('✅ Gestion utilisateurs récupérée:', data);
       return data;
-
     } catch (error) {
       safeLog.error('❌ Erreur gestion utilisateurs:', error);
-      throw error;
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
     }
   }
 
@@ -144,27 +85,12 @@ class OwnerService {
   async updateCommissionSettings(settings) {
     try {
       devLog.info('🔐 Mise à jour paramètres commission (propriétaire)...', settings);
-
-      const response = await fetch(`${this.API_BASE}/update-commission-settings`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(settings)
-      });
-
-      if (!response.ok) {
-        if (response.status === 403) {
-          throw new Error('Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement');
-        }
-        throw new Error(`Erreur serveur: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await api.post('/owner/update-commission-settings', settings);
       devLog.info('✅ Paramètres commission mis à jour:', data);
       return data;
-
     } catch (error) {
       safeLog.error('❌ Erreur mise à jour commission:', error);
-      throw error;
+      throw this._translateOwnerError(error, `Erreur serveur: ${error?.response?.status || 'inconnu'}`);
     }
   }
 
@@ -179,9 +105,10 @@ class OwnerService {
     }
   }
 
-  // Compatibilité ascendante
+  // Compatibilité ascendante : sans argument, retombe sur le profil stocké
+  // en localStorage (toujours écrit par establishSession au login).
   isFamakanLoggedIn(userCandidate = null) {
-    return this.isOwnerSessionValid(userCandidate);
+    return this.isOwnerSessionValid(userCandidate || this.getStoredUser());
   }
 }
 

@@ -228,16 +228,13 @@ function AppRoutes() {
                 <Dashboard />
               </ProtectedRoute>
             } />
-            <Route path="/jobs" element={
-              <ProtectedRoute>
-                <Jobs />
-              </ProtectedRoute>
-            } />
-            <Route path="/jobs/:id" element={
-              <ProtectedRoute>
-                <JobDetails />
-              </ProtectedRoute>
-            } />
+            {/* Lecture des jobs PUBLIQUE (découverte sans compte) : les
+                actions (créer, postuler, accepter, supprimer) restent
+                réservées aux utilisateurs connectés — le backend refuse
+                toute mutation non authentifiée, et les pages affichent
+                une invitation à se connecter pour les actions. */}
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/jobs/:id" element={<JobDetails />} />
             <Route path="/messages" element={
               <ProtectedRoute>
                 <Messages />

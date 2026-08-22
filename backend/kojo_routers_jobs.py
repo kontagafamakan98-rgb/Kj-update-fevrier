@@ -22,6 +22,7 @@ from kojo_settings import (
 )
 from kojo_core import (
     get_current_user,
+    get_current_user_optional,
 )
 from kojo_shared import notify_user_localized, _dispatch_address_to_worker
 from kojo_payments import (
@@ -392,7 +393,31 @@ async def create_job(
         logger.error(f"❌ Failed to create job: {e}")
         raise HTTPException(status_code=500, detail="Internal server error creating job")
 
-@router.get("/jobs", response_model=List[Job])
+# Champs sensibles retirés de la vue PUBLIQUE (visiteur non connecté) :
+# l'identité du client / du travailleur attribué et la position GPS partagée
+# (visible normalement par le travailleur accepté) ne doivent pas être
+# exposées à quiconque n'a pas de session.
+_JOB_PUBLIC_STRIPPED_FIELDS = (
+    "client_id",
+    "assigned_worker_id",
+    "accepted_proposal_id",
+    "shared_location",
+)
+
+
+def _job_view(job: dict, current_user: Optional[User]) -> dict:
+    """Vue d'un job tel que renvoyée aux clients. Les utilisateurs connectés
+    reçoivent le document complet ; les visiteurs anonymes reçoivent la même
+    fiche SANS les champs sensibles (identités + position partagée)."""
+    view = dict(job)
+    view.pop("_id", None)
+    if current_user is None:
+        for field in _JOB_PUBLIC_STRIPPED_FIELDS:
+            view.pop(field, None)
+    return view
+
+
+@router.get("/jobs")
 async def get_jobs(
     status: Optional[JobStatus] = None,
     category: Optional[str] = None,
@@ -403,7 +428,7 @@ async def get_jobs(
     lat: Optional[float] = Query(default=None, ge=-90, le=90),
     lng: Optional[float] = Query(default=None, ge=-180, le=180),
     radius_km: Optional[float] = Query(default=None, ge=0.1, le=2000),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     try:
         query = {}
@@ -422,36 +447,43 @@ async def get_jobs(
             }
 
         query["deleted"] = {"$ne": True}
-        
-        is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
-        if not is_owner_user:
-            query["$or"] = [
-                {"country": current_user.country},
-                {"country": {"$exists": False}},
-                {"country": None}
-            ]
+
+        # Lecture PUBLIQUE (découverte sans compte) : un visiteur anonyme
+        # voit les offres de tous les pays. Les utilisateurs connectés
+        # restent filtrés par leur pays (comportement historique).
+        if current_user is not None:
+            is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+            if not is_owner_user:
+                query["$or"] = [
+                    {"country": current_user.country},
+                    {"country": {"$exists": False}},
+                    {"country": None}
+                ]
 
         jobs = await db.jobs.find(query).sort("created_at", -1).to_list(limit)
-        
-        logger.debug(f"✅ Retrieved {len(jobs)} jobs for user {current_user.id}")
-        return [Job(**job) for job in jobs]
-        
+
+        logger.debug(f"✅ Retrieved {len(jobs)} jobs (auth={current_user is not None})")
+        return [_job_view(job, current_user) for job in jobs]
+
     except Exception as e:
         logger.error(f"❌ Failed to retrieve jobs: {e}")
         raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")
 
 @router.get("/jobs/{job_id}")
-async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+async def get_job(job_id: str, current_user: Optional[User] = Depends(get_current_user_optional)):
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-        
-    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
-    job_country = job.get("country")
-    if not is_owner_user and job_country and job_country != current_user.country:
-        raise HTTPException(status_code=403, detail="Ce job n'appartient pas à votre pays.")
-        
-    return Job(**job)
+
+    # Filtre pays uniquement pour les utilisateurs connectés : un visiteur
+    # anonyme (découverte) peut consulter une offre de n'importe quel pays.
+    if current_user is not None:
+        is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+        job_country = job.get("country")
+        if not is_owner_user and job_country and job_country != current_user.country:
+            raise HTTPException(status_code=403, detail="Ce job n'appartient pas à votre pays.")
+
+    return _job_view(job, current_user)
 
 async def execute_paydunya_refund(payment_record: dict) -> str:
     """Exécute le remboursement d'un paiement séquestré vers le compte mobile

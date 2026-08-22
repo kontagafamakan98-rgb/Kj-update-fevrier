@@ -17,13 +17,19 @@ primary_region = 'fra'
   # URL publique du backend → callbacks IPN PayDunya (et hôtes de confiance si
   # le TrustedHostMiddleware reste activé)
   BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev'
-  # Le TrustedHostMiddleware est désormais ACTIVÉ sur Fly : build_trusted_hosts()
-  # couvre par défaut les motifs Fly (*.internal, *.flycast.internal, *.fly.dev)
-  # plus les hôtes dérivés de FRONTEND_APP_URL/BACKEND_PUBLIC_URL. Le Host des
-  # health checks Fly (*.internal) est couvert → le middleware ne bloque plus
-  # les sondes de santé. Action manuelle (une fois) : retirer le secret
-  # `fly secrets unset DISABLE_TRUSTED_HOST_MIDDLEWARE` pour le réactiver ;
-  # tant qu'il vaut 'true' le middleware reste désactivé par surcharge.
+  # TrustedHostMiddleware : DÉSACTIVÉ en prod via le secret
+  # DISABLE_TRUSTED_HOST_MIDDLEWARE=true. Constat (vérifié le 22/08/2026) :
+  # retirer ce secret fait échouer les health checks HTTP de Fly en 400
+  # « Invalid host header » — le Host envoyé par les sondes n'est couvert par
+  # AUCUN motif de build_trusted_hosts() (*.internal, *.flycast.internal,
+  # *.flycast, *.fly.dev testés), probablement l'adresse IPv6 interne que le
+  # parseur de Starlette découpe sur ':' (host.split(':')[0]). Risque réel
+  # faible : Fly normalise le Host du trafic public et tous les liens du
+  # backend sont construits depuis FRONTEND_APP_URL statique (pas de
+  # host-header poisoning exploitable). Pour réactiver proprement : passer
+  # le health check de HTTP à TCP dans [http_service] (les checks TCP ne
+  # traversent pas le middleware), puis `fly secrets unset
+  # DISABLE_TRUSTED_HOST_MIDDLEWARE`.
   TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev'
 
 [http_service]

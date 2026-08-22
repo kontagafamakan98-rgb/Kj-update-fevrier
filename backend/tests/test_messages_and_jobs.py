@@ -207,9 +207,54 @@ class TestMyProposals:
 
 @pytest.mark.asyncio
 class TestJobs:
-    async def test_get_jobs_requires_auth(self, client: AsyncClient):
+    async def test_get_jobs_public_for_anonymous(self, client: AsyncClient):
+        """La liste des jobs est en LECTURE PUBLIQUE (découverte sans compte) :
+        un visiteur anonyme reçoit les offres sans champs sensibles."""
         resp = await client.get("/api/jobs")
-        assert resp.status_code in AUTH_REQUIRED_STATUS
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    async def test_get_job_public_strips_sensitive_fields(self, client: AsyncClient):
+        """La vue publique retire client_id / assigned_worker_id /
+        accepted_proposal_id / shared_location (identités + position GPS)."""
+        client_user = await register_and_login(client, BASE_USER)
+        job_id = str(uuid.uuid4())
+        await db_insert("jobs", {
+            "id": job_id,
+            "title": "Mission publique test",
+            "description": "Description suffisamment longue pour un job public de test.",
+            "category": "plomberie",
+            "budget_min": 10000,
+            "budget_max": 30000,
+            "location": {"address": "Dakar Plateau, Sénégal"},
+            "client_id": client_user["user"]["id"],
+            "assigned_worker_id": "worker-xyz",
+            "accepted_proposal_id": "proposal-xyz",
+            "shared_location": {"maps_url": "https://maps.google.com/?q=1,2"},
+            "status": "open",
+            "deleted": False,
+        })
+
+        # Vue publique (anonyme) : champs sensibles absents, reste lisible.
+        # On vide le jar de cookies du client (le login précédent y a laissé
+        # kojo_session) pour simuler un vrai visiteur sans session.
+        client.cookies.clear()
+        resp = await client.get(f"/api/jobs/{job_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["title"] == "Mission publique test"
+        assert "client_id" not in data
+        assert "assigned_worker_id" not in data
+        assert "accepted_proposal_id" not in data
+        assert "shared_location" not in data
+
+        # Vue authentifiée : le document complet est renvoyé
+        headers = {"Authorization": f"Bearer {client_user['access_token']}"}
+        resp_auth = await client.get(f"/api/jobs/{job_id}", headers=headers)
+        assert resp_auth.status_code == 200
+        data_auth = resp_auth.json()
+        assert data_auth["client_id"] == client_user["user"]["id"]
+        assert data_auth["shared_location"]["maps_url"] == "https://maps.google.com/?q=1,2"
 
     async def test_create_job_requires_auth(self, client: AsyncClient):
         resp = await client.post("/api/jobs", json={"title": "Test"})

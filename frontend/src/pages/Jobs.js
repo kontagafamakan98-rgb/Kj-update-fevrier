@@ -205,8 +205,10 @@ export default function Jobs() {
           <p className="mt-2 text-gray-600">{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Sélecteur de pays — visible uniquement sur cette page */}
-          <CountrySelector />
+          {/* Sélecteur de pays — visible uniquement sur cette page, pour
+              les utilisateurs connectés (le changement de pays exige une
+              session) */}
+          {user && <CountrySelector />}
           {/* Bascule liste / carte */}
           <div className="flex rounded-xl border border-gray-200 bg-white p-1">
             <button

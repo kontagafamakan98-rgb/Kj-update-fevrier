@@ -352,7 +352,8 @@ const pages = {
       proposalAssigned: 'Proposition attribuée',
       interlocutorFallback: 'Interlocuteur',
       workerFallback: 'Travailleur',
-      missionDone: 'Terminée'
+      missionDone: 'Terminée',
+      loginToApply: 'Connectez-vous pour postuler'
     },
     en: {
       loadError: 'Error while loading the job',
@@ -433,7 +434,8 @@ const pages = {
       proposalAssigned: 'Proposal assigned',
       interlocutorFallback: 'Contact',
       workerFallback: 'Worker',
-      missionDone: 'Done'
+      missionDone: 'Done',
+      loginToApply: 'Log in to apply'
     }
   },
   jobs: {

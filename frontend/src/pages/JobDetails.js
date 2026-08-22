@@ -613,6 +613,15 @@ export default function JobDetails() {
                   {t('jobUiApply')}
                 </button>
               )}
+
+              {/* Visiteur anonyme (découverte publique) : inviter à se
+                  connecter pour postuler — les mutations restent réservées
+                  aux comptes authentifiés. */}
+              {!user && (job?.status === 'open' || !job?.status) && !assignedWorkerId && (
+                <button onClick={() => navigate('/login')} className="rounded-xl bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700">
+                  {pageT('loginToApply') || t('jobUiApply')}
+                </button>
+              )}
             </div>
 
             {!canApply && hasApplied && !isJobOwner && (

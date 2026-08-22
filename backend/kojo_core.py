@@ -1165,3 +1165,19 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_current_user_optional(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[User]:
+    """Variante de get_current_user qui ne lève PAS de 401 : retourne None
+    pour les visiteurs anonymes. Utilisée par les endpoints en LECTURE
+    publique (liste des jobs, détail d'un job) dont les mutations restent
+    strictement authentifiées."""
+    try:
+        return await get_current_user(request, credentials)
+    except HTTPException as exc:
+        if exc.status_code == 401:
+            return None
+        raise
