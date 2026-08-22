@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from kojo_core import db
 from kojo_shared import _send_payment_pending_to_worker
@@ -34,8 +34,13 @@ router = APIRouter()
 
 
 def _job_identifier_query(job_id: str) -> dict:
-    """Find current and legacy jobs regardless of the stored identifier field."""
-    candidates = [{"id": job_id}, {"job_id": job_id}]
+    """Find current and legacy jobs regardless of the stored identifier field.
+
+    Couvre : `id` (chaîne uuid, jobs actuels), `job_id` (legacy), et `_id`
+    quand il stocke l'identifiant au lieu d'un ObjectId Mongo (anciens jeux de
+    données importés). Le candidat `_id` brut (chaîne) est ajouté en plus de la
+    variante ObjectId : les deux formes coexistent selon l'historique du doc."""
+    candidates = [{"id": job_id}, {"job_id": job_id}, {"_id": job_id}]
     if ObjectId.is_valid(job_id):
         candidates.append({"_id": ObjectId(job_id)})
     return {"$or": candidates}
@@ -344,8 +349,15 @@ async def create_job(
             jobcreate_fields = set(JobCreate.model_fields.keys())
             filtered_for_validation = {k: v for k, v in incoming.items() if k in jobcreate_fields}
             validated_input = JobCreate(**filtered_for_validation)
-        except Exception as validation_error:
-            raise HTTPException(status_code=422, detail=str(validation_error))
+        except ValidationError as validation_error:
+            # Messages lisibles : « titre: String should have at least 5
+            # characters » au lieu du dump Pydantic brut avec loc en tuple.
+            details = []
+            for err in validation_error.errors():
+                field = ".".join(str(part) for part in err.get("loc", []) if part not in ("body",))
+                msg = str(err.get("msg", "valeur invalide"))
+                details.append(f"{field}: {msg}" if field else msg)
+            raise HTTPException(status_code=422, detail="; ".join(details))
 
         job = Job(**validated_input.model_dump(), client_id=current_user.id, country=current_user.country)
 

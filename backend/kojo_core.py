@@ -451,12 +451,59 @@ security = HTTPBearer(auto_error=False)
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
-def _resolve_token(request: Request, credentials: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
-    """Source du token : Authorization: Bearer (header) puis cookie httpOnly."""
+def _iter_auth_tokens(request: Request, credentials: Optional[HTTPAuthorizationCredentials]):
+    """Sources de token candidates, dans l'ordre : header Authorization:
+    Bearer puis cookie httpOnly kojo_session.
+
+    Le header est essayé en premier (mobile / Capacitor / intégrations /
+    tests), mais un token STALE laissé dans le web storage par une ancienne
+    version du frontend ne doit PAS faire échouer une session cookie valide :
+    on retombe sur le cookie si le header ne décode pas (bug réel : 401
+    « Invalid token » sur GET /users/payment-accounts alors que l'utilisateur
+    était bien connecté via son cookie de session)."""
     if credentials is not None and credentials.credentials:
-        return credentials.credentials
+        yield ("header", credentials.credentials)
     cookie_token = request.cookies.get(AUTH_COOKIE_NAME)
-    return cookie_token or None
+    if cookie_token:
+        yield ("cookie", cookie_token)
+
+
+async def _decode_auth_token(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials],
+    *,
+    expired_detail: str,
+    invalid_detail: str,
+) -> dict:
+    """Décode le premier token valide (header Bearer puis cookie httpOnly) et
+    retourne son payload. Lève HTTPException 401 si aucune source n'est valide.
+
+    CSRF : une requête authentifiée PAR COOKIE sur une méthode non sûre
+    (POST/PUT/PATCH/DELETE) doit présenter un jeton X-CSRFToken correspondant
+    au cookie CSRF (double-submit — le navigateur envoie le cookie de session
+    automatiquement, même depuis un site tiers). Les requêtes authentifiées
+    par header Bearer (mobile/legacy) sont exemptes (pas de cookies
+    ambiants)."""
+    candidates = list(_iter_auth_tokens(request, credentials))
+    if not candidates:
+        raise HTTPException(status_code=401, detail="Non authentifié")
+
+    last_error: Optional[Exception] = None
+    for source, token in candidates:
+        try:
+            if request.method not in _SAFE_METHODS and source == "cookie":
+                _verify_csrf(request)
+            return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        except HTTPException:
+            raise
+        except jwt.ExpiredSignatureError as exc:
+            last_error = exc
+        except jwt.InvalidTokenError as exc:
+            last_error = exc
+
+    if isinstance(last_error, jwt.ExpiredSignatureError):
+        raise HTTPException(status_code=401, detail=expired_detail)
+    raise HTTPException(status_code=401, detail=invalid_detail)
 
 
 def _verify_csrf(request: Request) -> None:
@@ -591,12 +638,12 @@ async def verify_owner_access(
     Dual-mode header/cookie (cf. get_current_user). Les mutations via cookie
     exigent un jeton CSRF valide."""
     try:
-        token = _resolve_token(request, credentials)
-        if not token:
-            raise HTTPException(status_code=401, detail="Non authentifié")
-        if request.method not in _SAFE_METHODS and credentials is None:
-            _verify_csrf(request)
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = await _decode_auth_token(
+            request,
+            credentials,
+            expired_detail="Token expiré",
+            invalid_detail="Token invalide",
+        )
         user_id = payload.get("sub")
         email = payload.get("email")
 
@@ -1083,16 +1130,12 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ):
     try:
-        token = _resolve_token(request, credentials)
-        if not token:
-            raise HTTPException(status_code=401, detail="Non authentifié")
-        # CSRF : une requête authentifiée PAR COOKIE sur une méthode non sûre
-        # (POST/PUT/PATCH/DELETE) doit présenter un jeton X-CSRFToken
-        # correspondant au cookie CSRF. Les requêtes authentifiées par header
-        # Bearer (mobile/legacy) sont exemptes (pas de cookies ambients).
-        if request.method not in _SAFE_METHODS and credentials is None:
-            _verify_csrf(request)
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = await _decode_auth_token(
+            request,
+            credentials,
+            expired_detail="Token expired",
+            invalid_detail="Invalid token",
+        )
         user_id: str = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")

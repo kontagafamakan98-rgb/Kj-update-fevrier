@@ -49,12 +49,15 @@ export default defineConfig(({ mode }) => {
           // son domaine n'est autorisé dans script-src QUE si l'analytics est
           // réellement configurée (sinon surface d'attaque inutile).
           const plausibleDomain = (env.VITE_PLAUSIBLE_DOMAIN || '').trim()
-          const scriptSrc = plausibleDomain
-            ? "script-src 'self' https://plausible.io"
-            : "script-src 'self'"
+          // Le SDK Google Identity Services (bouton SSO) est chargé dynamiquement
+          // depuis accounts.google.com/gsi/client : sans cette entrée dans
+          // script-src, la CSP le bloque et le bouton Google échoue avec
+          // « Impossible de charger le SDK Google » (script.onerror).
+          const scriptSrc = ["'self'", 'https://accounts.google.com']
+          if (plausibleDomain) scriptSrc.push('https://plausible.io')
           const csp = [
             "default-src 'self'",
-            scriptSrc,
+            `script-src ${scriptSrc.join(' ')}`,
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://res.cloudinary.com https://tile.openstreetmap.org",
             // Géolocalisation 100% centralisée derrière le backend Kojo :
@@ -62,13 +65,15 @@ export default defineConfig(({ mode }) => {
             // (/geolocation/reverse) et base villes/quartiers
             // (/geolocation/cities) passent tous par apiOrigin. Plus aucun
             // appel direct à ipapi.co / ipinfo.io / nominatim depuis le
-            // navigateur → connect-src réduit au strict minimum.
-            `connect-src 'self' ${apiOrigin}`,
+            // navigateur → connect-src réduit au strict minimum (Google
+            // Identity Services ajouté pour le SSO).
+            `connect-src 'self' ${apiOrigin} https://accounts.google.com`,
             // Cartes : les aperçus de localisation sont des iframes
             // (CreateJob / JobCreateModal → buildMapEmbedUrl) Google Maps ou
             // OpenStreetMap. Sans frame-src, default-src 'self' les bloque
-            // (console : « Refused to frame »).
-            "frame-src 'self' https://www.google.com https://www.openstreetmap.org",
+            // (console : « Refused to frame »). accounts.google.com est
+            // nécessaire au sélecteur de compte du SSO Google.
+            "frame-src 'self' https://www.google.com https://www.openstreetmap.org https://accounts.google.com",
             "font-src 'self' data:",
             "object-src 'none'",
             "base-uri 'self'",

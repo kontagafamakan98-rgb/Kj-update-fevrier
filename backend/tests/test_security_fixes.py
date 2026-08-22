@@ -191,6 +191,38 @@ class TestHttpOnlyCookieAuth:
         resp = await client.put("/api/users/profile", headers=headers, json={"first_name": "HeaderOK"})
         assert resp.status_code == 200
 
+    async def test_stale_header_token_falls_back_to_valid_cookie(self, client: AsyncClient):
+        """Régression du bug réel : un token STALE en localStorage (vestige
+        d'une ancienne version du frontend) envoyé en Authorization: Bearer ne
+        doit PAS faire échouer une session cookie valide (401 « Invalid token »
+        sur GET /users/payment-accounts alors que l'utilisateur est connecté).
+        Le backend retombe sur le cookie httpOnly quand le header ne décode pas."""
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        # Header avec un token périmé/illisible + cookie de session valide.
+        headers = {"Authorization": "Bearer token.stale.invalide"}
+        me = await client.get("/api/auth/me", headers=headers)
+        assert me.status_code == 200
+        assert me.json()["email"] == result["user"]["email"]
+
+    async def test_stale_header_fallback_mutation_still_requires_csrf(self, client: AsyncClient):
+        """Le fallback vers le cookie n'ouvre PAS une brèche CSRF : une
+        mutation authentifiée via le cookie (header stale ignoré) doit toujours
+        présenter un X-CSRFToken valide, sinon 403."""
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        resp = await client.put(
+            "/api/users/profile",
+            json={"first_name": "FallbackSansCSRF"},
+            headers={"Authorization": "Bearer token.stale.invalide"},
+        )
+        assert resp.status_code == 403
+        assert "csrf" in resp.json()["detail"].lower()
+
     async def test_logout_clears_session_cookie(self, client: AsyncClient):
         result = await register_and_login(client)
         await client.post("/api/auth/login", json={

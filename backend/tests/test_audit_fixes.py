@@ -720,6 +720,55 @@ class TestReviews:
 
 
 # ---------------------------------------------------------------------------
+# 🟠 Suppression de jobs legacy : identifiant stocké dans _id (chaîne)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+class TestDeleteLegacyJobById:
+    async def test_delete_job_stored_with_string_id(self, client: AsyncClient):
+        """Les vieux jeux de données stockaient l'identifiant dans _id (chaîne,
+        pas ObjectId) : la suppression doit retrouver et supprimer ces jobs."""
+        client_user = await register_and_login(client, BASE_USER)
+        legacy_id = str(uuid.uuid4())
+        await db_insert("jobs", {
+            "_id": legacy_id,  # pas de champ "id" : doc legacy importé
+            "title": "Mission importée",
+            "client_id": client_user["user"]["id"],
+            "status": "open",
+            "deleted": False,
+        })
+
+        headers = {"Authorization": f"Bearer {client_user['access_token']}"}
+        resp = await client.delete(f"/api/jobs/{legacy_id}", headers=headers)
+        assert resp.status_code == 200
+
+        job = await db_find_one("jobs", {"_id": legacy_id})
+        assert job is not None
+        assert job["deleted"] is True
+        assert job["status"] == "cancelled"
+
+    async def test_delete_job_with_objectid_id_still_works(self, client: AsyncClient):
+        """Les jobs stockés avec un ObjectId Mongo natif restent supprimables."""
+        from bson import ObjectId
+        client_user = await register_and_login(client, BASE_USER)
+        oid = ObjectId()
+        await db_insert("jobs", {
+            "_id": oid,
+            "id": str(oid),
+            "title": "Mission récente",
+            "client_id": client_user["user"]["id"],
+            "status": "open",
+            "deleted": False,
+        })
+
+        headers = {"Authorization": f"Bearer {client_user['access_token']}"}
+        resp = await client.delete(f"/api/jobs/{oid}", headers=headers)
+        assert resp.status_code == 200
+        job = await db_find_one("jobs", {"id": str(oid)})
+        assert job["deleted"] is True
+
+
+# ---------------------------------------------------------------------------
 # 🟠 return_url : payment_id ajouté même quand le frontend fournit une URL
 # ---------------------------------------------------------------------------
 

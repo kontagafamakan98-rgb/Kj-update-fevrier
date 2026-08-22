@@ -842,8 +842,10 @@ async def logout_user(
     même s'il a été intercepté avant le logout.
     Les cookies de session (httpOnly) + CSRF sont aussi retirés (cookie auth).
     """
-    # Le token peut venir du header (mobile) OU du cookie httpOnly : on le
-    # récupère via _resolve_token pour révoquer le bon jti dans les deux cas.
+    # Le token peut venir du header (mobile) OU du cookie httpOnly : on
+    # révoque le jti du header quand il est présent ; pour le cookie, la
+    # révocation est best-effort (clear_auth_cookies retire de toute façon la
+    # session côté navigateur).
     try:
         token = (credentials.credentials if credentials and credentials.credentials
                  else current_user.__kojo_token__ if hasattr(current_user, "__kojo_token__") else None)

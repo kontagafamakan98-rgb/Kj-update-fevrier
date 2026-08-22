@@ -182,7 +182,6 @@ let sessionRedirecting = false;
 const handleUnauthorized = (path) => {
   if (BUSINESS_401_PREFIXES.some((prefix) => path.startsWith(prefix))) return;
   if (sessionRedirecting) return;
-  sessionRedirecting = true;
 
   try {
     const purge = (bucketName) => {
@@ -192,9 +191,25 @@ const handleUnauthorized = (path) => {
         try { bucket.removeItem(key); } catch (_e) { /* clé absente */ }
       });
     };
+
+    // Session cookie httpOnly toujours présente (kojo_csrf associé lisible) :
+    // le 401 vient d'un token STALE en localStorage (vestige de la migration
+    // cookie auth), pas d'une session morte. On purge le stockage
+    // (auto-guérison : les prochains appels partent en cookie-only) mais on
+    // NE redirige PAS vers /login — l'utilisateur est toujours connecté. Si
+    // la session cookie est réellement morte, /auth/me échouera et le garde
+    // de route (App.js) renverra vers /login.
+    if (hasSessionCookie()) {
+      purge('localStorage');
+      purge('sessionStorage');
+      return;
+    }
+
     purge('localStorage');
     purge('sessionStorage');
   } catch (_error) {}
+
+  sessionRedirecting = true;
 
   try {
     if (typeof window !== 'undefined' && window.location && !window.location.pathname.endsWith('/login')) {
