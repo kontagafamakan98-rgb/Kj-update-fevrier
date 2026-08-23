@@ -434,7 +434,7 @@ export const messagesAPI = {
   list: async () => normalizeMessageListResponse(await api.get('/messages')),
   getConversations: async () => normalizeConversationListResponse(await api.get('/messages/conversations')),
   getConversation: async (conversationId) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`)),
-  getMessages: async (conversationId) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`)),
+  getMessages: async (conversationId, { limit = 100, offset = 0 } = {}) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`, { params: { limit, offset } })),
 };
 
 const camelToKebab = (value) => String(value || '')
@@ -571,11 +571,10 @@ export const reviewAPI = {
 export const reviewsAPI = reviewAPI;
 export const supportAPI = {
   createTicket: (payload) => api.post('/support/tickets', payload),
+  getTicketStatus: (ticketId, email) => api.post('/support/tickets/status', { ticket_id: ticketId, email }),
   listTickets: (statusFilter) => api.get('/support/tickets', { params: statusFilter ? { status_filter: statusFilter } : {} }),
   updateTicketStatus: (ticketId, status) => api.patch(`/support/tickets/${ticketId}/status`, { status }),
 };
-export const proposalAPI = createResourceApi('proposals');
-export const proposalsAPI = proposalAPI;
 export const messageAPI = {
   list: (params = {}) => messagesAPI.list(params),
   getAll: (params = {}) => messagesAPI.list(params),

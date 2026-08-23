@@ -35,6 +35,15 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
   const requiredMinimum = userType === 'worker' ? 2 : 1;
   const supportedOrangeMoneyCountries = [t('mali'), t('senegal'), t('burkina_faso'), t('ivory_coast')].join(', ');
 
+  // Wave n'est opéré que par PayDunya au Sénégal et en Côte d'Ivoire : un
+  // compte Wave lié au Mali/Burkina serait accepté ici puis bloqué au moment
+  // du paiement (400 « Wave non disponible »). On désactive le champ AVANT,
+  // avec un message explicite, et on ne le compte pas parmi les moyens liés.
+  const WAVE_UNAVAILABLE_COUNTRIES = ['mali', 'burkina_faso'];
+  const isWaveUnavailable = Boolean(
+    detectedCountry && WAVE_UNAVAILABLE_COUNTRIES.includes(detectedCountry.code)
+  );
+
   useEffect(() => {
     // Détecter automatiquement le pays de l'utilisateur
     detectUserCountryAsync();
@@ -73,12 +82,12 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     // backend rejetterait le numéro au moment de la soumission.
     let count = 0;
     if (accounts.orange_money.trim() && validateOrangeMoneyNumber(accounts.orange_money)) count++;
-    if (accounts.wave.trim() && validateWaveNumber(accounts.wave)) count++;
+    if (!isWaveUnavailable && accounts.wave.trim() && validateWaveNumber(accounts.wave)) count++;
     if (accounts.bank_account && accounts.bank_account.account_number.trim() && 
         accounts.bank_account.bank_name.trim() && accounts.bank_account.account_holder.trim() &&
         validateBankAccount(accounts.bank_account)) count++;
     setLinkedAccountsCount(count);
-  }, [accounts]);
+  }, [accounts, isWaveUnavailable]);
 
   const validateOrangeMoneyNumber = (number) => {
     const cleanNumber = number.replace(/[\s\-\+]/g, '');
@@ -135,6 +144,13 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
   };
 
   const handleInputChange = (field, value) => {
+    if (field === 'wave' && isWaveUnavailable) {
+      // Wave indisponible (Mali/Burkina) : on ne laisse pas saisir un numéro
+      // qui sera de toute façon refusé au paiement — l'utilisateur doit
+      // utiliser Orange Money ou une carte bancaire.
+      setValidationErrors(prev => ({ ...prev, wave: t('waveUnavailableInYourCountry') }));
+      return;
+    }
     if (field === 'orange_money' || field === 'wave') {
       value = formatPhoneNumber(value);
       setAccounts(prev => ({
@@ -168,7 +184,9 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
       errors.orange_money = t('invalidOrangeMoneyNumber');
     }
 
-    if (accounts.wave && !validateWaveNumber(accounts.wave)) {
+    if (accounts.wave && isWaveUnavailable) {
+      errors.wave = t('waveUnavailableInYourCountry');
+    } else if (accounts.wave && !validateWaveNumber(accounts.wave)) {
       errors.wave = t('invalidWaveNumber');
     }
 
@@ -196,7 +214,10 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     try {
       const paymentData = {
         orange_money: accounts.orange_money || null,
-        wave: accounts.wave || null,
+        // Wave indisponible (Mali/Burkina) : on n'envoie pas de numéro Wave —
+        // le backend rejetterait le compte, et un paiement Wave y est de toute
+        // façon impossible (canaux PayDunya inexistants).
+        wave: !isWaveUnavailable ? (accounts.wave || null) : null,
         bank_account: (accounts.bank_account && accounts.bank_account.account_number) ? accounts.bank_account : null
       };
 
@@ -304,30 +325,38 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         </div>
 
         {/* Wave */}
-        <div className="border border-blue-200 rounded-lg p-4">
+        <div className={`border rounded-lg p-4 ${isWaveUnavailable ? 'border-gray-200 bg-gray-50' : 'border-blue-200'}`}>
           <div className="flex items-center mb-3">
             <span className="text-2xl mr-3">🌊</span>
             <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
-            <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+            <span className={`ml-2 text-xs px-2 py-1 rounded ${isWaveUnavailable ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
               {t('availableAcrossWestAfrica')}
             </span>
           </div>
           
-          <label htmlFor="payment_setup_wave" className="sr-only">{t('wave')}</label>
-          <input
-            id="payment_setup_wave"
-            name="payment_setup_wave"
-            autoComplete="tel"
-            type="text"
-            value={accounts.wave}
-            onChange={(e) => handleInputChange('wave', e.target.value)}
-            placeholder={phoneExample}
-            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-              validationErrors.wave ? 'border-red-500' : 'border-gray-300'
-            }`}
-          />
-          {validationErrors.wave && (
-            <p className="text-red-500 text-sm mt-1">{validationErrors.wave}</p>
+          {isWaveUnavailable ? (
+            <p className="text-sm text-gray-500 bg-white border border-gray-200 rounded-lg px-4 py-3">
+              {t('waveUnavailableInYourCountry')}
+            </p>
+          ) : (
+            <>
+              <label htmlFor="payment_setup_wave" className="sr-only">{t('wave')}</label>
+              <input
+                id="payment_setup_wave"
+                name="payment_setup_wave"
+                autoComplete="tel"
+                type="text"
+                value={accounts.wave}
+                onChange={(e) => handleInputChange('wave', e.target.value)}
+                placeholder={phoneExample}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  validationErrors.wave ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              {validationErrors.wave && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.wave}</p>
+              )}
+            </>
           )}
         </div>
 

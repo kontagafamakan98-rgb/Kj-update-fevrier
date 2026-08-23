@@ -212,6 +212,51 @@ class Job(BaseModel):
             raise ValueError('budget_max must be greater than or equal to budget_min')
         return v
 
+class JobPublic(BaseModel):
+    """Vue PUBLIQUE d'un job (découverte sans compte) : ALLOWLIST stricte des
+    champs non sensibles, au lieu d'un denylist qui vieillit mal. Tout champ
+    ajouté au document MongoDB est donc PRIVÉ par défaut tant qu'il n'est pas
+    explicitement listé ici (extra='ignore' de Pydantic v2).
+
+    Jamais exposés publiquement : identités (client_id, assigned_worker_id,
+    accepted_proposal_id), point geo, coordonnées GPS de localisation et
+    champs internes (deleted, created_at, _id...).
+
+    Contraintes volontairement relâchées (pas de min_length/ge/le, pas de
+    validateur budget_max>=budget_min) : une fiche legacy un peu atypique ne
+    doit jamais faire tomber la découverte publique en 500 — le flux public se
+    contente de types valides, la validation stricte reste côté écriture.
+    """
+    location: dict = Field(...)  # Localisation = adresse texte uniquement (coordonnées retirées)
+
+    id: str
+    title: str
+    description: str
+    category: str
+    budget_min: float = 0.0
+    budget_max: float = 0.0
+    country: Optional[str] = None
+    status: JobStatus = JobStatus.OPEN
+    required_skills: List[str] = Field(default=[])
+    estimated_duration: Optional[str] = None
+    posted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    deadline: Optional[datetime] = None
+    mechanic_must_bring_parts: bool = False
+    mechanic_must_bring_tools: bool = False
+    parts_and_tools_notes: Optional[str] = None
+
+    @field_validator("location")
+    @classmethod
+    def strip_coordinates(cls, v: dict) -> dict:
+        """L'adresse textuelle reste publique, jamais la position GPS brute
+        (latitude/longitude/coordinates des créations récentes, lat/lng des
+        documents legacy)."""
+        if isinstance(v, dict):
+            return {k: val for k, val in v.items()
+                    if k not in ("latitude", "longitude", "coordinates", "lat", "lng")}
+        return v
+
+
 class JobProposal(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     job_id: str
@@ -249,6 +294,10 @@ class PaymentQuoteRequest(BaseModel):
 class PaymentCheckoutRequest(PaymentQuoteRequest):
     return_url: Optional[str] = Field(default=None, max_length=500)
     cancel_url: Optional[str] = Field(default=None, max_length=500)
+    # Clé d'idempotence client (double-clic / retry réseau) : si un paiement
+    # PENDING existe déjà pour (clé, payeur), le checkout renvoie la même
+    # facture au lieu d'en créer une seconde.
+    idempotency_key: Optional[str] = Field(default=None, max_length=64)
 
 class Review(BaseModel):
     """Avis / note laissé par un participant sur l'autre partie d'une mission terminée."""

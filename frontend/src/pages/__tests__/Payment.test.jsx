@@ -69,6 +69,9 @@ const quoteAt20 = {
 describe('Payment — cohérence de la répartition quand le taux change', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Les paiements libres sont fermés : le formulaire n'apparaît que pour un
+    // paiement rattaché à une mission (job_id dans l'URL).
+    window.history.replaceState({}, '', '/payment?job_id=job-1&worker_id=worker-1&amount=1000&job_title=Mission%20test');
     CommissionService.getQuote.mockImplementation(() => Promise.resolve(quoteAt14));
     CommissionService.createCheckout.mockResolvedValue({ checkout_url: 'https://paydunya.test/checkout', payment_id: 'p1' });
   });

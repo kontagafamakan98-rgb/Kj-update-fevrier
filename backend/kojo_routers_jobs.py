@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 from kojo_core import db
 from kojo_shared import _send_payment_pending_to_worker
 from kojo_models import (
-    Job, JobCreate, JobProposal,
+    Job, JobCreate, JobProposal, JobPublic,
     JobStatus, Message, NotificationType, ProposalCreate, User, UserType,
     WorkerProfile,
 )
@@ -189,13 +189,17 @@ async def _notify_matching_workers(job: Job):
     erreur ici ne doit jamais faire échouer la création du job.
     """
     try:
-        category = (job.category or '').strip().lower()
+        category = _normalize_job_category(job.category)
         if not category:
             return
 
-        # 1) Travailleurs dont une spécialité = catégorie du job (insensible à la casse)
+        # 1) Travailleurs dont une spécialité = catégorie du job (insensible à
+        # la casse) — on matche TOUTES les écritures du groupe (EN + FR)
+        # pour ne pas rater un profil legacy.
+        variants = sorted({v.lower() for v in _CATEGORY_GROUPS.get(category, [category])}, key=len, reverse=True)
+        variants_regex = "^(" + "|".join(re.escape(v) for v in variants) + ")$"
         profiles = await db.worker_profiles.find({
-            "specialties": {"$regex": f"^{re.escape(category)}$", "$options": "i"},
+            "specialties": {"$regex": variants_regex, "$options": "i"},
         }).to_list(50)
         worker_ids = [p.get("user_id") for p in profiles if p.get("user_id")]
         method = "spécialité"
@@ -320,7 +324,9 @@ async def create_job(
             budget_max = budget_min
 
         incoming["title"] = _text(incoming.get("title"))
-        incoming["category"] = _text(incoming.get("category")) or "general"
+        # Catégorie ramenée au slug CANONIQUE (plomberie → plumbing, etc.) :
+        # les filtres UI interrogent les slugs EN, les données legacy sont FR.
+        incoming["category"] = _normalize_job_category(incoming.get("category"))
         incoming["location"] = location_payload
         incoming["budget_min"] = budget_min
         incoming["budget_max"] = budget_max
@@ -393,28 +399,70 @@ async def create_job(
         logger.error(f"❌ Failed to create job: {e}")
         raise HTTPException(status_code=500, detail="Internal server error creating job")
 
-# Champs sensibles retirés de la vue PUBLIQUE (visiteur non connecté) :
-# l'identité du client / du travailleur attribué et la position GPS partagée
-# (visible normalement par le travailleur accepté) ne doivent pas être
-# exposées à quiconque n'a pas de session.
-_JOB_PUBLIC_STRIPPED_FIELDS = (
-    "client_id",
-    "assigned_worker_id",
-    "accepted_proposal_id",
-    "shared_location",
-)
+# Vue PUBLIQUE des jobs (découverte sans compte) : modélisée par une
+# ALLOWLIST stricte (JobPublic dans kojo_models), pas un denylist — tout champ
+# ajouté au document (identité, GPS, interne) reste privé par défaut.
 
 
-def _job_view(job: dict, current_user: Optional[User]) -> dict:
-    """Vue d'un job tel que renvoyée aux clients. Les utilisateurs connectés
-    reçoivent le document complet ; les visiteurs anonymes reçoivent la même
-    fiche SANS les champs sensibles (identités + position partagée)."""
+def _job_view(job: dict, current_user: Optional[User]):
+    """Vue d'un job selon l'identité de l'appelant.
+
+    - Visiteur anonyme : instance JobPublic construite depuis le document —
+      seuls les champs explicitement autorisés sortent (identités, point geo,
+      coordonnées GPS et champs internes exclus par construction, jamais par
+      un retrait manuel qui pourrait être oublié à la prochaine évolution).
+    - Utilisateur connecté : document complet sans _id (comportement
+      historique — le frontend lit aussi created_at en fallback d'affichage).
+    """
+    if current_user is None:
+        return JobPublic.model_validate(job)
     view = dict(job)
     view.pop("_id", None)
-    if current_user is None:
-        for field in _JOB_PUBLIC_STRIPPED_FIELDS:
-            view.pop(field, None)
     return view
+
+
+# --------------------------------------------------------------------------
+# Catégories : normalisation multi-écritures (slugs FR legacy vs EN actuel)
+# --------------------------------------------------------------------------
+# Les anciens jobs et certains clients écrivent des catégories FR (plomberie,
+# menuiserie…) alors que les filtres UI utilisent des slugs EN (plumbing…).
+# _initialize_job_category ramène TOUT à un slug canonique à l'écriture, et
+# le filtre liste interroge le groupe d'équivalence complet pour ne jamais
+# rater un job legacy.
+_CATEGORY_GROUPS: dict[str, list[str]] = {
+    "general": ["general", "divers", "général", "generaliste", "généraliste"],
+    "plumbing": ["plumbing", "plomberie", "plombier", "plomberie urgent", "plombier urgent"],
+    "electrical": ["electrical", "electricite", "électricité", "electricien", "électricien", "electronique", "électronique"],
+    "construction": ["construction", "batiment", "bâtiment", "maconnerie", "maçonnerie", "macon", "maçon", "peinture", "carrelage"],
+    "cleaning": ["cleaning", "menage", "ménage", "nettoyage", "femme de menage", "femme de ménage"],
+    "gardening": ["gardening", "jardinage", "jardinier", "espace vert"],
+    "tutoring": ["tutoring", "cours", "soutien scolaire", "professeur", "enseignant", "formation"],
+    "mechanics": ["mechanics", "mecanique", "mécanique", "mecanicien", "mécanicien", "garage", "auto"],
+}
+
+# Dictionnaire inverse : n'importe quelle écriture → slug canonique.
+_CATEGORY_TO_CANONICAL: dict[str, str] = {
+    variant.strip().lower(): group
+    for group, variants in _CATEGORY_GROUPS.items()
+    for variant in variants
+}
+
+
+def _normalize_job_category(value: Optional[str]) -> str:
+    """Ramène n'importe quelle écriture de catégorie au slug canonique."""
+    if not value:
+        return "general"
+    return _CATEGORY_TO_CANONICAL.get(str(value).strip().lower(), "general")
+
+
+def _category_search_variants(value: str) -> list[str]:
+    """Toutes les écritures stockées en base qui appartiennent au même groupe
+    canonique (pour que le filtre retrouve les jobs legacy)."""
+    canonical = _normalize_job_category(value)
+    for group, variants in _CATEGORY_GROUPS.items():
+        if group == canonical:
+            return sorted({v.lower() for v in variants})
+    return [canonical]
 
 
 @router.get("/jobs")
@@ -422,6 +470,18 @@ async def get_jobs(
     status: Optional[JobStatus] = None,
     category: Optional[str] = None,
     limit: int = Query(default=50, ge=1, le=100),
+    page: int = Query(default=1, ge=1),
+    # Recherche plein texte simple (titre + description), insensible à la casse.
+    q: Optional[str] = Query(default=None, max_length=100),
+    # Si défini, limite la liste aux jobs dont l'id est dans la liste
+    # (séparée par des virgules, max 100) — utilisé par les onglets
+    # « Mes candidatures » du frontend.
+    ids: Optional[str] = Query(default=None, max_length=3000),
+    # "mine=posted" (cliente) : jobs publiés par l'utilisateur courant ;
+    # "mine=assigned" (travailleur) : missions qui lui sont attribuées.
+    mine: Optional[str] = Query(default=None),
+    # Filtre pays explicite (visiteur anonyme : découverte par pays).
+    country: Optional[str] = Query(default=None),
     # Recherche par rayon côté serveur : seuls les jobs portant un point
     # GeoJSON (geo) dans le rayon entrent en compte. Sans lat/lng/radius_km
     # complets, le filtre ne s'applique pas (comportement inchangé).
@@ -435,7 +495,31 @@ async def get_jobs(
         if status:
             query["status"] = status
         if category:
-            query["category"] = category
+            # Filtre le GROUPE d'équivalence (canonique + écritures legacy FR)
+            query["category"] = {"$in": _category_search_variants(category)}
+        if country:
+            query["country"] = str(country).strip().lower()
+        if ids:
+            id_list = [i.strip() for i in ids.split(",") if i.strip()][:100]
+            if id_list:
+                query["id"] = {"$in": id_list}
+        if mine:
+            if current_user is None:
+                raise HTTPException(status_code=401, detail="Authentification requise")
+            if mine == "posted":
+                query["client_id"] = current_user.id
+            elif mine == "assigned":
+                query["assigned_worker_id"] = current_user.id
+            else:
+                raise HTTPException(status_code=400, detail="Paramètre mine invalide")
+        if q:
+            q_escaped = re.escape(str(q).strip())
+            query["$and"] = [
+                {"$or": [
+                    {"title": {"$regex": q_escaped, "$options": "i"}},
+                    {"description": {"$regex": q_escaped, "$options": "i"}},
+                ]}
+            ]
 
         # Rayon : $geoWithin + $centerSphere (rayon en radians = km / 6371).
         # Nécessite l'index 2dsphere sur jobs.geo (créé au boot).
@@ -460,11 +544,29 @@ async def get_jobs(
                     {"country": None}
                 ]
 
-        jobs = await db.jobs.find(query).sort("created_at", -1).to_list(limit)
+        # Pagination : offset = (page - 1) * limit. Le client déduit
+        # « plus de résultats » du fait que la page est pleine.
+        offset = max(0, (page - 1) * limit)
+        jobs = await db.jobs.find(query).sort("created_at", -1).skip(offset).to_list(limit)
 
-        logger.debug(f"✅ Retrieved {len(jobs)} jobs (auth={current_user is not None})")
+        logger.debug(f"✅ Retrieved {len(jobs)} jobs (auth={current_user is not None}, page={page})")
+        if current_user is None:
+            # Vue publique : un fiche legacy invalide ne doit JAMAIS faire
+            # tomber toute la liste en 500 — on l'écarte avec un warning (elle
+            # reste visible aux utilisateurs connectés, qui ont le doc brut).
+            views = []
+            for job in jobs:
+                try:
+                    views.append(_job_view(job, current_user))
+                except ValidationError as exc:
+                    logger.warning(f"⚠️ Job {job.get('id')} invalide pour la vue publique, ignoré: {exc}")
+            return views
         return [_job_view(job, current_user) for job in jobs]
 
+    except HTTPException:
+        # Paramètre invalide (mine=..., requête anonyme) → ne PAS transformer
+        # en 500 : le except Exception générique ci-dessous avalerait l'erreur.
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to retrieve jobs: {e}")
         raise HTTPException(status_code=500, detail="Internal server error retrieving jobs")

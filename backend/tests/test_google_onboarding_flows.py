@@ -17,7 +17,7 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import db_find_one
+from tests.conftest import db_find_one, db_insert
 
 
 def _google_claims(email=None):
@@ -88,6 +88,20 @@ class TestGoogleOnboardingPayment:
         })
         assert resp.status_code == 200, resp.text
 
+        # Le checkout exige une mission rattachée : on insère un job payable
+        # (worker assigné + proposition acceptée) pour ce client Google.
+        job_id = str(uuid.uuid4())
+        proposal_id = str(uuid.uuid4())
+        await db_insert("jobs", {
+            "id": job_id, "title": "Mission Google payable", "client_id": user["id"],
+            "status": "in_progress", "assigned_worker_id": "worker-google",
+            "accepted_proposal_id": proposal_id, "deleted": False,
+        })
+        await db_insert("job_proposals", {
+            "id": proposal_id, "job_id": job_id, "worker_id": "worker-google",
+            "proposed_amount": 5000, "status": "accepted",
+        })
+
         captured_payload = {}
 
         def _fake_create_invoice(payload):
@@ -98,7 +112,8 @@ class TestGoogleOnboardingPayment:
              patch("kojo_routers_payments.create_paydunya_invoice", side_effect=_fake_create_invoice), \
              patch("kojo_routers_payments.notify_user_localized", AsyncMock()):
             resp = await client.post("/api/payments/checkout", headers=headers, json={
-                "amount": 1000,
+                "job_id": job_id,
+                "amount": 5000,
                 "payment_method": "orange_money",
                 "country": "senegal",
             })

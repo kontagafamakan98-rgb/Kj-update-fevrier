@@ -67,3 +67,65 @@ export const usePageTitle = (title, { description, canonical } = {}) => {
 };
 
 export const buildPageTitle = (suffix) => (suffix ? `${suffix} — Kojo` : 'Kojo — Services et travailleurs en Afrique de l\'Ouest');
+
+const DEFAULT_OG_IMAGE =
+  typeof window !== 'undefined' && window.location.origin
+    ? `${window.location.origin}/icons/icon-512x512.png`
+    : '/icons/icon-512x512.png';
+
+const ensureMeta = (selector, attr, value) => {
+  let meta = document.querySelector(selector);
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute(attr, value);
+    document.head.appendChild(meta);
+  }
+  return meta;
+};
+
+const ensureOgMeta = (property, contentValue) => {
+  const meta = ensureMeta(`meta[property="${property}"]`, 'property', property);
+  meta.setAttribute('content', contentValue);
+  return meta;
+};
+
+// Méta Open Graph / Twitter dynamiques par route (SPA). Les partages
+// WhatsApp/Facebook d'un lien /jobs/:id affichent ainsi le titre et la
+// description réels de la mission au lieu du texte générique d'index.html.
+// Limite connue : un crawler sans JavaScript voit encore les méta statiques
+// (le HTML initial n'est pas pré-rendu par route).
+export const usePageOpenGraph = ({
+  title,
+  description,
+  image,
+  url,
+} = {}) => {
+  useEffect(() => {
+    if (!document?.head || !title) return undefined;
+    const prev = {};
+    const props = {
+      'og:title': title,
+      'og:description': description || '',
+      'og:image': image || DEFAULT_OG_IMAGE,
+      'og:url': url || getCurrentUrl(),
+      'twitter:title': title,
+      'twitter:description': description || '',
+      'twitter:image': image || DEFAULT_OG_IMAGE,
+    };
+    Object.entries(props).forEach(([prop, value]) => {
+      const el = ensureMeta(`meta[property="${prop}"]`, 'property', prop);
+      prev[prop] = el.getAttribute('content');
+      el.setAttribute('content', value);
+    });
+    return () => {
+      Object.entries(prev).forEach(([prop, value]) => {
+        const el = document.querySelector(`meta[property="${prop}"]`);
+        if (el) {
+          if (value) el.setAttribute('content', value);
+          else el.removeAttribute('content');
+        }
+      });
+    };
+  }, [title, description, url]);
+};
+

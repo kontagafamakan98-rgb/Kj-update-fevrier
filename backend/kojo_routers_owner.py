@@ -20,9 +20,10 @@ from kojo_routers_jobs import execute_paydunya_refund
 router = APIRouter()
 
 @router.get("/stats")
-async def get_system_stats(current_user: User = Depends(get_current_user)):
-    """Statistics endpoint (authentifié — ne plus exposer les compteurs
-    d'utilisateurs/missions publiquement à quiconque n'est pas connecté)."""
+async def get_system_stats(owner_user = Depends(verify_owner_access)):
+    """Statistics endpoint — PROPRIÉTAIRE UNIQUEMENT (les compteurs
+    d'utilisateurs/missions ne doivent être visibles d'aucun utilisateur
+    lambda ; la landing utilise /api/public/stats, qui reste public)."""
     db_available = await is_database_available()
 
     if not db_available:
@@ -32,7 +33,7 @@ async def get_system_stats(current_user: User = Depends(get_current_user)):
             "total_workers": 0,
             "total_clients": 0,
             "supported_countries": ["senegal", "mali", "cote_divoire", "burkina_faso"],
-            "supported_languages": ["fr", "en", "wo", "bm"],
+            "supported_languages": ["fr", "en", "wo", "bm", "mos"],
             "database": "unavailable",
             "timestamp": datetime.now(timezone.utc)
         }
@@ -46,9 +47,8 @@ async def get_system_stats(current_user: User = Depends(get_current_user)):
         "total_users": total_users,
         "total_jobs": total_jobs,
         "total_workers": total_workers,
-        "total_clients": total_clients,
-        "supported_countries": ["senegal", "mali", "cote_divoire", "burkina_faso"],
-        "supported_languages": ["fr", "en", "wo", "bm"],
+        "total_clients": total_clients,                "supported_countries": ["senegal", "mali", "cote_divoire", "burkina_faso"],
+        "supported_languages": ["fr", "en", "wo", "bm", "mos"],
         "database": "connected",
         "timestamp": datetime.now(timezone.utc)
     }

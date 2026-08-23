@@ -409,9 +409,12 @@ async def update_user_payment_accounts(
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Valider les nouveaux comptes de paiement
+    # Valider les nouveaux comptes de paiement (le pays permet de refuser
+    # Wave là où le canal PayDunya n'est pas opéré : Mali, Burkina Faso).
     try:
-        payment_validation = validate_payment_accounts(payment_data, user_data["user_type"])
+        payment_validation = validate_payment_accounts(
+            payment_data, user_data["user_type"], user_data.get("country")
+        )
     except HTTPException as e:
         raise e
     
@@ -909,3 +912,72 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
         "reward_balance": balance,
         "message": "Le retrait a échoué : votre solde est intact, vous pouvez réessayer.",
     }
+
+
+# ---------------------------------------------------------------------------
+# Suppression de compte (droit RGPD / store) — SOFT DELETE + anonymisation
+# ---------------------------------------------------------------------------
+
+@router.delete("/users/account")
+async def delete_my_account(current_user: User = Depends(get_current_user)):
+    """Supprime définitivement le compte de l'utilisateur connecté.
+
+    - Soft delete + anonymisation des PII (email masqué, mot de passe et
+      numéro de téléphone effacés) → les jetons existants deviennent inutiles
+      (get_current_user rejette un compte `deleted`, et aucun login possible
+      sans password_hash).
+    - Cascade : push tokens, notifications, propositions envoyées, avis
+      laissés ; les jobs créés par le client sont soft-deleted (les missions
+      en cours sont annulées sans remboursement automatique : l'utilisateur
+      confirme la destruction de ses données).
+    - Les enregistrements DE PAIEMENT sont conservés (obligation comptable /
+      lutte contre la fraude) : ils référencent des identifiants internes,
+      plus aucune PII n'y est jointe après anonymisation.
+    """
+    user_id = current_user.id
+
+    anonymous_email = f"deleted_{uuid.uuid4().hex[:12]}@kojo.deleted"
+    now = datetime.now(timezone.utc)
+
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {
+            "deleted": True,
+            "deleted_at": now,
+            "email": anonymous_email,
+            "password_hash": None,
+            "phone": None,
+            "payment_accounts": None,
+            "payment_accounts_count": 0,
+            "google_sub": None,
+            "profile_photo": None,
+            "referral_code": None,
+            "referred_by": None,
+            "referral_reward_balance": 0.0,
+            "referral_rewards": [],
+            "permissions": [],
+            "updated_at": now,
+        }}
+    )
+
+    # Cascade des données directement liées au compte.
+    await db.push_tokens.delete_many({"user_id": user_id})
+    await db.notifications.delete_many({"user_id": user_id})
+    await db.worker_profiles.delete_many({"user_id": user_id})
+    await db.job_proposals.delete_many({"worker_id": user_id})
+    await db.reviews.delete_many({"reviewer_id": user_id})
+    # Les missions POSTÉES par ce client sont closes (plus de nouvelles
+    # propositions, plus visibles publiquement). Les messages restent
+    # (ils appartiennent aussi à l'autre partie).
+    await db.jobs.update_many(
+        {"client_id": user_id},
+        {"$set": {"deleted": True, "deleted_at": now, "status": "cancelled"}},
+    )
+
+    # Used by get_current_user (aucune session ne peut plus se réauthentifier) :
+    # le jeton en cours restera valide jusqu'à son expiration naturelle, mais
+    # chaque appel renverra 401 (compte inexistant) → le frontend redirigera
+    # vers /login et videra le stockage local.
+
+    logger.info(f"✅ Compte supprimé (soft delete): {user_id}")
+    return {"message": "Votre compte Kojo a été supprimé. Au revoir !", "deleted": True}

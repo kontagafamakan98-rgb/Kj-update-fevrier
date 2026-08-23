@@ -2,6 +2,7 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -46,11 +47,14 @@ export default function Profile() {
   const [filleuls, setFilleuls] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [portfolioUploading, setPortfolioUploading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
-  const { user, loadUser } = useAuth();
+  const { user, loadUser, logout } = useAuth();
   const { t, currentLanguage, getAvailableLanguagesForCountry } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'profile');
   const toast = useToast();
+  const navigate = useNavigate();
   usePageTitle('Mon profil — Kojo');
 
   useEffect(() => {
@@ -322,6 +326,54 @@ export default function Profile() {
             <span>{t('supportHelp')}</span>
             <span className="text-orange-600">→</span>
           </Link>
+        </div>
+
+        {/* Zone dangereuse : suppression du compte (RGPD) */}
+        <div className="px-6 pb-6">
+          <div className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
+            <h2 className="text-lg font-semibold text-red-800 mb-1">{t('deleteAccountTitle') || 'Supprimer mon compte'}</h2>
+            <p className="text-sm text-red-700 mb-4">
+              {t('deleteAccountWarning') || 'Cette action est définitive : votre profil, vos propositions et vos missions seront supprimés. Les messages déjà échangés restent visibles pour votre interlocuteur.'}
+            </p>
+            {!deletingAccount && (
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder={t('deleteAccountConfirmHint') || 'Tapez SUPPRIMER pour confirmer'}
+                className="w-full max-w-sm rounded-lg border border-red-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 mb-3"
+              />
+            )}
+            <button
+              onClick={async () => {
+                if (deleteConfirm.trim().toUpperCase() !== 'SUPPRIMER') {
+                  toast.error(t('deleteAccountConfirmHint') || 'Tapez SUPPRIMER pour confirmer');
+                  return;
+                }
+                setDeletingAccount(true);
+                try {
+                  const res = await fetch(buildApiUrl('/users/account'), {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${getAuthToken()}` }
+                  });
+                  if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail || 'Erreur suppression');
+                  }
+                  await logout();
+                  navigate('/');
+                } catch (deleteError) {
+                  safeLog.error('Erreur suppression compte:', deleteError);
+                  setError(deleteError.message || t('error'));
+                  setDeletingAccount(false);
+                }
+              }}
+              disabled={deletingAccount}
+              className={`inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold text-white ${deletingAccount ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+            >
+              {deletingAccount ? (t('deleting') || 'Suppression en cours…') : (t('deleteAccountCta') || 'Supprimer définitivement mon compte')}
+            </button>
+          </div>
         </div>
       </div>
     </div>

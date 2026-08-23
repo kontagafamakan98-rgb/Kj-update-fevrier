@@ -38,6 +38,9 @@ const COPY = {
     paymentForMissionDetail: '💼 Paiement pour la mission{jobTitle} — le montant a été rempli automatiquement suite à l’attribution du travailleur.',
     minPaydunyaAmount: '⚠️ Le montant minimum accepté par PayDunya est de 200 FCFA.',
     rateChanged: 'Le taux de commission a changé : la répartition a été mise à jour. Cliquez à nouveau pour confirmer et payer.',
+    noJobTitle: 'Un paiement doit être rattaché à une mission',
+    noJobText: 'Les paiements libres ne sont plus possibles : ouvrez une mission depuis la liste des emplois pour la payer en toute sécurité (fonds bloqués jusqu’à la livraison).',
+    noJobCta: 'Voir les missions disponibles',
     countries: { senegal: 'Sénégal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Carte bancaire' }
   },
@@ -73,6 +76,9 @@ const COPY = {
     paymentForMissionDetail: '💼 Payment for the job{jobTitle} — the amount was filled automatically after the worker was assigned.',
     minPaydunyaAmount: '⚠️ The minimum amount accepted by PayDunya is 200 FCFA.',
     rateChanged: 'The commission rate has changed: the split has been updated. Click again to confirm and pay.',
+    noJobTitle: 'A payment must be tied to a job',
+    noJobText: 'Free payments are no longer accepted: open a job from the jobs page and pay it securely (funds held in escrow until delivery).',
+    noJobCta: 'See available jobs',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Ivory Coast' },
     methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank card' }
   },
@@ -105,6 +111,9 @@ const COPY = {
     noPayments: 'Amul paiement bu ñu bindal account bii.',
     openCheckout: 'Ubbi checkout',
     rateChanged: 'Fees bi soppi na: séddoo bi ñu ko yeesal. Dellu klik ngir dëggal te fey.',
+    noJobTitle: 'Fey bi xamal na sama mission',
+    noJobText: 'Fey bu amul mission duñu ko ame: Ubi mission bi ci xët wu emplois bi ngir raxas ko fey (escrow ba ci jëmm bi dellusi).',
+    noJobCta: 'Gis mission yu am',
     minPaymentAmount: 'Sàntu fey gu digg la: 200 FCFA.',
     paymentForMissionDetail: '💼 Fey bu mission bi{jobTitle} — sàntu bi ñu ko yombal ci saasi ñu jappale liggéeykat bi.',
     minPaydunyaAmount: '⚠️ Sàntu gu digg gu PayDunya la: 200 FCFA.',
@@ -140,7 +149,10 @@ const COPY = {
     noPayments: 'Paiement si tɛ account nin kama fɔlɔ.',
     openCheckout: 'Checkout da yɔrɔ',
     rateChanged: 'Commission rate yɛlɛma: jɛgɛnsira ladilanen don. I ka klik segin ka a sɔn ka sara.',
-    minPaymentAmount: 'Sariya-faga jate min: 200 FCFA.',
+    noJobTitle: 'Sariya-faga dangɛ ka bɛ baara si ma',
+    noJobText: 'Sariya-faga min tɛ baara ma, a tɛ sɔn sisan: yɛlɛ baara kelen kɛnɛ ka na a la sare.',
+    noJobCta: 'Baara nninw yɛlɛma',
+    minPaymentAmount: 'Sariya-fuwu jate min: 200 FCFA.',
     paymentForMissionDetail: '💼 Sariya-faga baaraw kama{jobTitle} — jate ladilanen ka bɔ otomatik ni barakɛla donnen ye.',
     minPaydunyaAmount: '⚠️ Jate min PayDunya b’a sɔn: 200 FCFA.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
@@ -175,7 +187,10 @@ const COPY = {
     noPayments: 'Paiement baa ka be account yɩnga ye.',
     openCheckout: 'Checkout yɔk',
     rateChanged: 'Commission rate togame: yidgã manegame. Leeb n klik n kõ sɩda n yaool.',
-    minPaymentAmount: 'Paoongo sõor sẽn sõmb n yɩ: 200 FCFA.',
+    noJobTitle: 'Paoongo sõmb n naag tʋʋm ne yã',
+    noJobText: 'Paoongo sẽn pa tʋʋm ye, bɩ bɩ sõor ka kɩ. Yelg tʋʋmã n ye paoong ne nam ne ligdi-sequ n wa tʋʋo.',
+    noJobCta: 'Tʋʋm sẽn be wã yõk',
+    minPaymentAmount: 'Paoongo sõor sõn n sõmb n yɩ: 200 FCFA.',
     paymentForMissionDetail: '💼 Paoongo yĩnga tʋʋmã{jobTitle} — sõorã sigla ne a menga sẽn wa n paam barakɛda wã.',
     minPaydunyaAmount: '⚠️ Sõor sẽn sõmb n yɩ PayDunya: 200 FCFA.',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
@@ -220,6 +235,14 @@ const Payment = () => {
   // État séparé pour les erreurs de checkout — protège le message contre
   // l'écrasement par les appels refresh/quote qui réinitialisent error=''.
   const [checkoutError, setCheckoutError] = useState('');
+  // Retour depuis PayDunya (payment_id/token) : la page affiche alors le
+  // statut même sans contexte de mission — on ne remplace ce mode que pour
+  // un checkout "libre" (aucune mission, aucun retour de payeur).
+  const statusParams = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return Boolean(params.get('payment_id') || params.get('token'));
+  }, []);
+
   const [form, setForm] = useState({
     // Plus de valeur "démo" (25000) codée en dur : sans contexte de mission,
     // le montant part de 0 plutôt que de suggérer un chiffre arbitraire qui
@@ -317,7 +340,16 @@ const Payment = () => {
     setError('');
     setCheckoutError('');
 
-    // Validation côté client — évite un aller-retour API inutile et donne
+    // Sans mission rattachée, un paiement "libre" n'a ni destinataire, ni
+    // escrow, ni chemin de versement : le backend le rejette (400). On garde
+    // le même message côté client pour ne pas faire d'aller-retour inutile.
+    if (!jobPaymentContext) {
+      setCheckoutError(copy.noJobTitle);
+      setProcessing(false);
+      return;
+    }
+
+    // Validation client — évite un aller-retour API inutile et donne
     // un retour immédiat si le montant est trop faible.
     if (!form.amount || form.amount < 200) {
       setCheckoutError(copy.minPaymentAmount);
@@ -421,6 +453,16 @@ const Payment = () => {
           </div>
         )}
 
+        {!jobPaymentContext && !statusParams ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+            <div className="text-4xl mb-3">💼</div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">{copy.noJobTitle}</h2>
+            <p className="text-gray-600 max-w-lg mx-auto mb-5">{copy.noJobText}</p>
+            <Link to="/jobs" className="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
+              {copy.noJobCta}
+            </Link>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
@@ -557,6 +599,7 @@ const Payment = () => {
             </div>
           </div>
         </div>
+        )}
 
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">

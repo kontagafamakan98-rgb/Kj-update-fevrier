@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from kojo_core import db
 from kojo_email import send_email_via_brevo_api
@@ -15,6 +16,34 @@ from kojo_settings import OWNER_EMAIL, OWNER_USER_ID, logger
 from kojo_shared import notify_user_localized
 
 router = APIRouter()
+
+
+class SupportTicketStatusLookup(BaseModel):
+    """Interrogation publique du statut d'un ticket par SON CRÉATEUR :
+    ticket_id (secret de session renvoyé à la création) + email saisi.
+    L'email ne peut pas être deviné par énumération (combiné à un uuid),
+    donc voir le statut d'un ticket ne permet pas de voir ceux des autres."""
+    ticket_id: str = Field(min_length=1, max_length=100)
+    email: str = Field(min_length=3, max_length=254)
+
+
+@router.post("/support/tickets/status")
+async def get_support_ticket_status(payload: SupportTicketStatusLookup):
+    """Permet à l'expéditeur d'un ticket de suivre son statut (l'endpoint
+    GET /support/tickets est réservé au propriétaire). Ne renvoie que le
+    statut et les métadonnées — pas la conversation complète."""
+    ticket = await db.support_tickets.find_one({"id": payload.ticket_id})
+    if not ticket or str(ticket.get("email") or "").strip().lower() != payload.email.strip().lower():
+        raise HTTPException(status_code=404, detail="Ticket introuvable")
+    return {
+        "ticket_id": ticket.get("id"),
+        "status": ticket.get("status"),
+        "reason": ticket.get("reason"),
+        "created_at": ticket.get("created_at"),
+        "updated_at": ticket.get("updated_at"),
+        "message": "Merci, votre demande a bien été envoyée. Notre équipe vous répondra dans les meilleurs délais.",
+    }
+
 
 @router.post("/support/tickets")
 async def create_support_ticket(ticket_data: SupportTicketCreate):

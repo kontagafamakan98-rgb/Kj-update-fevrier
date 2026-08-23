@@ -14,11 +14,6 @@ const CountryChangePopup = () => {
   useEffect(() => {
     if (!user || isOwner) return;
 
-    // Check if user already dismissed the popup this session or permanently
-    const sessionDismissed = sessionStorage.getItem('country_popup_dismissed');
-    const permanentDismissed = localStorage.getItem('country_popup_never_show');
-    if (sessionDismissed || permanentDismissed) return;
-
     const detectLocation = async () => {
       try {
         const response = await geolocationAPI.detect({});
@@ -29,6 +24,16 @@ const CountryChangePopup = () => {
           response.country.id !== currentCountry &&
           availableCountries.some(c => c.id === response.country.id)
         ) {
+          // Mémorisations de refus PAR PAYS : « Plus tard » = silencieux
+          // pour cette session et ce pays ; « Ne plus demander » = définitif
+          // pour ce pays. Un voyageur qui alterne Mali ↔ Sénégal n'est pas
+          // bloqué à jamais sur un seul refus — chaque pays est indépendant.
+          const sessionDismissed = sessionStorage.getItem('country_popup_dismissed');
+          const permanentDismissed = localStorage.getItem('country_popup_never_show');
+          const permanentForCountry = localStorage.getItem(`country_popup_never_show_${response.country.id}`);
+          if (sessionDismissed === response.country.id || permanentDismissed || permanentForCountry) {
+            return;
+          }
           setDetectedCountry(response.country);
           setShowPopup(true);
         }
@@ -51,12 +56,16 @@ const CountryChangePopup = () => {
   };
 
   const handleDecline = () => {
-    sessionStorage.setItem('country_popup_dismissed', 'true');
+    // Refus mémorisé PAR PAYS pour la session : si l'utilisateur se déplace
+    // vers un autre pays, la question se reposera (une fois), pour ce pays.
+    sessionStorage.setItem('country_popup_dismissed', detectedCountry.id);
     setShowPopup(false);
   };
 
   const handleNeverShow = () => {
+    // Refus définitif PAR PAYS (et compat avec l'ancienne clé globale).
     localStorage.setItem('country_popup_never_show', 'true');
+    localStorage.setItem(`country_popup_never_show_${detectedCountry.id}`, 'true');
     setShowPopup(false);
   };
 

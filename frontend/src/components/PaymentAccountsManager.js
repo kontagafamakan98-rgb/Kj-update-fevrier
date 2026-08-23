@@ -33,6 +33,13 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   const [popularBanks, setPopularBanks] = useState([]);
   const supportedOrangeMoneyCountries = [t('mali'), t('senegal'), t('burkina_faso'), t('ivory_coast')].join(', ');
 
+  // Wave n'est opéré que par PayDunya au Sénégal et en Côte d'Ivoire : un
+  // compte Wave lié au Mali/Burkina serait refusé au moment du paiement.
+  const WAVE_UNAVAILABLE_COUNTRIES = ['mali', 'burkina_faso'];
+  const isWaveUnavailable = Boolean(
+    detectedCountry && WAVE_UNAVAILABLE_COUNTRIES.includes(detectedCountry.code)
+  );
+
   useEffect(() => {
     loadPaymentAccounts();
     detectUserCountryAsync();
@@ -148,7 +155,9 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     }
     
     // Validate Wave
-    if (accounts.wave && !validateWaveNumber(accounts.wave)) {
+    if (accounts.wave && isWaveUnavailable) {
+      errors.wave = t('waveUnavailableInYourCountry');
+    } else if (accounts.wave && !validateWaveNumber(accounts.wave)) {
       errors.wave = t('invalidWaveNumber');
     }
     
@@ -177,7 +186,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       // Format phone numbers
       const formattedAccounts = {
         orange_money: accounts.orange_money ? formatPhoneNumber(accounts.orange_money) : '',
-        wave: accounts.wave ? formatPhoneNumber(accounts.wave) : '',
+        wave: !isWaveUnavailable && accounts.wave ? formatPhoneNumber(accounts.wave) : '',
         bank_account: accounts.bank_account.account_number ? accounts.bank_account : null
       };
 
@@ -223,7 +232,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
     // sans indicatif ne doit pas être compté comme un compte lié.
     let count = 0;
     if (accounts.orange_money?.trim() && validateOrangeMoneyNumber(accounts.orange_money)) count++;
-    if (accounts.wave?.trim() && validateWaveNumber(accounts.wave)) count++;
+    if (!isWaveUnavailable && accounts.wave?.trim() && validateWaveNumber(accounts.wave)) count++;
     if (accounts.bank_account?.account_number?.trim() && validateBankAccount(accounts.bank_account)) count++;
     return count;
   };
@@ -342,7 +351,11 @@ const PaymentAccountsManager = ({ onSuccess }) => {
             <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
           </div>
           
-          {isEditing ? (
+          {isEditing && isWaveUnavailable ? (
+            <p className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+              {t('waveUnavailableInYourCountry')}
+            </p>
+          ) : isEditing ? (
             <div>
               <label htmlFor="payment_accounts_wave" className="sr-only">{t('wave')}</label>
               <input

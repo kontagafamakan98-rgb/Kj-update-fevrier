@@ -11,7 +11,7 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
-import { usePageTitle } from '../utils/seo';
+import { usePageTitle, usePageOpenGraph } from '../utils/seo';
 import {
   extractProposalId,
   extractProposalMessage,
@@ -155,6 +155,14 @@ export default function JobDetails() {
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
   const navigate = useNavigate();
   usePageTitle(job?.title ? `${job.title} — Kojo` : t('jobDetailsTitleFallback'));
+  // OG dynamique : un lien /jobs/:id partagé (WhatsApp, Facebook) montre le
+  // titre et la description réels de la mission au lieu du texte générique.
+  usePageOpenGraph({
+    title: job?.title ? `${job.title} — Kojo` : 'Kojo — Services en Afrique de l\'Ouest',
+    description: job?.description
+      ? `${job.description.slice(0, 150)}${job.description.length > 150 ? '…' : ''}`
+      : 'Trouvez des services et travailleurs en Afrique de l\'Ouest : plomberie, électricité, mécanique, construction.',
+  });
 
   useEffect(() => {
     loadJobDetails();

@@ -1,7 +1,7 @@
 import asyncio
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -289,58 +289,82 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
     # SECURITE: le montant, le job et le travailleur ne sont plus pris tels
     # quels depuis la requête client (n'importe quel utilisateur pouvait
     # auparavant envoyer un montant arbitraire, sans rapport avec le prix
-    # réellement convenu sur la mission). Si un job_id est fourni, tout est
-    # dérivé côté serveur à partir du job et de sa proposition acceptée :
-    # - seul le client propriétaire du job peut lancer un paiement pour lui
-    # - le montant est celui de la proposition acceptée (proposed_amount),
-    #   pas une valeur libre envoyée par le front-end
-    # - le worker_id est celui réellement assigné à la mission
-    job = None
+    # réellement convenu sur la mission). Un paiement doit être RATTACHÉ à
+    # une mission (job_id obligatoire) : un paiement "libre" n'aurait ni
+    # destinataire, ni escrow, ni chemin de versement — l'argent serait
+    # collecté sans suite possible.
+    if not request.job_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Un paiement doit être rattaché à une mission. Ouvrez la mission depuis la liste des emplois pour la payer."
+        )
+
     resolved_amount = request.amount
     resolved_worker_id = request.worker_id or ''
 
-    if request.job_id:
-        job = await db.jobs.find_one({"id": request.job_id, "deleted": {"$ne": True}})
-        if not job:
-            raise HTTPException(status_code=404, detail="Mission introuvable")
+    job = await db.jobs.find_one({"id": request.job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Mission introuvable")
 
-        is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
-        if job.get("client_id") != current_user.id and not is_owner_user:
-            raise HTTPException(status_code=403, detail="Seul le client à l'origine de cette mission peut lancer son paiement")
+    # Idempotence : un paiement PENDING déjà existant pour (job, payeur)
+    # est renvoyé tel quel (même facture) au lieu d'en créer un second —
+    # protège d'un double-clic ou d'un retry réseau qui créait 2 factures.
+    existing_pending = await db.payments.find_one({
+        "job_id": request.job_id,
+        "payer_id": current_user.id,
+        "status": "pending",
+    })
+    if existing_pending and existing_pending.get("checkout_url"):
+        breakdown = calculate_payment_breakdown(existing_pending.get("amount") or 0, await get_effective_commission_rate())
+        return {
+            "status": "success",
+            "provider": "paydunya",
+            "payment_id": existing_pending["id"],
+            "invoice_token": existing_pending.get("invoice_token"),
+            "checkout_url": existing_pending.get("checkout_url"),
+            "payment_method": existing_pending.get("payment_method"),
+            "channel": existing_pending.get("provider_channel"),
+            "reused": True,
+            **breakdown
+        }
 
-        assigned_worker_id = job.get("assigned_worker_id")
-        if not assigned_worker_id:
-            raise HTTPException(status_code=400, detail="Aucun travailleur n'a encore été attribué à cette mission")
-        resolved_worker_id = assigned_worker_id
+    is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
+    if job.get("client_id") != current_user.id and not is_owner_user:
+        raise HTTPException(status_code=403, detail="Seul le client de l'origine de cette mission peut lancer son paiement")
 
-        accepted_proposal_id = job.get("accepted_proposal_id")
-        accepted_proposal = (
-            await db.job_proposals.find_one({"id": accepted_proposal_id, "job_id": request.job_id})
-            if accepted_proposal_id else None
-        )
-        # Supporte les deux noms de champ utilisés selon les versions :
-        # "proposed_amount" (nouveau) et "amount" (ancien format).
-        proposal_amount = None
-        if accepted_proposal:
-            raw = accepted_proposal.get("proposed_amount") or accepted_proposal.get("amount")
-            if raw:
-                try:
-                    proposal_amount = float(raw)
-                except (TypeError, ValueError):
-                    pass
+    assigned_worker_id = job.get("assigned_worker_id")
+    if not assigned_worker_id:
+        raise HTTPException(status_code=400, detail="Aucun travailleur n'a encore été attribué à cette mission")
+    resolved_worker_id = assigned_worker_id
 
-        if proposal_amount and proposal_amount > 0:
-            resolved_amount = proposal_amount
-        elif job.get("budget_max") or job.get("budget_min"):
-            # Filet de sécurité : pas de proposition trouvée ou montant invalide →
-            # on utilise le budget du job plutôt que l'input client.
-            resolved_amount = float(job.get("budget_max") or job.get("budget_min"))
-        elif resolved_amount and resolved_amount >= 200:
-            # Dernier recours : le frontend a passé un montant valide, on l'accepte
-            # uniquement s'il est >= 200 FCFA (minimum PayDunya).
-            pass
-        else:
-            raise HTTPException(status_code=400, detail="Impossible de déterminer le montant à payer pour cette mission. Vérifiez que la proposition a bien un montant.")
+    accepted_proposal_id = job.get("accepted_proposal_id")
+    accepted_proposal = (
+        await db.job_proposals.find_one({"id": accepted_proposal_id, "job_id": request.job_id})
+        if accepted_proposal_id else None
+    )
+    # Supporte les deux noms de champ utilisés selon les versions :
+    # "proposed_amount" (nouveau) et "amount" (ancien format).
+    proposal_amount = None
+    if accepted_proposal:
+        raw = accepted_proposal.get("proposed_amount") or accepted_proposal.get("amount")
+        if raw:
+            try:
+                proposal_amount = float(raw)
+            except (TypeError, ValueError):
+                pass
+
+    if proposal_amount and proposal_amount > 0:
+        resolved_amount = proposal_amount
+    elif job.get("budget_max") or job.get("budget_min"):
+        # Filet de sécurité : pas de proposition trouvée ou montant invalide →
+        # on utilise le budget du job plutôt que l'input client.
+        resolved_amount = float(job.get("budget_max") or job.get("budget_min"))
+    elif resolved_amount and resolved_amount >= 200:
+        # Dernier recours : le frontend a passé un montant valide, on l'accepte
+        # uniquement s'il est >= 200 FCFA (minimum PayDunya).
+        pass
+    else:
+        raise HTTPException(status_code=400, detail="Impossible de déterminer le montant à payer pour cette mission. Vérifiez que la proposition a bien un montant.")
 
     normalized_country = normalize_payment_country(request.country or current_user.country)
     channel = get_paydunya_channel(request.payment_method.value, normalized_country)
@@ -361,7 +385,7 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
     payment_record = {
         'id': str(uuid.uuid4()),
-        'job_id': request.job_id or '',
+        'job_id': request.job_id,
         'payer_id': current_user.id,
         'receiver_id': resolved_worker_id,
         'amount': round(resolved_amount),
@@ -372,6 +396,10 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
         'provider_channel': channel,
         'commission_amount': breakdown['commission_amount'],
         'worker_amount': breakdown['worker_amount'],
+        'idempotency_key': request.idempotency_key or None,
+        # TTL : les factures PENDING jamais terminées sont purgées par
+        # l'index expireAfterSeconds après 48h (voir kojo_core).
+        'expires_at': (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat(),
         'created_at': datetime.now(timezone.utc).isoformat(),
         'updated_at': datetime.now(timezone.utc).isoformat(),
     }

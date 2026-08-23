@@ -16,8 +16,16 @@ export default function Messages() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  // Pagination du fil : les 100 messages les plus récents d'abord… non,
+  // le backend renvoie par ordre chronologique avec offset/limit — on charge
+  // 50 premiers, puis « Afficher plus » ajoute les 50 suivants (plus anciens).
+  const MESSAGE_PAGE_SIZE = 50;
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [moreError, setMoreError] = useState('');
   const messagesEndRef = useRef(null);
   const lastMessageCountRef = useRef(0);
+  const messagesCountRef = useRef(0);
 
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
@@ -45,7 +53,11 @@ export default function Messages() {
   useEffect(() => {
     if (!activeConversation) return undefined;
     const intervalId = setInterval(() => {
-      loadMessages(activeConversation, activeConversationData, { silent: true });
+      loadMessages(activeConversation, activeConversationData, {
+        silent: true,
+        offset: messagesCountRef.current,
+        append: true
+      });
     }, 5000);
     return () => clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -71,23 +83,52 @@ export default function Messages() {
     }
   };
 
-  const loadMessages = async (conversationId, conversationData, { silent = false } = {}) => {
+  const loadMessages = async (conversationId, conversationData, {
+    silent = false,
+    offset = 0,
+    append = false
+  } = {}) => {
     try {
-      const data = await messagesAPI.getMessages(conversationId);
+      const limit = append ? MESSAGE_PAGE_SIZE : Math.max(MESSAGE_PAGE_SIZE, messagesCountRef.current || 0);
+      const data = await messagesAPI.getMessages(conversationId, { limit, offset });
+      if (append) {
+        // Chargement des messages PLUS ANCIENS : on concatène après ceux déjà
+        // affichés (le backend trie par timestamp croissant, donc offset = nb
+        // de messages déjà chargés retourne la tranche suivante).
+        setMessages((prev) => [...prev, ...data]);
+      } else {
+        setMessages(data);
+      }
+      setHasMoreMessages(append ? data.length === MESSAGE_PAGE_SIZE : data.length >= MESSAGE_PAGE_SIZE);
       if (!silent) {
         // Nouvelle conversation ouverte : on veut toujours défiler en bas au
         // premier chargement, quelle que soit la taille de la précédente.
         lastMessageCountRef.current = 0;
-      }
-      setMessages(data);
-      if (!silent) {
         setActiveConversation(conversationId);
         setActiveConversationData(conversationData);
       }
     } catch (error) {
       safeLog.error('Error loading messages:', handleApiError(error));
+      if (append) setMoreError(pageT('loadOlderFailed') || 'Impossible de charger les messages plus anciens.');
+    } finally {
+      setLoadingOlder(false);
     }
   };
+
+  const loadOlderMessages = async () => {
+    if (!activeConversation || loadingOlder) return;
+    setLoadingOlder(true);
+    setMoreError('');
+    await loadMessages(activeConversation, activeConversationData, { silent: true, offset: messages.length, append: true });
+  };
+
+  // Le polling silencieux recharge les messages au-delà du fil déjà affiché :
+  // offset = nombre de messages chargés → seuls les vrais nouveaux arrivés
+  // sont récupérés et concaténés, sans devoir recharger tout le fil (qui
+  // peut dépasser 100 messages une fois « Afficher plus » utilisé).
+  useEffect(() => {
+    messagesCountRef.current = messages.length;
+  }, [messages]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -213,6 +254,21 @@ export default function Messages() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
+                {hasMoreMessages && (
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      onClick={loadOlderMessages}
+                      disabled={loadingOlder}
+                      className="inline-flex items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {loadingOlder ? (pageT('loadingOlder') || 'Chargement…') : (pageT('loadOlderExists') || 'Afficher les messages plus anciens')}
+                    </button>
+                  </div>
+                )}
+                {moreError && (
+                  <p className="text-center text-xs text-red-600">{moreError}</p>
+                )}
                 {messages.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-sm text-gray-400">
                     {t('noMessagesYet')}

@@ -153,13 +153,18 @@ async def _exchange_google_code(code: str, origin: Optional[str] = None) -> dict
 
 @router.post("/auth/email/check-availability")
 async def check_signup_email_availability(payload: EmailOtpRequest):
+    """Anti-énumération STRICT : réponse identique que l'email soit libre ou
+    déjà inscrit (available=None, message neutre) — on ne fait plus aucune
+    lecture en base ici. L'existence réelle d'un compte n'est révélée qu'au
+    moment où l'utilisateur finalise son inscription (register-verified, qui
+    renvoie « Cette adresse email est déjà utilisée »), ce qui ne permet pas
+    d'énumérer les emails par simple scan.
+    """
     clean_email = sanitize_email(payload.email)
-    existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
-
     return {
         "email": clean_email,
-        "available": existing_user is None,
-        "message": "Adresse email disponible" if not existing_user else "Cette adresse email est déjà utilisée"
+        "available": None,
+        "message": "Vérification effectuée.",
     }
 
 def _generic_otp_response(clean_email: str) -> dict:
@@ -380,11 +385,15 @@ async def reset_password_with_verified_token(payload: PasswordResetConfirmReques
         raise HTTPException(status_code=404, detail="Adresse email introuvable.")
 
     now = datetime.now(timezone.utc)
+    # password_version incrémentée : TOUS les jetons émis avant ce reset sont
+    # désormais invalides (get_current_user compare pwdv du jeton à cette
+    # valeur) — un jeton volé ne survit pas à la réinitialisation.
     await db.users.update_one(
         {"email": clean_email},
         {
             "$set": {
                 "password_hash": hash_password(payload.new_password),
+                "password_version": (user.get("password_version") or 0) + 1,
                 "updated_at": now
             }
         }
@@ -440,9 +449,12 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
         if existing_user:
             log_and_raise_http_exception(400, "Cette adresse email est déjà utilisée")
         
-        # Valider les comptes de paiement selon le type d'utilisateur
+        # Valider les comptes de paiement selon le type d'utilisateur (le pays
+        # permet de refuser Wave là où le canal n'est pas opéré).
         try:
-            payment_validation = validate_payment_accounts(user_data.payment_accounts, user_data.user_type)
+            payment_validation = validate_payment_accounts(
+                user_data.payment_accounts, user_data.user_type, user_data.country
+            )
         except HTTPException as e:
             raise e
         
@@ -609,8 +621,10 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
             worker_profile_created = True
             logger.info(f"✅ Profil travailleur créé pour {user.email}")
         
-        # Create access token
-        access_token = create_access_token(data={"sub": user.id, "email": user.email})
+        # Create access token. pwdv=0 : nouveau compte, version de mot de
+        # passe initiale (sera incrémentée à chaque changement de mot de passe
+        # pour révoquer les sessions antérieures).
+        access_token = create_access_token(data={"sub": user.id, "email": user.email, "pwdv": 0})
         
         # Session par cookie httpOnly (cf. /auth/login).
         set_auth_cookies(response, access_token)
@@ -663,7 +677,11 @@ async def login_user(credentials: UserLogin, response: Response):
     if not user or not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    access_token = create_access_token(data={"sub": user["id"], "email": user["email"]})
+    access_token = create_access_token(data={
+        "sub": user["id"],
+        "email": user["email"],
+        "pwdv": user.get("password_version", 0),
+    })
     
     # Session par cookie httpOnly : le token vit hors localStorage (protection
     # XSS). Le token reste renvoyé dans le corps pour le mobile/legacy.
@@ -706,7 +724,11 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
     # 1. Compte déjà lié à ce sub Google → connexion directe
     existing = await db.users.find_one({"google_sub": sub})
     if existing:
-        access_token = create_access_token(data={"sub": existing["id"], "email": existing["email"]})
+        access_token = create_access_token(data={
+            "sub": existing["id"],
+            "email": existing["email"],
+            "pwdv": existing.get("password_version", 0),
+        })
         set_auth_cookies(response, access_token)
         return {
             "status": "success",
@@ -787,7 +809,7 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
         # Concurrence : un compte créé entre-temps avec le même email/sub
         raise HTTPException(status_code=409, detail="Un compte existe déjà avec cet email ou ce compte Google")
 
-    access_token = create_access_token(data={"sub": user_id, "email": email})
+    access_token = create_access_token(data={"sub": user_id, "email": email, "pwdv": 0})
     set_auth_cookies(response, access_token)
     return {
         "status": "success",

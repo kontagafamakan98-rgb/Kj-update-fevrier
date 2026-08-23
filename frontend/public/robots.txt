@@ -5,10 +5,11 @@ User-agent: *
 Allow: /
 Allow: /login
 Allow: /register
+Allow: /jobs
+Allow: /how-it-works
 Disallow: /dashboard
 Disallow: /profile
 Disallow: /messages
-Disallow: /jobs
 Disallow: /api/
 Disallow: /photo-test
 Disallow: /photo-debug

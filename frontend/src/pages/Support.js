@@ -46,6 +46,18 @@ const COPY = {
     genericError: "Une erreur est survenue, merci de réessayer ou d'utiliser un moyen de contact direct.",
     confirmTitle: 'Demande envoyée',
     confirmMessage: 'Merci, votre demande a bien été envoyée. Notre équipe vous répondra dans les meilleurs délais.',
+    yourTicketId: 'Votre n° de ticket',
+    trackMyTicket: 'Suivre mon ticket',
+    trackTitle: 'Suivre une demande existante',
+    trackSubtitle: 'Entrez votre n° de ticket et l\'e-mail utilisé pour voir où en est votre demande.',
+    ticketIdPlaceholder: 'N° de ticket (ex : 3fa85f64…)',
+    ticketEmailPlaceholder: 'Votre e-mail',
+    trackCta: 'Vérifier le statut',
+    tracking: 'Vérification en cours…',
+    trackNotFound: 'Aucun ticket trouvé avec ces informations.',
+    ticketReason: 'Motif',
+    ticketStatusLabel: 'Statut actuel',
+    ticketSentOn: 'Envoyé le',
     directCardTitle: 'Contacter directement le support',
     directCardSubtitle: 'Nous sommes joignables aux coordonnées ci-dessous.',
     call: 'Appeler',
@@ -83,6 +95,18 @@ const COPY = {
     genericError: 'Something went wrong, please try again or use a direct contact method.',
     confirmTitle: 'Request sent',
     confirmMessage: 'Thank you, your request has been sent. Our team will get back to you as soon as possible.',
+    yourTicketId: 'Your ticket number',
+    trackMyTicket: 'Track my ticket',
+    trackTitle: 'Track an existing request',
+    trackSubtitle: 'Enter your ticket number and the email you used to see the current status.',
+    ticketIdPlaceholder: 'Ticket number (e.g. 123fa85f…)',
+    ticketEmailPlaceholder: 'Your email',
+    trackCta: 'Check status',
+    tracking: 'Checking…',
+    trackNotFound: 'No ticket found with these details.',
+    ticketReason: 'Reason',
+    ticketStatusLabel: 'Current status',
+    ticketSentOn: 'Sent on',
     directCardTitle: 'Contact support directly',
     directCardSubtitle: 'You can reach us using the details below.',
     call: 'Call',
@@ -120,6 +144,18 @@ const COPY = {
     genericError: 'Am na njumte, jéemaatal walla jokkoosi direkte.',
     confirmTitle: 'Laaj bi yónnee na',
     confirmMessage: 'Jërëjëf, sa laaj yónnee na. Ekip bi dina la tontu ci diirub léegi léegi.',
+    yourTicketId: 'Sa limero ticket',
+    trackMyTicket: 'Topp sa ticket',
+    trackTitle: 'Topp laaj bi nu yónnee',
+    trackSubtitle: 'Duggal limero laaj bi ak email bi ñu jëfandikoo ngir xam ni laaj biy dugg.',
+    ticketIdPlaceholder: 'Limero ticket (misal: 3fa85f64…)',
+    ticketEmailPlaceholder: 'Sa email',
+    trackCta: 'Xamal statu bi',
+    tracking: 'Diin koy xamal...',
+    trackNotFound: 'Amul ticket yu bari ci xibaar yii.',
+    ticketReason: 'Taxawu',
+    ticketStatusLabel: 'Statu bu leegi',
+    ticketSentOn: 'Yónnee ci',
     directCardTitle: 'Jokkoo direkte ak ndimbal bi',
     directCardSubtitle: 'Man ngeen a jokkoosi ci ay xibaar yii.',
     call: 'Woote',
@@ -157,6 +193,18 @@ const COPY = {
     genericError: 'Fili dɔ kɛra, i k’a lajɛ tugun walima i ka jɔyɔrɔ wɛrɛ minɛ.',
     confirmTitle: 'Ɲinini cira',
     confirmMessage: 'I ni ce, i ka ɲinini cira. An ka jama bɛna i jaabi joona joona.',
+    yourTicketId: 'I ka ɲinini nimɔrɔ',
+    trackMyTicket: 'Kɔdɔmɔ i ka ɲinini',
+    trackTitle: 'Ɲinini min cira ka a ɲɛ',
+    trackSubtitle: 'I ka ɲinini nimɔrɔ ani email min i ka a kɛ, ka a lajɛ.',
+    ticketIdPlaceholder: 'Nimɔrɔ (misali: 3fa85f64…)',
+    ticketEmailPlaceholder: 'I email',
+    trackCta: 'Lajɛ cogo',
+    tracking: 'Lajɛ a ka tɛmɛ…',
+    trackNotFound: 'Ɲinini si tɛ sɔrɔ nin kunnafoniw na.',
+    ticketReason: 'Kunfɛ',
+    ticketStatusLabel: 'Jɔyɔrɔ sisen',
+    ticketSentOn: 'Cira',
     directCardTitle: 'Dɛmɛni jɔyɔrɔ minɛ ka a ɲɛ',
     directCardSubtitle: 'Aw bɛ se ka an sɔrɔ kunnafoni ninnu fɛ.',
     call: 'Weele',
@@ -194,6 +242,18 @@ const COPY = {
     genericError: 'Zu-zɛka n zĩnda, y modg n lebs bɩ y loe ne sõngre pʋgẽ tao-tao.',
     confirmTitle: 'Sokrã tʋme',
     confirmMessage: 'Barka, y sokrã tʋme. Tõnd sull na n leok yãmb tao-tao.',
+    yourTicketId: 'Y sokrã nomboore',
+    trackMyTicket: 'Perg y sokrã',
+    trackTitle: 'Sokr sẽn tʋmã perg',
+    trackSubtitle: 'Dɩng-y y sokrã nomboore la email ning y sẽn dɩk wã n gese a sẽn beẽ.',
+    ticketIdPlaceholder: 'Sokrã nomboore (wala: 3fa85f64…)',
+    ticketEmailPlaceholder: 'Y email',
+    trackCta: 'Gese status',
+    tracking: 'Bɛ nin gẽese…',
+    trackNotFound: 'Sokr baa ka yẽ ne kibay nins ba.',
+    ticketReason: 'Yĩnga',
+    ticketStatusLabel: 'Status sẽn be sᴐ',
+    ticketSentOn: 'Tʋm b',
     directCardTitle: 'Loe ne sõngre pʋgẽ tao-tao',
     directCardSubtitle: 'Y tõe n loe ne tõnd ne kibay nins sẽn be ka.',
     call: 'Boole',
@@ -281,6 +341,7 @@ function RobotChat({ onBack, copy }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [lastTicketId, setLastTicketId] = useState('');
   const [submitError, setSubmitError] = useState('');
   const bottomRef = useRef(null);
 
@@ -314,7 +375,21 @@ function RobotChat({ onBack, copy }) {
     setSubmitting(true);
     setSubmitError('');
     try {
-      await supportAPI.createTicket({ ...finalAnswers, channel: 'robot' });
+      const response = await supportAPI.createTicket({ ...finalAnswers, channel: 'robot' });
+      const ticketId = response?.data?.ticket_id || response?.ticket_id || '';
+      setLastTicketId(ticketId);
+      if (ticketId) {
+        // Mémorisation locale (cet appareil) : permet de proposer « Suivre
+        // mon ticket » pré-rempli sans demander l'ID à l'utilisateur.
+        try {
+          localStorage.setItem('kojo_last_ticket', JSON.stringify({
+            id: ticketId,
+            email: finalAnswers.email,
+          }));
+        } catch (_e) {
+          // stockage local indisponible : on garde juste l'ID en mémoire
+        }
+      }
       setSubmitted(true);
     } catch (err) {
       setSubmitError(
@@ -325,14 +400,19 @@ function RobotChat({ onBack, copy }) {
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-          <CheckCircle size={28} />
-        </div>
+  if (submitted) {  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+        <CheckCircle size={28} />
+      </div>
         <h2 className="text-xl font-semibold text-gray-900 mb-2">{copy.confirmTitle}</h2>
         <p className="text-gray-600">{copy.confirmMessage}</p>
+        {lastTicketId && (
+          <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 px-4 py-3 text-sm">
+            <span className="text-gray-500">{copy.yourTicketId} : </span>
+            <span className="font-mono font-semibold text-gray-900">{lastTicketId}</span>
+          </div>
+        )}
         <button onClick={onBack} className="mt-6 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
           {copy.back}
         </button>
@@ -418,6 +498,101 @@ function RobotChat({ onBack, copy }) {
   );
 }
 
+// Suivi de ticket : le créateur peut vérifier le statut de sa demande avec
+// l'identifiant renvoyé à la création + l'e-mail saisi (le backend exige la
+// correspondance — un ticket ne peut pas être interrogé par un tiers).
+function TicketTracker({ copy }) {
+  const [ticketId, setTicketId] = useState('');
+  const [ticketEmail, setTicketEmail] = useState('');
+  const [tracking, setTracking] = useState(false);
+  const [trackResult, setTrackResult] = useState(null); // null | {…} | 'not_found'
+  const [trackError, setTrackError] = useState('');
+
+  const trackTicket = async () => {
+    if (!ticketId.trim() || !ticketEmail.trim()) return;
+    setTracking(true);
+    setTrackError('');
+    try {
+      const response = await supportAPI.getTicketStatus(ticketId.trim(), ticketEmail.trim());
+      setTrackResult(response?.data || response || null);
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 404) {
+        setTrackResult('not_found');
+      } else {
+        setTrackError(copy.genericError);
+      }
+    } finally {
+      setTracking(false);
+    }
+  };
+
+  const statusBadgeColor = (status) => {
+    if (/résolu|resolved/i.test(status || '')) return 'bg-emerald-100 text-emerald-700';
+    if (/en cours|progress/i.test(status || '')) return 'bg-amber-100 text-amber-700';
+    return 'bg-blue-100 text-blue-700';
+  };
+
+  return (
+    <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">{copy.trackTitle}</h2>
+      <p className="text-sm text-gray-500 mb-4">{copy.trackSubtitle}</p>
+
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          value={ticketId}
+          onChange={(e) => setTicketId(e.target.value)}
+          placeholder={copy.ticketIdPlaceholder}
+          aria-label={copy.ticketIdPlaceholder}
+          className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+        />
+        <input
+          type="email"
+          value={ticketEmail}
+          onChange={(e) => setTicketEmail(e.target.value)}
+          placeholder={copy.ticketEmailPlaceholder}
+          aria-label={copy.ticketEmailPlaceholder}
+          className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+        />
+        <button
+          onClick={trackTicket}
+          disabled={tracking || !ticketId.trim() || !ticketEmail.trim()}
+          className="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
+        >
+          {tracking ? copy.tracking : copy.trackCta}
+        </button>
+      </div>
+
+      {trackError && <p className="mt-3 text-sm text-red-600">{trackError}</p>}
+
+      {trackResult === 'not_found' && (
+        <p className="mt-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          {copy.trackNotFound}
+        </p>
+      )}
+
+      {trackResult && trackResult !== 'not_found' && (
+        <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900 line-clamp-1">{trackResult.reason}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {copy.ticketSentOn}{' '}
+                {trackResult.created_at ? new Date(trackResult.created_at).toLocaleDateString() : ''}
+                {' • '}{copy.ticketIdLabel || 'ID'}: {String(trackResult.ticket_id || trackResult.id || '').slice(0, 8)}…
+              </p>
+            </div>
+            <span className={`inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold ${statusBadgeColor(trackResult.status)}`}>
+              {copy.ticketStatusLabel}: {trackResult.status}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const Support = () => {
   const { currentLanguage } = useLanguage();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
@@ -429,6 +604,8 @@ const Support = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{copy.title}</h1>
         <p className="text-gray-600">{copy.subtitle}</p>
       </div>
+
+      <TicketTracker copy={copy} />
 
       {mode === null && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">

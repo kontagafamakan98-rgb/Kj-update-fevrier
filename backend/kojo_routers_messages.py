@@ -1,7 +1,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from kojo_core import db
 from kojo_models import (
@@ -64,12 +64,15 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
     # l'ancien pipeline $match/$sort/$group de Mongo) : le dernier message est
     # déterminé par comparaison de timestamp, donc PAS de dépendance à l'ordre
     # d'arrivée des documents. Compatible avec la FakeDB de test.
+    # Borné (2000) : évite de charger toute la collection en mémoire sur un
+    # compte très actif, tout en restant largement au-dessus des conversations
+    # réelles. Un message plus ancien que cette fenêtre n'affecte pas l'aperçu.
     messages = await db.messages.find({
         "$or": [
             {"sender_id": current_user.id},
             {"receiver_id": current_user.id}
         ]
-    }).to_list(length=None)
+    }).to_list(length=2000)
 
     grouped = {}
     for msg in messages:
@@ -144,6 +147,8 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
 @router.get("/messages/{conversation_id}")
 async def get_conversation_messages(
     conversation_id: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user)
 ):
     # Verify user is part of conversation. conversation_id est formaté
@@ -154,9 +159,11 @@ async def get_conversation_messages(
     if current_user.id not in participant_ids:
         raise HTTPException(status_code=403, detail="Access denied")
     
+    # Pagination par offset (les plus anciens sont chargés ensuite : offset
+    # croissant) — un fil de plus de 100 messages n'est plus tronqué.
     messages = await db.messages.find({
         "conversation_id": conversation_id
-    }).sort("timestamp", 1).to_list(100)
+    }).sort("timestamp", 1).skip(offset).to_list(limit)
 
     # Marquer comme lus les messages REÇUS par l'utilisateur qui ouvre la
     # conversation (le flag read n'était jamais utilisé : aucun indicateur

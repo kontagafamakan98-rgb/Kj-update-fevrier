@@ -193,6 +193,16 @@ async def create_database_indexes():
         await db.payments.create_index("status")
         await db.payments.create_index("invoice_token", sparse=True)
         await db.payments.create_index([("created_at", -1)])
+        # Nettoyage automatique des factures PENDING jamais terminées (client
+        # parti, IPN perdu) : chaque checkout pending pose `expires_at`
+        # (48h) ; l'index TTL partiel supprime ces documents après expiration
+        # SANS toucher aux paiements complétés/annulés (ils ne matchent pas
+        # le filtre partiel status=pending).
+        await db.payments.create_index(
+            [("expires_at", 1)],
+            partialFilterExpression={"status": "pending", "expires_at": {"$exists": True}},
+            expireAfterSeconds=0,
+        )
 
         # Email OTP collection indexes
         await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)
@@ -659,12 +669,20 @@ async def verify_owner_access(
         
         # Récupérer les données utilisateur depuis la DB
         user = await db.users.find_one({"id": user_id})
-        if not user:
+        if not user or user.get("deleted"):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Propriétaire non trouvé"
             )
-            
+
+        # Mot de passe changé depuis l'émission du jeton → session révoquée
+        # (même mécanisme que get_current_user).
+        if payload.get("pwdv", 0) != user.get("password_version", 0):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expirée : reconnectez-vous."
+            )
+
         return user
         
     except jwt.ExpiredSignatureError:
@@ -741,8 +759,26 @@ async def ensure_owner_exists():
     except Exception as exc:
         logger.error(f"⚠️ Création automatique du compte owner ignorée (compte probablement déjà existant sous un autre id): {exc}")
 
-def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str) -> dict:
-    """Valide les comptes de paiement selon le type d'utilisateur"""
+def validate_payment_accounts(payment_accounts: PaymentAccount, user_type: str, country: Optional[str] = None) -> dict:
+    """Valide les comptes de paiement selon le type d'utilisateur.
+
+    `country` (optionnel, si connu) : Wave n'est OPÉRÉ que au Sénégal et en
+    Côte d'Ivoire (canaux PayDunya réels) — un compte malien/burkinabé qui ne
+    lierait que Wave serait validé ici puis bloqué au moment du paiement.
+    """
+    if country:
+        country_value = getattr(country, "value", str(country)).lower().replace(' ', '_')
+    else:
+        country_value = None
+    if (
+        country_value
+        and payment_accounts.wave
+        and country_value not in ("senegal", "cote_divoire")
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Wave n'est pas disponible dans ce pays : utilisez Orange Money ou une carte bancaire."
+        )
     
     # Compter le nombre de comptes liés
     linked_accounts = 0
@@ -1092,6 +1128,13 @@ def create_access_token(data: dict):
     # individuellement (ex: au logout) sans invalider tous les autres tokens
     # de l'utilisateur ni changer JWT_SECRET.
     to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
+    # pwdv = version du mot de passe AU MOMENT de l'émission : get_current_user
+    # compare cette valeur à password_version du compte ; si le mot de passe a
+    # changé depuis (reset), la version diffère → le jeton est refusé (401),
+    # ce qui révoque TOUTES les sessions émises avant le changement.
+    # (compat : les anciens jetons sans pwdv valent 0 = version initiale).
+    if "pwdv" not in to_encode:
+        to_encode["pwdv"] = 0
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt
 
@@ -1144,8 +1187,21 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Token revoked")
 
         user = await db.users.find_one({"id": user_id})
-        if user is None:
+        if user is None or user.get("deleted"):
+            # Compte supprimé (soft delete RGPD) : la session ne peut plus rien
+            # faire — même traitement qu'un compte inexistant.
             raise HTTPException(status_code=401, detail="User not found")
+
+        # Mot de passe changé depuis l'émission du jeton (reset) → refuser :
+        # le payload pwdv est figé à la création, password_version du compte
+        # est incrémentée à chaque changement. (compat : anciens jetons sans
+        # pwdv valent 0, identiques à un compte jamais modifié).
+        if payload.get("pwdv", 0) != user.get("password_version", 0):
+            raise HTTPException(
+                status_code=401,
+                detail="Session expirée : votre mot de passe a changé, reconnectez-vous."
+            )
+
         try:
             return User(**user)
         except ValidationError as exc:

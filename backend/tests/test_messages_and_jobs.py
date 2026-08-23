@@ -215,8 +215,9 @@ class TestJobs:
         assert isinstance(resp.json(), list)
 
     async def test_get_job_public_strips_sensitive_fields(self, client: AsyncClient):
-        """La vue publique retire client_id / assigned_worker_id /
-        accepted_proposal_id / shared_location (identités + position GPS)."""
+        """La vue publique est une ALLOWLIST (JobPublic) : identités, point geo,
+        coordonnées GPS de localisation et champs internes/inconnus ne sortent
+        JAMAIS, même s'ils sont présents dans le document MongoDB."""
         client_user = await register_and_login(client, BASE_USER)
         job_id = str(uuid.uuid4())
         await db_insert("jobs", {
@@ -226,16 +227,25 @@ class TestJobs:
             "category": "plomberie",
             "budget_min": 10000,
             "budget_max": 30000,
-            "location": {"address": "Dakar Plateau, Sénégal"},
+            "location": {
+                "address": "Dakar Plateau, Sénégal",
+                "fullAddress": "Dakar Plateau, Sénégal",
+                "city": "Dakar",
+                "latitude": 14.6937,
+                "longitude": -17.4441,
+            },
             "client_id": client_user["user"]["id"],
             "assigned_worker_id": "worker-xyz",
             "accepted_proposal_id": "proposal-xyz",
             "shared_location": {"maps_url": "https://maps.google.com/?q=1,2"},
+            "geo": {"type": "Point", "coordinates": [-17.4441, 14.6937]},
             "status": "open",
             "deleted": False,
+            "created_at": "2026-08-22T10:00:00Z",
+            "internal_note": "champ inconnu legacy à ne jamais exposer",
         })
 
-        # Vue publique (anonyme) : champs sensibles absents, reste lisible.
+        # Vue publique (anonyme) : rien de sensible ne sort, la fiche reste lisible.
         # On vide le jar de cookies du client (le login précédent y a laissé
         # kojo_session) pour simuler un vrai visiteur sans session.
         client.cookies.clear()
@@ -243,18 +253,78 @@ class TestJobs:
         assert resp.status_code == 200
         data = resp.json()
         assert data["title"] == "Mission publique test"
+        assert data["location"]["address"] == "Dakar Plateau, Sénégal"
+        # Identités + position partagée
         assert "client_id" not in data
         assert "assigned_worker_id" not in data
         assert "accepted_proposal_id" not in data
         assert "shared_location" not in data
+        # Coordonnées brutes (point geo + location) jamais exposées
+        assert "geo" not in data
+        assert "latitude" not in data["location"]
+        assert "longitude" not in data["location"]
+        # Champs internes et champs inconnus du modèle : exclus par l'allowlist
+        assert "deleted" not in data
+        assert "created_at" not in data
+        assert "_id" not in data
+        assert "internal_note" not in data
 
-        # Vue authentifiée : le document complet est renvoyé
+        # Vue authentifiée : le document complet est renvoyé (comportement
+        # historique — le frontend lit created_at en fallback d'affichage)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
         resp_auth = await client.get(f"/api/jobs/{job_id}", headers=headers)
         assert resp_auth.status_code == 200
         data_auth = resp_auth.json()
         assert data_auth["client_id"] == client_user["user"]["id"]
         assert data_auth["shared_location"]["maps_url"] == "https://maps.google.com/?q=1,2"
+        assert data_auth["location"]["latitude"] == 14.6937
+
+    async def test_get_jobs_list_anonymous_is_allowlist(self, client: AsyncClient):
+        """La LISTE publique applique la même allowlist que le détail : un job
+        contenant des champs sensibles/inconnus ne les divulgue pas, et une
+        fiche legacy invalide est écartée sans faire tomber la liste."""
+        job_id = str(uuid.uuid4())
+        await db_insert("jobs", {
+            "id": job_id,
+            "title": "Mission liste publique",
+            "description": "Description suffisamment longue pour un job public de test.",
+            "category": "menuiserie",
+            "budget_min": 5000,
+            "budget_max": 15000,
+            "location": {
+                "address": "Bamako, Mali",
+                "latitude": 12.6392,
+                "longitude": -8.0029,
+            },
+            "client_id": "client-secret",
+            "geo": {"type": "Point", "coordinates": [-8.0029, 12.6392]},
+            "deleted": False,
+            "status": "open",
+            "secret_legacy_field": "à ne jamais exposer",
+        })
+        # Fiche legacy cassée (pas de title) : écartée du flux public, pas de 500
+        await db_insert("jobs", {
+            "id": str(uuid.uuid4()),
+            "client_id": "client-b",
+            "deleted": False,
+            "status": "open",
+        })
+
+        resp = await client.get("/api/jobs")
+        assert resp.status_code == 200
+        items = resp.json()
+        assert isinstance(items, list)
+        item = next((j for j in items if j.get("id") == job_id), None)
+        assert item is not None, "le job valide doit apparaître dans le flux public"
+        assert item["title"] == "Mission liste publique"
+        assert "client_id" not in item
+        assert "geo" not in item
+        assert "deleted" not in item
+        assert "created_at" not in item
+        assert "secret_legacy_field" not in item
+        assert "latitude" not in item["location"]
+        assert "longitude" not in item["location"]
+        assert not any("client_id" in j for j in items), "aucune fiche ne divulgue client_id"
 
     async def test_create_job_requires_auth(self, client: AsyncClient):
         resp = await client.post("/api/jobs", json={"title": "Test"})

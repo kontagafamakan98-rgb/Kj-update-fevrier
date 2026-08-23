@@ -8,7 +8,7 @@ import { jobsAPI } from '../services/api';
 import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
-import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser } from '../utils/jobPageSafeHelpers';
+import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobPageSafeHelpers';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import CountrySelector from '../components/CountrySelector';
@@ -63,15 +63,30 @@ function JobCard({ job, user, userType, appliedJobIds, t }) {
   );
 }
 
+// Onglets de la liste des emplois :
+// - « Découvrir » (travailleurs) : offres ouvertes du pays, paginées serveur.
+// - « Mes candidatures » (travailleurs) : jobs auxquels j'ai postulé.
+// - « Mes missions » (travailleurs) : missions attribuées ; (clients) : mes
+//   annonces publiées.
+const JOB_TAB_DISCOVER = 'discover';
+const JOB_TAB_APPLICATIONS = 'applications';
+const JOB_TAB_MISSIONS = 'missions';
+const JOBS_PAGE_SIZE = 12;
+
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [filters, setFilters] = useState({ category: '', status: '', search: '' });
   const [radiusKm, setRadiusKm] = useState('');
   const [userCoords, setUserCoords] = useState(null);
   const [locating, setLocating] = useState(false);
   const [viewMode, setViewMode] = useState('list');
+  const [tab, setTab] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadError, setLoadError] = useState('');
   // null = pas encore chargé (JobCard retombe alors sur localStorage) ;
   // Set (même vide) = donnée serveur fiable disponible.
   const [appliedJobIds, setAppliedJobIds] = useState(null);
@@ -83,18 +98,9 @@ export default function Jobs() {
   const locale = getLocaleForLanguage(currentLanguage);
   usePageTitle('Emplois disponibles — Kojo');
 
-  useEffect(() => {
-    const categoryParam = searchParams.get('category');
-    if (categoryParam) {
-      setFilters((prev) => ({ ...prev, category: categoryParam }));
-    }
-    loadJobs();
-    if (user?.user_type === 'worker') {
-      loadAppliedJobIds();
-    } else {
-      setAppliedJobIds(null);
-    }
-  }, [searchParams, user?.id, user?.user_type]);
+  // Onglet par défaut selon le type d'utilisateur : client connecté → « Mes
+  // missions » (ses annonces), sinon découverte publique.
+  const effectiveTab = tab || (user?.user_type === 'client' ? JOB_TAB_MISSIONS : JOB_TAB_DISCOVER);
 
   const loadAppliedJobIds = async () => {
     try {
@@ -109,47 +115,97 @@ export default function Jobs() {
     }
   };
 
-  const loadJobs = async () => {
-    setLoading(true);
+  // Tous les filtres (recherche, catégorie, statut) sont appliqués CÔTÉ
+  // SERVEUR (pagination + requête MongoDB) : un résultat n'est plus tronqué
+  // à 50 jobs puis filtré localement — le 51e job d'une catégorie apparaît
+  // enfin.
+  const loadJobs = async ({ append = false } = {}) => {
+    const targetPage = append ? page + 1 : 1;
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    setLoadError('');
     try {
-      const response = await jobsAPI.getAll();
+      const params = { limit: JOBS_PAGE_SIZE, page: targetPage };
+      if (filters.search.trim()) params.q = filters.search.trim();
+      if (filters.category) params.category = filters.category;
+
+      if (effectiveTab === JOB_TAB_MISSIONS) {
+        // Missions attribuées (travailleur) / annonces publiées (client).
+        params.mine = user?.user_type === 'client' ? 'posted' : 'assigned';
+      } else if (effectiveTab === JOB_TAB_APPLICATIONS) {
+        // Mes candidatures : on interroge le serveur avec la liste de mes
+        // job_id postulés (l'ordre et le statut restent filtrés serveur).
+        const response = await jobsAPI.getMyProposals();
+        const proposals = Array.isArray(response) ? response : response?.data || [];
+        const ids = proposals.map((p) => p.job_id).filter(Boolean);
+        if (ids.length === 0) {
+          setJobs([]);
+          setHasMore(false);
+          return;
+        }
+        params.ids = ids.join(',');
+      } else {
+        // Découverte : uniquement les offres ouvertes (les autres statuts
+        // n'ont rien à faire dans la vitrine publique).
+        params.status = 'open';
+      }
+      // Filtre de statut explicite (onglets « Mes candidatures » / « Mes
+      // missions ») : appliqué en complément de mine= / ids=.
+      if (effectiveTab !== JOB_TAB_DISCOVER && filters.status) {
+        params.status = filters.status;
+      }
+
+      const response = await jobsAPI.getAll(params);
       const jobsData = normalizeJobList(Array.isArray(response) ? response : response?.data || []);
-      const visibleJobs = user?.user_type === 'client'
-        ? jobsData.filter((job) => isOwnedByCurrentUser(job, user))
-        : jobsData.filter((job) => job.status === 'open' || !job.status);
-      setJobs(visibleJobs);
+      setJobs((prev) => (append ? [...prev, ...jobsData] : jobsData));
+      setPage(targetPage);
+      setHasMore(jobsData.length === JOBS_PAGE_SIZE);
     } catch (error) {
       safeLog.error('Jobs load error', error);
-      setJobs([]);
+      setLoadError(error?.response?.data?.detail || error.message || 'Erreur');
+      if (!append) setJobs([]);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    if (categoryParam) {
+      setFilters((prev) => ({ ...prev, category: categoryParam }));
+    }
+    if (user?.user_type === 'worker') {
+      loadAppliedJobIds();
+    } else {
+      setAppliedJobIds(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user?.id, user?.user_type]);
+
+  // Recharger quand l'onglet ou un filtre change (page repart de 1).
+  useEffect(() => {
+    loadJobs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveTab, filters.search, filters.category, user?.id, user?.user_type]);
+
   const filteredJobs = useMemo(() => {
+    // Seul le filtre RAYON reste côté client (distance par rapport à la
+    // position de l'utilisateur) : il s'applique aux jobs de la page courante.
     const radius = Number(radiusKm);
     const radiusActive = Number.isFinite(radius) && radius > 0 && Boolean(userCoords);
+    if (!radiusActive) return jobs;
 
     return jobs.filter((job) => {
-      if (filters.category && job.category !== filters.category) return false;
-      if (filters.status && job.status !== filters.status) return false;
-      if (filters.search) {
-        const haystack = `${job.title || ''} ${job.description || ''} ${job.location_text || ''}`.toLowerCase();
-        if (!haystack.includes(filters.search.toLowerCase())) return false;
-      }
-      // Recherche par rayon : le job est retenu seulement s'il a des
-      // coordonnées ET est dans le rayon demandé. Sans coordonnées, il est
-      // exclu (impossible de calculer la distance) — le filtre est donc
-      // volontairement strict.
-      if (radiusActive) {
-        const coords = getJobCoordinates(job);
-        if (!coords) return false;
-        const distance = haversineKm(userCoords.latitude, userCoords.longitude, coords.latitude, coords.longitude);
-        if (distance > radius) return false;
-      }
-      return true;
+      const coords = getJobCoordinates(job);
+      if (!coords) return false;
+      const distance = haversineKm(userCoords.latitude, userCoords.longitude, coords.latitude, coords.longitude);
+      return distance <= radius;
     });
-  }, [jobs, filters, radiusKm, userCoords]);
+  }, [jobs, radiusKm, userCoords]);
 
   const locateMe = () => {    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       window.alert(t('geoUnavailable'));
@@ -200,7 +256,7 @@ export default function Jobs() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {user?.user_type === 'client' ? (pageT('myJobs') || 'Mes emplois') : (pageT('availableJobs') || 'Emplois disponibles')}
+            {effectiveTab === JOB_TAB_MISSIONS ? (pageT('myMissions') || 'Mes missions') : (pageT('availableJobs') || 'Emplois disponibles')}
           </h1>
           <p className="mt-2 text-gray-600">{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
         </div>
@@ -232,6 +288,45 @@ export default function Jobs() {
         </div>
       </div>
 
+      {/* Onglets : découverte / candidatures / missions */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {user?.user_type === 'worker' && (
+          <>
+            <button
+              onClick={() => setTab(JOB_TAB_DISCOVER)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_DISCOVER ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+            >
+              {pageT('tabDiscover') || 'Découvrir'}
+            </button>
+            <button
+              onClick={() => setTab(JOB_TAB_APPLICATIONS)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_APPLICATIONS ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+            >
+              {pageT('tabApplications') || 'Mes candidatures'}
+            </button>
+            <button
+              onClick={() => setTab(JOB_TAB_MISSIONS)}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_MISSIONS ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+            >
+              {pageT('tabMissions') || 'Mes missions'}
+            </button>
+          </>
+        )}
+        {user?.user_type === 'client' && (
+          <button
+            onClick={() => setTab(JOB_TAB_MISSIONS)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_MISSIONS ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+          >
+            {pageT('myMissions') || 'Mes missions'}
+          </button>
+        )}
+        {!user && (
+          <span className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-200">
+            {pageT('tabDiscover') || 'Découvrir'}
+          </span>
+        )}
+      </div>
+
       <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <input
           value={filters.search}
@@ -248,15 +343,17 @@ export default function Jobs() {
             <option key={category.value} value={category.value}>{category.label}</option>
           ))}
         </select>
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-          className="rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-        >
-          {statuses.map((status) => (
-            <option key={status.value} value={status.value}>{status.label}</option>
-          ))}
-        </select>
+        {effectiveTab !== JOB_TAB_DISCOVER && (
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+            className="rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+          >
+            {statuses.map((status) => (
+              <option key={status.value} value={status.value}>{status.label}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Recherche par rayon : trouve les jobs proches de toi (uniquement
@@ -294,20 +391,41 @@ export default function Jobs() {
         )}
       </div>
 
+      {loadError && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
+
       {viewMode === 'map' ? (
         <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
           <JobsMap jobs={filteredJobs} />
         </div>
       ) : filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-          {user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')}
+          {effectiveTab === JOB_TAB_APPLICATIONS
+            ? (pageT('noApplicationsYet') || 'Vous n\'avez pas encore postulé à une mission.')
+            : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow'))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {filteredJobs.map((job) => (
-            <JobCard key={job.id} job={job} user={user} userType={user?.user_type} appliedJobIds={appliedJobIds} t={t} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-4">
+            {filteredJobs.map((job) => (
+              <JobCard key={job.id} job={job} user={user} userType={user?.user_type} appliedJobIds={appliedJobIds} t={t} />
+            ))}
+          </div>
+          {hasMore && !radiusKm && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => loadJobs({ append: true })}
+                disabled={loadingMore}
+                className="rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {loadingMore ? (pageT('loadingMore') || 'Chargement…') : (pageT('loadMore') || 'Afficher plus de missions')}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {showCreateModal && (
