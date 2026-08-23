@@ -96,19 +96,21 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     // 1er clic : le quote à jour diffère de l'affiché → confirmation requise,
     // PAS de checkout, PAS de redirection. On attend que le bouton soit
     // cliquable (le loading initial de la page le garde disabled un instant).
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled());
+    // Timeout 5s : CI parfois chargée (jobs parallèles), un 1000ms par défaut
+    // rendrait le test flaky sans lien avec une régression réelle.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Payer maintenant' }));
-    expect(await screen.findByText(/taux de commission a changé/i)).toBeInTheDocument();
+    expect(await screen.findByText(/taux de commission a changé/i, {}, { timeout: 5000 })).toBeInTheDocument();
     // La répartition affichée a été mise à jour (200 XOF).
     expect(screen.getByText('200 XOF')).toBeInTheDocument();
     expect(CommissionService.createCheckout).not.toHaveBeenCalled();
     expect(hrefSetter).not.toHaveBeenCalled();
 
     // 2ème clic : la répartition affichée est à jour → checkout + redirection.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Payer maintenant' }));
-    await waitFor(() => expect(CommissionService.createCheckout).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(hrefSetter).toHaveBeenCalledWith('https://paydunya.test/checkout'));
+    await waitFor(() => expect(CommissionService.createCheckout).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    await waitFor(() => expect(hrefSetter).toHaveBeenCalledWith('https://paydunya.test/checkout'), { timeout: 5000 });
   });
 
   it('lance le checkout directement si le taux n’a pas changé', async () => {
@@ -119,10 +121,10 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     expect(await screen.findByText('140 XOF')).toBeInTheDocument();
 
     // Aucun changement de taux : le quote re-fetché est identique.
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Payer maintenant' }));
-    await waitFor(() => expect(CommissionService.createCheckout).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(hrefSetter).toHaveBeenCalledWith('https://paydunya.test/checkout'));
+    await waitFor(() => expect(CommissionService.createCheckout).toHaveBeenCalledTimes(1), { timeout: 5000 });
+    await waitFor(() => expect(hrefSetter).toHaveBeenCalledWith('https://paydunya.test/checkout'), { timeout: 5000 });
     // Pas de message de confirmation.
     expect(screen.queryByText(/taux de commission a changé/i)).not.toBeInTheDocument();
   });
