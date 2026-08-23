@@ -23,10 +23,12 @@ vi.mock('../../contexts/LanguageContext', () => ({
   useLanguage: () => ({ currentLanguage: 'fr' }),
 }));
 
+// OBJET STABLE : retourner un nouvel objet user à chaque appel re-renderait
+// Payment (useEffect [user]) en boucle infinie (loadBase → setState → rerender
+// → nouvel objet → …) — le bouton resterait disabled et aucun clic ne partirait.
+const MOCK_USER = { id: 'user-1', first_name: 'Jean', last_name: 'Dupont', email: 'a@b.c', phone: '+221771234567' };
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: { id: 'user-1', first_name: 'Jean', last_name: 'Dupont', email: 'a@b.c', phone: '+221771234567' },
-  }),
+  useAuth: () => ({ user: MOCK_USER }),
 }));
 
 vi.mock('../../services/commissionService', () => ({
@@ -92,7 +94,9 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     CommissionService.getQuote.mockImplementation(() => Promise.resolve(quoteAt20));
 
     // 1er clic : le quote à jour diffère de l'affiché → confirmation requise,
-    // PAS de checkout, PAS de redirection.
+    // PAS de checkout, PAS de redirection. On attend que le bouton soit
+    // cliquable (le loading initial de la page le garde disabled un instant).
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Payer maintenant' }));
     expect(await screen.findByText(/taux de commission a changé/i)).toBeInTheDocument();
     // La répartition affichée a été mise à jour (200 XOF).
@@ -101,6 +105,7 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     expect(hrefSetter).not.toHaveBeenCalled();
 
     // 2ème clic : la répartition affichée est à jour → checkout + redirection.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Payer maintenant' }));
     await waitFor(() => expect(CommissionService.createCheckout).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(hrefSetter).toHaveBeenCalledWith('https://paydunya.test/checkout'));
@@ -114,6 +119,7 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     expect(await screen.findByText('140 XOF')).toBeInTheDocument();
 
     // Aucun changement de taux : le quote re-fetché est identique.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Payer maintenant' }));
     await waitFor(() => expect(CommissionService.createCheckout).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(hrefSetter).toHaveBeenCalledWith('https://paydunya.test/checkout'));
