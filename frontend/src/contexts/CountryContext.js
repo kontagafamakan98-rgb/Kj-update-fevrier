@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { authAPI, geolocationAPI } from '../services/api';
+import { safeLog } from '../utils/env';
 
 const CountryContext = createContext();
 
@@ -20,7 +21,7 @@ export const CountryProvider = ({ children }) => {
         const response = await geolocationAPI.getAvailableCountries();
         setAvailableCountries(response.countries || []);
       } catch (error) {
-        console.error('Error fetching available countries:', error);
+        safeLog.error('Error fetching available countries:', error);
       } finally {
         setLoadingCountries(false);
       }
@@ -36,7 +37,7 @@ export const CountryProvider = ({ children }) => {
       await loadUser();
       return true;
     } catch (error) {
-      console.error('Error changing country:', error);
+      safeLog.error('Error changing country:', error);
       return false;
     }
   };

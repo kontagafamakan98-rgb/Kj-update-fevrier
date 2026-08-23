@@ -43,9 +43,11 @@ export default function CountrySelector({ className = '' }) {
     if (countryId === currentCountry) { setIsOpen(false); return; }
     setSaving(true);
     setIsOpen(false);
-    const success = await changeUserCountry(countryId);
+    // changeUserCountry met déjà à jour le contexte (loadUser) — un
+    // window.location.reload() écraserait tout l'état React (notifications,
+    // navigation) inutilement.
+    await changeUserCountry(countryId);
     setSaving(false);
-    if (success) window.location.reload();
   };
 
   return (

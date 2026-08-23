@@ -116,22 +116,18 @@ cd frontend && npm test
   et `/proc/<pid>/status` (le console `-C` exécute sans shell — envelopper
   dans `sh -c` pour les globs/pipes).
 
-### Backend — Render (LEGACY, à supprimer)
+### Backend — Fly.io (hébergement actuel)
 
-> ⚠️ **Ancien hébergement, en cours de retrait.** L'app Render
-> `kojo-backend-03az` (`https://kojo-backend-03az.onrender.com`) est
-> **payante** et doit être supprimée une fois la bascule Fly.io validée
-> (UptimeRobot pointé sur la nouvelle URL). Ne pas la réutiliser pour de
-> nouveaux déploiements. Les leçons ci-dessous restent utiles en cas de
-> retour arrière :
-
-- **Start command** : `uvicorn server:app --host 0.0.0.0 --port $PORT`
-- En cas d'échec au boot, **l'ancienne version reste servie** (vérifier le
-  statut du déploiement, pas seulement le health check).
-- `RENDER_EXTERNAL_HOSTNAME` étant injecté automatiquement, `build_trusted_hosts`
-  s'exécute avec une URL non vide au boot : tout import manquant dans un
-  module découpé (`kojo_*`) crashe le démarrage. Garde-fou : l'étape pyflakes
-  de la CI (« undefined name » → build rouge).
+- Le backend est déployé sur **Fly.io** (`kojo-backend` — voir `backend/fly.toml`
+  et la section « Déploiement » ci-dessus). L'ancien hébergement Render
+  (`kojo-backend-03az`) a été **retiré** ; ne pas le réutiliser.
+- Start command : `uvicorn server:app --host 0.0.0.0 --port $PORT` (via le
+  Dockerfile — cf. `backend/Dockerfile`).
+- Les secrets (JWT_SECRET, EMAIL_OTP_SECRET, clés PayDunya…) se configurent
+  dans les **variables d'environnement Fly** (`flyctl secrets set`).
+- Garde-fou au démarrage : tout import manquant dans un module découpé
+  (`kojo_*`) crashe le boot. Vérification par l'étape pyflakes de la CI
+  (« undefined name » → build rouge).
 
 ### Frontend — Vercel
 

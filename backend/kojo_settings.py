@@ -88,7 +88,7 @@ elif APP_ENV in ("production", "prod"):
         "JWT_SECRET environment variable is not set. Refusing to start in "
         "production with an auto-generated secret, since that would silently "
         "invalidate all user sessions on every restart/deploy and break auth "
-        "across multiple worker processes. Set JWT_SECRET on Render (a long "
+        "across multiple worker processes. Set JWT_SECRET on Fly.io (a long "
         "random string) and redeploy."
     )
 else:
@@ -114,7 +114,7 @@ elif APP_ENV in ("production", "prod"):
     raise RuntimeError(
         "EMAIL_OTP_SECRET environment variable is not set. Refusing to start "
         "in production because email-verification tokens would otherwise rely "
-        "on a silent fallback. Set EMAIL_OTP_SECRET on Render and redeploy."
+        "on a silent fallback. Set EMAIL_OTP_SECRET on Fly.io and redeploy."
     )
 else:
     # Dev/local uniquement : fallback stable sur JWT_SECRET pour survivre aux

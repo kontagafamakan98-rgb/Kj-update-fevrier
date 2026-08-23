@@ -762,7 +762,7 @@ export default function JobDetails() {
                     const isAccepted = Boolean(assignedWorkerId) && extractProposalWorkerId(proposal) === assignedWorkerId;
                     return (
                       <ProposalCard
-                        key={proposalId || `${extractProposalWorkerId(proposal) || 'proposal'}-${proposal.created_at || Math.random()}`}
+                        key={proposalId || `${extractProposalWorkerId(proposal) || 'proposal'}-${proposal.created_at || proposal._id || proposal.worker_id || 'anon'}`}
                         proposal={proposal}
                         isSelected={proposalId === extractProposalId(selectedProposal)}
                         isAccepted={isAccepted}
@@ -828,7 +828,7 @@ export default function JobDetails() {
 
                     return (
                       <MessageBubble
-                        key={message.id || message._id || `${authorId}-${message.created_at || Math.random()}`}
+                        key={message.id || message._id || `${authorId}-${message.created_at || message.timestamp || message.sender_id || 'anon'}`}
                         message={message}
                         isCurrentUser={isCurrentUser}
                         authorName={authorName}

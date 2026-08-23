@@ -48,11 +48,10 @@ const CountryChangePopup = () => {
   if (!showPopup || !detectedCountry) return null;
 
   const handleAccept = async () => {
-    const success = await changeUserCountry(detectedCountry.id);
-    if (success) {
-      setShowPopup(false);
-      window.location.reload();
-    }
+    // changeUserCountry rafraîchit déjà le contexte (loadUser) : pas de
+    // window.location.reload() qui écraserait l'état React en cours.
+    await changeUserCountry(detectedCountry.id);
+    setShowPopup(false);
   };
 
   const handleDecline = () => {

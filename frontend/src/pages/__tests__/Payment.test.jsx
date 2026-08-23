@@ -100,6 +100,8 @@ describe('Payment — cohérence de la répartition quand le taux change', () =>
     // rendrait le test flaky sans lien avec une régression réelle.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Payer maintenant' })).toBeEnabled(), { timeout: 5000 });
     fireEvent.click(screen.getByRole('button', { name: 'Payer maintenant' }));
+    // Message de confirmation du changement de taux affiché. Le contexte de
+    // test est mocké en FR, donc le message est la string rateChanged FR.
     expect(await screen.findByText(/taux de commission a changé/i, {}, { timeout: 5000 })).toBeInTheDocument();
     // La répartition affichée a été mise à jour (200 XOF).
     expect(screen.getByText('200 XOF')).toBeInTheDocument();

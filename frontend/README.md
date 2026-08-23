@@ -40,9 +40,9 @@ src/
 
 ## Backend
 
-L'API FastAPI attendue se configure via `VITE_API_URL` (défaut : l'URL Render
-codée en dur dans `src/services/api.js` comme dernier recours). Voir le
-`README.md` racine pour lancer le backend localement.
+L'API FastAPI attendue se configure via `VITE_API_URL` (défaut :
+`https://kojo-backend.fly.dev/api` — le backend est déployé sur Fly.io). Voir
+le `README.md` racine pour lancer le backend localement.
 
 ## PWA / Service workers
 
