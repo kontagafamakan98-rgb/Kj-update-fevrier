@@ -1,5 +1,6 @@
 # Kojo - Plateforme de Services Afrique de l'Ouest
-# Robots.txt optimized for West African market
+# Repli statique : en production, /robots.txt est réécrit par Vercel vers
+# /api/robots.txt (backend) qui sert la version dynamique (domaine + sitemap).
 
 User-agent: *
 Allow: /
@@ -11,13 +12,7 @@ Disallow: /dashboard
 Disallow: /profile
 Disallow: /messages
 Disallow: /api/
-Disallow: /photo-test
 Disallow: /photo-debug
-Disallow: /payment-demo
-Disallow: /mobile-test
 
-# Sitemap location
+# Sitemap dynamique (backend) : réécrit par /api/sitemap.xml via vercel.json
 Sitemap: https://kj-update-fevrier.vercel.app/sitemap.xml
-
-# Crawl-delay for slow servers (West Africa optimization)
-Crawl-delay: 2

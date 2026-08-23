@@ -127,6 +127,7 @@ async def create_database_indexes():
         await db.jobs.create_index("category")
         await db.jobs.create_index("country")
         await db.jobs.create_index([("status", 1), ("category", 1)])
+        await db.jobs.create_index([("status", 1), ("created_at", -1)])
         await db.jobs.create_index([("created_at", -1)])  # For sorting by date
         # Géospatial : recherche par rayon (GET /jobs?lat=&lng=&radius_km=)
         await db.jobs.create_index([("geo", "2dsphere")])
@@ -599,11 +600,16 @@ class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
         if path.startswith("/docs") or path.startswith("/redoc") or path.startswith("/openapi.json"):
             response.headers["Cache-Control"] = "no-store"
         elif path.startswith("/api"):
-            is_sensitive = any(path.startswith(prefix) for prefix in sensitive_prefixes)
-            if has_auth_header or is_sensitive or request.method not in {"GET", "HEAD", "OPTIONS"}:
-                response.headers["Cache-Control"] = "private, no-store"
-            else:
-                response.headers["Cache-Control"] = "public, max-age=120, stale-while-revalidate=60"
+            # Un endpoint spécifique (ex: /sitemap.xml, /robots.txt, ou la
+            # liste publique /jobs qui se met en cache 60s) a déjà posé un
+            # Cache-Control précis : on respecte la valeur métier au lieu
+            # d'écraser avec le défaut générique ci-dessous.
+            if not response.headers.get("Cache-Control"):
+                is_sensitive = any(path.startswith(prefix) for prefix in sensitive_prefixes)
+                if has_auth_header or is_sensitive or request.method not in {"GET", "HEAD", "OPTIONS"}:
+                    response.headers["Cache-Control"] = "private, no-store"
+                else:
+                    response.headers["Cache-Control"] = "public, max-age=120, stale-while-revalidate=60"
 
         return response
 

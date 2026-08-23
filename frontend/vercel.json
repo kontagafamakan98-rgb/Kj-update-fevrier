@@ -7,6 +7,14 @@
       "source": "/api/:path*",
       "destination": "https://kojo-backend.fly.dev/api/:path*"
     },
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://kojo-backend.fly.dev/api/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "https://kojo-backend.fly.dev/api/robots.txt"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

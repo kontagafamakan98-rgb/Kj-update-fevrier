@@ -4,7 +4,7 @@ from bson import ObjectId
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from kojo_core import db
@@ -488,6 +488,7 @@ async def get_jobs(
     lat: Optional[float] = Query(default=None, ge=-90, le=90),
     lng: Optional[float] = Query(default=None, ge=-180, le=180),
     radius_km: Optional[float] = Query(default=None, ge=0.1, le=2000),
+    response: Response = Response(),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     try:
@@ -548,6 +549,14 @@ async def get_jobs(
         # « plus de résultats » du fait que la page est pleine.
         offset = max(0, (page - 1) * limit)
         jobs = await db.jobs.find(query).sort("created_at", -1).skip(offset).to_list(limit)
+
+        # Cache-Control : la liste PUBLIQUE (visiteur anonyme) ne change que
+        # par les créations/clôtures de missions — on la sert avec un cache
+        # court (60s) pour que Googlebot et les visiteurs répétés ne tapent
+        # pas MongoDB à chaque vue. JAMAIS de cache pour un utilisateur
+        # connecté (ses données/filtres sont personnels).
+        if current_user is None:
+            response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
 
         logger.debug(f"✅ Retrieved {len(jobs)} jobs (auth={current_user is not None}, page={page})")
         if current_user is None:
