@@ -666,6 +666,7 @@
   "deleteAccountWarning": "Kesaan yi a mu: sa profil, sa ndigal yi ak sa mission yi ñu woom. Bataaxal yi ñu yónnee na kenn nañu gis.",
   "deleteAccountConfirmHint": "Bind SUPPRIMER ngir dëggal",
   "deleteAccountCta": "Moom sa konto definitiv",
+  "deleteAccountFailed": "Njuumte ci moomu konto bi",
   "deleting": "Mi ngi moom...",
   "phonePlaceholder": "77 123 45 67",
   "loadingOlder": "Dàng...",

@@ -361,7 +361,7 @@ export default function Profile() {
                   });
                   if (!res.ok) {
                     const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.detail || 'Erreur suppression');
+                    throw new Error(errData.detail || t('deleteAccountFailed'));
                   }
                   await logout();
                   navigate('/');

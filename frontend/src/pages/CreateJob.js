@@ -176,8 +176,7 @@ export default function CreateJob() {
               <div className="font-semibold">{ui.selectedAddress}</div>
               <div>{locationLabel}</div>
             </div>
-            {mapUrl && (
-              <iframe title="Aperçu de la localisation du job" src={mapUrl} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+            {mapUrl && (                <iframe title={ui.mapPreviewTitle} src={mapUrl} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
             )}
           </div>
         )}

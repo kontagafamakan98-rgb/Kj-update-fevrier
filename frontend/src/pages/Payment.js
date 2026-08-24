@@ -40,6 +40,7 @@ const COPY = {
     minPaydunyaAmount: '⚠️ Le montant minimum accepté par PayDunya est de 200 FCFA.',
     rateChanged: 'Le taux de commission a changé : la répartition a été mise à jour. Cliquez à nouveau pour confirmer et payer.',
     noJobTitle: 'Un paiement doit être rattaché à une mission',
+    paymentError: 'Erreur paiement',
     noJobText: 'Les paiements libres ne sont plus possibles : ouvrez une mission depuis la liste des emplois pour la payer en toute sécurité (fonds bloqués jusqu’à la livraison).',
     noJobCta: 'Voir les missions disponibles',
     countries: { senegal: 'Sénégal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
@@ -79,6 +80,7 @@ const COPY = {
     minPaydunyaAmount: '⚠️ The minimum amount accepted by PayDunya is 200 FCFA.',
     rateChanged: 'The commission rate has changed: the split has been updated. Click again to confirm and pay.',
     noJobTitle: 'A payment must be tied to a job',
+    paymentError: 'Payment error',
     noJobText: 'Free payments are no longer accepted: open a job from the jobs page and pay it securely (funds held in escrow until delivery).',
     noJobCta: 'See available jobs',
     countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Ivory Coast' },
@@ -115,6 +117,7 @@ const COPY = {
     openCheckout: 'Ubbi checkout',
     rateChanged: 'Fees bi soppi na: séddoo bi ñu ko yeesal. Dellu klik ngir dëggal te fey.',
     noJobTitle: 'Fey bi xamal na sama mission',
+    paymentError: 'Njuumte ci fey bi',
     noJobText: 'Fey bu amul mission duñu ko ame: Ubi mission bi ci xët wu emplois bi ngir raxas ko fey (escrow ba ci jëmm bi dellusi).',
     noJobCta: 'Gis mission yu am',
     minPaymentAmount: 'Sàntu fey gu digg la: 200 FCFA.',
@@ -154,6 +157,7 @@ const COPY = {
     openCheckout: 'Checkout da yɔrɔ',
     rateChanged: 'Commission rate yɛlɛma: jɛgɛnsira ladilanen don. I ka klik segin ka a sɔn ka sara.',
     noJobTitle: 'Sariya-faga dangɛ ka bɛ baara si ma',
+    paymentError: 'Fili bɛ sara na',
     noJobText: 'Sariya-faga min tɛ baara ma, a tɛ sɔn sisan: yɛlɛ baara kelen kɛnɛ ka na a la sare.',
     noJobCta: 'Baara nninw yɛlɛma',
     minPaymentAmount: 'Sariya-fuwu jate min: 200 FCFA.',
@@ -193,6 +197,7 @@ const COPY = {
     openCheckout: 'Checkout yɔk',
     rateChanged: 'Commission rate togame: yidgã manegame. Leeb n klik n kõ sɩda n yaool.',
     noJobTitle: 'Paoongo sõmb n naag tʋʋm ne yã',
+    paymentError: 'Yelle n paoongo',
     noJobText: 'Paoongo sẽn pa tʋʋm ye, bɩ bɩ sõor ka kɩ. Yelg tʋʋmã n ye paoong ne nam ne ligdi-sequ n wa tʋʋo.',
     noJobCta: 'Tʋʋm sẽn be wã yõk',
     minPaymentAmount: 'Paoongo sõor sõn n sõmb n yɩ: 200 FCFA.',
@@ -281,7 +286,7 @@ const Payment = () => {
       }
     } catch (err) {
       safeLog.error('Payment page load error', err);
-      setError(err?.response?.data?.detail || err.message || 'Erreur paiement');
+      setError(err?.response?.data?.detail || err.message || copy.paymentError);
     } finally {
       setLoading(false);
     }
@@ -305,7 +310,7 @@ const Payment = () => {
         const liveQuote = await CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country });
         if (!cancelled) setQuote(liveQuote);
       } catch (err) {
-        if (!cancelled) setError(err?.response?.data?.detail || err.message || 'Erreur paiement');
+        if (!cancelled) setError(err?.response?.data?.detail || err.message || copy.paymentError);
       }
     };
     refreshQuote();
@@ -396,7 +401,7 @@ const Payment = () => {
       });
       window.location.href = checkout.checkout_url;
     } catch (err) {
-      const msg = err?.response?.data?.detail || err.message || 'Erreur paiement';
+      const msg = err?.response?.data?.detail || err.message || copy.paymentError;
       setCheckoutError(msg);
       setProcessing(false);
     }
@@ -408,7 +413,7 @@ const Payment = () => {
       const nextStatus = await CommissionService.getPaymentStatus(statusData.id);
       setStatusData(nextStatus);
     } catch (err) {
-      setError(err?.response?.data?.detail || err.message || 'Erreur paiement');
+      setError(err?.response?.data?.detail || err.message || copy.paymentError);
     }
   };
 

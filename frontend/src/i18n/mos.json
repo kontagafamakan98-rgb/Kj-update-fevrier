@@ -666,6 +666,7 @@
   "deleteAccountWarning": "Yão sẽn yaa sɩda: f profil, f tẽngse la f tʋʋm-rãmb b na yãag. Gomd-rãmb sẽn dɑ tʋm n b kɑ n bɑɑs.",
   "deleteAccountConfirmHint": "Gʋls SUPPRIMER n t f sɩd",
   "deleteAccountCta": "Yãag m konto vĩɩɩga",
+  "deleteAccountFailed": "Yelle n yãag konto wã",
   "deleting": "A ket n yãagd...",
   "phonePlaceholder": "77 123 45 67",
   "loadingOlder": "A ket n pakd...",

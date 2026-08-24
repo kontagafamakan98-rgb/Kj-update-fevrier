@@ -666,6 +666,7 @@
   "deleteAccountWarning": "This action is permanent: your account, proposals and jobs will be deleted. Messages already exchanged will still be visible to your contact.",
   "deleteAccountConfirmHint": "Type DELETE to confirm",
   "deleteAccountCta": "Permanently delete my account",
+  "deleteAccountFailed": "Deletion error",
   "deleting": "Deleting…",
   "phonePlaceholder": "77 123 45 67",
   "loadingOlder": "Loading…",

@@ -101,11 +101,11 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
     setError('');
 
     const payload = buildJobCreatePayload(formData);
-    if (!payload.title) return setError('Titre requis');
-    if (payload.title.length < 5) return setError('Le titre doit contenir au moins 5 caractères');
-    if (!payload.location?.address && !payload.location?.fullAddress) return setError('Localisation requise');
-    if (payload.budget_min === null && payload.budget_max === null) return setError('Prix requis');
-    if (payload.budget_min > payload.budget_max) return setError('Le prix maximum doit être supérieur ou égal au prix minimum');
+    if (!payload.title) return setError(ui.titleRequired);
+    if (payload.title.length < 5) return setError(ui.titleTooShort);
+    if (!payload.location?.address && !payload.location?.fullAddress) return setError(ui.locationRequired);
+    if (payload.budget_min === null && payload.budget_max === null) return setError(ui.budgetRequired);
+    if (payload.budget_min > payload.budget_max) return setError(ui.budgetMaxInvalid);
 
     setLoading(true);
     try {
@@ -187,7 +187,7 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
                 <div>{locationLabel}</div>
               </div>
               {mapUrl && (
-                <iframe title="Aperçu de la localisation du job" src={mapUrl} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                <iframe title={ui.mapPreviewTitle} src={mapUrl} className="h-72 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
               )}
             </div>
           )}

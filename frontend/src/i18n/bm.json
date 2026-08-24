@@ -666,6 +666,7 @@
   "deleteAccountWarning": "Nin baara bɔ: i ka profil, i ka hakɛw ni i ka baaraw bɛna bɔ. Cikan minnu bɔ sɛbɛn bɛ jira fɔlɔ.",
   "deleteAccountConfirmHint": "Sɛbɛn SUPPRIMER ka a dafagiga",
   "deleteAccountCta": "I ka konto bɔ pini",
+  "deleteAccountFailed": "Fili bɛ konto bɔ na",
   "deleting": "Bɛ marɔ...",
   "phonePlaceholder": "77 123 45 67",
   "loadingOlder": "Ka makɔnɔ...",

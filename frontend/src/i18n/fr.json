@@ -666,6 +666,7 @@
   "deleteAccountWarning": "Cette action est définitive : votre profil, vos propositions et vos missions seront supprimés. Les messages déjà échangés restent visibles pour votre interlocuteur.",
   "deleteAccountConfirmHint": "Tapez SUPPRIMER pour confirmer",
   "deleteAccountCta": "Supprimer définitivement mon compte",
+  "deleteAccountFailed": "Erreur suppression",
   "deleting": "Suppression en cours…",
   "phonePlaceholder": "77 123 45 67",
   "loadingOlder": "Chargement…",
