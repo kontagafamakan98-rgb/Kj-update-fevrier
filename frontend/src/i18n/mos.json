@@ -661,5 +661,19 @@
   "referralWithdrawConfirm": "F sɑk n yit {amount} FCFA f mobile money kont pʋgẽ?",
   "referralWithdrawalLabel": "Yɩm-gõoneg yɩɩtgo",
   "referralWorkerOnly": "Kɔd-tʋʋmd yaa tʋʋm-nedb dãmba.",
-  "referralReferredNote": "B rɑɑs fɑɑ nɑ parrainée : f code kɑ tõog n parrainer ned tʋʋg. F yɩm-gõoneg rãmb nɑ n kẽng tɑoor f rogem wã wɑkɑtẽ."
+  "referralReferredNote": "B rɑɑs fɑɑ nɑ parrainée : f code kɑ tõog n parrainer ned tʋʋg. F yɩm-gõoneg rãmb nɑ n kẽng tɑoor f rogem wã wɑkɑtẽ.",
+  "deleteAccountTitle": "Yãag m konto",
+  "deleteAccountWarning": "Yão sẽn yaa sɩda: f profil, f tẽngse la f tʋʋm-rãmb b na yãag. Gomd-rãmb sẽn dɑ tʋm n b kɑ n bɑɑs.",
+  "deleteAccountConfirmHint": "Gʋls SUPPRIMER n t f sɩd",
+  "deleteAccountCta": "Yãag m konto vĩɩɩga",
+  "deleting": "A ket n yãagd...",
+  "phonePlaceholder": "77 123 45 67",
+  "loadingOlder": "A ket n pakd...",
+  "loadOlderExists": "Gesg koees kãrembs",
+  "loadOlderFailed": "A kɑ tõog n pakd koees kãrembs",
+  "orSeparator": "wala",
+  "registerFailed": "Yelle n gʋlsg f yʋʋre",
+  "or": "wala",
+  "openMenu": "Pakd menu wã",
+  "closeMenu": "Yõ menu wã"
 }

@@ -99,11 +99,11 @@ export default function CreateJob() {
     e.preventDefault();
     setError('');
     const payload = buildJobCreatePayload(formData);
-    if (!payload.title) return setError('Titre requis');
-    if (payload.title.length < 5) return setError('Le titre doit contenir au moins 5 caractères');
-    if (!payload.location?.address && !payload.location?.fullAddress) return setError('Localisation requise');
-    if (payload.budget_min === null && payload.budget_max === null) return setError('Prix requis');
-    if (payload.budget_min > payload.budget_max) return setError('Le prix maximum doit être supérieur ou égal au prix minimum');
+    if (!payload.title) return setError(ui.titleRequired);
+    if (payload.title.length < 5) return setError(ui.titleTooShort);
+    if (!payload.location?.address && !payload.location?.fullAddress) return setError(ui.locationRequired);
+    if (payload.budget_min === null && payload.budget_max === null) return setError(ui.budgetRequired);
+    if (payload.budget_min > payload.budget_max) return setError(ui.budgetMaxInvalid);
 
     setLoading(true);
     try {

@@ -349,7 +349,7 @@ export default function Profile() {
             )}
             <button
               onClick={async () => {
-                if (deleteConfirm.trim().toUpperCase() !== 'SUPPRIMER') {
+                if (!['SUPPRIMER', 'DELETE'].includes(deleteConfirm.trim().toUpperCase())) {
                   toast.error(t('deleteAccountConfirmHint') || 'Tapez SUPPRIMER pour confirmer');
                   return;
                 }

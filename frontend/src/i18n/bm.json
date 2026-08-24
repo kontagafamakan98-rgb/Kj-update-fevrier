@@ -661,5 +661,19 @@
   "referralWithdrawConfirm": "I bɛ bɔli {amount} FCFA i ka mobile money konti la?",
   "referralWithdrawalLabel": "Sɔrɔko bɔli",
   "referralWorkerOnly": "Cawbila ye baarakɛlaw dɔrɔn ta ye.",
-  "referralReferredNote": "Parrainɛ bɔlen don : i ka code tɛ se ka cawbila kɛ. I ka sɔrɔkow bɛ taa ɲɛ ni pɛrɛkɛ ye."
+  "referralReferredNote": "Parrainɛ bɔlen don : i ka code tɛ se ka cawbila kɛ. I ka sɔrɔkow bɛ taa ɲɛ ni pɛrɛkɛ ye.",
+  "deleteAccountTitle": "I ka konto bɔ",
+  "deleteAccountWarning": "Nin baara bɔ: i ka profil, i ka hakɛw ni i ka baaraw bɛna bɔ. Cikan minnu bɔ sɛbɛn bɛ jira fɔlɔ.",
+  "deleteAccountConfirmHint": "Sɛbɛn SUPPRIMER ka a dafagiga",
+  "deleteAccountCta": "I ka konto bɔ pini",
+  "deleting": "Bɛ marɔ...",
+  "phonePlaceholder": "77 123 45 67",
+  "loadingOlder": "Ka makɔnɔ...",
+  "loadOlderExists": "Cikan kɔrɔw jira",
+  "loadOlderFailed": "Fili bɛ cikan kɔrɔw kala",
+  "orSeparator": "wala",
+  "registerFailed": "Fili bɛ tɔgɔ sɛbɛn na",
+  "or": "wala",
+  "openMenu": "Menu da wuli",
+  "closeMenu": "Menu da"
 }

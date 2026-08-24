@@ -661,5 +661,19 @@
   "referralWithdrawConfirm": "Dëggal génn bu {amount} FCFA ci sa konte mobile money?",
   "referralWithdrawalLabel": "Genne bu nafaakay",
   "referralWorkerOnly": "Diggoo bi liggéeykat yi rekk la jëfandikookat.",
-  "referralReferredNote": "Ñu la diggooko na : sa koodu du mën a genne diggook kenn ci yoon wi. Dëg-géjjeel sa nafaakay yi ni kuñu la diggooko."
+  "referralReferredNote": "Ñu la diggooko na : sa koodu du mën a genne diggook kenn ci yoon wi. Dëg-géjjeel sa nafaakay yi ni kuñu la diggooko.",
+  "deleteAccountTitle": "Moom sa konto",
+  "deleteAccountWarning": "Kesaan yi a mu: sa profil, sa ndigal yi ak sa mission yi ñu woom. Bataaxal yi ñu yónnee na kenn nañu gis.",
+  "deleteAccountConfirmHint": "Bind SUPPRIMER ngir dëggal",
+  "deleteAccountCta": "Moom sa konto definitiv",
+  "deleting": "Mi ngi moom...",
+  "phonePlaceholder": "77 123 45 67",
+  "loadingOlder": "Dàng...",
+  "loadOlderExists": "Wone bataaxal yu gëna yàgg",
+  "loadOlderFailed": "Njuumte ci yebbi bataaxal yu gëna yàgg",
+  "orSeparator": "walla",
+  "registerFailed": "Njuumte ci bind bi",
+  "or": "walla",
+  "openMenu": "Ubbi menu bi",
+  "closeMenu": "Tëj menu bi"
 }
