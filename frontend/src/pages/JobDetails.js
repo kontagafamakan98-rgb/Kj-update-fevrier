@@ -255,25 +255,15 @@ export default function JobDetails() {
   };
 
   const openDiscussionForProposal = (proposalId) => {
-    const proposal = proposals.find((item) => extractProposalId(item) === proposalId) || selectedProposal;
-    const workerId = extractProposalWorkerId(proposal);
-    const workerName = extractProposalWorkerName(proposal, t('worker'));
+    // La discussion vit sur cette même page (section #job-discussion) : on
+    // sélectionne la proposition puis on y fait défiler la page. L'ancien
+    // code naviguait vers /messages?jobId=…&userId=…&name=… puis tentait un
+    // scrollIntoView/focus sur la page courante (refs devenues nulles après
+    // navigation) — et Messages.js ne lisait de toute façon jamais ces query
+    // params : le clic ouvrait la liste générique des conversations.
     setSelectedProposalId(proposalId);
-
-    const params = new URLSearchParams();
-    if (job?.id) params.set('jobId', job.id);
-    if (workerId) params.set('userId', workerId);
-    if (workerName) params.set('name', workerName);
-    params.set('source', 'job-details');
-
-    navigate(`/messages?${params.toString()}`);
-
-    if (typeof window !== 'undefined') {
-      window.location.hash = 'job-discussion';
-    }
     window.setTimeout(() => {
       discussionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      discussionInputRef.current?.focus();
     }, 120);
   };
 

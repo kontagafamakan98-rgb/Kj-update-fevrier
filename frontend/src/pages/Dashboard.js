@@ -120,16 +120,19 @@ export default function Dashboard() {
     return baseActions;
   })();
 
+  // Catégories canoniques du backend (kojo_routers_jobs.py) : general,
+  // plumbing, electrical, construction, cleaning, gardening, tutoring,
+  // mechanics. « carpentry »/« computing » n'existent pas côté serveur (ils
+  // seraient normalisés en « general ») — cliquer menait vers un filtre vide.
   const popularCategories = [
     { key: 'plumbing', icon: Wrench },
     { key: 'electrical', icon: Zap },
     { key: 'mechanics', icon: Briefcase },
     { key: 'construction', icon: Hammer },
-    { key: 'carpentry', icon: PanelsTopLeft },
+    { key: 'general', icon: PanelsTopLeft },
     { key: 'cleaning', icon: Sparkles },
     { key: 'gardening', icon: Leaf },
-    { key: 'tutoring', icon: GraduationCap },
-    { key: 'computing', icon: Monitor }
+    { key: 'tutoring', icon: GraduationCap }
   ];
 
   if (loading) {

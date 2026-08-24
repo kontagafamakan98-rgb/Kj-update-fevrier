@@ -81,14 +81,23 @@ const CommissionDashboard = () => {
   };
 
   const formatMoney = (amount) => new Intl.NumberFormat(currentLanguage === 'en' ? 'en-US' : 'fr-FR').format(amount || 0);
-  const formatDate = (dateString) =>
-    new Date(dateString).toLocaleDateString(currentLanguage === 'en' ? 'en-US' : 'fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  // Garde-fou anti-crash : un timestamp absent/invalide ne doit pas lever de
+  // RangeError (new Date(invalide).toLocaleDateString) qui ferait planter
+  // tout le tableau de bord.
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleDateString(currentLanguage === 'en' ? 'en-US' : 'fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return '';
+    }
+  };
 
   const getMethodIcon = (method) => {
     switch (method) {
@@ -256,7 +265,7 @@ const CommissionDashboard = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm"><span className="font-semibold text-green-600">{formatMoney(transaction.ownerCommission)} XOF</span></td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm"><span className="font-semibold text-blue-600">{formatMoney(transaction.workerAmount)} XOF</span></td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="inline-flex items-center">{getMethodIcon(transaction.paymentMethod)}<span className="ml-2 capitalize">{transaction.paymentMethod.replace('_', ' ')}</span></span>
+                        <span className="inline-flex items-center">{getMethodIcon(transaction.paymentMethod)}<span className="ml-2 capitalize">{String(transaction.paymentMethod || '—').replace(/_/g, ' ')}</span></span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(transaction.timestamp)}</td>
                     </tr>

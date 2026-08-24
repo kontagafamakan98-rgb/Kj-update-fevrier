@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -8,14 +7,13 @@ import { useToast } from '../contexts/ToastContext';
 import {
   detectCountryFromPhone,
   formatPhoneNumber,
-  getCountriesList,
   getPhonePrefixByCountry
 } from '../services/geolocationService';
 import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
-import { usersAPI, reviewAPI, getAuthToken } from '../services/api';
+import { usersAPI, reviewAPI, workerProfileAPI, getAuthToken } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
@@ -100,8 +98,13 @@ export default function Profile() {
 
       if (user?.user_type === 'worker') {
         try {
-          const workerResponse = await axios.get('/workers/profile');
-          setWorkerProfile(workerResponse.data);
+          // Passer par l'API centralisée (buildApiUrl + auth cookie/token) :
+          // l'ancien axios.get('/workers/profile') utilisait une URL relative
+          // qui, en prod Vercel, renvoyait le catch-all index.html (200) au
+          // lieu du profil — la section « Profil travailleur » s'affichait
+          // vide. workerProfileAPI.get() construit la vraie URL backend.
+          const workerProfileData = await workerProfileAPI.get();
+          setWorkerProfile(workerProfileData);
         } catch {
           devLog.info('No worker profile found');
         }

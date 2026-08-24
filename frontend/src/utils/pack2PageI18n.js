@@ -175,7 +175,9 @@ const pages = {
       dashboardMessage: 'Bienvenue {firstName} ! Votre compte est vérifié avec {count} moyen(s) de paiement.',
       referralAppliedToast: '🎁 Code de parrainage appliqué avec succès !',
       referralAppliedWithBonusToast: '🎁 Code de parrainage appliqué ! +{amount} FCFA de bonus de bienvenue crédités.',
-      duplicateEmailError: 'Cette adresse email est déjà utilisée'
+      duplicateEmailError: 'Cette adresse email est déjà utilisée',
+      step3DoneToast: 'Étape 3 terminée avec succès.',
+      dashboardReadyMessage: 'Configuration des paiements terminée. Votre compte est maintenant prêt.'
     },
     en: {
       redirecting: 'Redirecting...',
@@ -205,7 +207,9 @@ const pages = {
       dashboardMessage: 'Welcome {firstName}! Your account is verified with {count} payment method(s).',
       referralAppliedToast: '🎁 Referral code applied successfully!',
       referralAppliedWithBonusToast: '🎁 Referral code applied! +{amount} FCFA welcome bonus credited.',
-      duplicateEmailError: 'This email address is already in use'
+      duplicateEmailError: 'This email address is already in use',
+      step3DoneToast: 'Step 3 completed successfully.',
+      dashboardReadyMessage: 'Payment setup complete. Your account is now ready.'
     }
   },
   emailVerification: {
@@ -444,14 +448,37 @@ const pages = {
       categoryLabel: 'Catégorie',
       statusLabel: 'Statut',
       duration: 'Durée : {value}',
-      apply: 'Postuler'
+      apply: 'Postuler',
+      // Onglets et libellés de la liste : sans ces clés, makeScopedTranslator
+      // retombait sur la clé brute (ex. « tabDiscover ») — l'onglet s'affichait
+      // littéralement « tabDiscover » quelle que soit la langue.
+      tabDiscover: 'Découvrir',
+      tabApplications: 'Mes candidatures',
+      tabMissions: 'Mes missions',
+      myMissions: 'Mes missions',
+      availableJobs: 'Emplois disponibles',
+      allCategories: 'Toutes les catégories',
+      allStatuses: 'Tous les statuts',
+      loadingMore: 'Chargement…',
+      loadMore: 'Afficher plus de missions',
+      noApplicationsYet: 'Vous n\'avez pas encore postulé à une mission.'
     },
     en: {
       searchPlaceholder: 'Title or description...',
       categoryLabel: 'Category',
       statusLabel: 'Status',
       duration: 'Duration: {value}',
-      apply: 'Apply'
+      apply: 'Apply',
+      tabDiscover: 'Discover',
+      tabApplications: 'My applications',
+      tabMissions: 'My jobs',
+      myMissions: 'My jobs',
+      availableJobs: 'Available jobs',
+      allCategories: 'All categories',
+      allStatuses: 'All statuses',
+      loadingMore: 'Loading…',
+      loadMore: 'Show more jobs',
+      noApplicationsYet: 'You have not applied to a job yet.'
     }
   },
   messages: {

@@ -28,16 +28,20 @@ export default function Home() {
   const statCompleted = stats?.completed_jobs != null ? stats.completed_jobs : 500;
   const statCountries = stats?.countries != null ? stats.countries : 4;
 
+  // Liste alignée sur les catégories canoniques du backend (kojo_routers_jobs.py) :
+  // general, plumbing, electrical, construction, cleaning, gardening, tutoring,
+  // mechanics. « carpentry » et « computing » n'existent pas côté serveur (ils
+  // seraient normalisés en « general ») — les cliquer menait vers un filtre
+  // sans résultat.
   const categories = [
+    { key: 'general', icon: '🛠️' },
     { key: 'plumbing', icon: '🔧' },
     { key: 'electrical', icon: '⚡' },
-    { key: 'mechanics', icon: '🔩' },
     { key: 'construction', icon: '🏗️' },
-    { key: 'carpentry', icon: '🪚' },
     { key: 'cleaning', icon: '🧽' },
     { key: 'gardening', icon: '🌱' },
     { key: 'tutoring', icon: '📚' },
-    { key: 'computing', icon: '💻' }
+    { key: 'mechanics', icon: '🔩' }
   ];
 
   const countries = getAllCountries().map((country, index) => ({

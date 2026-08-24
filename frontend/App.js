@@ -22,6 +22,9 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 
+// « Comment ça marche » : page publique SEO (lien depuis Home et JobDetails)
+const HowItWorks = lazy(() => import("./pages/HowItWorks"));
+
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Jobs = lazy(() => import("./pages/Jobs"));
@@ -186,6 +189,7 @@ function AppRoutes() {
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/how-it-works" element={<HowItWorks />} />
             
             {/* Protected routes - lazy loaded */}
             <Route path="/dashboard" element={
@@ -193,16 +197,13 @@ function AppRoutes() {
                 <Dashboard />
               </ProtectedRoute>
             } />
-            <Route path="/jobs" element={
-              <ProtectedRoute>
-                <Jobs />
-              </ProtectedRoute>
-            } />
-            <Route path="/jobs/:id" element={
-              <ProtectedRoute>
-                <JobDetails />
-              </ProtectedRoute>
-            } />
+            {/* Découverte publique des jobs (backend GET /jobs et /jobs/{id}
+                sans auth via l'allowlist JobPublic) : les pages gèrent déjà
+                le cas anonyme (onglet « Découvrir », bouton « Connectez-vous
+                pour postuler »). Toutes les mutations restent protégées côté
+                backend. */}
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/jobs/:id" element={<JobDetails />} />
             <Route path="/messages" element={
               <ProtectedRoute>
                 <Messages />
@@ -219,17 +220,24 @@ function AppRoutes() {
               </ProtectedRoute>
             } />
             
-            {/* Test and demo routes - lazy loaded */}
-            <Route path="/mobile-test" element={
-              <ProtectedRoute>
-                <MobileTest />
-              </ProtectedRoute>
-            } />
-            <Route path="/photo-test" element={
-              <ProtectedRoute>
-                <PhotoTest />
-              </ProtectedRoute>
-            } />
+            {/* Test and demo routes - lazy loaded. /mobile-test et /photo-test
+                ne sont enregistrées qu'en développement (import.meta.env.DEV) :
+                en prod elles 404, comme le précise le commentaire de
+                Dashboard.js. /photo-debug est l'équivalent prod (owner-only). */}
+            {import.meta.env.DEV && (
+              <>
+                <Route path="/mobile-test" element={
+                  <ProtectedRoute>
+                    <MobileTest />
+                  </ProtectedRoute>
+                } />
+                <Route path="/photo-test" element={
+                  <ProtectedRoute>
+                    <PhotoTest />
+                  </ProtectedRoute>
+                } />
+              </>
+            )}
             <Route path="/photo-debug" element={
               <ProtectedRoute>
                 <OwnerOnlyRoute>

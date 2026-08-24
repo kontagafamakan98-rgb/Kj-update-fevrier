@@ -187,10 +187,12 @@ export default function Jobs() {
   }, [searchParams, user?.id, user?.user_type]);
 
   // Recharger quand l'onglet ou un filtre change (page repart de 1).
+  // filters.status est inclus : sans lui, changer le statut dans les onglets
+  // « Mes candidatures » / « Mes missions » ne redéclenchait jamais loadJobs.
   useEffect(() => {
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveTab, filters.search, filters.category, user?.id, user?.user_type]);
+  }, [effectiveTab, filters.search, filters.category, filters.status, user?.id, user?.user_type]);
 
   const filteredJobs = useMemo(() => {
     // Seul le filtre RAYON reste côté client (distance par rapport à la

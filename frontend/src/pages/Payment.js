@@ -20,6 +20,7 @@ const COPY = {
     loginCta: 'Se connecter',
     payNow: 'Payer maintenant',
     paying: 'Redirection en cours...',
+    loadingText: 'Chargement...',
     quoteTitle: 'Répartition automatique',
     total: 'Total client',
     commission: 'Commission KOJO',
@@ -58,6 +59,7 @@ const COPY = {
     loginCta: 'Log in',
     payNow: 'Pay now',
     paying: 'Redirecting...',
+    loadingText: 'Loading...',
     quoteTitle: 'Automatic split',
     total: 'Client total',
     commission: 'KOJO commission',
@@ -96,6 +98,7 @@ const COPY = {
     loginCta: 'Dugg',
     payNow: 'Tàmbali checkout bu dëgg',
     paying: 'Mi ngi jëm ci checkout...',
+    loadingText: 'Mi ngi yebbi...',
     quoteTitle: 'Séddoo otomatik',
     total: 'Lëppu klient bi',
     commission: 'Commission KOJO',
@@ -134,6 +137,7 @@ const COPY = {
     loginCta: 'Don',
     payNow: 'Checkout yatiyalen daminɛ',
     paying: 'Bɛ taa checkout la...',
+    loadingText: 'Bɛ kalan...',
     quoteTitle: 'Jɛgɛnsira otomatik',
     total: 'Kiliyan ka bɛɛ',
     commission: 'KOJO commission',
@@ -172,6 +176,7 @@ const COPY = {
     loginCta: 'Lʋ',
     payNow: 'Checkout yel-kɩɩm taaba',
     paying: 'Bɛ yiki checkout...',
+    loadingText: 'A kareng...',
     quoteTitle: 'Yidg otomatik',
     total: 'Client bɛɛga',
     commission: 'KOJO commission',
@@ -615,7 +620,7 @@ const Payment = () => {
 
         {loading && (
           <div className="rounded-2xl border border-gray-200 bg-white px-5 py-6 text-gray-500">
-            Loading...
+            {copy.loadingText}
           </div>
         )}
       </div>

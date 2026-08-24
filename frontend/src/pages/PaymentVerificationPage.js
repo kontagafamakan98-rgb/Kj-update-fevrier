@@ -215,10 +215,10 @@ const PaymentVerificationPage = () => {
         email_verified: authUser?.email_verified ?? true
       });
 
-      toast.success('Étape 3 terminée avec succès.');
+      toast.success(pageT('step3DoneToast'));
       navigate('/dashboard', {
         state: {
-          message: 'Configuration des paiements terminée. Votre compte est maintenant prêt.',
+          message: pageT('dashboardReadyMessage'),
           type: 'success'
         }
       });
