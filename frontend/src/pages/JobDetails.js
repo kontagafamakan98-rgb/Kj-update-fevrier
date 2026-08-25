@@ -2,11 +2,13 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmModal from '../components/ConfirmModal';
 import ProposalModal from '../components/ProposalModal';
 import { jobsAPI } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { safeLog } from '../utils/env';
-import { deleteJobWithFallbacks, ensureJobOwnerActionBar } from '../utils/jobOwnerDeleteRuntime';
+import { deleteJobWithFallbacks } from '../utils/jobOwnerDeleteRuntime';
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser, normalizeComparableId } from '../utils/jobPageSafeHelpers';
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
@@ -135,6 +137,8 @@ export default function JobDetails() {
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState('');
   const [messages, setMessages] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -153,6 +157,7 @@ export default function JobDetails() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
+  const toast = useToast();
   const navigate = useNavigate();
   usePageTitle(job?.title ? `${job.title} — Kojo` : t('jobDetailsTitleFallback'));
   // OG dynamique : un lien /jobs/:id partagé (WhatsApp, Facebook) montre le
@@ -182,10 +187,6 @@ export default function JobDetails() {
       setPaymentStatusLoading(false);
     }
   };
-
-  useEffect(() => {
-    return ensureJobOwnerActionBar(job);
-  }, [job]);
 
   const isJobOwner = isOwnedByCurrentUser(job, user);
   const rememberedApplication = useMemo(() => getRememberedApplication(job?.id, user), [job?.id, user]);
@@ -352,16 +353,13 @@ export default function JobDetails() {
 
   const handleDelete = async () => {
     if (!job) return;
-    const confirmed = window.confirm(pageT('confirmDeleteJob'));
-    if (!confirmed) return;
-
     setDeleting(true);
     try {
       await deleteJobWithFallbacks(job);
-      window.alert(pageT('jobDeletedSuccess'));
+      toast.success(pageT('jobDeletedSuccess'));
       navigate('/jobs');
     } catch (deleteError) {
-      window.alert(deleteError?.message || pageT('deleteFailed'));
+      toast.error(deleteError?.message || pageT('deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -487,10 +485,6 @@ export default function JobDetails() {
 
   const handleCompleteJob = async () => {
     if (!job?.id) return;
-    if (!window.confirm(pageT('confirmCompleteJob'))) {
-      return;
-    }
-
     setCompletingJob(true);
     setMessageError('');
     setMessageSuccess('');
@@ -595,11 +589,11 @@ export default function JobDetails() {
                   <button onClick={() => navigate('/jobs')} className="rounded-xl border border-gray-200 px-4 py-3 font-semibold text-gray-700 hover:bg-gray-50">
                     {t('jobUiMyJobs')}
                   </button>
-                  <button onClick={handleDelete} disabled={deleting} className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                  <button onClick={() => setConfirmDeleteOpen(true)} disabled={deleting} className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
                     {deleting ? t('jobUiDeleting') : t('jobUiDeleteJob')}
                   </button>
                   {job.status === 'in_progress' && assignedWorkerId && paymentStatus?.payment_status === 'completed' && (
-                    <button onClick={handleCompleteJob} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
+                    <button onClick={() => setConfirmCompleteOpen(true)} disabled={completingJob} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60">
                       {completingJob ? pageT('closing') : pageT('workDone')}
                     </button>
                   )}
@@ -664,10 +658,10 @@ export default function JobDetails() {
                     {steps.map((step, idx) => (
                       <Fragment key={step.key}>
                         <div className="flex flex-col items-center gap-1 text-center w-24">
-                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.done ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step.done ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
                             {step.done ? '✓' : idx + 1}
                           </div>
-                          <span className={`text-xs leading-tight ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</span>
+                          <span className={`text-xs leading-tight ${step.done ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>{step.label}</span>
                         </div>
                         {idx < steps.length - 1 && (
                           <div className={`h-0.5 flex-1 ${steps[idx + 1].done ? 'bg-emerald-600' : 'bg-gray-200'}`} />
@@ -900,6 +894,38 @@ export default function JobDetails() {
           }}
         />
       )}
+
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        title={pageT('jobUiDeleteJob') || t('jobUiDeleteJob')}
+        message={pageT('confirmDeleteJob')}
+        confirmLabel={pageT('delete') || t('delete')}
+        cancelLabel={pageT('cancel') || t('cancel')}
+        variant="danger"
+        loading={deleting}
+        loadingLabel={t('jobUiDeleting')}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          handleDelete();
+        }}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
+
+      <ConfirmModal
+        open={confirmCompleteOpen}
+        title={pageT('workDone')}
+        message={pageT('confirmCompleteJob')}
+        confirmLabel={t('confirmAction')}
+        cancelLabel={pageT('cancel') || t('cancel')}
+        variant="primary"
+        loading={completingJob}
+        loadingLabel={pageT('closing')}
+        onConfirm={() => {
+          setConfirmCompleteOpen(false);
+          handleCompleteJob();
+        }}
+        onCancel={() => setConfirmCompleteOpen(false)}
+      />
     </div>
   );
 }

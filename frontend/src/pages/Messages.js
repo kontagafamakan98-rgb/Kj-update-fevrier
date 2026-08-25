@@ -30,7 +30,7 @@ export default function Messages() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const pageT = makeScopedTranslator(currentLanguage, t, 'messages');
-  usePageTitle('Messages — Kojo');
+  usePageTitle(t('messagesMetaTitle'));
 
   useEffect(() => {
     loadConversations();
@@ -290,7 +290,7 @@ export default function Messages() {
                             il est désormais stocké dans un champ séparé,
                             mais on garde ce nettoyage par sécurité). */}
                         <p className="whitespace-pre-line">{stripJobMarkerFromMessage(message.content)}</p>
-                        <p className={`text-[11px] mt-1 flex items-center justify-end gap-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-400'}`}>
+                        <p className={`text-[11px] mt-1 flex items-center justify-end gap-1 ${message.sender_id === user?.id ? 'text-orange-100' : 'text-gray-500'}`}>
                           {formatMessageTime(message.timestamp)}
                           {message.sender_id === user?.id && (
                             <span title={message.read_at ? t('readReceiptReadAt').replace('{time}', formatMessageTime(message.read_at)) : (message.read ? t('readReceiptRead') : t('readReceiptSent'))}>
@@ -331,7 +331,7 @@ export default function Messages() {
               </form>
             </>
           ) : (
-            <div className="flex-1 items-center justify-center text-gray-400 hidden sm:flex">
+            <div className="flex-1 items-center justify-center text-gray-500 hidden sm:flex">
               <div className="text-center">
                 <EmptyIcon />
                 <p className="mt-3 text-sm">{t('selectConversation')}</p>

@@ -54,7 +54,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
 
   const handleFiles = async (files) => {
     if (!isCurrentUser && targetUserId) {
-      alert(t('photoVisibleAllUsers'));
+      toast.error(t('photoVisibleAllUsers'));
       return;
     }
 

@@ -398,8 +398,8 @@ const ForgotPassword = () => {
         <div className="bg-white rounded-2xl shadow-md p-6 space-y-6">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
             <span className={step === 'email' ? 'text-blue-600' : 'text-green-600'}>1. {copy.stepEmail}</span>
-            <span className={step === 'code' ? 'text-blue-600' : step === 'password' ? 'text-green-600' : 'text-gray-400'}>2. {copy.stepCode}</span>
-            <span className={step === 'password' ? 'text-blue-600' : 'text-gray-400'}>3. {copy.stepPassword}</span>
+            <span className={step === 'code' ? 'text-blue-600' : step === 'password' ? 'text-green-600' : 'text-gray-500'}>2. {copy.stepCode}</span>
+            <span className={step === 'password' ? 'text-blue-600' : 'text-gray-500'}>3. {copy.stepPassword}</span>
           </div>
 
           {displayedEmail && step !== 'email' && (

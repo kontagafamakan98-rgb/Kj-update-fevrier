@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
 import { devLog, safeLog } from '../utils/env';
 
 const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) => {
@@ -9,6 +10,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
   const inputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const { t } = useLanguage();
+  const toast = useToast();
 
   const handleFiles = (files) => {
     const file = files[0];
@@ -17,14 +19,14 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
     // Vérifier le type de fichier
     if (!file.type.startsWith('image/')) {
       const errorMessage = t('pleaseSelectImage') || 'Veuillez sélectionner une image (JPG, PNG, etc.)';
-      alert(errorMessage);
+      toast.error(errorMessage);
       return;
     }
 
     // Vérifier la taille (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       const errorMessage = t('imageTooLarge') || 'L\'image doit faire moins de 5MB';
-      alert(errorMessage);
+      toast.error(errorMessage);
       return;
     }
 
@@ -42,7 +44,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
     reader.onerror = (error) => {
       safeLog.error('Error reading file:', error);
       const errorMessage = t('errorReadingFile') || 'Erreur lors de la lecture du fichier';
-      alert(errorMessage);
+      toast.error(errorMessage);
     };
     reader.readAsDataURL(file);
   };

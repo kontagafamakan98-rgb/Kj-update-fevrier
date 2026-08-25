@@ -115,7 +115,7 @@ const SupportAdmin = () => {
                   value={ticket.status}
                   disabled={updatingId === ticket.id}
                   onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold focus:outline-none ${STATUS_STYLES[ticket.status] || 'bg-gray-50 text-gray-700 border-gray-200'}`}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 ${STATUS_STYLES[ticket.status] || 'bg-gray-50 text-gray-700 border-gray-200'}`}
                 >
                   {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{statusLabel(s, t)}</option>)}
                 </select>

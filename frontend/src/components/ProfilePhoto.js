@@ -5,11 +5,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Camera, Edit2, X } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 import profilePhotoService from '../services/ProfilePhotoService';
 import { devConsole } from '../utils/devLogger';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
 
 const ProfilePhoto = ({ 
   user, 
@@ -24,7 +26,9 @@ const ProfilePhoto = ({
   const [loading, setLoading] = useState(false);
   const [showDeleteButton, setShowDeleteButton] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const { t } = useLanguage();
+  const toast = useToast();
 
   const userId = targetUserId || user?.id || user?._id || user?.user_id;
   const isCurrentUser = !targetUserId || targetUserId === user?.id;
@@ -94,7 +98,7 @@ const ProfilePhoto = ({
     }
 
     if (!userId) {
-      alert(t('userIdMissing'));
+      toast.error(t('userIdMissing'));
       return;
     }
 
@@ -155,7 +159,7 @@ const ProfilePhoto = ({
         }
         
         const errorMessage = error.message || t('photoSelectError');
-        alert(errorMessage);
+        toast.error(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -168,12 +172,9 @@ const ProfilePhoto = ({
     if (!editable || !profilePhoto || !isCurrentUser) return;
 
     if (!userId) {
-      alert(t('userIdMissing'));
+      toast.error(t('userIdMissing'));
       return;
     }
-
-    const confirmed = window.confirm(t('confirmDeletePhoto'));
-    if (!confirmed) return;
 
     devLog.info('Deleting photo for user:', userId);
     setLoading(true);
@@ -192,7 +193,7 @@ const ProfilePhoto = ({
       
     } catch (error) {
       safeLog.error('Error deleting photo:', error);
-      alert(t('photoDeleteError'));
+      toast.error(t('photoDeleteError'));
     } finally {
       setLoading(false);
     }
@@ -347,13 +348,29 @@ const ProfilePhoto = ({
       {editable && isCurrentUser && showDeleteButton && profilePhoto && !loading && (
         <button
           aria-label={t('deletePhoto')}
-          onClick={handlePhotoDelete}
+          onClick={() => setConfirmDeleteOpen(true)}
           style={deleteButtonStyle}
           title={t('deletePhoto')}
         >
           <X size={12} color="white" />
         </button>
       )}
+
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        title={t('deletePhoto')}
+        message={t('confirmDeletePhoto')}
+        confirmLabel={t('delete')}
+        cancelLabel={t('cancel')}
+        variant="danger"
+        loading={loading}
+        loadingLabel={t('deleting') || t('delete')}
+        onConfirm={() => {
+          setConfirmDeleteOpen(false);
+          handlePhotoDelete();
+        }}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
     </div>
   );
 };

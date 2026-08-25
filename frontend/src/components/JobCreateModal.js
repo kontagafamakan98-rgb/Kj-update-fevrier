@@ -16,6 +16,26 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   const { currentLanguage, t } = useLanguage();
   const ui = getJobUiLabel(currentLanguage);
   const manualLocationEditedRef = useRef(false);
+  const dialogRef = useRef(null);
+
+  // Accessibilité : focus initial dans la modale (conteneur tabindex=-1),
+  // fermeture à Échap, et restauration du focus sur l'élément déclencheur à
+  // la fermeture — le pattern attendu pour un dialogue modal.
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    dialogRef.current?.focus();
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        previouslyFocused.focus();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [autoLocationTried, setAutoLocationTried] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -124,14 +144,14 @@ export default function JobCreateModal({ onClose, onJobCreated }) {
   const mapUrl = buildMapEmbedUrl(formData.location);
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 px-4 py-6">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="job-create-modal-title" tabIndex={-1} className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 px-4 py-6">
       <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-gray-100 max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 sticky top-0 bg-white">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{ui.createJobTitle}</h2>
+            <h2 id="job-create-modal-title" className="text-xl font-bold text-gray-900">{ui.createJobTitle}</h2>
             <p className="text-sm text-gray-500">{ui.createJobSubtitle}</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
+          <button type="button" onClick={onClose} aria-label={t('close')} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">

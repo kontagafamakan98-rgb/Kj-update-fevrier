@@ -11,7 +11,7 @@ import { safeLog } from '../utils/env';
 export default function Home() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  usePageTitle('Kojo — Services et travailleurs en Afrique de l\'Ouest');
+  usePageTitle(t('homeMetaTitle'));
 
   // Chiffres réels depuis /public/stats (repli sur des valeurs génériques
   // si l'appel échoue, pour ne jamais bloquer l'affichage de la landing).

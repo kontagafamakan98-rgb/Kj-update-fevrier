@@ -11,6 +11,7 @@ import {
 } from '../services/geolocationService';
 import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
+import ConfirmModal from '../components/ConfirmModal';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI, reviewAPI, workerProfileAPI, getAuthToken } from '../services/api';
@@ -45,6 +46,9 @@ export default function Profile() {
   const [filleuls, setFilleuls] = useState([]);
   const [portfolioImages, setPortfolioImages] = useState([]);
   const [portfolioUploading, setPortfolioUploading] = useState(false);
+  // Index de la photo de portfolio en attente de confirmation de suppression
+  // (null = aucune modale ouverte).
+  const [portfolioRemoveIndex, setPortfolioRemoveIndex] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
 
@@ -53,7 +57,7 @@ export default function Profile() {
   const pageT = makeScopedTranslator(currentLanguage, t, 'profile');
   const toast = useToast();
   const navigate = useNavigate();
-  usePageTitle('Mon profil — Kojo');
+  usePageTitle(t('profileMetaTitle'));
 
   useEffect(() => {
     loadProfile();
@@ -181,8 +185,10 @@ export default function Profile() {
     }
   };
 
-  const handlePortfolioRemove = async (index) => {
-    if (!window.confirm(t('portfolioRemoveConfirm'))) return;
+  const handlePortfolioRemove = async () => {
+    const index = portfolioRemoveIndex;
+    if (index === null || index === undefined) return;
+    setPortfolioRemoveIndex(null);
     try {
       const data = await usersAPI.removePortfolioImage(index);
       setPortfolioImages(Array.isArray(data?.portfolio_images) ? data.portfolio_images : []);
@@ -300,7 +306,7 @@ export default function Profile() {
               images={portfolioImages}
               uploading={portfolioUploading}
               onUpload={handlePortfolioUpload}
-              onRemove={handlePortfolioRemove}
+              onRemove={setPortfolioRemoveIndex}
               t={t}
             />
           </div>
@@ -320,6 +326,17 @@ export default function Profile() {
             }}
           />
         </div>
+
+        <ConfirmModal
+          open={portfolioRemoveIndex !== null}
+          title={t('portfolioTitle')}
+          message={t('portfolioRemoveConfirm')}
+          confirmLabel={t('delete')}
+          cancelLabel={t('cancel')}
+          variant="danger"
+          onConfirm={handlePortfolioRemove}
+          onCancel={() => setPortfolioRemoveIndex(null)}
+        />
 
         <div className="px-6 pb-6">
           <Link
@@ -716,6 +733,7 @@ function ReferralCard({ referral, t, referredBy }) {
   const [copied, setCopied] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState(null); // { type, text }
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const [balance, setBalance] = useState(() => Number(referral?.reward_balance || 0));
   if (!referral?.referral_code) return null;
 
@@ -739,7 +757,6 @@ function ReferralCard({ referral, t, referredBy }) {
   // Retrait du solde de récompense via PayDunya (décaissement mobile money).
   const handleWithdraw = async () => {
     if (withdrawing) return;
-    if (!window.confirm(interpolate(t('referralWithdrawConfirm'), { amount: balance.toLocaleString('fr-FR') }))) return;
     setWithdrawing(true);
     setWithdrawMsg(null);
     try {
@@ -820,13 +837,28 @@ function ReferralCard({ referral, t, referredBy }) {
         {balance >= withdrawMin && (
           <button
             type="button"
-            onClick={handleWithdraw}
+            onClick={() => setConfirmWithdraw(true)}
             disabled={withdrawing}
             className="mt-3 w-full rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-60"
           >
             {withdrawing ? t('referralWithdrawing') : t('referralWithdraw')}
           </button>
         )}
+        <ConfirmModal
+          open={confirmWithdraw}
+          title={t('referralWithdraw')}
+          message={interpolate(t('referralWithdrawConfirm'), { amount: balance.toLocaleString('fr-FR') })}
+          confirmLabel={t('referralWithdraw')}
+          cancelLabel={t('cancel')}
+          variant="primary"
+          loading={withdrawing}
+          loadingLabel={t('referralWithdrawing')}
+          onConfirm={() => {
+            setConfirmWithdraw(false);
+            handleWithdraw();
+          }}
+          onCancel={() => setConfirmWithdraw(false)}
+        />
         {withdrawMsg && (
           <p className={`mt-2 text-xs ${withdrawMsg.type === 'error' ? 'text-red-600' : withdrawMsg.type === 'success' ? 'text-green-700' : 'text-green-600'}`}>
             {withdrawMsg.text}

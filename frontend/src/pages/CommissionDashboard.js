@@ -3,12 +3,14 @@ import CommissionService from '../services/commissionService';
 import OwnerService from '../services/ownerService';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
+  const toast = useToast();
   const pageT = makeScopedTranslator(currentLanguage, t, 'commissionDashboard');
 
   const [stats, setStats] = useState(() => ({}));
@@ -77,7 +79,7 @@ const CommissionDashboard = () => {
   const saveAccounts = () => {
     CommissionService.updateOwnerAccounts(ownerAccounts);
     setEditingAccounts(false);
-    alert(pageT('updatedSuccess'));
+    toast.success(pageT('updatedSuccess'));
   };
 
   const formatMoney = (amount) => new Intl.NumberFormat(currentLanguage === 'en' ? 'en-US' : 'fr-FR').format(amount || 0);

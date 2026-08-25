@@ -156,7 +156,7 @@ const styles = {
   neverShowButton: {
     background: 'none',
     border: 'none',
-    color: '#888',
+    color: '#666',
     fontSize: '12px',
     width: '100%',
     textAlign: 'center',

@@ -201,7 +201,7 @@ export default function NotificationDropdown() {
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                 <div className="text-4xl mb-3">🔔</div>
                 <p className="text-gray-500 text-sm font-medium">{t('noNotifications')}</p>
-                <p className="text-gray-400 text-xs mt-1">{t('notifEmptyHint')}</p>
+                <p className="text-gray-500 text-xs mt-1">{t('notifEmptyHint')}</p>
               </div>
             ) : (
               <ul role="list" className="divide-y divide-gray-50">
@@ -242,7 +242,7 @@ export default function NotificationDropdown() {
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
                           {notif.body}
                         </p>
-                        <p className="text-[11px] text-gray-400 mt-1">
+                        <p className="text-[11px] text-gray-500 mt-1">
                           {relativeTime(notif.created_at, t)}
                         </p>
                       </div>

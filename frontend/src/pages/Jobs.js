@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useToast } from '../contexts/ToastContext';
 import JobCreateModal from '../components/JobCreateModal';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { jobsAPI } from '../services/api';
@@ -92,11 +93,12 @@ export default function Jobs() {
   const [appliedJobIds, setAppliedJobIds] = useState(null);
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
+  const toast = useToast();
   const pageT = makeScopedTranslator(currentLanguage, t, 'jobs');
   const jobUi = getJobUiLabel(currentLanguage);
   const [searchParams] = useSearchParams();
   const locale = getLocaleForLanguage(currentLanguage);
-  usePageTitle('Emplois disponibles — Kojo');
+  usePageTitle(t('jobsMetaTitle'));
 
   // Onglet par défaut selon le type d'utilisateur : client connecté → « Mes
   // missions » (ses annonces), sinon découverte publique.
@@ -209,8 +211,9 @@ export default function Jobs() {
     });
   }, [jobs, radiusKm, userCoords]);
 
-  const locateMe = () => {    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      window.alert(t('geoUnavailable'));
+  const locateMe = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast.error(t('geoUnavailable'));
       return;
     }
     setLocating(true);
@@ -221,10 +224,9 @@ export default function Jobs() {
       },
       () => {
         setLocating(false);
-        window.alert(t('geoPermissionDenied'));
+        toast.error(t('geoPermissionDenied'));
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 120000 }
-
     );
   };
 
