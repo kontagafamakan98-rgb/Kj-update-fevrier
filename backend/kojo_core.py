@@ -389,9 +389,21 @@ async def _rate_limit_cleanup_loop():
             logger.warning(f"⚠️ Erreur cleanup rate-limit: {e}")
 
 def get_client_ip(request: Request) -> str:
+    """IP du client pour le rate-limiting.
+
+    SECURITE : on prend la DERNIÈRE entrée de X-Forwarded-For, pas la
+    première. Ce header est contrôlable par le client : derrière un proxy
+    de confiance (Render/Fly), la vraie IP est APPENDÉE à la fin de la
+    chaîne, donc la première entrée peut être falsifiée à volonté
+    (X-Forwarded-For: 1.2.3.4) — ce qui permettait de contourner le
+    rate-limiting en changeant d'IP à chaque requête. La dernière entrée
+    est celle ajoutée par le proxy et n'est pas modifiable par le client
+    (le proxy écrase/ajoute). Sans header, on retombe sur l'IP de la
+    connexion directe (dev local, pas de proxy).
+    """
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
     if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+        return forwarded_for.split(",")[-1].strip()
     if request.client and request.client.host:
         return request.client.host
     return "unknown"

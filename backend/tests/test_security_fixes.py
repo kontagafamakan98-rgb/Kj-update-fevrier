@@ -336,3 +336,59 @@ class TestCheckoutRedirectUrl:
         monkeypatch.setattr(kojo_payments, "FRONTEND_APP_URL", "https://kj-update-fevrier.vercel.app")
         url = kojo_payments.build_checkout_redirect_url("/payment", "javascript:alert(1)")
         assert url == "https://kj-update-fevrier.vercel.app/payment"
+
+
+class TestClientIpSpoofing:
+    """get_client_ip ne doit PAS utiliser la première entrée de X-Forwarded-For.
+
+    Ce header est contrôlable par le client : derrière un proxy de confiance
+    (Render/Fly) qui APPEND la vraie IP à la fin de la chaîne, prendre la
+    première entrée permettait de la falsifier à volonté
+    (X-Forwarded-For: <IP arbitraire>) et de contourner le rate-limiting en
+    changeant d'IP à chaque requête. La vraie IP est la DERNIÈRE entrée.
+    """
+
+    def _make_request(self, forwarded_for=None):
+        from fastapi import Request
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/test",
+            "headers": [],
+            "client": ("203.0.113.9", 12345),
+            "query_string": b"",
+        }
+        if forwarded_for is not None:
+            scope["headers"].append(
+                (b"x-forwarded-for", forwarded_for.encode("utf-8"))
+            )
+        request = Request(scope)
+        return request
+
+    def test_uses_last_entry_of_forwarded_chain(self):
+        """La chaîne '1.2.3.4, 5.6.7.8' (proxy qui append) → 5.6.7.8."""
+        from kojo_core import get_client_ip
+        request = self._make_request(forwarded_for="1.2.3.4, 5.6.7.8")
+        assert get_client_ip(request) == "5.6.7.8"
+
+    def test_spoofed_first_entry_ignored(self):
+        """Un attaquant qui pose X-Forwarded-For: 1.2.3.4 ne doit pas
+        être identifié comme 1.2.3.4 quand le proxy a append la vraie IP."""
+        from kojo_core import get_client_ip
+        request = self._make_request(forwarded_for="1.2.3.4, 203.0.113.9")
+        assert get_client_ip(request) == "203.0.113.9"
+
+    def test_single_value_used(self):
+        from kojo_core import get_client_ip
+        request = self._make_request(forwarded_for="203.0.113.9")
+        assert get_client_ip(request) == "203.0.113.9"
+
+    def test_missing_header_falls_back_to_client_host(self):
+        from kojo_core import get_client_ip
+        request = self._make_request(forwarded_for=None)
+        assert get_client_ip(request) == "203.0.113.9"
+
+    def test_empty_header_falls_back_to_client_host(self):
+        from kojo_core import get_client_ip
+        request = self._make_request(forwarded_for="   ")
+        assert get_client_ip(request) == "203.0.113.9"
