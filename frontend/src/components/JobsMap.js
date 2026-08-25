@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import L from 'leaflet';
 import { useLanguage } from '../contexts/LanguageContext';
+import { escapeHtml } from '../utils/htmlEscape';
 import 'leaflet/dist/leaflet.css';
 // Les icônes par défaut de Leaflet sont référencées par des URL relatives
 // dans leaflet.css qui cassent sous un bundler (Vite). On les importe
@@ -74,13 +75,20 @@ export default function JobsMap({ jobs }) {
       .filter((item) => item.coords);
 
     points.forEach(({ job, coords }) => {
-      const title = job.title || t('mission');
+      // SÉCURITÉ XSS : le popup est construit en HTML brut (Leaflet), donc
+      // TOUTES les valeurs contrôlées par l'utilisateur sont échappées — le
+      // titre ET la localisation (adresse saisie à la création du job) et
+      // l'id. Sans échappement, une adresse contenant un <script> ou un
+      // gestionnaire d'événement s'exécuterait au survol du marqueur.
+      const title = escapeHtml(job.title || t('mission'));
+      const locationText = escapeHtml(job.location_text || job.location?.address || '');
+      const jobId = escapeHtml(job.id || '');
       const marker = L.marker(coords).addTo(layerGroup);
       marker.bindPopup(
         `<div style="font-family:inherit;min-width:160px">
-           <strong>${title.replace(/</g, '&lt;')}</strong><br/>
-           <span style="font-size:12px;color:#555">${job.location_text || job.location?.address || ''}</span><br/>
-           <button data-kojo-job="${job.id}" style="margin-top:6px;background:#ea580c;color:#fff;border:0;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer">${t('viewMission')}</button>
+           <strong>${title}</strong><br/>
+           <span style="font-size:12px;color:#555">${locationText}</span><br/>
+           <button data-kojo-job="${jobId}" style="margin-top:6px;background:#ea580c;color:#fff;border:0;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer">${t('viewMission')}</button>
          </div>`
       );
     });

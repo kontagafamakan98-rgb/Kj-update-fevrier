@@ -130,7 +130,9 @@ class TestProfileUpdateValidation:
         assert resp.status_code == 200
         me = await client.get("/api/auth/me", headers=headers)
         assert me.json()["user_type"] == "client"
-        assert me.json().get("payment_accounts", {}).get("orange_money") != "+22199999999"
+        # PRIVACITÉ : les numéros de paiement ne sont JAMAIS renvoyés dans le
+        # profil — ni ceux du compte, ni ceux tentés par mass-assignment.
+        assert "payment_accounts" not in me.json()
 
 
 # ---------------------------------------------------------------------------

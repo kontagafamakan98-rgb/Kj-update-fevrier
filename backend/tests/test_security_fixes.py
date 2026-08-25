@@ -39,7 +39,11 @@ class TestProfileMassAssignment:
         assert me["rating"] == 0.0
         assert me["total_reviews"] == 0
         assert me["payment_accounts_count"] == 1
-        assert me["payment_accounts"] == {"orange_money": "+221771234567"}
+        # PRIVACITÉ : payment_accounts (numéros COMPLETS) n'est JAMAIS
+        # renvoyé dans le profil /auth/me — seulement via GET
+        # /users/payment-accounts (appelé à la demande par le frontend).
+        # Les numéros ne doivent pas transiter ni être stockés avec le profil.
+        assert "payment_accounts" not in me
 
     async def test_update_profile_ignores_id_and_email(self, client: AsyncClient):
         headers = await auth_headers(client)

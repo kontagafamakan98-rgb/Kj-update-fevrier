@@ -51,9 +51,12 @@ export function captureMessage(message, level = 'info') {
 
 export function setUser(user) {
   if (!isSentryEnabled() || !user) return;
+  // PRIVACITÉ : on n'envoie JAMAIS d'identifiants personnels (email, nom,
+  // téléphone) à Sentry — uniquement l'identifiant interne et le pays, pour
+  // pouvoir diagnostiquer sans exposer de PII (même politique que le backend
+  // avec send_default_pii=False).
   Sentry.setUser({
     id: user.id,
-    email: user.email,
     country: user.country,
   });
 }

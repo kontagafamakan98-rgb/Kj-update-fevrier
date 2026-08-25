@@ -632,7 +632,7 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
         response_data = {
             "access_token": access_token,
             "token_type": "bearer",
-            "user": user.model_dump(exclude={"password_hash"}),
+            "user": user.model_dump(exclude={"password_hash", "payment_accounts"}),
             "referral_applied": referral_applied,
             "referral_welcome_bonus": 0,
             "payment_verification": {
@@ -690,7 +690,7 @@ async def login_user(credentials: UserLogin, response: Response):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": User(**user).model_dump(exclude={"password_hash"})
+        "user": User(**user).model_dump(exclude={"password_hash", "payment_accounts"})
     }
 
 
@@ -735,7 +735,7 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
             "linked": True,
             "access_token": access_token,
             "token_type": "bearer",
-            "user": User(**existing).model_dump(exclude={"password_hash"}),
+            "user": User(**existing).model_dump(exclude={"password_hash", "payment_accounts"}),
         }
 
     # 2. Un compte existe avec le même email (mais pas lié à ce sub Google)
@@ -817,8 +817,7 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
         "created": True,
         "needs_onboarding": True,
         "access_token": access_token,
-        "token_type": "bearer",
-        "user": User(**user_doc).model_dump(exclude={"password_hash"}),
+        "token_type": "bearer",            "user": User(**user_doc).model_dump(exclude={"password_hash", "payment_accounts"}),
     }
 
 
@@ -890,7 +889,7 @@ async def logout_user(
 
 @router.get("/auth/me")
 async def get_current_user_auth(current_user: User = Depends(get_current_user)):
-    return current_user.model_dump(exclude={"password_hash"})
+    return current_user.model_dump(exclude={"password_hash", "payment_accounts"})
 
 class CountryUpdate(BaseModel):
     country: Country

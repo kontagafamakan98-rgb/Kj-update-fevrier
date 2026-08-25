@@ -39,7 +39,13 @@ router = APIRouter()
 
 @router.get("/users/profile")
 async def get_profile(current_user: User = Depends(get_current_user)):
-    return current_user.model_dump(exclude={"password_hash"})
+    # PRIVACITÉ : payment_accounts (numéros Orange Money/Wave, cartes,
+    # comptes bancaires COMPLETS) n'est JAMAIS renvoyé dans le profil — le
+    # frontend ne l'utilise que via GET /users/payment-accounts, appelé à la
+    # demande quand l'utilisateur ouvre la section comptes. Exclure ici
+    # évite que les numéros transitent/soient stockés avec le profil
+    # (ex: localStorage du frontend) même quand ils ne sont pas affichés.
+    return current_user.model_dump(exclude={"password_hash", "payment_accounts"})
 
 # Champs modifiables via PUT /users/profile — WHITELIST STRICTE.
 # SECURITE : interdire l'écriture des champs sensibles (user_type,

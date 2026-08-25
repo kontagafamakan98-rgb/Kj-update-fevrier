@@ -5,7 +5,6 @@ import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { registerPushSubscription, unregisterPushSubscription, isPushSupported } from '../utils/pushRegistration';
-import { setUser as setSentryUser } from '../utils/sentry';
 
 const AuthContext = createContext();
 
@@ -34,6 +33,62 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('user');
   };
 
+  // PRIVACITÉ : avant de persister le profil en localStorage, on retire les
+  // numéros de paiement complets (Orange Money/Wave, cartes, comptes
+  // bancaires). Le frontend ne les lit jamais depuis le profil (ils sont
+  // chargés à la demande via GET /users/payment-accounts) — les stocker en
+  // clair dans localStorage les exposerait à un script XSS ou à un device
+  // partagé sans aucun usage. Le backend ne les renvoie plus non plus dans
+  // le profil (défense en profondeur) ; cette sanitisation couvre aussi les
+  // données stockées par d'anciennes versions.
+  const sanitizeUserForStorage = (user) => {
+    if (!user || typeof user !== 'object') return user;
+    const { payment_accounts, ...safeUser } = user;
+    return safeUser;
+  };
+
+  // Purge les numéros de paiement éventuellement stockés par une ancienne
+  // version du code dans le profil localStorage (migration propre) — à la
+  // fois la clé 'user' et le cache hors-ligne kojo_cache_user_profile_*.
+  const purgeStoredPaymentAccounts = () => {
+    const stripPaymentAccounts = (value) => {
+      if (value && typeof value === 'object' && value.payment_accounts !== undefined) {
+        const { payment_accounts, ...safeValue } = value;
+        return safeValue;
+      }
+      return value;
+    };
+    try {
+      const raw = localStorage.getItem('user');
+      if (raw) {
+        const safe = stripPaymentAccounts(JSON.parse(raw));
+        localStorage.setItem('user', JSON.stringify(safe));
+      }
+    } catch (_error) {
+      // Profil corrompu/illisible : on laisse le localStorage tel quel.
+    }
+    // Nettoyage du cache hors-ligne (namespace kojo_cache_..._user_profile_...)
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.includes('user_profile'))
+        .forEach((key) => {
+          try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            const safe = stripPaymentAccounts(parsed?.data);
+            if (safe !== parsed?.data) {
+              localStorage.setItem(key, JSON.stringify({ ...parsed, data: safe }));
+            }
+          } catch (_error) {
+            // Entrée corrompue : on la laisse (le cache gère l'expiration).
+          }
+        });
+    } catch (_error) {
+      // localStorage indisponible (tests jsdom) : on ignore.
+    }
+  };
+
   const isTokenExpiredLocally = () => {
     const expiresAt = localStorage.getItem('token_expires_at');
     if (!expiresAt) return false; // token sans expiry stockée = ancien format, on laisse le serveur décider
@@ -46,6 +101,9 @@ export function AuthProvider({ children }) {
     // 2) cookie de session httpOnly présent (détecté via le cookie CSRF
     //    associé, lisible en JS) → loadUser (cookie)
     // 3) sinon → visiteur anonyme
+    // Migration privacy : purge les numéros de paiement stockés par une
+    // ancienne version du code dans le profil localStorage.
+    purgeStoredPaymentAccounts();
     const token = localStorage.getItem('token');
     if (token) {
       if (isTokenExpiredLocally()) {
@@ -77,8 +135,8 @@ export function AuthProvider({ children }) {
       const userData = await authAPI.getProfile();
       setUser(userData);
       
-      // Cache user data for offline access
-      kojoCache.set(CACHE_KEYS.USER_PROFILE, userData, 60 * 60 * 1000); // 1 hour
+      // Cache user data for offline access (sans les numéros de paiement)
+      kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(userData), 60 * 60 * 1000); // 1 hour
       devLog.info('✅ User profile loaded and cached');
       
     } catch (error) {
@@ -109,9 +167,10 @@ export function AuthProvider({ children }) {
   // Établit la session après une auth réussie (cookie httpOnly posé par le
   // backend ; on ne stocke que le profil en localStorage, jamais le token).
   const establishSession = (user, cacheHours = 24) => {
-    localStorage.setItem('user', JSON.stringify(user));
+    // Ne persiste PAS les numéros de paiement en localStorage (privacy).
+    localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
     setUser(user);
-    kojoCache.set(CACHE_KEYS.USER_PROFILE, user, cacheHours * 60 * 60 * 1000);
+    kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(user), cacheHours * 60 * 60 * 1000);
     if (isPushSupported()) {
       registerPushSubscription(user.id).catch(() => {});
     }
@@ -205,11 +264,11 @@ export function AuthProvider({ children }) {
       // Le token vit dans le cookie httpOnly posé par le backend sur
       // /auth/register-verified ; on ne le persiste plus en localStorage.
       // Le paramètre `token` est conservé pour la signature (compat).
-      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(userData)));
       setUser(userData);
       
-      // Cache user data
-      kojoCache.set(CACHE_KEYS.USER_PROFILE, userData, 24 * 60 * 60 * 1000); // 24 hours
+      // Cache user data (sans les numéros de paiement)
+      kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(userData), 24 * 60 * 60 * 1000); // 24 hours
       
       devLog.info('✅ User auto-logged in after registration');
 
@@ -234,11 +293,11 @@ export function AuthProvider({ children }) {
       const { user } = response;
       // Le token vit dans le cookie httpOnly posé par le backend ; on ne le
       // persiste plus en localStorage (protection XSS).
-      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
       setUser(user);
       
-      // Cache user data
-      kojoCache.set(CACHE_KEYS.USER_PROFILE, user, 24 * 60 * 60 * 1000); // 24 hours
+      // Cache user data (sans les numéros de paiement)
+      kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(user), 24 * 60 * 60 * 1000); // 24 hours
       
       devLog.info('✅ User registered successfully');
       return { success: true };
