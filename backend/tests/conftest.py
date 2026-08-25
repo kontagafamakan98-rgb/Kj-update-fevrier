@@ -76,6 +76,12 @@ class FakeCollection:
                         return False
                     elif op == "$nin" and doc_val in op_val:
                         return False
+                    elif op == "$gte":
+                        try:
+                            if not (float(doc_val) >= float(op_val)):
+                                return False
+                        except (TypeError, ValueError):
+                            return False
                     elif op == "$exists":
                         if op_val and key not in doc:
                             return False

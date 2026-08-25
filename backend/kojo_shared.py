@@ -410,24 +410,38 @@ async def apply_referral_payout_confirmed(payment_record: dict) -> None:
 
     # --- Succès : décrément du solde + trace + notif (idempotent) ---
     if payout_status == "released":
-        if payment.get("referral_balance_applied"):
+        # Verrou CAS atomique sur le claim : trois chemins peuvent confirmer
+        # le MÉME retrait (submit sync, IPN disburse, recheck status) et se
+        # chevaucher en pleine exécution. Sans verrou, deux confirmations
+        # quasi simultanées pouvaient lire referral_balance_applied absent
+        # toutes les deux, puis DUPLIQUER la trace d'historique (double
+        # $push) et la notification de succès. Le update_one conditionnel est
+        # atomique : un seul appelant gagne, les autres reçoivent
+        # matched_count=0 et s'arrêtent.
+        claim = await db.payments.update_one(
+            {"id": payment["id"], "referral_balance_applied": {"$ne": True}},
+            {"$set": {"referral_balance_applied": True}},
+        )
+        if claim.matched_count == 0:
             return
+
         user_id = payment.get("payer_id")
         amount = int(payment.get("amount", 0) or 0)
         if not user_id or amount <= 0:
             return
 
-        user = await db.users.find_one({"id": user_id}, {"referral_reward_balance": 1})
-        if not user:
-            return
-        current_balance = float(user.get("referral_reward_balance") or 0)
-        new_balance = max(0.0, current_balance - amount)
-
-        await db.users.update_one(
-            {"id": user_id},
+        # Débit ATOMIQUE ($inc conditionnel) : évite le "lost update" si un
+        # crédit de récompense arrive en même temps (le read-modify-write
+        # explicite pouvait écraser le gain), et ne débite jamais plus que le
+        # solde. Le cas "solde < montant" est anormal (le verrou
+        # anti-double-retrait garantit qu'aucun autre retrait n'a pu réduire
+        # le solde entre la demande et la confirmation) : on logge et on
+        # laisse le flag posé pour ne jamais re-tenter un double débit.
+        result = await db.users.update_one(
+            {"id": user_id, "referral_reward_balance": {"$gte": amount}},
             {
+                "$inc": {"referral_reward_balance": -amount},
                 "$set": {
-                    "referral_reward_balance": new_balance,
                     "referral_withdrawal_in_progress": False,
                     "updated_at": datetime.now(timezone.utc),
                 },
@@ -439,10 +453,12 @@ async def apply_referral_payout_confirmed(payment_record: dict) -> None:
                 }},
             },
         )
-        await db.payments.update_one(
-            {"id": payment["id"]},
-            {"$set": {"referral_balance_applied": True}},
-        )
+        if result.matched_count == 0:
+            logger.error(
+                f"⚠️ Retrait parrainage payé mais solde insuffisant (user={user_id}, "
+                f"payment={payment.get('id')}, amount={amount}) — vérification manuelle requise"
+            )
+            return
         asyncio.create_task(notify_user_localized(
             user_id=user_id,
             key="referral_withdraw_success",
@@ -453,7 +469,14 @@ async def apply_referral_payout_confirmed(payment_record: dict) -> None:
 
     # --- Échec : solde intact, on lève juste le verrou (idempotent) ---
     if payout_status == "release_failed":
-        if payment.get("referral_lock_released"):
+        # Même verrou CAS atomique : deux chemins (submit sync / IPN / recheck)
+        # peuvent confirmer l'échec en parallèle ; un seul doit lever le
+        # verrou et notifier.
+        claim = await db.payments.update_one(
+            {"id": payment["id"], "referral_lock_released": {"$ne": True}},
+            {"$set": {"referral_lock_released": True}},
+        )
+        if claim.matched_count == 0:
             return
         user_id = payment.get("payer_id")
         if not user_id:
@@ -464,10 +487,6 @@ async def apply_referral_payout_confirmed(payment_record: dict) -> None:
                 "referral_withdrawal_in_progress": False,
                 "updated_at": datetime.now(timezone.utc),
             }},
-        )
-        await db.payments.update_one(
-            {"id": payment["id"]},
-            {"$set": {"referral_lock_released": True}},
         )
         amount = int(payment.get("amount", 0) or 0)
         asyncio.create_task(notify_user_localized(

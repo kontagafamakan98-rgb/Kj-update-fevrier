@@ -880,3 +880,75 @@ async def test_push_matching_notifies_workers_with_matching_specialty(client):
         # le travailleur plombier reçoit une notification
         called_user_ids = {call.kwargs.get("user_id") for call in mock_notify.await_args_list}
         assert worker_id in called_user_ids
+
+
+@pytest.mark.asyncio
+async def test_referral_withdraw_concurrent_confirm_applies_once(client):
+    """COURSE CONCURRENTE : deux confirmations du MÊME retrait lancées en
+    parallèle (ex: submit-invoice synchrone 'success' + IPN disburse qui
+    arrive au même moment) ne doivent débiter le solde, tracer le retrait et
+    notifier le succès QU'UNE SEULE fois.
+
+    Régression du bug : le check `referral_balance_applied` était lu puis
+    écrit SANS atomicité → deux appels quasi simultanés pouvaient le lire
+    absent tous les deux, puis DUPLIQUER la trace d'historique (double
+    $push), doublonner la notification et re-débiter le solde.
+    """
+    import uuid as _uuid
+    import server as srv
+    from tests.conftest import WORKER_USER
+    from kojo_shared import apply_referral_payout_confirmed
+
+    worker_email = f"withdraw-race-{_uuid.uuid4().hex[:8]}@example.com"
+    worker_headers = await auth_headers(client, dict(WORKER_USER, email=worker_email))
+    worker = await db_find_one("users", {"email": worker_email})
+    # Simuler un retrait RÉUSSI (décaissé par PayDunya) en attente d'application
+    await _credit_referral_balance(client, worker["id"], 1500)
+    payment_id = str(_uuid.uuid4())
+    await srv.db.payments.insert_one({
+        "id": payment_id,
+        "payer_id": worker["id"],
+        "payout_kind": "referral",
+        "payout_status": "released",
+        "amount": 1500,
+    })
+
+    # Deux confirmations concurrentes du même paiement (asyncio.gather). La
+    # FakeDB in-memory ne cède pas la main entre ses opérations (pas de vrai
+    # I/O), donc on force UN point de cession DANS le update_one des users :
+    # la 1ère coroutine a lu le paiement (flag absent) et s'apprête à écrire,
+    # la 2ème lit son tour le paiement — reproduisant la fenêtre de course
+    # réelle entre deux requêtes I/O concurrentes (IPN + recheck, ou IPN +
+    # submit sync) où les deux ont lu avant qu'aucune n'écrive.
+    import kojo_shared
+    real_users_update_one = kojo_shared.db.users.update_one
+
+    async def yielding_users_update_one(*args, **kwargs):
+        await asyncio.sleep(0)  # cède la main : l'autre coroutine lit aussi
+        return await real_users_update_one(*args, **kwargs)
+
+    notify_mock = AsyncMock()
+    with patch("kojo_shared.notify_user_localized", notify_mock), \
+         patch.object(kojo_shared.db.users, "update_one", yielding_users_update_one):
+        await asyncio.gather(
+            apply_referral_payout_confirmed({"id": payment_id}),
+            apply_referral_payout_confirmed({"id": payment_id}),
+        )
+
+    worker_after = await db_find_one("users", {"id": worker["id"]})
+    # Solde débité UNE seule fois (1500 → 0, pas -3000)
+    assert float(worker_after["referral_reward_balance"]) == 0
+    withdrawals = [r for r in worker_after["referral_rewards"]
+                   if r.get("type") == "withdrawal" and r.get("amount") == -1500]
+    assert len(withdrawals) == 1  # trace unique, pas de doublon
+    assert withdrawals[0]["payment_id"] == payment_id
+    # Verrou levé
+    assert worker_after.get("referral_withdrawal_in_progress") is not True
+
+    payment = await srv.db.payments.find_one({"id": payment_id})
+    assert payment["referral_balance_applied"] is True
+
+    # Une seule notification de succès (pas de doublon)
+    success_calls = [c for c in notify_mock.call_args_list
+                     if c.kwargs.get("key") == "referral_withdraw_success"]
+    assert len(success_calls) == 1
