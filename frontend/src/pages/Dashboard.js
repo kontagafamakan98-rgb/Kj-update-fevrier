@@ -110,8 +110,8 @@ export default function Dashboard() {
       });
       baseActions.push({
         to: '/support-admin',
-        label: 'Demandes de support',
-        subtitle: 'Consulter et répondre aux clients',
+        label: t('supportRequestsTitle'),
+        subtitle: t('supportAdminSubtitle'),
         icon: LifeBuoy,
         iconClass: 'text-orange-600 bg-orange-100',
       });

@@ -501,9 +501,27 @@ function RobotChat({ onBack, copy }) {
 // Suivi de ticket : le créateur peut vérifier le statut de sa demande avec
 // l'identifiant renvoyé à la création + l'e-mail saisi (le backend exige la
 // correspondance — un ticket ne peut pas être interrogé par un tiers).
+// Pré-remplit le suivi avec le dernier ticket créé sur CET appareil (stocké
+// par RobotChat à la création) : l'utilisateur n'a pas à retaper l'ID ni
+// l'e-mail pour vérifier le statut de sa dernière demande.
+const getLastStoredTicket = () => {
+  try {
+    const raw = localStorage.getItem('kojo_last_ticket');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && parsed.id) {
+      return { id: String(parsed.id), email: String(parsed.email || '') };
+    }
+    return null;
+  } catch (_e) {
+    return null;
+  }
+};
+
 function TicketTracker({ copy }) {
-  const [ticketId, setTicketId] = useState('');
-  const [ticketEmail, setTicketEmail] = useState('');
+  const lastTicket = getLastStoredTicket();
+  const [ticketId, setTicketId] = useState(lastTicket?.id || '');
+  const [ticketEmail, setTicketEmail] = useState(lastTicket?.email || '');
   const [tracking, setTracking] = useState(false);
   const [trackResult, setTrackResult] = useState(null); // null | {…} | 'not_found'
   const [trackError, setTrackError] = useState('');

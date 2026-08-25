@@ -582,6 +582,7 @@
   "viewMission": "View job",
   "mission": "Job",
   "supportRequestsTitle": "Support requests",
+  "supportAdminSubtitle": "Review and reply to client requests",
   "refresh": "Refresh",
   "noSupportRequests": "No support requests at the moment.",
   "loadSupportError": "Unable to load support requests.",

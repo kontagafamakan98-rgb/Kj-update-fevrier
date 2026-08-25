@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCountry } from '../contexts/CountryContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { geolocationAPI } from '../services/api';
+import { safeLog } from '../utils/env';
 
 const CountryChangePopup = () => {
   const { user } = useAuth();
@@ -38,7 +39,7 @@ const CountryChangePopup = () => {
           setShowPopup(true);
         }
       } catch (error) {
-        console.error('Erreur lors de la détection du pays:', error);
+        safeLog.error('Erreur lors de la détection du pays:', error);
       }
     };
 

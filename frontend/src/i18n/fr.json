@@ -582,6 +582,7 @@
   "viewMission": "Voir la mission",
   "mission": "Mission",
   "supportRequestsTitle": "Demandes de support",
+  "supportAdminSubtitle": "Consulter et répondre aux clients",
   "refresh": "Rafraîchir",
   "noSupportRequests": "Aucune demande de support pour le moment.",
   "loadSupportError": "Impossible de charger les demandes de support.",
