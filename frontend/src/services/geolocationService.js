@@ -1,6 +1,6 @@
 import { devLog, safeLog } from '../utils/env';
 import geolocationMonitor from '../utils/geolocationMonitor';
-import { buildApiUrl } from '../utils/backendUrl';
+import { api } from './api';
 
 /**
  * MODULE DE GÉOLOCALISATION UNIQUE (fusion de geolocationService.js et
@@ -114,13 +114,10 @@ const loadGeographicDatabase = async () => {
   if (databaseLoadPromise) return databaseLoadPromise;
   databaseLoadPromise = (async () => {
     try {
-      const response = await fetch(buildApiUrl('/geolocation/cities'), {
-        headers: { Accept: 'application/json' }
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const data = await response.json();
+      // Client central api : cookies + CSRF gérés (GET public, aucune
+      // authentification requise — la session cookie est envoyée quand elle
+      // existe).
+      const data = await api.get('/geolocation/cities');
       const countries = data?.countries || data?.database;
       if (countries && typeof countries === 'object' && Object.keys(countries).length > 0) {
         geographicDatabase = countries;
@@ -146,7 +143,7 @@ hydrateDatabaseFromCache();
 const IP_GEOLOCATION_SERVICES = [
   {
     name: 'KojoBackend',
-    url: buildApiUrl('/geolocation/detect'),
+    path: '/geolocation/detect',
     isBackend: true,
     parser: (data) => {
       // Ne jamais inventer un pays par défaut : si le backend n'a pas pu
@@ -454,21 +451,11 @@ class PreciseGeolocationService {
     const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
 
     try {
-      const url = buildApiUrl(`/geolocation/reverse?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`);
-      const response = await fetch(url, {
-        method: 'GET',
+      return await api.get('/geolocation/reverse', {
+        params: { lat: latitude, lng: longitude },
         signal: controller ? controller.signal : undefined,
-        headers: {
-          'Accept': 'application/json',
-          'Accept-Language': 'fr,en'
-        }
+        headers: { 'Accept-Language': 'fr,en' },
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      return await response.json();
     } catch (error) {
       devLog.info('⚠️ Reverse geocoding backend échoué:', error.message);
       return null;
@@ -568,20 +555,11 @@ class PreciseGeolocationService {
       try {
         devLog.info(`📡 Test service ${service.name}...`);
 
-        const response = await fetch(service.url, {
-          method: 'GET',
-          timeout: 5000,
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (compatible; KojoApp/1.0)'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
+        // Client central api (GET public). Note : l'ancien `timeout: 5000`
+        // et le header User-Agent étaient ignorés par fetch (option invalide /
+        // header interdit en navigateur) — le timeout réel de reverse geocoding
+        // passe par AbortController via signal.
+        const data = await api.get(service.path);
         const parsed = service.parser(data);
 
         devLog.info(`✅ ${service.name} réponse:`, parsed);

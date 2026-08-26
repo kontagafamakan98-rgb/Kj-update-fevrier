@@ -246,7 +246,7 @@ const readCsrfCookie = () => {
 // associé l'est → sa présence indique qu'une session existe.
 export const hasSessionCookie = () => Boolean(readCsrfCookie());
 
-const request = async (method, path, { params, data, headers, skipUnauthorizedRedirect = false } = {}) => {
+const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${buildApiUrl(normalizedPath)}${buildQueryString(params)}`;
   const token = getAuthToken();
@@ -257,6 +257,7 @@ const request = async (method, path, { params, data, headers, skipUnauthorizedRe
   const response = await fetch(url, {
     method,
     credentials: 'include',
+    ...(signal ? { signal } : {}),
     headers: {
       Accept: 'application/json',
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),

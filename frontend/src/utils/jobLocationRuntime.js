@@ -1,4 +1,4 @@
-import { buildApiUrl } from './backendUrl';
+import { api } from '../services/api';
 
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -47,20 +47,12 @@ export const mergeManualAddress = (currentLocation, value) => {
   };
 };
 
-// Reverse geocoding via le backend Kojo (plus d'appel direct à Nominatim)
+// Reverse geocoding via le backend Kojo (plus d'appel direct à Nominatim).
+// Client central api : cookies + CSRF gérés, GET public sans authentification.
 const reverseGeocode = async (latitude, longitude) => {
-  const url = buildApiUrl(`/geolocation/reverse?lat=${latitude}&lng=${longitude}`);
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-    },
+  const data = await api.get('/geolocation/reverse', {
+    params: { lat: latitude, lng: longitude },
   });
-
-  if (!response.ok) {
-    throw new Error('Reverse geocoding failed');
-  }
-
-  const data = await response.json();
   const addr = data?.address || {};
   const label = text(data?.display_name);
 
