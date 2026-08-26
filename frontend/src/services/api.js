@@ -282,6 +282,29 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
   const responseCsrfToken = response.headers?.get?.('X-Kojo-CSRFToken');
   if (responseCsrfToken) csrfTokenMemory = responseCsrfToken;
 
+  // Rotation du jeton (fenêtre glissante) : /auth/me ré-émet un jeton frais
+  // quand le courant approche de l'expiration (X-Kojo-Token). On le stocke
+  // immédiatement ('token' + token_expires_at) pour ne pas être déconnecté à
+  // 24 h. Le cookie httpOnly est reposé par le backend dans la même réponse.
+  const rotatedToken = response.headers?.get?.('X-Kojo-Token');
+  if (rotatedToken) {
+    try {
+      localStorage.setItem('token', rotatedToken);
+      const parts = String(rotatedToken).split('.');
+      if (parts.length >= 2) {
+        const payload = JSON.parse(
+          atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+        );
+        if (payload && payload.exp) {
+          localStorage.setItem('token_expires_at', String(payload.exp * 1000));
+        }
+      }
+    } catch (_error) {
+      // localStorage indisponible (tests jsdom / privé) : le cookie httpOnly
+      // posé par le backend porte déjà le nouveau jeton.
+    }
+  }
+
   if (!response.ok) {
     if (response.status === 401) {
       handleUnauthorized(normalizedPath, { redirect: !skipUnauthorizedRedirect });

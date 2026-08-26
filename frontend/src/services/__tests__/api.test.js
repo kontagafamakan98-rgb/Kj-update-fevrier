@@ -183,3 +183,50 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
     expect(options.headers['X-CSRFToken']).toBeUndefined();
   });
 });
+
+// Rotation à fenêtre glissante : /auth/me renvoie X-Kojo-Token quand le jeton
+// courant approche de l'expiration — le client doit le stocker immédiatement
+// ('token' + token_expires_at) pour ne pas être déconnecté à 24 h.
+describe('api — rotation du jeton (X-Kojo-Token)', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_URL', 'https://stub.example');
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it('stocke le jeton tourné + son expiration depuis l’en-tête', async () => {
+    const payload = btoa(JSON.stringify({ exp: 1800000000 }))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const rotated = `header.${payload}.sig`;
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{}',
+      headers: { get: (name) => (name === 'X-Kojo-Token' ? rotated : null) },
+    });
+
+    await api.get('/auth/me');
+    expect(localStorage.getItem('token')).toBe(rotated);
+    expect(localStorage.getItem('token_expires_at')).toBe('1800000000000');
+  });
+
+  it('ne touche pas au token quand aucun X-Kojo-Token', async () => {
+    localStorage.setItem('token', 'old-token');
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{}',
+      headers: { get: () => null },
+    });
+
+    await api.get('/auth/me');
+    expect(localStorage.getItem('token')).toBe('old-token');
+  });
+});

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { authAPI, handleApiError } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
@@ -106,6 +106,11 @@ export function AuthProvider({ children }) {
     return Date.now() > Number(expiresAt);
   };
 
+  // Référence vers la dernière version de loadUser pour le listener de
+  // synchronisation multi-onglets (éviter une closure obsolète).
+  const loadUserRef = useRef();
+  loadUserRef.current = loadUser;
+
   useEffect(() => {
     // Amorçage de session au démarrage de l'app.
     // Le cookie de session httpOnly n'est pas lisible depuis JavaScript,
@@ -121,6 +126,34 @@ export function AuthProvider({ children }) {
       clearToken();
     }
     loadUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Synchronisation multi-onglets : un logout dans l'onglet A (ou un login)
+  // modifie localStorage → l'événement 'storage' se déclenche dans les AUTRES
+  // onglets. Sans ça, l'onglet B gardait un utilisateur « fantôme » après une
+  // déconnexion ailleurs (déconnexion simultanée désynchronisée).
+  useEffect(() => {
+    const onStorage = (event) => {
+      if (event.key !== 'token' && event.key !== 'user') return;
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Connexion (ou rotation) dans un autre onglet : on rafraîchit le profil.
+        loadUserRef.current();
+      } else {
+        // Déconnexion dans un autre onglet : on nettoie l'état local.
+        setUser(null);
+        if (
+          typeof window !== 'undefined'
+          && window.location
+          && !window.location.pathname.endsWith('/login')
+        ) {
+          window.location.href = '/login';
+        }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
