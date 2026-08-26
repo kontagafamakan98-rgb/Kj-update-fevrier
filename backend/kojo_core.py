@@ -609,9 +609,19 @@ class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
         # le cookie CSRF. Ré-émettre sa valeur dans un header CORS exposé
         # permet au frontend de conserver le double-submit sans exposer la
         # session httpOnly.
-        csrf_token = request.cookies.get(CSRF_COOKIE_NAME)
-        if csrf_token:
-            response.headers["X-Kojo-CSRFToken"] = csrf_token
+        #
+        # IMPORTANT : si le route handler a déjà posé l'en-tête, on ne le
+        # remplace PAS. Cas réel : la rotation de jeton sur /auth/me appelle
+        # set_auth_cookies qui pose un NOUVEAU cookie kojo_csrf et met
+        # l'en-tête à cette valeur fraîche — mais le cookie envoyé DANS la
+        # requête (lu ici) est encore l'ANCIEN. Écraser l'en-tête avec
+        # l'ancienne valeur donnerait au client header=ancien CSRF,
+        # cookie=nouveau → 403 « Validation CSRF échouée » sur la première
+        # mutation après la rotation (double-submit header ≠ cookie).
+        if not response.headers.get("X-Kojo-CSRFToken"):
+            csrf_token = request.cookies.get(CSRF_COOKIE_NAME)
+            if csrf_token:
+                response.headers["X-Kojo-CSRFToken"] = csrf_token
         # Vary inclut Cookie : les réponses authentifiées dépendent du
         # cookie de session httpOnly — un cache intermédiaire ne doit pas
         # servir la réponse d'un utilisateur à un autre.

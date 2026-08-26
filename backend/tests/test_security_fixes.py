@@ -180,6 +180,105 @@ class TestHttpOnlyCookieAuth:
         csrf_cookie = client.cookies.get("kojo_csrf")
         assert csrf_header == csrf_cookie
 
+    async def test_auth_me_rotates_token_near_expiry(self, client: AsyncClient):
+        """Rotation à fenêtre glissante : quand le jeton approche de
+        l'expiration (seuil patché), /auth/me émet un jeton FRAIS (en-tête
+        X-Kojo-Token + nouveau cookie) sans révoquer l'ancien (pas de lockout
+        si le client n'a pas reçu le nouveau)."""
+        result = await register_and_login(client)
+        old_token = result["access_token"]
+        login = await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        assert login.status_code == 200
+
+        with patch("kojo_routers_auth.AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS", 10 ** 12):
+            me = await client.get("/api/auth/me")  # cookie seul
+        assert me.status_code == 200
+        new_token = me.headers.get("X-Kojo-Token")
+        assert new_token and new_token != old_token
+        # Nouveau cookie de session posé par la rotation.
+        session_cookie = client.cookies.get("kojo_session")
+        assert session_cookie == new_token
+        # L'ancien jeton n'est PAS révoqué : encore utilisable.
+        still_ok = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {old_token}"})
+        assert still_ok.status_code == 200
+
+    async def test_auth_me_does_not_rotate_fresh_token(self, client: AsyncClient):
+        """Un jeton frais (loin de l'expiration, seuil 0) n'est PAS tourné —
+        pas de frappe de jetons à chaque /auth/me."""
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        with patch("kojo_routers_auth.AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS", 0):
+            me = await client.get("/api/auth/me")
+        assert me.status_code == 200
+        assert not me.headers.get("X-Kojo-Token")
+        # Le CSRF existant est toujours ré-écho (pas de rotation).
+        csrf_cookie = client.cookies.get("kojo_csrf")
+        assert me.headers.get("X-Kojo-CSRFToken") == csrf_cookie
+
+    async def test_rotation_e2e_new_token_used_by_followup_mutations(self, client: AsyncClient):
+        """Bout en bout du scénario rotation : session proche de l'expiration
+        → /auth/me émet un jeton frais (nouveau cookie httpOnly + en-tête
+        X-Kojo-Token). Le frontend stocke ce nouveau jeton et l'utilise pour
+        les mutations suivantes : elles doivent passer avec le NOUVEAU jeton
+        (mode hybride, header seul) ET avec le nouveau cookie + CSRF ré-écho
+        (mode cookie pur). L'ancien jeton reste valide (pas de révocation)."""
+        result = await register_and_login(client)
+        old_token = result["access_token"]
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        old_session_cookie = client.cookies.get("kojo_session")
+
+        # Bootstrap : session cookie proche de l'expiration → rotation.
+        with patch("kojo_routers_auth.AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS", 10 ** 12):
+            me = await client.get("/api/auth/me")  # cookie seul
+        assert me.status_code == 200
+        new_token = me.headers.get("X-Kojo-Token")
+        assert new_token and new_token != old_token
+        # set_auth_cookies repose les DEUX cookies : session = nouveau jeton
+        # (≠ ancien), et CSRF = nouvelle valeur transportée par l'en-tête
+        # X-Kojo-CSRFToken (le frontend rafraîchit sa mémoire CSRF à chaque
+        # réponse — le cookie étant invisible cross-origin).
+        assert client.cookies.get("kojo_session") == new_token
+        assert client.cookies.get("kojo_session") != old_session_cookie
+        # RÉGRESSION : l'en-tête X-Kojo-CSRFToken de la réponse de rotation
+        # doit être la NOUVELLE valeur (= cookie posé), pas l'ancien CSRF de
+        # la requête. Avant le correctif du middleware, l'en-tête était écrasé
+        # avec l'ancienne valeur → client avec header=ancien, cookie=nouveau
+        # → 403 CSRF sur la première mutation après rotation.
+        new_csrf = me.headers.get("X-Kojo-CSRFToken")
+        assert new_csrf and new_csrf == client.cookies.get("kojo_csrf")
+
+        # 1) Mutation suivante avec le NOUVEAU jeton en header (mode hybride).
+        resp = await client.put(
+            "/api/users/profile",
+            json={"first_name": "Rotated"},
+            headers={"Authorization": f"Bearer {new_token}"},
+        )
+        assert resp.status_code == 200
+
+        # 2) Mutation suivante via le NOUVEAU cookie + le CSRF reçu à la
+        #    rotation (mode cookie pur) : le scénario exact du 403 avant fix.
+        resp2 = await client.put(
+            "/api/users/profile",
+            json={"first_name": "RotatedCookie"},
+            headers={"X-CSRFToken": new_csrf},
+        )
+        assert resp2.status_code == 200
+        me3 = await client.get("/api/auth/me")
+        assert me3.json()["first_name"] == "RotatedCookie"
+
+        # 3) L'ancien jeton n'est PAS révoqué (pas de lockout si le client
+        #    n'a pas reçu le nouveau) : il reste utilisable.
+        still_ok = await client.get(
+            "/api/auth/me", headers={"Authorization": f"Bearer {old_token}"}
+        )
+        assert still_ok.status_code == 200
+
     async def test_cookie_auth_post_requires_csrf_header(self, client: AsyncClient):
         # Une mutation authentifiée par cookie SANS X-CSRFToken doit être rejetée (403).
         result = await register_and_login(client)

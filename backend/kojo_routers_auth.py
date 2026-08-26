@@ -19,6 +19,8 @@ from kojo_models import (
     UserLogin, UserType, UserWithPayment, WorkerProfile,
 )
 from kojo_settings import (
+    AUTH_COOKIE_NAME,
+    AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS,
     CSRF_COOKIE_NAME,
     EMAIL_OTP_EXPIRY_MINUTES,
     EMAIL_OTP_MAX_ATTEMPTS,
@@ -890,6 +892,40 @@ async def logout_user(
 
 @router.get("/auth/me")
 async def get_current_user_auth(request: Request, response: Response, current_user: User = Depends(get_current_user)):
+    # ROTATION À FENÊTRE GLISSANTE : quand la session est encore valide mais
+    # proche de l'expiration (< AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS restants,
+    # défaut 6 h = 25 % de la fenêtre de 24 h), on émet un jeton frais (même
+    # compte, même pwdv — il vient de passer le contrôle de get_current_user —,
+    # nouvelle jti, exp = maintenant + 24 h) et on repose cookie httpOnly +
+    # en-tête X-Kojo-Token (le frontend le stocke en localStorage). L'utilisateur
+    # actif n'est plus déconnecté chaque 24 h. L'ancien jti n'est PAS révoqué
+    # (risque de lockout si le nouveau n'arrive pas jusqu'au client) : il expire
+    # naturellement. Le seuil borne la frappe de jetons (~1 rotation/session/jour).
+    rotated = False
+    try:
+        raw_token = ""
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            raw_token = auth_header[7:].strip()
+        else:
+            raw_token = request.cookies.get(AUTH_COOKIE_NAME, "") or ""
+        if raw_token:
+            payload = jwt.decode(raw_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            exp = float(payload.get("exp", 0) or 0)
+            remaining = exp - datetime.now(timezone.utc).timestamp()
+            if remaining < AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS:
+                new_token = create_access_token(data={
+                    "sub": payload.get("sub") or current_user.id,
+                    "email": payload.get("email") or current_user.email,
+                    "pwdv": payload.get("pwdv", 0),
+                })
+                set_auth_cookies(response, new_token)
+                response.headers["X-Kojo-Token"] = new_token
+                rotated = True
+    except Exception:
+        # Jamais bloquant : un échec de décodage ne doit pas casser /auth/me.
+        pass
+
     # Écho du jeton CSRF (même valeur que le cookie kojo_csrf) : le frontend
     # web Vercel est CROSS-ORIGIN → document.cookie ne voit jamais le cookie
     # posé sur fly.dev ; le client a besoin de l'en-tête X-Kojo-CSRFToken
@@ -897,10 +933,12 @@ async def get_current_user_auth(request: Request, response: Response, current_us
     # écho, un token localStorage EXPIRÉ (24 h) avec une session cookie
     # encore valide cassait les mutations APRÈS un rechargement : mémoire
     # CSRF du client vide → 403 « Validation CSRF échouée ». Chaque bootstrap
-    # (/auth/me) rafraîchit désormais la mémoire CSRF du client.
-    csrf_token = request.cookies.get(CSRF_COOKIE_NAME)
-    if csrf_token:
-        response.headers["X-Kojo-CSRFToken"] = csrf_token
+    # (/auth/me) rafraîchit la mémoire CSRF du client.
+    if not rotated:
+        # Pas de rotation → pas de nouveau cookie CSRF : on ré-échoit l'existant.
+        csrf_token = request.cookies.get(CSRF_COOKIE_NAME)
+        if csrf_token:
+            response.headers["X-Kojo-CSRFToken"] = csrf_token
     return current_user.model_dump(exclude={"password_hash", "payment_accounts"})
 
 class CountryUpdate(BaseModel):

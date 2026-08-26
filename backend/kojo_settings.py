@@ -168,6 +168,13 @@ AUTH_COOKIE_MAX_AGE = JWT_EXPIRATION_HOURS * 3600
 # pas tranché) au-delà de ce seuil déclenche une alerte au propriétaire.
 PAYOUT_ALERT_THRESHOLD_HOURS = float(os.environ.get('PAYOUT_ALERT_THRESHOLD_HOURS', '24'))
 
+# Rotation à fenêtre glissante du jeton de session : /auth/me émet un jeton
+# frais quand il reste moins de ce seuil (secondes) avant expiration (défaut
+# 6 h = 25 % de la fenêtre de 24 h) — l'utilisateur actif n'est plus
+# déconnecté chaque 24 h. Borne la frappe de jetons : ~1 rotation par session
+# et par jour.
+AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS = int(os.environ.get('AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS', str(6 * 3600)))
+
 # Escalade : après la première alerte (24 h), un rappel est renvoyé si le
 # décaissement est TOUJOURS bloqué au-delà de ce délai (PayDunya injoignable
 # plusieurs jours ne doit pas rester silencieux). owner_payout_alerted_at est
