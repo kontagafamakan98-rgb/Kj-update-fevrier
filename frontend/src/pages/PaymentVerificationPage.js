@@ -97,7 +97,9 @@ const PaymentVerificationPage = () => {
   const detectUserLocationForPayments = async () => {
     try {
       const country = await detectUserCountry();
-      if (country) {
+      // detected:false = échec de détection (objet neutre, jamais null) : on
+      // ne sélectionne pas un pays dont le code est vide.
+      if (country && country.detected !== false) {
         setDetectedCountry(country);
         devLog.info(`📍 Pays détecté pour paiements: ${country.nameFrench} ${country.flag}`);
       }

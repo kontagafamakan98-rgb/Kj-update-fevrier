@@ -171,7 +171,9 @@ export default function Register() {
       devLog.info('🌍 Détection automatique du pays de l\'utilisateur...');
       const country = await detectUserCountry();
       
-      if (country) {
+      // detected:false = échec de détection (objet neutre, jamais null) : on
+      // ne remplace PAS un pays déjà choisi ni n'auto-sélectionne un code vide.
+      if (country && country.detected !== false) {
         if (manualCountrySelectionRef.current) {
           devLog.info('🛑 Sélection manuelle détectée, la géolocalisation ne remplace pas le pays choisi');
           return;

@@ -48,10 +48,11 @@ const PaymentAccountsManager = ({ onSuccess }) => {
   const detectUserCountryAsync = async () => {
     try {
       const country = await detectUserCountry();
-      if (!country) {
-        // Détection impossible (IP/GPS indisponible) : l'utilisateur choisira
-        // son pays manuellement — surtout ne pas planter (TypeError sur
-        // country.nameFrench) et ne pas réinitialiser un pays déjà choisi.
+      if (!country || country.detected === false) {
+        // Détection impossible (IP/GPS indisponible — detectUserCountry renvoie
+        // un objet neutre `detected:false`, jamais null) : l'utilisateur
+        // choisira son pays manuellement — ne pas réinitialiser un pays déjà
+        // choisi ni utiliser un code vide.
         setDetectedCountry(null);
         return;
       }

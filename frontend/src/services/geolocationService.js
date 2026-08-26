@@ -1001,18 +1001,36 @@ class PreciseGeolocationService {
 const preciseGeolocationService = new PreciseGeolocationService();
 export default preciseGeolocationService;
 
+// Objet pays NEUTRE renvoyé quand la détection échoue (IP/GPS indisponible,
+// position approximative refusée) : detectUserCountry ne renvoie PLUS JAMAIS
+// null → toute la classe de bugs « Cannot read properties of null (reading
+// 'nameFrench') » disparaît à la source. Le flag `detected: false` et le code
+// vide signalent aux appelants de NE PAS auto-sélectionner un pays (l'utilisateur
+// choisit manuellement), tout en restant lisible pour un affichage neutre.
+const NEUTRAL_DETECTED_COUNTRY = Object.freeze({
+  detected: false,
+  code: '',
+  name: 'Detected country',
+  nameFrench: 'Pays détecté',
+  flag: '🌍',
+  phonePrefix: '',
+  currency: 'XOF',
+  language: 'fr',
+});
+
 // Export des fonctions utilitaires pour compatibilité
 export const detectUserCountry = async (options = {}) => {
   await loadGeographicDatabase();
   const location = await preciseGeolocationService.detectPreciseLocation(options);
-  if (!location) return null;
-  if (location.isApproximate && !options.allowApproximate) return null;
+  if (!location) return { ...NEUTRAL_DETECTED_COUNTRY };
+  if (location.isApproximate && !options.allowApproximate) return { ...NEUTRAL_DETECTED_COUNTRY };
 
   const normalizedCountryCode = normalizeCountryCode(location.countryCode || '');
   const countryData = getDatabase()[normalizedCountryCode];
   if (!countryData) {
     // Pays hors base de données - retourner des infos neutres sans biais Sénégal
     return {
+      detected: true,
       code: normalizedCountryCode,
       name: location.country || 'Detected country',
       nameFrench: location.country || 'Pays détecté',
@@ -1023,6 +1041,7 @@ export const detectUserCountry = async (options = {}) => {
     };
   }
   return {
+    detected: true,
     code: normalizedCountryCode,
     name: countryData.country,
     nameFrench: countryData.nameFrench,

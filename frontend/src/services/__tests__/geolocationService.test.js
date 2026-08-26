@@ -1,4 +1,5 @@
-import {
+import { vi, describe, it, expect } from 'vitest';
+import preciseGeolocationService, {
   getCountriesList,
   getCountryByCode,
   getPhonePrefixByCountry,
@@ -11,6 +12,7 @@ import {
   getLocalLanguageForCountry,
   getOrderedLanguagesForCountry,
   getLanguageSuggestionMessage,
+  detectUserCountry,
 } from '../geolocationService';
 
 describe('geolocationService (fallback pays)', () => {
@@ -89,5 +91,38 @@ describe('geolocationService — helpers fusionnés (banques + langues)', () => 
     expect(suggestion).not.toBeNull();
     expect(suggestion.localLang).toBe('Bambara');
     expect(getLanguageSuggestionMessage(null)).toBeNull();
+  });
+});
+
+describe('detectUserCountry — objet neutre au lieu de null (élimine la classe de bugs)', () => {
+  it('renvoie un objet neutre detected:false quand la localisation échoue (jamais null)', async () => {
+    const spy = vi.spyOn(preciseGeolocationService, 'detectPreciseLocation').mockResolvedValue(null);
+    const country = await detectUserCountry();
+    expect(country).not.toBeNull();
+    expect(country.detected).toBe(false);
+    expect(country.nameFrench).toBeDefined(); // lisible sans TypeError
+    expect(country.code).toBe('');
+    spy.mockRestore();
+  });
+
+  it('renvoie un objet neutre quand la position est approximative et non autorisée', async () => {
+    const spy = vi
+      .spyOn(preciseGeolocationService, 'detectPreciseLocation')
+      .mockResolvedValue({ isApproximate: true, countryCode: 'sn', country: 'Sénégal' });
+    const country = await detectUserCountry();
+    expect(country.detected).toBe(false);
+    expect(country.nameFrench).toBe('Pays détecté');
+    spy.mockRestore();
+  });
+
+  it('renvoie un pays detected:true quand la localisation aboutit', async () => {
+    const spy = vi
+      .spyOn(preciseGeolocationService, 'detectPreciseLocation')
+      .mockResolvedValue({ isApproximate: false, countryCode: 'SN', country: 'Sénégal', phonePrefix: '+221', flag: '🇸🇳' });
+    const country = await detectUserCountry();
+    expect(country.detected).toBe(true);
+    expect(country.code).toBe('senegal');
+    expect(country.nameFrench).toBe('Sénégal');
+    spy.mockRestore();
   });
 });
