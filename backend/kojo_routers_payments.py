@@ -29,7 +29,7 @@ from kojo_payments import (
     build_checkout_redirect_url, build_payment_callback_url,
     calculate_payment_breakdown, check_paydunya_disburse_status,
     create_paydunya_invoice, get_effective_commission_rate,
-    get_paydunya_channel, is_paydunya_configured,
+    get_paydunya_channel, is_paydunya_circuit_open, is_paydunya_configured,
     normalize_payment_country, serialize_payment_record,
     sync_payment_status_with_paydunya,
 )
@@ -327,6 +327,16 @@ async def get_payment_quote(request: PaymentQuoteRequest):
 async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_user: User = Depends(get_current_user)):
     if not is_paydunya_configured():
         raise HTTPException(status_code=503, detail="PayDunya n'est pas encore configuré en production")
+
+    # Circuit breaker GLOBAL PayDunya : quand il est OUVERT (échecs réseau
+    # consécutifs), on refuse IMMÉDIATEMENT la création de facture avec un
+    # message clair — AVANT d'insérer un enregistrement pending (évite les
+    # orphelins) et sans geler l'utilisateur sur un timeout de 30 s.
+    if is_paydunya_circuit_open():
+        raise HTTPException(
+            status_code=503,
+            detail="PayDunya est momentanément indisponible. Réessayez dans quelques heures.",
+        )
 
     # SECURITE: le montant, le job et le travailleur ne sont plus pris tels
     # quels depuis la requête client (n'importe quel utilisateur pouvait

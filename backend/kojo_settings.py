@@ -184,6 +184,18 @@ PAYOUT_ALERT_REMINDER_DAYS = int(os.environ.get('PAYOUT_ALERT_REMINDER_DAYS', '3
 # Fréquence du passage de re-vérification PayDunya (minutes).
 PAYOUT_SWEEPER_INTERVAL_MINUTES = int(os.environ.get('PAYOUT_SWEEPER_INTERVAL_MINUTES', '60'))
 
+# --- Circuit breaker GLOBAL PayDunya ---
+# Si l'API PayDunya devient injoignable (échecs RÉSEAU consécutifs : timeout,
+# connexion refusée, réponse non-JSON), le circuit s'ouvre : tous les appels
+# sortants échouent IMMÉDIATEMENT (fail fast) pendant la période de repos, au
+# lieu de marteler une API down avec des timeouts de 30 s. Protège tous les
+# flux : checkout (création de facture), re-vérification des décaissements
+# (sweeper + polling /payments/status), IPN disburse, remboursements et
+# retraits. Un échec MÉTIER (response_code != '00', ex. montant refusé)
+# n'ouvre PAS le circuit : c'est un refus de la requête, pas une panne.
+PAYDUNYA_CIRCUIT_FAILURE_THRESHOLD = int(os.environ.get('PAYDUNYA_CIRCUIT_FAILURE_THRESHOLD', '5'))
+PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS = int(os.environ.get('PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS', str(2 * 3600)))
+
 # --- Google Sign-In (SSO) ---
 # Flux serveur : le frontend reçoit un code d'autorisation Google (PKCE) et
 # le backend l'échange contre un id_token, dont il vérifie la signature et

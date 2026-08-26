@@ -5,17 +5,14 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from kojo_core import db
-from kojo_models import (
-    User,
-)
 from kojo_settings import (
     JWT_ALGORITHM,
     PAYOUT_ALERT_THRESHOLD_HOURS,
 )
 from kojo_core import (
-    get_current_user, is_database_available, verify_owner_access,
+    is_database_available, verify_owner_access,
 )
-from kojo_payments import get_effective_commission_rate
+from kojo_payments import get_effective_commission_rate, paydunya_circuit_state
 from kojo_routers_jobs import execute_paydunya_refund
 # Helpers du sweeper (kojo_scheduler) : source unique de vérité pour les
 # statuts incertains et le calcul de la durée de blocage.
@@ -354,8 +351,19 @@ async def get_stuck_payouts(owner_user = Depends(verify_owner_access)):
         reverse=True,
     )
 
+    # État du circuit breaker GLOBAL PayDunya : si le circuit est OUVERT
+    # (échecs réseau consécutifs), TOUS les statuts ci-dessus sont simplement
+    # « non re-vérifiés » — l'owner doit le savoir pour interpréter la liste.
+    circuit = paydunya_circuit_state()
+
     return {
         "count": len(items),
         "threshold_hours": PAYOUT_ALERT_THRESHOLD_HOURS,
         "payouts": items,
+        "paydunya_circuit": {
+            "state": circuit["state"],
+            "consecutive_failures": circuit["consecutive_failures"],
+            "failure_threshold": circuit["failure_threshold"],
+            "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
+        },
     }

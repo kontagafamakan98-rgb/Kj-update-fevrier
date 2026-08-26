@@ -2,6 +2,7 @@
 """Intégration PayDunya : canaux, factures, statuts, décaissements."""
 
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
@@ -18,6 +19,8 @@ from kojo_settings import (
     PAYDUNYA_PRIVATE_KEY,
     PAYDUNYA_TOKEN,
     PAYDUNYA_DISBURSE_BASE_URL,
+    PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS,
+    PAYDUNYA_CIRCUIT_FAILURE_THRESHOLD,
     PAYMENT_COMMISSION_RATE,
     logger,
 )
@@ -72,6 +75,97 @@ def get_paydunya_headers() -> Dict[str, str]:
         'PAYDUNYA-PRIVATE-KEY': PAYDUNYA_PRIVATE_KEY,
         'PAYDUNYA-TOKEN': PAYDUNYA_TOKEN,
     }
+
+
+# --- Circuit breaker GLOBAL PayDunya ---
+# Si l'API PayDunya devient INJOIGNABLE (échecs réseau consécutifs : timeout,
+# connexion refusée, réponse non-JSON), le circuit s'OUVRE : tous les appels
+# sortants échouent IMMÉDIATEMENT (fail fast, ~0 ms) pendant la période de
+# repos, au lieu de marteler une API down avec des timeouts de 30 s (qui
+# gelaient l'event loop sur les flux asynchrones). Protège TOUS les flux :
+# checkout (création de facture), re-vérification des décaissements (sweeper
+# + polling /payments/status), IPN disburse, remboursements et retraits.
+# Après le cooldown, un seul appel de sonde (half-open) décide de la
+# réouverture (closed) ou de la prolongation (open). Un échec MÉTIER
+# (response_code != '00', ex. montant refusé) n'ouvre PAS le circuit : c'est
+# un refus de la requête, pas une panne fournisseur.
+_paydunya_circuit = {
+    "state": "closed",          # closed | open | half_open (effectif)
+    "consecutive_failures": 0,
+    "opened_at": 0.0,           # time.time() au moment de l'ouverture
+}
+
+
+def paydunya_circuit_state() -> dict:
+    """État EFFECTIF du circuit breaker (lecture logs / métriques / owner).
+    Le passage open → half_open (cooldown écoulé, UN appel de sonde autorisé)
+    est calculé ici pour rester déterministe sans timer."""
+    now = time.time()
+    state = _paydunya_circuit["state"]
+    remaining = 0.0
+    if state == "open":
+        remaining = _paydunya_circuit["opened_at"] + PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS - now
+        if remaining <= 0:
+            state = "half_open"
+            remaining = 0.0
+    return {
+        "state": state,
+        "consecutive_failures": _paydunya_circuit["consecutive_failures"],
+        "failure_threshold": PAYDUNYA_CIRCUIT_FAILURE_THRESHOLD,
+        "cooldown_seconds": PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS,
+        "remaining_cooldown_seconds": max(0.0, remaining),
+    }
+
+
+def is_paydunya_circuit_open() -> bool:
+    """Vrai quand le circuit est OUVERT (fail fast — aucun appel réseau)."""
+    return paydunya_circuit_state()["state"] == "open"
+
+
+def _circuit_record_success() -> None:
+    _paydunya_circuit.update({"state": "closed", "consecutive_failures": 0, "opened_at": 0.0})
+
+
+def _circuit_record_failure() -> None:
+    _paydunya_circuit["consecutive_failures"] += 1
+    if _paydunya_circuit["consecutive_failures"] >= PAYDUNYA_CIRCUIT_FAILURE_THRESHOLD:
+        _paydunya_circuit["state"] = "open"
+        _paydunya_circuit["opened_at"] = time.time()
+        logger.error(
+            f"🚨 Circuit breaker PayDunya OUVERT : {PAYDUNYA_CIRCUIT_FAILURE_THRESHOLD} échecs réseau "
+            f"consécutifs — appels PayDunya suspendus "
+            f"{PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS // 3600} h (fail fast)."
+        )
+
+
+def _paydunya_call(method: str, url: str, *, json: Optional[Dict[str, Any]] = None, timeout: int = 30) -> Dict[str, Any]:
+    """Appel HTTP PayDunya protégé par le circuit breaker GLOBAL (point unique
+    de toutes les requêtes sortantes : checkout, confirm, get-invoice,
+    submit-invoice, check-status).
+
+    - Circuit OPEN → requests.ConnectionError immédiate (fail fast, ~0 ms) :
+      tous les appelants la convertissent en 502 SANS toucher le réseau — le
+      checkout, l'IPN disburse et le sweeper ne martèlent plus une API down
+      et ne gèlent plus l'event loop sur des timeouts de 30 s.
+    - Échec RÉSEAU (RequestException / réponse non-JSON) → compté ; au-delà du
+      seuil, le circuit passe OPEN pour la durée du cooldown.
+    - Réussite HTTP (y compris response_code != '00', refus MÉTIER) → circuit
+      refermé : le fournisseur répond, ce n'est pas une panne.
+    """
+    if is_paydunya_circuit_open():
+        raise requests.ConnectionError(
+            "PayDunya circuit breaker ouvert — appels suspendus "
+            f"{PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS // 3600} h (fail fast)"
+        )
+    try:
+        response = requests.request(method, url, headers=get_paydunya_headers(), json=json, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+    except (requests.RequestException, ValueError):
+        _circuit_record_failure()
+        raise
+    _circuit_record_success()
+    return data
 
 async def get_effective_commission_rate() -> float:
     """Taux de commission EFFECTIF : db.settings (type=commission) s'il existe,
@@ -186,9 +280,7 @@ def create_paydunya_invoice(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     endpoint = f"{get_paydunya_base_url()}/checkout-invoice/create"
     try:
-        response = requests.post(endpoint, headers=get_paydunya_headers(), json=payload, timeout=30)
-        response.raise_for_status()
-        data = response.json()
+        data = _paydunya_call("POST", endpoint, json=payload)
     except requests.RequestException as exc:
         logger.error(f"PayDunya create invoice error: {exc}")
         raise HTTPException(status_code=502, detail='Impossible de créer la session de paiement PayDunya')
@@ -216,9 +308,7 @@ def confirm_paydunya_invoice(invoice_token: str) -> Dict[str, Any]:
 
     endpoint = f"{get_paydunya_base_url()}/checkout-invoice/confirm/{invoice_token}"
     try:
-        response = requests.get(endpoint, headers=get_paydunya_headers(), timeout=30)
-        response.raise_for_status()
-        return response.json()
+        return _paydunya_call("GET", endpoint)
     except requests.RequestException as exc:
         logger.error(f"PayDunya confirm invoice error: {exc}")
         raise HTTPException(status_code=502, detail='Impossible de vérifier le statut du paiement PayDunya')
@@ -311,13 +401,7 @@ def create_paydunya_disburse_invoice(account_alias: str, amount: float, withdraw
         "callback_url": callback_url,
     }
     try:
-        response = requests.post(
-            f"{PAYDUNYA_DISBURSE_BASE_URL}/get-invoice",
-            headers=get_paydunya_headers(),
-            json=payload,
-            timeout=30
-        )
-        data = response.json()
+        data = _paydunya_call("POST", f"{PAYDUNYA_DISBURSE_BASE_URL}/get-invoice", json=payload)
     except requests.RequestException as exc:
         logger.error(f"PayDunya disburse get-invoice error: {exc}")
         raise HTTPException(status_code=502, detail="Impossible de préparer le versement PayDunya")
@@ -340,13 +424,7 @@ def submit_paydunya_disburse_invoice(disburse_token: str, disburse_id: Optional[
         payload["disburse_id"] = disburse_id
 
     try:
-        response = requests.post(
-            f"{PAYDUNYA_DISBURSE_BASE_URL}/submit-invoice",
-            headers=get_paydunya_headers(),
-            json=payload,
-            timeout=30
-        )
-        data = response.json()
+        data = _paydunya_call("POST", f"{PAYDUNYA_DISBURSE_BASE_URL}/submit-invoice", json=payload)
     except requests.RequestException as exc:
         logger.error(f"PayDunya disburse submit-invoice error: {exc}")
         raise HTTPException(status_code=502, detail="Impossible d'exécuter le versement PayDunya")
@@ -361,13 +439,11 @@ def check_paydunya_disburse_status(disburse_token: str) -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="PayDunya n'est pas configuré sur le serveur")
 
     try:
-        response = requests.post(
+        return _paydunya_call(
+            "POST",
             f"{PAYDUNYA_DISBURSE_BASE_URL}/check-status",
-            headers=get_paydunya_headers(),
             json={"disburse_invoice": disburse_token},
-            timeout=30
         )
-        return response.json()
     except (requests.RequestException, ValueError) as exc:
         logger.error(f"PayDunya disburse check-status error: {exc}")
         raise HTTPException(status_code=502, detail="Impossible de vérifier le statut du versement PayDunya")

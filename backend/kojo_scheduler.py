@@ -36,6 +36,10 @@ from kojo_shared import notify_user_localized
 # de transition et même application des retraits de récompenses. Point unique
 # de vérité du check-status — pas de mapping dupliqué ici.
 from kojo_routers_payments import _maybe_recheck_disburse_status
+# Circuit breaker GLOBAL PayDunya (kojo_payments) : quand il est OUVERT, les
+# re-vérifications sont SUSPENDUES (elles échoueraient de toute façon en fail
+# fast) — on ne martèle pas une API down — mais l'escalade continue.
+from kojo_payments import paydunya_circuit_state
 
 # Statuts « incertains » : PayDunya a peut-être exécuté le décaissement, seul
 # un check-status (ou l'IPN) peut trancher.
@@ -86,24 +90,42 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
         "payout_status": {"$in": list(_STUCK_PAYOUT_STATUSES)},
     }).to_list(length=500)
 
+    # Circuit breaker GLOBAL PayDunya : quand il est OUVERT, on ne lance AUCUNE
+    # re-vérification (chaque check-status échouerait en fail fast ~0 ms) — on
+    # évite même la boucle de per-payment inutile. L'escalade (étape 2) reste
+    # active : le propriétaire doit savoir que les décaissements restent
+    # incertains pendant la panne PayDunya.
+    circuit = paydunya_circuit_state()
+    circuit_open = circuit["state"] == "open"
+    if circuit_open:
+        logger.warning(
+            f"🔌 Sweeper décaissements bloqués: circuit breaker PayDunya OUVERT — "
+            f"re-vérifications suspendues (cooldown restant ~"
+            f"{int(circuit['remaining_cooldown_seconds'] // 3600)} h), escalade maintenue."
+        )
+
     for payment in payments:
         payment_id = payment.get("id")
         if not payment_id:
             continue
-        summary["rechecked"] += 1
 
         # 1) Re-vérification PayDunya : si l'IPN n'est jamais arrivée, le
         #    check-status peut trancher (success → released/refunded, échec →
         #    release_failed/refund_failed). Un échec de vérification (réseau,
         #    PayDunya non configuré) laisse le record inchangé → traité comme
-        #    toujours incertain ci-dessous.
-        try:
-            updated = await _maybe_recheck_disburse_status(payment)
-        except Exception as exc:
-            logger.warning(
-                f"⚠️ Sweeper: re-vérification impossible (payment={payment_id}): {exc}"
-            )
+        #    toujours incertain ci-dessous. SUSPENDUE quand le circuit est
+        #    ouvert (fail fast systématique — on ne martèle pas une API down).
+        if circuit_open:
             updated = payment
+        else:
+            summary["rechecked"] += 1
+            try:
+                updated = await _maybe_recheck_disburse_status(payment)
+            except Exception as exc:
+                logger.warning(
+                    f"⚠️ Sweeper: re-vérification impossible (payment={payment_id}): {exc}"
+                )
+                updated = payment
 
         current = updated or payment
         current_status = current.get("payout_status")
