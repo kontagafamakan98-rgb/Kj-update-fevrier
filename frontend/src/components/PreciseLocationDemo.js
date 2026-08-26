@@ -32,7 +32,9 @@ const PreciseLocationDemo = () => {
       const detectedLocation = await preciseGeolocationService.detectPreciseLocation();
       const endTime = Date.now();
       
-      if (detectedLocation) {
+      // detectPreciseLocation renvoie un objet neutre (detected: false) quand
+      // aucune méthode n'aboutit — jamais null — donc on vérifie le flag.
+      if (detectedLocation?.detected === true) {
         setLocation(detectedLocation);
         setAccuracy(detectedLocation.accuracy);
         setDetectionMethod(detectedLocation.method);

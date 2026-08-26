@@ -164,6 +164,18 @@ const IP_GEOLOCATION_SERVICES = [
   }
 ];
 
+// Objet localisation NEUTRE renvoyé quand une méthode de détection échoue
+// (IP, reverse geocoding, GPS, contextuelle) : plus jamais null → aucune
+// lecture de propriété ne peut lever de TypeError. Même convention que
+// detectUserCountry : le flag `detected: false` signale aux appelants de ne
+// PAS traiter le résultat comme une détection (l'utilisateur choisit
+// manuellement), tout en restant lisible pour un affichage neutre.
+const neutralLocation = (method = '', extra = {}) => ({
+  detected: false,
+  method,
+  ...extra,
+});
+
 class PreciseGeolocationService {
   constructor() {
     this.isDetecting = false;
@@ -260,6 +272,7 @@ class PreciseGeolocationService {
         devLog.info('📦 Utilisation position précise cachée (age: ' + Math.round(age / 1000) + 's)');
 
         const cachedResult = {
+          detected: true,
           ...this.cachedLocation,
           method: 'cache',
           fromCache: true,
@@ -279,7 +292,7 @@ class PreciseGeolocationService {
 
     try {
       const gpsLocation = await this.getHighPrecisionGPSLocation();
-      if (gpsLocation && gpsLocation.coordinates) {
+      if (gpsLocation?.detected === true) {
         devLog.info('✅ Localisation GPS obtenue:', gpsLocation);
         this.lastKnownLocation = gpsLocation;
         this.detectionAccuracy = gpsLocation.confidence || 0;
@@ -294,7 +307,7 @@ class PreciseGeolocationService {
       }
 
       const ipLocation = await this.getMultiIPGeolocation();
-      if (ipLocation) {
+      if (ipLocation?.detected === true) {
         devLog.info('⚠️ Fallback localisation IP utilisé:', ipLocation);
         this.lastKnownLocation = ipLocation;
         this.detectionAccuracy = ipLocation.confidence || 0;
@@ -308,7 +321,7 @@ class PreciseGeolocationService {
       }
 
       const contextLocation = await this.getContextualLocation();
-      if (contextLocation) {
+      if (contextLocation?.detected === true) {
         devLog.info('ℹ️ Localisation contextuelle approximative obtenue:', contextLocation);
         this.lastKnownLocation = contextLocation;
         this.detectionAccuracy = contextLocation.confidence || 0;
@@ -325,7 +338,7 @@ class PreciseGeolocationService {
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(null, detectionTime, false);
       devLog.info('⚠️ Aucune localisation suffisamment fiable trouvée');
-      return null;
+      return neutralLocation('detect');
 
     } catch (error) {
       safeLog.error('❌ Erreur détection géolocalisation:', error);
@@ -334,7 +347,7 @@ class PreciseGeolocationService {
       const detectionTime = Date.now() - startTime;
       geolocationMonitor.recordDetection(null, detectionTime, false);
 
-      return this.lastKnownLocation && !this.lastKnownLocation.isApproximate ? this.lastKnownLocation : null;
+      return this.lastKnownLocation && !this.lastKnownLocation.isApproximate ? this.lastKnownLocation : neutralLocation('error');
     }
   }
 
@@ -451,14 +464,17 @@ class PreciseGeolocationService {
     const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
 
     try {
-      return await api.get('/geolocation/reverse', {
+      const data = await api.get('/geolocation/reverse', {
         params: { lat: latitude, lng: longitude },
         signal: controller ? controller.signal : undefined,
         headers: { 'Accept-Language': 'fr,en' },
       });
+      return { detected: true, ...data };
     } catch (error) {
       devLog.info('⚠️ Reverse geocoding backend échoué:', error.message);
-      return null;
+      // Neutre (jamais null) : buildPreciseAddressFromReverseData retombe sur
+      // les coordonnées + la base locale sans rien casser (address lisible).
+      return neutralLocation('reverse', { address: {}, display_name: '' });
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
@@ -496,7 +512,7 @@ class PreciseGeolocationService {
   async getHighPrecisionGPSLocation() {
     if (!navigator.geolocation) {
       devLog.info('⚠️ Géolocalisation non supportée par le navigateur');
-      return null;
+      return neutralLocation('gps');
     }
 
     try {
@@ -513,6 +529,7 @@ class PreciseGeolocationService {
       const confidence = this.calculateDetectionAccuracy(roundedAccuracy, 'gps');
 
       return {
+        detected: true,
         ...fallbackLocationData,
         ...preciseAddressData,
         coordinates: { lat: latitude, lng: longitude },
@@ -538,7 +555,7 @@ class PreciseGeolocationService {
 
     } catch (error) {
       devLog.info('⚠️ Géolocalisation GPS échouée:', error.message);
-      return null;
+      return neutralLocation('gps');
     }
   }
 
@@ -581,7 +598,7 @@ class PreciseGeolocationService {
 
     if (results.length === 0) {
       devLog.info('❌ Aucun service IP n\'a fourni de localisation valide');
-      return null;
+      return neutralLocation('ip');
     }
 
     // Validation croisée des résultats
@@ -589,7 +606,7 @@ class PreciseGeolocationService {
 
     if (!validatedResult) {
       devLog.info('❌ Validation croisée IP échouée');
-      return null;
+      return neutralLocation('ip');
     }
 
     // Identifier la localisation précise
@@ -602,6 +619,7 @@ class PreciseGeolocationService {
 
     if (locationData) {
       return {
+        detected: true,
         ...locationData,
         coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
         accuracy: 0,
@@ -617,6 +635,7 @@ class PreciseGeolocationService {
     devLog.info('📍 IP hors zone Afrique de l\'Ouest - position réelle retournée');
     const firstResult = results[0];
     return {
+      detected: true,
       country: firstResult.countryName || firstResult.country || 'Détecté par IP',
       countryCode: (firstResult.country || '').toLowerCase(),
       city: firstResult.city || '',
@@ -673,18 +692,19 @@ class PreciseGeolocationService {
 
       if (!bestCountryGuess) {
         devLog.info('⚠️ Impossible de déterminer le pays par le contexte');
-        return null;
+        return neutralLocation('contextual');
       }
 
       const countryData = getDatabase()[bestCountryGuess];
       if (!countryData || !countryData.majorCities?.length) {
-        return null;
+        return neutralLocation('contextual');
       }
 
       const mainCity = countryData.majorCities[0];
       const detectionAccuracy = this.calculateDetectionAccuracy(50, 'contextual');
 
       return {
+        detected: true,
         address: `${mainCity.name}, ${countryData.nameFrench}`,
         fullAddress: `${mainCity.name}, ${countryData.nameFrench}`,
         city: mainCity.name,
@@ -704,7 +724,7 @@ class PreciseGeolocationService {
 
     } catch (error) {
       devLog.info('⚠️ Analyse contextuelle échouée:', error.message);
-      return null;
+      return neutralLocation('contextual');
     }
   }
 
@@ -1022,7 +1042,9 @@ const NEUTRAL_DETECTED_COUNTRY = Object.freeze({
 export const detectUserCountry = async (options = {}) => {
   await loadGeographicDatabase();
   const location = await preciseGeolocationService.detectPreciseLocation(options);
-  if (!location) return { ...NEUTRAL_DETECTED_COUNTRY };
+  // Le pipeline renvoie désormais un objet neutre (detected: false) au lieu
+  // de null quand toutes les méthodes échouent — on traite les deux cas.
+  if (!location || location.detected === false) return { ...NEUTRAL_DETECTED_COUNTRY };
   if (location.isApproximate && !options.allowApproximate) return { ...NEUTRAL_DETECTED_COUNTRY };
 
   const normalizedCountryCode = normalizeCountryCode(location.countryCode || '');

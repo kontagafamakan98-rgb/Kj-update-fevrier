@@ -1,4 +1,5 @@
 import { vi, describe, it, expect } from 'vitest';
+import { api } from '../api';
 import preciseGeolocationService, {
   getCountriesList,
   getCountryByCode,
@@ -105,6 +106,18 @@ describe('detectUserCountry — objet neutre au lieu de null (élimine la classe
     spy.mockRestore();
   });
 
+  it('renvoie un objet neutre quand la localisation échoue avec le nouveau pipeline (detected:false)', async () => {
+    const spy = vi
+      .spyOn(preciseGeolocationService, 'detectPreciseLocation')
+      .mockResolvedValue({ detected: false, method: 'detect' });
+    const country = await detectUserCountry();
+    expect(country).not.toBeNull();
+    expect(country.detected).toBe(false);
+    expect(country.nameFrench).toBeDefined(); // lisible sans TypeError
+    expect(country.code).toBe('');
+    spy.mockRestore();
+  });
+
   it('renvoie un objet neutre quand la position est approximative et non autorisée', async () => {
     const spy = vi
       .spyOn(preciseGeolocationService, 'detectPreciseLocation')
@@ -124,5 +137,76 @@ describe('detectUserCountry — objet neutre au lieu de null (élimine la classe
     expect(country.code).toBe('senegal');
     expect(country.nameFrench).toBe('Sénégal');
     spy.mockRestore();
+  });
+});
+
+describe('pattern detected:false généralisé — services IP, reverse geocoding, pipeline', () => {
+  it('reverseGeocodePrecise renvoie un objet neutre detected:false quand le backend échoue (jamais null)', async () => {
+    const spy = vi.spyOn(api, 'get').mockRejectedValue(new Error('backend down'));
+    const result = await preciseGeolocationService.reverseGeocodePrecise(14.69, -17.44);
+    expect(result).not.toBeNull();
+    expect(result.detected).toBe(false);
+    // Lisible : buildPreciseAddressFromReverseData ne crashe pas sur un neutre.
+    expect(result.address).toEqual({});
+    expect(result.display_name).toBe('');
+    spy.mockRestore();
+  });
+
+  it('reverseGeocodePrecise marque detected:true quand le backend répond', async () => {
+    const spy = vi.spyOn(api, 'get').mockResolvedValue({ display_name: 'Dakar', address: { country: 'Sénégal' } });
+    const result = await preciseGeolocationService.reverseGeocodePrecise(14.69, -17.44);
+    expect(result.detected).toBe(true);
+    expect(result.display_name).toBe('Dakar');
+    spy.mockRestore();
+  });
+
+  it('getMultiIPGeolocation renvoie un objet neutre detected:false quand le backend ne détecte rien', async () => {
+    const spy = vi.spyOn(api, 'get').mockResolvedValue({ country: null, detected: false });
+    const result = await preciseGeolocationService.getMultiIPGeolocation();
+    expect(result).not.toBeNull();
+    expect(result.detected).toBe(false);
+    expect(result.method).toBe('ip');
+    spy.mockRestore();
+  });
+
+  it('detectPreciseLocation renvoie un objet neutre detected:false quand toutes les méthodes échouent', async () => {
+    // api.get mocké aussi : loadGeographicDatabase (/geolocation/cities) ne
+    // doit pas tenter un vrai appel réseau dans le test.
+    vi.spyOn(api, 'get').mockResolvedValue({ countries: {} });
+    vi.spyOn(preciseGeolocationService, 'getHighPrecisionGPSLocation').mockResolvedValue({ detected: false, method: 'gps' });
+    vi.spyOn(preciseGeolocationService, 'getMultiIPGeolocation').mockResolvedValue({ detected: false, method: 'ip' });
+    vi.spyOn(preciseGeolocationService, 'getContextualLocation').mockResolvedValue({ detected: false, method: 'contextual' });
+    const result = await preciseGeolocationService.detectPreciseLocation();
+    expect(result).not.toBeNull();
+    expect(result.detected).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it('detectPreciseLocation renvoie un objet neutre detected:false quand une méthode lève une exception', async () => {
+    vi.spyOn(api, 'get').mockResolvedValue({ countries: {} });
+    vi.spyOn(preciseGeolocationService, 'getHighPrecisionGPSLocation').mockRejectedValue(new Error('GPS refusé'));
+    vi.spyOn(preciseGeolocationService, 'getMultiIPGeolocation').mockResolvedValue({ detected: false, method: 'ip' });
+    vi.spyOn(preciseGeolocationService, 'getContextualLocation').mockResolvedValue({ detected: false, method: 'contextual' });
+    const result = await preciseGeolocationService.detectPreciseLocation();
+    expect(result).not.toBeNull();
+    expect(result.detected).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it('detectPreciseLocation conserve une détection réussie detected:true', async () => {
+    const gps = {
+      detected: true,
+      method: 'gps',
+      coordinates: { lat: 14.69, lng: -17.44 },
+      country: 'Sénégal',
+      countryCode: 'sn',
+      confidence: 93,
+    };
+    vi.spyOn(preciseGeolocationService, 'getHighPrecisionGPSLocation').mockResolvedValue(gps);
+    const result = await preciseGeolocationService.detectPreciseLocation();
+    expect(result).not.toBeNull();
+    expect(result.detected).toBe(true);
+    expect(result.method).toBe('gps');
+    vi.restoreAllMocks();
   });
 });
