@@ -65,6 +65,13 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
   const detectUserCountryAsync = async () => {
     try {
       const country = await detectUserCountry();
+      if (!country) {
+        // Détection impossible (IP/GPS indisponible) : l'utilisateur choisira
+        // son pays manuellement — surtout ne pas planter (TypeError sur
+        // country.nameFrench) et ne pas réinitialiser un pays déjà choisi.
+        setDetectedCountry(null);
+        return;
+      }
       setDetectedCountry(country);
       setPhoneExample(getPhoneExampleForCountry(country));
       setPopularBanks(getPopularBanksByCountry(country));
