@@ -1,15 +1,18 @@
 import { devLog, safeLog } from '../utils/env';
-import { api, hasSessionCookie } from './api';
+import { api, getAuthToken } from './api';
 
 // Service pour les fonctionnalités propriétaire - ACCÈS RESTREINT
 //
-// NOTE AUTH (migration cookie) : la session vit désormais dans le cookie
-// httpOnly kojo_session (plus aucun token en localStorage). La vérification
-// d'accès owner repose donc sur le profil chargé depuis /auth/me (user_type)
-// ET la présence du cookie de session (détectée via le cookie CSRF associé,
-// lisible en JS). Tous les appels API passent par le client partagé `api`
-// (credentials: 'include' + en-tête X-CSRFToken sur les mutations) — plus
-// aucun fetch manuel avec Bearer localStorage.
+// NOTE AUTH (mode hybride) : la session est portée par le token en
+// localStorage (fallback en-tête Authorization) ET le cookie httpOnly là où
+// le navigateur l'accepte. La vérification d'accès owner repose donc sur le
+// profil chargé depuis /auth/me (user_type) ET la présence du token en
+// localStorage. IMPORTANT : hasSessionCookie() (lecture de document.cookie)
+// est TOUJOURS faux en web cross-origin (Vercel → Fly : le cookie est posé
+// sur fly.dev, invisible pour document.cookie) — l'utiliser ici rendrait le
+// dashboard owner inaccessible à Famakan. Tous les appels API passent par le
+// client partagé `api` (credentials: 'include' + en-tête X-CSRFToken sur les
+// mutations) — plus aucun fetch manuel.
 class OwnerService {
   getStoredUser() {
     try {
@@ -31,8 +34,11 @@ class OwnerService {
 
   isOwnerSessionValid(userCandidate = null) {
     // Deux conditions : le profil est bien un compte owner ET une session
-    // cookie active existe (sinon les appels /owner/* échoueraient en 401).
-    return this.isOwnerUser(userCandidate) && hasSessionCookie();
+    // active existe (sinon les appels /owner/* échoueraient en 401). En mode
+    // hybride, le token en localStorage est l'indicateur fiable (hasSessionCookie
+    // est toujours faux en web cross-origin). S'il est expiré, /auth/me
+    // renverra 401 et le client purgera/redirigera — pas de blocage ici.
+    return this.isOwnerUser(userCandidate) && Boolean(getAuthToken());
   }
 
   _translateOwnerError(error, fallback) {

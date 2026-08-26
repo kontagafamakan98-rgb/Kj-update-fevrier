@@ -145,16 +145,17 @@ export function AuthProvider({ children }) {
       devLog.info('✅ User profile loaded and cached');
       
     } catch (error) {
-      safeLog.error('Error loading user:', error);
-
-      // 401 = token expiré/révoqué : ne JAMAIS se rabattre sur le cache,
-      // sinon l'app affiche un utilisateur fantôme dont tous les appels
-      // API échouent. On purge la session (le redirect /login est géré
-      // globalement par api.js).
+      // 401 = visiteur anonyme OU session expirée/révoquée : cas NORMAL au
+      // bootstrap (l'app sonde /auth/me systématiquement, le cookie httpOnly
+      // étant invisible cross-origin). Pas un log d'erreur — on purge la
+      // session (ne JAMAIS se rabattre sur le cache, sinon l'app afficherait
+      // un utilisateur fantôme dont tous les appels échouent ; le redirect
+      // /login est géré globalement par api.js).
       if (error?.response?.status === 401) {
         clearToken();
         setUser(null);
       } else {
+        safeLog.error('Error loading user:', error);
         // Hors 401 (réseau, 5xx…) : cache autorisé en dernier recours
         const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);
         if (cachedUser) {
@@ -171,6 +172,24 @@ export function AuthProvider({ children }) {
 
   // Établit la session après une auth réussie (cookie httpOnly posé par le
   // backend ; on ne stocke que le profil en localStorage, jamais le token).
+  // Décode l'expiration du JWT (payload base64url) pour stocker
+  // token_expires_at : au bootstrap, le token EXPIRÉ est alors purgé AVANT
+  // tout appel (évite d'envoyer un header stale — avec une session cookie
+  // valide, le backend retombe de toute façon sur le cookie, mais le header
+  // expiré forçait un 401/403 CSRF inutile sur les mutations).
+  const readJwtExpiry = (accessToken) => {
+    try {
+      const parts = String(accessToken || '').split('.');
+      if (parts.length < 2) return null;
+      const payload = JSON.parse(
+        atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+      );
+      return payload && payload.exp ? payload.exp * 1000 : null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
   // Persiste le jeton en localStorage pour l'en-tête Authorization (mode
   // hybride) — le cookie httpOnly reste le canal primaire là où il est
   // accepté. Clé 'token' : lue par getAuthToken (api.js) et purgée par
@@ -179,6 +198,8 @@ export function AuthProvider({ children }) {
     if (!accessToken) return;
     try {
       localStorage.setItem('token', accessToken);
+      const expiry = readJwtExpiry(accessToken);
+      if (expiry) localStorage.setItem('token_expires_at', String(expiry));
     } catch (_error) {
       // localStorage indisponible (tests jsdom / privé) : le cookie reste le
       // seul canal.
