@@ -38,6 +38,7 @@ from kojo_core import (
     request_counts,
 )
 from kojo_email import generate_email_otp_code, hash_email_otp
+from kojo_scheduler import payout_stuck_sweeper_loop
 from kojo_settings import APP_ENV, APP_VERSION, FRONTEND_APP_URL, logger
 
 
@@ -269,7 +270,7 @@ app.add_middleware(
         "X-CSRFToken",
         "Cache-Control"
     ],
-    expose_headers=["Content-Range", "X-Content-Range"],
+    expose_headers=["Content-Range", "X-Content-Range", "X-Kojo-CSRFToken"],
     max_age=86400,
 )
 
@@ -308,17 +309,21 @@ async def lifespan(application: FastAPI):
     except Exception as exc:
         logger.error(f"⚠️ create_database_indexes() a échoué, démarrage poursuivi quand même: {exc}")
 
-    # Tâche de fond stockée pour être annulée proprement au shutdown (évite
+    # Tâches de fond stockées pour être annulées proprement au shutdown (évite
     # le warning "Task was destroyed but it is pending" et coupe la boucle).
     rate_limit_task = asyncio.create_task(_rate_limit_cleanup_loop())
+    # Surveille les décaissements bloqués (releasing/refunding) : re-vérifie
+    # PayDunya et alerte le propriétaire au-delà du seuil (kojo_scheduler).
+    payout_sweeper_task = asyncio.create_task(payout_stuck_sweeper_loop())
     logger.info("✅ API Kojo prête!")
 
     yield  # l'application tourne ici
 
     # ---- SHUTDOWN ----
     rate_limit_task.cancel()
+    payout_sweeper_task.cancel()
     try:
-        await rate_limit_task
+        await asyncio.gather(rate_limit_task, payout_sweeper_task)
     except asyncio.CancelledError:
         pass
     client.close()

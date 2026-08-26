@@ -149,6 +149,7 @@ async def get_conversation_messages(
     conversation_id: str,
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    order: str = Query(default="asc", pattern="^(asc|desc)$"),
     current_user: User = Depends(get_current_user)
 ):
     # Verify user is part of conversation. conversation_id est formaté
@@ -159,11 +160,16 @@ async def get_conversation_messages(
     if current_user.id not in participant_ids:
         raise HTTPException(status_code=403, detail="Access denied")
     
-    # Pagination par offset (les plus anciens sont chargés ensuite : offset
-    # croissant) — un fil de plus de 100 messages n'est plus tronqué.
+    # Pagination par offset. Le mode asc conserve le contrat historique ; le
+    # mode desc permet au frontend de récupérer d'abord les messages récents,
+    # puis les pages plus anciennes avec un offset croissant.
+    sort_direction = -1 if order == "desc" else 1
     messages = await db.messages.find({
         "conversation_id": conversation_id
-    }).sort("timestamp", 1).skip(offset).to_list(limit)
+    }).sort("timestamp", sort_direction).skip(offset).to_list(limit)
+    if order == "desc":
+        # L'UI affiche toujours le fil dans l'ordre chronologique.
+        messages.reverse()
 
     # Marquer comme lus les messages REÇUS par l'utilisateur qui ouvre la
     # conversation (le flag read n'était jamais utilisé : aucun indicateur

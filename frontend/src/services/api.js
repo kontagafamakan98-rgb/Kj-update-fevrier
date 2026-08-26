@@ -173,13 +173,14 @@ const AUTH_STORAGE_KEYS = [
 ];
 
 let sessionRedirecting = false;
+let csrfTokenMemory = '';
 
 /**
  * Session expirée ou révoquée (401) : purge locale (localStorage +
  * sessionStorage) et redirection vers /login. Garde-fou anti-boucle (une
  * seule redirection) et anti-crash (jsdom/tests).
  */
-const handleUnauthorized = (path) => {
+const handleUnauthorized = (path, { redirect = true } = {}) => {
   if (BUSINESS_401_PREFIXES.some((prefix) => path.startsWith(prefix))) return;
   if (sessionRedirecting) return;
 
@@ -209,6 +210,8 @@ const handleUnauthorized = (path) => {
     purge('sessionStorage');
   } catch (_error) {}
 
+  if (!redirect) return;
+
   sessionRedirecting = true;
 
   try {
@@ -230,6 +233,7 @@ const handleUnauthorized = (path) => {
 const CSRF_COOKIE_NAME = 'kojo_csrf';
 
 const readCsrfCookie = () => {
+  if (csrfTokenMemory) return csrfTokenMemory;
   if (typeof document === 'undefined' || !document.cookie) return '';
   const match = document.cookie
     .split('; ')
@@ -240,10 +244,9 @@ const readCsrfCookie = () => {
 // Détection d'une session active pour l'amorçage au montage de l'app : le
 // cookie de session est httpOnly (non lisible en JS), mais le cookie CSRF
 // associé l'est → sa présence indique qu'une session existe.
-export const hasSessionCookie = () =>
-  typeof document !== 'undefined' && document.cookie.indexOf(`${CSRF_COOKIE_NAME}=`) !== -1;
+export const hasSessionCookie = () => Boolean(readCsrfCookie());
 
-const request = async (method, path, { params, data, headers } = {}) => {
+const request = async (method, path, { params, data, headers, skipUnauthorizedRedirect = false } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${buildApiUrl(normalizedPath)}${buildQueryString(params)}`;
   const token = getAuthToken();
@@ -275,9 +278,12 @@ const request = async (method, path, { params, data, headers } = {}) => {
     }
   }
 
+  const responseCsrfToken = response.headers?.get?.('X-Kojo-CSRFToken');
+  if (responseCsrfToken) csrfTokenMemory = responseCsrfToken;
+
   if (!response.ok) {
     if (response.status === 401) {
-      handleUnauthorized(normalizedPath);
+      handleUnauthorized(normalizedPath, { redirect: !skipUnauthorizedRedirect });
     }
 
     const fallbackMessage = `HTTP ${response.status}`;
@@ -319,8 +325,8 @@ export const authAPI = {
   logout: async () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   getMe: () => api.get('/auth/me'),
-  getProfile: () => api.get('/auth/me'),
-  getCurrentUser: () => api.get('/auth/me'),
+  getProfile: (options = {}) => api.get('/auth/me', options),
+  getCurrentUser: (options = {}) => api.get('/auth/me', options),
   updateCountry: (payload) => api.patch('/auth/me/country', payload),
   // Google SSO : le frontend envoie le code d'autorisation (jamais l'id_token).
   googleAuth: (payload) => api.post('/auth/google', payload),
@@ -434,7 +440,7 @@ export const messagesAPI = {
   list: async () => normalizeMessageListResponse(await api.get('/messages')),
   getConversations: async () => normalizeConversationListResponse(await api.get('/messages/conversations')),
   getConversation: async (conversationId) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`)),
-  getMessages: async (conversationId, { limit = 100, offset = 0 } = {}) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`, { params: { limit, offset } })),
+  getMessages: async (conversationId, { limit = 100, offset = 0, order = 'asc' } = {}) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`, { params: { limit, offset, order } })),
 };
 
 const camelToKebab = (value) => String(value || '')
@@ -521,6 +527,7 @@ export const usersAPI = {
   getUserProfilePhoto: (userId) => api.get(`/users/${userId}/profile-photo`),
   uploadProfilePhoto: (formData) => api.post('/users/profile-photo', formData),
   deleteProfilePhoto: () => api.delete('/users/profile-photo'),
+  deleteAccount: () => api.delete('/users/account'),
   // Profile update
   updateProfile: (payload) => api.put('/users/profile', payload),
   // Portfolio travailleur (photos de réalisations)
@@ -539,6 +546,7 @@ export const workerAPI = createResourceApi('workers');
 export const workersAPI = workerAPI;
 export const workerProfileAPI = {
   get: () => api.get('/workers/profile'),
+  create: (payload) => api.post('/workers/profile', payload),
   update: (payload) => api.put('/workers/profile', payload),
 };
 export const notificationAPI = {

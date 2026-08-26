@@ -14,10 +14,9 @@ import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import ConfirmModal from '../components/ConfirmModal';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
-import { usersAPI, reviewAPI, workerProfileAPI, getAuthToken } from '../services/api';
+import { usersAPI, reviewAPI, workerProfileAPI } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n';
 import { devLog, safeLog } from '../utils/env';
-import { buildApiUrl } from '../utils/backendUrl';
 import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 
@@ -143,19 +142,7 @@ export default function Profile() {
   const handleWorkerProfileCreate = async (workerData) => {
     try {
       setError('');
-      const response = await fetch(buildApiUrl('/workers/profile'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getAuthToken()}`
-        },
-        body: JSON.stringify(workerData)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || t('profileCreateError'));
-      }
+      await workerProfileAPI.create(workerData);
 
       setSuccess(t('profileCreated'));
       await loadProfile();
@@ -372,14 +359,7 @@ export default function Profile() {
                 }
                 setDeletingAccount(true);
                 try {
-                  const res = await fetch(buildApiUrl('/users/account'), {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${getAuthToken()}` }
-                  });
-                  if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    throw new Error(errData.detail || t('deleteAccountFailed'));
-                  }
+                  await usersAPI.deleteAccount();
                   await logout();
                   navigate('/');
                 } catch (deleteError) {

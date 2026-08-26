@@ -163,6 +163,14 @@ AUTH_COOKIE_SECURE = os.environ.get(
 # Durée du cookie alignée sur le JWT (24h) : le cookie expire avec le token.
 AUTH_COOKIE_MAX_AGE = JWT_EXPIRATION_HOURS * 3600
 
+# --- Sweeper des décaissements bloqués (tâche de fond, kojo_scheduler) ---
+# Un versement/remboursement resté incertain (releasing/refunding — l'IPN n'a
+# pas tranché) au-delà de ce seuil déclenche une alerte au propriétaire.
+PAYOUT_ALERT_THRESHOLD_HOURS = float(os.environ.get('PAYOUT_ALERT_THRESHOLD_HOURS', '24'))
+
+# Fréquence du passage de re-vérification PayDunya (minutes).
+PAYOUT_SWEEPER_INTERVAL_MINUTES = int(os.environ.get('PAYOUT_SWEEPER_INTERVAL_MINUTES', '60'))
+
 # --- Google Sign-In (SSO) ---
 # Flux serveur : le frontend reçoit un code d'autorisation Google (PKCE) et
 # le backend l'échange contre un id_token, dont il vérifie la signature et

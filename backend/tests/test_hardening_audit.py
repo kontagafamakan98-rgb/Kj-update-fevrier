@@ -278,6 +278,146 @@ class TestAccountDeletion:
         assert stored.get("password_hash") is None
         assert stored.get("phone") is None
 
+    async def _insert_payment(self, payer_id, job_id=None, payout_status="held", receiver_id="worker-1", amount=15000):
+        """Insère un paiement complété (fonds séquestrés / versés) en base."""
+        await db_insert("payments", {
+            "id": str(uuid.uuid4()),
+            "job_id": job_id or str(uuid.uuid4()),
+            "payer_id": payer_id,
+            "receiver_id": receiver_id,
+            "amount": amount,
+            "status": "completed",
+            "payout_status": payout_status,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def test_delete_account_refunds_held_payment_before_anonymization(self, client: AsyncClient):
+        """Point 1 RGPD : les fonds séquestrés (held) sont remboursés AVANT la
+        purge de payment_accounts. La preuve de l'ordre est implicite : si
+        l'anonymisation précédait le refund, execute_paydunya_refund ne
+        trouverait plus de compte mobile money → refund_failed → 409. Ici on
+        exige 200 + refunded, donc le refund a tourné avec les comptes encore
+        en base."""
+        user = await register_and_login(client, BASE_USER)
+        headers = {"Authorization": f"Bearer {user['access_token']}"}
+        job_id = str(uuid.uuid4())
+        await db_insert("jobs", {
+            "id": job_id, "title": "Mission payée", "client_id": user["user"]["id"],
+            "status": "in_progress", "deleted": False,
+        })
+        await self._insert_payment(user["user"]["id"], job_id=job_id, payout_status="held")
+
+        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+                   return_value={"disburse_token": "refund-token-abc", "response_code": "00"}), \
+             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+                   return_value={"status": "success", "response_code": "00"}):
+            resp = await client.delete("/api/users/account", headers=headers)
+
+        assert resp.status_code == 200, resp.text
+        # Le paiement a été remboursé (le refund a donc lu les comptes du
+        # payeur avant qu'ils ne soient purgés).
+        payment = await db_find_one("payments", {"job_id": job_id})
+        assert payment["payout_status"] == "refunded"
+        assert payment["payout_kind"] == "refund"
+        # Compte bien anonymisé APRÈS le remboursement.
+        stored = await db_find_one("users", {"id": user["user"]["id"]})
+        assert stored.get("deleted") is True
+        assert stored.get("payment_accounts") is None
+
+    async def test_delete_account_blocked_when_payment_in_flight(self, client: AsyncClient):
+        """Point 2 RGPD : la garde 409 couvre releasing (versement en vol) ET
+        refunding (remboursement en vol) — l'IPN n'a pas tranché, le compte ne
+        doit pas être supprimé."""
+        for payout_status in ("releasing", "refunding"):
+            user = await register_and_login(client, {
+                **BASE_USER, "email": f"inflight-{payout_status}@kojo.sn",
+            })
+            headers = {"Authorization": f"Bearer {user['access_token']}"}
+            await self._insert_payment(user["user"]["id"], payout_status=payout_status)
+
+            resp = await client.delete("/api/users/account", headers=headers)
+            assert resp.status_code == 409, f"{payout_status}: {resp.text}"
+            stored = await db_find_one("users", {"id": user["user"]["id"]})
+            assert stored.get("deleted") is not True
+            assert stored.get("payment_accounts") is not None
+
+    async def test_delete_account_blocked_when_refund_fails(self, client: AsyncClient):
+        """Un remboursement qui ÉCHOUE explicitement bloque la suppression
+        (409) : le compte garde ses moyens de paiement pour que le propriétaire
+        puisse relancer (retry-refund) — l'argent n'est pas condamné."""
+        user = await register_and_login(client, BASE_USER)
+        headers = {"Authorization": f"Bearer {user['access_token']}"}
+        await self._insert_payment(user["user"]["id"], payout_status="held")
+
+        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+                   return_value={"disburse_token": "refund-token-fail", "response_code": "00"}), \
+             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+                   return_value={"status": "failed", "response_code": "01", "response_text": "Compte invalide"}):
+            resp = await client.delete("/api/users/account", headers=headers)
+
+        assert resp.status_code == 409, resp.text
+        stored = await db_find_one("users", {"id": user["user"]["id"]})
+        assert stored.get("deleted") is not True
+        assert stored.get("payment_accounts") is not None
+
+    async def test_delete_account_resets_worker_assigned_jobs(self, client: AsyncClient):
+        """Point 3 RGPD : un travailleur qui supprime son compte ne laisse pas
+        de missions orphelines — le job est réinitialisé (annulé, assignment
+        retiré) et le CLIENT est remboursé des fonds séquestrés."""
+        worker = await register_and_login(client, WORKER_USER)
+        client_user = await register_and_login(client, {
+            **BASE_USER, "email": "client-worker-del@kojo.sn",
+        })
+        job_id = str(uuid.uuid4())
+        await db_insert("jobs", {
+            "id": job_id, "title": "Mission attribuée", "client_id": client_user["user"]["id"],
+            "assigned_worker_id": worker["user"]["id"],
+            "status": "in_progress", "deleted": False,
+        })
+        await self._insert_payment(
+            client_user["user"]["id"], job_id=job_id,
+            receiver_id=worker["user"]["id"], amount=20000, payout_status="held",
+        )
+
+        headers = {"Authorization": f"Bearer {worker['access_token']}"}
+        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+                   return_value={"disburse_token": "refund-token-abc", "response_code": "00"}), \
+             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+                   return_value={"status": "success", "response_code": "00"}):
+            resp = await client.delete("/api/users/account", headers=headers)
+
+        assert resp.status_code == 200, resp.text
+        job = await db_find_one("jobs", {"id": job_id})
+        assert job["status"] == "cancelled"
+        assert job["assigned_worker_id"] is None
+        # Le client (payeur intact) a bien été remboursé.
+        payment = await db_find_one("payments", {"job_id": job_id})
+        assert payment["payout_status"] == "refunded"
+        assert payment["payout_kind"] == "refund"
+
+    async def test_delete_account_leaves_terminal_payments_untouched(self, client: AsyncClient):
+        """Point 4 RGPD : un paiement déjà versé (released) ou déjà remboursé
+        (refunded) n'est NI re-remboursé NI bloqué : la suppression passe et
+        aucun appel de décaissement n'est émis."""
+        for payout_status in ("released", "refunded"):
+            user = await register_and_login(client, {
+                **BASE_USER, "email": f"terminal-{payout_status}@kojo.sn",
+            })
+            headers = {"Authorization": f"Bearer {user['access_token']}"}
+            await self._insert_payment(user["user"]["id"], payout_status=payout_status)
+
+            with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+                       return_value={"disburse_token": "should-not-run", "response_code": "00"}) as mock_create, \
+                 patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+                       return_value={"status": "success", "response_code": "00"}) as mock_submit:
+                resp = await client.delete("/api/users/account", headers=headers)
+
+            assert resp.status_code == 200, f"{payout_status}: {resp.text}"
+            assert mock_create.call_count == 0, f"{payout_status}: refund relancé à tort"
+            assert mock_submit.call_count == 0, f"{payout_status}: submit émis à tort"
+            stored = await db_find_one("users", {"id": user["user"]["id"]})
+            assert stored.get("deleted") is True
+
     def _patch_support(self, client):
         pass
 

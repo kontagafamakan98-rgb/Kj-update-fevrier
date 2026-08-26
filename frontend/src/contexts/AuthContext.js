@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI, handleApiError, hasSessionCookie } from '../services/api';
+import { authAPI, handleApiError } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
@@ -28,9 +28,14 @@ export function AuthProvider({ children }) {
   // pas purgé — l'auth dual-mode du backend l'accepte.
 
   const clearToken = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('token_expires_at');
-    localStorage.removeItem('user');
+    const keys = [
+      'token', 'token_expires_at', 'user', 'auth_token', 'access_token',
+      'accessToken', 'kojo_token', 'jwt', 'bearer_token', 'auth',
+      'auth_user', 'session_user', 'currentUser', 'kojo_user',
+    ];
+    for (const storage of [localStorage, sessionStorage]) {
+      keys.forEach((key) => storage.removeItem(key));
+    }
   };
 
   // PRIVACITÉ : avant de persister le profil en localStorage, on retire les
@@ -97,27 +102,19 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // Amorçage de session au démarrage de l'app.
-    // 1) ancien token localStorage non expiré (migration) → loadUser (header)
-    // 2) cookie de session httpOnly présent (détecté via le cookie CSRF
-    //    associé, lisible en JS) → loadUser (cookie)
-    // 3) sinon → visiteur anonyme
+    // Le cookie de session httpOnly n'est pas lisible depuis JavaScript,
+    // surtout quand l'API est sur un autre domaine. On sonde donc /auth/me
+    // systématiquement; un 401 silencieux signifie simplement visiteur anonyme.
     // Migration privacy : purge les numéros de paiement stockés par une
     // ancienne version du code dans le profil localStorage.
     purgeStoredPaymentAccounts();
     const token = localStorage.getItem('token');
-    if (token) {
-      if (isTokenExpiredLocally()) {
-        // Token expiré côté client : on nettoie sans appel réseau inutile
-        clearToken();
-        setLoading(false);
-      } else {
-        loadUser();
-      }
-    } else if (hasSessionCookie()) {
-      loadUser();
-    } else {
-      setLoading(false);
+    if (token && isTokenExpiredLocally()) {
+      // Token expiré côté client : on nettoie sans appel réseau inutile,
+      // mais on sonde tout de même le cookie httpOnly éventuel.
+      clearToken();
     }
+    loadUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -132,7 +129,9 @@ export function AuthProvider({ children }) {
         return;
       }
       
-      const userData = await authAPI.getProfile();
+      // Le 401 attendu d'un visiteur ne doit pas déclencher la redirection
+      // globale de api.js avant que ProtectedRoute ait décidé quoi faire.
+      const userData = await authAPI.getProfile({ skipUnauthorizedRedirect: true });
       setUser(userData);
       
       // Cache user data for offline access (sans les numéros de paiement)

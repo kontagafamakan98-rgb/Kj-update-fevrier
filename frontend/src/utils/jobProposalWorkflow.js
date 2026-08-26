@@ -1,9 +1,8 @@
 import { getStoredSessionUser, normalizeComparableId } from './jobPageSafeHelpers';
-// Construction d'URL : source de vérité unique (backendUrl.buildApiUrl).
-// Ne PAS réimplémenter la dérivation de base ici — bug réel historique de
-// double préfixe /api/api quand deux helpers normalisent différemment la
-// même variable d'environnement.
-import { buildApiUrl } from './backendUrl';
+// Tous les appels réseau passent par le client central `api` (api.js) :
+// credentials: 'include' (cookie de session httpOnly) + en-tête X-CSRFToken
+// sur les mutations + Bearer legacy si un ancien token traîne en storage.
+import { api } from '../services/api';
 
 const STORAGE_KEY = 'kojo_job_applications_v1';
 const ACCEPTED_STORAGE_KEY = 'kojo_job_accepted_v1';
@@ -57,127 +56,30 @@ const persistAcceptedMap = (value) => {
   }
 };
 
-const getPossibleTokenKeys = () => ([
-  'token',
-  'authToken',
-  'access_token',
-  'accessToken',
-  'jwt',
-  'kojo_token',
-  'kojo_auth_token',
-  'userToken',
-  'authData',
-  'auth',
-  'session',
-  'user',
-]);
-
-const extractTokenFromRawValue = (rawValue) => {
-  if (!rawValue) return '';
-  if (typeof rawValue === 'string') {
-    const trimmed = rawValue.trim();
-    if (!trimmed) return '';
-    if (/^Bearer\s+/i.test(trimmed)) return trimmed.replace(/^Bearer\s+/i, '').trim();
-    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-      try {
-        return extractTokenFromRawValue(JSON.parse(trimmed));
-      } catch (_error) {
-        return trimmed;
-      }
-    }
-    return trimmed;
-  }
-
-  if (typeof rawValue === 'object') {
-    const candidates = [
-      rawValue.token,
-      rawValue.access_token,
-      rawValue.accessToken,
-      rawValue.jwt,
-      rawValue.authToken,
-      rawValue?.data?.token,
-      rawValue?.data?.access_token,
-      rawValue?.data?.accessToken,
-    ];
-
-    for (const candidate of candidates) {
-      const token = extractTokenFromRawValue(candidate);
-      if (token) return token;
-    }
-  }
-
-  return '';
-};
-
-const getAuthToken = () => {
-  for (const bucket of getStorageBuckets()) {
-    for (const key of getPossibleTokenKeys()) {
-      try {
-        const token = extractTokenFromRawValue(bucket.getItem(key));
-        if (token) return token;
-      } catch (_error) {}
-    }
-  }
-  return '';
-};
-
-const extractApiErrorMessage = (payload, fallback) => {
-  if (typeof payload === 'string' && payload.trim()) return payload.trim();
-  if (Array.isArray(payload)) {
-    const joined = payload
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object') return item.msg || item.message || item.detail || '';
-        return '';
-      })
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    if (joined) return joined;
-  }
-  if (payload && typeof payload === 'object') {
-    if (typeof payload.detail === 'string' && payload.detail.trim()) return payload.detail.trim();
-    if (Array.isArray(payload.detail)) return extractApiErrorMessage(payload.detail, fallback);
-    return payload.message || payload.msg || fallback;
-  }
-  return fallback;
-};
-
 const fetchApiJson = async (path, options = {}) => {
-  const token = getAuthToken();
-  const headers = {
-    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-    ...(options.headers || {}),
-  };
+  const method = String(options.method || 'GET').toUpperCase();
+  const rawBody = options.body;
+  const body =
+    rawBody === undefined
+      ? undefined
+      : typeof rawBody === 'string'
+        ? JSON.parse(rawBody)
+        : rawBody;
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(buildApiUrl(path), {
-    ...options,
-    headers,
-  });
-
-  const rawText = await response.text();
-  let payload = null;
-  if (rawText) {
-    try {
-      payload = JSON.parse(rawText);
-    } catch (_error) {
-      payload = rawText;
+  try {
+    if (method === 'GET') return await api.get(path);
+    if (method === 'PUT') return await api.put(path, body);
+    if (method === 'PATCH') return await api.patch(path, body);
+    if (method === 'DELETE') return await api.delete(path);
+    return await api.post(path, body);
+  } catch (error) {
+    // Compat : les appelants lisent error.status (ex: sendProposalConversationMessage
+    // retente d'autres formes de payload sur 400/404/405/422).
+    if (error && !error.status && error.response) {
+      error.status = error.response.status;
     }
-  }
-
-  if (!response.ok) {
-    const fallback = `HTTP ${response.status}`;
-    const error = new Error(extractApiErrorMessage(payload, fallback));
-    error.status = response.status;
-    error.response = { data: payload };
     throw error;
   }
-
-  return payload;
 };
 
 export const getCurrentUserIdentitySet = (currentUser) => {

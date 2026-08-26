@@ -4,8 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { detectUserCountry, getPhoneExampleForCountry, getPhonePrefixByCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { devLog, safeLog } from '../utils/env';
-import { buildApiUrl } from '../utils/backendUrl';
-import { getAuthToken } from '../services/api';
+import { api } from '../services/api';
 import CountryDisplay from './CountryDisplay';
 
 const createDefaultAccounts = (initialAccounts = null) => ({
@@ -226,21 +225,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         onComplete && onComplete(paymentData);
       } else {
         // Pour la mise à jour, appeler l'API
-        const response = await fetch(buildApiUrl('/users/payment-accounts'), {
-          method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`
-        },
-        body: JSON.stringify(paymentData)
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || t('error'));
-        }
-
-        const result = await response.json();
+        const result = await api.put('/users/payment-accounts', paymentData);
         onComplete && onComplete(result);
       }
 

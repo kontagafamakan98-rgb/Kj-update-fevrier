@@ -16,9 +16,8 @@ export default function Messages() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  // Pagination du fil : les 100 messages les plus récents d'abord… non,
-  // le backend renvoie par ordre chronologique avec offset/limit — on charge
-  // 50 premiers, puis « Afficher plus » ajoute les 50 suivants (plus anciens).
+  // Pagination du fil : les 50 messages les plus récents d'abord, puis les
+  // pages plus anciennes sont insérées au début sans casser l'ordre visuel.
   const MESSAGE_PAGE_SIZE = 50;
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -55,8 +54,9 @@ export default function Messages() {
     const intervalId = setInterval(() => {
       loadMessages(activeConversation, activeConversationData, {
         silent: true,
-        offset: messagesCountRef.current,
-        append: true
+        offset: 0,
+        order: 'desc',
+        refresh: true
       });
     }, 5000);
     return () => clearInterval(intervalId);
@@ -86,20 +86,30 @@ export default function Messages() {
   const loadMessages = async (conversationId, conversationData, {
     silent = false,
     offset = 0,
-    append = false
+    order = 'desc',
+    append = false,
+    refresh = false
   } = {}) => {
     try {
-      const limit = append ? MESSAGE_PAGE_SIZE : Math.max(MESSAGE_PAGE_SIZE, messagesCountRef.current || 0);
-      const data = await messagesAPI.getMessages(conversationId, { limit, offset });
+      const data = await messagesAPI.getMessages(conversationId, { limit: MESSAGE_PAGE_SIZE, offset, order });
       if (append) {
-        // Chargement des messages PLUS ANCIENS : on concatène après ceux déjà
-        // affichés (le backend trie par timestamp croissant, donc offset = nb
-        // de messages déjà chargés retourne la tranche suivante).
-        setMessages((prev) => [...prev, ...data]);
+        // La page ancienne est renvoyée chronologiquement après reverse côté
+        // backend : elle se place donc avant le contenu déjà affiché.
+        setMessages((prev) => [...data, ...prev]);
+      } else if (refresh) {
+        // Le polling fusionne les nouveaux messages sans effacer les pages
+        // anciennes déjà chargées ni dupliquer un élément existant.
+        setMessages((prev) => {
+          const knownIds = new Set(prev.map((message) => message.id));
+          const fresh = data.filter((message) => !knownIds.has(message.id));
+          return fresh.length ? [...prev, ...fresh] : prev;
+        });
       } else {
         setMessages(data);
       }
-      setHasMoreMessages(append ? data.length === MESSAGE_PAGE_SIZE : data.length >= MESSAGE_PAGE_SIZE);
+      if (!refresh) {
+        setHasMoreMessages(data.length === MESSAGE_PAGE_SIZE);
+      }
       if (!silent) {
         // Nouvelle conversation ouverte : on veut toujours défiler en bas au
         // premier chargement, quelle que soit la taille de la précédente.
@@ -119,13 +129,11 @@ export default function Messages() {
     if (!activeConversation || loadingOlder) return;
     setLoadingOlder(true);
     setMoreError('');
-    await loadMessages(activeConversation, activeConversationData, { silent: true, offset: messages.length, append: true });
+    await loadMessages(activeConversation, activeConversationData, { silent: true, offset: messages.length, order: 'desc', append: true });
   };
 
-  // Le polling silencieux recharge les messages au-delà du fil déjà affiché :
-  // offset = nombre de messages chargés → seuls les vrais nouveaux arrivés
-  // sont récupérés et concaténés, sans devoir recharger tout le fil (qui
-  // peut dépasser 100 messages une fois « Afficher plus » utilisé).
+  // Conserve la taille affichée pour calculer l'offset de la prochaine page
+  // de messages plus anciens.
   useEffect(() => {
     messagesCountRef.current = messages.length;
   }, [messages]);
@@ -144,7 +152,7 @@ export default function Messages() {
       });
 
       setNewMessage('');
-      loadMessages(activeConversation, activeConversationData);
+      loadMessages(activeConversation, activeConversationData, { order: 'desc' });
     } catch (error) {
       safeLog.error('Error sending message:', handleApiError(error));
     }

@@ -577,6 +577,11 @@ def set_auth_cookies(response: Response, access_token: str) -> None:
         httponly=False,
         samesite=AUTH_COOKIE_SAMESITE,
     )
+    # Le frontend Vercel est sur une autre origine que l'API Fly : il ne peut
+    # pas lire document.cookie du backend. L'en-tête expose uniquement le
+    # jeton CSRF (jamais le cookie httpOnly de session), que le client ré-écho
+    # ensuite sur les mutations.
+    response.headers["X-Kojo-CSRFToken"] = csrf_token
 
 
 def clear_auth_cookies(response: Response) -> None:
@@ -600,6 +605,13 @@ class WestAfricaSecurityMiddleware(BaseHTTPMiddleware):
 
         response.headers["X-Kojo-Region"] = "west-africa"
         response.headers["X-Kojo-Version"] = APP_VERSION
+        # Après le premier login, le navigateur cross-origin ne peut pas lire
+        # le cookie CSRF. Ré-émettre sa valeur dans un header CORS exposé
+        # permet au frontend de conserver le double-submit sans exposer la
+        # session httpOnly.
+        csrf_token = request.cookies.get(CSRF_COOKIE_NAME)
+        if csrf_token:
+            response.headers["X-Kojo-CSRFToken"] = csrf_token
         # Vary inclut Cookie : les réponses authentifiées dépendent du
         # cookie de session httpOnly — un cache intermédiaire ne doit pas
         # servir la réponse d'un utilisateur à un autre.

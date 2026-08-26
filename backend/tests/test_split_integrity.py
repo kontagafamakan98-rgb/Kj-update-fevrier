@@ -123,7 +123,7 @@ def test_no_undefined_names_in_split_modules():
         "kojo_routers_auth", "kojo_routers_geo", "kojo_routers_jobs",
         "kojo_routers_messages", "kojo_routers_notifications",
         "kojo_routers_owner", "kojo_routers_payments", "kojo_routers_support",
-        "kojo_routers_users", "kojo_settings", "kojo_shared",
+        "kojo_routers_users", "kojo_scheduler", "kojo_settings", "kojo_shared",
     ]
     import kojo_shared  # noqa: F401  (importe pywebpush si dispo)
 

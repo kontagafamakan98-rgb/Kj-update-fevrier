@@ -31,6 +31,9 @@ from kojo_payments import (
     get_paydunya_withdraw_mode, strip_country_code_for_disburse,
     submit_paydunya_disburse_invoice,
 )
+# Réutilise le remboursement PayDunya de kojo_routers_jobs (point unique de
+# vérité du décaissement de refund, avec verrou CAS et mapping IPN refund-aware).
+from kojo_routers_jobs import execute_paydunya_refund
 
 # Même règle que le modèle User (prénom/nom).
 _NAME_PATTERN = re.compile(r"^[a-zA-ZÀ-ÿ\s\-\'0-9_\.]+$")
@@ -924,26 +927,174 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
 # Suppression de compte (droit RGPD / store) — SOFT DELETE + anonymisation
 # ---------------------------------------------------------------------------
 
+# Statuts de versement REFUNDABLES de façon SÛRE (PayDunya n'a rien exécuté) :
+# held (fonds séquestrés), release_failed (versement travailleur refusé),
+# refund_failed (échec EXPLICITE d'un remboursement précédent — rien exécuté,
+# une relance est sûre).
+REFUNDABLE_PAYOUT_STATES = ("held", "release_failed", "refund_failed")
+
 @router.delete("/users/account")
 async def delete_my_account(current_user: User = Depends(get_current_user)):
     """Supprime définitivement le compte de l'utilisateur connecté.
 
-    - Soft delete + anonymisation des PII (email masqué, mot de passe et
-      numéro de téléphone effacés) → les jetons existants deviennent inutiles
-      (get_current_user rejette un compte `deleted`, et aucun login possible
-      sans password_hash).
-    - Cascade : push tokens, notifications, propositions envoyées, avis
-      laissés ; les jobs créés par le client sont soft-deleted (les missions
-      en cours sont annulées sans remboursement automatique : l'utilisateur
-      confirme la destruction de ses données).
-    - Les enregistrements DE PAIEMENT sont conservés (obligation comptable /
-      lutte contre la fraude) : ils référencent des identifiants internes,
-      plus aucune PII n'y est jointe après anonymisation.
+    Ordre critique (audit RGPD) :
+    1. Les fonds SÉQUESTRÉS (paiement `held` / `release_failed` /
+       `refund_failed` où l'utilisateur est le PAYEUR) sont remboursés AVANT
+       toute anonymisation : `execute_paydunya_refund` lit les comptes mobile
+       money du payeur en base — purger `payment_accounts` d'abord rendrait
+       le remboursement impossible et l'argent resterait bloqué chez PayDunya.
+    2. GARDE 409 : un versement/remboursement EN VOL (`releasing` /
+       `refunding`) est ambigu (l'IPN n'a pas tranché) → suppression refusée.
+       Un remboursement qui ÉCHOUE bloque aussi la suppression (le propriétaire
+       doit relancer pendant que le compte possède encore ses moyens de
+       paiement).
+    3. Les paiements TERMINÉS (`released` / `refunded`) ne sont JAMAIS
+       touchés : ni re-remboursés, ni re-annulés (pas de double remboursement).
+    4. Les missions où ce compte est le TRAVAILLEUR assigné sont
+       réinitialisées (annulées, assignment retiré) et le CLIENT est remboursé
+       des fonds séquestrés — les données du client ne sont pas supprimées.
+
+    Puis : soft delete + anonymisation des PII (email masqué, mot de passe et
+    numéro de téléphone effacés) → les jetons existants deviennent inutiles
+    (get_current_user rejette un compte `deleted`, et aucun login possible
+    sans password_hash).
+    Cascade : push tokens, notifications, propositions envoyées, avis laissés ;
+    les jobs créés par le client sont soft-deleted. Les messages restent (ils
+    appartiennent aussi à l'autre partie). Les enregistrements DE PAIEMENT
+    sont conservés (obligation comptable / lutte contre la fraude) : ils
+    référencent des identifiants internes, plus aucune PII n'y est jointe
+    après anonymisation.
     """
     user_id = current_user.id
-
-    anonymous_email = f"deleted_{uuid.uuid4().hex[:12]}@kojo.deleted"
     now = datetime.now(timezone.utc)
+
+    # ------------------------------------------------------------------
+    # 1) GARDE : paiement en vol (versement OU remboursement) côté PAYEUR
+    # ------------------------------------------------------------------
+    # releasing = versement au travailleur en cours ; refunding = remboursement
+    # en cours. Dans les deux cas l'IPN n'a pas tranché : supprimer le compte
+    # maintenant gèlerait l'argent sans voie de résolution → 409.
+    in_flight_payment = await db.payments.find_one(
+        {
+            "payer_id": user_id,
+            "status": "completed",
+            "payout_status": {"$in": ["releasing", "refunding"]},
+        },
+        {"_id": 1},
+    )
+    if in_flight_payment:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Un paiement est en cours de traitement sur votre compte : "
+                "attendez sa confirmation avant de supprimer votre compte."
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # 2) REMBOURSEMENT des fonds séquestrés (AVANT toute anonymisation)
+    # ------------------------------------------------------------------
+    # held / release_failed / refund_failed : PayDunya n'a rien exécuté, un
+    # remboursement est sûr. Le verrou CAS (→ refunding) empêche un double
+    # remboursement concurrent. On lit payment_accounts du payeur TANT QU'IL
+    # EST ENCORE EN BASE.
+    refundable_payments = await db.payments.find(
+        {
+            "payer_id": user_id,
+            "status": "completed",
+            "payout_status": {"$in": list(REFUNDABLE_PAYOUT_STATES)},
+        }
+    ).to_list(length=100)
+
+    for payment in refundable_payments:
+        payout_status = payment.get("payout_status") or "held"
+        lock_result = await db.payments.update_one(
+            {"id": payment["id"], "payout_status": payout_status},
+            {"$set": {
+                "payout_status": "refunding",
+                "payout_kind": "refund",
+                "updated_at": now,
+            }},
+        )
+        if lock_result.matched_count == 0:
+            # Concurrence : un autre flux traite déjà ce paiement.
+            continue
+        outcome = await execute_paydunya_refund(payment)
+        if outcome == "refund_failed":
+            # L'argent est coincé : refuser la suppression pour que le
+            # propriétaire puisse relancer (retry-refund) tant que le compte
+            # possède encore ses moyens de paiement.
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Un remboursement automatique a échoué : contactez le "
+                    "support avant de supprimer votre compte."
+                ),
+            )
+        # refunded / refunding → on poursuit (l'IPN confirmera le cas échéant).
+
+    # ------------------------------------------------------------------
+    # 3) RESET des missions où ce compte est le TRAVAILLEUR assigné
+    # ------------------------------------------------------------------
+    # Un travailleur supprimé ne peut plus mener la mission : on annule les
+    # jobs qui lui étaient attribués (les données appartiennent au CLIENT, pas
+    # de soft-delete) et on rembourse le client des fonds séquestrés — le
+    # payeur n'est pas le compte supprimé, ses comptes restent intacts.
+    assigned_jobs = await db.jobs.find(
+        {"assigned_worker_id": user_id, "deleted": {"$ne": True}}
+    ).to_list(length=200)
+
+    for job in assigned_jobs:
+        job_id = job.get("id") or job.get("job_id")
+        if not job_id:
+            continue
+
+        job_payment = await db.payments.find_one(
+            {"job_id": job_id, "status": "completed"},
+            sort=[("created_at", -1)],
+        )
+        if job_payment:
+            payout_status = job_payment.get("payout_status") or "held"
+            if payout_status in REFUNDABLE_PAYOUT_STATES:
+                lock_result = await db.payments.update_one(
+                    {"id": job_payment["id"], "payout_status": payout_status},
+                    {"$set": {
+                        "payout_status": "refunding",
+                        "payout_kind": "refund",
+                        "updated_at": now,
+                    }},
+                )
+                if lock_result.matched_count:
+                    await execute_paydunya_refund(job_payment)
+            # releasing / refunding / released / refunded : l'IPN tranche, on
+            # ne touche à rien (pas de double remboursement).
+
+        await db.jobs.update_one(
+            {"id": job_id},
+            {"$set": {
+                "status": "cancelled",
+                "assigned_worker_id": None,
+                "accepted_proposal_id": None,
+                "cancelled_at": now,
+                "updated_at": now,
+            }},
+        )
+
+        client_id = job.get("client_id")
+        if client_id:
+            asyncio.create_task(notify_user_localized(
+                user_id=client_id,
+                key="mission_cancelled_client",
+                notif_type=NotificationType.GENERAL,
+                related_id=job_id,
+                related_type="job",
+                job_title=job.get("title") or "la mission",
+            ))
+
+    # ------------------------------------------------------------------
+    # 4) ANONYMISATION (soft delete) — APRÈS les remboursements
+    # ------------------------------------------------------------------
+    anonymous_email = f"deleted_{uuid.uuid4().hex[:12]}@kojo.deleted"
 
     await db.users.update_one(
         {"id": user_id},

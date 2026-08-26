@@ -222,6 +222,7 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "referral_withdraw_failed": {"title": "⚠️ Retrait de récompenses en échec", "body": "Votre retrait de {amount} FCFA a échoué. Le montant est toujours sur votre solde, réessayez."},
         "new_ticket_support": {"title": "Nouveau ticket support", "body": "{ticket_text}"},
         "address_dispatched": {"title": "📍 Adresse du chantier reçue", "body": "L'adresse de « {job_title} » vous a été envoyée."},
+        "owner_payout_stuck_alert": {"title": "🚨 Décaissement bloqué", "body": "Paiement {payment_id} : {amount} FCFA toujours en « {status} » depuis plus de {hours} h. Vérification manuelle requise."},
     },
     "en": {
         "bonus_filleul_first_mission": {"title": "🎁 Referral bonus unlocked", "body": "Your first job « {job_title} » is complete: +{amount} FCFA bonus credited to you."},
@@ -248,6 +249,7 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "referral_withdraw_failed": {"title": "⚠️ Referral withdrawal failed", "body": "Your {amount} FCFA withdrawal failed. The amount is still on your balance, please retry."},
         "new_ticket_support": {"title": "New support ticket", "body": "{ticket_text}"},
         "address_dispatched": {"title": "📍 Job address received", "body": "The address for « {job_title} » has been sent to you."},
+        "owner_payout_stuck_alert": {"title": "🚨 Stuck payout", "body": "Payment {payment_id}: {amount} FCFA still in « {status} » for over {hours} h. Manual check required."},
     },
     "wo": {
         "bonus_filleul_first_mission": {"title": "🎁 Bonus bu parrainage bi", "body": "Sa njëkk liggéey « {job_title} » mujj na: +{amount} FCFA bonus ñu la jox."},
@@ -274,6 +276,7 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "referral_withdraw_failed": {"title": "⚠️ Génn bi fexeewul", "body": "Sa génn bu {amount} FCFA fexeewul. Xaalis bi dafay ci sa solde, gay naa indi ci."},
         "new_ticket_support": {"title": "Ticket support bu bees", "body": "{ticket_text}"},
         "address_dispatched": {"title": "📍 Aadreesu mission bi ñu jox", "body": "Aadrees bi ci « {job_title} » ñu la ko yónnee."},
+        "owner_payout_stuck_alert": {"title": "🚨 Paay bi moo xëy", "body": "Paay {payment_id}: {amount} FCFA moo ngi ci « {status} » ci lu gën {hours} waxtu. Xamal ci loxo."},
     },
     "bm": {
         "bonus_filleul_first_mission": {"title": "🎁 Bonus parrainage bɔlen", "body": "I ka baara fɔlɔ « {job_title} » dafara: +{amount} FCFA bonus bɛ i ka konti la."},
@@ -300,6 +303,7 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "referral_withdraw_failed": {"title": "⚠️ Récompense bɔli tɛna kɛ", "body": "I ka bɔli {amount} FCFA tɛna kɛ. Wari bɛ i ka konti la, kɔsɛbɛ i ka ɲini."},
         "new_ticket_support": {"title": "Ticket support kura", "body": "{ticket_text}"},
         "address_dispatched": {"title": "📍 Baara yɔrɔ donnen", "body": "Baara « {job_title} » ka yɔrɔ ci i ma."},
+        "owner_payout_stuck_alert": {"title": "🚨 Wari bɛ sɛgɛn", "body": "Wari {payment_id}: {amount} FCFA bɛ « {status} » kɔnɔ kabini {hours} wati. Lajɛ ni lɔgɔkɛla bolo ye."},
     },
     "mos": {
         "bonus_filleul_first_mission": {"title": "🎁 Parrainage bonus", "body": "F tʋʋm rẽgenga « {job_title} » sɑɑme: +{amount} FCFA bonus b tʋm ne fo."},
@@ -326,6 +330,7 @@ _NOTIF_MSG: Dict[str, Dict[str, Dict[str, str]]] = {
         "referral_withdraw_failed": {"title": "⚠️ Récompense yit n sɑɑm ne paoogo", "body": "F yit {amount} FCFA sɑɑm ne paoogo. Ligdã be f solde zugu, lebs n maan."},
         "new_ticket_support": {"title": "Support ticket paalle", "body": "{ticket_text}"},
         "address_dispatched": {"title": "📍 Tʋʋm zĩigã", "body": "Zĩig ning « {job_title} » yĩngre b tʋma ne fo."},
+        "owner_payout_stuck_alert": {"title": "🚨 Ligdi sẽn be sᴐ", "body": "Ligdi {payment_id}: {amount} FCFA sẽn be « {status} » sẽn yɩɩd {hours} sᴐɑɑr. Gese ne nusẽ."},
     },
 }
 
