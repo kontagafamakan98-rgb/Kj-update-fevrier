@@ -48,7 +48,30 @@ describe('geolocationService (fallback pays)', () => {
     expect(detected).not.toBeNull();
     expect(detected.code).toBe('senegal');
     expect(detectCountryFromPhone('+225 07 12 34 56').code).toBe('cote_divoire');
-    expect(detectCountryFromPhone('+999')).toBeNull();
+  });
+
+  it('détection par téléphone inconnu → objet neutre detected:false (jamais null)', () => {
+    const detected = detectCountryFromPhone('+999');
+    expect(detected).not.toBeNull();
+    expect(detected.detected).toBe(false);
+    expect(detected.code).toBe('');
+    expect(detected.nameFrench).toBeDefined(); // lisible sans TypeError
+  });
+
+  it('code pays inconnu → getCountryByCode renvoie un objet neutre detected:false (jamais null)', () => {
+    const country = getCountryByCode('zz');
+    expect(country).not.toBeNull();
+    expect(country.detected).toBe(false);
+    expect(country.code).toBe('');
+    expect(country.phonePrefix).toBe('');
+    // Les helpers dérivés restent neutres sur un code inconnu.
+    expect(getPhonePrefixByCountry('zz')).toBe('');
+  });
+
+  it('banques d\'un pays inconnu → [] (jamais la liste Sénégal par défaut)', () => {
+    expect(getPopularBanksByCountry('zz')).toEqual([]);
+    expect(getPopularBanksByCountry(null)).toEqual([]);
+    expect(getPopularBanksByCountry({ code: 'senegal' })).toContain('Société Générale Sénégal');
   });
 
   it('formate un numéro de téléphone avec le préfixe du pays', () => {

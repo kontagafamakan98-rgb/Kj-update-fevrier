@@ -1099,15 +1099,15 @@ export const getCountriesList = () => {
   }));
 };
 
-export const getCountryByCode = (code) => {
-  const normalizedCode = normalizeCountryCode(code);
-  const countryData = getDatabase()[normalizedCode];
-  if (!countryData) {
-    return null;
-  }
-
+// Construit l'objet pays à partir des données de la base — ou l'objet NEUTRE
+// (detected: false, code vide) quand le pays est inconnu : jamais null, même
+// convention que detectUserCountry. Les appelants ne doivent utiliser le
+// résultat que si detected !== false (pas d'auto-sélection d'un code vide).
+const buildCountryObject = (countryData, code) => {
+  if (!countryData) return { ...NEUTRAL_DETECTED_COUNTRY };
   return {
-    code: normalizedCode,
+    detected: true,
+    code,
     name: countryData.country,
     nameFrench: countryData.nameFrench,
     flag: countryData.flag,
@@ -1117,19 +1117,26 @@ export const getCountryByCode = (code) => {
   };
 };
 
+export const getCountryByCode = (code) => {
+  const normalizedCode = normalizeCountryCode(code);
+  const countryData = getDatabase()[normalizedCode];
+  return buildCountryObject(countryData, normalizedCode);
+};
+
 export const getPhonePrefixByCountry = (countryCode) => {
   const country = getCountryByCode(countryCode);
   return country?.phonePrefix || '';
 };
 
 export const detectCountryFromPhone = (phoneNumber) => {
-  if (!phoneNumber) return null;
+  if (!phoneNumber) return { ...NEUTRAL_DETECTED_COUNTRY };
 
   const cleanPhone = phoneNumber.replace(/\s+/g, '');
 
   for (const [code, data] of Object.entries(getDatabase())) {
     if (cleanPhone.startsWith(data.phonePrefix)) {
       return {
+        detected: true,
         code,
         name: data.country,
         nameFrench: data.nameFrench,
@@ -1140,7 +1147,7 @@ export const detectCountryFromPhone = (phoneNumber) => {
       };
     }
   }
-  return null;
+  return { ...NEUTRAL_DETECTED_COUNTRY };
 };
 
 export const formatPhoneNumber = (phone, countryCode) => {
@@ -1216,7 +1223,9 @@ export const getPopularBanksByCountry = (country) => {
   };
   
   const countryCode = normalizeCountryCode(country?.code || country);
-  return banks[countryCode] || banks['senegal'];
+  // Inconnu → [] (jamais la liste Sénégal par défaut : biais silencieux qui
+  // proposait des banques sénégalaises à un utilisateur d'un autre pays).
+  return banks[countryCode] || [];
 };
 
 // Langues disponibles dans l'application

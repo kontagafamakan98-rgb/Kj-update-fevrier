@@ -439,8 +439,16 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
       }
 
       if (key === 'phone') {
+        // detectCountryFromPhone renvoie un objet NEUTRE (detected:false,
+        // code vide) quand aucun indicatif ne correspond — jamais null : on
+        // n'utilise la détection que si elle a abouti ET a un code réel
+        // (sinon on écraserait le pays avec une chaîne vide).
         const detectedCountry = detectCountryFromPhone(value);
-        if (detectedCountry && detectedCountry.code !== newData.country.toLowerCase()) {
+        if (
+          detectedCountry?.detected !== false
+          && detectedCountry.code
+          && detectedCountry.code !== newData.country.toLowerCase()
+        ) {
           newData.country = detectedCountry.code;
         }
       }
