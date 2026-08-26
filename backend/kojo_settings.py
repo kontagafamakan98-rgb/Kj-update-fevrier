@@ -168,6 +168,12 @@ AUTH_COOKIE_MAX_AGE = JWT_EXPIRATION_HOURS * 3600
 # pas tranché) au-delà de ce seuil déclenche une alerte au propriétaire.
 PAYOUT_ALERT_THRESHOLD_HOURS = float(os.environ.get('PAYOUT_ALERT_THRESHOLD_HOURS', '24'))
 
+# Escalade : après la première alerte (24 h), un rappel est renvoyé si le
+# décaissement est TOUJOURS bloqué au-delà de ce délai (PayDunya injoignable
+# plusieurs jours ne doit pas rester silencieux). owner_payout_alerted_at est
+# décalé à chaque rappel → rappel périodique espacé, pas de spam.
+PAYOUT_ALERT_REMINDER_DAYS = int(os.environ.get('PAYOUT_ALERT_REMINDER_DAYS', '3'))
+
 # Fréquence du passage de re-vérification PayDunya (minutes).
 PAYOUT_SWEEPER_INTERVAL_MINUTES = int(os.environ.get('PAYOUT_SWEEPER_INTERVAL_MINUTES', '60'))
 

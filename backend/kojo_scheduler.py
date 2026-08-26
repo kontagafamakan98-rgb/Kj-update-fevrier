@@ -24,6 +24,7 @@ from kojo_models import NotificationType
 from kojo_settings import (
     OWNER_EMAIL,
     OWNER_USER_ID,
+    PAYOUT_ALERT_REMINDER_DAYS,
     PAYOUT_ALERT_THRESHOLD_HOURS,
     PAYOUT_SWEEPER_INTERVAL_MINUTES,
     logger,
@@ -110,19 +111,23 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
             summary["resolved"] += 1
             continue
 
-        # 2) Toujours incertain : alerte au propriétaire UNE SEULE FOIS par
-        #    paiement (champ owner_payout_alerted_at posé à la première
-        #    alerte) si le blocage dépasse le seuil.
+        # 2) Toujours incertain : alerte au propriétaire si le blocage dépasse
+        #    le seuil, puis RAPPEL périodique tant que le blocage dure
+        #    (escalade — PayDunya injoignable plusieurs jours ne doit pas
+        #    rester silencieux après la première alerte). owner_payout_alerted_at
+        #    est décalé à chaque rappel → rappel espacé, pas de spam.
         summary["stuck"] += 1
-        if current.get("owner_payout_alerted_at"):
-            continue
-
+        alerted_at = _parse_payment_ts(current.get("owner_payout_alerted_at"))
         stuck_for = _stuck_for(current, now)
-        if stuck_for is None or stuck_for < timedelta(hours=PAYOUT_ALERT_THRESHOLD_HOURS):
+        if alerted_at is not None:
+            if now - alerted_at < timedelta(days=PAYOUT_ALERT_REMINDER_DAYS):
+                continue
+        elif stuck_for is None or stuck_for < timedelta(hours=PAYOUT_ALERT_THRESHOLD_HOURS):
             continue
 
         amount = int(current.get("amount", 0) or 0)
         hours_stuck = int(stuck_for.total_seconds() // 3600)
+        is_reminder = alerted_at is not None
         # Résolution du compte owner RÉEL par email (source de vérité) : en
         # prod, l'id du compte ne correspond pas au secret OWNER_USER_ID (id
         # fantôme) et les notifications ciblées par le secret étaient perdues.
@@ -144,9 +149,14 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
         # atteint Famakan dans tous les cas.
         if OWNER_EMAIL:
             try:
+                subject = (
+                    "KOJO — Décaissement toujours bloqué (rappel)"
+                    if is_reminder
+                    else "KOJO — Alerte décaissement bloqué"
+                )
                 send_email_via_brevo_api(
                     OWNER_EMAIL,
-                    "KOJO — Alerte décaissement bloqué",
+                    subject,
                     f"Un décaissement reste bloqué depuis plus de {PAYOUT_ALERT_THRESHOLD_HOURS} h.\n"
                     f"Paiement : {payment_id}\n"
                     f"Montant : {amount} FCFA\n"

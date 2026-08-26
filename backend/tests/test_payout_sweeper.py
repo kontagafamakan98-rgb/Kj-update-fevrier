@@ -142,6 +142,70 @@ class TestPayoutSweeper:
         stored = await db_find_one("payments", {"id": payment["id"]})
         assert stored["payout_status"] == "releasing"
 
+    async def test_backoff_skips_recheck_when_paydunya_unreachable(self, client: AsyncClient):
+        """PayDunya injoignable : après le premier échec, un passage IMMÉDIAT ne
+        re-tente pas le même paiement (backoff 1 h) — pas de martèlement d'une
+        API down (spam réseau/logs)."""
+        payment = _make_payment(payout_status="refunding", payout_kind="refund", hours_ago=30)
+        await db_insert("payments", payment)
+
+        with patch("kojo_scheduler.OWNER_USER_ID", "famakan-test"), \
+             patch("kojo_routers_payments.check_paydunya_disburse_status",
+                   side_effect=Exception("PayDunya down")) as check_mock, \
+             patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+             patch("kojo_scheduler.notify_user_localized", AsyncMock()):
+            summary1 = await self._run_sweep()
+            summary2 = await self._run_sweep()
+
+        assert summary1["stuck"] == 1
+        assert summary2["stuck"] == 1
+        # Deux passages mais UN SEUL appel à PayDunya (backoff actif).
+        assert check_mock.call_count == 1
+
+    async def test_reminder_after_reminder_interval(self, client: AsyncClient):
+        """Escalade : alerte déjà envoyée mais toujours bloquée au-delà de
+        PAYOUT_ALERT_REMINDER_DAYS → rappel renvoyé et fenêtre décalée."""
+        payment = _make_payment(payout_status="releasing", hours_ago=120)
+        alerted = datetime.now(timezone.utc) - timedelta(days=4)
+        payment["owner_payout_alerted_at"] = alerted.isoformat()
+        await db_insert("payments", payment)
+
+        with patch("kojo_scheduler.OWNER_USER_ID", "famakan-test"), \
+             patch("kojo_scheduler.OWNER_EMAIL", "famakan@kojo.sn"), \
+             patch("kojo_routers_payments.check_paydunya_disburse_status",
+                   return_value={"status": "pending", "response_code": "00"}), \
+             patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+             patch("kojo_scheduler.notify_user_localized", AsyncMock()) as alert_mock, \
+             patch("kojo_scheduler.send_email_via_brevo_api") as email_mock:
+            summary = await self._run_sweep()
+
+        assert summary["alerted"] == 1
+        alert_mock.assert_called_once()
+        # Rappel décalé : la prochaine alerte ne repartira que dans 3 jours.
+        stored = await db_find_one("payments", {"id": payment["id"]})
+        assert stored["owner_payout_alerted_at"] != payment["owner_payout_alerted_at"]
+        assert email_mock.call_count == 1
+        assert "rappel" in email_mock.call_args.args[1]
+
+    async def test_no_respam_before_reminder_interval(self, client: AsyncClient):
+        """Alerte envoyée il y a 1 jour (sous le délai de rappel) → aucun
+        re-alerte au passage suivant (pas de spam)."""
+        payment = _make_payment(payout_status="releasing", hours_ago=48)
+        payment["owner_payout_alerted_at"] = (
+            datetime.now(timezone.utc) - timedelta(days=1)
+        ).isoformat()
+        await db_insert("payments", payment)
+
+        with patch("kojo_scheduler.OWNER_USER_ID", "famakan-test"), \
+             patch("kojo_routers_payments.check_paydunya_disburse_status",
+                   return_value={"status": "pending", "response_code": "00"}), \
+             patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+             patch("kojo_scheduler.notify_user_localized", AsyncMock()) as alert_mock:
+            summary = await self._run_sweep()
+
+        assert summary["alerted"] == 0
+        alert_mock.assert_not_called()
+
     async def test_loop_is_importable_and_wired(self, client: AsyncClient):
         """La boucle de fond est importable (câblage server.py) et la fonction
         de sweep est appelable sans erreur."""

@@ -106,6 +106,15 @@ async def _notify_refund_transition(payment_record: dict, previous_status, new_s
 DISBURSE_RECHECK_INTERVAL_SECONDS = 60
 _disburse_recheck_at: dict = {}
 
+# BACKOFF quand PayDunya est INJOIGNABLE : on ne martèle pas une API down.
+# Après un échec, le cooldown double à chaque échec consécutif du même
+# paiement (1 h, 2 h, 4 h… plafonné à 6 h) et se réinitialise dès qu'un
+# check réussit. Sans ça, un sweep horaire + un polling /payments/status
+# re-tentaient chaque paiement bloqué indéfiniment (spam réseau + logs).
+DISBURSE_RECHECK_BACKOFF_BASE_SECONDS = 60 * 60
+DISBURSE_RECHECK_BACKOFF_MAX_SECONDS = 6 * 3600
+_disburse_recheck_failures: dict = {}
+
 
 async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
     """Best-effort : re-vérifie auprès de PayDunya le statut d'un décaissement
@@ -124,7 +133,25 @@ async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
         return payment_record
 
     now = time.time()
-    if _disburse_recheck_at.get(payment_id, 0) > now - DISBURSE_RECHECK_INTERVAL_SECONDS:
+    # Purge des traces in-memory expirées (garde-fou anti-fuite : le polling
+    # /payments/status peut référencer des milliers de paiements au fil du
+    # temps, on ne garde que les entrées de la fenêtre de backoff max).
+    if len(_disburse_recheck_at) > 2000:
+        cutoff = now - DISBURSE_RECHECK_BACKOFF_MAX_SECONDS
+        stale = [pid for pid, ts in _disburse_recheck_at.items() if ts < cutoff]
+        for pid in stale:
+            _disburse_recheck_at.pop(pid, None)
+            _disburse_recheck_failures.pop(pid, None)
+
+    failures = _disburse_recheck_failures.get(payment_id, 0)
+    if failures:
+        backoff = min(
+            DISBURSE_RECHECK_BACKOFF_BASE_SECONDS * (2 ** (failures - 1)),
+            DISBURSE_RECHECK_BACKOFF_MAX_SECONDS,
+        )
+        if now - _disburse_recheck_at.get(payment_id, 0) < backoff:
+            return payment_record
+    elif _disburse_recheck_at.get(payment_id, 0) > now - DISBURSE_RECHECK_INTERVAL_SECONDS:
         return payment_record
     _disburse_recheck_at[payment_id] = now
 
@@ -132,10 +159,22 @@ async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
     if not disburse_token:
         return payment_record
     try:
-        check_result = check_paydunya_disburse_status(disburse_token)
+        # check_paydunya_disburse_status est SYNCHRONE (requests, timeout
+        # 30 s) : on le sort de l'event loop via to_thread, sinon N paiements
+        # bloqués × 30 s de timeout gelaient toute l'API quand PayDunya est
+        # injoignable.
+        check_result = await asyncio.to_thread(
+            check_paydunya_disburse_status, disburse_token
+        )
     except Exception as exc:
+        # Échec (PayDunya down / réseau) : on compte l'échec pour allonger le
+        # backoff du prochain retry de CE paiement.
+        _disburse_recheck_failures[payment_id] = failures + 1
         logger.warning(f"⚠️ Re-vérification décaissement impossible: {exc}")
         return payment_record
+
+    # Le check a répondu (même "pending") : backoff réinitialisé.
+    _disburse_recheck_failures.pop(payment_id, None)
 
     provider_status = str(
         check_result.get("status")
@@ -201,7 +240,10 @@ async def paydunya_disburse_ipn(request: Request):
     # l'enregistrement trouvé en base, pas du payload reçu.
     real_disburse_token = payment_record.get('disburse_token')
     try:
-        check_result = check_paydunya_disburse_status(real_disburse_token)
+        # Synchrone (requests) : to_thread pour ne pas bloquer l'event loop.
+        check_result = await asyncio.to_thread(
+            check_paydunya_disburse_status, real_disburse_token
+        )
     except Exception as exc:
         logger.error(f"⚠️ Échec de vérification IPN décaissement PayDunya: {exc}")
         return {'status': 'error', 'detail': 'verification failed'}
