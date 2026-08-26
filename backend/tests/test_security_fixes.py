@@ -161,6 +161,25 @@ class TestHttpOnlyCookieAuth:
         assert me.status_code == 200
         assert me.json()["email"] == result["user"]["email"]
 
+    async def test_auth_me_echoes_csrf_header_for_cross_origin_client(self, client: AsyncClient):
+        """/auth/me doit ré-échoquer le jeton CSRF (en-tête X-Kojo-CSRFToken =
+        valeur du cookie kojo_csrf). Le frontend web est cross-origin (Vercel
+        → Fly) : document.cookie ne voit jamais le cookie fly.dev, il a donc
+        besoin de l'en-tête pour ré-échoyer le CSRF sur les mutations — sans
+        ça, un token localStorage expiré avec session cookie valide cassait
+        les mutations après rechargement (403 CSRF)."""
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        me = await client.get("/api/auth/me")  # cookie seul, pas de header
+        assert me.status_code == 200
+        csrf_header = me.headers.get("X-Kojo-CSRFToken")
+        assert csrf_header, "X-Kojo-CSRFToken doit être présent sur /auth/me"
+        # L'en-tête doit correspondre au cookie CSRF posé (double-submit).
+        csrf_cookie = client.cookies.get("kojo_csrf")
+        assert csrf_header == csrf_cookie
+
     async def test_cookie_auth_post_requires_csrf_header(self, client: AsyncClient):
         # Une mutation authentifiée par cookie SANS X-CSRFToken doit être rejetée (403).
         result = await register_and_login(client)

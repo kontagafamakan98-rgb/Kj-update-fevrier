@@ -19,6 +19,7 @@ from kojo_models import (
     UserLogin, UserType, UserWithPayment, WorkerProfile,
 )
 from kojo_settings import (
+    CSRF_COOKIE_NAME,
     EMAIL_OTP_EXPIRY_MINUTES,
     EMAIL_OTP_MAX_ATTEMPTS,
     EMAIL_OTP_RESEND_COOLDOWN_SECONDS,
@@ -888,7 +889,18 @@ async def logout_user(
     return {"message": "Logout successful", "status": "success"}
 
 @router.get("/auth/me")
-async def get_current_user_auth(current_user: User = Depends(get_current_user)):
+async def get_current_user_auth(request: Request, response: Response, current_user: User = Depends(get_current_user)):
+    # Écho du jeton CSRF (même valeur que le cookie kojo_csrf) : le frontend
+    # web Vercel est CROSS-ORIGIN → document.cookie ne voit jamais le cookie
+    # posé sur fly.dev ; le client a besoin de l'en-tête X-Kojo-CSRFToken
+    # pour ré-échoyer le CSRF sur les mutations (double-submit). Sans cet
+    # écho, un token localStorage EXPIRÉ (24 h) avec une session cookie
+    # encore valide cassait les mutations APRÈS un rechargement : mémoire
+    # CSRF du client vide → 403 « Validation CSRF échouée ». Chaque bootstrap
+    # (/auth/me) rafraîchit désormais la mémoire CSRF du client.
+    csrf_token = request.cookies.get(CSRF_COOKIE_NAME)
+    if csrf_token:
+        response.headers["X-Kojo-CSRFToken"] = csrf_token
     return current_user.model_dump(exclude={"password_hash", "payment_accounts"})
 
 class CountryUpdate(BaseModel):
