@@ -131,6 +131,46 @@ class TestDisburseIpnRefundAware:
         payment = await db_find_one("payments", {"id": payment_id})
         assert payment["payout_status"] == "released"
 
+    async def test_refund_ipn_does_not_notify_deleted_payer(self, client: AsyncClient):
+        """Audit IPN disburse + RGPD : un remboursement initié pendant
+        delete_my_account peut rester en vol (refunding) et être tranché par
+        l'IPN APRÈS la suppression du compte du payeur. Le paiement passe bien
+        à refunded, mais AUCUNE notification orpheline n'est créée pour
+        l'utilisateur supprimé (garde-fou dans kojo_shared.notify_user).
+        Le chemin RÉEL de notification est exercé (pas de mock sur
+        notify_user_localized)."""
+        from kojo_core import db as core_db
+
+        payer = await register_and_login(client, BASE_USER)
+        payer_id = payer["user"]["id"]
+        payment_id = str(uuid.uuid4())
+        await db_insert("payments", _payment_doc(
+            payment_id, str(uuid.uuid4()), payer_id, "worker-1",
+            payout_status="refunding", payout_kind="refund",
+            disburse_token="tok-ipn-deleted",
+        ))
+
+        # Le payeur supprime son compte pendant que le refund est en vol
+        # (soft delete + anonymisation, exactement comme delete_my_account
+        # le laisse faire quand l'IPN n'a pas encore tranché).
+        await core_db.users.update_one(
+            {"id": payer_id},
+            {"$set": {"deleted": True, "email": "deleted_x@kojo.deleted"}},
+        )
+
+        with patch("kojo_routers_payments.check_paydunya_disburse_status",
+                   return_value={"status": "success", "response_code": "00"}):
+            resp = await client.post("/api/payments/disburse-ipn", json={"token": "tok-ipn-deleted"})
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+        # Le paiement est bien mis à jour (le refund a abouti côté PayDunya)…
+        payment = await db_find_one("payments", {"id": payment_id})
+        assert payment["payout_status"] == "refunded"
+        # … mais aucune notification orpheline pour le compte supprimé.
+        orphan = await db_find_one("notifications", {"user_id": payer_id})
+        assert orphan is None
+
 
 # ---------------------------------------------------------------------------
 # 🤔 Submit incertain : une exception pendant submit-invoice ne doit PAS

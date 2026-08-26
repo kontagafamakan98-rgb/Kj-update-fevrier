@@ -125,7 +125,24 @@ async def notify_user(
     """
     Fonction principale : stocke la notification en base ET envoie le push Web.
     Silencieuse en cas d'erreur pour ne jamais bloquer un flux métier.
+
+    Garde-fou anti-notification orpheline : un destinataire SUPPRIMÉ
+    (deleted=True, compte anonymisé) ne reçoit plus rien. Cas réel (audit
+    IPN disburse) : un remboursement initié pendant delete_my_account peut
+    rester en vol (refunding) et être tranché APRÈS la suppression du compte
+    du payeur → sans ce garde-fou, une notification refunded/refund_failed
+    était créée pour un compte fantôme (la cascade de suppression avait déjà
+    purgé les notifications existantes). Le statut du paiement, lui, est mis
+    à jour indépendamment de cette notification.
     """
+    try:
+        recipient = await db.users.find_one({"id": user_id}, {"deleted": 1})
+        if not recipient or recipient.get("deleted"):
+            return
+    except Exception:
+        # Jamais bloquant : si la vérification échoue, on notifie quand même.
+        pass
+
     try:
         await store_notification(
             user_id=user_id,
