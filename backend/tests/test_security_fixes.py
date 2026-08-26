@@ -279,6 +279,50 @@ class TestHttpOnlyCookieAuth:
         )
         assert still_ok.status_code == 200
 
+    async def test_rotation_not_shadowed_by_expired_header(self, client: AsyncClient):
+        """Un header Authorization EXPIRÉ ne doit PAS masquer la rotation de
+        la session cookie : /auth/me essaie le header puis retombe sur le
+        cookie. Sans ce repli, un token localStorage expiré (24 h) avec un
+        cookie encore valide bloquait la rotation → la session cookie mourait
+        à 24 h et l'utilisateur actif était déconnecté malgré un cookie bon
+        (c'est ce que le frontend évite désormais en sondant /auth/me sur un
+        401 de mutation : la sonde tourne alors le jeton via le cookie)."""
+        import uuid as _uuid
+        from datetime import datetime, timedelta, timezone as _tz
+        import jwt as _jwt
+        from kojo_settings import JWT_SECRET, JWT_ALGORITHM
+
+        result = await register_and_login(client)
+        await client.post("/api/auth/login", json={
+            "email": result["user"]["email"], "password": dict(BASE_USER)["password"]
+        })
+        # Jeton EXPIRÉ (exp dans le passé) pour le même compte — le scénario
+        # du token localStorage stale après 24 h.
+        expired_token = _jwt.encode({
+            "sub": result["user"]["id"],
+            "email": result["user"]["email"],
+            "pwdv": 0,
+            "jti": str(_uuid.uuid4()),
+            "exp": datetime.now(_tz.utc) - timedelta(minutes=5),
+        }, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+        with patch("kojo_routers_auth.AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS", 10 ** 12):
+            me = await client.get(
+                "/api/auth/me",
+                headers={"Authorization": f"Bearer {expired_token}"},
+            )
+        assert me.status_code == 200
+        # La rotation a bien eu lieu depuis le COOKIE malgré le header expiré.
+        new_token = me.headers.get("X-Kojo-Token")
+        assert new_token and new_token != expired_token
+        session_cookie = client.cookies.get("kojo_session")
+        assert session_cookie == new_token
+        # Le nouveau jeton est immédiatement utilisable.
+        ok = await client.get(
+            "/api/auth/me", headers={"Authorization": f"Bearer {new_token}"}
+        )
+        assert ok.status_code == 200
+
     async def test_cookie_auth_post_requires_csrf_header(self, client: AsyncClient):
         # Une mutation authentifiée par cookie SANS X-CSRFToken doit être rejetée (403).
         result = await register_and_login(client)

@@ -182,6 +182,73 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
     const [, options] = global.fetch.mock.calls[0];
     expect(options.headers['X-CSRFToken']).toBeUndefined();
   });
+
+  it('401 avec session récupérable → sonde /auth/me, tourne le jeton et rejoue (pas de redirection)', async () => {
+    localStorage.setItem('token', 'expired.token.abc');
+    const location = fakeLocation();
+    const rotated = 'fresh.token.xyz';
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false, status: 401, text: async () => '{"detail":"Invalid token"}', headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{}',
+        headers: { get: (name) => (name === 'X-Kojo-Token' ? rotated : null) },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{"ok":true}', headers: { get: () => null },
+      });
+
+    const result = await api.get('/users/payment-accounts');
+
+    expect(result).toEqual({ ok: true });
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    // 1) mutation 401 → 2) sonde /auth/me → 3) rejeu de la mutation.
+    expect(global.fetch.mock.calls[1][0]).toContain('/api/auth/me');
+    expect(global.fetch.mock.calls[2][0]).toContain('/api/users/payment-accounts');
+    // Le jeton tourné par la sonde est stocké (plus de 401 à répétition).
+    expect(localStorage.getItem('token')).toBe(rotated);
+    expect(location.getRedirectTarget()).toBe('');
+  });
+
+  it('401 sur session réellement morte → purge + redirige (la sonde échoue aussi)', async () => {
+    localStorage.setItem('token', 'expired.token.abc');
+    const location = fakeLocation();
+    // TOUTES les réponses sont des 401 (mutation + sonde /auth/me).
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false, status: 401, text: async () => '{"detail":"Invalid token"}', headers: { get: () => null },
+    });
+
+    await expect(api.get('/users/payment-accounts')).rejects.toThrow('Invalid token');
+
+    expect(localStorage.getItem('token')).toBeNull();
+    expect(location.getRedirectTarget()).toBe('/login');
+  });
+
+  it('403 CSRF (mémoire périmée) → sonde /auth/me, rafraîchit le CSRF et rejoue la mutation', async () => {
+    localStorage.setItem('token', 'still-valid-token');
+    setSessionCookie();
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false, status: 403,
+        text: async () => '{"detail":"Validation CSRF échouée. Jeton manquant ou invalide."}',
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{}',
+        headers: { get: (name) => (name === 'X-Kojo-CSRFToken' ? 'fresh-csrf' : null) },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{"ok":true}', headers: { get: () => null },
+      });
+
+    const result = await api.put('/users/profile', { first_name: 'X' });
+
+    expect(result).toEqual({ ok: true });
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    // Le rejeu envoie le CSRF rafraîchi par la sonde (écho X-Kojo-CSRFToken).
+    expect(global.fetch.mock.calls[2][1].headers['X-CSRFToken']).toBe('fresh-csrf');
+  });
 });
 
 // Rotation à fenêtre glissante : /auth/me renvoie X-Kojo-Token quand le jeton

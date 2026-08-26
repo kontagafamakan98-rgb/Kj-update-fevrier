@@ -174,6 +174,10 @@ const AUTH_STORAGE_KEYS = [
 
 let sessionRedirecting = false;
 let csrfTokenMemory = '';
+// Récupération de session en cours : une seule sonde /auth/me à la fois quand
+// plusieurs requêtes échouent en parallèle (anti-tempête).
+let sessionRecovering = false;
+const RECOVERY_FAILED = Symbol('recovery-failed');
 
 /**
  * Session expirée ou révoquée (401) : purge locale (localStorage +
@@ -246,7 +250,7 @@ const readCsrfCookie = () => {
 // associé l'est → sa présence indique qu'une session existe.
 export const hasSessionCookie = () => Boolean(readCsrfCookie());
 
-const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false } = {}) => {
+const request = async (method, path, { params, data, headers, signal, skipUnauthorizedRedirect = false, skipRecovery = false } = {}) => {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path || ''}`;
   const url = `${buildApiUrl(normalizedPath)}${buildQueryString(params)}`;
   const token = getAuthToken();
@@ -306,6 +310,32 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
   }
 
   if (!response.ok) {
+    // RÉCUPÉRATION DE SESSION : un token EXPIRÉ en localStorage ne signifie
+    // pas forcément session morte — le cookie httpOnly peut être encore
+    // valide (mode hybride). On sonde /auth/me UNE fois : le backend confirme
+    // la session via le cookie, ré-échoit le CSRF et TOURNE le jeton quand le
+    // cookie approche de l'expiration (X-Kojo-Token), puis on REJOUE la
+    // requête avec le jeton/CSRF rafraîchis — sans aller-retour inutile vers
+    // /login. Le 403 CSRF (mémoire CSRF périmée après une rotation) est aussi
+    // récupérable : la sonde rafraîchit l'écho. Les endpoints métier
+    // (login/OTP/logout) renvoient 401 comme résultat attendu → pas de
+    // récupération ; /auth/me EST la sonde → pas de récursion.
+    const isAuthFailure = response.status === 401;
+    const isCsrfFailure = response.status === 403 && /csrf/i.test(String(payload?.detail || ''));
+    const canRecover = (isAuthFailure || isCsrfFailure)
+      && Boolean(token)
+      && !skipRecovery
+      && normalizedPath !== '/auth/me'
+      && !BUSINESS_401_PREFIXES.some((prefix) => normalizedPath.startsWith(prefix));
+
+    if (canRecover) {
+      const recovered = await recoverSession(
+        method, normalizedPath,
+        { params, data, headers, signal, skipUnauthorizedRedirect }
+      );
+      if (recovered !== RECOVERY_FAILED) return recovered;
+    }
+
     if (response.status === 401) {
       handleUnauthorized(normalizedPath, { redirect: !skipUnauthorizedRedirect });
     }
@@ -323,6 +353,27 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
   }
 
   return payload;
+};
+
+/**
+ * Récupération de session après un 401 (token expiré) ou un 403 CSRF : la
+ * session réelle peut encore vivre dans le cookie httpOnly (ou la mémoire CSRF
+ * est périmée). Sonde /auth/me (skipRecovery + redirect désactivé pour ne pas
+ * récurser ni rediriger si la session est morte), puis REJOUE la requête
+ * originale avec le jeton/CSRF rafraîchis. Renvoie RECOVERY_FAILED si la
+ * session est réellement morte (le 401 normal purge + redirige ensuite).
+ */
+const recoverSession = async (method, path, options) => {
+  if (sessionRecovering) return RECOVERY_FAILED;
+  sessionRecovering = true;
+  try {
+    await request('GET', '/auth/me', { skipUnauthorizedRedirect: true, skipRecovery: true });
+    return await request(method, path, { ...options, skipRecovery: true });
+  } catch (_error) {
+    return RECOVERY_FAILED;
+  } finally {
+    sessionRecovering = false;
+  }
 };
 
 export const api = {

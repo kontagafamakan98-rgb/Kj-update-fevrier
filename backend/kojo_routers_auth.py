@@ -902,15 +902,21 @@ async def get_current_user_auth(request: Request, response: Response, current_us
     # (risque de lockout si le nouveau n'arrive pas jusqu'au client) : il expire
     # naturellement. Le seuil borne la frappe de jetons (~1 rotation/session/jour).
     rotated = False
-    try:
-        raw_token = ""
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            raw_token = auth_header[7:].strip()
-        else:
-            raw_token = request.cookies.get(AUTH_COOKIE_NAME, "") or ""
-        if raw_token:
-            payload = jwt.decode(raw_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    auth_header = request.headers.get("Authorization", "")
+    header_token = auth_header[7:].strip() if auth_header.startswith("Bearer ") else ""
+    cookie_token = request.cookies.get(AUTH_COOKIE_NAME, "") or ""
+    # Le header peut être EXPIRÉ (token localStorage stale) alors que la
+    # session cookie est encore valide : on essaie chaque source de jeton —
+    # si le header ne décode pas (expiré/invalide), on retombe sur le cookie.
+    # Sans ce repli, un header expiré « masquait » la rotation : jwt.decode
+    # échouait et la session cookie mourait à 24 h sans jamais être tournée
+    # (l'utilisateur actif était déconnecté de force malgré un cookie bon).
+    # Jamais bloquant : un échec de décodage ne doit pas casser /auth/me.
+    for candidate_token in (header_token, cookie_token):
+        if not candidate_token:
+            continue
+        try:
+            payload = jwt.decode(candidate_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             exp = float(payload.get("exp", 0) or 0)
             remaining = exp - datetime.now(timezone.utc).timestamp()
             if remaining < AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS:
@@ -922,9 +928,10 @@ async def get_current_user_auth(request: Request, response: Response, current_us
                 set_auth_cookies(response, new_token)
                 response.headers["X-Kojo-Token"] = new_token
                 rotated = True
-    except Exception:
-        # Jamais bloquant : un échec de décodage ne doit pas casser /auth/me.
-        pass
+            break  # premier jeton décodable : c'est la session active
+        except Exception:
+            # Jeton invalide/expiré → on essaie la source suivante (cookie).
+            continue
 
     # Écho du jeton CSRF (même valeur que le cookie kojo_csrf) : le frontend
     # web Vercel est CROSS-ORIGIN → document.cookie ne voit jamais le cookie

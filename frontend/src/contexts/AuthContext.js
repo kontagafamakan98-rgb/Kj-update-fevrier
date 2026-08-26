@@ -129,28 +129,25 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Synchronisation multi-onglets : un logout dans l'onglet A (ou un login)
-  // modifie localStorage → l'événement 'storage' se déclenche dans les AUTRES
-  // onglets. Sans ça, l'onglet B gardait un utilisateur « fantôme » après une
-  // déconnexion ailleurs (déconnexion simultanée désynchronisée).
+  // Synchronisation multi-onglets : un changement de 'token' dans l'onglet A
+  // (login, rotation, logout, purge 401) déclenche l'événement 'storage' dans
+  // les AUTRES onglets → on re-sonde la session. loadUser relit localStorage
+  // ET le cookie httpOnly : si une session valide survit (ex. purge
+  // auto-guérison d'un token stale alors que le cookie est bon), /auth/me
+  // 200 restaure le profil SANS rechargement ; si la session est réellement
+  // morte, le 401 laisse user=null et ProtectedRoute redirige vers /login.
+  //
+  // Pas de redirection forcée ni de window.location.href : un rechargement
+  // complet faisait clignoter /login et perdait l'état de l'app — la
+  // navigation SPA (Navigate de ProtectedRoute) suffit, et re-sonder plutôt
+  // que purger évite qu'un simple purge dans un onglet déconnecte les autres.
   useEffect(() => {
     const onStorage = (event) => {
-      if (event.key !== 'token' && event.key !== 'user') return;
-      const token = localStorage.getItem('token');
-      if (token) {
-        // Connexion (ou rotation) dans un autre onglet : on rafraîchit le profil.
-        loadUserRef.current();
-      } else {
-        // Déconnexion dans un autre onglet : on nettoie l'état local.
-        setUser(null);
-        if (
-          typeof window !== 'undefined'
-          && window.location
-          && !window.location.pathname.endsWith('/login')
-        ) {
-          window.location.href = '/login';
-        }
-      }
+      if (event.key !== 'token') return;
+      // 'user' est toujours écrit/supprimé en même temps que 'token' (login,
+      // register, logout) — réagir au seul 'token' suffit et évite les
+      // double-déclenchements de clearToken (14 clés purgées → 2 événements).
+      loadUserRef.current();
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
@@ -195,7 +192,15 @@ export function AuthProvider({ children }) {
           setUser(cachedUser);
           devLog.info('📱 User loaded from cache (API failed)');
         } else {
-          clearToken();
+          // On NE purge PAS le token : une panne réseau transitoire ne doit
+          // pas détruire la session. Le token vit dans le localStorage
+          // PARTAGÉ entre les onglets — un clearToken ici déconnecterait
+          // TOUS les onglets via l'événement 'storage' (et, en navigateur
+          // bloquant les cookies tiers, forcerait un re-login manuel). On
+          // affiche simplement l'état non connecté : le prochain /auth/me
+          // réussi restaurera le profil, et un VRAI 401 (session morte)
+          // purgera proprement via handleUnauthorized.
+          setUser(null);
         }
       }
     } finally {
