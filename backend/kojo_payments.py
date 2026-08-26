@@ -1,19 +1,24 @@
 # -*- coding: utf-8 -*-
 """Intégration PayDunya : canaux, factures, statuts, décaissements."""
 
+import asyncio
 import re
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
 from fastapi import HTTPException
 
-from kojo_core import db
+from kojo_core import db, resolve_owner_id
+from kojo_email import send_email_via_brevo_api
+from kojo_models import NotificationType
 from kojo_settings import (
     BACKEND_PUBLIC_URL,
     FRONTEND_APP_URL,
+    OWNER_EMAIL,
+    OWNER_USER_ID,
     PAYDUNYA_MASTER_KEY,
     PAYDUNYA_MODE,
     PAYDUNYA_PRIVATE_KEY,
@@ -24,6 +29,7 @@ from kojo_settings import (
     PAYMENT_COMMISSION_RATE,
     logger,
 )
+from kojo_shared import notify_user_localized
 
 PAYDUNYA_CHANNELS = {
     "orange_money": {
@@ -95,6 +101,179 @@ _paydunya_circuit = {
     "opened_at": 0.0,           # time.time() au moment de l'ouverture
 }
 
+# --- Persistance MongoDB de l'état du circuit ---
+# Le dict mémoire ci-dessus est la source RAPIDE du chemin critique (fail
+# fast sans I/O), mais il est VOLATIL : perdu à chaque redéploiement et
+# propre à chaque worker (Fly peut exécuter plusieurs instances). Chaque
+# TRANSITION est donc écrite en base (upsert best-effort d'un seul document)
+# et l'état est rechargé au démarrage (init_paydunya_circuit) puis rafraîchi
+# sur les points de lecture (sweeper, checkout, owner) : un worker rejoint
+# ainsi un circuit déjà ouvert par un autre SANS avoir à re-brûler le seuil
+# d'échecs, et le circuit survit aux redéploiements.
+_CIRCUIT_COLLECTION = "paydunya_circuit"
+_CIRCUIT_DOC_ID = "global"
+# Boucle principale capturée au démarrage : les écritures partent depuis des
+# chemins SYNC (checkout, IPN) et des threads (sweeper via to_thread) →
+# call_soon_threadsafe est le seul moyen sûr de créer la tâche sur la boucle.
+_circuit_loop = None
+
+
+def _circuit_snapshot() -> dict:
+    """Snapshot persistant de l'état mémoire (ce qui est écrit en base)."""
+    return {
+        "state": _paydunya_circuit["state"],
+        "consecutive_failures": _paydunya_circuit["consecutive_failures"],
+        "opened_at": _paydunya_circuit["opened_at"],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+async def _circuit_upsert() -> None:
+    """Écrit l'état mémoire en base (upsert). Jamais bloquant pour le chemin
+    critique : toujours exécuté en tâche de fond sur la boucle principale."""
+    try:
+        await db[_CIRCUIT_COLLECTION].update_one(
+            {"_id": _CIRCUIT_DOC_ID},
+            {"$set": _circuit_snapshot()},
+            upsert=True,
+        )
+    except Exception as exc:
+        logger.warning(f"⚠️ Persistance circuit breaker PayDunya impossible: {exc}")
+
+
+def _spawn_circuit_upsert() -> None:
+    """S'exécute SUR la boucle principale : crée la tâche d'upsert."""
+    try:
+        asyncio.ensure_future(_circuit_upsert())
+    except Exception:
+        pass
+
+
+def _schedule_circuit_persist() -> None:
+    """Planifie l'écriture en base sur la boucle principale (thread-safe) —
+    appelé depuis les chemins SYNC (checkout, IPN) et les threads (sweeper)."""
+    loop = _circuit_loop
+    if loop is None or loop.is_closed():
+        return  # pas de boucle (tests, import précoce) — mémoire seule
+    try:
+        loop.call_soon_threadsafe(_spawn_circuit_upsert)
+    except Exception:
+        pass
+
+
+def _spawn_circuit_owner_alert() -> None:
+    """S'exécute SUR la boucle principale : crée la tâche d'alerte owner."""
+    try:
+        asyncio.ensure_future(_circuit_owner_alert())
+    except Exception:
+        pass
+
+
+def _schedule_circuit_owner_alert() -> None:
+    """Planifie l'alerte propriétaire sur la boucle principale (thread-safe) —
+    le déclenchement vient des chemins SYNC/threads (checkout, IPN, sweeper)."""
+    loop = _circuit_loop
+    if loop is None or loop.is_closed():
+        return
+    try:
+        loop.call_soon_threadsafe(_spawn_circuit_owner_alert)
+    except Exception:
+        pass
+
+
+async def _circuit_owner_alert() -> None:
+    """Alerte le propriétaire quand le circuit s'OUVRE (notification in-app +
+    email Brevo en fallback, même pattern que le sweeper) : une panne
+    PayDunya est détectée SANS attendre le dashboard owner ni le sweeper
+    (l'alerte part dès le seuil d'échecs atteint). Best-effort — une alerte
+    ratée n'affecte jamais le circuit."""
+    state = paydunya_circuit_state()
+    consecutive_failures = state["consecutive_failures"]
+    cooldown_hours = PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS // 3600
+    try:
+        owner_id = await resolve_owner_id() or OWNER_USER_ID
+        await notify_user_localized(
+            user_id=owner_id,
+            key="owner_paydunya_circuit_open",
+            notif_type=NotificationType.GENERAL,
+            related_id="paydunya",
+            related_type="paydunya_circuit",
+            state=state["state"],
+            consecutive_failures=consecutive_failures,
+            cooldown_hours=cooldown_hours,
+        )
+    except Exception as exc:
+        logger.warning(f"⚠️ Notification alerte circuit breaker échouée: {exc}")
+    if OWNER_EMAIL:
+        try:
+            send_email_via_brevo_api(
+                OWNER_EMAIL,
+                "KOJO — PayDunya injoignable (circuit breaker ouvert)",
+                (
+                    f"Le circuit breaker PayDunya s'est OUVERT après "
+                    f"{consecutive_failures} échecs réseau consécutifs.\n\n"
+                    f"Cooldown : {cooldown_hours} h (fail fast — les appels "
+                    f"PayDunya échouent immédiatement).\n"
+                    f"Impact : checkout, décaissements travailleurs, "
+                    f"remboursements et retraits suspendus.\n\n"
+                    f"Suivi : /api/health (paydunya_circuit) et "
+                    f"/api/owner/stuck-payouts."
+                ),
+            )
+        except Exception as exc:
+            logger.warning(f"⚠️ Email alerte circuit breaker échoué: {exc}")
+
+
+def _adopt_persisted_circuit(doc) -> bool:
+    """Adopte l'état persisté dans la mémoire LOCALE. Règle de fraîcheur : un
+    circuit OUVERT en mémoire (échecs observés APRÈS la dernière écriture
+    persistée) n'est JAMAIS écrasé par un état fermé en base."""
+    if not doc:
+        return False
+    if _paydunya_circuit["state"] == "open":
+        return False
+    persisted_state = doc.get("state", "closed")
+    if persisted_state not in ("closed", "open"):
+        persisted_state = "closed"
+    _paydunya_circuit.update({
+        "state": persisted_state,
+        "consecutive_failures": int(doc.get("consecutive_failures", 0) or 0),
+        "opened_at": float(doc.get("opened_at", 0.0) or 0.0),
+    })
+    return True
+
+
+async def init_paydunya_circuit() -> None:
+    """Appelé au démarrage (server.py lifespan) : capture la boucle principale
+    (pour les écritures thread-safe) et recharge l'état persisté — le circuit
+    survit aux redéploiements et est partagé entre les workers."""
+    global _circuit_loop
+    try:
+        _circuit_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        _circuit_loop = None
+    try:
+        doc = await db[_CIRCUIT_COLLECTION].find_one({"_id": _CIRCUIT_DOC_ID})
+        if _adopt_persisted_circuit(doc):
+            logger.info(
+                f"🔌 Circuit breaker PayDunya rechargé depuis MongoDB: "
+                f"state={_paydunya_circuit['state']}, "
+                f"consecutive_failures={_paydunya_circuit['consecutive_failures']}"
+            )
+    except Exception as exc:
+        logger.warning(f"⚠️ Chargement circuit breaker PayDunya impossible: {exc}")
+
+
+async def refresh_paydunya_circuit_from_db() -> None:
+    """Re-synchronise l'état mémoire depuis la base (partage entre workers) :
+    adopté par le sweeper à chaque passage, et par le checkout / l'endpoint
+    owner avant la lecture. Best-effort, jamais bloquant."""
+    try:
+        doc = await db[_CIRCUIT_COLLECTION].find_one({"_id": _CIRCUIT_DOC_ID})
+        _adopt_persisted_circuit(doc)
+    except Exception as exc:
+        logger.warning(f"⚠️ Refresh circuit breaker PayDunya impossible: {exc}")
+
 
 def paydunya_circuit_state() -> dict:
     """État EFFECTIF du circuit breaker (lecture logs / métriques / owner).
@@ -124,11 +303,13 @@ def is_paydunya_circuit_open() -> bool:
 
 def _circuit_record_success() -> None:
     _paydunya_circuit.update({"state": "closed", "consecutive_failures": 0, "opened_at": 0.0})
+    _schedule_circuit_persist()
 
 
 def _circuit_record_failure() -> None:
     _paydunya_circuit["consecutive_failures"] += 1
     if _paydunya_circuit["consecutive_failures"] >= PAYDUNYA_CIRCUIT_FAILURE_THRESHOLD:
+        was_open = _paydunya_circuit["state"] == "open"
         _paydunya_circuit["state"] = "open"
         _paydunya_circuit["opened_at"] = time.time()
         logger.error(
@@ -136,6 +317,12 @@ def _circuit_record_failure() -> None:
             f"consécutifs — appels PayDunya suspendus "
             f"{PAYDUNYA_CIRCUIT_COOLDOWN_SECONDS // 3600} h (fail fast)."
         )
+        # Alerte propriétaire UNE FOIS par passage en open (pas à chaque échec
+        # tant que le circuit reste ouvert ; un ré-open après un échec de
+        # sonde half-open est un NOUVEL événement, donc re-alerté).
+        if not was_open:
+            _schedule_circuit_owner_alert()
+    _schedule_circuit_persist()
 
 
 def _paydunya_call(method: str, url: str, *, json: Optional[Dict[str, Any]] = None, timeout: int = 30) -> Dict[str, Any]:
@@ -356,13 +543,15 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
     latest = await db.payments.find_one({'id': payment_record['id']})
     return latest or payment_record
 
-def get_mobile_money_account(payment_accounts: Optional[Dict]) -> tuple:
+def get_mobile_money_account(payment_accounts: Optional[Dict]) -> Tuple[Optional[str], Optional[str]]:
     """Retourne (méthode, numéro) du compte mobile money à utiliser pour un
     décaissement PayDunya : Orange Money en priorité, sinon Wave (le compte
     bancaire n'est pas un mode de décaissement automatique supporté).
 
     Convention partagée par les versements travailleurs, les remboursements
-    et les retraits de récompenses de parrainage."""
+    et les retraits de récompenses de parrainage. Retourne (None, None) si
+    aucun compte mobile money n'est enregistré — les appelants doivent alors
+    lever une erreur 400 explicite (« aucun compte de décaissement »)."""
     accounts = payment_accounts or {}
     if accounts.get("orange_money"):
         return "orange_money", accounts["orange_money"]

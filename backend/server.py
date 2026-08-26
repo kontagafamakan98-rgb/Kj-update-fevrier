@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, FastAPI, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -31,13 +32,19 @@ from kojo_core import (
     _rate_limit_cleanup_loop,
     build_trusted_hosts,
     client,
+    cloudinary_health_probe,
     create_database_indexes,
     db,
     ensure_owner_exists,
     is_database_available,
     request_counts,
 )
-from kojo_email import generate_email_otp_code, hash_email_otp
+from kojo_email import brevo_health_probe, generate_email_otp_code, hash_email_otp
+from kojo_payments import (
+    init_paydunya_circuit,
+    paydunya_circuit_state,
+    refresh_paydunya_circuit_from_db,
+)
 from kojo_scheduler import payout_stuck_sweeper_loop
 from kojo_settings import APP_ENV, APP_VERSION, FRONTEND_APP_URL, logger
 
@@ -114,13 +121,29 @@ async def _health_payload() -> dict:
     Une seule source de vérité pour la version (APP_VERSION) et l'état DB :
     les deux routes ci-dessous l'appellent, plus de dérive possible entre
     /api/health et /health.
+
+    L'état du circuit breaker GLOBAL PayDunya est exposé ici (et non seulement
+    dans le dashboard owner) pour que les moniteurs d'infra et l'alerting
+    tiers détectent une panne PayDunya SANS attendre le dashboard. Refresh
+    préalable : l'état est partagé entre les workers. NB : `status` reste
+    piloté par la DB — une panne PayDunya ne rend pas l'API « degraded »
+    (les moniteurs ne redémarrent pas l'app à tort), le champ
+    paydunya_circuit.state porte l'info.
     """
     db_available = await is_database_available()
+    await refresh_paydunya_circuit_from_db()
+    circuit = paydunya_circuit_state()
     return {
         "status": "healthy" if db_available else "degraded",
         "timestamp": datetime.now(timezone.utc),
         "database": "connected" if db_available else "unavailable",
         "version": APP_VERSION,
+        "paydunya_circuit": {
+            "state": circuit["state"],
+            "consecutive_failures": circuit["consecutive_failures"],
+            "failure_threshold": circuit["failure_threshold"],
+            "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
+        },
     }
 
 
@@ -148,6 +171,11 @@ api_router.include_router(public_router)
 # ---------------------------------------------------------------------------
 @app.api_route("/", methods=["GET", "HEAD"])
 async def app_root():
+    """Racine de l'API pour les moniteurs et la découverte.
+
+    Returns:
+        dict: {message, status: "running"}.
+    """
     return {"message": "Kojo API - Connecting Mali & Senegal", "status": "running"}
 
 
@@ -155,7 +183,116 @@ async def app_root():
 # Méthodes déclarées explicitement (GET + HEAD) pour les moniteurs d'infra.
 @app.api_route("/health", methods=["GET", "HEAD"])
 async def root_health_check():
+    """Health check d'infra (Render/UptimeRobot).
+
+    Returns:
+        dict: {status, timestamp, database, version, paydunya_circuit} — voir
+        _health_payload().
+    """
     return await _health_payload()
+
+
+async def _paydunya_monitor_payload() -> dict:
+    """État du circuit breaker GLOBAL PayDunya pour les moniteurs d'infra
+    (UptimeRobot, Render...). Refresh préalable depuis MongoDB : l'état est
+    partagé entre les workers — un moniteur qui interroge un worker voit un
+    circuit ouvert par un autre SANS que ce worker ait re-brûlé le seuil.
+
+    Sémantique du statut HTTP :
+    - 200 : circuit closed OU half_open (cooldown écoulé, une sonde est
+      autorisée — PayDunya peut redevenir joignable, plus de fail fast).
+    - 503 : circuit OPEN (fail fast actif — aucun appel réseau pendant le
+      cooldown) : le propriétaire et les moniteurs sont alertés.
+
+    Contrairement à /health (piloté par la DB, statut toujours « healthy »),
+    cet endpoint est la SONDE dédiée à l'alerte PayDunya : un 503 déclenche
+    les alertes UptimeRobot/Render sans faire redémarrer l'app (les moniteurs
+    ne redémarrent pas sur 503, ils alertent).
+    """
+    await refresh_paydunya_circuit_from_db()
+    circuit = paydunya_circuit_state()
+    payload = {
+        "service": "paydunya",
+        "circuit": "open" if circuit["state"] == "open" else "ok",
+        "paydunya_circuit": {
+            "state": circuit["state"],
+            "consecutive_failures": circuit["consecutive_failures"],
+            "failure_threshold": circuit["failure_threshold"],
+            "remaining_cooldown_seconds": int(circuit["remaining_cooldown_seconds"]),
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return payload, circuit["state"]
+
+
+# Sonde dédiée à l'état du circuit breaker PayDunya pour UptimeRobot/Render :
+# 200 si PayDunya est opérationnel (ou en demi-ouverture = sonde autorisée),
+# 503 si le circuit est OUVERT (panne fournisseur en cours, fail fast actif).
+# Hors /api pour être directement pointable par les moniteurs d'infra.
+@app.api_route("/monitor/paydunya", methods=["GET", "HEAD"])
+async def monitor_paydunya():
+    """Sonde PayDunya pour UptimeRobot/Render : 200 si le circuit est
+    closed/half_open, 503 s'il est OUVERT (fail fast actif).
+
+    Returns:
+        dict: {service, circuit, paydunya_circuit, timestamp} — 503 quand
+        circuit == "open".
+    """
+    payload, state = await _paydunya_monitor_payload()
+    if state == "open":
+        return JSONResponse(status_code=503, content=payload)
+    return payload
+
+
+async def _external_provider_monitor(probe, service: str):
+    """Contrat commun /monitor/<service> pour les fournisseurs externes
+    (Brevo, Cloudinary) : 200 quand le service répond, 503 sinon.
+
+    Les sondes sont SYNC (requests / SDK cloudinary) et potentiellement
+    lentes en cas de panne → exécutées dans un thread (asyncio.to_thread)
+    pour ne pas bloquer l'event loop. Chaque sonde a son propre cache TTL
+    interne (60 s) : les moniteurs qui interrogent toutes les 30-60 s ne
+    martèlent pas le fournisseur.
+    """
+    result = await asyncio.to_thread(probe)
+    payload = {
+        "service": service,
+        "circuit": "ok" if result.get("ok") else "down",
+        "configured": result.get("configured", True),
+        "detail": result.get("detail", ""),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    if not result.get("ok"):
+        return JSONResponse(status_code=503, content=payload)
+    return payload
+
+
+# Sonde Brevo (email OTP, réinitialisation de mot de passe) : 200 si l'API
+# répond, 503 sinon (config manquante, transport, HTTP erreur).
+@app.api_route("/monitor/brevo", methods=["GET", "HEAD"])
+async def monitor_brevo():
+    """Sonde Brevo (email) : 200 si l'API répond, 503 sinon (config manquante,
+    transport, HTTP erreur).
+
+    Returns:
+        dict: {service, circuit, configured, detail, timestamp} — 503 quand
+        circuit == "down".
+    """
+    return await _external_provider_monitor(brevo_health_probe, "brevo")
+
+
+# Sonde Cloudinary (photos de profil, portfolio) : 200 si l'Admin API répond
+# au ping officiel, 503 sinon (config manquante, transport).
+@app.api_route("/monitor/cloudinary", methods=["GET", "HEAD"])
+async def monitor_cloudinary():
+    """Sonde Cloudinary (photos) : 200 si l'Admin API répond au ping officiel,
+    503 sinon (config manquante, transport).
+
+    Returns:
+        dict: {service, circuit, configured, detail, timestamp} — 503 quand
+        circuit == "down".
+    """
+    return await _external_provider_monitor(cloudinary_health_probe, "cloudinary")
 
 
 # Favicon & racine — cette API ne sert pas de frontend, mais les navigateurs/
@@ -164,6 +301,8 @@ async def root_health_check():
 # content) pour le favicon garde les logs propres (correctif standard).
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
+    """Répond 204 (no content) aux pings de favicon des navigateurs/bots pour
+    garder les logs propres (aucune forme de retour JSON)."""
     return Response(status_code=204)
 
 
@@ -308,6 +447,14 @@ async def lifespan(application: FastAPI):
         await create_database_indexes()
     except Exception as exc:
         logger.error(f"⚠️ create_database_indexes() a échoué, démarrage poursuivi quand même: {exc}")
+
+    # Circuit breaker GLOBAL PayDunya : recharge l'état persisté en MongoDB
+    # (survit aux redéploiements, partagé entre les workers) et capture la
+    # boucle principale pour les écritures thread-safe.
+    try:
+        await init_paydunya_circuit()
+    except Exception as exc:
+        logger.error(f"⚠️ init_paydunya_circuit() a échoué, démarrage poursuivi quand même: {exc}")
 
     # Tâches de fond stockées pour être annulées proprement au shutdown (évite
     # le warning "Task was destroyed but it is pending" et coupe la boucle).

@@ -19,6 +19,8 @@ Structure d'un pays :
     }
 """
 
+from typing import Any, Dict, Optional
+
 GEOGRAPHIC_DATABASE = {
     "mali": {
         "country": "Mali",
@@ -222,12 +224,13 @@ def _haversine_km(lat1, lng1, lat2, lng2):
     return radius * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def find_nearest_location(lat, lng):
+def find_nearest_location(lat: float, lng: float) -> Optional[Dict[str, Any]]:
     """Trouve la ville/quartier le plus proche des coordonnées.
 
     Retourne un dict {country_code, country_name, city, district, distance_km}
     ou None si les coordonnées sont hors des limites de la base (Afrique de
-    l'Ouest).
+    l'Ouest) — les appelants (reverse geocoding) doivent alors retomber sur
+    un fallback (coordonnées brutes / pays du profil).
     """
     best = None  # (distance, code, name_french, city_name, district_name)
     for code, data in GEOGRAPHIC_DATABASE.items():

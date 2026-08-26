@@ -32,7 +32,11 @@ class SupportTicketStatusLookup(BaseModel):
 async def get_support_ticket_status(payload: SupportTicketStatusLookup):
     """Permet à l'expéditeur d'un ticket de suivre son statut (l'endpoint
     GET /support/tickets est réservé au propriétaire). Ne renvoie que le
-    statut et les métadonnées — pas la conversation complète."""
+    statut et les métadonnées — pas la conversation complète.
+
+    Returns:
+        dict: {ticket_id, status, reason, created_at, updated_at, message}.
+    """
     ticket = await db.support_tickets.find_one({"id": payload.ticket_id})
     if not ticket or str(ticket.get("email") or "").strip().lower() != payload.email.strip().lower():
         raise HTTPException(status_code=404, detail="Ticket introuvable")
@@ -48,6 +52,12 @@ async def get_support_ticket_status(payload: SupportTicketStatusLookup):
 
 @router.post("/support/tickets")
 async def create_support_ticket(ticket_data: SupportTicketCreate):
+    """Crée un ticket de support (canal public) et notifie le propriétaire
+    (in-app + email Brevo, best-effort).
+
+    Returns:
+        dict: {message, ticket_id}.
+    """
     ticket = SupportTicket(
         full_name=ticket_data.full_name.strip(),
         phone=ticket_data.phone.strip(),
@@ -96,6 +106,11 @@ async def list_support_tickets(
     status_filter: Optional[str] = None,
     owner_user = Depends(verify_owner_access)
 ):
+    """Liste les tickets de support (accès owner), filtrables par statut.
+
+    Returns:
+        list[dict]: tickets sérialisés (SupportTicket.model_dump).
+    """
     query = {}
     if status_filter:
         query["status"] = status_filter
@@ -108,6 +123,11 @@ async def update_support_ticket_status(
     status_update: SupportTicketStatusUpdate,
     owner_user = Depends(verify_owner_access)
 ):
+    """Change le statut d'un ticket (accès owner).
+
+    Returns:
+        dict: ticket mis à jour (SupportTicket.model_dump).
+    """
     result = await db.support_tickets.update_one(
         {"id": ticket_id},
         {"$set": {

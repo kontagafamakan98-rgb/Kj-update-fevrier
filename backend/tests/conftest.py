@@ -291,6 +291,11 @@ class FakeDB:
             self._collections[name] = FakeCollection()
         return self._collections[name]
 
+    def __getitem__(self, name: str) -> FakeCollection:
+        # Miroir de AsyncIOMotorDatabase.__getitem__ (db["collection"]) —
+        # utilisé par la persistance du circuit breaker (kojo_payments).
+        return self.__getattr__(name)
+
     async def command(self, cmd):
         return {"ok": 1}
 
@@ -346,12 +351,26 @@ async def reset_state():
     # fantômes (buckets auth-otp 12/5min et auth-session 20/5min) en mode
     # réel comme en mode FakeDB.
     _srv.request_counts.clear()
+    # Le circuit breaker PayDunya a un état EN MÉMOIRE (kojo_payments) en plus
+    # du doc persisté en base : sans reset, un test qui adopte un circuit open
+    # en base le laisse en mémoire pour les tests suivants (fraîcheur : un
+    # circuit ouvert en mémoire n'est pas écrasé par une base vide/fermée).
+    try:
+        import kojo_payments
+        kojo_payments._paydunya_circuit.update({"state": "closed", "consecutive_failures": 0, "opened_at": 0.0})
+    except Exception:
+        pass
     if USE_REAL_MONGO:
         await _srv.db.client.drop_database(_srv.db.name)
     else:
         fake_db.reset_all()
     yield
     _srv.request_counts.clear()
+    try:
+        import kojo_payments
+        kojo_payments._paydunya_circuit.update({"state": "closed", "consecutive_failures": 0, "opened_at": 0.0})
+    except Exception:
+        pass
     if USE_REAL_MONGO:
         await _srv.db.client.drop_database(_srv.db.name)
 

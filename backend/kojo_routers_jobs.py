@@ -139,6 +139,11 @@ async def create_worker_profile(
     profile_data: WorkerProfile,
     current_user: User = Depends(get_current_user)
 ):
+    """Crée le profil travailleur (réservé au rôle WORKER).
+
+    Returns:
+        dict: {message: "Worker profile created successfully"}.
+    """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Only workers can create worker profiles")
     
@@ -148,6 +153,11 @@ async def create_worker_profile(
 
 @router.get("/workers/profile")
 async def get_worker_profile(current_user: User = Depends(get_current_user)):
+    """Profil travailleur de l'utilisateur connecté (404 si inexistant).
+
+    Returns:
+        WorkerProfile: objet profil travailleur complet.
+    """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Access denied")
     
@@ -167,6 +177,9 @@ async def update_worker_profile(
 
     Le frontend gère le portfolio (ajout/suppression de photos) via
     /users/portfolio ; ce PUT sert à la mise à jour globale du profil.
+
+    Returns:
+        dict: {message: "Worker profile updated successfully"}.
     """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Only workers can update worker profiles")
@@ -246,6 +259,12 @@ async def create_job(
     job_data: dict,
     current_user: User = Depends(get_current_user)
 ):
+    """Crée une mission (réservé au rôle CLIENT). Normalise la description,
+    valide les montants et renvoie le job complet.
+
+    Returns:
+        Job: mission créée (modèle Pydantic complet, response_model=Job).
+    """
     try:
         if current_user.user_type != UserType.CLIENT:
             raise HTTPException(status_code=403, detail="Only clients can create jobs")
@@ -491,6 +510,14 @@ async def get_jobs(
     response: Response = Response(),
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
+    """Liste des jobs avec filtres (statut, catégorie, recherche q, ids,
+    mine=posted/assigned, pays, rayon lat/lng/radius_km). Accessible en
+    lecture publique (visiteur anonyme : vue nettoyée).
+
+    Returns:
+        list[dict]: vues de jobs via _job_view (le contenu diffère selon
+        que l'utilisateur est connecté ou non).
+    """
     try:
         query = {}
         if status:
@@ -582,6 +609,13 @@ async def get_jobs(
 
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str, current_user: Optional[User] = Depends(get_current_user_optional)):
+    """Détail d'un job (404 si introuvable/supprimé ; 403 si le job est d'un
+    autre pays pour un utilisateur connecté non-owner).
+
+    Returns:
+        dict: vue du job via _job_view (contient job + relation avec
+        l'utilisateur courant).
+    """
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -740,6 +774,13 @@ async def execute_paydunya_refund(payment_record: dict) -> str:
 
 @router.delete("/jobs/{job_id}")
 async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """Annule/supprime une mission (réservé à la cliente ou au owner). Si la
+    mission était PAYÉE, déclenche le remboursement automatique du client
+    (escrow PayDunya) avant l'annulation.
+
+    Returns:
+        dict: {message, job_id, refund_status, refunded_amount}.
+    """
     job = await db.jobs.find_one({
         "$and": [
             _job_identifier_query(job_id),
@@ -870,6 +911,12 @@ async def create_proposal(
     proposal_data: ProposalCreate,
     current_user: User = Depends(get_current_user)
 ):
+    """Soumet une proposition de travailleur sur un job ouvert (une seule par
+    travailleur et par job ; cohérence pays vérifiée).
+
+    Returns:
+        dict: {message: "Proposal submitted successfully"}.
+    """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Only workers can create proposals")
     
@@ -942,6 +989,10 @@ async def accept_job_proposal(
       clic), elle est enregistree sur le job ET envoyee automatiquement au
       travailleur via un message dans la discussion, sans action manuelle
       supplementaire.
+
+    Returns:
+        dict: {message, job, proposal_status, worker} — le job mis à jour
+        (in_progress, assigned_worker_id) et la proposition acceptée.
     """
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
@@ -1103,6 +1154,10 @@ async def complete_job_and_release_payment(
     valide, panne PayDunya, etc.), la mission est quand meme cloturee mais
     le paiement reste marque a traiter manuellement (payout_status=
     'release_failed') plutot que de bloquer le client indefiniment.
+
+    Returns:
+        dict: {message, job (modèle complet), payout_status
+        (released | release_failed | already_released)}.
     """
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
@@ -1343,6 +1398,10 @@ async def get_my_proposals(current_user: User = Depends(get_current_user)):
     localStorage (qui se perd en changeant d'appareil/navigateur ou en
     vidant le cache, ce qui laissait l'utilisateur postuler une 2e fois et
     tomber sur une erreur "vous avez déjà postulé").
+
+    Returns:
+        list[dict]: propositions du travailleur (job_id, status,
+        proposed_amount, created_at) — liste vide pour un non-travailleur.
     """
     if current_user.user_type != UserType.WORKER:
         return []
@@ -1358,6 +1417,12 @@ async def get_job_proposals(
     job_id: str,
     current_user: User = Depends(get_current_user)
 ):
+    """Liste des propositions d'un job (réservé à la cliente du job).
+
+    Returns:
+        list[dict]: propositions enrichies du nom/photo/notation du
+        travailleur (worker_name, worker_photo, rating…).
+    """
     # Check if user is the job owner
     job = await db.jobs.find_one({"id": job_id, "client_id": current_user.id})
     if not job:
@@ -1408,6 +1473,11 @@ async def get_job_payment_status(
     en base de donnees (jamais devine a partir du statut du job). Sert de
     source de verite unique pour l'affichage cote client ET travailleur,
     afin d'eviter d'afficher "argent sequestre" quand rien n'a ete paye.
+
+    Returns:
+        dict: {has_payment, payment_status, payout_status, amount,
+        worker_amount, created_at, completed_at} — has_payment false quand
+        aucun paiement n'existe.
     """
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:

@@ -27,7 +27,11 @@ async def get_notifications(
     unread_only: bool = Query(default=False),
     current_user: User = Depends(get_current_user)
 ):
-    """Récupère les notifications de l'utilisateur connecté (les plus récentes en premier)."""
+    """Récupère les notifications de l'utilisateur connecté (les plus récentes en premier).
+
+    Returns:
+        dict: {notifications: [Notification.model_dump()], unread_count, total}.
+    """
     query: dict = {"user_id": current_user.id}
     if unread_only:
         query["is_read"] = False
@@ -52,7 +56,11 @@ async def mark_notification_read(
     notification_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Marque une notification spécifique comme lue."""
+    """Marque une notification spécifique comme lue.
+
+    Returns:
+        dict: {message: "Notification marquée comme lue"}.
+    """
     result = await db.notifications.update_one(
         {"id": notification_id, "user_id": current_user.id},
         {"$set": {"is_read": True}}
@@ -63,7 +71,11 @@ async def mark_notification_read(
 
 @router.put("/notifications/mark-all-read")
 async def mark_all_notifications_read(current_user: User = Depends(get_current_user)):
-    """Marque toutes les notifications de l'utilisateur comme lues."""
+    """Marque toutes les notifications de l'utilisateur comme lues.
+
+    Returns:
+        dict: {message, updated} (nombre de notifications modifiées).
+    """
     result = await db.notifications.update_many(
         {"user_id": current_user.id, "is_read": False},
         {"$set": {"is_read": True}}
@@ -75,7 +87,11 @@ async def delete_notification(
     notification_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Supprime une notification de l'utilisateur."""
+    """Supprime une notification de l'utilisateur.
+
+    Returns:
+        dict: {message: "Notification supprimée"}.
+    """
     result = await db.notifications.delete_one({"id": notification_id, "user_id": current_user.id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Notification introuvable")
@@ -83,6 +99,10 @@ async def delete_notification(
 
 @router.delete("/notifications")
 async def delete_all_notifications(current_user: User = Depends(get_current_user)):
-    """Supprime toutes les notifications de l'utilisateur."""
+    """Supprime toutes les notifications de l'utilisateur.
+
+    Returns:
+        dict: {message, deleted} (nombre de notifications supprimées).
+    """
     result = await db.notifications.delete_many({"user_id": current_user.id})
     return {"message": f"{result.deleted_count} notification(s) supprimée(s)", "deleted": result.deleted_count}

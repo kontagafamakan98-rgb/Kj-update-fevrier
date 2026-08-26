@@ -39,7 +39,7 @@ from kojo_routers_payments import _maybe_recheck_disburse_status
 # Circuit breaker GLOBAL PayDunya (kojo_payments) : quand il est OUVERT, les
 # re-vérifications sont SUSPENDUES (elles échoueraient de toute façon en fail
 # fast) — on ne martèle pas une API down — mais l'escalade continue.
-from kojo_payments import paydunya_circuit_state
+from kojo_payments import paydunya_circuit_state, refresh_paydunya_circuit_from_db
 
 # Statuts « incertains » : PayDunya a peut-être exécuté le décaissement, seul
 # un check-status (ou l'IPN) peut trancher.
@@ -89,6 +89,12 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
     payments = await db.payments.find({
         "payout_status": {"$in": list(_STUCK_PAYOUT_STATUSES)},
     }).to_list(length=500)
+
+    # Partage inter-workers : on adopte l'état du circuit persisté en base —
+    # un AUTRE worker a pu ouvrir le circuit pendant que celui-ci dormait
+    # (redéploiement, montée en charge). Sans ce refresh, ce worker
+    # re-brûlerait le seuil d'échecs avant de se synchroniser.
+    await refresh_paydunya_circuit_from_db()
 
     # Circuit breaker GLOBAL PayDunya : quand il est OUVERT, on ne lance AUCUNE
     # re-vérification (chaque check-status échouerait en fail fast ~0 ms) — on
@@ -189,10 +195,14 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
                 )
             except Exception as exc:
                 logger.warning(f"⚠️ Email alerte owner échoué: {exc}")
-        await db.payments.update_one(
-            {"id": payment_id},
-            {"$set": {"owner_payout_alerted_at": now.isoformat()}},
-        )
+        # Traçabilité : owner_payout_alerted_at (fenêtre de rappel) + compteur
+        # de RAPPELS déjà envoyés (incrémenté uniquement sur un rappel, pas sur
+        # la première alerte) — exposé dans /api/owner/stuck-payouts pour que
+        # l'owner sache combien de fois il a été relancé pour ce décaissement.
+        alert_update = {"$set": {"owner_payout_alerted_at": now.isoformat()}}
+        if is_reminder:
+            alert_update["$inc"] = {"owner_payout_reminders_sent": 1}
+        await db.payments.update_one({"id": payment_id}, alert_update)
         summary["alerted"] += 1
 
     if summary["rechecked"]:

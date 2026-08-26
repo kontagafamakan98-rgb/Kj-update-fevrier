@@ -131,6 +131,41 @@ class TestSendMessage:
 
 @pytest.mark.asyncio
 class TestConversationOrdering:
+    async def test_conversation_other_user_neutral_when_deleted(self, client: AsyncClient):
+        """Interlocuteur SUPPRIMÉ (RGPD) : other_user est un objet NEUTRE
+        (is_deleted: true), jamais null — les consommateurs n'ont pas à gérer
+        un null dans le payload des conversations (pattern retours neutres)."""
+        from kojo_core import db as _db
+
+        user_a = await register_and_login(client, BASE_USER)
+        user_b = await register_and_login(client, WORKER_USER)
+        id1, id2 = sorted([user_a["user"]["id"], user_b["user"]["id"]])
+        conversation_id = f"{id1}_{id2}"
+
+        headers_a = {"Authorization": f"Bearer {user_a['access_token']}"}
+        resp = await client.post("/api/messages", headers=headers_a, json={
+            "receiver_id": user_b["user"]["id"],
+            "content": "Bonjour",
+        })
+        assert resp.status_code == 200
+        assert conversation_id  # la conversation existe (id composé trié)
+
+        # Suppression RGPD de l'interlocuteur.
+        await _db.users.delete_one({"id": user_b["user"]["id"]})
+
+        resp = await client.get("/api/messages/conversations", headers=headers_a)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        conv = data[0]
+        # Jamais null : objet neutre identifiant l'interlocuteur supprimé.
+        assert conv["other_user"] is not None
+        assert conv["other_user"]["id"] == user_b["user"]["id"]
+        assert conv["other_user"].get("is_deleted") is True
+        assert "first_name" in conv["other_user"]
+        assert conv["other_user"]["profile_photo"] is None
+        assert conv["other_user_name"]  # fallback non vide
+
     async def test_messages_ordered_chronologically(self, client: AsyncClient):
         """Les messages d'une conversation doivent être triés par timestamp ASC."""
         user_a = await register_and_login(client, BASE_USER)

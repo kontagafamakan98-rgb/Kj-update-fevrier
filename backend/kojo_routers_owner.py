@@ -12,7 +12,11 @@ from kojo_settings import (
 from kojo_core import (
     is_database_available, verify_owner_access,
 )
-from kojo_payments import get_effective_commission_rate, paydunya_circuit_state
+from kojo_payments import (
+    get_effective_commission_rate,
+    paydunya_circuit_state,
+    refresh_paydunya_circuit_from_db,
+)
 from kojo_routers_jobs import execute_paydunya_refund
 # Helpers du sweeper (kojo_scheduler) : source unique de vérité pour les
 # statuts incertains et le calcul de la durée de blocage.
@@ -24,7 +28,12 @@ router = APIRouter()
 async def get_system_stats(owner_user = Depends(verify_owner_access)):
     """Statistics endpoint — PROPRIÉTAIRE UNIQUEMENT (les compteurs
     d'utilisateurs/missions ne doivent être visibles d'aucun utilisateur
-    lambda ; la landing utilise /api/public/stats, qui reste public)."""
+    lambda ; la landing utilise /api/public/stats, qui reste public).
+
+    Returns:
+        dict: {total_users, total_jobs, total_workers, total_clients,
+        supported_countries, supported_languages, database, timestamp}.
+    """
     db_available = await is_database_available()
 
     if not db_available:
@@ -118,7 +127,11 @@ async def compute_real_commission_stats() -> Dict[str, Any]:
 
 @router.get("/owner/commission-stats")
 async def get_commission_stats(owner_user = Depends(verify_owner_access)):
-    """Statistiques des commissions - PROPRIÉTAIRE UNIQUEMENT"""
+    """Statistiques des commissions - PROPRIÉTAIRE UNIQUEMENT.
+
+    Returns:
+        dict: {status, owner_email, stats} (stats = détail commission).
+    """
     try:
         stats = await compute_real_commission_stats()
         return {
@@ -132,7 +145,12 @@ async def get_commission_stats(owner_user = Depends(verify_owner_access)):
 
 @router.get("/owner/debug-info")
 async def get_debug_info(owner_user = Depends(verify_owner_access)):
-    """Informations de debug - PROPRIÉTAIRE UNIQUEMENT"""
+    """Informations de debug - PROPRIÉTAIRE UNIQUEMENT.
+
+    Returns:
+        dict: {system_status, database_connected, total_users, …} — vue
+        technique complète.
+    """
     try:
         # Compter les utilisateurs
         total_users = await db.users.count_documents({})
@@ -180,7 +198,11 @@ async def get_users_management(
     offset: int = Query(default=0, ge=0),
     owner_user = Depends(verify_owner_access)
 ):
-    """Gestion des utilisateurs - PROPRIÉTAIRE UNIQUEMENT (paginé)"""
+    """Gestion des utilisateurs - PROPRIÉTAIRE UNIQUEMENT (paginé).
+
+    Returns:
+        dict: {status, users (sans password_hash), stats, access_level}.
+    """
     try:
         # Récupérer les utilisateurs (sauf le propriétaire), paginé pour
         # éviter de charger toute la collection en mémoire à chaque appel.
@@ -219,7 +241,11 @@ async def update_commission_settings(
     settings: dict,
     owner_user = Depends(verify_owner_access)
 ):
-    """Mettre à jour les paramètres de commission - PROPRIÉTAIRE UNIQUEMENT"""
+    """Mettre à jour les paramètres de commission - PROPRIÉTAIRE UNIQUEMENT.
+
+    Returns:
+        dict: {status, message, new_settings}.
+    """
     try:
         # Valider les paramètres
         commission_rate = settings.get("commission_rate", 14)
@@ -259,7 +285,11 @@ async def retry_payment_refund(payment_id: str, owner_user = Depends(verify_owne
 
     PROPRIÉTAIRE UNIQUEMENT. Un remboursement en cours (refunding) n'est
     jamais relancé ici : il est tranché par l'IPN ou la re-vérification du
-    statut, pas par une seconde tentative (risque de double remboursement)."""
+    statut, pas par une seconde tentative (risque de double remboursement).
+
+    Returns:
+        dict: {payment_id, job_id, refund_status, refunded_amount}.
+    """
     payment_record = await db.payments.find_one({"id": payment_id})
     if not payment_record:
         raise HTTPException(status_code=404, detail="Paiement introuvable")
@@ -304,7 +334,16 @@ async def get_stuck_payouts(owner_user = Depends(verify_owner_access)):
     - exceeds_threshold : le seuil d'alerte est dépassé.
     - alerted / last_alert_at / needs_alert : statut de l'alerte envoyée par le
       sweeper (jamais alerté, alerté à date, ou à alerter au prochain passage).
-    Tri du plus bloqué au moins bloqué."""
+    - reminders_sent : nombre de RAPPELS déjà envoyés par le sweeper pour ce
+      décaissement (0 = première alerte seule ; incrémenté à chaque rappel
+      périodique tant que le blocage dure).
+    Tri du plus bloqué au moins bloqué.
+
+    Returns:
+        dict: {count, threshold_hours, paydunya_circuit, payouts: [{payment_id,
+        job_id, amount, blocked_since, blocked_seconds, blocked_hours,
+        exceeds_threshold, alerted, last_alert_at, reminders_sent, …}]}.
+    """
     now = datetime.now(timezone.utc)
     threshold = timedelta(hours=PAYOUT_ALERT_THRESHOLD_HOURS)
 
@@ -341,6 +380,7 @@ async def get_stuck_payouts(owner_user = Depends(verify_owner_access)):
             "alerted": bool(last_alert_at),
             "last_alert_at": last_alert_at,
             "needs_alert": bool(exceeds_threshold and not last_alert_at),
+            "reminders_sent": int(payment.get("owner_payout_reminders_sent", 0) or 0),
             "created_at": payment.get("created_at"),
             "updated_at": payment.get("updated_at"),
         })
@@ -354,6 +394,9 @@ async def get_stuck_payouts(owner_user = Depends(verify_owner_access)):
     # État du circuit breaker GLOBAL PayDunya : si le circuit est OUVERT
     # (échecs réseau consécutifs), TOUS les statuts ci-dessus sont simplement
     # « non re-vérifiés » — l'owner doit le savoir pour interpréter la liste.
+    # Refresh préalable : partage inter-workers (un autre worker a pu ouvrir
+    # le circuit) — l'endpoint montre l'état le plus récent, pas celui local.
+    await refresh_paydunya_circuit_from_db()
     circuit = paydunya_circuit_state()
 
     return {

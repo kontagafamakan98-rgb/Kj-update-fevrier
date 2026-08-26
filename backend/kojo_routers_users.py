@@ -42,6 +42,14 @@ router = APIRouter()
 
 @router.get("/users/profile")
 async def get_profile(current_user: User = Depends(get_current_user)):
+    """Profil de l'utilisateur connecté.
+
+    PRIVACITÉ : payment_accounts n'est JAMAIS renvoyé ici — le frontend
+    ne l'utilise que via GET /users/payment-accounts à la demande.
+
+    Returns:
+        dict: profil User complet, SANS password_hash ni payment_accounts.
+    """
     # PRIVACITÉ : payment_accounts (numéros Orange Money/Wave, cartes,
     # comptes bancaires COMPLETS) n'est JAMAIS renvoyé dans le profil — le
     # frontend ne l'utilise que via GET /users/payment-accounts, appelé à la
@@ -72,6 +80,13 @@ async def update_profile(
     user_data: dict,
     current_user: User = Depends(get_current_user)
 ):
+    """Met à jour le profil (whitelist stricte : first_name, last_name, phone,
+    preferred_language, country, bio, skills, profile_photo — les champs
+    sensibles sont ignorés, jamais écrits).
+
+    Returns:
+        dict: {message: "Profile updated successfully"}.
+    """
     # Seuls les champs de la whitelist sont acceptés ; les autres sont ignorés
     # (jamais stockés), y compris les champs sensibles tentés par un client.
     update_data = {k: v for k, v in user_data.items() if k in EDITABLE_PROFILE_FIELDS}
@@ -168,6 +183,12 @@ async def upload_profile_photo(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
+    """Upload de la photo de profil (max 5 Mo, image réelle vérifiée par
+    signature, stockée sur Cloudinary).
+
+    Returns:
+        dict: {message, photo_url}.
+    """
     if not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
 
@@ -211,7 +232,12 @@ async def upload_profile_photo(
 
 @router.get("/users/profile-photo")
 async def get_current_user_profile_photo(current_user: User = Depends(get_current_user)):
-    """Get current user's profile photo"""
+    """Photo de profil de l'utilisateur connecté (200 avec photo_url: null
+    quand aucune photo — état normal, pas une erreur).
+
+    Returns:
+        dict: {photo_url, user_id}.
+    """
     # Pas de photo = etat normal (compte sans photo), pas une erreur.
     # On renvoie 200 avec photo_url: null plutot qu'un 404 pour eviter
     # de polluer la console navigateur sur chaque page qui verifie la photo.
@@ -222,12 +248,17 @@ async def get_current_user_profile_photo(current_user: User = Depends(get_curren
 
 @router.get("/users/{user_id}/profile-photo")
 async def get_user_profile_photo(user_id: str, current_user: User = Depends(get_current_user)):
-    """Get any user's profile photo (endpoint authentifié pour l'affichage
-    des photos d'autres utilisateurs dans les conversations/missions).
+    """Photo de profil d'un autre utilisateur (authentifié, pour l'affichage
+    dans les conversations/missions).
 
     SECURITE : rendu authentifié pour empêcher l'énumération d'identifiants
     utilisateurs par un tiers non connecté (chaque requête révélant si un
-    user_id existe)."""
+    user_id existe).
+
+    Returns:
+        dict: {photo_url, user_id} — photo_url null si l'utilisateur n'a pas
+        de photo (état normal).
+    """
     try:
         user = await db.users.find_one({"id": user_id})
         if not user:
@@ -244,6 +275,11 @@ async def get_user_profile_photo(user_id: str, current_user: User = Depends(get_
 
 @router.delete("/users/profile-photo")
 async def delete_profile_photo(current_user: User = Depends(get_current_user)):
+    """Supprime la photo de profil (404 si aucune photo).
+
+    Returns:
+        dict: {message: "Profile photo deleted successfully"}.
+    """
     if not current_user.profile_photo:
         raise HTTPException(status_code=404, detail="No profile photo to delete")
     
@@ -259,7 +295,12 @@ async def register_push_token(
     token_data: PushTokenCreate,
     current_user: User = Depends(get_current_user)
 ):
-    """Register push notification token for mobile app"""
+    """Enregistre (ou met à jour) un token push mobile ; max 10 appareils
+    actifs par utilisateur.
+
+    Returns:
+        dict: {message, token_id, action: "created" | "updated"}.
+    """
     try:
         logger.debug(f"Registering push token for user: {current_user.id}")
         
@@ -335,7 +376,12 @@ async def register_push_token(
 
 @router.get("/users/push-tokens")
 async def get_user_push_tokens(current_user: User = Depends(get_current_user)):
-    """Get all push tokens for current user"""
+    """Tokens push actifs de l'utilisateur connecté (sans le token brut).
+
+    Returns:
+        dict: {tokens: [{id, device_type, device_id, created_at, updated_at}],
+        count}.
+    """
     try:
         tokens = await db.push_tokens.find(
             {"user_id": current_user.id, "active": True}
@@ -363,7 +409,12 @@ async def delete_push_token(
     token_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Delete/deactivate a push token"""
+    """Désactive un token push (désactivation, pas suppression physique —
+    audit trail).
+
+    Returns:
+        dict: {message: "Push token deactivated successfully"}.
+    """
     try:
         # Find token and verify ownership
         token = await db.push_tokens.find_one({"id": token_id, "user_id": current_user.id})
@@ -392,7 +443,13 @@ async def delete_push_token(
 
 @router.get("/users/payment-accounts")
 async def get_user_payment_accounts(current_user: User = Depends(get_current_user)):
-    """Obtenir les comptes de paiement de l'utilisateur connecté"""
+    """Comptes de paiement de l'utilisateur connecté (seul endpoint qui
+    expose les numéros complets, appelé à la demande).
+
+    Returns:
+        dict: {user_id, user_type, payment_accounts, payment_accounts_count,
+        is_verified, minimum_required}.
+    """
     
     user_data = await db.users.find_one({"id": current_user.id})
     if not user_data:
@@ -412,7 +469,13 @@ async def update_user_payment_accounts(
     payment_data: PaymentAccount,
     current_user: User = Depends(get_current_user)
 ):
-    """Mettre à jour les comptes de paiement de l'utilisateur"""
+    """Met à jour les comptes de paiement de l'utilisateur (validation
+    stricte : pays, canaux PayDunya opérés, minimum requis par rôle).
+
+    Returns:
+        dict: {message, payment_verification: {linked_accounts,
+        required_minimum, is_verified, accounts}}.
+    """
     
     user_data = await db.users.find_one({"id": current_user.id})
     if not user_data:
@@ -452,7 +515,12 @@ async def update_user_payment_accounts(
 
 @router.post("/users/verify-payment-access")
 async def verify_payment_access(current_user: User = Depends(get_current_user)):
-    """Vérifier si l'utilisateur peut accéder aux fonctionnalités de paiement"""
+    """Vérifie si l'utilisateur peut accéder aux paiements (comptes liés >= minimum).
+
+    Returns:
+        dict: {access_granted, message, required_minimum, current_count,
+        user_type, is_verified?}.
+    """
     
     user_data = await db.users.find_one({"id": current_user.id})
     if not user_data:
@@ -498,7 +566,12 @@ async def add_portfolio_image(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ):
-    """Ajoute une photo au portfolio du travailleur (max 10)."""
+    """Ajoute une photo au portfolio du travailleur (max 10, image vérifiée,
+    stockée sur Cloudinary).
+
+    Returns:
+        dict: {portfolio_images} — liste à jour des URLs.
+    """
     if current_user.user_type != "worker":
         raise HTTPException(status_code=403, detail="Réservé aux travailleurs")
 
@@ -553,7 +626,11 @@ async def remove_portfolio_image(
     index: int,
     current_user: User = Depends(get_current_user),
 ):
-    """Supprime la photo de portfolio à l'index donné."""
+    """Supprime la photo de portfolio à l'index donné.
+
+    Returns:
+        dict: {portfolio_images} — liste à jour des URLs.
+    """
     if current_user.user_type != "worker":
         raise HTTPException(status_code=403, detail="Réservé aux travailleurs")
 
@@ -634,7 +711,11 @@ async def get_referral_filleuls(current_user: User = Depends(get_current_user)):
     (les filleuls). Chaque entrée contient les infos publiques du filleul et
     son éventuelle contribution au parrainage (récompenses déjà générées).
 
-    Réservé aux travailleurs (le parrainage ne concerne pas les clients)."""
+    Réservé aux travailleurs (le parrainage ne concerne pas les clients).
+
+    Returns:
+        dict: {filleuls: [{infos publiques du filleul, récompenses générées}]}.
+    """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Le parrainage est réservé aux travailleurs")
     code = await _ensure_referral_code(current_user.id)
@@ -677,7 +758,11 @@ async def apply_referral(
     """Enregistre le code du parrain saisi à l'inscription (référence croisée,
     pas de crédit monétaire automatique). Réservé aux travailleurs : un
     client ne peut ni parrainer ni être parrainé (il ne réalise pas de
-    mission, donc aucune récompense ne peut être débloquée)."""
+    mission, donc aucune récompense ne peut être débloquée).
+
+    Returns:
+        dict: {message, referred_by} (code du parrain appliqué).
+    """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Le parrainage est réservé aux travailleurs")
     code = str((payload or {}).get("code") or '').strip().upper()
@@ -743,6 +828,10 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     - Le solde n'est décrémenté qu'à la CONFIRMATION du décaissement (submit
       "success" ou IPN/check-status ultérieur) : en cas d'échec le solde
       reste intact et le travailleur peut réessayer.
+
+    Returns:
+        dict: {status (released | releasing), payment_id, reward_balance,
+        message}.
     """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Le retrait des récompenses est réservé aux travailleurs")
@@ -964,6 +1053,9 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     sont conservés (obligation comptable / lutte contre la fraude) : ils
     référencent des identifiants internes, plus aucune PII n'y est jointe
     après anonymisation.
+
+    Returns:
+        dict: {message, deleted: true}.
     """
     user_id = current_user.id
     now = datetime.now(timezone.utc)

@@ -249,6 +249,82 @@ describe('api — session 401 (token stale vs session morte) et CSRF', () => {
     // Le rejeu envoie le CSRF rafraîchi par la sonde (écho X-Kojo-CSRFToken).
     expect(global.fetch.mock.calls[2][1].headers['X-CSRFToken']).toBe('fresh-csrf');
   });
+
+  it('deux mutations 401 simultanées → UNE sonde partagée, les deux rejouent avec le jeton tourné (pas de fausse déconnexion)', async () => {
+    localStorage.setItem('token', 'expired.token.abc');
+    const location = fakeLocation();
+    const rotated = 'fresh.token.xyz';
+    // mutation A 401 → mutation B 401 → sonde /auth/me 200 (rotation) →
+    // rejeu A 200 → rejeu B 200.
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false, status: 401, text: async () => '{"detail":"Invalid token"}', headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: false, status: 401, text: async () => '{"detail":"Invalid token"}', headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{}',
+        headers: { get: (name) => (name === 'X-Kojo-Token' ? rotated : null) },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{"okA":true}', headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true, status: 200, text: async () => '{"okB":true}', headers: { get: () => null },
+      });
+
+    const [resultA, resultB] = await Promise.all([
+      api.get('/users/payment-accounts'),
+      api.get('/jobs/mine'),
+    ]);
+
+    expect(resultA).toEqual({ okA: true });
+    expect(resultB).toEqual({ okB: true });
+    // Séquence des jetons envoyés sur les 4 appels hors sonde : les deux
+    // tentatives INITIALES partent avec l'ancien jeton (d'où le 401), et les
+    // deux REJEUX utilisent le jeton TOURNÉ par la sonde — jamais l'ancien
+    // remplacé (le rejeu relit getAuthToken() au moment du rejeu).
+    const allAuths = global.fetch.mock.calls
+      .filter(([url]) => !url.includes('/api/auth/me'))
+      .map(([, options]) => options.headers.Authorization);
+    expect(allAuths).toEqual([
+      'Bearer expired.token.abc',
+      'Bearer expired.token.abc',
+      `Bearer ${rotated}`,
+      `Bearer ${rotated}`,
+    ]);
+    // Une SEULE sonde pour les deux échecs simultanés (anti-tempête).
+    const meCalls = global.fetch.mock.calls.filter(([url]) => url.includes('/api/auth/me'));
+    expect(meCalls).toHaveLength(1);
+    // Aucune fausse déconnexion : le jeton tourné est conservé, pas de
+    // redirection, et les deux mutations ont abouti.
+    expect(localStorage.getItem('token')).toBe(rotated);
+    expect(location.getRedirectTarget()).toBe('');
+  });
+
+  it('deux mutations 401 simultanées, session réellement morte → une seule sonde, purge locale (pas de fausse récupération)', async () => {
+    localStorage.setItem('token', 'expired.token.abc');
+    // Toutes les réponses (mutations + sonde) sont des 401.
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false, status: 401, text: async () => '{"detail":"Invalid token"}', headers: { get: () => null },
+    });
+
+    await expect(Promise.all([
+      api.get('/users/payment-accounts'),
+      api.get('/jobs/mine'),
+    ])).rejects.toThrow('Invalid token');
+
+    // Une seule sonde partagée a été tentée pour les deux échecs (anti-tempête),
+    // puis chaque appelant retombe sur la gestion 401 : purge locale du jeton.
+    // (La redirection vers /login peut être déléguée au garde de route quand une
+    // session cookie / mémoire CSRF est encore détectée — invariants corrects
+    // des deux côtés ; ce qui ne doit JAMAIS arriver, c'est une fausse
+    // récupération ou une seconde sonde.)
+    const meCalls = global.fetch.mock.calls.filter(([url]) => url.includes('/api/auth/me'));
+    expect(meCalls).toHaveLength(1);
+    expect(localStorage.getItem('token')).toBeNull();
+  });
 });
 
 // Rotation à fenêtre glissante : /auth/me renvoie X-Kojo-Token quand le jeton

@@ -108,8 +108,11 @@ export function AuthProvider({ children }) {
 
   // Référence vers la dernière version de loadUser pour le listener de
   // synchronisation multi-onglets (éviter une closure obsolète).
+  // NOTE : l'assignation se fait APRÈS la déclaration de loadUser (voir plus
+  // bas) — l'assigner ici, avant le `const loadUser`, levait un
+  // ReferenceError (TDZ « Cannot access 'loadUser' before initialization »)
+  // au premier rendu d'AuthProvider : écran blanc sur toute l'app.
   const loadUserRef = useRef();
-  loadUserRef.current = loadUser;
 
   useEffect(() => {
     // Amorçage de session au démarrage de l'app.
@@ -172,6 +175,21 @@ export function AuthProvider({ children }) {
       
       // Cache user data for offline access (sans les numéros de paiement)
       kojoCache.set(CACHE_KEYS.USER_PROFILE, sanitizeUserForStorage(userData), 60 * 60 * 1000); // 1 hour
+
+      // COHÉRENCE du snapshot localStorage 'user' : écrit au login/register, il
+      // resterait sinon figé au pays d'origine après une mise à jour de profil
+      // (ex. pays changé depuis le formulaire — détecté par téléphone ou choisi
+      // manuellement) jusqu'au prochain login. loadUser rafraîchit donc aussi
+      // ce snapshot avec la vérité backend. Aucun effet de bord multi-onglets
+      // (le listener storage ne réagit qu'à la clé 'token'), et la
+      // sanitisation privacy est identique à establishSession (jamais les
+      // numéros de paiement).
+      try {
+        localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(userData)));
+      } catch (_error) {
+        // localStorage indisponible (tests jsdom / privé) : le cache kojoCache
+        // reste la source hors-ligne.
+      }
       devLog.info('✅ User profile loaded and cached');
       
     } catch (error) {
@@ -207,6 +225,11 @@ export function AuthProvider({ children }) {
       setLoading(false);
     }
   };
+
+  // Référence de loadUser pour le listener multi-onglets : mise à jour APRÈS
+  // la déclaration (le `const loadUser` ci-dessus) — assignée avant, le rendu
+  // d'AuthProvider levait une ReferenceError TDZ au premier rendu.
+  loadUserRef.current = loadUser;
 
   // Établit la session après une auth réussie (cookie httpOnly posé par le
   // backend ; on ne stocke que le profil en localStorage, jamais le token).

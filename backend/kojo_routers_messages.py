@@ -22,6 +22,13 @@ async def send_message(
     message_data: MessageCreate,
     current_user: User = Depends(get_current_user)
 ):
+    """Envoie un message privé (l'expéditeur doit exister et différer du
+    destinataire ; la conversation est dérivée des deux ids triés).
+
+    Returns:
+        dict: message créé (conversation_id, sender_id, receiver_id,
+        content, job_id, timestamp…).
+    """
     # Anti-spam / anti-bruit : le destinataire doit exister, et on ne peut
     # pas s'envoyer un message à soi-même.
     if message_data.receiver_id == current_user.id:
@@ -49,7 +56,11 @@ async def send_message(
 
 @router.get("/messages")
 async def get_all_messages(current_user: User = Depends(get_current_user)):
-    """Récupérer tous les messages de l'utilisateur connecté"""
+    """Récupérer tous les messages de l'utilisateur connecté (100 derniers).
+
+    Returns:
+        list[dict]: messages où l'utilisateur est expéditeur ou destinataire.
+    """
     messages = await db.messages.find({
         "$or": [
             {"sender_id": current_user.id},
@@ -60,6 +71,15 @@ async def get_all_messages(current_user: User = Depends(get_current_user)):
 
 @router.get("/messages/conversations")
 async def get_conversations(current_user: User = Depends(get_current_user)):
+    """Liste des conversations de l'utilisateur (dernier message, non-lus,
+    interlocuteur). L'interlocuteur supprimé (soft-delete RGPD) est un objet
+    neutre {is_deleted: true} — jamais null.
+
+    Returns:
+        list[dict]: conversations triées par activité décroissante, chacune
+        avec last_message, last_timestamp, unread_count, other_user et
+        other_user_name.
+    """
     # Regroupement par conversation fait en Python (équivalent fonctionnel de
     # l'ancien pipeline $match/$sort/$group de Mongo) : le dernier message est
     # déterminé par comparaison de timestamp, donc PAS de dépendance à l'ordre
@@ -137,7 +157,17 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
                 full_name = f"{first_name} {last_name}".strip()
                 conv["other_user_name"] = full_name or other_user.get("email") or "Unknown"
             else:
-                conv["other_user"] = None
+                # Interlocuteur SUPPRIMÉ (soft-delete RGPD) : jamais null —
+                # objet neutre `is_deleted: true` pour que les consommateurs
+                # (rendu avatar, nom, navigation) n'aient pas à gérer un null
+                # (même pattern que les retours `detected:false` du frontend).
+                conv["other_user"] = {
+                    "id": other_user_id,
+                    "first_name": "",
+                    "last_name": "",
+                    "profile_photo": None,
+                    "is_deleted": True,
+                }
                 conv["other_user_name"] = "Unknown"
 
         result.append(conv)
@@ -152,6 +182,13 @@ async def get_conversation_messages(
     order: str = Query(default="asc", pattern="^(asc|desc)$"),
     current_user: User = Depends(get_current_user)
 ):
+    """Messages d'une conversation (paginated par offset, ordre asc/desc ;
+    accès réservé aux participants ; marque les reçus comme lus).
+
+    Returns:
+        list[dict]: messages de la conversation (ordre chronologique),
+        avec conversation_id et les flags de lecture.
+    """
     # Verify user is part of conversation. conversation_id est formaté
     # "{id1}_{id2}" - on compare les IDs exacts après split, pas une
     # recherche de sous-chaîne ("in") qui pouvait matcher par accident si

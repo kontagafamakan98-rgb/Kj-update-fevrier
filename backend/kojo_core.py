@@ -15,6 +15,8 @@ from urllib.parse import urlparse
 
 import bcrypt
 import jwt
+import cloudinary
+import cloudinary.api
 from cloudinary import uploader as cloudinary_uploader
 from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -67,6 +69,55 @@ except Exception as e:
     logger.error(f"❌ MongoDB connection failed: {e}")
     raise
 
+
+
+# --- Sonde de santé Cloudinary (moniteur d'infra /monitor/cloudinary) ---
+# cloudinary.api.ping() est la sonde officielle (Admin API, read-only,
+# légère). Cache TTL court : le moniteur peut interroger toutes les 30-60 s,
+# on ne martèle pas Cloudinary pour autant. La config globale (cloud_name,
+# api_key, api_secret) est lue depuis l'environnement (CLOUDINARY_URL) par le
+# SDK à l'import.
+CLOUDINARY_HEALTH_CACHE_TTL_SECONDS = 60
+_cloudinary_health_cache = {}  # {"at": float, "result": dict}
+
+
+def cloudinary_health_probe() -> dict:
+    """Sonde l'API Cloudinary (ping officiel) pour /monitor/cloudinary.
+
+    Retourne {"ok": bool, "configured": bool, "detail": str} — jamais
+    d'exception. Résultat mis en cache TTL (60 s) pour ne pas marteler
+    Cloudinary quand le moniteur interroge fréquemment.
+    """
+    now = time.time()
+    cached = _cloudinary_health_cache.get("result")
+    if cached and (now - cached["at"]) < CLOUDINARY_HEALTH_CACHE_TTL_SECONDS:
+        return cached["result"]
+
+    try:
+        cfg = cloudinary.config()
+        if not (cfg.cloud_name and cfg.api_key and cfg.api_secret):
+            result = {
+                "ok": False,
+                "configured": False,
+                "detail": "Cloudinary non configuré (CLOUDINARY_URL)",
+            }
+        else:
+            ping = cloudinary.api.ping(timeout=5)
+            ok = ping.get("status") == "ok"
+            result = {
+                "ok": ok,
+                "configured": True,
+                "detail": f"status={ping.get('status')}" if ok else f"Ping inattendu: {ping}",
+            }
+    except Exception as exc:
+        result = {
+            "ok": False,
+            "configured": True,
+            "detail": f"Transport Cloudinary indisponible: {exc}",
+        }
+
+    _cloudinary_health_cache["result"] = {"at": now, "result": result}
+    return result
 
 
 def upload_image_to_cloudinary(file_obj, user_identifier: str, folder: str, public_prefix: str):
@@ -409,6 +460,12 @@ def get_client_ip(request: Request) -> str:
     return "unknown"
 
 def extract_host_from_url(raw_url: str) -> Optional[str]:
+    """Extrait le hostname d'une URL, en tolérant l'absence de schéma.
+
+    Retourne le hostname (ex: 'kojo-backend.fly.dev') ou None si l'entrée est
+    vide/blank ou que l'URL est invalide (urlparse ne trouve pas de hostname) —
+    les appelants (build_trusted_hosts) doivent ignorer silencieusement None.
+    """
     if not raw_url:
         return None
     candidate = raw_url.strip()
@@ -680,7 +737,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
-async def get_owner_account():
+async def get_owner_account() -> Optional[dict]:
     """Résout le compte owner RÉEL.
 
     Source de vérité : l'EMAIL (secret OWNER_EMAIL). En prod, le compte owner
@@ -688,6 +745,10 @@ async def get_owner_account():
     aucun compte ne porte ce secret (id fantôme) — les notifications ciblées
     par le secret étaient donc perdues. On cherche donc d'abord par email,
     puis on retombe sur l'id du secret (compatibilité legacy).
+
+    Retourne None si aucun compte owner n'est trouvé (email ET id absents,
+    ou erreur de base) — les appelants doivent alors replier sur
+    OWNER_USER_ID / OWNER_EMAIL sans notifier.
     """
     try:
         if OWNER_EMAIL:

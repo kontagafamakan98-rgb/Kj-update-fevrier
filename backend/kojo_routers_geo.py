@@ -174,7 +174,13 @@ IP_COUNTRY_HINTS = {
 }
 
 def detect_country_from_ip(ip_address: str) -> Optional[str]:
-    """Détecter le pays à partir de l'adresse IP"""
+    """Détecte le pays à partir de l'adresse IP (préfixes FAI ouest-africains).
+
+    Retourne le code pays (ex: 'senegal', 'mali') ou None si la détection est
+    impossible : adresse vide, localhost (127.0.0.1, ::1, localhost) ou préfixe
+    inconnu (hors Afrique de l'Ouest / IP privée). Les appelants doivent
+    traiter None comme « pays non détecté » — ne PAS forcer un défaut ici.
+    """
     if not ip_address or ip_address in ["127.0.0.1", "localhost", "::1"]:
         return None
     
@@ -186,7 +192,13 @@ def detect_country_from_ip(ip_address: str) -> Optional[str]:
     return None
 
 def detect_country_from_phone(phone: str) -> Optional[str]:
-    """Détecter le pays à partir du numéro de téléphone"""
+    """Détecte le pays à partir du numéro de téléphone (indicatif pays).
+
+    Retourne le code pays (ex: 'senegal', 'mali') ou None si la détection est
+    impossible : numéro vide ou indicatif inconnu (hors +221/+223/+226/+225).
+    Les espaces sont ignorés avant comparaison. Les appelants doivent traiter
+    None comme « pays non détecté » — ne PAS forcer un défaut ici.
+    """
     if not phone:
         return None
     
@@ -207,6 +219,11 @@ def detect_country_from_phone(phone: str) -> Optional[str]:
 
 @router.get("/geolocation/available-countries")
 async def get_available_countries():
+    """Liste compacte des pays supportés (id, nom, drapeau, langues).
+
+    Returns:
+        dict: {countries: [{id, name, flag, languages}]}.
+    """
     return {
         "countries": [
             {"id": "mali", "name": "Mali", "flag": "🇲🇱", "languages": ["fr", "en", "bm"]},

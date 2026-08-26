@@ -3,6 +3,7 @@
 import pytest
 
 from kojo_geo_data import GEOGRAPHIC_DATABASE, find_nearest_location
+from kojo_routers_geo import detect_country_from_ip, detect_country_from_phone
 
 
 @pytest.mark.asyncio
@@ -81,6 +82,41 @@ def test_find_nearest_location_happy_path():
 
 def test_find_nearest_location_outside_zone():
     assert find_nearest_location(48.8566, 2.3522) is None
+
+
+def test_detect_country_from_ip_known_prefix():
+    # Préfixes FAI ouest-africains documentés
+    assert detect_country_from_ip("41.82.12.34") == "senegal"
+    assert detect_country_from_ip("41.73.5.5") == "mali"
+    assert detect_country_from_ip("196.28.1.1") == "burkina_faso"
+    assert detect_country_from_ip("196.180.0.1") == "cote_divoire"
+
+
+def test_detect_country_from_ip_unknown_returns_none():
+    # Cas None documentés : vide, localhost, préfixe inconnu
+    assert detect_country_from_ip("") is None
+    assert detect_country_from_ip(None) is None
+    assert detect_country_from_ip("127.0.0.1") is None
+    assert detect_country_from_ip("localhost") is None
+    assert detect_country_from_ip("::1") is None
+    assert detect_country_from_ip("8.8.8.8") is None  # Google DNS, hors AO
+    assert detect_country_from_ip("192.168.1.1") is None  # IP privée
+
+
+def test_detect_country_from_phone_known_prefix():
+    # Indicatifs documentés, espaces ignorés
+    assert detect_country_from_phone("+221 77 123 45 67") == "senegal"
+    assert detect_country_from_phone("+22376123456") == "mali"
+    assert detect_country_from_phone("+22670123456") == "burkina_faso"
+    assert detect_country_from_phone("+22507123456") == "cote_divoire"
+
+
+def test_detect_country_from_phone_unknown_returns_none():
+    # Cas None documentés : vide, indicatif inconnu
+    assert detect_country_from_phone("") is None
+    assert detect_country_from_phone(None) is None
+    assert detect_country_from_phone("+33612345678") is None  # France, hors support
+    assert detect_country_from_phone("77123456") is None  # sans indicatif
 
 
 def test_geographic_database_is_source_of_truth():

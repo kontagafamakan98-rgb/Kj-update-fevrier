@@ -181,6 +181,13 @@ def _generic_otp_response(clean_email: str) -> dict:
 
 @router.post("/auth/email/send-otp")
 async def send_signup_email_otp(payload: EmailOtpRequest):
+    """Envoie un OTP d'inscription à une adresse email (ou réponse générique
+    si un compte existe déjà — on ne révèle pas l'existence du compte).
+
+    Returns:
+        dict: {message, masked_email, expires_in_seconds, cooldown_seconds}
+        (issue_email_otp peut ajouter des champs).
+    """
     clean_email = sanitize_email(payload.email)
 
     existing_user = await db.users.find_one({"email": clean_email})
@@ -193,6 +200,12 @@ async def send_signup_email_otp(payload: EmailOtpRequest):
 
 @router.post("/auth/email/resend-otp")
 async def resend_signup_email_otp(payload: EmailOtpResendRequest):
+    """Renvoie un OTP d'inscription (même contrat de réponse que
+    send_signup_email_otp, avec cooldown anti-spam).
+
+    Returns:
+        dict: {message, masked_email, expires_in_seconds, cooldown_seconds}
+    """
     clean_email = sanitize_email(payload.email)
 
     existing_user = await db.users.find_one({"email": clean_email})
@@ -203,6 +216,12 @@ async def resend_signup_email_otp(payload: EmailOtpResendRequest):
 
 @router.post("/auth/email/verify-otp")
 async def verify_signup_email_otp(payload: EmailOtpVerifyRequest):
+    """Vérifie un OTP d'inscription ; émet le jeton de vérification email qui
+    sera exigé par /auth/register-verified.
+
+    Returns:
+        dict: {message, verification_token, masked_email, verified: true}
+    """
     clean_email = sanitize_email(payload.email)
     now = datetime.now(timezone.utc)
 
@@ -271,6 +290,12 @@ async def verify_signup_email_otp(payload: EmailOtpVerifyRequest):
 
 @router.post("/auth/password/forgot/request")
 async def request_password_reset_otp(payload: EmailOtpRequest):
+    """Demande un OTP de réinitialisation de mot de passe. Réponse générique
+    (identique que l'email existe ou non) pour ne pas révéler l'inscription.
+
+    Returns:
+        dict: {message, masked_email, expires_in_seconds, cooldown_seconds}
+    """
     clean_email = sanitize_email(payload.email)
     existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
 
@@ -288,6 +313,11 @@ async def request_password_reset_otp(payload: EmailOtpRequest):
 
 @router.post("/auth/password/forgot/resend")
 async def resend_password_reset_otp(payload: EmailOtpResendRequest):
+    """Renvoie un OTP de réinitialisation de mot de passe (cooldown anti-spam).
+
+    Returns:
+        dict: {message, masked_email, expires_in_seconds, cooldown_seconds}
+    """
     clean_email = sanitize_email(payload.email)
     existing_user = await db.users.find_one({"email": clean_email}, {"_id": 1})
 
@@ -305,6 +335,12 @@ async def resend_password_reset_otp(payload: EmailOtpResendRequest):
 
 @router.post("/auth/password/forgot/verify")
 async def verify_password_reset_otp(payload: EmailOtpVerifyRequest):
+    """Vérifie un OTP de réinitialisation ; émet le jeton stateless qui sera
+    exigé par /auth/password/reset (anti-replay via jti révoqué).
+
+    Returns:
+        dict: {message, verification_token, masked_email, verified: true}
+    """
     clean_email = sanitize_email(payload.email)
     now = datetime.now(timezone.utc)
 
@@ -368,6 +404,12 @@ async def verify_password_reset_otp(payload: EmailOtpVerifyRequest):
 
 @router.post("/auth/password/reset")
 async def reset_password_with_verified_token(payload: PasswordResetConfirmRequest):
+    """Réinitialise le mot de passe avec un jeton de vérification validé
+    (anti-replay : un jeton déjà utilisé est révoqué et refusé).
+
+    Returns:
+        dict: {message, email, password_reset: true}
+    """
     clean_email = sanitize_email(payload.email)
     verification_payload = verify_email_verification_token(
         payload.verification_token, clean_email, purpose="password_reset"
@@ -425,6 +467,10 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
     CETTE route est le seul chemin d'inscription. Le jeton de vérification
     email est requis — un client qui s'inscrirait sans l'avoir obtenu via
     le flux OTP (/auth/email/send-otp → verify-otp) est rejeté avec un 400.
+
+    Returns:
+        dict: {access_token, user (sans password_hash ni payment_accounts),
+        token_type} — pose aussi les cookies de session/CSRF.
     """
     
     try:
@@ -666,6 +712,12 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
 
 @router.post("/auth/login")
 async def login_user(credentials: UserLogin, response: Response):
+    """Connexion par email + mot de passe (cookie httpOnly + jeton bearer).
+
+    Returns:
+        dict: {access_token, user (sans password_hash ni payment_accounts),
+        éventuellement token_type}. Pose aussi les cookies de session/CSRF.
+    """
     try:
         # Sanitize email input
         clean_email = sanitize_email(credentials.email)
@@ -713,6 +765,10 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
 
     Règle produit : l'utilisateur choisit user_type/country/language à la
     création. Les comptes de paiement sont vérifiés APRÈS (onboarding), pas ici.
+
+    Returns:
+        dict: {status, access_token?, user?, email_exists?, message?} — selon
+        le cas (connexion directe, création, ou besoin de fusion Google).
     """
     claims = await _exchange_google_code(payload.code, origin=request.headers.get("origin"))
     email = claims["email"]
@@ -831,6 +887,9 @@ async def google_link(payload: GoogleLinkRequest, request: Request, current_user
     L'utilisateur doit être connecté (Bearer) et fournir son mot de passe :
     on vérifie qu'il est bien le propriétaire du compte avant de lier le sub
     Google. Après liaison, il pourra se connecter via Google à l'avenir.
+
+    Returns:
+        dict: {message, status: success, linked: true, user}.
     """
     claims = await _exchange_google_code(payload.code, origin=request.headers.get("origin"))
     sub = claims["sub"]
@@ -865,6 +924,9 @@ async def logout_user(
     sa date d'expiration naturelle, afin qu'il ne puisse plus être réutilisé
     même s'il a été intercepté avant le logout.
     Les cookies de session (httpOnly) + CSRF sont aussi retirés (cookie auth).
+
+    Returns:
+        dict: {message: "Logout successful", status: "success"}.
     """
     # Le token peut venir du header (mobile) OU du cookie httpOnly : on
     # révoque le jti du header quand il est présent ; pour le cookie, la
@@ -892,6 +954,14 @@ async def logout_user(
 
 @router.get("/auth/me")
 async def get_current_user_auth(request: Request, response: Response, current_user: User = Depends(get_current_user)):
+    """Profil de l'utilisateur connecté + rotation de session à fenêtre
+    glissante (nouveau jeton + cookie + X-Kojo-Token quand la session approche
+    de l'expiration) et écho du CSRF (X-Kojo-CSRFToken) pour le client
+    cross-origin Vercel.
+
+    Returns:
+        dict: profil User complet, SANS password_hash ni payment_accounts.
+    """
     # ROTATION À FENÊTRE GLISSANTE : quand la session est encore valide mais
     # proche de l'expiration (< AUTH_TOKEN_ROTATION_THRESHOLD_SECONDS restants,
     # défaut 6 h = 25 % de la fenêtre de 24 h), on émet un jeton frais (même
@@ -956,6 +1026,12 @@ async def update_user_country(
     country_update: CountryUpdate,
     current_user: User = Depends(get_current_user)
 ):
+    """Met à jour le pays de l'utilisateur (le compte owner est exempté :
+    accès multi-pays).
+
+    Returns:
+        dict: {message, country}
+    """
     is_owner_user = bool(OWNER_EMAIL) and current_user.email == OWNER_EMAIL
     if is_owner_user:
         return {"message": "Owner accounts have access to all countries. Country change bypassed.", "country": current_user.country}

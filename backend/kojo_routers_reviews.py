@@ -73,6 +73,12 @@ async def create_review(
     review_data: ReviewCreate,
     current_user: User = Depends(get_current_user),
 ):
+    """Publie un avis sur une mission TERMINÉE (l'auteur note l'autre partie ;
+    un seul avis par mission et par auteur).
+
+    Returns:
+        dict: {message, review, reviewee_rating, reviewee_total_reviews}.
+    """
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Mission introuvable")
@@ -150,6 +156,11 @@ async def create_review(
 
 @router.get("/jobs/{job_id}/reviews")
 async def get_job_reviews(job_id: str, current_user: User = Depends(get_current_user)):
+    """Avis d'une mission (accès réservé aux participants ou au owner).
+
+    Returns:
+        list[dict]: avis enrichis du nom/photo de l'auteur.
+    """
     job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Mission introuvable")
@@ -168,6 +179,12 @@ async def get_job_reviews(job_id: str, current_user: User = Depends(get_current_
 
 @router.get("/users/{user_id}/reviews")
 async def get_user_reviews(user_id: str, current_user: User = Depends(get_current_user)):
+    """Avis reçus par un utilisateur (50 derniers) + résumé de notation.
+
+    Returns:
+        dict: {user, rating, total_reviews, reviews} — les avis sont
+        enrichis du nom/photo de l'auteur.
+    """
     user = await db.users.find_one(
         {"id": user_id},
         {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "profile_photo": 1, "rating": 1, "total_reviews": 1},
@@ -186,6 +203,11 @@ async def get_user_reviews(user_id: str, current_user: User = Depends(get_curren
 
 @router.delete("/reviews/{review_id}")
 async def delete_review(review_id: str, current_user: User = Depends(get_current_user)):
+    """Supprime un avis (réservé à son auteur ou au owner).
+
+    Returns:
+        dict: {message: "Avis supprimé", review_id}.
+    """
     review = await db.reviews.find_one({"id": review_id})
     if not review:
         raise HTTPException(status_code=404, detail="Avis introuvable")

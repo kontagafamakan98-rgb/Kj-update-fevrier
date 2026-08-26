@@ -174,9 +174,13 @@ const AUTH_STORAGE_KEYS = [
 
 let sessionRedirecting = false;
 let csrfTokenMemory = '';
-// Récupération de session en cours : une seule sonde /auth/me à la fois quand
-// plusieurs requêtes échouent en parallèle (anti-tempête).
-let sessionRecovering = false;
+// Récupération de session : UNE SEULE sonde /auth/me PARTAGÉE quand plusieurs
+// requêtes échouent en parallèle (anti-tempête). Tous les appelants attendent
+// la MÊME promesse — un simple flag fail-fast transformait la 2ᵉ requête en
+// fausse déconnexion : purge du jeton fraîchement tourné + redirection /login
+// malgré une session vivante, et sa mutation était perdue au lieu d'être
+// rejouée avec le nouveau jeton.
+let sessionRecoveryPromise = null;
 const RECOVERY_FAILED = Symbol('recovery-failed');
 
 /**
@@ -364,15 +368,33 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
  * session est réellement morte (le 401 normal purge + redirige ensuite).
  */
 const recoverSession = async (method, path, options) => {
-  if (sessionRecovering) return RECOVERY_FAILED;
-  sessionRecovering = true;
+  // Single-flight PARTAGÉ : si une sonde est déjà en cours (ou vient de
+  // finir), on attend la MÊME promesse au lieu d'échouer immédiatement.
+  if (!sessionRecoveryPromise) {
+    sessionRecoveryPromise = request('GET', '/auth/me', {
+      skipUnauthorizedRedirect: true,
+      skipRecovery: true,
+    }).finally(() => {
+      // La promesse partagée est consommée : la prochaine série de 401
+      // déclenchera une NOUVELLE sonde (l'état de session a pu changer).
+      sessionRecoveryPromise = null;
+    });
+  }
   try {
-    await request('GET', '/auth/me', { skipUnauthorizedRedirect: true, skipRecovery: true });
+    await sessionRecoveryPromise;
+  } catch (_error) {
+    // La sonde a échoué : session réellement morte → chaque appelant retombe
+    // sur la gestion 401 normale (purge + redirection, garde-fou anti-boucle).
+    return RECOVERY_FAILED;
+  }
+  // La sonde a réussi : la session est vivante et le jeton/CSRF sont frais
+  // (X-Kojo-Token stocké, csrfTokenMemory rafraîchi par l'écho). Le REJEU
+  // relit getAuthToken() À CE MOMENT → le jeton tourné par la sonde, jamais
+  // l'ancien remplacé ; et readCsrfCookie() → la mémoire CSRF rafraîchie.
+  try {
     return await request(method, path, { ...options, skipRecovery: true });
   } catch (_error) {
     return RECOVERY_FAILED;
-  } finally {
-    sessionRecovering = false;
   }
 };
 

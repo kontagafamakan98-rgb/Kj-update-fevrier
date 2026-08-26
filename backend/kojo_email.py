@@ -167,6 +167,57 @@ def brevo_is_configured() -> bool:
         BREVO_SENDER_EMAIL,
     ])
 
+
+# --- Sonde de santé Brevo (moniteur d'infra /monitor/brevo) ---
+# Endpoint read-only et léger de l'API Brevo (compte/plan), appelé à chaque
+# passage du moniteur. Cache TTL court : UptimeRobot/Render peuvent interroger
+# toutes les 30-60 s, on ne martèle pas Brevo pour autant.
+BREVO_ACCOUNT_API_URL = "https://api.brevo.com/v3/account"
+BREVO_HEALTH_CACHE_TTL_SECONDS = 60
+_brevo_health_cache = {}  # {"at": float, "result": dict}
+
+
+def brevo_health_probe() -> dict:
+    """Sonde l'API Brevo (GET /v3/account) pour le moniteur /monitor/brevo.
+
+    Retourne {"ok": bool, "configured": bool, "detail": str} — jamais
+    d'exception. Le résultat est mis en cache TTL (60 s) pour ne pas marteler
+    Brevo quand le moniteur interroge fréquemment.
+    """
+    now = time.time()
+    cached = _brevo_health_cache.get("result")
+    if cached and (now - cached["at"]) < BREVO_HEALTH_CACHE_TTL_SECONDS:
+        return cached["result"]
+
+    if not brevo_is_configured():
+        result = {
+            "ok": False,
+            "configured": False,
+            "detail": "Brevo non configuré (BREVO_API_KEY / BREVO_SENDER_EMAIL)",
+        }
+    else:
+        try:
+            probe_response = requests.get(
+                BREVO_ACCOUNT_API_URL,
+                headers={"accept": "application/json", "api-key": BREVO_API_KEY},
+                timeout=5,
+            )
+            ok = probe_response.ok
+            result = {
+                "ok": ok,
+                "configured": True,
+                "detail": f"HTTP {probe_response.status_code}" if ok else f"HTTP {probe_response.status_code}: {probe_response.text[:120]}",
+            }
+        except requests.RequestException as exc:
+            result = {
+                "ok": False,
+                "configured": True,
+                "detail": f"Transport Brevo indisponible: {exc}",
+            }
+
+    _brevo_health_cache["result"] = {"at": now, "result": result}
+    return result
+
 def get_missing_brevo_env_vars() -> List[str]:
     missing = []
     if not BREVO_API_KEY:

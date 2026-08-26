@@ -2,6 +2,7 @@ import asyncio
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -30,6 +31,7 @@ from kojo_payments import (
     calculate_payment_breakdown, check_paydunya_disburse_status,
     create_paydunya_invoice, get_effective_commission_rate,
     get_paydunya_channel, is_paydunya_circuit_open, is_paydunya_configured,
+    refresh_paydunya_circuit_from_db,
     normalize_payment_country, serialize_payment_record,
     sync_payment_status_with_paydunya,
 )
@@ -58,7 +60,10 @@ PAYMENT_STATUS_CACHE_TTL_SECONDS = 15
 _payment_status_cache: dict = {}
 
 
-def _get_cached_payment_status(payment_id: str):
+def _get_cached_payment_status(payment_id: str) -> Optional[dict]:
+    """Retourne le record de statut mis en cache s'il est encore frais
+    (< TTL de 15 s), sinon None — les appelants (endpoints /payments/status)
+    doivent alors effectuer l'appel sortant PayDunya."""
     cached = _payment_status_cache.get(payment_id)
     if cached and (time.time() - cached["at"]) < PAYMENT_STATUS_CACHE_TTL_SECONDS:
         return cached["record"]
@@ -297,6 +302,12 @@ async def paydunya_disburse_ipn(request: Request):
 
 @router.get('/payments/config')
 async def get_real_payments_config():
+    """Configuration de paiement visible par le frontend.
+
+    Returns:
+        dict: {provider, configured, mode, commission_rate_percent,
+        supported_channels}.
+    """
     return {
         'provider': 'paydunya',
         'configured': is_paydunya_configured(),
@@ -311,6 +322,13 @@ async def get_real_payments_config():
 
 @router.post('/payments/quote')
 async def get_payment_quote(request: PaymentQuoteRequest):
+    """Devis de paiement : calcule montant, commission et frais pour un
+    montant/moyen/pays donné, sans créer d'enregistrement.
+
+    Returns:
+        dict: {provider, configured, channel, country, payment_method,
+        amount, commission, total…} (détail du breakdown).
+    """
     channel = get_paydunya_channel(request.payment_method.value, request.country)
     rate = await get_effective_commission_rate()
     breakdown = calculate_payment_breakdown(request.amount, rate)
@@ -325,13 +343,24 @@ async def get_payment_quote(request: PaymentQuoteRequest):
 
 @router.post('/payments/checkout')
 async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_user: User = Depends(get_current_user)):
+    """Crée une facture PayDunya pour une mission (escrow). Refuse 503 quand
+    PayDunya est non configuré ou que le circuit breaker est OUVERT, 400 sans
+    job_id, et vérifie le montant côté serveur (jamais pris du client seul).
+
+    Returns:
+        dict: {status, provider, payment_id, invoice_token, checkout_url,
+        payment_method, channel, breakdown…}.
+    """
     if not is_paydunya_configured():
         raise HTTPException(status_code=503, detail="PayDunya n'est pas encore configuré en production")
 
     # Circuit breaker GLOBAL PayDunya : quand il est OUVERT (échecs réseau
     # consécutifs), on refuse IMMÉDIATEMENT la création de facture avec un
     # message clair — AVANT d'insérer un enregistrement pending (évite les
-    # orphelins) et sans geler l'utilisateur sur un timeout de 30 s.
+    # orphelins) et sans geler l'utilisateur sur un timeout de 30 s. Refresh
+    # préalable : un AUTRE worker (ou un redéploiement) a pu ouvrir le
+    # circuit — ce worker l'adopte avant de décider (partage inter-workers).
+    await refresh_paydunya_circuit_from_db()
     if is_paydunya_circuit_open():
         raise HTTPException(
             status_code=503,
@@ -541,6 +570,13 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
 @router.get('/payments/status/{payment_id}')
 async def get_payment_status(payment_id: str, current_user: User = Depends(get_current_user)):
+    """Statut d'un paiement (accès réservé au payeur, au receveur ou au
+    owner). Re-synchronise avec PayDunya (cache TTL 15 s) et relance les
+    décaissements en attente.
+
+    Returns:
+        dict: paiement sérialisé (status, payout_status, montants, timestamps…).
+    """
     payment_record = await db.payments.find_one({'id': payment_id})
     if not payment_record:
         raise HTTPException(status_code=404, detail='Paiement introuvable')
@@ -564,6 +600,12 @@ async def get_payment_status(payment_id: str, current_user: User = Depends(get_c
 
 @router.get('/payments/status/token/{invoice_token}')
 async def get_payment_status_by_token(invoice_token: str, current_user: User = Depends(get_current_user)):
+    """Statut d'un paiement retrouvé par son invoice_token PayDunya (même
+    contrat d'accès et de synchronisation que /payments/status/{id}).
+
+    Returns:
+        dict: paiement sérialisé (status, payout_status, montants, timestamps…).
+    """
     payment_record = await db.payments.find_one({'invoice_token': invoice_token})
     if not payment_record:
         raise HTTPException(status_code=404, detail='Paiement introuvable')
@@ -587,6 +629,12 @@ async def get_payment_status_by_token(invoice_token: str, current_user: User = D
 
 @router.get('/payments/my')
 async def get_my_payments(current_user: User = Depends(get_current_user)):
+    """Historique des 50 derniers paiements où l'utilisateur est payeur ou
+    receveur.
+
+    Returns:
+        dict: {payments: [paiements sérialisés]}.
+    """
     cursor = db.payments.find({'$or': [{'payer_id': current_user.id}, {'receiver_id': current_user.id}]}).sort('created_at', -1).limit(50)
     payments = [serialize_payment_record(item) async for item in cursor]
     return {'payments': payments}

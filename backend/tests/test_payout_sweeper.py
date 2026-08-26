@@ -103,6 +103,8 @@ class TestPayoutSweeper:
         assert alert_mock.call_count == 1
         stored = await db_find_one("payments", {"id": payment["id"]})
         assert stored.get("owner_payout_alerted_at")
+        # Première alerte ≠ rappel : le compteur de rappels reste à 0.
+        assert stored.get("owner_payout_reminders_sent", 0) == 0
         assert stored["payout_status"] == "releasing"  # toujours incertain
 
     async def test_no_alert_below_threshold(self, client: AsyncClient):
@@ -184,6 +186,8 @@ class TestPayoutSweeper:
         # Rappel décalé : la prochaine alerte ne repartira que dans 3 jours.
         stored = await db_find_one("payments", {"id": payment["id"]})
         assert stored["owner_payout_alerted_at"] != payment["owner_payout_alerted_at"]
+        # Un rappel a été compté (exposé ensuite par /owner/stuck-payouts).
+        assert stored.get("owner_payout_reminders_sent", 0) == 1
         assert email_mock.call_count == 1
         assert "rappel" in email_mock.call_args.args[1]
 
@@ -231,9 +235,10 @@ class TestOwnerStuckPayouts:
         payout_kind=None,
         hours_ago=30,
         alerted=False,
+        reminders_sent=0,
     ):
         """Paiement resté incertain depuis `hours_ago` heures (alerte owner
-        éventuellement déjà envoyée par le sweeper)."""
+        éventuellement déjà envoyée par le sweeper, rappels éventuels)."""
         created = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
         doc = {
             "id": str(uuid.uuid4()),
@@ -251,6 +256,8 @@ class TestOwnerStuckPayouts:
             doc["payout_kind"] = payout_kind
         if alerted:
             doc["owner_payout_alerted_at"] = (created + timedelta(hours=1)).isoformat()
+        if reminders_sent:
+            doc["owner_payout_reminders_sent"] = reminders_sent
         return doc
 
     async def test_owner_lists_stuck_payouts_with_duration_and_alert(self, client: AsyncClient):
@@ -260,8 +267,14 @@ class TestOwnerStuckPayouts:
         owner = await register_and_login(client, BASE_USER)
         headers = {"Authorization": f"Bearer {owner['access_token']}"}
 
-        # 48 h, déjà alerté par le sweeper
-        alerted_old = self._owner_payment_doc(owner["user"]["id"], payout_status="releasing", hours_ago=48, alerted=True)
+        # 48 h, déjà alerté par le sweeper + 2 rappels envoyés (escalade)
+        alerted_old = self._owner_payment_doc(
+            owner["user"]["id"],
+            payout_status="releasing",
+            hours_ago=48,
+            alerted=True,
+            reminders_sent=2,
+        )
         # 10 h, sous le seuil, jamais alerté
         recent = self._owner_payment_doc(owner["user"]["id"], payout_status="refunding", payout_kind="refund", hours_ago=10)
         # 30 h, au-dessus du seuil, jamais alerté → needs_alert
@@ -290,6 +303,8 @@ class TestOwnerStuckPayouts:
         assert pa["last_alert_at"] is not None
         assert pa["needs_alert"] is False
         assert pa["disburse_token_present"] is True
+        # Nombre de rappels déjà envoyés par le sweeper (escalade).
+        assert pa["reminders_sent"] == 2
 
         pb = by_id[recent["id"]]
         assert pb["payout_status"] == "refunding"
@@ -298,6 +313,7 @@ class TestOwnerStuckPayouts:
         assert pb["exceeds_threshold"] is False
         assert pb["alerted"] is False
         assert pb["needs_alert"] is False  # sous le seuil : rien à signaler
+        assert pb["reminders_sent"] == 0
 
         pc = by_id[old_unalerted["id"]]
         assert pc["blocked_hours"] == 30
@@ -305,6 +321,7 @@ class TestOwnerStuckPayouts:
         assert pc["alerted"] is False
         assert pc["last_alert_at"] is None
         assert pc["needs_alert"] is True  # le sweeper alertera au prochain passage
+        assert pc["reminders_sent"] == 0
 
     async def test_owner_stuck_payouts_requires_owner(self, client: AsyncClient):
         """Un utilisateur lambda reçoit 403 (accès propriétaire restreint)."""
@@ -545,3 +562,387 @@ class TestOwnerResolutionByEmail:
         assert alert_mock.call_args.kwargs["user_id"] == real_id
         email_mock.assert_called_once()
         assert email_mock.call_args.args[0] == owner["user"]["email"]
+
+
+# ---------------------------------------------------------------------------
+# 💾 Persistance MongoDB de l'état du circuit breaker (kojo_payments)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+class TestPaydunyaCircuitPersistence:
+    """L'état du circuit breaker (mémoire = chemin critique) est PERSISTÉ en
+    MongoDB à chaque transition : il survit aux redéploiements (rechargé par
+    init_paydunya_circuit au démarrage) et est partagé entre les workers
+    (refresh_paydunya_circuit_from_db avant les points de lecture). Règle de
+    fraîcheur : un circuit OUVERT en mémoire (échecs locaux récents) n'est
+    jamais écrasé par un état fermé persisté par un autre worker."""
+
+    async def _flush(self):
+        """Laisse la tâche d'upsert (call_soon_threadsafe) s'exécuter."""
+        import asyncio as _asyncio
+        for _ in range(5):
+            await _asyncio.sleep(0)
+
+    async def test_persists_transitions_and_reloads_on_init(self, client: AsyncClient):
+        """Chaque transition (échec compté, succès → reset) est écrite en base,
+        et un redémarrage (nouveau worker) recharge l'état persisté : le
+        circuit OUVERT survit au redéploiement."""
+        import time as _time
+        import kojo_payments
+        from kojo_payments import (
+            _circuit_record_failure,
+            _circuit_record_success,
+            init_paydunya_circuit,
+            paydunya_circuit_state,
+        )
+
+        try:
+            # Capture la boucle (comme le lifespan en prod) + mémoire propre.
+            with patch.dict(
+                "kojo_payments._paydunya_circuit",
+                {"state": "closed", "consecutive_failures": 0, "opened_at": 0.0},
+            ):
+                await init_paydunya_circuit()
+
+                # 2 échecs réseau → compteur 2, PERSISTÉ en base.
+                _circuit_record_failure()
+                _circuit_record_failure()
+                await self._flush()
+
+                stored = await db_find_one("paydunya_circuit", {"_id": "global"})
+                assert stored is not None
+                assert stored["state"] == "closed"
+                assert stored["consecutive_failures"] == 2
+
+                # Un succès referme et réécrit (compteur à 0).
+                _circuit_record_success()
+                await self._flush()
+                stored = await db_find_one("paydunya_circuit", {"_id": "global"})
+                assert stored["state"] == "closed"
+                assert stored["consecutive_failures"] == 0
+
+            # Redémarrage : un autre worker a persisté un circuit OUVERT.
+            # update_one (upsert) remplace le doc existant — la FakeDB n'a pas
+            # d'index unique sur _id, un insert créerait un doublon.
+            from kojo_core import db as _db
+            await _db["paydunya_circuit"].update_one(
+                {"_id": "global"},
+                {"$set": {
+                    "state": "open",
+                    "consecutive_failures": 5,
+                    "opened_at": _time.time(),
+                }},
+                upsert=True,
+            )
+            with patch.dict(
+                "kojo_payments._paydunya_circuit",
+                {"state": "closed", "consecutive_failures": 0, "opened_at": 0.0},
+            ):
+                await init_paydunya_circuit()
+                state = paydunya_circuit_state()
+                assert state["state"] == "open"
+                assert state["consecutive_failures"] == 5
+        finally:
+            kojo_payments._circuit_loop = None
+
+    async def test_refresh_adopts_other_worker_open_circuit(self, client: AsyncClient):
+        """Un worker en mémoire CLOSED adopte l'état OUVERT persisté par un
+        autre worker (sweeper, checkout, owner) — il rejoint le circuit sans
+        re-brûler le seuil d'échecs."""
+        import time as _time
+        import kojo_payments
+        from kojo_payments import (
+            paydunya_circuit_state,
+            refresh_paydunya_circuit_from_db,
+        )
+
+        try:
+            await db_insert("paydunya_circuit", {
+                "_id": "global",
+                "state": "open",
+                "consecutive_failures": 4,
+                "opened_at": _time.time(),
+            })
+            with patch.dict(
+                "kojo_payments._paydunya_circuit",
+                {"state": "closed", "consecutive_failures": 0, "opened_at": 0.0},
+            ):
+                await refresh_paydunya_circuit_from_db()
+                state = paydunya_circuit_state()
+                assert state["state"] == "open"
+                assert state["consecutive_failures"] == 4
+        finally:
+            kojo_payments._circuit_loop = None
+
+    async def test_memory_open_not_overwritten_by_stale_closed(self, client: AsyncClient):
+        """Règle de fraîcheur : le circuit OUVERT en mémoire (échecs observés
+        APRÈS la dernière écriture persistée) n'est jamais refermé par un
+        refresh qui lirait un état closed périmé en base."""
+        import time as _time
+        import kojo_payments
+        from kojo_payments import (
+            paydunya_circuit_state,
+            refresh_paydunya_circuit_from_db,
+        )
+
+        try:
+            await db_insert("paydunya_circuit", {
+                "_id": "global",
+                "state": "closed",
+                "consecutive_failures": 0,
+                "opened_at": 0.0,
+            })
+            with patch.dict(
+                "kojo_payments._paydunya_circuit",
+                {"state": "open", "consecutive_failures": 5, "opened_at": _time.time()},
+            ):
+                await refresh_paydunya_circuit_from_db()
+                state = paydunya_circuit_state()
+                assert state["state"] == "open"
+                assert state["consecutive_failures"] == 5
+        finally:
+            kojo_payments._circuit_loop = None
+
+
+# ---------------------------------------------------------------------------
+# 🚨 Alerte owner à l'ouverture du circuit + état dans /health
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+class TestPaydunyaCircuitOwnerAlert:
+    """Quand le circuit s'OUVRE, le propriétaire est alerté IMMÉDIATEMENT
+    (notification in-app + email Brevo en fallback — même pattern que le
+    sweeper) : une panne PayDunya est détectée sans attendre le dashboard.
+    L'alerte part UNE fois par passage en open (pas de spam tant que le
+    circuit reste ouvert). L'état du circuit est aussi exposé dans /health."""
+
+    async def _flush(self):
+        import asyncio as _asyncio
+        for _ in range(5):
+            await _asyncio.sleep(0)
+
+    async def test_alert_fires_once_when_circuit_opens(self, client: AsyncClient):
+        """5 échecs réseau → ouverture → UNE alerte (notif + email) ; les
+        échecs suivants, circuit toujours ouvert, ne re-alertent pas."""
+        import kojo_payments
+        from kojo_payments import _circuit_record_failure, init_paydunya_circuit
+
+        try:
+            with patch.dict(
+                "kojo_payments._paydunya_circuit",
+                {"state": "closed", "consecutive_failures": 0, "opened_at": 0.0},
+            ), \
+                 patch("kojo_payments.OWNER_EMAIL", "famakan@kojo.sn"), \
+                 patch("kojo_payments.notify_user_localized", AsyncMock()) as notify_mock, \
+                 patch("kojo_payments.send_email_via_brevo_api") as email_mock:
+                await init_paydunya_circuit()
+
+                # 5 échecs → le circuit s'ouvre → UNE alerte (notif + email).
+                for _ in range(5):
+                    _circuit_record_failure()
+                await self._flush()
+
+                assert notify_mock.call_count == 1
+                assert email_mock.call_count == 1
+                assert "circuit breaker" in email_mock.call_args.args[1].lower()
+
+                # Toujours ouvert : les échecs suivants ne re-alertent PAS
+                # (l'alerte est liée à la TRANSITION, pas à chaque échec).
+                for _ in range(3):
+                    _circuit_record_failure()
+                await self._flush()
+                assert notify_mock.call_count == 1
+                assert email_mock.call_count == 1
+        finally:
+            kojo_payments._circuit_loop = None
+
+    async def test_health_exposes_circuit_state(self, client: AsyncClient):
+        """/api/health expose l'état du circuit breaker PayDunya (state,
+        échecs consécutifs, seuil, cooldown restant) — détectable par les
+        moniteurs d'infra sans attendre le dashboard owner."""
+        resp = await client.get("/api/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["paydunya_circuit"]["state"] in ("closed", "open", "half_open")
+        assert data["paydunya_circuit"]["consecutive_failures"] == 0
+        assert data["paydunya_circuit"]["failure_threshold"] >= 1
+        assert "remaining_cooldown_seconds" in data["paydunya_circuit"]
+
+    async def test_health_reflects_open_circuit(self, client: AsyncClient):
+        """Circuit OUVERT (persisté en base par un autre worker) → /health le
+        montre grâce au refresh préalable — pas seulement la vue locale."""
+        import time as _time
+        await db_insert("paydunya_circuit", {
+            "_id": "global",
+            "state": "open",
+            "consecutive_failures": 5,
+            "opened_at": _time.time(),
+        })
+        resp = await client.get("/api/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["paydunya_circuit"]["state"] == "open"
+        assert data["paydunya_circuit"]["consecutive_failures"] == 5
+
+    async def test_monitor_paydunya_ok_when_closed(self, client: AsyncClient):
+        """Circuit fermé → /monitor/paydunya renvoie 200 : les moniteurs
+        d'infra (UptimeRobot/Render) ne sont pas alertés."""
+        resp = await client.get("/monitor/paydunya")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["service"] == "paydunya"
+        assert data["circuit"] == "ok"
+        assert data["paydunya_circuit"]["state"] in ("closed", "half_open")
+        assert data["paydunya_circuit"]["consecutive_failures"] == 0
+        assert "remaining_cooldown_seconds" in data["paydunya_circuit"]
+
+    async def test_monitor_paydunya_503_when_open(self, client: AsyncClient):
+        """Circuit OUVERT (persisté en base par un autre worker) →
+        /monitor/paydunya renvoie 503 : les moniteurs alertent immédiatement."""
+        import time as _time
+        await db_insert("paydunya_circuit", {
+            "_id": "global",
+            "state": "open",
+            "consecutive_failures": 5,
+            "opened_at": _time.time(),
+        })
+        resp = await client.get("/monitor/paydunya")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["circuit"] == "open"
+        assert data["paydunya_circuit"]["state"] == "open"
+        assert data["paydunya_circuit"]["consecutive_failures"] == 5
+        assert data["paydunya_circuit"]["remaining_cooldown_seconds"] > 0
+
+    async def test_monitor_paydunya_ok_when_half_open(self, client: AsyncClient):
+        """half_open (cooldown écoulé, sonde autorisée) → 200 : plus de fail
+        fast, PayDunya peut redevenir joignable — on n'alerte pas sur l'état
+        de récupération."""
+        import time as _time
+        await db_insert("paydunya_circuit", {
+            "_id": "global",
+            "state": "open",
+            "consecutive_failures": 5,
+            "opened_at": _time.time() - 3 * 3600,  # cooldown (2h) écoulé
+        })
+        resp = await client.get("/monitor/paydunya")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["paydunya_circuit"]["state"] == "half_open"
+        assert data["paydunya_circuit"]["remaining_cooldown_seconds"] == 0
+
+
+# ---------------------------------------------------------------------------
+# 🖥️ Moniteurs d'infra des fournisseurs externes (/monitor/brevo, /monitor/cloudinary)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+class TestExternalProviderMonitors:
+    """Contrat commun /monitor/<service> pour les fournisseurs externes
+    (Brevo email, Cloudinary photos) : 200 quand le service répond, 503 sinon
+    (config manquante, transport, HTTP erreur). Les sondes tournent dans un
+    thread (asyncio.to_thread) et sont mises en cache TTL 60 s par la sonde
+    elle-même."""
+
+    async def _clear_caches(self):
+        import kojo_core, kojo_email
+        kojo_core._cloudinary_health_cache.clear()
+        kojo_email._brevo_health_cache.clear()
+
+    async def test_brevo_ok(self, client: AsyncClient):
+        """Brevo configuré et API joignable → 200."""
+        await self._clear_caches()
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get") as get_mock:
+            get_mock.return_value.ok = True
+            get_mock.return_value.status_code = 200
+            resp = await client.get("/monitor/brevo")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["service"] == "brevo"
+        assert data["circuit"] == "ok"
+        assert data["configured"] is True
+        assert data["detail"] == "HTTP 200"
+
+    async def test_brevo_transport_error_503(self, client: AsyncClient):
+        """Brevo injoignable (RequestException) → 503 avec detail transport."""
+        import requests as _requests
+        await self._clear_caches()
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get",
+                   side_effect=_requests.ConnectionError("Brevo down")):
+            resp = await client.get("/monitor/brevo")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["circuit"] == "down"
+        assert data["configured"] is True
+        assert "Transport Brevo" in data["detail"]
+
+    async def test_brevo_not_configured_503(self, client: AsyncClient):
+        """BREVO_API_KEY / BREVO_SENDER_EMAIL absents → 503 config."""
+        await self._clear_caches()
+        with patch("kojo_email.brevo_is_configured", return_value=False):
+            resp = await client.get("/monitor/brevo")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["configured"] is False
+        assert "non configuré" in data["detail"]
+
+    async def test_cloudinary_ok(self, client: AsyncClient):
+        """Cloudinary configuré et ping officiel ok → 200."""
+        await self._clear_caches()
+        with patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping",
+                   return_value={"status": "ok"}) as ping_mock:
+            cfg_mock.return_value.cloud_name = "kojo"
+            cfg_mock.return_value.api_key = "key"
+            cfg_mock.return_value.api_secret = "secret"
+            resp = await client.get("/monitor/cloudinary")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["service"] == "cloudinary"
+        assert data["circuit"] == "ok"
+        assert data["configured"] is True
+        assert ping_mock.call_count == 1
+
+    async def test_cloudinary_transport_error_503(self, client: AsyncClient):
+        """Cloudinary injoignable (ping lève) → 503 avec detail transport."""
+        await self._clear_caches()
+        with patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping",
+                   side_effect=Exception("Cloudinary down")):
+            cfg_mock.return_value.cloud_name = "kojo"
+            cfg_mock.return_value.api_key = "key"
+            cfg_mock.return_value.api_secret = "secret"
+            resp = await client.get("/monitor/cloudinary")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["circuit"] == "down"
+        assert data["configured"] is True
+        assert "Transport Cloudinary" in data["detail"]
+
+    async def test_cloudinary_not_configured_503(self, client: AsyncClient):
+        """CLOUDINARY_URL absent → 503 config, aucun ping réseau tenté."""
+        await self._clear_caches()
+        with patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping") as ping_mock:
+            cfg_mock.return_value.cloud_name = None
+            cfg_mock.return_value.api_key = None
+            cfg_mock.return_value.api_secret = None
+            resp = await client.get("/monitor/cloudinary")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["configured"] is False
+        assert ping_mock.call_count == 0
+
+    async def test_brevo_probe_uses_cache(self, client: AsyncClient):
+        """Deux hits rapprochés → un seul appel réseau (cache TTL 60 s)."""
+        await self._clear_caches()
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get") as get_mock:
+            get_mock.return_value.ok = True
+            get_mock.return_value.status_code = 200
+            resp1 = await client.get("/monitor/brevo")
+            resp2 = await client.get("/monitor/brevo")
+        assert resp1.status_code == 200 and resp2.status_code == 200
+        assert get_mock.call_count == 1

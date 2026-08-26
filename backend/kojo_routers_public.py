@@ -32,7 +32,11 @@ def _site_base() -> str:
 
 @router.get("/public/stats")
 async def get_public_stats():
-    """Compteurs réels pour la landing : travailleurs, missions, avis, pays."""
+    """Compteurs réels pour la landing : travailleurs, missions, avis, pays.
+
+    Returns:
+        dict: {workers, clients, open_jobs, completed_jobs, reviews, countries}.
+    """
     workers = await db.users.count_documents({"user_type": "worker"})
     clients = await db.users.count_documents({"user_type": "client"})
     open_jobs = await db.jobs.count_documents(

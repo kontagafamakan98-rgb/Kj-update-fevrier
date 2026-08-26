@@ -36,6 +36,57 @@ def test_build_trusted_hosts_with_render_hostname(monkeypatch):
     assert "127.0.0.1" in hosts
 
 
+def test_extract_host_from_url_documented_none_cases():
+    """extract_host_from_url : hostname extrait, None documenté pour les
+    entrées vides ou invalides (appelants = build_trusted_hosts)."""
+    from kojo_core import extract_host_from_url
+
+    # Hostname extrait, avec ou sans schéma
+    assert extract_host_from_url("https://kojo-backend.fly.dev") == "kojo-backend.fly.dev"
+    assert extract_host_from_url("kojo-backend.fly.dev") == "kojo-backend.fly.dev"
+    assert extract_host_from_url("  https://api.kojo.sn/  ") == "api.kojo.sn"
+    # Cas None documentés
+    assert extract_host_from_url("") is None
+    assert extract_host_from_url("   ") is None
+    assert extract_host_from_url(None) is None
+    assert extract_host_from_url("://pas-de-host") is None
+
+
+def test_get_mobile_money_account_documented_none():
+    """get_mobile_money_account : (méthode, numéro) ou (None, None) documenté
+    quand aucun compte mobile money n'est enregistré."""
+    from kojo_payments import get_mobile_money_account
+
+    assert get_mobile_money_account({"orange_money": "77000000"}) == ("orange_money", "77000000")
+    assert get_mobile_money_account({"wave": "77111111"}) == ("wave", "77111111")
+    # Orange Money prioritaire sur Wave
+    assert get_mobile_money_account({"orange_money": "77000000", "wave": "77111111"}) == ("orange_money", "77000000")
+    # Cas (None, None) documentés
+    assert get_mobile_money_account({"bank": {"iban": "x"}}) == (None, None)
+    assert get_mobile_money_account({}) == (None, None)
+    assert get_mobile_money_account(None) == (None, None)
+
+
+def test_get_cached_payment_status_documented_none():
+    """_get_cached_payment_status : record frais retourné, None documenté sur
+    cache-miss ou entrée expirée (> TTL 15 s)."""
+    import time as _time
+    from kojo_routers_payments import _get_cached_payment_status, _cache_payment_status
+
+    try:
+        assert _get_cached_payment_status("missing-id") is None
+        _cache_payment_status("p1", {"id": "p1", "status": "completed"})
+        cached = _get_cached_payment_status("p1")
+        assert cached is not None and cached["status"] == "completed"
+        # Expiration simulée (le TTL est comparé à time.time())
+        import kojo_routers_payments as rp
+        rp._payment_status_cache["p1"] = {"at": _time.time() - 60, "record": {"id": "p1", "status": "completed"}}
+        assert _get_cached_payment_status("p1") is None
+    finally:
+        import kojo_routers_payments as rp
+        rp._payment_status_cache.pop("p1", None)
+
+
 def test_generate_email_otp_code_uses_secrets():
     """generate_email_otp_code dépend de l'import `secrets` (ajouté en régression)."""
     from kojo_email import generate_email_otp_code
