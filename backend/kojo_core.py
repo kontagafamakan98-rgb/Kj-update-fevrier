@@ -670,13 +670,45 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
+async def get_owner_account():
+    """Résout le compte owner RÉEL.
+
+    Source de vérité : l'EMAIL (secret OWNER_EMAIL). En prod, le compte owner
+    a été créé avec un id qui ne correspond PAS au secret OWNER_USER_ID, et
+    aucun compte ne porte ce secret (id fantôme) — les notifications ciblées
+    par le secret étaient donc perdues. On cherche donc d'abord par email,
+    puis on retombe sur l'id du secret (compatibilité legacy).
+    """
+    try:
+        if OWNER_EMAIL:
+            owner = await db.users.find_one({"email": OWNER_EMAIL})
+            if owner:
+                return owner
+        return await db.users.find_one({"id": OWNER_USER_ID})
+    except Exception:
+        return None
+
+
+async def resolve_owner_id() -> Optional[str]:
+    """Id réel du compte owner (résolu par email), None si introuvable.
+    Les appelants doivent replier sur OWNER_USER_ID s'ils reçoivent None."""
+    owner = await get_owner_account()
+    return (owner or {}).get("id")
+
+
 async def verify_owner_access(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ):
     """Vérifie que seul le propriétaire peut accéder aux fonctionnalités sensibles.
     Dual-mode header/cookie (cf. get_current_user). Les mutations via cookie
-    exigent un jeton CSRF valide."""
+    exigent un jeton CSRF valide.
+
+    L'identité est résolue par EMAIL (secret OWNER_EMAIL) — source de vérité :
+    en prod, l'id du compte owner ne correspond pas forcément au secret
+    OWNER_USER_ID (aucun compte ne porte même ce secret). On accepte donc le
+    jeton si son email == OWNER_EMAIL ET son id == celui du compte owner
+    résolu (repli legacy sur l'id du secret)."""
     try:
         payload = await _decode_auth_token(
             request,
@@ -690,15 +722,32 @@ async def verify_owner_access(
         if await is_token_revoked(payload.get("jti")):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token révoqué")
 
-        # Vérification stricte: seul Famakan Kontaga Master a accès
-        if user_id != OWNER_USER_ID or email != OWNER_EMAIL:
+        # Vérification stricte : seul le compte Famakan (par email) a accès.
+        if email != OWNER_EMAIL:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
             )
-        
-        # Récupérer les données utilisateur depuis la DB
-        user = await db.users.find_one({"id": user_id})
+
+        owner = await get_owner_account()
+        owner_id = (owner or {}).get("id")
+        if owner_id:
+            # Compte owner résolu (email) : le jeton doit être celui de CE compte.
+            if user_id != owner_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
+                )
+            user = owner
+        else:
+            # Repli legacy : aucun compte owner résolu → comparaison au secret.
+            if user_id != OWNER_USER_ID:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Accès interdit: Fonctionnalité réservée à Famakan Kontaga Master uniquement"
+                )
+            user = await db.users.find_one({"id": user_id})
+
         if not user or user.get("deleted"):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -738,6 +787,25 @@ async def ensure_owner_exists():
 
     existing_owner = await db.users.find_one({"$or": [{"id": OWNER_USER_ID}, {"email": OWNER_EMAIL}]})
     if existing_owner:
+        # Diagnostic de l'état réel en prod : le compte owner a été créé (par
+        # email) avec un id qui ne correspond pas au secret OWNER_USER_ID. On
+        # ne change RIEN (changer un id casserait ses références), mais on
+        # logue fortement : la résolution owner par email est la source de
+        # vérité (get_owner_account / resolve_owner_id).
+        if existing_owner.get("email") != OWNER_EMAIL:
+            logger.warning(
+                f"⚠️ Compte trouvé par id OWNER_USER_ID mais email différent "
+                f"({existing_owner.get('email')} != {OWNER_EMAIL}) : ce compte n'est "
+                f"PAS le propriétaire — la résolution owner par email échouera."
+            )
+        elif existing_owner.get("id") != OWNER_USER_ID:
+            logger.warning(
+                f"⚠️ Compte owner trouvé par email ({OWNER_EMAIL}) mais son id "
+                f"({existing_owner.get('id')}) diffère du secret OWNER_USER_ID "
+                f"({OWNER_USER_ID}). La résolution owner utilise l'EMAIL comme "
+                f"source de vérité (get_owner_account) — notifications et accès "
+                f"/api/owner/* ciblent le compte réel."
+            )
         logger.info(f"✅ Compte owner existe déjà: {OWNER_EMAIL}")
         return
 

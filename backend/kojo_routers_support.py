@@ -10,6 +10,7 @@ from kojo_models import (
     NotificationType, SupportTicket, SupportTicketCreate, SupportTicketStatusUpdate,
 )
 from kojo_core import (
+    resolve_owner_id,
     verify_owner_access,
 )
 from kojo_settings import OWNER_EMAIL, OWNER_USER_ID, logger
@@ -59,14 +60,19 @@ async def create_support_ticket(ticket_data: SupportTicketCreate):
 
     # Notifier le propriétaire (in-app + email, best-effort) : sans ça,
     # aucun canal ne signalait l'arrivée d'un ticket (l'équipe devait poller).
-    if OWNER_USER_ID:
+    if OWNER_EMAIL or OWNER_USER_ID:
         try:
-            await notify_user_localized(
-                user_id=OWNER_USER_ID,
-                key="new_ticket_support",
-                notif_type=NotificationType.GENERAL,
-                ticket_text=f"{ticket_data.full_name} — {ticket_data.reason} : {ticket_data.message[:120]}",
-            )
+            # Résolution du compte owner RÉEL par email (source de vérité) : en
+            # prod, l'id du compte ne correspond pas au secret OWNER_USER_ID —
+            # cibler le secret envoyait la notification à un id fantôme (perdue).
+            owner_id = await resolve_owner_id() or OWNER_USER_ID
+            if owner_id:
+                await notify_user_localized(
+                    user_id=owner_id,
+                    key="new_ticket_support",
+                    notif_type=NotificationType.GENERAL,
+                    ticket_text=f"{ticket_data.full_name} — {ticket_data.reason} : {ticket_data.message[:120]}",
+                )
         except Exception as exc:
             logger.warning(f"⚠️ Notification owner ticket échouée: {exc}")
     if OWNER_EMAIL:

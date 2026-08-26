@@ -18,9 +18,11 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from kojo_core import db
+from kojo_core import db, resolve_owner_id
+from kojo_email import send_email_via_brevo_api
 from kojo_models import NotificationType
 from kojo_settings import (
+    OWNER_EMAIL,
     OWNER_USER_ID,
     PAYOUT_ALERT_THRESHOLD_HOURS,
     PAYOUT_SWEEPER_INTERVAL_MINUTES,
@@ -120,8 +122,13 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
             continue
 
         amount = int(current.get("amount", 0) or 0)
+        hours_stuck = int(stuck_for.total_seconds() // 3600)
+        # Résolution du compte owner RÉEL par email (source de vérité) : en
+        # prod, l'id du compte ne correspond pas au secret OWNER_USER_ID (id
+        # fantôme) et les notifications ciblées par le secret étaient perdues.
+        owner_id = await resolve_owner_id() or OWNER_USER_ID
         await notify_user_localized(
-            user_id=OWNER_USER_ID,
+            user_id=owner_id,
             key="owner_payout_stuck_alert",
             notif_type=NotificationType.GENERAL,
             related_id=payment_id,
@@ -129,8 +136,27 @@ async def payout_stuck_sweep_once(now: Optional[datetime] = None) -> dict:
             payment_id=payment_id,
             amount=amount,
             status=current_status,
-            hours=int(stuck_for.total_seconds() // 3600),
+            hours=hours_stuck,
         )
+        # Fallback EMAIL : le compte owner n'a aucun push token web enregistré
+        # en prod → la notification in-app/push peut ne jamais être vue. L'email
+        # Brevo (best-effort, comme les tickets support) garantit que l'alerte
+        # atteint Famakan dans tous les cas.
+        if OWNER_EMAIL:
+            try:
+                send_email_via_brevo_api(
+                    OWNER_EMAIL,
+                    "KOJO — Alerte décaissement bloqué",
+                    f"Un décaissement reste bloqué depuis plus de {PAYOUT_ALERT_THRESHOLD_HOURS} h.\n"
+                    f"Paiement : {payment_id}\n"
+                    f"Montant : {amount} FCFA\n"
+                    f"Statut : {current_status}\n"
+                    f"Bloqué depuis : {hours_stuck} h\n\n"
+                    f"Consultez /api/owner/stuck-payouts pour le détail et /owner/retry-refund "
+                    f"pour relancer un remboursement.",
+                )
+            except Exception as exc:
+                logger.warning(f"⚠️ Email alerte owner échoué: {exc}")
         await db.payments.update_one(
             {"id": payment_id},
             {"$set": {"owner_payout_alerted_at": now.isoformat()}},
