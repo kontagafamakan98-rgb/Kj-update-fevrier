@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,12 +10,16 @@ from kojo_models import (
 )
 from kojo_settings import (
     JWT_ALGORITHM,
+    PAYOUT_ALERT_THRESHOLD_HOURS,
 )
 from kojo_core import (
     get_current_user, is_database_available, verify_owner_access,
 )
 from kojo_payments import get_effective_commission_rate
 from kojo_routers_jobs import execute_paydunya_refund
+# Helpers du sweeper (kojo_scheduler) : source unique de vérité pour les
+# statuts incertains et le calcul de la durée de blocage.
+from kojo_scheduler import _STUCK_PAYOUT_STATUSES, _stuck_for
 
 router = APIRouter()
 
@@ -287,4 +291,71 @@ async def retry_payment_refund(payment_id: str, owner_user = Depends(verify_owne
         "job_id": payment_record.get("job_id"),
         "refund_status": refund_status,
         "refunded_amount": payment_record.get("amount"),
+    }
+
+@router.get("/owner/stuck-payouts")
+async def get_stuck_payouts(owner_user = Depends(verify_owner_access)):
+    """Liste les décaissements restés en statut incertain (releasing/refunding)
+    avec leur durée de blocage et l'état de la dernière alerte propriétaire.
+
+    PROPRIÉTAIRE UNIQUEMENT. Complément du sweeper (kojo_scheduler) : l'alerte
+    pousse au propriétaire au-delà du seuil (PAYOUT_ALERT_THRESHOLD_HOURS), cet
+    endpoint donne la vue exhaustive et à jour pour agir (relancer un refund,
+    contacter PayDunya…) :
+    - blocked_since / blocked_hours : depuis quand le statut est incertain
+      (même calcul que le sweeper : dernière transition de statut).
+    - exceeds_threshold : le seuil d'alerte est dépassé.
+    - alerted / last_alert_at / needs_alert : statut de l'alerte envoyée par le
+      sweeper (jamais alerté, alerté à date, ou à alerter au prochain passage).
+    Tri du plus bloqué au moins bloqué."""
+    now = datetime.now(timezone.utc)
+    threshold = timedelta(hours=PAYOUT_ALERT_THRESHOLD_HOURS)
+
+    payments = await db.payments.find({
+        "payout_status": {"$in": list(_STUCK_PAYOUT_STATUSES)},
+    }).to_list(length=500)
+
+    items = []
+    for payment in payments:
+        stuck_for = _stuck_for(payment, now)
+        if stuck_for is None:
+            blocked_seconds = None
+            blocked_hours = None
+        else:
+            blocked_seconds = int(stuck_for.total_seconds())
+            blocked_hours = int(blocked_seconds // 3600)
+
+        exceeds_threshold = bool(stuck_for is not None and stuck_for >= threshold)
+        last_alert_at = payment.get("owner_payout_alerted_at")
+
+        items.append({
+            "payment_id": payment.get("id"),
+            "job_id": payment.get("job_id"),
+            "amount": int(payment.get("amount", 0) or 0),
+            "payout_kind": payment.get("payout_kind"),
+            "payout_status": payment.get("payout_status"),
+            "payer_id": payment.get("payer_id"),
+            "receiver_id": payment.get("receiver_id"),
+            "disburse_token_present": bool(payment.get("disburse_token")),
+            "blocked_since": payment.get("updated_at") or payment.get("created_at"),
+            "blocked_seconds": blocked_seconds,
+            "blocked_hours": blocked_hours,
+            "exceeds_threshold": exceeds_threshold,
+            "alerted": bool(last_alert_at),
+            "last_alert_at": last_alert_at,
+            "needs_alert": bool(exceeds_threshold and not last_alert_at),
+            "created_at": payment.get("created_at"),
+            "updated_at": payment.get("updated_at"),
+        })
+
+    # Du plus bloqué au moins bloqué (blocage inconnu en dernier).
+    items.sort(
+        key=lambda item: (item["blocked_seconds"] if item["blocked_seconds"] is not None else -1),
+        reverse=True,
+    )
+
+    return {
+        "count": len(items),
+        "threshold_hours": PAYOUT_ALERT_THRESHOLD_HOURS,
+        "payouts": items,
     }

@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import db_find_one, db_insert
+from tests.conftest import BASE_USER, db_find_one, db_insert, register_and_login
 
 
 def _make_payment(
@@ -151,3 +151,161 @@ class TestPayoutSweeper:
         # Un sweep à vide ne plante pas (aucun paiement en attente).
         summary = await self._run_sweep()
         assert summary == {"rechecked": 0, "resolved": 0, "stuck": 0, "alerted": 0}
+
+
+# ---------------------------------------------------------------------------
+# 🎛️ Endpoint owner : vue des décaissements bloqués
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+class TestOwnerStuckPayouts:
+    def _owner_payment_doc(
+        self,
+        payer_id,
+        *,
+        payout_status="releasing",
+        payout_kind=None,
+        hours_ago=30,
+        alerted=False,
+    ):
+        """Paiement resté incertain depuis `hours_ago` heures (alerte owner
+        éventuellement déjà envoyée par le sweeper)."""
+        created = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
+        doc = {
+            "id": str(uuid.uuid4()),
+            "job_id": str(uuid.uuid4()),
+            "payer_id": payer_id,
+            "receiver_id": "worker-1",
+            "amount": 25000,
+            "status": "completed",
+            "payout_status": payout_status,
+            "disburse_token": "sweep-token",
+            "created_at": created.isoformat(),
+            "updated_at": created.isoformat(),
+        }
+        if payout_kind:
+            doc["payout_kind"] = payout_kind
+        if alerted:
+            doc["owner_payout_alerted_at"] = (created + timedelta(hours=1)).isoformat()
+        return doc
+
+    async def test_owner_lists_stuck_payouts_with_duration_and_alert(self, client: AsyncClient):
+        """L'endpoint liste les décaissements releasing/refunding avec durée de
+        blocage, dépassement du seuil et état de la dernière alerte — triés du
+        plus bloqué au moins bloqué."""
+        owner = await register_and_login(client, BASE_USER)
+        headers = {"Authorization": f"Bearer {owner['access_token']}"}
+
+        # 48 h, déjà alerté par le sweeper
+        alerted_old = self._owner_payment_doc(owner["user"]["id"], payout_status="releasing", hours_ago=48, alerted=True)
+        # 10 h, sous le seuil, jamais alerté
+        recent = self._owner_payment_doc(owner["user"]["id"], payout_status="refunding", payout_kind="refund", hours_ago=10)
+        # 30 h, au-dessus du seuil, jamais alerté → needs_alert
+        old_unalerted = self._owner_payment_doc(owner["user"]["id"], payout_status="releasing", hours_ago=30)
+        for doc in (alerted_old, recent, old_unalerted):
+            await db_insert("payments", doc)
+
+        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_core.OWNER_USER_ID", owner["user"]["id"]):
+            resp = await client.get("/api/owner/stuck-payouts", headers=headers)
+
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["count"] == 3
+        assert data["threshold_hours"] == 24
+        # Tri : le plus bloqué en premier.
+        assert data["payouts"][0]["payment_id"] == alerted_old["id"]
+
+        by_id = {p["payment_id"]: p for p in data["payouts"]}
+
+        pa = by_id[alerted_old["id"]]
+        assert pa["payout_status"] == "releasing"
+        assert pa["blocked_hours"] == 48
+        assert pa["exceeds_threshold"] is True
+        assert pa["alerted"] is True
+        assert pa["last_alert_at"] is not None
+        assert pa["needs_alert"] is False
+        assert pa["disburse_token_present"] is True
+
+        pb = by_id[recent["id"]]
+        assert pb["payout_status"] == "refunding"
+        assert pb["payout_kind"] == "refund"
+        assert pb["blocked_hours"] == 10
+        assert pb["exceeds_threshold"] is False
+        assert pb["alerted"] is False
+        assert pb["needs_alert"] is False  # sous le seuil : rien à signaler
+
+        pc = by_id[old_unalerted["id"]]
+        assert pc["blocked_hours"] == 30
+        assert pc["exceeds_threshold"] is True
+        assert pc["alerted"] is False
+        assert pc["last_alert_at"] is None
+        assert pc["needs_alert"] is True  # le sweeper alertera au prochain passage
+
+    async def test_owner_stuck_payouts_requires_owner(self, client: AsyncClient):
+        """Un utilisateur lambda reçoit 403 (accès propriétaire restreint)."""
+        user = await register_and_login(client, {**BASE_USER, "email": "not-owner@kojo.sn"})
+        headers = {"Authorization": f"Bearer {user['access_token']}"}
+        resp = await client.get("/api/owner/stuck-payouts", headers=headers)
+        assert resp.status_code == 403
+
+    async def test_owner_stuck_payouts_empty(self, client: AsyncClient):
+        """Aucun décaissement en attente → liste vide, pas d'erreur."""
+        owner = await register_and_login(client, BASE_USER)
+        headers = {"Authorization": f"Bearer {owner['access_token']}"}
+        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_core.OWNER_USER_ID", owner["user"]["id"]):
+            resp = await client.get("/api/owner/stuck-payouts", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json() == {"count": 0, "threshold_hours": 24, "payouts": []}
+
+
+class TestOwnerResolutionByEmail:
+    """Scénario réel en prod : le compte owner existe par email mais son id ne
+    correspond PAS au secret OWNER_USER_ID (aucun compte ne porte ce secret —
+    id fantôme). La résolution par email doit restaurer l'accès /api/owner/*,
+    l'alerte du sweeper (notification in-app au compte RÉEL) et le fallback
+    email Brevo."""
+
+    async def test_owner_access_and_resolution_with_phantom_secret_id(self, client: AsyncClient):
+        """Avec un secret id fantôme, l'accès owner fonctionne pour le compte
+        réel (résolu par email) et resolve_owner_id renvoie l'id réel."""
+        owner = await register_and_login(client, BASE_USER)  # id = uuid réel
+        real_id = owner["user"]["id"]
+        phantom_id = "phantom-owner-id-2024"
+
+        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_core.OWNER_USER_ID", phantom_id):
+            from kojo_core import resolve_owner_id
+            resolved = await resolve_owner_id()
+            assert resolved == real_id
+
+            headers = {"Authorization": f"Bearer {owner['access_token']}"}
+            resp = await client.get("/api/owner/stuck-payouts", headers=headers)
+            assert resp.status_code == 200, resp.text
+
+    async def test_sweeper_alert_targets_real_owner_and_sends_email(self, client: AsyncClient):
+        """Le sweeper alerte le compte RÉEL (résolu par email) même si le
+        secret est un id fantôme, et envoie l'email Brevo en fallback (aucun
+        push token owner en prod)."""
+        from kojo_scheduler import payout_stuck_sweep_once
+
+        owner = await register_and_login(client, BASE_USER)
+        real_id = owner["user"]["id"]
+        payment = _make_payment(payout_status="refunding", payout_kind="refund", hours_ago=30)
+        await db_insert("payments", payment)
+
+        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_scheduler.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_core.OWNER_USER_ID", "phantom-owner-id-2024"), \
+             patch("kojo_routers_payments.check_paydunya_disburse_status",
+                   return_value={"status": "pending", "response_code": "00"}), \
+             patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
+             patch("kojo_scheduler.notify_user_localized", AsyncMock()) as alert_mock, \
+             patch("kojo_scheduler.send_email_via_brevo_api") as email_mock:
+            summary = await payout_stuck_sweep_once()
+
+        assert summary["alerted"] == 1
+        assert alert_mock.call_args.kwargs["user_id"] == real_id
+        email_mock.assert_called_once()
+        assert email_mock.call_args.args[0] == owner["user"]["email"]
