@@ -16,16 +16,22 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // NOTE AUTH : le JWT vit désormais dans un cookie httpOnly (kojo_session)
-  // posé par le backend — il n'est plus stocké en localStorage (protection
-  // XSS : un script injecté ne peut plus voler le token). Le navigateur
-  // l'envoie automatiquement (credentials: 'include' dans api.js).
-  // Le backend renvoie toujours access_token dans le corps (compat mobile /
-  // legacy), mais on NE le persiste plus sur le web.
+  // NOTE AUTH (mode HYBRIDE) : la session vit dans le cookie httpOnly
+  // (kojo_session) posé par le backend POUR LES NAVIGATEURS qui acceptent les
+  // cookies cross-site, ET le jeton access_token est AUSSI persisté en
+  // localStorage (fallback en-tête Authorization: Bearer).
   //
-  // Migration : un éventuel ancien token en localStorage reste envoyé via
-  // l'en-tête Authorization (cf. getAuthToken dans api.js) tant qu'il n'est
-  // pas purgé — l'auth dual-mode du backend l'accepte.
+  // Pourquoi ce retour en arrière assumé : le frontend Vercel appelle le
+  // backend Fly en CROSS-ORIGINE → le cookie de session est un cookie TIERS,
+  // rejeté par les navigateurs stricts (Chrome 2026, Safari/ITP, navigation
+  // privée) : le login « réussissait » (le serveur posait le cookie) mais le
+  // navigateur le jetait → session inexistante → 401 sur tous les appels
+  // authentifiés → boucle vers /login. Le backend accepte les deux modes
+  // (dual-mode) : api.js envoie Authorization: Bearer quand un token est
+  // présent, le cookie sinon. Le cookie httpOnly reste posé (défense en
+  // profondeur) là où il fonctionne ; le token localStorage garantit le
+  // login partout. Compromis : le token est lisible par JS (risque XSS
+  // assumé — c'est le standard des SPA de production).
 
   const clearToken = () => {
     const keys = [
@@ -165,7 +171,22 @@ export function AuthProvider({ children }) {
 
   // Établit la session après une auth réussie (cookie httpOnly posé par le
   // backend ; on ne stocke que le profil en localStorage, jamais le token).
-  const establishSession = (user, cacheHours = 24) => {
+  // Persiste le jeton en localStorage pour l'en-tête Authorization (mode
+  // hybride) — le cookie httpOnly reste le canal primaire là où il est
+  // accepté. Clé 'token' : lue par getAuthToken (api.js) et purgée par
+  // clearToken / handleUnauthorized.
+  const persistSessionToken = (accessToken) => {
+    if (!accessToken) return;
+    try {
+      localStorage.setItem('token', accessToken);
+    } catch (_error) {
+      // localStorage indisponible (tests jsdom / privé) : le cookie reste le
+      // seul canal.
+    }
+  };
+
+  const establishSession = (user, accessToken = null, cacheHours = 24) => {
+    persistSessionToken(accessToken);
     // Ne persiste PAS les numéros de paiement en localStorage (privacy).
     localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
     setUser(user);
@@ -179,9 +200,10 @@ export function AuthProvider({ children }) {
     try {
       const response = await authAPI.login({ email, password });
       const { user } = response;
-      // Le token vit dans le cookie httpOnly posé par le backend (kojo_session).
-      // On ne le persiste plus en localStorage (protection XSS).
-      establishSession(user);
+      // Mode hybride : on persiste le jeton (fallback en-tête Authorization) ;
+      // le cookie httpOnly reste posé par le backend pour les navigateurs qui
+      // l'acceptent.
+      establishSession(user, response.access_token);
       devLog.info('✅ User logged in successfully');
       return { success: true, user };
     } catch (error) {
@@ -225,7 +247,7 @@ export function AuthProvider({ children }) {
       }
 
       if (response.status === 'success' && response.user) {
-        establishSession(response.user);
+        establishSession(response.user, response.access_token);
         return {
           success: true,
           user: response.user,
@@ -260,9 +282,10 @@ export function AuthProvider({ children }) {
   // Nouvelle fonction pour connexion automatique après inscription
   const autoLoginAfterRegistration = (userData, token) => {
     try {
-      // Le token vit dans le cookie httpOnly posé par le backend sur
-      // /auth/register-verified ; on ne le persiste plus en localStorage.
-      // Le paramètre `token` est conservé pour la signature (compat).
+      // Mode hybride : on persiste le jeton (fallback en-tête Authorization),
+      // le cookie httpOnly reste posé par le backend sur
+      // /auth/register-verified.
+      persistSessionToken(token);
       localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(userData)));
       setUser(userData);
       
@@ -290,8 +313,9 @@ export function AuthProvider({ children }) {
       // obligatoire côté backend). userData doit contenir email_verification_token.
       const response = await authAPI.registerVerified(userData);
       const { user } = response;
-      // Le token vit dans le cookie httpOnly posé par le backend ; on ne le
-      // persiste plus en localStorage (protection XSS).
+      // Mode hybride : on persiste le jeton (fallback en-tête Authorization),
+      // le cookie httpOnly reste posé par le backend.
+      persistSessionToken(response.access_token);
       localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
       setUser(user);
       
