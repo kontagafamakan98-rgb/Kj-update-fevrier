@@ -21,13 +21,15 @@
 // renvoie la base telle quelle (avec /api si fourni) ; buildApiUrl normalise
 // vers l'origine nue puis ajoute /api exactement une fois.
 //
-// PROXY MÊME-ORIGINE (production) : en prod, les requêtes /api/* passent par
-// un rewrite Vercel (vercel.json) qui proxifie vers le backend Fly. Le
-// frontend envoie donc des requêtes RELATIVES (/api/...) sur SA PROPRE
-// origine → les cookies de session httpOnly deviennent same-site (plus de
-// blocage par Safari ITP / cookies tiers). Le mode "cross-site direct vers
-// Fly" reste disponible via VITE_USE_SAME_ORIGIN_API=false (ex: mobile
-// Capacitor, ou debug).
+// PROXY MÊME-ORIGINE (production) : DÉSACTIVÉ PAR DÉFAUT. Un domaine
+// *.vercel.app est sur la Public Suffix List → le navigateur REFUSE les
+// cookies de session y étant posés, ce qui cassait le login en production
+// (boucle 401 → /login, même en navigation privée). Le frontend appelle
+// donc le backend Fly EN CROSS-ORIGINE DIRECT (kojo-backend.fly.dev), où le
+// cookie SameSite=None est posé sur un domaine normal et fonctionne (mode
+// prévu par le backend). Le proxy même-origine Vercel reste réactivable
+// via VITE_USE_SAME_ORIGIN_API=true, mais UNIQUEMENT avec un domaine custom
+// (pas *.vercel.app) dont les cookies ne sont pas bloqués.
 // ============================================================================
 
 const trimTrailingSlashes = (value = '') => String(value || '').replace(/\/+$/, '');
@@ -48,12 +50,17 @@ const isSameOriginApiProd = () => {
     (typeof process !== 'undefined' && process.env?.VITE_USE_SAME_ORIGIN_API) ||
     '';
   const normalized = String(envFlag || '').trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1') return true; // opt-in explicite (ex: domaine custom)
   if (normalized === 'false' || normalized === '0') return false;
-  // Par défaut : actif en production build (mode production Vite), inactif
-  // en dev (le dev server ne proxifie pas /api).
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
-    return import.meta.env.PROD === true || import.meta.env.MODE === 'production';
-  }
+  // Par défaut : FALSE. En production sur un domaine *.vercel.app (Public
+  // Suffix List), le navigateur REFUSE les cookies de session posés sur ce
+  // domaine → login en boucle (401 → /login), y compris en navigation privée.
+  // On appelle donc le backend Fly EN CROSS-ORIGIN DIRECT (kojo-backend.fly.dev)
+  // : le cookie SameSite=None y est posé sur un domaine normal (non
+  // public-suffix) et fonctionne. C'est le mode prévu par le backend
+  // (kojo_settings : « cross-site, SameSite=None »). Le proxy même-origine
+  // Vercel ne doit être réactivé QUE avec un domaine custom dont les cookies
+  // ne sont pas bloqués (VITE_USE_SAME_ORIGIN_API=true).
   return false;
 };
 
