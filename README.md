@@ -206,3 +206,20 @@ curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 
 - **mobile-build** : `cap sync android` + build APK debug (Gradle 8.14 /
   AGP 8.13, **Java 21** — requis par Capacitor 8, SDK Android) — valide la
   config Capacitor à chaque push
+
+## Branches
+
+- **`main`** — branche de référence et de production (déploiements
+  automatiques Vercel + Fly.io via la CI). Tout le développement passe par
+  des branches dédiées fusionnées ici (PR).
+- **`master`** — branche héritée de l'ancien historique, **avant la
+  réécriture du dépôt du 15/08/2026**. Conservée uniquement pour référence ;
+  ne plus travailler dessus ni l'utiliser comme base.
+- **`backup-pre-rewrite-20260815`** — **sauvegarde locale** de l'état du
+  dépôt juste avant la réécriture du 15/08/2026 (dernier commit `e41538c`).
+  Gardée par sécurité pour récupérer un éventuel contenu perdu ; elle n'est
+  pas poussée sur origin et n'est pas une branche de travail.
+
+> ⚠️ La branche distante `fix/pack4-native` (ancien travail i18n d'avril
+> 2026, histoire pré-rewrite) a été **supprimée** : son contenu est
+> intégré/refait sur `main` (ex. `frontend/src/utils/pack2PageI18n.js`).
