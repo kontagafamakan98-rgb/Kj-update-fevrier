@@ -224,3 +224,79 @@ class TestCheckEnvExampleCoverage:
         check.errors, check.checked = [], []
         check.check_env_example_coverage({"A", "B"}, {"A": "1"}, {"B": "d"})
         assert not check.errors, check.errors
+
+
+class TestMask:
+    def test_vide(self, check):
+        assert check._mask("") == "(vide)"
+
+    def test_avec_schema_garde_le_prefixe(self, check):
+        assert check._mask("redis://x") == "redis://[9 car.]"
+        assert check._mask("https://a.com/path") == "https://[18 car.]"
+
+    def test_sans_schema(self, check):
+        assert check._mask("mailto:kojoapp98@gmail.com") == "[26 car.]"
+
+    def test_ne_contient_jamais_la_valeur(self, check):
+        assert "kojoapp98" not in check._mask("mailto:kojoapp98@gmail.com")
+
+
+class TestSanitizeError:
+    def test_remplace_la_valeur_par_le_masque(self, check):
+        msg = "MONGO_URL invalide : «mongodb+srv://u:p@h/db» contient un espace."
+        out = check._sanitize_error(msg, "mongodb+srv://u:p@h/db")
+        assert "u:p@h" not in out
+        assert "mongodb+srv://[22 car.]" in out
+
+    def test_sans_valeur_inchange(self, check):
+        assert check._sanitize_error("erreur générique", "") == "erreur générique"
+
+
+class TestCheckDeployedFormats:
+    PUBLIC_OK = {
+        "BACKEND_PUBLIC_URL": "https://kojo-backend.fly.dev",
+        "FRONTEND_APP_URL": "https://kj-update-fevrier.vercel.app",
+        "TRUSTED_HOSTS": "*.internal,kojo-backend.fly.dev",
+    }
+    SECRETS_OK = {
+        "CORS_ORIGINS": "https://kj-update-fevrier.vercel.app",
+        "REDIS_URL": "rediss://default:p@h:6379",
+        "MONGO_URL": "mongodb+srv://u:p@c.mongodb.net/db",
+        "VAPID_CLAIMS_EMAIL": "mailto:kojoapp98@gmail.com",
+    }
+
+    def test_formats_valides_aucune_erreur(self, check):
+        check.errors, check.checked = [], []
+        check.check_deployed_formats(self.PUBLIC_OK, self.SECRETS_OK)
+        assert not check.errors, check.errors
+        assert len(check.checked) == 7
+
+    def test_public_url_invalide_detectee(self, check):
+        check.errors, check.checked = [], []
+        public = dict(self.PUBLIC_OK, BACKEND_PUBLIC_URL="http://kojo.fly.dev")
+        check.check_deployed_formats(public, {})
+        assert any("BACKEND_PUBLIC_URL" in e for e in check.errors), check.errors
+
+    def test_slash_final_non_normalise_detecte(self, check):
+        # RÉGRESSION : un slash final sur BACKEND_PUBLIC_URL casse les callbacks
+        # IPN — le validateur normalise, mais le runtime ne normalise pas : la
+        # valeur déployée brute doit être signalée comme NON normalisée.
+        check.errors, check.checked = [], []
+        public = dict(self.PUBLIC_OK, BACKEND_PUBLIC_URL="https://kojo-backend.fly.dev/")
+        check.check_deployed_formats(public, {})
+        assert any("NON normalisée" in e for e in check.errors), check.errors
+
+    def test_secret_invalide_detecte_sans_fuite(self, check):
+        check.errors, check.checked = [], []
+        secrets = {"VAPID_CLAIMS_EMAIL": "mailto: kojoapp98@gmail.com"}
+        check.check_deployed_formats({}, secrets)
+        joined = " ".join(check.errors)
+        assert "VAPID_CLAIMS_EMAIL" in joined
+        assert "mailto: kojoapp98@gmail.com" not in joined, "secret fuité dans la sortie"
+
+    def test_credential_mongo_masquee(self, check):
+        check.errors, check.checked = [], []
+        secrets = {"MONGO_URL": "mongodb+srv://admin:TopSecret2026@cluster.mongodb.net/db"}
+        check.check_deployed_formats({}, secrets)
+        joined = " ".join(check.errors)
+        assert "TopSecret2026" not in joined, "credential fuité dans la sortie"

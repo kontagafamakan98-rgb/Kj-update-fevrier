@@ -278,6 +278,21 @@ VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
 
 VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'mailto:kojo@example.com').strip()
 
+# Validateurs de format des variables d'env — extraits dans
+# kojo_env_validators.py (module stdlib-only, importable sans dépendances
+# lourdes : utilisé par le script d'audit Fly .github/scripts/check-fly-env-
+# drift.py en CI, qui n'installe pas les dépendances backend). Ré-exportés
+# ici pour préserver l'API publique (tests, server.py).
+from kojo_env_validators import (  # noqa: E402,F401
+    validate_cors_origins,
+    validate_https_url,
+    validate_mongo_url,
+    validate_redis_url,
+    validate_trusted_hosts,
+    validate_vapid_sub_claim,
+)
+
+
 DEFAULT_SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",

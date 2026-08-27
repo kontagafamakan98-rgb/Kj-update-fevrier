@@ -30,6 +30,13 @@ donc ce qui l'est réellement :
      changement de digest d'une valeur censée être stable déclenche une
      alerte (rotation non documentée). Les clés réellement secrètes
      (tokens, clés privées) sont exclues — leur rotation est voulue.
+  7. FORMAT des valeurs DÉPLOYÉES : les variables publiques [env] (via
+     l'API Machines, lisibles) et les SECRETS (via SSH `flyctl ssh console`
+     → printenv, valeurs JAMAIS affichées — masquées dans la sortie) sont
+     validées par les validateurs de kojo_env_validators.py (URLs https,
+     CORS, VAPID, TRUSTED_HOSTS, REDIS_URL, MONGO_URL). Détecte une valeur
+     déployée mal formée (ex. un slash final sur BACKEND_PUBLIC_URL, un
+     espace après mailto:, une URI redis:// manquante).
 
 Usage :
     FLY_API_TOKEN=<deploy_token> python .github/scripts/check-fly-env-drift.py
@@ -43,6 +50,24 @@ import re
 import sys
 import urllib.request
 from pathlib import Path
+
+# Validateurs de format — module stdlib-only (kojo_env_validators.py), PAS
+# kojo_settings.py (qui exécute cloudinary.config()/load_dotenv à l'import
+# et exigerait les dépendances backend). Le script tourne en CI sans deps.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "backend"))
+try:
+    from kojo_env_validators import (
+        validate_cors_origins,
+        validate_https_url,
+        validate_mongo_url,
+        validate_redis_url,
+        validate_trusted_hosts,
+        validate_vapid_sub_claim,
+    )
+    _VALIDATORS_OK = True
+except Exception as exc:  # noqa: BLE001 - module absent = pas de contrôle format
+    _VALIDATORS_OK = False
+    _VALIDATORS_ERR = str(exc)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = Path(os.environ.get("KOJO_ROOT", SCRIPT_DIR.parent.parent)).resolve()
@@ -358,6 +383,128 @@ def check_env_example_coverage(example_keys, fly_toml_env, fly_secrets):
             )
 
 
+def _mask(value):
+    """Masque une valeur secrète : ne garde que le préfixe du schéma et la
+    longueur (ex. 'redis://... [55 car.]'). JAMAIS la valeur complète dans la
+    sortie — le script audit peut tourner dans des logs CI publics."""
+    if not value:
+        return "(vide)"
+    prefix = value.split("://", 1)[0] + "://" if "://" in value else ""
+    return f"{prefix}[{len(value)} car.]"
+
+
+def _sanitize_error(msg, value):
+    """Les messages d'erreur des validateurs embarquent la valeur fautive
+    (ex. «mailto: kojoapp98@gmail.com»). Pour un SECRET, on remplace toute
+    occurrence de la valeur par son masque avant de l'afficher — un log CI
+    est public."""
+    if not value:
+        return msg
+    return msg.replace(value, _mask(value))
+
+
+# Format attendu par clé déployée → (validateur, description, accepte_label,
+# renvoie_la_valeur). has_label=False pour les validateurs à signature 1
+# paramètre (validate_cors_origins, validate_vapid_sub_claim).
+# returns_value=True : le validateur renvoie la valeur normalisée (chaîne) —
+# si elle diffère de l'entrée, la valeur déployée est NON canonique (le
+# runtime ne normalise pas). returns_value=False : validateur qui renvoie une
+# liste (cors_origins, trusted_hosts) — seule la levée d'erreur compte.
+PUBLIC_FORMAT_CHECKS = {
+    "BACKEND_PUBLIC_URL": (validate_https_url, "URL https publique", True, True),
+    "FRONTEND_APP_URL": (validate_https_url, "URL https publique", True, True),
+    "TRUSTED_HOSTS": (validate_trusted_hosts, "CSV d'hôtes de confiance", True, False),
+}
+
+SECRET_FORMAT_CHECKS = {
+    "CORS_ORIGINS": (validate_cors_origins, "CSV d'origines https", False, False),
+    "REDIS_URL": (validate_redis_url, "URI redis:// ou rediss://", True, True),
+    "MONGO_URL": (validate_mongo_url, "URI mongodb:// ou mongodb+srv://", True, True),
+    "VAPID_CLAIMS_EMAIL": (validate_vapid_sub_claim, "URI mailto:/https: (RFC 8292)", False, True),
+}
+
+
+def check_deployed_formats(public_env, secret_values, label_prefix="format"):
+    """Valide le FORMAT des valeurs DÉPLOYÉES : les variables publiques [env]
+    (lues via l'API) et les secrets (lus via SSH, valeurs masquées).
+
+    `secret_values` : dict {NOM: valeur} lu via printenv — les valeurs sont
+    transmises au validateur mais JAMAIS affichées (seul le verdict + un
+    masque sortent).
+
+    Détecte une valeur déployée mal formée — le pire cas d'erreur de
+    config : le code démarre, mais CORS/URLs/VAPID sont cassés silencieusement
+    (ex. slash final sur BACKEND_PUBLIC_URL, espace après mailto:).
+    """
+    for key, (validator, desc, has_label, returns_value) in sorted(PUBLIC_FORMAT_CHECKS.items()):
+        value = public_env.get(key, "")
+        try:
+            result = validator(value, key) if has_label else validator(value)
+            checked.append(f"  {OK} {key} format OK ({desc})")
+        except (ValueError, TypeError) as exc:
+            errors.append(f"[format {key}] {_sanitize_error(str(exc), value)} — valeur déployée={_mask(value)}")
+            continue
+        # Un validateur qui NORMALISE la valeur (slash final, espaces externes)
+        # renvoie une valeur ≠ entrée : la valeur déployée brute est donc non
+        # canonique (le runtime ne normalise pas → callbacks cassés silencieusement).
+        if returns_value and result != value:
+            errors.append(
+                f"[format {key}] valeur déployée NON normalisée : {_mask(value)} "
+                f"→ attendu {_mask(result)} (le runtime ne normalise pas)"
+            )
+
+    for key, (validator, desc, has_label, returns_value) in sorted(SECRET_FORMAT_CHECKS.items()):
+        if key not in secret_values:
+            continue
+        value = secret_values[key]
+        try:
+            result = validator(value, key) if has_label else validator(value)
+            checked.append(f"  {OK} {key} format OK ({desc}, {_mask(value)})")
+        except (ValueError, TypeError) as exc:
+            errors.append(f"[format {key}] {_sanitize_error(str(exc), value)} — valeur déployée={_mask(value)}")
+            continue
+        if returns_value and result != value:
+            errors.append(
+                f"[format {key}] valeur déployée NON normalisée : {_mask(value)} "
+                f"→ attendu {_mask(result)}"
+            )
+
+
+def read_secrets_via_ssh(keys):
+    """Lit les valeurs des secrets déployés via SSH (flyctl ssh console →
+    printenv). Les valeurs sont renvoyées au script mais ne sont jamais
+    affichées (masquées par l'appelant).
+
+    Retourne {NOM: valeur} pour les clés présentes dans l'environnement de
+    la machine. Retourne {} si SSH est indisponible (CI sans clé SSH) — les
+    formats secrets sont alors simplement non vérifiés, PAS bloquants.
+    """
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["flyctl", "ssh", "console", "-a", FLY_APP, "-C",
+             f"printenv {' '.join(keys)}"],
+            capture_output=True, text=True, timeout=90,
+            env={**os.environ, "FLY_API_TOKEN": API_TOKEN},
+        )
+    except Exception as exc:  # noqa: BLE001
+        checked.append(f"  [WARN] SSH indisponible ({exc}) — formats secrets non vérifiés")
+        return {}
+    # NB : flyctl ssh console sort avec exit=1 après la commande (« Descripteur
+    # non valide » sur Windows, EOF côté console) MÊME quand la sortie est
+    # correcte. Le signal de réussite est donc la PRÉSENCE de valeurs dans
+    # stdout, pas le code de retour.
+    values = {}
+    lines = out.stdout.splitlines()
+    for i, key in enumerate(keys):
+        # printenv écrit chaque valeur sur sa propre ligne, dans l'ordre.
+        if i < len(lines) and lines[i].strip():
+            values[key] = lines[i]
+    if not values and out.returncode != 0:
+        checked.append("  [WARN] SSH console échoué (aucune valeur lue) — formats secrets non vérifiés")
+    return values
+
+
 _fly_toml_env_cache = None
 
 
@@ -442,6 +589,7 @@ def main():
 
     # 4) Secrets : présences (requis par DEPLOY_FLYIO.md) + snapshot stabilité
     required = required_secrets_from_deploy_doc()
+    fly_secrets = {}
     try:
         fly_secrets = list_fly_secrets(API_TOKEN)
         # Les secrets injectés dans config.env par Fly ne sont pas là ; on retire
@@ -471,7 +619,13 @@ def main():
     except RuntimeError as exc:
         errors.append(str(exc))
 
-    # 5) Rapport
+    # 5) FORMAT des valeurs déployées : publiques (API) + secrets (SSH, masqués)
+    if _VALIDATORS_OK:
+        secret_keys = sorted(set(SECRET_FORMAT_CHECKS) & set(fly_secrets))
+        secret_values = read_secrets_via_ssh(secret_keys) if secret_keys else {}
+        check_deployed_formats(live_env, secret_values)
+
+    # 6) Rapport
     print(f"Check doc<->prod Fly (app={FLY_APP}) :")
     for line in checked:
         print(line)
