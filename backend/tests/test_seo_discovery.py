@@ -186,3 +186,79 @@ class TestJobsCacheControl:
         cc = resp.headers.get("cache-control", "")
         assert "public" not in cc
         assert "max-age=60" not in cc
+
+
+@pytest.mark.asyncio
+class TestJobOgHtml:
+    """Pré-rendu HTML des fiches mission (/api/og/jobs/:id) — servi aux
+    crawlers via le rewrite Vercel /jobs/(.*) (remplace la fonction
+    serverless api/og-jobs/[id].js jamais déployée par Vercel).
+    """
+
+    async def test_og_html_serves_job_meta(self, client: AsyncClient):
+        headers = await auth_headers(client, BASE_USER)
+        job = (await client.post("/api/jobs", headers=headers, json={
+            **BASE_JOB,
+            "title": "Fiche avec HTML pré-rendu",
+            "category": "general",
+            "description": "Description courte pour la carte de partage.",
+        })).json()
+        assert job["id"]
+
+        resp = await client.get(f"/api/og/jobs/{job['id']}")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/html")
+        assert "Fiche avec HTML pré-rendu" in resp.text
+        # Cartes wide + carrée pointées vers les endpoints Pillow du backend.
+        assert f"/api/og/jobs/{job['id']}.png" in resp.text
+        assert f"/api/og/jobs/{job['id']}-square.png" in resp.text
+        assert resp.text.count('property="og:image"') == 2
+        assert 'name="twitter:image"' in resp.text
+        # Shell h1 statique (LCP avant boot React) présent.
+        assert "<h1" in resp.text
+        assert "text-3xl font-bold text-gray-900" in resp.text
+        # Pas de noindex sur une mission existante.
+        assert "noindex" not in resp.headers.get("x-robots-tag", "")
+
+    async def test_og_html_404_noindex_for_missing_job(self, client: AsyncClient):
+        resp = await client.get("/api/og/jobs/unknown-job-xyz")
+        assert resp.status_code == 404
+        assert resp.headers["content-type"].startswith("text/html")
+        assert "noindex" in resp.headers.get("x-robots-tag", "")
+        assert "unknown-job-xyz" not in resp.text
+
+    async def test_og_html_escapes_job_data(self, client: AsyncClient):
+        """Les données utilisateur (titre/description) sont échappées dans le
+        HTML servi — jamais injectées brutes (XSS via crawler/bot)."""
+        headers = await auth_headers(client, BASE_USER)
+        job = (await client.post("/api/jobs", headers=headers, json={
+            **BASE_JOB,
+            "title": "Mission & Co <script>alert(1)</script>",
+            "category": "general",
+        })).json()
+
+        resp = await client.get(f"/api/og/jobs/{job['id']}")
+        assert resp.status_code == 200
+        assert "<script>alert(1)</script>" not in resp.text
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in resp.text
+        assert "&amp;" in resp.text
+
+    async def test_og_html_cache_long_for_closed_job(self, client: AsyncClient):
+        """Même politique de cache que les cartes : 24 h + revalidation pour
+        une mission clôturée (immuable), 1 h sinon."""
+        await db_insert("jobs", {
+            "id": "og-html-closed-001",
+            "title": "Mission HTML terminée",
+            "description": "Achevée.",
+            "category": "general",
+            "budget_min": 5000,
+            "budget_max": 12000,
+            "location_text": "Dakar, Sénégal",
+            "status": "completed",
+            "deleted": False,
+        })
+        resp = await client.get("/api/og/jobs/og-html-closed-001")
+        assert resp.status_code == 200
+        cc = resp.headers.get("cache-control", "")
+        assert "max-age=86400" in cc
+        assert "s-maxage=86400" in cc

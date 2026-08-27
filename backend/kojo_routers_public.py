@@ -325,6 +325,105 @@ async def get_job_og_image(job_id: str):
         headers={"Cache-Control": _job_og_cache_control(job)},
     )
 
+
+def _job_og_html(job: dict, base: str) -> str:
+    """HTML pré-rendu (crawlers sans JS) d'une fiche mission /jobs/:id.
+
+    Les crawlers de partage (Facebook, LinkedIn, WhatsApp) ne lisent QUE le
+    HTML servi, sans exécuter JavaScript : ce document porte les méta OG de
+    la mission (titre, description, cartes wide + carrée pointées vers les
+    endpoints Pillow du backend) + le shell h1 statique. Le rewrite Vercel
+    /jobs/(.*) → /api/og/jobs/$1 achemine les fiches ici — plus de fonction
+    serverless Vercel à déployer (Vercel ne collecte pas api/ en mode
+    outputDirectory statique).
+    """
+    job_id = str(job.get("id") or "")
+    raw_title = str(job.get("title") or "")
+    title = f"{raw_title} — Kojo" if raw_title else "Mission — Kojo"
+    raw_desc = str(job.get("description") or "")
+    desc = raw_desc[:150] + ("…" if len(raw_desc) > 150 else "")
+    url = f"{base}/jobs/{_xml_escape(job_id)}"
+    wide = f"{base}/api/og/jobs/{_xml_escape(job_id)}.png"
+    square = f"{base}/api/og/jobs/{_xml_escape(job_id)}-square.png"
+    t = _xml_escape(title)
+    d = _xml_escape(desc)
+    return (
+        "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n"
+        "<meta charset=\"utf-8\" />\n"
+        f"<title>{t}</title>\n"
+        f"<meta name=\"description\" content=\"{d}\" />\n"
+        "<meta name=\"robots\" content=\"index, follow\" />\n"
+        f"<link rel=\"canonical\" href=\"{url}\" />\n"
+        "<meta property=\"og:type\" content=\"article\" />\n"
+        f"<meta property=\"og:url\" content=\"{url}\" />\n"
+        f"<meta property=\"og:title\" content=\"{t}\" />\n"
+        f"<meta property=\"og:description\" content=\"{d}\" />\n"
+        f"<meta property=\"og:image\" content=\"{wide}\" />\n"
+        "<meta property=\"og:image:width\" content=\"1200\" />\n"
+        "<meta property=\"og:image:height\" content=\"630\" />\n"
+        "<meta property=\"og:image:type\" content=\"image/png\" />\n"
+        f"<meta property=\"og:image\" content=\"{square}\" />\n"
+        "<meta property=\"og:image:width\" content=\"1200\" />\n"
+        "<meta property=\"og:image:height\" content=\"1200\" />\n"
+        "<meta property=\"og:image:type\" content=\"image/png\" />\n"
+        "<meta property=\"og:locale\" content=\"fr_FR\" />\n"
+        "<meta property=\"og:site_name\" content=\"Kojo\" />\n"
+        "<meta name=\"twitter:card\" content=\"summary_large_image\" />\n"
+        f"<meta name=\"twitter:url\" content=\"{url}\" />\n"
+        f"<meta name=\"twitter:title\" content=\"{t}\" />\n"
+        f"<meta name=\"twitter:description\" content=\"{d}\" />\n"
+        f"<meta name=\"twitter:image\" content=\"{wide}\" />\n"
+        "</head>\n<body>\n"
+        "<div id=\"root\">\n"
+        "<div class=\"h-16 bg-white border-b border-gray-200\"></div>\n"
+        "<div class=\"max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8\">\n"
+        f"<h1 class=\"text-3xl font-bold text-gray-900 mb-2\">{t}</h1>\n"
+        "</div>\n</div>\n</body>\n</html>\n"
+    )
+
+
+def _job_og_html_404(base: str) -> str:
+    """HTML neutre pour une fiche inconnue — explicite noindex."""
+    return (
+        "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n"
+        "<meta charset=\"utf-8\" />\n"
+        "<title>Mission introuvable — Kojo</title>\n"
+        "<meta name=\"robots\" content=\"noindex, nofollow\" />\n"
+        "</head>\n<body>\n<div id=\"root\"></div>\n</body>\n</html>\n"
+    )
+
+
+# IMPORTANT : déclaré APRÈS les routes « {job_id}-square.png » et
+# « {job_id}.png » — sinon FastAPI matcherait « …-square.png » sur {job_id}
+# (job_id = « …-square.png ») et casserait les cartes images.
+@router.get("/og/jobs/{job_id}", include_in_schema=False)
+async def get_job_og_html(job_id: str):
+    """Page HTML pré-rendue d'une fiche mission (/jobs/:id) pour les crawlers.
+
+    Remplace la fonction serverless Vercel api/og-jobs/[id].js (jamais
+    déployée : Vercel ne collecte pas le dossier api/ en mode outputDirectory
+    statique). Le rewrite Vercel /jobs/(.*) → /api/og/jobs/$1 achemine les
+    fiches ici : 200 + méta OG de la mission si elle existe, 404 + noindex
+    sinon — c'est ce que vérifie le check CI check-og-images.
+
+    Returns:
+        Response: HTML (text/html) — 404 noindex si la mission n'existe pas.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    base = _site_base()
+    if not job:
+        return Response(
+            content=_job_og_html_404(base),
+            media_type="text/html; charset=utf-8",
+            status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
+        )
+    return Response(
+        content=_job_og_html(job, base),
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": _job_og_cache_control(job)},
+    )
+
 # Base du site pour le sitemap/robots. En production, FRONTEND_APP_URL doit
 # pointer vers le domaine public Vercel ; repli sur le domaine Fly du backend
 # (utilisateur derrière le proxy /api, jamais pour le vrai crawl).
