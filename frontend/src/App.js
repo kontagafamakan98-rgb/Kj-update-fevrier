@@ -23,8 +23,12 @@ import { useNotifications } from './contexts/NotificationContext';
 // Eager load critical pages (public pages shown immediately)
 import Home from "./pages/Home";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
-import HowItWorks from "./pages/HowItWorks";
+
+// Lazy load secondary pages (public non-critiques + protégées) : réduit le
+// bundle initial — Register/HowItWorks ne sont chargés que si l'utilisateur
+// y navigue.
+const Register = lazy(() => import("./pages/Register"));
+const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));

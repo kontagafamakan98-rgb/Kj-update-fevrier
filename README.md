@@ -211,15 +211,41 @@ curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 
 
 - **`main`** — branche de référence et de production (déploiements
   automatiques Vercel + Fly.io via la CI). Tout le développement passe par
-  des branches dédiées fusionnées ici (PR).
-- **`master`** — branche héritée de l'ancien historique, **avant la
-  réécriture du dépôt du 15/08/2026**. Conservée uniquement pour référence ;
-  ne plus travailler dessus ni l'utiliser comme base.
-- **`backup-pre-rewrite-20260815`** — **sauvegarde locale** de l'état du
-  dépôt juste avant la réécriture du 15/08/2026 (dernier commit `e41538c`).
-  Gardée par sécurité pour récupérer un éventuel contenu perdu ; elle n'est
-  pas poussée sur origin et n'est pas une branche de travail.
+  des branches dédiées fusionnées ici (PR). C'est la **seule** branche
+  restante du dépôt.
 
-> ⚠️ La branche distante `fix/pack4-native` (ancien travail i18n d'avril
-> 2026, histoire pré-rewrite) a été **supprimée** : son contenu est
-> intégré/refait sur `main` (ex. `frontend/src/utils/pack2PageI18n.js`).
+**Historique antérieur à la réécriture du 15/08/2026** : les anciennes
+branches (`master`, `backup-pre-rewrite-20260815`) ont été remplacées par
+**des tags Git immuables** (plus propre qu'une branche, l'historique reste
+accessible mais n'apparaît pas dans les branches) :
+
+- `backup/pre-rewrite-20260815` → snapshot de l'état du dépôt juste avant la
+  réécriture (commit `e41538c`)
+- `legacy/master-pre-rewrite` → ancien historique principal (commit
+  `27285f7`)
+
+> ⚠️ Les branches distantes `fix/pack4-native` (ancien travail i18n d'avril
+> 2026) et `master` ont été **supprimées** : leur contenu est intégré ou
+> préservé dans les tags ci-dessus.
+
+## Comptes de test
+
+Des comptes de démonstration existent en production (backend Fly.io) :
+
+| Compte | Type | Mot de passe | Usage |
+|---|---|---|---|
+| `makemoney0598@gmail.com` | client | voir secret | Test du parcours client (profil, photo, création de mission) |
+| `cesarijulies95@gmail.com` | worker | voir secret | Test du parcours worker (compétences, postulation) |
+
+**Politique de rotation** :
+
+- Les mots de passe des comptes de test sont stockés dans le gestionnaire de
+  secrets de l'équipe (jamais dans le dépôt, jamais dans ce README).
+- Ils doivent être **rotés** (1) à chaque fuite/échange via un canal non
+  sécurisé, (2) au minimum tous les 90 jours, (3) avant un passage en
+  démo publique.
+- Rotation : connexion admin → page profil du compte → « Modifier » →
+  changer le mot de passe (le champ `password_version` invalide alors tous
+  les jetons émis avant).
+- Après chaque test manuel, **restaurer les données de démo** : `skills:
+  []`, `bio: ""`, suppression des missions/propositions de test créées.

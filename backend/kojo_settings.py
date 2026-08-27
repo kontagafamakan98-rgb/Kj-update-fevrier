@@ -75,7 +75,8 @@ APP_ENV = os.environ.get("APP_ENV", "production").strip().lower()
 
 # Version de l'API — source unique de vérité : health checks (/health,
 # /api/health) et en-tête X-Kojo-Version. À bumper ensemble, jamais ailleurs.
-APP_VERSION = "1.0.1"
+# 1.0.2 : modèle User étendu (skills/bio exposés par /auth/me, PR #3).
+APP_VERSION = "1.0.2"
 
 _env_jwt_secret = os.environ.get('JWT_SECRET', '').strip()
 
