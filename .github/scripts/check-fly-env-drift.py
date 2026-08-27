@@ -470,6 +470,86 @@ def check_deployed_formats(public_env, secret_values, label_prefix="format"):
             )
 
 
+# Clés CRITIQUES dont le format est contrôlé dans les RÉFÉRENCES du dépôt
+# (déterministe, sans accès Fly) — même mapping que le check déployé.
+REFERENCE_FORMAT_CHECKS = {
+    **PUBLIC_FORMAT_CHECKS,
+    **SECRET_FORMAT_CHECKS,
+}
+
+
+def check_reference_formats():
+    """Valide le FORMAT des variables critiques dans les RÉFÉRENCES du dépôt :
+    backend/.env.example, backend/DEPLOY_FLYIO.md et backend/fly.toml [env].
+
+    Déterministe et exécutable SANS accès Fly (pas de token, pas de réseau) :
+    c'est le garde-fou de base que la CI peut lancer à chaque push pour
+    détecter une régression de format dans les fichiers de référence — un
+    CORS_ORIGINS avec slash final, une VAPID_CLAIMS_EMAIL avec espace après
+    mailto:, une URL http:// dans fly.toml…
+
+    Règles par source :
+    - fly.toml [env]  : TOUTES les valeurs présentes sont validées (c'est la
+      config de prod commitée) ;
+    - .env.example    : les valeurs VIDE sont ignorées (template de dev, la
+      plupart des secrets sont laissés vides) ; les valeurs non vides sont
+      validées (ex. VAPID_CLAIMS_EMAIL=mailto:kojoapp98@gmail.com) ;
+    - DEPLOY_FLYIO.md : les valeurs du bloc `fly secrets set` (doc à copier
+      sur Fly) — extraites par regex, seules les valeurs non vides et non
+      placeholder (« ... ») sont validées.
+
+    Détecte une référence du dépôt devenue invalide — le même bug qui, une
+    fois copié sur Fly, casserait silencieusement CORS/VAPID/callbacks.
+    """
+    def _check(key, value, source):
+        if key not in REFERENCE_FORMAT_CHECKS:
+            return
+        validator, desc, has_label, returns_value = REFERENCE_FORMAT_CHECKS[key]
+        if not value:
+            return  # vide = template dev / clé absente : rien à valider
+        try:
+            result = validator(value, key) if has_label else validator(value)
+            checked.append(f"  {OK} {key} référence OK ({source}, {desc})")
+        except (ValueError, TypeError) as exc:
+            errors.append(
+                f"[référence {key}] {_sanitize_error(str(exc), value)} — source={source}"
+            )
+            return
+        if returns_value and result != value:
+            errors.append(
+                f"[référence {key}] NON normalisée ({source}) : {_mask(value)} "
+                f"→ attendu {_mask(result)}"
+            )
+
+    # 1) fly.toml [env] — config de prod commitée
+    if FLY_TOML.exists():
+        fly_env = parse_fly_toml_env(FLY_TOML.read_text(encoding="utf-8"))
+        for key, value in sorted(fly_env.items()):
+            _check(key, value, "fly.toml [env]")
+
+    # 2) .env.example — template DEV : les valeurs vides sont ignorées, et les
+    #    valeurs de développement (http://localhost, mongodb://localhost) sont
+    #    des PLACEHOLDERS de dev (ex. FRONTEND_APP_URL=http://localhost:3000,
+    #    MONGO_URL=mongodb://localhost:27017) — seules les valeurs de type
+    #    production (https://, redis://, mongodb+srv://, mailto:…) sont
+    #    validées, comme dans test_env_url_validation.py::TestReferencesProd.
+    if ENV_EXAMPLE.exists():
+        example = parse_env_example(ENV_EXAMPLE.read_text(encoding="utf-8"))
+        for key, value in sorted(example.items()):
+            if key in ("FRONTEND_APP_URL", "BACKEND_PUBLIC_URL") and value.startswith("http://"):
+                continue  # placeholder dev (localhost)
+            _check(key, value, ".env.example")
+
+    # 3) DEPLOY_FLYIO.md — bloc `fly secrets set` (doc à copier sur Fly)
+    if DEPLOY_DOC.exists():
+        doc_text = DEPLOY_DOC.read_text(encoding="utf-8")
+        for key, value in re.findall(r"([A-Z][A-Z0-9_]{3,})=(\S+)", doc_text):
+            value = value.strip('\"\'')
+            if value.startswith("...") or "..." in value:
+                continue  # placeholder doc (« ... »)
+            _check(key, value, "DEPLOY_FLYIO.md")
+
+
 def read_secrets_via_ssh(keys):
     """Lit les valeurs des secrets déployés via SSH (flyctl ssh console →
     printenv). Les valeurs sont renvoyées au script mais ne sont jamais
@@ -556,9 +636,31 @@ def check_snapshot(fly_secrets):
             checked.append(f"  {OK} {key} digest stable ({live_digest[:8]}...)")
 
 
-def main():
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    refs_only = "--refs-only" in argv
+    if refs_only and not API_TOKEN:
+        # Mode références seules : déterministe, aucun accès Fly requis.
+        # Utile en CI (chaque push) et en local pour auditer les fichiers
+        # de référence SANS token ni réseau.
+        if _VALIDATORS_OK:
+            check_reference_formats()
+        else:
+            errors.append(f"Validateurs indisponibles : {_VALIDATORS_ERR}")
+        print(f"Audit des RÉFÉRENCES du dépôt (mode --refs-only, app={FLY_APP}) :")
+        for line in checked:
+            print(line)
+        if errors:
+            print(f"\n{BAD} {len(errors)} divergence(s) de format dans les références :")
+            for e in errors:
+                print("  " + e)
+            return 1
+        print("\n[OK] formats des références du dépôt conformes.")
+        return 0
+
     if not API_TOKEN:
-        print("FLY_API_TOKEN manquant — impossible d'interroger Fly")
+        print("FLY_API_TOKEN manquant — impossible d'interroger Fly "
+              "(ou utiliser --refs-only pour auditer les références seules)")
         return 2
 
     # 1) fly.toml (référence doc)
@@ -619,11 +721,14 @@ def main():
     except RuntimeError as exc:
         errors.append(str(exc))
 
-    # 5) FORMAT des valeurs déployées : publiques (API) + secrets (SSH, masqués)
+    # 5) FORMAT : références du dépôt (déterministe) PUIS valeurs déployées
     if _VALIDATORS_OK:
+        check_reference_formats()
         secret_keys = sorted(set(SECRET_FORMAT_CHECKS) & set(fly_secrets))
         secret_values = read_secrets_via_ssh(secret_keys) if secret_keys else {}
         check_deployed_formats(live_env, secret_values)
+    else:
+        errors.append(f"Validateurs indisponibles : {_VALIDATORS_ERR}")
 
     # 6) Rapport
     print(f"Check doc<->prod Fly (app={FLY_APP}) :")

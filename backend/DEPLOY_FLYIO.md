@@ -67,7 +67,7 @@ fly secrets set \
   "CLOUDINARY_API_SECRET=..." \
   "VAPID_PRIVATE_KEY=..." \
   "VAPID_PUBLIC_KEY=..." \
-  "VAPID_CLAIMS_EMAIL=mailto:contact@kojo.app"
+  "VAPID_CLAIMS_EMAIL=mailto:kojoapp98@gmail.com"
 ```
 
 **Règles d'or :**
@@ -78,6 +78,13 @@ fly secrets set \
 - ✅ **`BACKEND_PUBLIC_URL` est obligatoire** : sans elle, le
   TrustedHostMiddleware rejette les requêtes vers `*.fly.dev` (erreur 400) et
   les callbacks IPN PayDunya seraient construits sans domaine (donc cassés).
+- 📧 **`VAPID_CLAIMS_EMAIL`** (claim `sub` des notifications push, RFC 8292) :
+  doit être une URI `mailto:` **sans espace** après le schéma
+  (`mailto:kojoapp98@gmail.com` ✅, `mailto: contact@kojo.app` ❌). La valeur
+  déployée sur Fly est **`mailto:kojoapp98@gmail.com`** — elle doit rester
+  identique à celle de `.env.example`. Un garde-fou CI
+  (`backend/tests/test_vapid_sub_claim.py`) vérifie le format des références
+  du dépôt à chaque push.
 - **`REDIS_URL` (recommandé en prod)** : active un rate-limiting PARTAGÉ
   multi-workers. Sans Redis, le rate-limiter reste en mémoire par process
   (limites effectives × N workers, non partagées). Provisionner un Redis sur
@@ -114,6 +121,41 @@ curl -s https://kojo-backend.fly.dev/
 ```
 
 Logs : `fly logs` · État : `fly status`
+
+### 4bis. Audit des variables d'environnement (format + présence)
+
+Un script d'audit réutilisable vérifie le FORMAT et la PRÉSENCE des
+variables critiques (CORS_ORIGINS, VAPID_CLAIMS_EMAIL, URLs publiques,
+TRUSTED_HOSTS, REDIS_URL, MONGO_URL) sur 3 plans :
+
+```bash
+# 1) Formats des RÉFÉRENCES du dépôt (déterministe, SANS token ni réseau —
+#    rejouable localement et lancé par la CI à chaque push) :
+python .github/scripts/check-fly-env-drift.py --refs-only
+
+# 2) Drift doc↔prod + présence des secrets + formats DÉPLOYÉS (nécessite
+#    FLY_API_TOKEN ; les valeurs des secrets sont lues via SSH et masquées,
+#    jamais affichées) :
+FLY_API_TOKEN=<deploy_token> python .github/scripts/check-fly-env-drift.py
+```
+
+Le check valide :
+
+- **`CORS_ORIGINS`** : CSV d'origines https://, sans slash final, sans
+  localhost/127.0.0.1 ni entrée vide ;
+- **`VAPID_CLAIMS_EMAIL`** : URI `mailto:` ou `https:` sans espace (RFC 8292) ;
+- **`BACKEND_PUBLIC_URL` / `FRONTEND_APP_URL`** : URL https://, sans slash
+  final (un slash final casse les callbacks IPN PayDunya — le runtime ne
+  normalise pas) ;
+- **`TRUSTED_HOSTS`** : CSV d'hôtes, motifs joker `*.` autorisés (trafic
+  interne Fly des health checks) ;
+- **`REDIS_URL`** : URI `redis://` ou `rediss://` (vide = mémoire, accepté) ;
+- **`MONGO_URL`** : URI `mongodb://` ou `mongodb+srv://` (Atlas).
+
+Valeurs de référence contrôlées : `backend/fly.toml [env]` (config de prod),
+`backend/.env.example` (template dev — les valeurs vides et `http://localhost`
+sont ignorées) et `backend/DEPLOY_FLYIO.md` (bloc `fly secrets set`, les
+placeholders `...` ignorés).
 
 ## 5. Mettre à jour le frontend Vercel
 

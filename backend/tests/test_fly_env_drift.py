@@ -300,3 +300,97 @@ class TestCheckDeployedFormats:
         check.check_deployed_formats({}, secrets)
         joined = " ".join(check.errors)
         assert "TopSecret2026" not in joined, "credential fuité dans la sortie"
+
+
+class TestCheckReferenceFormats:
+    """Le mode --refs-only valide le FORMAT des variables critiques dans les
+    RÉFÉRENCES du dépôt (fly.toml, .env.example, DEPLOY_FLYIO.md) —
+    déterministe, sans accès Fly, lancé à chaque push par la CI."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_paths(self, check):
+        # Les tests mutent check.ENV_EXAMPLE/FLY_TOML/DEPLOY_DOC vers des
+        # copies temporaires — on restaure les chemins réels après CHAQUE test
+        # pour éviter la pollution de l'état du module entre tests.
+        originals = (check.ENV_EXAMPLE, check.FLY_TOML, check.DEPLOY_DOC)
+        yield
+        check.ENV_EXAMPLE, check.FLY_TOML, check.DEPLOY_DOC = originals
+
+    def _load_real_repo(self, check, tmp_path, env_override=None, toml_override=None):
+        """Pointe le module vers des copies des fichiers réels (mutables)."""
+        real_env = check.ENV_EXAMPLE.read_text(encoding="utf-8")
+        real_toml = check.FLY_TOML.read_text(encoding="utf-8")
+        real_doc = check.DEPLOY_DOC.read_text(encoding="utf-8")
+        check.ENV_EXAMPLE = tmp_path / "env"
+        check.FLY_TOML = tmp_path / "fly.toml"
+        check.DEPLOY_DOC = tmp_path / "doc"
+        check.ENV_EXAMPLE.write_text(
+            env_override(real_env) if env_override else real_env, encoding="utf-8"
+        )
+        check.FLY_TOML.write_text(
+            toml_override(real_toml) if toml_override else real_toml, encoding="utf-8"
+        )
+        check.DEPLOY_DOC.write_text(real_doc, encoding="utf-8")
+
+    def test_references_reelles_conformes(self, check, tmp_path):
+        # Les fichiers RÉELS du dépôt doivent passer le check de format.
+        self._load_real_repo(check, tmp_path)
+        check.errors, check.checked = [], []
+        check.check_reference_formats()
+        assert not check.errors, check.errors
+        # Les 3 sources sont couvertes (fly.toml + .env.example + DEPLOY_FLYIO.md).
+        sources = {line.split("(")[-1].split(",")[0].strip() for line in check.checked}
+        assert "fly.toml [env]" in sources
+        assert ".env.example" in sources
+        assert "DEPLOY_FLYIO.md" in sources
+
+    def test_regression_vapid_espace_detectee(self, check, tmp_path):
+        # RÉGRESSION : un espace après mailto: dans .env.example doit échouer.
+        self._load_real_repo(
+            check, tmp_path,
+            env_override=lambda t: t.replace(
+                "VAPID_CLAIMS_EMAIL=mailto:kojoapp98@gmail.com",
+                "VAPID_CLAIMS_EMAIL=mailto: kojoapp98@gmail.com",
+            ),
+        )
+        check.errors, check.checked = [], []
+        check.check_reference_formats()
+        assert any("VAPID_CLAIMS_EMAIL" in e for e in check.errors), check.errors
+
+    def test_regression_slash_final_flytoml_detectee(self, check, tmp_path):
+        # RÉGRESSION : un slash final sur BACKEND_PUBLIC_URL dans fly.toml casse
+        # les callbacks IPN — doit être signalé NON normalisé.
+        self._load_real_repo(
+            check, tmp_path,
+            toml_override=lambda t: t.replace(
+                "BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev'",
+                "BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev/'",
+            ),
+        )
+        check.errors, check.checked = [], []
+        check.check_reference_formats()
+        assert any("NON normalisée" in e for e in check.errors), check.errors
+
+    def test_placeholder_doc_ignores(self, check, tmp_path):
+        # Les placeholders de la doc (« ... ») ne doivent pas être validés.
+        self._load_real_repo(check, tmp_path)
+        check.errors, check.checked = [], []
+        # Injecte une valeur placeholder MONGO dans la doc et vérifie qu'aucune
+        # erreur ne la concerne (elle est ignorée).
+        real_doc = check.DEPLOY_DOC.read_text(encoding="utf-8")
+        check.DEPLOY_DOC.write_text(
+            real_doc.replace('MONGO_URL=mongodb+srv://...', 'MONGO_URL=mongodb+srv://...'),
+            encoding="utf-8",
+        )
+        check.check_reference_formats()
+        assert not any("MONGO_URL" in e for e in check.errors), check.errors
+
+    def test_main_refs_only_sans_token(self, check, capsys, monkeypatch):
+        # --refs-only doit fonctionner SANS FLY_API_TOKEN (exit 0 sur les
+        # références réelles conformes).
+        monkeypatch.setenv("FLY_API_TOKEN", "")
+        import importlib
+        rc = check.main(["--refs-only"])
+        assert rc == 0
+        out = capsys.readouterr().out
+        assert "références du dépôt conformes" in out

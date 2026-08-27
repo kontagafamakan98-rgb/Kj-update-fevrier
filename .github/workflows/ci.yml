@@ -187,6 +187,14 @@ jobs:
         with:
           python-version: "3.11"
 
+      # FORMAT des variables critiques dans les RÉFÉRENCES du dépôt
+      # (fly.toml, .env.example, DEPLOY_FLYIO.md) : CORS_ORIGINS,
+      # VAPID_CLAIMS_EMAIL, BACKEND_PUBLIC_URL, FRONTEND_APP_URL,
+      # TRUSTED_HOSTS, REDIS_URL, MONGO_URL. Déterministe — SANS token ni
+      # réseau (audit local rejouable), lancé à chaque push.
+      - name: Audit formats des références (refs-only)
+        run: python .github/scripts/check-fly-env-drift.py --refs-only
+
       # flyctl est requis par le check (flyctl secrets list). Même action que
       # le job deploy-fly — tag @master non épinglé, cohérent avec deploy-fly.
       - name: Setup flyctl
