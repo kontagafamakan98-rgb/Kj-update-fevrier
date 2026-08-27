@@ -133,7 +133,21 @@ describe('check-api-split : contrat au niveau BUNDLE', () => {
 
 describe('check-api-split : vert sur le dépôt et le build courants', () => {
   it('passe sur le repo + build actuels (18 groupes, core présent)', () => {
-    const result = runApiSplitCheck({ root: REPO_ROOT });
+    const repo = REPO_ROOT;
+    // CI exécute les tests AVANT `vite build` : sans build/assets, seule la
+    // partie source est vérifiable — le check bundle est couvert par les cas
+    // négatifs ci-dessus sur fixtures.
+    const hasBuild = fs.existsSync(path.join(repo, 'build', 'assets'));
+    const result = runApiSplitCheck({ root: repo });
+    if (!hasBuild) {
+      // Sans bundle, seule la partie source est vérifiable : le check échoue
+      // proprement sur « build/assets introuvable » (cas couvert), sans
+      // aucune erreur de contrat source.
+      expect(result.ok).toBe(false);
+      expect(result.errors.join('\n')).toMatch(/build\/assets\/? introuvable/);
+      expect(result.errors.join('\n')).not.toMatch(/services\/apiEndpoints/);
+      return;
+    }
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
   });

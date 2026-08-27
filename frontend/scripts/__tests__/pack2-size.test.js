@@ -81,7 +81,17 @@ describe('check-pack2-chunks : mesureur de poids des dictionnaires', () => {
   });
 
   it('runPack2Check est vert sur le build courant (aucune fusion, aucun dépassement)', () => {
-    const result = runPack2Check({ root: path.resolve(__dirname, '../..') });
+    const repo = path.resolve(__dirname, '../..');
+    // CI exécute les tests AVANT `vite build` : si build/assets n'existe pas,
+    // le check bundle est inapplicable — on ne teste que la partie source
+    // (l'échec sur build absent est couvert par le cas négatif ci-dessus).
+    const hasBuild = fs.existsSync(path.join(repo, 'build', 'assets'));
+    const result = runPack2Check({ root: repo });
+    if (!hasBuild) {
+      expect(result.ok).toBe(false); // build/assets introuvable → échec attendu
+      expect(result.errors.join('\n')).toMatch(/build\/assets/);
+      return;
+    }
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
     // Chaque scope du dépôt est mesuré et rapporté.

@@ -153,9 +153,10 @@ jobs:
       # actionlint : validité syntaxe ET sémantique de ci.yml (expressions
       # ${{ }}, if:, needs, uses, concurrency...). L'action officielle scane
       # .github/workflows/*.yml — si CI lui-même est invalide à un commit, ce
-      # job échoue (le garde-fou se teste lui-même).
+      # job échoue (le garde-fou se teste lui-même). Tag ÉPINGLÉ (v1.7.12) :
+      # le dépôt rhysd/actionlint ne publie pas de tag flottant « v1 ».
       - name: Lint workflows (actionlint)
-        uses: rhysd/actionlint@v1
+        uses: rhysd/actionlint@v1.7.12
 
       # shellcheck (pré-installé sur ubuntu-latest) : analyse statique des
       # scripts shell du dépôt. Échoue sur les erreurs (les warnings restent
