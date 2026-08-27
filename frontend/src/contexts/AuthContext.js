@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { authAPI, handleApiError } from '../services/api';
+import { authAPI, handleApiError, markSoftRedirectConsumed } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
@@ -113,6 +113,22 @@ export function AuthProvider({ children }) {
   // ReferenceError (TDZ « Cannot access 'loadUser' before initialization »)
   // au premier rendu d'AuthProvider : écran blanc sur toute l'app.
   const loadUserRef = useRef();
+
+  // Signal d'expiration de session émis par api.js (handleUnauthorized) pour
+  // les 401 non métier sans cookie de repli. Au lieu d'un plein rechargement
+  // vers /login (flicker + URL finale ambiguë pour Lighthouse), on vide
+  // user=null ici : ProtectedRoute réalise alors une redirection SPA douce
+  // (<Navigate> React) — l'état React est conservé et LHCI audite l'URL
+  // initiale sans la voir basculer sur /login par un window.location hard.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onSessionExpired = () => {
+      markSoftRedirectConsumed();
+      setUser(null);
+    };
+    window.addEventListener('kojo:unauthorized', onSessionExpired);
+    return () => window.removeEventListener('kojo:unauthorized', onSessionExpired);
+  }, []);
 
   useEffect(() => {
     // Amorçage de session au démarrage de l'app.

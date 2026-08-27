@@ -1,4 +1,4 @@
-import { jobsAPI } from '../services/api';
+import { jobsAPI } from '../services/apiEndpoints';
 
 const normalizeComparableId = (value) => {
   if (value === null || value === undefined) return '';

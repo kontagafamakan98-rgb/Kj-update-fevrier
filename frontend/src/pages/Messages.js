@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Send, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { messagesAPI, handleApiError } from '../services/api';
+import { messagesAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
 import { ListSkeleton } from '../components/SkeletonLoader';
-import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/messages';
 import { safeLog } from '../utils/env';
 import { stripJobMarkerFromMessage } from '../utils/jobProposalWorkflow';
 import { usePageTitle } from '../utils/seo';
@@ -28,7 +30,7 @@ export default function Messages() {
 
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'messages');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   usePageTitle(t('messagesMetaTitle'));
 
   useEffect(() => {
@@ -173,7 +175,7 @@ export default function Messages() {
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[70vh] flex">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[75vh] flex">
           <div className="w-full sm:w-1/3 border-r border-gray-100 p-4">
             <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
             <ListSkeleton count={4} type="message" />

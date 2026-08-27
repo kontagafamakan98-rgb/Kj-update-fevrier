@@ -2,11 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import MobilePhotoTest from '../components/MobilePhotoTest';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/mobileTest';
 
 export default function MobileTest() {
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'mobileTest');
+  const pageT = makeScopedTranslator(currentLanguage, t);
 
   return (
     <div className="min-h-screen bg-gray-50">

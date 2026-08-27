@@ -199,7 +199,7 @@ function AppRoutes() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
+    <div className="min-h-screen bg-gray-50 relative flex flex-col">
       {/* Network Status and Offline Indicator */}
       <NetworkStatus />
       <OfflineIndicator />
@@ -213,8 +213,15 @@ function AppRoutes() {
       {/* Geolocation Popup */}
       <CountryChangePopup />
 
-      {/* Main Content with Suspense for lazy loaded routes */}
-      <main className="pb-24 md:pb-0">
+      {/* Main Content with Suspense for lazy loaded routes.
+          flex-1 : le contenu s'étire pour combler l'espace libre sous la
+          navbar. Combiné au flex-col du conteneur, le LegalFooter reste
+          ANCRÉ en bas de la viewport tant que le contenu ne dépasse pas —
+          quand les données arrivent (skeleton → contenu réel), le footer ne
+          bouge plus verticalement → élimine le CLS mesuré (0.129 volet
+          Dashboard, 0.112 Profile) causé par le footer qui accompagnait la
+          hauteur du contenu en chargement. */}
+      <main className="flex-1 pb-24 md:pb-0">
         <Suspense fallback={<PageSkeleton />}>
           <Routes>
             {/* Public routes - eagerly loaded */}

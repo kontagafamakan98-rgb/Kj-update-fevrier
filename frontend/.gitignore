@@ -10,6 +10,11 @@
 
 # production
 /build
+# Fonction Vercel générée à CHAQUE build par vite.config.js (plugin
+# generate-og-jobs-function) : le HTML final embarqué (CSS inliné + assets
+# hashés) change à chaque build — committer ce fichier créerait des
+# références d'assets périmées.
+/api/og-jobs/
 
 # misc
 .DS_Store

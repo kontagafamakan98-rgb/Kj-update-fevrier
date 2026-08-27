@@ -8,7 +8,14 @@
  * Sans ces variables, toutes les fonctions sont des no-op : aucun impact
  * sur le bundle au-delà du package installé.
  */
-import * as Sentry from '@sentry/react';
+// @sentry/react est importé DYNAMIQUEMENT (et uniquement si activé) : le
+// chunk vendor-sentry (~84 kB / 29 kB gzip) ne fait plus partie du chemin
+// critique du boot — il n'est téléchargé que si VITE_SENTRY_ENABLED=true.
+let _sentryPromise = null;
+const getSentry = () => {
+  if (!_sentryPromise) _sentryPromise = import('@sentry/react');
+  return _sentryPromise;
+};
 
 const isSentryEnabled = () => {
   if (typeof import.meta === 'undefined' || !import.meta.env) return false;
@@ -18,8 +25,9 @@ const isSentryEnabled = () => {
   );
 };
 
-export function initSentry() {
+export async function initSentry() {
   if (!isSentryEnabled()) return;
+  const Sentry = await getSentry();
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     environment: import.meta.env.MODE || 'production',
@@ -39,29 +47,33 @@ export function initSentry() {
   });
 }
 
-export function captureError(error, context = {}) {
+export async function captureError(error, context = {}) {
   if (!isSentryEnabled()) return;
+  const Sentry = await getSentry();
   Sentry.captureException(error, { extra: context });
 }
 
-export function captureMessage(message, level = 'info') {
+export async function captureMessage(message, level = 'info') {
   if (!isSentryEnabled()) return;
+  const Sentry = await getSentry();
   Sentry.captureMessage(message, level);
 }
 
-export function setUser(user) {
+export async function setUser(user) {
   if (!isSentryEnabled() || !user) return;
   // PRIVACITÉ : on n'envoie JAMAIS d'identifiants personnels (email, nom,
   // téléphone) à Sentry — uniquement l'identifiant interne et le pays, pour
   // pouvoir diagnostiquer sans exposer de PII (même politique que le backend
   // avec send_default_pii=False).
+  const Sentry = await getSentry();
   Sentry.setUser({
     id: user.id,
     country: user.country,
   });
 }
 
-export function addBreadcrumb(message, category = 'general', level = 'info', data = {}) {
+export async function addBreadcrumb(message, category = 'general', level = 'info', data = {}) {
   if (!isSentryEnabled()) return;
+  const Sentry = await getSentry();
   Sentry.addBreadcrumb({ message, category, level, data });
 }

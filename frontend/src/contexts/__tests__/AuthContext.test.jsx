@@ -13,7 +13,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 
 // --- Mocks : isole AuthProvider du réseau, du réseau-optimizer et du push ---
 
@@ -24,7 +24,13 @@ vi.mock('../../services/api', () => ({
     logout: vi.fn(),
   },
   handleApiError: (error) => (error?.message || 'Erreur'),
+  // Le signal de redirection douce consommé par AuthContext (appelé dans le
+  // listener 'kojo:unauthorized'). Export réel de api.js — mocké en no-op,
+  // le comportement est couvert par le test dédié "kojo:unauthorized".
+  markSoftRedirectConsumed: vi.fn(),
 }));
+
+import { markSoftRedirectConsumed } from '../../services/api';
 
 // Réseau « bon » : loadUser doit appeler /auth/me (pas le chemin cache pauvre).
 vi.mock('../../utils/networkOptimizer', () => ({
@@ -137,5 +143,24 @@ describe('AuthContext — cohérence du snapshot localStorage user', () => {
 
     await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('none'));
     expect(localStorage.getItem('user')).toBeNull();
+  });
+
+  it('le signal kojo:unauthorized vide user (redirection SPA douce, sans rechargement)', async () => {
+    // Session valide au départ : l'utilisateur est connecté côté React.
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+    renderProvider();
+    await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
+    markSoftRedirectConsumed.mockClear();
+
+    // api.js (handleUnauthorized) émet l'événement quand un 401 non métier
+    // survient sans cookie de repli. Le listener d'AuthContext vider user=null
+    // SYNCHRONEMENT → ProtectedRoute fera un <Navigate> SPA, pas un
+    // rechargement complet (anti-flicker, URL finale stable pour LHCI).
+    act(() => {
+      window.dispatchEvent(new Event('kojo:unauthorized'));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('none'));
+    expect(markSoftRedirectConsumed).toHaveBeenCalled();
   });
 });

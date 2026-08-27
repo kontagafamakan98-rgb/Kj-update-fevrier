@@ -20,9 +20,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import OwnerService from '../services/ownerService';
 const PreciseLocationDemo = lazy(() => import('../components/PreciseLocationDemo'));
-import { jobsAPI } from '../services/api';
-import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { jobsAPI } from '../services/apiEndpoints';
+import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/dashboard';
 import { safeLog } from '../utils/env';
+import { Skeleton } from '../components/SkeletonLoader';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -37,7 +39,7 @@ export default function Dashboard() {
 
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'dashboard');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const locale = useMemo(() => getLocaleForLanguage(currentLanguage), [currentLanguage]);
 
   useEffect(() => {
@@ -135,14 +137,16 @@ export default function Dashboard() {
     { key: 'tutoring', icon: GraduationCap }
   ];
 
+  // Squelette de chargement : reproduit la STRUCTURE EXACTE de la page (mêmes
+  // conteneurs, paddings, grilles et hauteurs) pour que le passage aux données
+  // réelles ne déplace AUCUN élément → réduit le CLS (mesuré 0.149 avant).
+  // Le bloc bannière/quick-actions/catégories est statique (aucune donnée) :
+  // seul le header d'accueil + les 4 cartes + la liste récente dépendent des
+  // jobs API. On reserve donc leur hauteur.
   if (loading) {
+    const cardWrappers = Array.from({ length: 4 });
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">{pageT('loading')}</p>
-        </div>
-      </div>
+      <SkeletonDashboardShell t={t} pageT={pageT} cardWrappers={cardWrappers} />
     );
   }
 
@@ -303,6 +307,91 @@ export default function Dashboard() {
               {user?.user_type === 'client' ? t('noJobsPosted') : t('noJobsAvailable')}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Squelette du Dashboard : mêmes conteneurs/grid/paddings que le rendu réel
+// pour que l'apparition des données ne déplace rien (anti-CLS). Le contenu
+// dépendant des jobs API (header d'accueil, 4 cartes stat, liste récente) est
+// remplacé par des blocs skeleton de hauteur identique.
+function SkeletonDashboardShell({ t, pageT, cardWrappers }) {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header d'accueil */}
+      <div className="mb-8">
+        <Skeleton className="h-8 w-64 max-w-full" />
+        <div className="mt-2">
+          <Skeleton className="h-4 w-80 max-w-full" />
+        </div>
+      </div>
+
+      {/* 4 cartes statistiques : même grille que le rendu final */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {cardWrappers.map((_, index) => (
+          <div key={index} className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <Skeleton className="h-4 w-20" />
+                <div className="mt-3">
+                  <Skeleton className="h-7 w-28" />
+                </div>
+              </div>
+              <Skeleton className="h-12 w-12 rounded-xl" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Section quick-actions : conteneur stable, contenu skeleton */}
+      <div className="bg-white rounded-lg shadow mb-8">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
+              <Skeleton className="h-11 w-11 rounded-xl" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+            <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
+              <Skeleton className="h-11 w-11 rounded-xl" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+            <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
+              <Skeleton className="h-11 w-11 rounded-xl" />
+              <Skeleton className="h-4 w-28" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Liste récente : header + lignes skeleton */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <div className="divide-y divide-gray-200">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-1/3 max-w-xs" />
+                  <div className="mt-2">
+                    <Skeleton className="h-3 w-full max-w-lg" />
+                  </div>
+                  <div className="flex items-center mt-3 space-x-4">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                </div>
+                <Skeleton className="h-5 w-5" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

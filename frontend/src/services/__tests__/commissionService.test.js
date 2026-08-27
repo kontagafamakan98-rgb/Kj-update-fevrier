@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CommissionService from '../commissionService';
-import { paymentAPI } from '../api';
+import { paymentAPI } from '../apiEndpoints';
 
 // Fragilité corrigée : COMMISSION_RATE=0.14 était codé en dur, alors que le
 // backend expose le taux EFFECTIF (/payments/config → commission_rate_percent,

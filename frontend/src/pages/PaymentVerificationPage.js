@@ -8,7 +8,7 @@ import CountryDisplay from '../components/CountryDisplay';
 import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry } from '../services/geolocationService';
 import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/paymentVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
 
@@ -17,7 +17,7 @@ const PaymentVerificationPage = () => {
   const location = useLocation();
   const { autoLoginAfterRegistration, loadUser, user: authUser } = useAuth();
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'paymentVerification');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const toast = useToast();
 
   const getUserTypeLabel = (userType) => t(userType) || userType;

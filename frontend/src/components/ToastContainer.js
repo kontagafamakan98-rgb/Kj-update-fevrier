@@ -1,7 +1,7 @@
 import React from 'react';
 import { useToast } from '../contexts/ToastContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeToastTranslator } from '../utils/toastScopedI18n';
 
 const ToastContainer = () => {
   const { toasts, removeToast } = useToast();
@@ -55,7 +55,7 @@ const ToastContainer = () => {
 
   const getToastMessage = (toast) => {
     if (toast?.messageKey && toast?.scope) {
-      const scopedT = makeScopedTranslator(currentLanguage, t, toast.scope);
+      const scopedT = makeToastTranslator(currentLanguage, t, toast.scope);
       return scopedT(toast.messageKey, toast.params || {});
     }
 

@@ -8,7 +8,7 @@ import {
   getLocalLanguageForCountry 
 } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
-import { normalizeCountryCode } from '../utils/pack2PageI18n';
+import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
 import FlagIcon from './FlagIcon';
 
 const COUNTRY_PREFERENCE_KEYS = {

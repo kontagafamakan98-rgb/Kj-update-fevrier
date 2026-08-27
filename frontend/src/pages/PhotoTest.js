@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import ProfilePhoto from '../components/ProfilePhoto';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/photoTest';
 import { devLog } from '../utils/env';
 
 export default function PhotoTest() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'photoTest');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const [testResults, setTestResults] = useState([]);
 
   const testUser = user || {

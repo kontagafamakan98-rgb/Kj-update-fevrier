@@ -3,7 +3,7 @@
  * Always uses backend for shared storage, no localStorage dependency
  */
 
-import { usersAPI } from './api';
+import { usersAPI } from './apiEndpoints';
 import { buildBackendUrl } from '../utils/backendUrl';
 import { safeLog } from '../utils/env';
 

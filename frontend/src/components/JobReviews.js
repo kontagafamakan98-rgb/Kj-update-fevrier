@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { reviewAPI, handleApiError } from '../services/api';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { reviewAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/jobReviews';
 import { safeLog } from '../utils/env';
 
 /**
@@ -15,7 +16,7 @@ import { safeLog } from '../utils/env';
 export default function JobReviews({ jobId }) {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'jobReviews');
+  const pageT = makeScopedTranslator(currentLanguage, t);
 
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -5,15 +5,16 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import ConfirmModal from '../components/ConfirmModal';
 import ProposalModal from '../components/ProposalModal';
-import { jobsAPI } from '../services/api';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { jobsAPI } from '../services/apiEndpoints';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/jobDetails';
 import { safeLog } from '../utils/env';
 import { deleteJobWithFallbacks } from '../utils/jobOwnerDeleteRuntime';
 import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser, normalizeComparableId } from '../utils/jobPageSafeHelpers';
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
+import { Skeleton } from '../components/SkeletonLoader';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
-import { usePageTitle, usePageOpenGraph } from '../utils/seo';
+import { usePageTitle, usePageOpenGraph, ogImageUrl } from '../utils/seo';
 import {
   extractProposalId,
   extractProposalMessage,
@@ -156,7 +157,7 @@ export default function JobDetails() {
   const { id } = useParams();
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'jobDetails');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const toast = useToast();
   const navigate = useNavigate();
   usePageTitle(job?.title ? `${job.title} — Kojo` : t('jobDetailsTitleFallback'));
@@ -167,6 +168,10 @@ export default function JobDetails() {
     description: job?.description
       ? `${job.description.slice(0, 150)}${job.description.length > 150 ? '…' : ''}`
       : 'Trouvez des services et travailleurs en Afrique de l\'Ouest : plomberie, électricité, mécanique, construction.',
+    // Carte OG DYNAMIQUE générée par le backend (Pillow) : PNG 1200x630 avec
+    // le TITRE RÉEL de la mission. Le rewrite Vercel /api/* → Fly achemine
+    // l'appel ; le crawler récupère une vraie image (pas une data: URL).
+    image: id ? ogImageUrl(`/api/og/jobs/${id}.png`) : undefined,
   });
 
   useEffect(() => {
@@ -515,9 +520,56 @@ export default function JobDetails() {
   };
 
   if (loading) {
+    // Skeleton structuré : réplique la hauteur du contenu réel (bouton
+    // retour + carte en-tête + carte description + sidebar info/client)
+    // pour que le footer ancré (flex-1, cf. App.js) ne remonte pas au swap
+    // spinner → contenu — le spinner 50vh laissait le footer remonter de
+    // ~50vh au chargement (CLS résiduel ~0.034 sur JobDetails).
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500"></div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Skeleton className="h-6 w-28 mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <Skeleton className="h-8 w-3/4" />
+              <div className="flex items-center gap-3 mt-3">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mt-6">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-9 w-32" />
+              </div>
+              <div className="flex flex-wrap gap-3 mt-6">
+                <Skeleton className="h-12 w-36 rounded-xl" />
+                <Skeleton className="h-12 w-28 rounded-xl" />
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-4/6" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <Skeleton className="h-6 w-32 mb-4" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-1/2 mt-2" />
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <Skeleton className="h-6 w-24 mb-4" />
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-12 w-12 rounded-full" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

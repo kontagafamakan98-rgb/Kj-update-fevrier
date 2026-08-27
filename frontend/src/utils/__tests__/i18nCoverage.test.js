@@ -7,7 +7,37 @@ import en from '../../i18n/en.json';
 import wo from '../../i18n/wo.json';
 import bm from '../../i18n/bm.json';
 import mos from '../../i18n/mos.json';
-import { makeScopedTranslator } from '../pack2PageI18n';
+// Depuis le découpage par scope (pack2PageI18n/), chaque page importe le
+// module de SON scope : on importe statiquement tous les modules pour
+// résoudre les clés pageT() comme le fait le code réel.
+import { makeScopedTranslator as commissionDashboardT } from '../pack2PageI18n/commissionDashboard';
+import { makeScopedTranslator as dashboardT } from '../pack2PageI18n/dashboard';
+import { makeScopedTranslator as emailVerificationT } from '../pack2PageI18n/emailVerification';
+import { makeScopedTranslator as jobDetailsT } from '../pack2PageI18n/jobDetails';
+import { makeScopedTranslator as jobReviewsT } from '../pack2PageI18n/jobReviews';
+import { makeScopedTranslator as jobsT } from '../pack2PageI18n/jobs';
+import { makeScopedTranslator as messagesT } from '../pack2PageI18n/messages';
+import { makeScopedTranslator as mobileTestT } from '../pack2PageI18n/mobileTest';
+import { makeScopedTranslator as paymentVerificationT } from '../pack2PageI18n/paymentVerification';
+import { makeScopedTranslator as photoTestT } from '../pack2PageI18n/photoTest';
+import { makeScopedTranslator as profileT } from '../pack2PageI18n/profile';
+import { makeScopedTranslator as registerT } from '../pack2PageI18n/register';
+
+// Map scope → makeScopedTranslator du module correspondant.
+const SCOPE_MODULES = {
+  commissionDashboard: commissionDashboardT,
+  dashboard: dashboardT,
+  emailVerification: emailVerificationT,
+  jobDetails: jobDetailsT,
+  jobReviews: jobReviewsT,
+  jobs: jobsT,
+  messages: messagesT,
+  mobileTest: mobileTestT,
+  paymentVerification: paymentVerificationT,
+  photoTest: photoTestT,
+  profile: profileT,
+  register: registerT,
+};
 
 // Ce test complète i18nParity.test.js : ce dernier vérifie que les 5 langues
 // contiennent les MÊMES clés, mais pas que chaque appel t()/pageT() du code
@@ -54,11 +84,15 @@ function collectCalls(source) {
   }));
 }
 
-// Scope littéral d'un makeScopedTranslator(..., 'scope'). Les scopes dynamiques
-// (ex. ToastContainer avec toast.scope) sont ignorés.
+// Scope du fichier : le module de scope est identifié par son import
+// `from '.../pack2PageI18n/<scope>'` (le découpage par scope a retiré le
+// 3e argument littéral de l'appel). Un fichier sans cet import n'a pas de
+// pageT scopé (t() global uniquement). Le module 'core' (helpers partagés
+// getLocaleForLanguage / normalizeCountryCode) n'est pas un scope.
 function findScope(source) {
-  const m = source.match(/makeScopedTranslator\([^)]*,\s*(?:t|fallbackT)\s*,\s*['"]([a-zA-Z_][a-zA-Z0-9_]*)['"]\s*\)/);
-  return m ? m[1] : null;
+  const m = source.match(/from '[^']*\/pack2PageI18n\/([a-zA-Z_][a-zA-Z0-9_]*)'/);
+  const scope = m ? m[1] : null;
+  return scope === 'core' ? null : scope;
 }
 
 describe('i18n coverage des appels t() / pageT()', () => {
@@ -92,12 +126,18 @@ describe('i18n coverage des appels t() / pageT()', () => {
       const source = fs.readFileSync(file, 'utf8');
       const scope = findScope(source);
       if (!scope) continue;
+      const makeT = SCOPE_MODULES[scope];
+      if (!makeT) {
+        // Module de scope inconnu : le test doit être mis à jour.
+        throw new Error(`Scope inconnu dans i18nCoverage.test.js : '${scope}' (${path.relative(SRC_ROOT, file)})`);
+      }
 
       for (const { kind, key } of collectCalls(source)) {
         if (kind !== 'pageT') continue;
         for (const lang of LANGS) {
-          // Résolution réelle (makeScopedTranslator) : clé brute = manquante.
-          const resolved = makeScopedTranslator(lang, globalT(lang), scope)(key);
+          // Résolution réelle (makeScopedTranslator du module de scope) :
+          // clé brute = manquante.
+          const resolved = makeT(lang, globalT(lang))(key);
           if (resolved === key) {
             missing.add(`${path.relative(SRC_ROOT, file)}: pageT('${key}') [scope ${scope}, lang ${lang}]`);
           }

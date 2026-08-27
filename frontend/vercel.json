@@ -15,6 +15,50 @@
       "source": "/robots.txt",
       "destination": "https://kojo-backend.fly.dev/api/robots.txt"
     },
+    {
+      "source": "/jobs",
+      "destination": "/jobs.html"
+    },
+    {
+      "source": "/jobs/",
+      "destination": "/jobs.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/login/",
+      "destination": "/login.html"
+    },
+    {
+      "source": "/register",
+      "destination": "/register.html"
+    },
+    {
+      "source": "/register/",
+      "destination": "/register.html"
+    },
+    {
+      "source": "/forgot-password",
+      "destination": "/forgot-password.html"
+    },
+    {
+      "source": "/forgot-password/",
+      "destination": "/forgot-password.html"
+    },
+    {
+      "source": "/payment",
+      "destination": "/payment.html"
+    },
+    {
+      "source": "/payment/",
+      "destination": "/payment.html"
+    },
+    {
+      "source": "/jobs/(.*)",
+      "destination": "/api/og-jobs/$1"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

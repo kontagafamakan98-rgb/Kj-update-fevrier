@@ -137,6 +137,34 @@ jobs:
           node scripts/audit_api_returns.cjs --fail-on-warning
           echo "✓ Baseline : audits, py_compile et pyflakes passent sans régression injectée"
 
+  # ─── Garde-fou permanent des workflows : actionlint + shellcheck ─────────
+  # S'exécute à CHAQUE push/PR (comme le reste du workflow) : un changement de
+  # workflow invalide (syntaxe YAML cassée, expression ${{ }} erronée, chemin
+  # de step/needs inconnu, script shell buggé) fait échouer le run AVANT toute
+  # conséquence. Actionlint embarque les problem matchers (annotations inline
+  # sur les fichiers concernés).
+  workflow-lint:
+    name: Workflow lint (actionlint + shellcheck)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # actionlint : validité syntaxe ET sémantique de ci.yml (expressions
+      # ${{ }}, if:, needs, uses, concurrency...). L'action officielle scane
+      # .github/workflows/*.yml — si CI lui-même est invalide à un commit, ce
+      # job échoue (le garde-fou se teste lui-même).
+      - name: Lint workflows (actionlint)
+        uses: rhysd/actionlint@v1
+
+      # shellcheck (pré-installé sur ubuntu-latest) : analyse statique des
+      # scripts shell du dépôt. Échoue sur les erreurs (les warnings restent
+      # informatifs — comportement par défaut de shellcheck).
+      - name: Lint shell scripts (shellcheck)
+        run: |
+          shellcheck .github/scripts/*.sh
+          shellcheck backend/scripts/*.sh
+
   # ─── Backend : tests Python (FakeDB + vrai MongoDB) ──────────────────────
   backend-tests:
     name: Backend tests (Python + MongoDB)
@@ -230,11 +258,168 @@ jobs:
           VITE_API_URL: https://kojo-backend.fly.dev/api
         run: npm run build
 
+      # Vérifie le PRÉ-RENDU par route dans les artefacts de build : jobs.html
+      # et login.html doivent contenir leur shell statique (h1/formulaire →
+      # LCP avant React) + og:image dédié, et index.html doit garder #root
+      # VIDE. Échoue le job en cas de régression silencieuse (plugin de
+      # pré-rendu désactivé, shell perdu, contenu ajouté à l'index).
+      - name: Check prerender shells (jobs/login html)
+        working-directory: frontend
+        run: node scripts/check-prerender-shells.js
+
+      # Régression « chunk partagé pack2PageI18n » : le découpage par scope
+      # (un dictionnaire par page lazy) ne doit pas réapparaître comme chunk
+      # commun portant ≥ 3 dictionnaires (l'ancien monolithe ~60 kB chargé
+      # par toutes les pages secondaires). Échoue le job si une fusion de
+      # dictionnaires est détectée dans les chunks buildés.
+      - name: Check pack2PageI18n chunk splitting (build)
+        working-directory: frontend
+        run: node scripts/check-pack2-chunks.js
+
+      # Garde-fou du découpage services/api vs services/apiEndpoints : les
+      # groupes d'endpoints LAZY (jobsAPI, usersAPI, paymentAPI…) doivent
+      # rester confinés dans apiEndpoints — importés uniquement par les pages
+      # lazy. Échoue le job si un fichier ré-importe un groupe lazy depuis
+      # services/api (niveau source), si un marqueur URL lazy réapparaît dans
+      # le chunk d'entrée index-*.js (niveau bundle), ou si un marqueur core
+      # (auth/me, login…) disparaît du shell.
+      - name: Check services/api split (lazy groups out of entry chunk)
+        working-directory: frontend
+        run: node scripts/check-api-split.js
+
       - name: Check bundle size
         working-directory: frontend
         run: |
           BUILD_SIZE=$(du -sh build/ | cut -f1)
           echo "Bundle size: $BUILD_SIZE"
+
+  # ─── Performance : budgets Lighthouse CI (accueil + pages protégées) ─────
+  # Audite le DÉPLOIEMENT VERCEL RÉEL en condition mobile simulée (Slow 4G
+  # + CPU 4x) et BLOQUE la PR si un budget est dépassé.
+  #
+  # URLs auditées (multi-URL, cf. frontend/lighthouserc.cjs) :
+  #   • /          — accueil (publique)
+  #   • /dashboard, /jobs, /profile — pages PROTÉGÉES, authentifiées via un
+  #     token Bearer obtenu en se connectant avec le COMPTE CLIENT DÉDIÉ CI
+  #     (secrets LHCI_CI_EMAIL / LHCI_CI_PASSWORD). Ce compte est distinct des
+  #     comptes de test e2e partagés (README) : il n'est jamais touché à la
+  #     main, donc les pages auditées ont un état déterministe et les budgets
+  #     Lighthouse restent stables d'un run à l'autre. Les identifiants ne sont
+  #     JAMAIS en clair dans le workflow ni dans le repo.
+  #
+  # Résolution de l'URL cible SANS VERCEL_TOKEN (seul FLY_API_TOKEN existait
+  # dans les secrets, on a depuis ajouté LHCI_TEST_*) :
+  #   • pull_request → l'app GitHub « Vercel » poste un commentaire avec
+  #     l'URL de preview ; on la lit via l'API GitHub (GITHUB_TOKEN auto).
+  #   • main (push) → URL de production kj-update-fevrier.vercel.app.
+  #   • Sinon → repli sur le build local servi statiquement (contenu
+  #     identique au déploiement).
+  lighthouse-ci:
+    name: Lighthouse performance budgets
+    runs-on: ubuntu-latest
+    needs: frontend-build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Même env que le job frontend-build : l'app appelle le backend prod
+      # en cross-origin pendant l'audit (les requêtes vers Fly sont réelles).
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://kojo-backend.fly.dev/api
+        run: npm run build
+
+      # Résout l'URL du déploiement Vercel à auditer : commentaire Vercel
+      # de la PR (API GitHub, sans token supplémentaire) ou URL de prod sur
+      # main. Sortie LHCI_URL → lighthouserc.cjs l'utilise comme collect.url
+      # (repli build local si non résolue). Logique dans
+      # .github/scripts/resolve-vercel-url.sh.
+      - name: Resolve Vercel deployment URL
+        id: vercel-url
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/resolve-vercel-url.sh
+
+      # Authentifie les pages protégées : se connecte au backend prod avec le
+      # COMPTE CLIENT DÉDIÉ CI (secrets LHCI_CI_EMAIL/LHCI_CI_PASSWORD) et
+      # stocke le token Bearer dans LHCI_AUTH_HEADER. Ce compte est isolé des
+      # comptes e2e partagés → l'état audité (/dashboard,/jobs,/profile) est
+      # déterministe. Pendant la transition, on retombe sur les anciens
+      # secrets LHCI_TEST_* s'ils sont encore définis. Les pages reçoivent cet
+      # en-tête lors du collect → le shell React les rend authentifiées
+      # (sinon /auth/me → 401 et redirection vers /login).
+      - name: Authenticate CI test account (fetch Bearer token)
+        id: ci-auth
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
+        run: |
+          EMAIL="${LHCI_CI_EMAIL:-$LHCI_TEST_EMAIL}"
+          PASSWORD="${LHCI_CI_PASSWORD:-$LHCI_TEST_PASSWORD}"
+          if [ -z "$EMAIL" ]; then
+            echo "::error::Secrets LHCI_CI_EMAIL/LHCI_CI_PASSWORD (ou LHCI_TEST_* en transition) non définis — les pages protégées ne seront pas auditées"
+            exit 1
+          fi
+          LOGIN_JSON=$(curl -sS -X POST "https://kojo-backend.fly.dev/api/auth/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
+          TOKEN=$(printf '%s' "$LOGIN_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Login du compte CI dédié échoué (vérifier les secrets) — réponse: ${LOGIN_JSON:0:200}"
+            exit 1
+          fi
+          # JSON sérialisé pour l'env : {\"Authorization\": \"Bearer <token>\"}
+          AUTH_HEADER=$(python3 -c "import json,sys; print(json.dumps({'Authorization': 'Bearer ' + sys.argv[1]}))" "$TOKEN")
+          echo "LHCI_AUTH_HEADER=$AUTH_HEADER" >> "$GITHUB_ENV"
+          echo "Token récupéré (${#TOKEN} chars, compte: $EMAIL)"
+
+      # Vérifie que chaque page auditée sert un og:image ABSOLU et spécifique
+      # par route — le HTML servi est exactement ce que reçoit un crawler sans
+      # JS (le pré-rendu OG). Échoue le job (→ PR bloquée) si un og:image est
+      # absent, relatif, ou ne correspond pas à la carte attendue de la route
+      # (/, /jobs, /login). LHCI_URL (résolue plus haut) est lue par le script
+      # via process.env ; sans elle, repli sur le build local.
+      - name: Check OG images per route (crawler view)
+        working-directory: frontend
+        run: node scripts/check-og-images.js
+
+      # ubuntu-latest embarque Google Chrome : chrome-launcher le détecte
+      # automatiquement (pas d'action d'installation nécessaire). LHCI_URL
+      # (si définie) fait auditer l'URL Vercel réelle, sinon le build local.
+      # LHCI_AUTH_HEADER authentifie les pages /dashboard,/jobs,/profile.
+      - name: Run Lighthouse CI (collect + assert, budgets bloquants)
+        working-directory: frontend
+        # LHCI_URL et LHCI_AUTH_HEADER sont dans l'env via $GITHUB_ENV (steps
+        # précédents) — lhci autorun lit process.env.LHCI_AUTH_HEADER.
+        run: npx lhci autorun --config=lighthouserc.cjs
+
+      # Rapports consultables dans les artifacts du run (utile pour
+      # diagnostiquer un échec de budget). Toujours uploadés, même si le
+      # job échoue (if: always()).
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: frontend/lhci-reports
 
   # ─── Mobile : Capacitor sync + build Android debug ───────────────────────
   mobile-build:

@@ -41,11 +41,11 @@ vi.mock('../../services/ProfilePhotoService', () => ({
 import { LanguageProvider } from '../../contexts/LanguageContext';
 import { ProfileEditForm } from '../Profile';
 import fr from '../../i18n/fr.json';
-import { makeScopedTranslator } from '../../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../../utils/pack2PageI18n/profile';
 
 const t = (key) => fr[key] ?? key;
 // Même construction que la page Profile : pageT = traducteur scopé 'profile'.
-const pageT = makeScopedTranslator('fr', t, 'profile');
+const pageT = makeScopedTranslator('fr', t);
 
 const baseProfile = {
   first_name: 'Jean',

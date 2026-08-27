@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { authAPI } from '../services/api';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/emailVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
 
@@ -13,7 +13,7 @@ const EmailVerificationPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, currentLanguage } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'emailVerification');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const toast = useToast();
 
   const persistedFlow = loadRegistrationFlow();

@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
 import FlagIcon from '../components/FlagIcon';
 import { usePageTitle } from '../utils/seo';
-import { publicAPI } from '../services/api';
+import { publicAPI } from '../services/apiEndpoints';
 import { safeLog } from '../utils/env';
 
 export default function Home() {

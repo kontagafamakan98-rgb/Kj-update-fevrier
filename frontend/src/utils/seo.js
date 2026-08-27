@@ -68,6 +68,17 @@ export const usePageTitle = (title, { description, canonical } = {}) => {
 
 export const buildPageTitle = (suffix) => (suffix ? `${suffix} — Kojo` : 'Kojo — Services et travailleurs en Afrique de l\'Ouest');
 
+// Image OG par page, servie depuis le dossier public/. On renvoie une URL
+// ABSOLUE (origine + chemin) : les crawlers de partage (LinkedIn, Facebook,
+// Twitter, WhatsApp) exigent une URL complète dans og:image — une URL
+// relative serait ignorée ou résolue de façon incohérente.
+export const ogImageUrl = (path) => {
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return `${window.location.origin}${path}`;
+  }
+  return path;
+};
+
 const DEFAULT_OG_IMAGE =
   typeof window !== 'undefined' && window.location.origin
     ? `${window.location.origin}/icons/icon-512x512.png`

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Phone, Mail, MapPin, MessageCircle, Bot, Send, CheckCircle, ArrowLeft } from 'lucide-react';
-import { supportAPI } from '../services/api';
+import { supportAPI } from '../services/apiEndpoints';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 

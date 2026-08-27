@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { jobsAPI } from '../services/api';
+import { jobsAPI } from '../services/apiEndpoints';
 import {
   buildInitialProposalConversationMessage,
   getCounterpartForWorker,

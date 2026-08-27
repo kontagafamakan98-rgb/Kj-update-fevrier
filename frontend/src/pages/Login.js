@@ -7,7 +7,8 @@ import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
 import GoogleButton from '../components/GoogleButton';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
+import { usePageTitle, usePageOpenGraph, ogImageUrl } from '../utils/seo';
 
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
@@ -38,8 +39,17 @@ export default function Login() {
     mos: 'Fo ye mot de passe wã yɩɩda ye?'
   };
   const forgotPasswordLabel = forgotPasswordLabelMap[currentLanguage] || forgotPasswordLabelMap.fr;
+
+  // SEO / OG par route : la page login a son propre titre, description et
+  // image de partage (og-login.png) — distincts de l'accueil.
+  usePageTitle(t('loginMetaTitle'));
+  usePageOpenGraph({
+    title: t('loginMetaTitle'),
+    description: t('loginMetaDescription'),
+    image: ogImageUrl('/og-login.png'),
+  });
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
-  const pageT = makeScopedTranslator(currentLanguage, t, 'register');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
 
   const handleSubmit = async (e) => {
@@ -123,7 +133,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">

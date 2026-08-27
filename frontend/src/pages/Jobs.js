@@ -5,8 +5,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import JobCreateModal from '../components/JobCreateModal';
 import { ListSkeleton } from '../components/SkeletonLoader';
-import { jobsAPI } from '../services/api';
-import { getLocaleForLanguage, makeScopedTranslator } from '../utils/pack2PageI18n';
+import { jobsAPI } from '../services/apiEndpoints';
+import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/jobs';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
 import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobPageSafeHelpers';
@@ -15,7 +16,7 @@ import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import CountrySelector from '../components/CountrySelector';
 import JobsMap from '../components/JobsMap';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
-import { usePageTitle } from '../utils/seo';
+import { usePageTitle, usePageOpenGraph, ogImageUrl } from '../utils/seo';
 
 function JobCard({ job, user, userType, appliedJobIds, t }) {
   const locationText = job.location_text || t('locationNotSpecified');
@@ -74,6 +75,77 @@ const JOB_TAB_APPLICATIONS = 'applications';
 const JOB_TAB_MISSIONS = 'missions';
 const JOBS_PAGE_SIZE = 12;
 
+// ── Préchargement PARALLÈLE de la liste publique (decouverte) ───────────────
+// Sans lui, la liste n'était demandée qu'APRÈS que le chunk lazy soit chargé,
+// que React monte le composant ET que son useEffect s'exécute — une cascade
+// réseau (chunk → boot React → fetch → rendu liste) qui retardait l'affichage
+// des jobs. On démarre la requête publique par défaut (découverte : status
+// open, 1re page) dès l'ÉVALUATION du module du chunk, donc EN PARALLÈLE du
+// boot React et du montage. Le composant réutilise le résultat au lieu d'en
+// refaire une (cf. consumePublicJobsPrefetch).
+//
+// Volontairement limité à la vue « Découvrir » publique, déterministe et sans
+// état utilisateur : les onglets « Mes candidatures » / « Mes missions » et
+// les filtres dépendent de l'utilisateur/URL, connus seulement au montage —
+// ils chargent comme avant. Un échec du préchargement est bénin : le cache
+// reste null et le composant recharge normalement.
+const PUBLIC_PREFETCH_PARAMS = { limit: JOBS_PAGE_SIZE, page: 1, status: 'open' };
+let publicJobsPrefetch = null; // { requestParams, promise } | null
+// null pendant le préchargement (en cours), un booléen ensuite. Évitée sous
+// jsdom/tests en vérifiant que l'environnement est un vrai navigateur.
+const canUseNetworkPrefetch =
+  typeof window !== 'undefined' &&
+  typeof window.localStorage !== 'undefined' &&
+  typeof navigator !== 'undefined' &&
+  !/jsdom/.test(String(navigator && navigator.userAgent));
+
+// Compare les params réels du composant à ceux du préchargement : on ne
+// réutilise le cache que pour la MÊME requête (decouverte, 1re page, open,
+// sans filtre/mine/ids). Tout écart → on recharge normalement.
+const matchesPublicPrefetch = (params) =>
+  params.limit === JOBS_PAGE_SIZE &&
+  params.page === 1 &&
+  params.status === 'open' &&
+  !params.q &&
+  !params.category &&
+  !params.mine &&
+  !params.ids;
+
+const kickPublicJobsPrefetch = () => {
+  if (!canUseNetworkPrefetch) return null;
+  if (publicJobsPrefetch && publicJobsPrefetch.promise) return publicJobsPrefetch;
+  const promise = jobsAPI
+    .getAll(PUBLIC_PREFETCH_PARAMS)
+    .then((response) => normalizeJobList(Array.isArray(response) ? response : response?.data || []))
+    .catch((error) => {
+      // Bénin : laisse le cache null pour que le composant recharge seul.
+      safeLog.warn('Public jobs prefetch failed (component will reload)', error);
+      return null;
+    });
+  publicJobsPrefetch = { requestParams: PUBLIC_PREFETCH_PARAMS, promise };
+  return publicJobsPrefetch;
+};
+
+// Consomme le préchargement depuis loadJobs : si la requête demandée
+// correspond à celle déjà lancée en parallèle ET que l'onglet réel est la
+// découverte, on l'attend au lieu d'en refaire une. Renvoie true si
+// consommé (aucun fetch nécessaire). Stores the normalized jobs + hasMore.
+const consumePublicJobsPrefetch = async (params) => {
+  if (!matchesPublicPrefetch(params)) return null;
+  if (!publicJobsPrefetch || !publicJobsPrefetch.promise) return null;
+  const jobs = await publicJobsPrefetch.promise;
+  // Réinitialise pour ne pas réutiliser ce cache sur une NAVIGATION ulterieure.
+  publicJobsPrefetch = null;
+  if (!jobs) return null; // échec → laisser loadJobs refaire sa propre requête
+  return { jobs, hasMore: jobs.length === JOBS_PAGE_SIZE };
+};
+
+// Déclencher À L'ÉTAPE MODULE : dès que le chunk lazy Jobs est évalué, la
+// requête part EN PARALLÈLE du boot React et du montage (avant tout useEffect).
+// Bénin si ce n'est pas l'onglet par défaut : le cache est consommé uniquement
+// par la vue découverte et réinitialisé après usage (une seule requête max).
+kickPublicJobsPrefetch();
+
 export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -94,11 +166,21 @@ export default function Jobs() {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const toast = useToast();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'jobs');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const jobUi = getJobUiLabel(currentLanguage);
   const [searchParams] = useSearchParams();
   const locale = getLocaleForLanguage(currentLanguage);
   usePageTitle(t('jobsMetaTitle'));
+  // OG dynamique par route : le partage d'un lien /jobs affiche une carte
+  // dédiée (og-jobs.png) avec le titre/description de la page emplois, au
+  // lieu de l'image générique de l'accueil.
+  usePageOpenGraph({
+    title: t('jobsMetaTitle'),
+    description:
+      t('jobsMetaDescription') ||
+      'Trouvez un travailleur qualifié près de chez vous : emplois, missions et talents disponibles dans toute l’Afrique de l’Ouest.',
+    image: ogImageUrl('/og-jobs.png'),
+  });
 
   // Onglet par défaut selon le type d'utilisateur : client connecté → « Mes
   // missions » (ses annonces), sinon découverte publique.
@@ -158,6 +240,21 @@ export default function Jobs() {
       // missions ») : appliqué en complément de mine= / ids=.
       if (effectiveTab !== JOB_TAB_DISCOVER && filters.status) {
         params.status = filters.status;
+      }
+
+      // Vue découverte : réutilise le préchargement parraillèle si la requête
+      // demandée est identique, sinon (premier montage où le préchargement n'a
+      // pas encore servi) lance le fetch normal. L'attente du préchargement
+      // ne marque pas loading=false plus lentement : la promise est déjà en
+      // vol, elle résout dès la réponse réseau.
+      if (!append && effectiveTab === JOB_TAB_DISCOVER) {
+        const prefetched = await consumePublicJobsPrefetch(params);
+        if (prefetched) {
+          setJobs(prefetched.jobs);
+          setPage(1);
+          setHasMore(prefetched.hasMore);
+          return;
+        }
       }
 
       const response = await jobsAPI.getAll(params);
@@ -250,10 +347,6 @@ export default function Jobs() {
     { value: 'cancelled', label: t('cancelled') },
     { value: 'pending', label: t('pending') },
   ];
-
-  if (loading) {
-    return <ListSkeleton />;
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -401,7 +494,19 @@ export default function Jobs() {
         </div>
       )}
 
-      {viewMode === 'map' ? (
+      {loading ? (
+        viewMode === 'map' ? (
+          // Placeholder à la hauteur exacte de la carte (60vh) : le swap
+          // skeleton → carte ne décale rien (anti-CLS, même principe que
+          // le skeleton de liste ci-dessous).
+          <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse bg-gray-200" style={{ height: '60vh' }} />
+        ) : (
+          // Skeleton à la hauteur de la liste RÉELLE (JOBS_PAGE_SIZE cartes) :
+          // le défaut (3 cartes) laissait le footer ancré (flex-1) remonter de
+          // ~9 cartes au swap données chargées → CLS résiduel ~0.034.
+          <ListSkeleton count={JOBS_PAGE_SIZE} />
+        )
+      ) : viewMode === 'map' ? (
         <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
           <JobsMap jobs={filteredJobs} />
         </div>

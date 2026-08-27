@@ -15,11 +15,12 @@ import TagInput from '../components/TagInput';
 import ConfirmModal from '../components/ConfirmModal';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
-import { usersAPI, reviewAPI, workerProfileAPI } from '../services/api';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { usersAPI, reviewAPI, workerProfileAPI } from '../services/apiEndpoints';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/profile';
 import { devLog, safeLog } from '../utils/env';
 import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
+import { Skeleton } from '../components/SkeletonLoader';
 
 const getLanguageLabel = (languageCode, t) => {
   const languageMap = {
@@ -54,7 +55,7 @@ export default function Profile() {
 
   const { user, loadUser, logout } = useAuth();
   const { t, currentLanguage, getAvailableLanguagesForCountry } = useLanguage();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'profile');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const toast = useToast();
   const navigate = useNavigate();
   usePageTitle(t('profileMetaTitle'));
@@ -187,12 +188,11 @@ export default function Profile() {
     }
   };
 
+  // Squelette de la carte profil : reproduit la STRUCTURE (conteneur max-w-4xl
+  // + carte blanche + header orange + sections) pour que l'arrivée des données
+  // ne déplace rien → réduit le CLS (mesuré 0.112 avant).
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
-      </div>
-    );
+    return <ProfileSkeleton t={t} pageT={pageT} />;
   }
 
   return (
@@ -978,3 +978,87 @@ function FilleulsCard({ filleuls, t }) {
     </div>
   );
 }
+
+// Squelette de la carte profil : reproduit la STRUCTURE exacte du profil
+// (conteneur max-w-4xl, carte blanche, header orange, sections) pour que
+// l'arrivée des données réelles ne déplace aucun élément → réduit le CLS
+// (mesuré 0.112 avant). Les données async (reviews, referral, portfolio,
+// workerProfile) remplissent des sections déjà dimensionnées.
+function ProfileSkeleton({ t, pageT }) {
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        {/* Header orange / photo / nom */}
+        <div className="bg-orange-600 px-6 py-8">
+          <div className="flex items-center">
+            <Skeleton className="h-20 w-20 rounded-full bg-white/30 border-2 border-white" />
+            <div className="ml-6 flex-1">
+              <Skeleton className="h-7 w-56 max-w-full bg-white/30" />
+              <div className="mt-2">
+                <Skeleton className="h-4 w-40 bg-white/30" />
+              </div>
+              <div className="mt-3">
+                <Skeleton className="h-4 w-52 bg-white/30" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section avis */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+          <div className="mt-4">
+            <Skeleton className="h-4 w-3/4 max-w-md" />
+          </div>
+        </div>
+
+        {/* Section informations personnelles */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <div className="flex justify-between items-center mb-4">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Skeleton className="h-4 w-20" />
+              <div className="mt-1">
+                <Skeleton className="h-4 w-40" />
+              </div>
+            </div>
+            <div>
+              <Skeleton className="h-4 w-20" />
+              <div className="mt-1">
+                <Skeleton className="h-4 w-40" />
+              </div>
+            </div>
+            <div>
+              <Skeleton className="h-4 w-20" />
+              <div className="mt-1">
+                <Skeleton className="h-4 w-40" />
+              </div>
+            </div>
+            <div>
+              <Skeleton className="h-4 w-20" />
+              <div className="mt-1">
+                <Skeleton className="h-4 w-40" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sections bas de carte : paiement + support */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+          <div className="mt-4">
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        </div>
+
+        <div className="px-6 pb-6">
+          <Skeleton className="h-14 w-full rounded-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+

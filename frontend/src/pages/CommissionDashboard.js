@@ -4,14 +4,14 @@ import OwnerService from '../services/ownerService';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
-import { makeScopedTranslator } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/commissionDashboard';
 import { devLog, safeLog } from '../utils/env';
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const toast = useToast();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'commissionDashboard');
+  const pageT = makeScopedTranslator(currentLanguage, t);
 
   const [stats, setStats] = useState(() => ({}));
   const [transactions, setTransactions] = useState([]);

@@ -3,6 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.ico" />
+    <!-- Favicon dédié aux surfaces SOMBRES (onglets en mode sombre, cartes
+         de partage sur fond foncé) : fond graphite + K dégradé, là où
+         l'icône claire disparaîtrait. Généré par scripts/gen-og-images.py. -->
+    <link rel="icon" media="(prefers-color-scheme: dark)" href="/icons/icon-dark.png" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
@@ -36,7 +40,28 @@
       property="og:description"
       content="Connectez-vous avec les meilleurs travailleurs en Afrique de l'Ouest. Services de qualité au Mali, Sénégal, Burkina Faso et Côte d'Ivoire."
     />
-    <meta property="og:image" content="/icons/icon-512x512.png" />
+    <!-- Image Open Graph dédiée 1200x630 (format recommandé) : générée via
+         /tmp/gen_og_image.py (dégradé hero + logo K + nom + tagline). Ne PAS
+         réutiliser l'icône 512x512 : trop petite pour les cartes de partage
+         (LinkedIn/Twitter recadrent les 1200x630 ; une image plus petite est
+         floue ou ignorée). -->
+    <!-- og:image en URL ABSOLUE : les crawlers de partage exigent une URL
+         complète dans og:image — une URL relative (/og-image-1200x630.png)
+         serait ignorée. C'est aussi le shell servi par /dashboard et
+         /profile (catch-all SPA) : leur carte de partage est donc celle-ci. -->
+    <meta property="og:image" content="https://kj-update-fevrier.vercel.app/og-image-1200x630.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <!-- Variante CARRÉE 1200x1200 pour les réseaux qui RECADRENT la carte en
+         vignette 1:1 (WhatsApp, Telegram, iMessage, LinkedIn, aperçus
+         Twitter) : composition centrée dans la zone sûre — un recadrage
+         central conserve logo + accroche. Les crawlers choisissent la
+         variante adaptée à leur rendu (dimensions déclarées). -->
+    <meta property="og:image" content="https://kj-update-fevrier.vercel.app/og-square-1200x1200.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="1200" />
+    <meta property="og:image:type" content="image/png" />
     <meta property="og:locale" content="fr_FR" />
     <meta property="og:locale:alternate" content="en_GB" />
     <meta property="og:site_name" content="Kojo" />
@@ -47,7 +72,7 @@
       name="twitter:description"
       content="Trouvez des travailleurs qualifiés pour tous vos besoins en Afrique de l'Ouest."
     />
-    <meta name="twitter:image" content="/icons/icon-512x512.png" />
+    <meta name="twitter:image" content="https://kj-update-fevrier.vercel.app/og-image-1200x630.png" />
     <link rel="manifest" href="/manifest.json?v=3" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#ea580c" />

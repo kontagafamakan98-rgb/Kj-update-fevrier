@@ -1,4 +1,4 @@
-import { paymentAPI } from './api';
+import { paymentAPI } from './apiEndpoints';
 import { devLog, safeLog } from '../utils/env';
 
 class CommissionService {

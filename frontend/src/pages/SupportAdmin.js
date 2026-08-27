@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { MessageSquareText, RefreshCcw, Phone, Mail } from 'lucide-react';
-import { supportAPI } from '../services/api';
+import { supportAPI } from '../services/apiEndpoints';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const STATUS_OPTIONS = ['Nouveau', 'En cours', 'Résolu'];

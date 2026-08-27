@@ -10,7 +10,8 @@ import RegistrationLanguageSelector from '../components/RegistrationLanguageSele
 import LoadingButton from '../components/LoadingButton';
 import GoogleButton from '../components/GoogleButton';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
-import { makeScopedTranslator, normalizeCountryCode } from '../utils/pack2PageI18n';
+import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
+import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
 import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
 import { authAPI } from '../services/api';
@@ -58,7 +59,7 @@ export default function Register() {
   const [userSelectedLanguage, setUserSelectedLanguage] = useState(defaultLanguage); // Choix utilisateur pour profil
   
   const { register, loginWithGoogle } = useAuth();
-  const pageT = makeScopedTranslator(currentLanguage, t, 'register');
+  const pageT = makeScopedTranslator(currentLanguage, t);
   const toast = useToast();
   const navigate = useNavigate();
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';

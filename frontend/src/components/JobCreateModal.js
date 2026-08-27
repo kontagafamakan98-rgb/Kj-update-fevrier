@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import TagInput from './TagInput';
-import { jobsAPI } from '../services/api';
+import { jobsAPI } from '../services/apiEndpoints';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import {
