@@ -333,6 +333,17 @@ async def db_insert(collection: str, doc: Dict):
         getattr(fake_db, collection)._docs.append(dict(doc))
 
 
+async def db_upsert(collection: str, query: Dict, update: Dict):
+    """Upsert (update_one avec upsert=True) dans la collection donnée
+    (mode indifférent). Évite les DuplicateKeyError en mode réel quand le
+    document existe déjà (ex: le circuit breaker _id="global" ré-inséré par
+    une tâche de fond)."""
+    if USE_REAL_MONGO:
+        await _srv.db[collection].update_one(query, update, upsert=True)
+    else:
+        await getattr(fake_db, collection).update_one(query, update, upsert=True)
+
+
 async def db_find_one(collection: str, query: Dict) -> Optional[Dict]:
     """find_one dans la collection donnée (mode indifférent)."""
     if USE_REAL_MONGO:

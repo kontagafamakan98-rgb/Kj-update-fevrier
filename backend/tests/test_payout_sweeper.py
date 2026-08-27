@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import BASE_USER, auth_headers, db_find_one, db_insert, register_and_login
+from tests.conftest import BASE_USER, auth_headers, db_find_one, db_insert, db_upsert, register_and_login
 
 
 def _make_payment(
@@ -578,10 +578,38 @@ class TestPaydunyaCircuitPersistence:
     jamais écrasé par un état fermé persisté par un autre worker."""
 
     async def _flush(self):
-        """Laisse la tâche d'upsert (call_soon_threadsafe) s'exécuter."""
+        """Laisse la tâche d'upsert (call_soon_threadsafe) s'exécuter.
+
+        En mode réel (Mongo), l'upsert est une vraie I/O réseau exécutée en
+        tâche de fond : `sleep(0)` ne suffit pas à la terminer. On donne la
+        main à la boucle plusieurs fois avec un vrai délai pour laisser
+        l'écriture aboutir (déterministe quel que soit le mode).
+        """
         import asyncio as _asyncio
-        for _ in range(5):
-            await _asyncio.sleep(0)
+        for _ in range(10):
+            await _asyncio.sleep(0.01)
+
+    async def _wait_for_circuit_doc(self, expected_failures=None, *, timeout: float = 5.0):
+        """Attend que le doc circuit `_id: "global"` soit persisté en base.
+
+        En mode réel, l'upsert est une I/O réseau asynchrone en tâche de
+        fond : on poll la base jusqu'à ce que l'écriture soit visible (ou
+        timeout). En FakeDB l'écriture est instantanée → premier poll OK.
+        Si `expected_failures` est fourni, on attend aussi que le compteur
+        corresponde (le doc peut déjà exister avec une valeur périmée).
+        """
+        import asyncio as _asyncio
+        deadline = _asyncio.get_running_loop().time() + timeout
+        while True:
+            stored = await db_find_one("paydunya_circuit", {"_id": "global"})
+            if stored is not None and (
+                expected_failures is None
+                or stored.get("consecutive_failures") == expected_failures
+            ):
+                return stored
+            if _asyncio.get_running_loop().time() > deadline:
+                return stored
+            await _asyncio.sleep(0.05)
 
     async def test_persists_transitions_and_reloads_on_init(self, client: AsyncClient):
         """Chaque transition (échec compté, succès → reset) est écrite en base,
@@ -607,17 +635,14 @@ class TestPaydunyaCircuitPersistence:
                 # 2 échecs réseau → compteur 2, PERSISTÉ en base.
                 _circuit_record_failure()
                 _circuit_record_failure()
-                await self._flush()
-
-                stored = await db_find_one("paydunya_circuit", {"_id": "global"})
+                stored = await self._wait_for_circuit_doc()
                 assert stored is not None
                 assert stored["state"] == "closed"
                 assert stored["consecutive_failures"] == 2
 
                 # Un succès referme et réécrit (compteur à 0).
                 _circuit_record_success()
-                await self._flush()
-                stored = await db_find_one("paydunya_circuit", {"_id": "global"})
+                stored = await self._wait_for_circuit_doc(expected_failures=0)
                 assert stored["state"] == "closed"
                 assert stored["consecutive_failures"] == 0
 
@@ -657,12 +682,11 @@ class TestPaydunyaCircuitPersistence:
         )
 
         try:
-            await db_insert("paydunya_circuit", {
-                "_id": "global",
+            await db_upsert("paydunya_circuit", {"_id": "global"}, {"$set": {
                 "state": "open",
                 "consecutive_failures": 4,
                 "opened_at": _time.time(),
-            })
+            }})
             with patch.dict(
                 "kojo_payments._paydunya_circuit",
                 {"state": "closed", "consecutive_failures": 0, "opened_at": 0.0},
@@ -686,12 +710,11 @@ class TestPaydunyaCircuitPersistence:
         )
 
         try:
-            await db_insert("paydunya_circuit", {
-                "_id": "global",
+            await db_upsert("paydunya_circuit", {"_id": "global"}, {"$set": {
                 "state": "closed",
                 "consecutive_failures": 0,
                 "opened_at": 0.0,
-            })
+            }})
             with patch.dict(
                 "kojo_payments._paydunya_circuit",
                 {"state": "open", "consecutive_failures": 5, "opened_at": _time.time()},
@@ -718,8 +741,8 @@ class TestPaydunyaCircuitOwnerAlert:
 
     async def _flush(self):
         import asyncio as _asyncio
-        for _ in range(5):
-            await _asyncio.sleep(0)
+        for _ in range(10):
+            await _asyncio.sleep(0.01)
 
     async def test_alert_fires_once_when_circuit_opens(self, client: AsyncClient):
         """5 échecs réseau → ouverture → UNE alerte (notif + email) ; les
@@ -772,12 +795,11 @@ class TestPaydunyaCircuitOwnerAlert:
         """Circuit OUVERT (persisté en base par un autre worker) → /health le
         montre grâce au refresh préalable — pas seulement la vue locale."""
         import time as _time
-        await db_insert("paydunya_circuit", {
-            "_id": "global",
+        await db_upsert("paydunya_circuit", {"_id": "global"}, {"$set": {
             "state": "open",
             "consecutive_failures": 5,
             "opened_at": _time.time(),
-        })
+        }})
         resp = await client.get("/api/health")
         assert resp.status_code == 200
         data = resp.json()
@@ -800,12 +822,11 @@ class TestPaydunyaCircuitOwnerAlert:
         """Circuit OUVERT (persisté en base par un autre worker) →
         /monitor/paydunya renvoie 503 : les moniteurs alertent immédiatement."""
         import time as _time
-        await db_insert("paydunya_circuit", {
-            "_id": "global",
+        await db_upsert("paydunya_circuit", {"_id": "global"}, {"$set": {
             "state": "open",
             "consecutive_failures": 5,
             "opened_at": _time.time(),
-        })
+        }})
         resp = await client.get("/monitor/paydunya")
         assert resp.status_code == 503
         data = resp.json()
@@ -819,12 +840,11 @@ class TestPaydunyaCircuitOwnerAlert:
         fast, PayDunya peut redevenir joignable — on n'alerte pas sur l'état
         de récupération."""
         import time as _time
-        await db_insert("paydunya_circuit", {
-            "_id": "global",
+        await db_upsert("paydunya_circuit", {"_id": "global"}, {"$set": {
             "state": "open",
             "consecutive_failures": 5,
             "opened_at": _time.time() - 3 * 3600,  # cooldown (2h) écoulé
-        })
+        }})
         resp = await client.get("/monitor/paydunya")
         assert resp.status_code == 200
         data = resp.json()
@@ -1057,12 +1077,11 @@ class TestCompositeMonitor:
         Brevo OK → down=1 : avec threshold=1 le composite renvoie 503, avec
         le défaut 2 il reste à 200 (un seul fournisseur touché)."""
         import time as _time
-        await db_insert("paydunya_circuit", {
-            "_id": "global",
+        await db_upsert("paydunya_circuit", {"_id": "global"}, {"$set": {
             "state": "open",
             "consecutive_failures": 5,
             "opened_at": _time.time(),
-        })
+        }})
         await self._clear_caches()
         with patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get") as get_mock, \
