@@ -187,6 +187,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      # flyctl est requis par le check (flyctl secrets list). Même action que
+      # le job deploy-fly — tag @master non épinglé, cohérent avec deploy-fly.
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
       - name: Check fly.toml env vs runtime + secret presence
         run: python .github/scripts/check-fly-env-drift.py
         env:
