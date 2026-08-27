@@ -346,9 +346,9 @@ class TestCheckReferenceFormats:
 
     def test_regression_vapid_espace_detectee(self, check, tmp_path):
         # RÉGRESSION : un espace après mailto: dans .env.example doit échouer.
-        # On injecte l'espace sur la LIGNE réelle (l'adresse peut être
-        # contact@kojo.app dans le commit ou kojoapp98@gmail.com en cours) —
-        # le test doit rester robuste à la valeur présente dans le fichier.
+        # On injecte l'espace sur la LIGNE réelle (l'adresse VAPID du
+        # .env.example peut varier selon le commit) — le test doit rester
+        # robuste à la valeur présente dans le fichier.
         def inject_space(text):
             import re as _re
             return _re.sub(

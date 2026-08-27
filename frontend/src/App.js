@@ -14,7 +14,7 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
 import ToastContainer from "./components/ToastContainer";
-import { PageSkeleton } from "./components/SkeletonLoader";
+import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
@@ -227,8 +227,16 @@ function AppRoutes() {
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/login" element={
+              <Suspense fallback={<LoginSkeleton />}>
+                <Login />
+              </Suspense>
+            } />
+            <Route path="/forgot-password" element={
+              <Suspense fallback={<ForgotPasswordSkeleton />}>
+                <ForgotPassword />
+              </Suspense>
+            } />
             <Route path="/register" element={<Register />} />
             
             {/* Protected routes - lazy loaded */}
@@ -242,8 +250,20 @@ function AppRoutes() {
                 réservées aux utilisateurs connectés — le backend refuse
                 toute mutation non authentifiée, et les pages affichent
                 une invitation à se connecter pour les actions. */}
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/jobs/:id" element={<JobDetails />} />
+            {/* /jobs et /jobs/:id ont des skeletons Suspense DÉDIÉS (grille de
+                cartes / détail structuré à hauteur réelle) : le fallback
+                générique (PageSkeleton, 3 blocs courts) laissait un saut de
+                ~118 px au remplacement du chunk → CLS résiduel sur /jobs. */}
+            <Route path="/jobs" element={
+              <Suspense fallback={<JobsSkeleton />}>
+                <Jobs />
+              </Suspense>
+            } />
+            <Route path="/jobs/:id" element={
+              <Suspense fallback={<JobDetailsSkeleton />}>
+                <JobDetails />
+              </Suspense>
+            } />
             <Route path="/messages" element={
               <ProtectedRoute>
                 <Messages />

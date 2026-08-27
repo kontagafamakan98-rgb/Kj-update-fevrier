@@ -336,6 +336,8 @@ export default function Jobs() {
     { value: 'gardening', label: t('gardening') },
     { value: 'tutoring', label: t('tutoring') },
     { value: 'mechanics', label: t('mechanics') },
+    { value: 'carpentry', label: t('carpentry') },
+    { value: 'computing', label: t('computing') },
     { value: 'general', label: t('general') },
   ];
 
