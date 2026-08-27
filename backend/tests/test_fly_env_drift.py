@@ -346,13 +346,19 @@ class TestCheckReferenceFormats:
 
     def test_regression_vapid_espace_detectee(self, check, tmp_path):
         # RÉGRESSION : un espace après mailto: dans .env.example doit échouer.
-        self._load_real_repo(
-            check, tmp_path,
-            env_override=lambda t: t.replace(
-                "VAPID_CLAIMS_EMAIL=mailto:kojoapp98@gmail.com",
-                "VAPID_CLAIMS_EMAIL=mailto: kojoapp98@gmail.com",
-            ),
-        )
+        # On injecte l'espace sur la LIGNE réelle (l'adresse peut être
+        # contact@kojo.app dans le commit ou kojoapp98@gmail.com en cours) —
+        # le test doit rester robuste à la valeur présente dans le fichier.
+        def inject_space(text):
+            import re as _re
+            return _re.sub(
+                r"^(VAPID_CLAIMS_EMAIL=mailto:)(\S+)$",
+                r"\1 \2",
+                text,
+                flags=_re.MULTILINE,
+            )
+
+        self._load_real_repo(check, tmp_path, env_override=inject_space)
         check.errors, check.checked = [], []
         check.check_reference_formats()
         assert any("VAPID_CLAIMS_EMAIL" in e for e in check.errors), check.errors
