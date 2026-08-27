@@ -420,7 +420,13 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
     preferred_language: profile.preferred_language || 'fr',
     country: profile.country || 'senegal',
     bio: profile.bio || '',
-    skills: profile.skills || '',
+    // Le backend attend skills en LISTE mais le champ est saisi en texte
+    // libre (virgules) : on garde une chaîne dans le formulaire et on
+    // convertit en liste à l'envoi (voir handleSubmit). Un profil déjà
+    // stocké en liste (défensif) est joint en texte lisible.
+    skills: Array.isArray(profile.skills)
+      ? profile.skills.join(', ')
+      : (profile.skills || ''),
     profile_photo: profile.profile_photo || ''
   });
   const [success, setSuccess] = useState('');
@@ -459,7 +465,14 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave(formData);
+    // PUT /users/profile rejette skills en chaîne (400 « skills doit être
+    // une liste ») : on convertit le texte séparé par des virgules en liste
+    // (trim + suppression des entrées vides) avant l'envoi.
+    const skillsList = String(formData.skills || '')
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+    onSave({ ...formData, skills: skillsList });
   };
 
   const handleChange = (e) => {
