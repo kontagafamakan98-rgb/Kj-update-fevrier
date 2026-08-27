@@ -143,4 +143,33 @@ export const FormSkeleton = ({ fields = 4 }) => {
   );
 };
 
+// Skeleton de page générique — fallback du Suspense pour les routes lazy
+// (Home, Login, …) : première peinture rapide et stable, évite le « saut »
+// de layout quand la page réelle arrive.
+export const PageSkeleton = () => {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        {/* Bandeau principal */}
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-2/3 md:w-1/2" />
+          <Skeleton className="h-4 w-full md:w-3/4" />
+          <Skeleton className="h-4 w-5/6 md:w-2/3" />
+        </div>
+        {/* Blocs de contenu */}
+        <div className="grid gap-6 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="bg-white rounded-lg shadow p-6 space-y-3">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-4/5" />
+              <Skeleton className="h-10 w-28 mt-2" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default Skeleton;
