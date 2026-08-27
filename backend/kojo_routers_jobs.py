@@ -450,13 +450,39 @@ def _job_view(job: dict, current_user: Optional[User]):
 # rater un job legacy.
 _CATEGORY_GROUPS: dict[str, list[str]] = {
     "general": ["general", "divers", "général", "generaliste", "généraliste"],
-    "plumbing": ["plumbing", "plomberie", "plombier", "plomberie urgent", "plombier urgent"],
-    "electrical": ["electrical", "electricite", "électricité", "electricien", "électricien", "electronique", "électronique"],
-    "construction": ["construction", "batiment", "bâtiment", "maconnerie", "maçonnerie", "macon", "maçon", "peinture", "carrelage"],
+    "plumbing": ["plumbing", "plomberie", "plombier", "plomberie urgent", "plombier urgent",
+        # Libellés FR prédéfinis (frontend WorkerRegistrationFields.js) : les
+        # profils stockent CES libellés exacts, le matching doit les matcher.
+        "installation sanitaire", "réparation fuites", "soudure",
+        "débouchage canalisations", "installation chauffe-eau"],
+    "electrical": ["electrical", "electricite", "électricité", "electricien", "électricien", "electronique", "électronique",
+        "installation électrique", "dépannage électrique", "câblage",
+        "tableau électrique", "éclairage"],
+    "construction": ["construction", "batiment", "bâtiment", "maconnerie", "maçonnerie", "macon", "maçon", "peinture", "carrelage",
+        "toiture", "coffrage"],
     "cleaning": ["cleaning", "menage", "ménage", "nettoyage", "femme de menage", "femme de ménage"],
-    "gardening": ["gardening", "jardinage", "jardinier", "espace vert"],
-    "tutoring": ["tutoring", "cours", "soutien scolaire", "professeur", "enseignant", "formation"],
-    "mechanics": ["mechanics", "mecanique", "mécanique", "mecanicien", "mécanicien", "garage", "auto"],
+    "gardening": ["gardening", "jardinage", "jardinier", "espace vert",
+        "entretien jardin", "élagage", "plantation", "arrosage automatique", "paysagisme"],
+    "tutoring": ["tutoring", "cours", "soutien scolaire", "professeur", "enseignant", "formation",
+        "mathématiques", "français", "anglais", "sciences", "histoire-géographie",
+        "physique-chimie", "informatique scolaire", "aide aux devoirs",
+        "préparation examens"],
+    "mechanics": ["mechanics", "mecanique", "mécanique", "mecanicien", "mécanicien", "garage", "auto",
+        "réparation moteur", "diagnostic automobile", "carrosserie",
+        "électricité auto", "climatisation auto"],
+    # Menuiserie / ébénisterie : groupe prédéfini du frontend, absent de la
+    # taxonomie historique (les jobs menuiserie tombaient en « general »).
+    "carpentry": ["carpentry", "menuiserie", "menuisier", "ébénisterie", "ébéniste", "bois",
+        "fabrication de meubles", "pose de portes", "pose de fenêtres",
+        "menuiserie aluminium", "menuiserie bois", "placards et dressings",
+        "cuisine sur mesure", "escaliers en bois", "finition et vernissage",
+        "réparation de meubles"],
+    # Informatique / réparation téléphone : groupe prédéfini du frontend, absent
+    # de la taxonomie historique (le profil « Réparation PC » ne matchait rien).
+    "computing": ["computing", "informatique", "informaticien", "ordinateur", "réparation pc",
+        "installation logiciels", "réseaux", "maintenance", "formation",
+        "réparation téléphone android", "réparation iphone",
+        "changement écran téléphone"],
 }
 
 # Dictionnaire inverse : n'importe quelle écriture → slug canonique.
