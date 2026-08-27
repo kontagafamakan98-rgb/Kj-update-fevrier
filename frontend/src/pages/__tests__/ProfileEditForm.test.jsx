@@ -123,6 +123,36 @@ describe('ProfileEditForm', () => {
     );
   });
 
+  it('convertit les compétences (texte séparé par virgules) en liste avant envoi', () => {
+    const { onSave } = renderForm({ profile: { user_type: 'worker' } });
+
+    fireEvent.change(screen.getByLabelText('Compétences'), {
+      target: { value: 'Plomberie, Électricité, Peinture, ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    // Régression : le backend PUT /users/profile renvoie 400
+    // « skills doit être une liste » quand skills est une chaîne.
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skills: ['Plomberie', 'Électricité', 'Peinture'],
+      })
+    );
+  });
+
+  it('envoie une liste vide quand le travailleur n\'a pas saisi de compétences', () => {
+    const { onSave } = renderForm({ profile: { user_type: 'worker', skills: ['Plomberie'] } });
+
+    // Le champ prérempli affiche la liste jointe
+    expect(screen.getByLabelText('Compétences').value).toBe('Plomberie');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ skills: ['Plomberie'] })
+    );
+  });
+
   it('appelle onCancel au clic sur « Annuler »', () => {
     const { onCancel } = renderForm();
 
