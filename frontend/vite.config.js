@@ -140,11 +140,17 @@ export default defineConfig(({ mode }) => {
             // exécutait createContext → page blanche en production.
             if (id.includes('@sentry')) return 'vendor-sentry'
             if (id.includes('/react-dom/')) return 'vendor-react-dom'
-            if (id.includes('/react-router-dom/')) return 'vendor-router'
+            // react-router v7 : react-router-dom ré-exporte depuis
+            // react-router (le code réel vit dans node_modules/react-router/).
+            // Matcher les DEUX chemins pour bien isoler le router.
+            if (id.includes('/react-router')) return 'vendor-router'
             if (id.includes('/react/')) return 'vendor-react'
             if (id.includes('/axios/')) return 'vendor-axios'
             if (id.includes('/lucide-react/')) return 'vendor-lucide'
             if (id.includes('/prop-types/')) return 'vendor-prop-types'
+            // leaflet (cartes) n'est utilisé que par JobsMap.js : chunk séparé
+            // pour ne pas alourdir le bundle initial des autres pages.
+            if (id.includes('/leaflet/')) return 'vendor-leaflet'
             return 'vendor'
           },
         },

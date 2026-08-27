@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Déploiement backend manuel à la demande (sans attendre un push qui
+  # touche backend/**). Bouton « Run workflow » → sélectionner la branche
+  # main. Le job deploy-fly s'exécute alors même sans changement de code.
+  workflow_dispatch:
 
 jobs:
   # ─── Méta-test des audits : vérifie que les garde-fous échouent sur une
@@ -302,8 +306,8 @@ jobs:
     name: Deploy backend to Fly.io
     runs-on: ubuntu-latest
     needs: backend-tests
-    # Jamais depuis un PR ; déploiement uniquement sur la branche main
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Jamais depuis un PR ; déploiement sur main (push auto OU dispatch manuel)
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     # Pas d'annulation en plein vol : un déploiement est étatique (machines
     # Fly) ; les pushes successifs attendent leur tour.
     concurrency:
@@ -324,15 +328,17 @@ jobs:
               - 'backend/**'
               - '.github/workflows/ci.yml'
 
+      # Déploiement forcé : un dispatch manuel déploie même sans changement
+      # backend (l'utilisateur a explicitement demandé le run).
       - name: Setup flyctl
-        if: steps.changes.outputs.backend == 'true'
+        if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       # --remote-only : le build se fait sur les builders distants de Fly
       # (Depot), pas de Docker nécessaire sur le runner. fly.toml et
       # Dockerfile sont lus depuis backend/ (working-directory).
       - name: Deploy to Fly.io
-        if: steps.changes.outputs.backend == 'true'
+        if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: backend
         run: flyctl deploy --remote-only
         env:

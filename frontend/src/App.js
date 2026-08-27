@@ -14,17 +14,19 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
 import ToastContainer from "./components/ToastContainer";
-import PageLoader from "./components/PageLoader";
+import { PageSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
 
 
-// Eager load critical pages (public pages shown immediately)
-import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import HowItWorks from "./pages/HowItWorks";
+// Toutes les pages sont lazy-loadées (bundle initial minimal) : seul le
+// shell (nav + contexte auth) est dans le chunk principal. Home et Login
+// utilisent un skeleton comme fallback pour un premier affichage rapide.
+const Home = lazy(() => import("./pages/Home"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -213,7 +215,7 @@ function AppRoutes() {
 
       {/* Main Content with Suspense for lazy loaded routes */}
       <main className="pb-24 md:pb-0">
-        <Suspense fallback={<PageLoader message={t('loadingPage')} />}>
+        <Suspense fallback={<PageSkeleton />}>
           <Routes>
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
