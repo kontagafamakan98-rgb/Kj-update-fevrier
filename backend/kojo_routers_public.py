@@ -10,12 +10,320 @@ count_documents restent bon marché même à volume.
 
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 
 from kojo_core import db
 from kojo_settings import FRONTEND_APP_URL, logger
 
 router = APIRouter()
+
+# Labels français des catégories pour la carte OG (le champ stocké est la clé
+# machine : "plumbing", "electrical"… — on affiche un libellé lisible).
+_CATEGORY_LABELS = {
+    "plumbing": "Plomberie",
+    "electrical": "Électricité",
+    "construction": "Construction",
+    "cleaning": "Nettoyage",
+    "gardening": "Jardinage",
+    "tutoring": "Cours particuliers",
+    "mechanics": "Mécanique",
+    "general": "Services divers",
+}
+
+
+def _fmt_fcfa(value) -> str:
+    """Formatte un montant FCFA avec séparateur de milliers (espace)."""
+    try:
+        return f"{float(value):,.0f}".replace(",", " ")
+    except (TypeError, ValueError):
+        return ""
+
+
+def _load_og_font(size: int):
+    """Charge une police pour la carte OG — DejaVu (Linux/Fly), Arial
+    (Windows/dev), repli sur la police embarquée Pillow (Aileron)."""
+    from PIL import ImageFont
+
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            continue
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
+
+def _wrap_text(draw, text: str, font, max_width: int, max_lines: int) -> list:
+    """Coupe le texte en lignes de largeur max_width (max_lines max).
+
+    Si le texte dépasse max_lines, la dernière ligne se termine par "…"
+    (la suite du titre est perdue mais l'utilisateur comprend la coupe).
+    """
+    words = text.split()
+    if not words:
+        return [""]
+    lines: list = []
+    current = ""
+    truncated = False
+    for word in words:
+        trial = f"{current} {word}".strip()
+        if draw.textlength(trial, font=font) <= max_width or not current:
+            current = trial
+        else:
+            if len(lines) == max_lines - 1:
+                truncated = True
+                break
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    if truncated:
+        lines[-1] = lines[-1].rstrip() + "…"
+    return lines
+
+
+def _job_og_meta(job: dict):
+    """Prépare les lignes de texte d'une carte OG (budget, catégorie, lieu)."""
+    budget_min = _fmt_fcfa(job.get("budget_min"))
+    budget_max = _fmt_fcfa(job.get("budget_max"))
+    if budget_min and budget_max:
+        budget_line = f"Budget : {budget_min} – {budget_max} FCFA"
+    elif budget_max:
+        budget_line = f"Budget : jusqu'à {budget_max} FCFA"
+    elif budget_min:
+        budget_line = f"Budget : dès {budget_min} FCFA"
+    else:
+        budget_line = "Budget : à discuter"
+    category = _CATEGORY_LABELS.get((job.get("category") or "").lower().strip(), job.get("category") or "")
+    location = (job.get("location_text") or "").strip()
+    meta_parts = [p for p in [category, location] if p]
+    return budget_line, " · ".join(meta_parts)
+
+
+def _draw_og_background(W: int, H: int):
+    """Dégradé orange→rouge + halos (identique aux cartes statiques)."""
+    from PIL import Image, ImageDraw
+
+    top, mid, bottom = (234, 88, 12), (194, 65, 12), (220, 38, 38)
+    img = Image.new("RGB", (W, H))
+    draw = ImageDraw.Draw(img)
+    for y in range(H):
+        t = y / (H - 1)
+        if t < 0.55:
+            f = t / 0.55
+            c = tuple(int(top[i] + (mid[i] - top[i]) * f) for i in range(3))
+        else:
+            f = (t - 0.55) / 0.45
+            c = tuple(int(mid[i] + (bottom[i] - mid[i]) * f) for i in range(3))
+        draw.line([(0, y), (W, y)], fill=c)
+
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    od.ellipse([-180, -180, 340, 340], fill=(255, 255, 255, 12))
+    od.ellipse([W - 340, H - 280, W + 260, H + 520], fill=(255, 255, 255, 12))
+    img = Image.alpha_composite(img.convert("RGBA"), overlay)
+    return img, ImageDraw.Draw(img)
+
+
+def _render_job_og_card(job: dict, square: bool = False) -> bytes:
+    """Génère la carte Open Graph de la fiche mission : dégradé orange→rouge
+    (cohérent avec les images OG statiques du frontend), logo K, titre réel
+    de la mission (2 lignes max), budget FCFA, catégorie et localisation.
+
+    Format wide 1200x630 (défaut) pour les cartes de flux ; format carré
+    1200x1200 (square=True) pour les réseaux qui recadrent en vignette 1:1
+    (WhatsApp/Telegram/LinkedIn/aperçus Twitter) : composition CENTRÉE dans
+    la zone sûre, un recadrage central conserve le contenu essentiel.
+
+    Retourne les octets PNG."""
+    from io import BytesIO
+
+    from PIL import Image, ImageDraw
+
+    W, H = (1200, 1200) if square else (1200, 630)
+    img, draw = _draw_og_background(W, H)
+
+    title = (job.get("title") or "Mission").strip()
+    budget_line, meta_line = _job_og_meta(job)
+
+    if square:
+        # ── Composition carrée CENTRÉE (zone sûre ~940 px de large) ────────
+        cx = W // 2
+        safe_w = 940
+
+        # Logo K centré en haut (carré arrondi semi-transparent + K blanc).
+        logo_size = 210
+        logo_x, logo_y = (W - logo_size) // 2, 120
+        draw.rounded_rectangle([logo_x, logo_y, logo_x + logo_size, logo_y + logo_size],
+                               radius=42, fill=(255, 255, 255, 40))
+        font_k = _load_og_font(260)
+        bbox = draw.textbbox((0, 0), "K", font=font_k)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text((logo_x + (logo_size - tw) / 2 - bbox[0],
+                   logo_y + (logo_size - th) / 2 - bbox[1]),
+                  "K", fill=(255, 255, 255), font=font_k)
+
+        # Kojo centré.
+        font_name = _load_og_font(100)
+        bbox = draw.textbbox((0, 0), "Kojo", font=font_name)
+        draw.text((cx - (bbox[2] - bbox[0]) / 2 - bbox[0], 400 - bbox[1]),
+                  "Kojo", fill=(255, 255, 255), font=font_name)
+
+        # Titre : 2 lignes max centrées, police auto-réduite.
+        lines: list = []
+        for size in (52, 44, 38):
+            font_title = _load_og_font(size)
+            lines = _wrap_text(draw, title, font_title, max_width=safe_w, max_lines=2)
+            if not any(line.endswith("…") for line in lines):
+                break
+        title_y = 530
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font_title)
+            draw.text((cx - (bbox[2] - bbox[0]) / 2 - bbox[0], title_y - bbox[1]),
+                      line, fill=(255, 255, 255), font=font_title)
+            title_y += 64
+
+        # Budget puis catégorie · lieu, centrés.
+        font_meta = _load_og_font(40)
+        bbox = draw.textbbox((0, 0), budget_line, font=font_meta)
+        draw.text((cx - (bbox[2] - bbox[0]) / 2 - bbox[0], title_y + 40 - bbox[1]),
+                  budget_line, fill=(255, 235, 215), font=font_meta)
+        if meta_line:
+            font_sub = _load_og_font(34)
+            bbox = draw.textbbox((0, 0), meta_line, font=font_sub)
+            draw.text((cx - (bbox[2] - bbox[0]) / 2 - bbox[0], title_y + 108 - bbox[1]),
+                      meta_line, fill=(255, 255, 255), font=font_sub)
+    else:
+        # ── Composition wide (logo à gauche, texte à droite) ────────────────
+        logo_size = 150
+        logo_x, logo_y = 70, 70
+        draw.rounded_rectangle([logo_x, logo_y, logo_x + logo_size, logo_y + logo_size],
+                               radius=30, fill=(255, 255, 255, 40))
+        font_k = _load_og_font(190)
+        bbox = draw.textbbox((0, 0), "K", font=font_k)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text((logo_x + (logo_size - tw) / 2 - bbox[0],
+                   logo_y + (logo_size - th) / 2 - bbox[1]),
+                  "K", fill=(255, 255, 255), font=font_k)
+
+        text_x = logo_x + logo_size + 46
+        draw.text((text_x, 108), "Kojo", fill=(255, 255, 255), font=_load_og_font(72))
+
+        text_width = W - text_x - 70
+        lines: list = []
+        for size in (56, 46, 40):
+            font_title = _load_og_font(size)
+            lines = _wrap_text(draw, title, font_title, max_width=text_width, max_lines=2)
+            if not any(line.endswith("…") for line in lines):
+                break
+        title_y = 200
+        for line in lines:
+            draw.text((text_x, title_y), line, fill=(255, 255, 255), font=font_title)
+            title_y += 68
+
+        font_meta = _load_og_font(36)
+        draw.text((text_x, title_y + 30), budget_line, fill=(255, 235, 215), font=font_meta)
+        if meta_line:
+            draw.text((text_x, title_y + 80), meta_line, fill=(255, 255, 255), font=_load_og_font(32))
+
+    # Bordure fine pour le contraste.
+    draw.rectangle([0, 0, W - 1, H - 1], outline=(200, 70, 10), width=4)
+
+    buf = BytesIO()
+    img.convert("RGB").save(buf, "PNG", optimize=True)
+    return buf.getvalue()
+
+
+_OG_CACHE_CLOSED = "public, max-age=86400, s-maxage=86400, must-revalidate"
+_OG_CACHE_ACTIVE = "public, max-age=3600, s-maxage=3600"
+
+
+def _job_og_cache_control(job: dict) -> str:
+    """Cache-Control de la carte OG selon l'état de la mission.
+
+    Les états TERMINAUX (completed / cancelled — « mission clôturée ») ne
+    peuvent plus jamais évoluer : le titre, le budget, la catégorie et la
+    localisation gravés sur la carte sont immuables. On peut donc demander au
+    CDN/crawlers un cache LONG (max-age=86400, soit 24 h, avec must-revalidate
+    pour revalider à expiration) au lieu du cache court de 1 h : ça évite aux
+    crawlers (Facebook, LinkedIn, WhatsApp) de re-fêter la carte à chaque
+    partage d'une mission déjà clôturée.
+
+    Les états non terminaux (open / in_progress) gardent un cache court de 1 h :
+    la mission est encore éditable, et une carte moins fraîche risquerait de
+    montrer un budget ou un titre périmé.
+    """
+    status = (job.get("status") or "").strip().lower()
+    if status in ("completed", "cancelled"):
+        return _OG_CACHE_CLOSED
+    return _OG_CACHE_ACTIVE
+
+
+# IMPORTANT : la route « -square.png » est déclarée AVANT la route générique
+# « {job_id}.png » — sinon FastAPI matcherait « …-square.png » sur la première
+# (job_id = "…-square") et renverrait un 404 pour les fiches existantes.
+@router.get("/og/jobs/{job_id}-square.png", include_in_schema=False)
+async def get_job_og_image_square(job_id: str):
+    """Carte Open Graph CARRÉE 1200x1200 d'une fiche mission.
+
+    Variante pour les réseaux qui RECADRENT la carte en vignette 1:1
+    (WhatsApp, Telegram, iMessage, LinkedIn, aperçus Twitter) : composition
+    centrée dans la zone sûre — un recadrage central conserve logo, titre et
+    budget. Le frontend déclare cette URL en second og:image (dimensions
+    1200x1200) ; les crawlers choisissent la variante adaptée à leur rendu.
+
+    Returns:
+        PNG (image/png) — 404 si la mission n'existe pas.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        png = _render_job_og_card(job, square=True)
+    except Exception as exc:  # Pillow absent ou erreur de rendu : 500 propre
+        logger.error("OG square image render failed for job %s: %s", job_id, exc)
+        raise HTTPException(status_code=500, detail="OG image rendering failed") from exc
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": _job_og_cache_control(job)},
+    )
+
+
+@router.get("/og/jobs/{job_id}.png", include_in_schema=False)
+async def get_job_og_image(job_id: str):
+    """Carte Open Graph dynamique d'une fiche mission (/jobs/:id).
+
+    Le frontend pointe og:image de JobDetails vers cette URL : les crawlers
+    de partage (Facebook, LinkedIn, WhatsApp) récupèrent un PNG 1200x630 avec
+    le TITRE RÉEL de la mission — impossible à pré-rendre statiquement (une
+    fiche par job). Le rewrite Vercel /api/:path* → Fly achemine l'appel.
+
+    Returns:
+        PNG (image/png) — 404 si la mission n'existe pas.
+    """
+    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    try:
+        png = _render_job_og_card(job)
+    except Exception as exc:  # Pillow absent ou erreur de rendu : 500 propre
+        logger.error("OG image render failed for job %s: %s", job_id, exc)
+        raise HTTPException(status_code=500, detail="OG image rendering failed") from exc
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": _job_og_cache_control(job)},
+    )
 
 # Base du site pour le sitemap/robots. En production, FRONTEND_APP_URL doit
 # pointer vers le domaine public Vercel ; repli sur le domaine Fly du backend

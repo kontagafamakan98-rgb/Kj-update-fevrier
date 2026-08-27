@@ -21,6 +21,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# --- Polices DejaVu pour les cartes Open Graph dynamiques (/api/og/jobs/:id)
+# --- rendues avec Pillow : sans police système, le texte serait illisible
+# --- (les wheels Pillow embarquent le codec PNG mais aucune police).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # --- Code applicatif (le backend vit à plat dans /app) ---
 COPY kojo_*.py server.py ./
 
