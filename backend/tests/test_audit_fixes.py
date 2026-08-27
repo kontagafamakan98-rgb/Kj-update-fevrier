@@ -107,7 +107,11 @@ class TestProfileUpdateValidation:
         assert me.status_code == 200
         assert me.json()["country"] == "mali"
         assert me.json()["phone"] == "+22377123456"
-        # bio/skills sont stockés en base (le modèle User ne les expose pas via /auth/me)
+        # bio/skills sont stockés en base ET exposés via /auth/me (le modèle
+        # User les déclare désormais — sans quoi le frontend les réinitialisait
+        # à vide à chaque édition de profil).
+        assert me.json()["bio"] == "Artisan disponible."
+        assert me.json()["skills"] == ["plomberie", "électricité"]
         stored = await db_find_one("users", {"id": me.json()["id"]})
         assert stored["bio"] == "Artisan disponible."
         assert stored["skills"] == ["plomberie", "électricité"]

@@ -138,6 +138,17 @@ class User(BaseModel):
             self.is_owner = str(self.email).strip().lower() == OWNER_EMAIL.strip().lower()
         return self
 
+    @field_validator('skills', mode='before')
+    @classmethod
+    def coerce_skills(cls, v):
+        # Défensif : les écritures passent par PUT /users/profile qui valide
+        # (liste de 1-20 chaînes ≤100 caractères), mais un doc legacy corrompu
+        # ne doit jamais faire échouer /auth/me (sinon l'utilisateur serait
+        # bloqué). On normalise au lieu de lever.
+        if not isinstance(v, list):
+            return []
+        return [str(s)[:100] for s in v if isinstance(s, str)][:20]
+
     @field_validator('phone')
     @classmethod
     def validate_phone(cls, v):
@@ -146,6 +157,12 @@ class User(BaseModel):
         if not v:
             return v
         return validate_west_africa_phone(v)
+    # Champs professionnels édités via PUT /users/profile. Déclarés ici (et
+    # non laissés hors-modèle) pour qu'ils soient renvoyés par /auth/me et
+    # /users/profile : sinon le frontend ne les voit jamais et les
+    # réinitialisait à vide (bio/skills) à chaque édition de profil.
+    bio: Optional[str] = Field(default=None, max_length=1000)
+    skills: List[str] = Field(default_factory=list)
     profile_photo: Optional[str] = Field(None, max_length=500)  # URL length limit
     is_verified: bool = False
     email_verified: bool = False

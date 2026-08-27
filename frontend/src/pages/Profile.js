@@ -270,7 +270,7 @@ export default function Profile() {
               t={t}
             />
           ) : (
-            <ProfileView profile={profile} t={t} />
+            <ProfileView profile={profile} t={t} pageT={pageT} />
           )}
         </div>
 
@@ -380,29 +380,51 @@ export default function Profile() {
   );
 }
 
-function ProfileView({ profile, t }) {
+function ProfileView({ profile, t, pageT }) {
+  // Compétences en lecture seule (chips), comme les spécialités du profil
+  // travailleur. Le backend renvoie désormais skills via /auth/me.
+  const skills = Array.isArray(profile.skills) ? profile.skills : [];
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div>
-        <label className="block text-sm font-medium text-gray-700">{t('email')}</label>
-        <p className="mt-1 text-gray-900">{profile.email}</p>
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">{t('email')}</label>
+          <p className="mt-1 text-gray-900">{profile.email}</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">{t('phone')}</label>
+          <p className="mt-1 text-gray-900">{profile.phone}</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
+          <p className="mt-1 text-gray-900">{getLanguageLabel(profile.preferred_language, t)}</p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">{t('verified')}</label>
+          <p className="mt-1">
+            <span className={`px-2 py-1 text-xs rounded-full ${profile.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {profile.is_verified ? t('verified') : `${t('no')} ${t('verified').toLowerCase()}`}
+            </span>
+          </p>
+        </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">{t('phone')}</label>
-        <p className="mt-1 text-gray-900">{profile.phone}</p>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-        <p className="mt-1 text-gray-900">{getLanguageLabel(profile.preferred_language, t)}</p>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700">{t('verified')}</label>
-        <p className="mt-1">
-          <span className={`px-2 py-1 text-xs rounded-full ${profile.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {profile.is_verified ? t('verified') : `${t('no')} ${t('verified').toLowerCase()}`}
-          </span>
-        </p>
-      </div>
+
+      {skills.length > 0 && (
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700">{pageT('skills')}</label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {skills.map((skill, index) => (
+              <span
+                key={`${skill}-${index}`}
+                className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm"
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
