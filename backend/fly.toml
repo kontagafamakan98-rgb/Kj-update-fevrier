@@ -17,19 +17,17 @@ primary_region = 'fra'
   # URL publique du backend → callbacks IPN PayDunya (et hôtes de confiance si
   # le TrustedHostMiddleware reste activé)
   BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev'
-  # TrustedHostMiddleware : DÉSACTIVÉ en prod via le secret
-  # DISABLE_TRUSTED_HOST_MIDDLEWARE=true. Constat (vérifié le 22/08/2026) :
-  # retirer ce secret fait échouer les health checks HTTP de Fly en 400
-  # « Invalid host header » — le Host envoyé par les sondes n'est couvert par
-  # AUCUN motif de build_trusted_hosts() (*.internal, *.flycast.internal,
-  # *.flycast, *.fly.dev testés), probablement l'adresse IPv6 interne que le
-  # parseur de Starlette découpe sur ':' (host.split(':')[0]). Risque réel
-  # faible : Fly normalise le Host du trafic public et tous les liens du
-  # backend sont construits depuis FRONTEND_APP_URL statique (pas de
-  # host-header poisoning exploitable). Pour réactiver proprement : passer
-  # le health check de HTTP à TCP dans [http_service] (les checks TCP ne
-  # traversent pas le middleware), puis `fly secrets unset
-  # DISABLE_TRUSTED_HOST_MIDDLEWARE`.
+  # TrustedHostMiddleware : ACTIF en prod (secret DISABLE_TRUSTED_HOST_MIDDLEWARE
+  # retiré le 27/08/2026, plan exécuté : health check passé en TCP ci-dessous
+  # puis `fly secrets unset DISABLE_TRUSTED_HOST_MIDDLEWARE`). Les checks HTTP
+  # précédents échouaient en 400 « Invalid host header » — le Host interne des
+  # sondes Fly n'était couvert par aucun motif de build_trusted_hosts()
+  # (probablement l'adresse IPv6 interne découpée sur ':' par Starlette).
+  # build_trusted_hosts() couvre désormais localhost, *.vercel.app,
+  # *.onrender.com, *.internal, *.flycast.internal, *.fly.dev et les hôtes
+  # dérivés de FRONTEND_APP_URL / BACKEND_PUBLIC_URL / CORS_ORIGINS /
+  # TRUSTED_HOSTS : le trafic public (Vercel, moniteurs UptimeRobot/Render)
+  # arrive via le proxy Fly avec Host *.fly.dev → servi normalement.
   TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev'
 
 [http_service]
@@ -45,12 +43,16 @@ primary_region = 'fra'
     hard_limit = 50
     soft_limit = 20
 
+  # Health check TCP : simple connexion sur internal_port (8080). Un check
+  # HTTP traverserait le TrustedHostMiddleware et échouerait en 400 sur le
+  # Host des sondes internes Fly → TCP requis pour que le middleware reste
+  # activable. La disponibilité applicative (GET /health) reste couverte par
+  # les moniteurs externes (UptimeRobot/Render) via le Host public *.fly.dev.
   [[http_service.checks]]
     interval = '30s'
     timeout = '5s'
     grace_period = '30s'
-    method = 'GET'
-    path = '/health'
+    protocol = 'tcp'
 
 [[vm]]
   size = 'shared-cpu-1x'
