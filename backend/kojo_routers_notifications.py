@@ -16,7 +16,11 @@ router = APIRouter()
 
 @router.get("/notifications/vapid-public-key")
 async def get_vapid_public_key():
-    """Retourne la clé VAPID publique pour que le frontend puisse s'abonner."""
+    """Retourne la clé VAPID publique pour que le frontend puisse s'abonner.
+
+    Returns:
+        dict: {vapid_public_key}.
+    """
     if not VAPID_PUBLIC_KEY:
         raise HTTPException(status_code=503, detail="Notifications push non configurées sur ce serveur")
     return {"vapid_public_key": VAPID_PUBLIC_KEY}
@@ -47,7 +51,11 @@ async def get_notifications(
 
 @router.get("/notifications/unread-count")
 async def get_unread_count(current_user: User = Depends(get_current_user)):
-    """Retourne uniquement le compteur de notifications non lues (polling léger)."""
+    """Retourne uniquement le compteur de notifications non lues (polling léger).
+
+    Returns:
+        dict: {unread_count}.
+    """
     count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
     return {"unread_count": count}
 

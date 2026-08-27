@@ -399,11 +399,17 @@ const recoverSession = async (method, path, options) => {
 };
 
 export const api = {
+  /** @returns {Promise<object>} Réponse JSON du backend (data, ok...). */
   get: (path, options) => request('GET', path, options),
+  /** @returns {Promise<object>} Réponse JSON du backend. */
   post: (path, data, options = {}) => request('POST', path, { ...options, data }),
+  /** @returns {Promise<object>} Réponse JSON du backend. */
   put: (path, data, options = {}) => request('PUT', path, { ...options, data }),
+  /** @returns {Promise<object>} Réponse JSON du backend. */
   patch: (path, data, options = {}) => request('PATCH', path, { ...options, data }),
+  /** @returns {Promise<object>} Réponse JSON du backend. */
   delete: (path, options) => request('DELETE', path, options),
+  /** @returns {Promise<object>} Réponse JSON du backend. */
   uploadFile: (path, formData, options = {}) => request('POST', path, { ...options, data: formData }),
 };
 
@@ -411,47 +417,81 @@ export const authAPI = {
   // SECURITE : l'ancien endpoint /auth/register (sans vérification email)
   // a été supprimé du backend — TOUTE inscription passe désormais par
   // /auth/register-verified, qui exige un jeton de vérification email (OTP).
+  /** @returns {Promise<object>} {user, token...} compte créé. */
   register: (userData) => api.post('/auth/register-verified', userData),
+  /** @returns {Promise<object>} {user, token...} compte créé. */
   signup: (userData) => api.post('/auth/register-verified', userData),
+  /** @returns {Promise<object>} {user, token...} compte créé. */
   registerVerified: (userData) => api.post('/auth/register-verified', userData),
+  /** @returns {Promise<object>} {user, token, token_expires_at...} session. */
   login: (credentials) => api.post('/auth/login', credentials),
+  /** @returns {Promise<object>} {user, token, token_expires_at...} session. */
   signin: (credentials) => api.post('/auth/login', credentials),
   // Déconnexion RÉELLE : révoque le jeton côté serveur (blacklist jti).
   // L'ancien stub `({ success: true })` ne contactait jamais /auth/logout,
   // donc un token volé restait valide 24h même après déconnexion.
+  /** @returns {Promise<object>} {success: true} jeton révoqué. */
   logout: async () => api.post('/auth/logout'),
+  /** @returns {Promise<object>} {user} profil de l'utilisateur connecté. */
   me: () => api.get('/auth/me'),
+  /** @returns {Promise<object>} {user} profil de l'utilisateur connecté. */
   getMe: () => api.get('/auth/me'),
+  /** @returns {Promise<object>} {user} profil de l'utilisateur connecté. */
   getProfile: (options = {}) => api.get('/auth/me', options),
+  /** @returns {Promise<object>} {user} profil de l'utilisateur connecté. */
   getCurrentUser: (options = {}) => api.get('/auth/me', options),
+  /** @returns {Promise<object>} {user, country} profil avec pays mis à jour. */
   updateCountry: (payload) => api.patch('/auth/me/country', payload),
   // Google SSO : le frontend envoie le code d'autorisation (jamais l'id_token).
+  /** @returns {Promise<object>} {user, token...} session Google. */
   googleAuth: (payload) => api.post('/auth/google', payload),
+  /** @returns {Promise<object>} {user, token...} compte lié à Google. */
   googleLink: (payload) => api.post('/auth/google/link', payload),
   // Email verification methods
+  /** @returns {Promise<object>} {email, available, message}. */
   checkEmailAvailability: (payload) => api.post('/auth/email/check-availability', payload),
+  /** @returns {Promise<object>} {success: true, otp_sent_to...}. */
   sendEmailOtp: (payload) => api.post('/auth/email/send-otp', payload),
+  /** @returns {Promise<object>} {success: true, otp_sent_to...}. */
   resendEmailOtp: (payload) => api.post('/auth/email/resend-otp', payload),
+  /** @returns {Promise<object>} {valid: true} ou {valid: false, message}. */
   verifyEmailOtp: (payload) => api.post('/auth/email/verify-otp', payload),
   // Password reset methods
+  /** @returns {Promise<object>} {success: true, otp_sent_to...}. */
   requestPasswordResetOtp: (payload) => api.post('/auth/password/forgot/request', payload),
+  /** @returns {Promise<object>} {success: true, otp_sent_to...}. */
   resendPasswordResetOtp: (payload) => api.post('/auth/password/forgot/resend', payload),
+  /** @returns {Promise<object>} {valid: true} ou {valid: false, message}. */
   verifyPasswordResetOtp: (payload) => api.post('/auth/password/forgot/verify', payload),
+  /** @returns {Promise<object>} {success: true} mot de passe réinitialisé. */
   resetPassword: (payload) => api.post('/auth/password/reset', payload),
 };
 
 export const jobsAPI = {
+  /** @returns {Promise<object>} {jobs, total, page, limit, has_more...}. */
   getAll: (params = {}) => api.get('/jobs', { params }),
+  /** @returns {Promise<object>} {job} mission complète. */
   getById: (id) => api.get(`/jobs/${id}`),
+  /** @returns {Promise<object>} {job} mission créée (response_model=Job). */
   create: (jobData) => api.post('/jobs', jobData),
-  update: (id, jobData) => api.put(`/jobs/${id}`, jobData),
+  // NOTE: pas de update — le backend n'expose AUCUNE route PUT /jobs/{id}
+  // (une mission est créée puis complétée, jamais éditée). L'ancienne
+  // méthode pointait vers une route inexistante (audit_api_returns.cjs).
+  /** @returns {Promise<object>} {success: true} mission supprimée. */
   delete: (id) => api.delete(`/jobs/${id}`),
+  /** @returns {Promise<object>} {proposal} candidature envoyée. */
   apply: (jobId, applicationData) => api.post(`/jobs/${jobId}/proposals`, applicationData),
+  /** @returns {Promise<object>} {proposals} liste des candidatures. */
   getApplications: (jobId) => api.get(`/jobs/${jobId}/proposals`),
+  /** @returns {Promise<object>} {proposals} liste des candidatures. */
   getProposals: (jobId) => api.get(`/jobs/${jobId}/proposals`),
+  /** @returns {Promise<object>} {proposal, job} candidature acceptée. */
   acceptProposal: (jobId, proposalId, payload = {}) => api.post(`/jobs/${jobId}/proposals/${proposalId}/accept`, payload),
+  /** @returns {Promise<object>} {proposals} candidatures du travailleur. */
   getMyProposals: () => api.get('/proposals/mine'),
+  /** @returns {Promise<object>} {job} mission marquée terminée. */
   completeJob: (jobId) => api.post(`/jobs/${jobId}/complete`),
+  /** @returns {Promise<object>} {status, payout_status...} statut du paiement. */
   getPaymentStatus: (jobId) => api.get(`/jobs/${jobId}/payment-status`),
 };
 
@@ -532,11 +572,17 @@ const normalizeConversationListResponse = (payload) => {
 };
 
 export const messagesAPI = {
+  /** @returns {Promise<object>} {message, conversation...} message envoyé. */
   send: (payload) => api.post('/messages', payload),
+  /** @returns {Promise<object>} {message, conversation...} message envoyé. */
   sendMessage: (payload) => api.post('/messages', payload),
+  /** @returns {Promise<Array<object>>} messages normalisés (KOJO_JOB strippé). */
   list: async () => normalizeMessageListResponse(await api.get('/messages')),
+  /** @returns {Promise<Array<object>>} conversations normalisées. */
   getConversations: async () => normalizeConversationListResponse(await api.get('/messages/conversations')),
+  /** @returns {Promise<Array<object>>} messages de la conversation normalisés. */
   getConversation: async (conversationId) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`)),
+  /** @returns {Promise<Array<object>>} messages paginés normalisés. */
   getMessages: async (conversationId, { limit = 100, offset = 0, order = 'asc' } = {}) => normalizeMessageListResponse(await api.get(`/messages/${conversationId}`, { params: { limit, offset, order } })),
 };
 
@@ -608,11 +654,17 @@ const createResourceApi = (resourceName) => {
 // au lieu de /payments/config, en GET au lieu du bon verbe HTTP, etc.)
 // Voir backend/server.py pour les routes reelles.
 export const paymentAPI = {
+  /** @returns {Promise<object>} {provider, configured, channels...}. */
   getConfig: () => api.get('/payments/config'),
+  /** @returns {Promise<object>} {provider, amount, commission, total...}. */
   getQuote: (payload) => api.post('/payments/quote', payload),
+  /** @returns {Promise<object>} {payment, checkout_url...} paiement créé. */
   createCheckout: (payload) => api.post('/payments/checkout', payload),
+  /** @returns {Promise<object>} {status, payout_status...} statut du paiement. */
   getPaymentStatus: (paymentId) => api.get(`/payments/status/${paymentId}`),
+  /** @returns {Promise<object>} {status, payout_status...} statut via token. */
   getPaymentStatusByToken: (invoiceToken) => api.get(`/payments/status/token/${invoiceToken}`),
+  /** @returns {Promise<object>} {payments} paiements de l'utilisateur. */
   getMyPayments: () => api.get('/payments/my'),
 };
 export const paymentsAPI = paymentAPI;
@@ -620,21 +672,34 @@ export const userAPI = createResourceApi('users');
 export const usersAPI = {
   ...userAPI,
   // Profile photo methods
+  /** @returns {Promise<object>} {photo_url} ou {photo_url: null} sans photo. */
   getProfilePhoto: () => api.get('/users/profile-photo'),
+  /** @returns {Promise<object>} {photo_url} photo du profil ciblé. */
   getUserProfilePhoto: (userId) => api.get(`/users/${userId}/profile-photo`),
+  /** @returns {Promise<object>} {photo_url} photo téléversée. */
   uploadProfilePhoto: (formData) => api.post('/users/profile-photo', formData),
+  /** @returns {Promise<object>} {success: true} photo supprimée. */
   deleteProfilePhoto: () => api.delete('/users/profile-photo'),
+  /** @returns {Promise<object>} {message, deleted: true} compte supprimé. */
   deleteAccount: () => api.delete('/users/account'),
   // Profile update
+  /** @returns {Promise<object>} {user} profil mis à jour. */
   updateProfile: (payload) => api.put('/users/profile', payload),
   // Portfolio travailleur (photos de réalisations)
+  /** @returns {Promise<object>} {portfolio_images} liste d'URLs. */
   getPortfolio: () => api.get('/users/portfolio'),
+  /** @returns {Promise<object>} {portfolio_images} image ajoutée. */
   addPortfolioImage: (formData) => api.uploadFile('/users/portfolio', formData),
+  /** @returns {Promise<object>} {portfolio_images} image retirée. */
   removePortfolioImage: (index) => api.delete(`/users/portfolio/${index}`),
   // Parrainage
+  /** @returns {Promise<object>} {referral_code, reward_balance...}. */
   getReferral: () => api.get('/users/referral'),
+  /** @returns {Promise<object>} {filleuls} liste des filleuls. */
   getReferralFilleuls: () => api.get('/users/referral/filleuls'),
+  /** @returns {Promise<object>} {success: true, referral_code...}. */
   applyReferral: (code) => api.post('/users/referral/apply', { code }),
+  /** @returns {Promise<object>} {success: true} récompense retirée. */
   withdrawReferral: () => api.post('/users/referral/withdraw'),
 };
 export const profileAPI = userAPI;
@@ -642,65 +707,87 @@ export const profilesAPI = userAPI;
 export const workerAPI = createResourceApi('workers');
 export const workersAPI = workerAPI;
 export const workerProfileAPI = {
+  /** @returns {Promise<object>} {profile} profil travailleur. */
   get: () => api.get('/workers/profile'),
+  /** @returns {Promise<object>} {profile} profil travailleur créé. */
   create: (payload) => api.post('/workers/profile', payload),
+  /** @returns {Promise<object>} {profile} profil travailleur mis à jour. */
   update: (payload) => api.put('/workers/profile', payload),
 };
 export const notificationAPI = {
-  // Récupérer toutes les notifications (+ unread_count)
+  /** @returns {Promise<object>} {notifications, unread_count}. */
   getAll: (params = {}) => api.get('/notifications', { params }),
-  // Compteur non-lus uniquement (polling léger)
+  /** @returns {Promise<object>} {unread_count} compteur non-lus. */
   getUnreadCount: () => api.get('/notifications/unread-count'),
-  // Clé VAPID publique pour l'abonnement push
+  /** @returns {Promise<object>} {vapid_public_key} clé VAPID publique. */
   getVapidPublicKey: () => api.get('/notifications/vapid-public-key'),
-  // Marquer une notification comme lue
+  /** @returns {Promise<object>} {success: true} notification marquée lue. */
   markRead: (notificationId) => api.put(`/notifications/${notificationId}/read`),
-  // Marquer toutes comme lues
+  /** @returns {Promise<object>} {success: true} toutes lues. */
   markAllRead: () => api.put('/notifications/mark-all-read'),
-  // Supprimer une notification
+  /** @returns {Promise<object>} {success: true} notification supprimée. */
   deleteOne: (notificationId) => api.delete(`/notifications/${notificationId}`),
-  // Supprimer toutes
+  /** @returns {Promise<object>} {success: true} toutes supprimées. */
   deleteAll: () => api.delete('/notifications'),
-  // Enregistrer un push token (web subscription JSON)
+  /** @returns {Promise<object>} {success: true} push token enregistré. */
   registerPushToken: (payload) => api.post('/users/push-token', payload),
 };
 export const notificationsAPI = notificationAPI;
 // Avis / notes : endpoints explicites (le proxy générique construisait des
 // URLs qui ne correspondent pas aux vraies routes backend).
 export const reviewAPI = {
+  /** @returns {Promise<object>} {review} avis créé. */
   create: (jobId, payload) => api.post(`/jobs/${jobId}/reviews`, payload),
+  /** @returns {Promise<object>} {reviews} avis de la mission. */
   getJobReviews: (jobId) => api.get(`/jobs/${jobId}/reviews`),
+  /** @returns {Promise<object>} {reviews} avis de l'utilisateur. */
   getUserReviews: (userId) => api.get(`/users/${userId}/reviews`),
+  /** @returns {Promise<object>} {success: true} avis supprimé. */
   remove: (reviewId) => api.delete(`/reviews/${reviewId}`),
 };
 export const reviewsAPI = reviewAPI;
 export const supportAPI = {
+  /** @returns {Promise<object>} {ticket} ticket créé. */
   createTicket: (payload) => api.post('/support/tickets', payload),
+  /** @returns {Promise<object>} {ticket, status...} statut du ticket. */
   getTicketStatus: (ticketId, email) => api.post('/support/tickets/status', { ticket_id: ticketId, email }),
+  /** @returns {Promise<object>} {tickets} liste des tickets. */
   listTickets: (statusFilter) => api.get('/support/tickets', { params: statusFilter ? { status_filter: statusFilter } : {} }),
+  /** @returns {Promise<object>} {ticket} statut mis à jour. */
   updateTicketStatus: (ticketId, status) => api.patch(`/support/tickets/${ticketId}/status`, { status }),
 };
 export const messageAPI = {
+  /** @returns {Promise<Array<object>>} messages normalisés. */
   list: (params = {}) => messagesAPI.list(params),
+  /** @returns {Promise<Array<object>>} messages normalisés. */
   getAll: (params = {}) => messagesAPI.list(params),
+  /** @returns {Promise<Array<object>>} messages de la conversation. */
   getById: (id) => messagesAPI.getConversation(id),
+  /** @returns {Promise<Array<object>>} conversation ou liste selon l'argument. */
   get: (id) => id ? messagesAPI.getConversation(id) : messagesAPI.list(),
+  /** @returns {Promise<object>} message envoyé. */
   create: (payload) => messagesAPI.send(payload),
+  /** @returns {Promise<object>} message envoyé. */
   post: (payload) => messagesAPI.send(payload),
+  /** @returns {Promise<object>} message envoyé. */
   send: (payload) => messagesAPI.send(payload),
+  /** @returns {Promise<Array<object>>} conversations normalisées. */
   getConversations: () => messagesAPI.getConversations(),
+  /** @returns {Promise<Array<object>>} messages de la conversation. */
   getConversation: (id) => messagesAPI.getConversation(id),
 };
 export const conversationAPI = messageAPI;
 export const conversationsAPI = messageAPI;
 
 export const geolocationAPI = {
+  /** @returns {Promise<object>} {detected, country...} ou {detected: false}. */
   detect: (params) => api.get('/geolocation/detect', { params }),
+  /** @returns {Promise<Array<object>>} pays disponibles. */
   getAvailableCountries: () => api.get('/geolocation/available-countries'),
 };
 
 export const publicAPI = {
-  // Chiffres réels de la landing (compteurs agrégés, sans auth)
+  /** @returns {Promise<object>} {jobs, workers, completed_jobs...} compteurs. */
   getStats: () => api.get('/public/stats'),
 };
 

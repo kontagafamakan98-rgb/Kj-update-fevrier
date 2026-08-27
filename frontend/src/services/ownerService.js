@@ -14,6 +14,7 @@ import { api, getAuthToken } from './api';
 // client partagé `api` (credentials: 'include' + en-tête X-CSRFToken sur les
 // mutations) — plus aucun fetch manuel.
 class OwnerService {
+  /** @returns {object|null} Utilisateur stocké en localStorage, ou null. */
   getStoredUser() {
     try {
       const rawUser = localStorage.getItem('user');
@@ -24,6 +25,7 @@ class OwnerService {
     }
   }
 
+  /** @returns {boolean} true si le profil a le rôle owner/admin. */
   isOwnerUser(userCandidate = null) {
     return Boolean(
       userCandidate?.user_type === 'owner'
@@ -32,6 +34,7 @@ class OwnerService {
     );
   }
 
+  /** @returns {boolean} true si profil owner ET session active (token). */
   isOwnerSessionValid(userCandidate = null) {
     // Deux conditions : le profil est bien un compte owner ET une session
     // active existe (sinon les appels /owner/* échoueraient en 401). En mode
@@ -48,7 +51,7 @@ class OwnerService {
     return error instanceof Error ? error : new Error(fallback);
   }
 
-  // Obtenir les statistiques de commission (propriétaire uniquement)
+  /** @returns {Promise<object>} Stats commission (propriétaire uniquement). */
   async getCommissionStats() {
     try {
       devLog.info('🔐 Récupération stats commission (propriétaire)...');
@@ -61,7 +64,7 @@ class OwnerService {
     }
   }
 
-  // Obtenir les informations de debug (propriétaire uniquement)
+  /** @returns {Promise<object>} Infos de debug (propriétaire uniquement). */
   async getDebugInfo() {
     try {
       devLog.info('🔐 Récupération infos debug (propriétaire)...');
@@ -74,7 +77,7 @@ class OwnerService {
     }
   }
 
-  // Obtenir la gestion des utilisateurs (propriétaire uniquement)
+  /** @returns {Promise<object>} Gestion des utilisateurs (propriétaire). */
   async getUsersManagement() {
     try {
       devLog.info('🔐 Récupération gestion utilisateurs (propriétaire)...');
@@ -87,7 +90,7 @@ class OwnerService {
     }
   }
 
-  // Mettre à jour les paramètres de commission (propriétaire uniquement)
+  /** @returns {Promise<object>} Paramètres de commission mis à jour. */
   async updateCommissionSettings(settings) {
     try {
       devLog.info('🔐 Mise à jour paramètres commission (propriétaire)...', settings);
@@ -100,7 +103,7 @@ class OwnerService {
     }
   }
 
-  // Vérifier si l'utilisateur actuel est le propriétaire
+  /** @returns {Promise<boolean>} true si l'accès owner est vérifié. */
   async checkOwnerAccess() {
     try {
       await this.getDebugInfo();
@@ -111,8 +114,7 @@ class OwnerService {
     }
   }
 
-  // Compatibilité ascendante : sans argument, retombe sur le profil stocké
-  // en localStorage (toujours écrit par establishSession au login).
+  /** @returns {boolean} true si la session owner est valide (compat). */
   isFamakanLoggedIn(userCandidate = null) {
     return this.isOwnerSessionValid(userCandidate || this.getStoredUser());
   }

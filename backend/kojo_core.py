@@ -57,9 +57,9 @@ try:
 
     client = AsyncIOMotorClient(
         mongo_url,
-        serverSelectionTimeoutMS=5000,
-        connectTimeoutMS=5000,
-        socketTimeoutMS=5000,
+        serverSelectionTimeoutMS=30000,
+        connectTimeoutMS=30000,
+        socketTimeoutMS=30000,
     )
     db = client[db_name]
 

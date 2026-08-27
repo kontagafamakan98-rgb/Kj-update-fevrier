@@ -3,7 +3,7 @@ import { devLog, safeLog } from '../utils/env';
 
 // Service de gestion des comptes de paiement pour la vérification
 class PaymentAccountService {
-  // Inscription finale avec vérification email + comptes de paiement
+  /** @returns {Promise<{success: boolean, data?: object, error?: string}>} */
   async registerWithPaymentVerification(userData, paymentAccounts, emailVerificationToken) {
     try {
       devLog.info('🏦📧 Finalisation inscription avec vérification paiement et email...');
@@ -34,7 +34,7 @@ class PaymentAccountService {
     }
   }
 
-  // Obtenir les comptes de paiement de l'utilisateur
+  /** @returns {Promise<{success: boolean, data?: object, error?: string}>} */
   async getUserPaymentAccounts() {
     try {
       devLog.info('📋 Récupération comptes de paiement...');
@@ -56,7 +56,7 @@ class PaymentAccountService {
     }
   }
 
-  // Mettre à jour les comptes de paiement
+  /** @returns {Promise<{success: boolean, data?: object, error?: string}>} */
   async updatePaymentAccounts(paymentAccounts) {
     try {
       devLog.info('🔄 Mise à jour comptes de paiement...');
@@ -78,7 +78,7 @@ class PaymentAccountService {
     }
   }
 
-  // Vérifier l'accès aux fonctionnalités de paiement
+  /** @returns {Promise<{success: boolean, data?: object, error?: string}>} */
   async verifyPaymentAccess() {
     try {
       devLog.info('🔐 Vérification accès paiement...');
@@ -100,7 +100,7 @@ class PaymentAccountService {
     }
   }
 
-  // Valider un numéro Orange Money côté client
+  /** @returns {boolean} true si le numéro Orange Money est valide. */
   validateOrangeMoneyNumber(number) {
     const cleanNumber = number.replace(/[\s\-\+]/g, '');
     const validPrefixes = ['223', '221', '226', '225']; // Mali, Sénégal, Burkina Faso, Côte d'Ivoire
@@ -111,7 +111,7 @@ class PaymentAccountService {
     return validPrefixes.includes(prefix) && cleanNumber.length <= 12;
   }
 
-  // Valider un numéro Wave côté client
+  /** @returns {boolean} true si le numéro Wave est valide. */
   validateWaveNumber(number) {
     const cleanNumber = number.replace(/[\s\-\+]/g, '');
     const validPrefixes = ['221', '225']; // Sénégal, Côte d'Ivoire
@@ -122,13 +122,13 @@ class PaymentAccountService {
     return validPrefixes.includes(prefix) && cleanNumber.length <= 12;
   }
 
-  // Valider une carte bancaire côté client
+  /** @returns {boolean} true si le numéro de carte est valide. */
   validateBankCard(cardNumber) {
     const cleanCard = cardNumber.replace(/[\s\-]/g, '');
     return cleanCard.length >= 15 && cleanCard.length <= 16 && /^\d+$/.test(cleanCard);
   }
 
-  // Formater un numéro de téléphone
+  /** @returns {string} Numéro formaté (+indicatif si possible). */
   formatPhoneNumber(number) {
     const cleanNumber = number.replace(/[\s\-]/g, '');
     if (cleanNumber.startsWith('+')) return cleanNumber;
@@ -139,13 +139,13 @@ class PaymentAccountService {
     return number;
   }
 
-  // Formater un numéro de carte bancaire
+  /** @returns {string} Carte formatée en groupes de 4. */
   formatBankCard(cardNumber) {
     const cleanCard = cardNumber.replace(/[\s\-]/g, '');
     return cleanCard.replace(/(.{4})/g, '$1-').slice(0, -1);
   }
 
-  // Masquer un numéro de carte bancaire
+  /** @returns {string} Carte masquée (****-****-****-1234). */
   maskBankCard(cardNumber) {
     const cleanCard = cardNumber.replace(/[\s\-]/g, '');
     if (cleanCard.length >= 16) {
@@ -156,7 +156,7 @@ class PaymentAccountService {
     return '****-****-****';
   }
 
-  // Obtenir le statut de vérification depuis localStorage
+  /** @returns {object|null} Statut de vérification stocké, ou null. */
   getStoredVerificationStatus() {
     try {
       const stored = localStorage.getItem('payment_verification_status');
@@ -167,7 +167,7 @@ class PaymentAccountService {
     }
   }
 
-  // Sauvegarder le statut de vérification dans localStorage
+  /** @returns {void} Statut sauvegardé dans localStorage. */
   storeVerificationStatus(status) {
     try {
       localStorage.setItem('payment_verification_status', JSON.stringify({
@@ -180,7 +180,7 @@ class PaymentAccountService {
     }
   }
 
-  // Nettoyer le cache de vérification
+  /** @returns {void} Cache de vérification nettoyé. */
   clearVerificationCache() {
     try {
       localStorage.removeItem('payment_verification_status');
@@ -190,7 +190,7 @@ class PaymentAccountService {
     }
   }
 
-  // Vérifier si l'utilisateur a besoin de configurer ses comptes
+  /** @returns {boolean} true si des comptes de paiement manquent. */
   needsPaymentSetup(userType, paymentAccountsCount) {
     if (userType === 'client') {
       return paymentAccountsCount < 1;
@@ -200,7 +200,7 @@ class PaymentAccountService {
     return false;
   }
 
-  // Obtenir les informations sur les exigences de paiement
+  /** @returns {object} {minimum, description, purpose} exigences par rôle. */
   getPaymentRequirements(userType) {
     if (userType === 'client') {
       return {

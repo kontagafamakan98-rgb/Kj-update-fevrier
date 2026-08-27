@@ -1039,6 +1039,12 @@ const NEUTRAL_DETECTED_COUNTRY = Object.freeze({
 });
 
 // Export des fonctions utilitaires pour compatibilité
+/**
+ * Détecte le pays de l'utilisateur (IP + GPS + réseau).
+ * @returns {Promise<object>} Objet pays {detected, code, name, nameFrench,
+ * flag, phonePrefix, currency, language} — objet NEUTRE {detected: false}
+ * si la détection échoue (jamais null).
+ */
 export const detectUserCountry = async (options = {}) => {
   await loadGeographicDatabase();
   const location = await preciseGeolocationService.detectPreciseLocation(options);
@@ -1087,6 +1093,11 @@ export const COUNTRIES = Object.entries(FALLBACK_COUNTRY_DATA).reduce((acc, [cod
   return acc;
 }, {});
 
+/**
+ * Liste tous les pays de la base de géolocalisation.
+ * @returns {Array<object>} [{code, name, nameFrench, flag, phonePrefix,
+ * currency, language}].
+ */
 export const getCountriesList = () => {
   return Object.entries(getDatabase()).map(([code, data]) => ({
     code,
@@ -1117,17 +1128,31 @@ const buildCountryObject = (countryData, code) => {
   };
 };
 
+/**
+ * Pays par code (majuscules/minuscules tolérées).
+ * @returns {object} Objet pays {detected, code, ...} — NEUTRE
+ * {detected: false} si le code est inconnu (jamais null).
+ */
 export const getCountryByCode = (code) => {
   const normalizedCode = normalizeCountryCode(code);
   const countryData = getDatabase()[normalizedCode];
   return buildCountryObject(countryData, normalizedCode);
 };
 
+/**
+ * Indicatif téléphonique d'un pays.
+ * @returns {string} Indicatif (ex: '+221') ou '' si inconnu.
+ */
 export const getPhonePrefixByCountry = (countryCode) => {
   const country = getCountryByCode(countryCode);
   return country?.phonePrefix || '';
 };
 
+/**
+ * Détecte le pays depuis un numéro de téléphone (indicatif).
+ * @returns {object} Objet pays {detected, code, ...} — NEUTRE
+ * {detected: false} si l'indicatif est inconnu ou numéro vide.
+ */
 export const detectCountryFromPhone = (phoneNumber) => {
   if (!phoneNumber) return { ...NEUTRAL_DETECTED_COUNTRY };
 
@@ -1150,6 +1175,10 @@ export const detectCountryFromPhone = (phoneNumber) => {
   return { ...NEUTRAL_DETECTED_COUNTRY };
 };
 
+/**
+ * Formate un numéro avec l'indicatif du pays (ajout ou normalisation).
+ * @returns {string} Numéro formaté, ou '' si le numéro est vide.
+ */
 export const formatPhoneNumber = (phone, countryCode) => {
   if (!phone) return '';
 
@@ -1175,6 +1204,10 @@ export const formatPhoneNumber = (phone, countryCode) => {
   return prefix + ' ' + cleanPhone;
 };
 
+/**
+ * Exemple de numéro de téléphone pour un pays.
+ * @returns {string} Exemple formaté, ou placeholder si pays inconnu.
+ */
 export const getPhoneExampleForCountry = (country) => {
   const examples = {
     'mali': '+223 70 12 34 56',
@@ -1190,6 +1223,11 @@ export const getPhoneExampleForCountry = (country) => {
 // Helpers pays/banques/langues (ex-geolocationService.js) — fusionnés ici pour
 // éliminer la duplication de COUNTRIES et des méthodes de géolocalisation.
 // ============================================================================
+/**
+ * Banques populaires d'un pays.
+ * @returns {Array<string>} Liste de banques — [] si pays inconnu
+ * (jamais la liste Sénégal par défaut : pas de biais silencieux).
+ */
 export const getPopularBanksByCountry = (country) => {
   const banks = {
     'mali': [
@@ -1296,21 +1334,38 @@ const getLanguageConfigByCountry = (country) => {
 };
 
 // Obtenir les langues principales par pays (langues recommandées en priorité)
+/**
+ * Langues recommandées pour un pays.
+ * @returns {Array<string>} Codes de langue ordonnés (ex: ['fr', 'wo']).
+ */
 export const getLanguagesByCountry = (country) => {
   return getLanguageConfigByCountry(country).ordered;
 };
 
 // Obtenir la langue principale (première) d'un pays
+/**
+ * Langue principale d'un pays.
+ * @returns {string} Code de langue (ex: 'fr').
+ */
 export const getPrimaryLanguageForCountry = (country) => {
   return getLanguageConfigByCountry(country).primary;
 };
 
 // Obtenir la langue locale réellement supportée par l'application
+/**
+ * Langue locale réellement supportée par l'application.
+ * @returns {string|null} Code de langue locale, ou null si aucune.
+ */
 export const getLocalLanguageForCountry = (country) => {
   return getLanguageConfigByCountry(country).local[0] || null;
 };
 
 // Organiser les langues selon le pays détecté (langues recommandées en premier, puis les autres)
+/**
+ * Langues ordonnées pour un pays détecté (recommandées d'abord).
+ * @returns {Array<object>} [{code, name, flag, isPrimary,
+ * isCountryLanguage, isRecommended}].
+ */
 export const getOrderedLanguagesForCountry = (detectedCountry) => {
   const countryConfig = getLanguageConfigByCountry(detectedCountry);
   const recommendedLanguages = countryConfig.ordered;
@@ -1330,6 +1385,11 @@ export const getOrderedLanguagesForCountry = (detectedCountry) => {
 };
 
 // Obtenir le message de suggestion de langue selon le pays
+/**
+ * Message de suggestion de langue pour un pays détecté.
+ * @returns {object|null} {message, primaryLang, localLang} ou null si pays
+ * inconnu.
+ */
 export const getLanguageSuggestionMessage = (detectedCountry) => {
   if (!detectedCountry) return null;
 

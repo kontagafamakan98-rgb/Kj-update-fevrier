@@ -224,9 +224,13 @@ async def paydunya_disburse_ipn(request: Request):
 
     SECURITE: comme pour l'IPN de collecte, on ne fait pas confiance au
     statut envoyé dans le payload du callback - on reconfirme auprès de
-    PayDunya via check-status, en utilisant le disburse_token retrouvé côté
-    serveur (jamais celui du payload) pour identifier quel enregistrement
+    PayDunya via check-status, en utilisant le disburse_token retrouvé    côté serveur (jamais celui du payload) pour identifier quel enregistrement
     mettre à jour.
+
+    Returns:
+        dict: {status: "ok" | "ignored" | "error" | "inconclusive",
+        detail?} — le statut réel est reconfirmé auprès de PayDunya avant
+        de mettre à jour l'enregistrement.
     """
     try:
         payload = await request.json()
@@ -655,6 +659,10 @@ async def paydunya_payment_ipn(request: Request):
     statut réel est systématiquement reconfirmé auprès de l'API PayDunya
     elle-même via sync_payment_status_with_paydunya(), à partir du
     invoice_token stocké côté serveur (jamais celui du payload).
+
+    Returns:
+        dict: {status: "ok" | "ignored" | "error", detail?} — le statut
+        est reconfirmé auprès de PayDunya avant toute mise à jour.
     """
     try:
         payload = await request.json()

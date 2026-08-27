@@ -147,6 +147,7 @@ class ProfilePhotoService {
   /**
    * Clean up preview URL to prevent memory leaks
    * @param {string} url - Object URL to revoke
+   * @returns {void}
    */
   revokePreviewUrl(url) {
     if (url && url.startsWith('blob:')) {

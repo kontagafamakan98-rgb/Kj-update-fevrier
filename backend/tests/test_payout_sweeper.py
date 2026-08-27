@@ -946,3 +946,137 @@ class TestExternalProviderMonitors:
             resp2 = await client.get("/monitor/brevo")
         assert resp1.status_code == 200 and resp2.status_code == 200
         assert get_mock.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# 🔗 Healthcheck composite (/monitor) : alerte agrégée 503 si N fournisseurs down
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+class TestCompositeMonitor:
+    """Healthcheck composite : sonde les 3 fournisseurs (PayDunya, Brevo,
+    Cloudinary) en parallèle et renvoie 503 si AU MOINS `threshold` d'entre
+    eux sont down (défaut 2). Le payload consolide l'état de chaque
+    fournisseur pour identifier la panne sans requête supplémentaire."""
+
+    async def _clear_caches(self):
+        import kojo_core, kojo_email
+        kojo_core._cloudinary_health_cache.clear()
+        kojo_email._brevo_health_cache.clear()
+
+    async def test_composite_all_ok_200(self, client: AsyncClient):
+        """Les 3 fournisseurs répondent → 200, down=0, circuit=ok."""
+        await self._clear_caches()
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get") as get_mock, \
+             patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping",
+                   return_value={"status": "ok"}):
+            get_mock.return_value.ok = True
+            get_mock.return_value.status_code = 200
+            cfg_mock.return_value.cloud_name = "kojo"
+            cfg_mock.return_value.api_key = "key"
+            cfg_mock.return_value.api_secret = "secret"
+            resp = await client.get("/monitor")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["service"] == "composite"
+        assert data["circuit"] == "ok"
+        assert data["total"] == 3
+        assert data["down"] == 0
+        assert data["threshold"] == 2
+        assert data["providers"]["paydunya"]["circuit"] == "ok"
+        assert data["providers"]["brevo"]["circuit"] == "ok"
+        assert data["providers"]["cloudinary"]["circuit"] == "ok"
+
+    async def test_composite_single_down_200_by_default(self, client: AsyncClient):
+        """UN seul fournisseur down (Brevo) avec seuil par défaut 2 → 200 :
+        l'alerte agrégée ignore les flaps isolés d'un fournisseur."""
+        await self._clear_caches()
+        import requests as _requests
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get",
+                   side_effect=_requests.ConnectionError("Brevo down")), \
+             patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping",
+                   return_value={"status": "ok"}):
+            cfg_mock.return_value.cloud_name = "kojo"
+            cfg_mock.return_value.api_key = "key"
+            cfg_mock.return_value.api_secret = "secret"
+            resp = await client.get("/monitor")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["down"] == 1
+        assert data["providers"]["brevo"]["circuit"] == "down"
+        assert data["providers"]["cloudinary"]["circuit"] == "ok"
+
+    async def test_composite_two_down_503(self, client: AsyncClient):
+        """DEUX fournisseurs down (Brevo + Cloudinary) → 503 avec seuil 2 :
+        alerte agrégée immédiate, payload listant les 2 pannes."""
+        await self._clear_caches()
+        import requests as _requests
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get",
+                   side_effect=_requests.ConnectionError("Brevo down")), \
+             patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping",
+                   side_effect=Exception("Cloudinary down")):
+            cfg_mock.return_value.cloud_name = "kojo"
+            cfg_mock.return_value.api_key = "key"
+            cfg_mock.return_value.api_secret = "secret"
+            resp = await client.get("/monitor")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["circuit"] == "degraded"
+        assert data["down"] == 2
+        assert data["providers"]["brevo"]["circuit"] == "down"
+        assert data["providers"]["cloudinary"]["circuit"] == "down"
+        assert data["providers"]["paydunya"]["circuit"] == "ok"
+
+    async def test_composite_threshold_1_raises_on_single_down(self, client: AsyncClient):
+        """threshold=1 : un seul fournisseur down → 503 (mode strict)."""
+        await self._clear_caches()
+        import requests as _requests
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get",
+                   side_effect=_requests.ConnectionError("Brevo down")), \
+             patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping",
+                   return_value={"status": "ok"}):
+            cfg_mock.return_value.cloud_name = "kojo"
+            cfg_mock.return_value.api_key = "key"
+            cfg_mock.return_value.api_secret = "secret"
+            resp = await client.get("/monitor?threshold=1")
+        assert resp.status_code == 503
+        data = resp.json()
+        assert data["down"] == 1
+        assert data["threshold"] == 1
+
+    async def test_composite_paydunya_open_counts_as_down(self, client: AsyncClient):
+        """Circuit PayDunya OUVERT (persisté en base par un autre worker) +
+        Brevo OK → down=1 : avec threshold=1 le composite renvoie 503, avec
+        le défaut 2 il reste à 200 (un seul fournisseur touché)."""
+        import time as _time
+        await db_insert("paydunya_circuit", {
+            "_id": "global",
+            "state": "open",
+            "consecutive_failures": 5,
+            "opened_at": _time.time(),
+        })
+        await self._clear_caches()
+        with patch("kojo_email.brevo_is_configured", return_value=True), \
+             patch("kojo_email.requests.get") as get_mock, \
+             patch("kojo_core.cloudinary.config") as cfg_mock, \
+             patch("kojo_core.cloudinary.api.ping",
+                   return_value={"status": "ok"}):
+            get_mock.return_value.ok = True
+            get_mock.return_value.status_code = 200
+            cfg_mock.return_value.cloud_name = "kojo"
+            cfg_mock.return_value.api_key = "key"
+            cfg_mock.return_value.api_secret = "secret"
+            resp_default = await client.get("/monitor")
+            resp_strict = await client.get("/monitor?threshold=1")
+        assert resp_default.status_code == 200
+        assert resp_default.json()["down"] == 1
+        assert resp_default.json()["providers"]["paydunya"]["circuit"] == "open"
+        assert resp_strict.status_code == 503

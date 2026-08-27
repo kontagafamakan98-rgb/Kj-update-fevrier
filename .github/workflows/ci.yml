@@ -7,6 +7,126 @@ on:
     branches: [main]
 
 jobs:
+  # ─── Méta-test des audits : vérifie que les garde-fous échouent sur une
+  # régression injectée (sinon ils ne protègent rien). Indépendant : crée des
+  # fixtures temporaires, assert exit 1 sur chaque audit, puis nettoie. ─────
+  audit-regression-test:
+    name: Audits détectent les régressions
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Injecter une régression backend (route sans docstring) → échec attendu
+        working-directory: backend
+        run: |
+          cat > tests/fixtures_audit_regression.py <<'PYEOF'
+          from fastapi import APIRouter
+          router = APIRouter()
+
+
+          @router.get("/regression/probe")
+          async def regression_probe():
+              return {"ok": True}
+          PYEOF
+          set +e
+          python scripts/audit_docstrings.py --fail-on-warning tests/fixtures_audit_regression.py > /tmp/audit_out.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+          rm -f tests/fixtures_audit_regression.py
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "::error::audit_docstrings.py a PASSÉ alors qu'une route sans docstring était injectée"
+            cat /tmp/audit_out.txt
+            exit 1
+          fi
+          echo "✓ audit_docstrings.py échoue sur une route sans docstring (exit $EXIT_CODE)"
+
+      - name: Injecter une régression frontend (endpoint fantôme) → échec attendu
+        working-directory: frontend
+        run: |
+          cat > src/services/fixtureRegression.js <<'JSEOF'
+          import { api } from './api';
+
+          export const regressionProbe = {
+            /** @returns {Promise<object>} Appel vers un endpoint inexistant. */
+            fetchMissing: () => api.get('/totally/missing-endpoint'),
+          };
+          JSEOF
+          set +e
+          node scripts/audit_api_returns.cjs --fail-on-warning > /tmp/audit_fe_out.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+          rm -f src/services/fixtureRegression.js
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "::error::audit_api_returns.cjs a PASSÉ alors qu'un endpoint fantôme était injecté"
+            cat /tmp/audit_fe_out.txt
+            exit 1
+          fi
+          echo "✓ audit_api_returns.cjs échoue sur un endpoint fantôme (exit $EXIT_CODE)"
+
+      - name: Injecter une régression syntaxe Python (py_compile) → échec attendu
+        working-directory: backend
+        run: |
+          cat > tests/fixtures_pycompile_regression.py <<'PYEOF'
+          from fastapi import APIRouter
+          router = APIRouter()
+
+
+          @router.get("/break")
+          async def broken(  # parenthèse jamais fermée — SyntaxError
+          PYEOF
+          set +e
+          python -m py_compile tests/fixtures_pycompile_regression.py > /tmp/pyc_out.txt 2>&1
+          EXIT_CODE=$?
+          set -e
+          rm -f tests/fixtures_pycompile_regression.py
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "::error::py_compile a PASSÉ alors qu'un fichier syntaxiquement invalide était injecté"
+            cat /tmp/pyc_out.txt
+            exit 1
+          fi
+          echo "✓ py_compile échoue sur une syntaxe invalide (exit $EXIT_CODE)"
+
+      - name: Injecter une régression pyflakes (nom non défini) → échec attendu
+        working-directory: backend
+        run: |
+          pip install --quiet pyflakes
+          cat > kojo_routers_break.py <<'PYEOF'
+          from fastapi import APIRouter
+          router = APIRouter()
+
+
+          @router.get("/break")
+          async def broken():
+              return undefined_variable_xyz
+          PYEOF
+          UNDEFINED=$(python -m pyflakes kojo_routers_break.py | grep "undefined name" || true)
+          rm -f kojo_routers_break.py
+          if [ -z "$UNDEFINED" ]; then
+            echo "::error::pyflakes a PASSÉ alors qu'un nom non défini était injecté"
+            exit 1
+          fi
+          echo "✓ pyflakes échoue sur un nom non défini"
+
+      - name: Vérifier le passage sans régression (baseline)
+        working-directory: backend
+        run: |
+          python scripts/audit_docstrings.py --fail-on-warning
+          python -m py_compile server.py tests/*.py
+          cd ../frontend
+          node scripts/audit_api_returns.cjs --fail-on-warning
+          echo "✓ Baseline : audits, py_compile et pyflakes passent sans régression injectée"
+
   # ─── Backend : tests Python (FakeDB + vrai MongoDB) ──────────────────────
   backend-tests:
     name: Backend tests (Python + MongoDB)
@@ -51,6 +171,10 @@ jobs:
           fi
           echo "✓ Aucun nom non défini dans les modules kojo_*"
 
+      - name: Docstrings des endpoints (audit_docstrings.py, strict)
+        working-directory: backend
+        run: python scripts/audit_docstrings.py --fail-on-warning
+
       - name: Run tests against real MongoDB
         working-directory: backend
         env:
@@ -85,6 +209,10 @@ jobs:
       - name: Run tests
         working-directory: frontend
         run: npm test
+
+      - name: Audit des retours des services (audit_api_returns.cjs, strict)
+        working-directory: frontend
+        run: node scripts/audit_api_returns.cjs --fail-on-warning
 
       - name: Build
         working-directory: frontend

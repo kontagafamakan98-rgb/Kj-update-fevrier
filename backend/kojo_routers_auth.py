@@ -162,6 +162,10 @@ async def check_signup_email_availability(payload: EmailOtpRequest):
     moment où l'utilisateur finalise son inscription (register-verified, qui
     renvoie « Cette adresse email est déjà utilisée »), ce qui ne permet pas
     d'énumérer les emails par simple scan.
+
+    Returns:
+        dict: {email, available, message} — available est TOUJOURS None
+        (réponse identique que l'email soit libre ou déjà inscrit).
     """
     clean_email = sanitize_email(payload.email)
     return {

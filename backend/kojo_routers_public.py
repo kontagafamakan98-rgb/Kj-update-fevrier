@@ -77,6 +77,9 @@ async def get_sitemap_xml():
     exactes, au lieu du sitemap statique Vercel qui n'énumérait que la home.
     Le Vercel rewrite /sitemap.xml → /api/sitemap.xml (vercel.json) achemine
     le crawler jusqu'ici.
+
+    Returns:
+        Response: XML (text/xml) — le sitemap complet, pas un objet JSON.
     """
     base = _site_base()
 
@@ -132,7 +135,11 @@ async def get_robots_txt():
 
     Le rewrite Vercel /robots.txt → /api/robots.txt (transient.json) fait que
     les crawlers reçoivent cette version. Le fichier statique reste en place
-    comme repli si le proxy /api est désactivé."""
+    comme repli si le proxy /api est désactivé.
+
+    Returns:
+        Response: texte brut (text/plain) — les directives robots.txt.
+    """
     base = _site_base()
     body = (
         f"User-agent: *\n"

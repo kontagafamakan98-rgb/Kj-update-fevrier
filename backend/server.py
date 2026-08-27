@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, FastAPI, Response
+from fastapi import APIRouter, FastAPI, Query, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -295,6 +295,84 @@ async def monitor_cloudinary():
     return await _external_provider_monitor(cloudinary_health_probe, "cloudinary")
 
 
+async def _composite_monitor_payload() -> tuple[dict, list]:
+    """Sonde les 3 fournisseurs externes (PayDunya, Brevo, Cloudinary) en
+    parallèle et consolide leur état pour l'alerte AGRÉGÉE.
+
+    Chaque fournisseur est évalué avec son contrat habituel :
+    - PayDunya   : "down" si le circuit est OPEN (half_open = sonde autorisée),
+    - Brevo/Cloudinary : "down" si la sonde échoue (transport, HTTP erreur,
+      config manquante).
+
+    Les sondes sync (requests / SDK cloudinary) tournent dans des threads via
+    asyncio.gather + to_thread : l'event loop n'est jamais bloqué, et les
+    caches TTL 60 s internes de chaque sonde protègent les fournisseurs quand
+    le moniteur interroge fréquemment.
+
+    Returns:
+        (dict, list): payload consolidé {service, circuit, total, down,
+        threshold, providers, timestamp} + liste des fournisseurs down.
+    """
+    paydunya_payload, paydunya_state = await _paydunya_monitor_payload()
+    brevo_result, cloudinary_result = await asyncio.gather(
+        asyncio.to_thread(brevo_health_probe),
+        asyncio.to_thread(cloudinary_health_probe),
+    )
+    providers = {
+        "paydunya": {
+            "circuit": "open" if paydunya_state == "open" else "ok",
+            "configured": True,
+            "detail": f"circuit {paydunya_state}",
+        },
+        "brevo": {
+            "circuit": "ok" if brevo_result.get("ok") else "down",
+            "configured": brevo_result.get("configured", True),
+            "detail": brevo_result.get("detail", ""),
+        },
+        "cloudinary": {
+            "circuit": "ok" if cloudinary_result.get("ok") else "down",
+            "configured": cloudinary_result.get("configured", True),
+            "detail": cloudinary_result.get("detail", ""),
+        },
+    }
+    down = [name for name, info in providers.items() if info["circuit"] != "ok"]
+    payload = {
+        "service": "composite",
+        "circuit": "degraded" if down else "ok",
+        "total": len(providers),
+        "down": len(down),
+        "providers": providers,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    # Conserve la ligne circuit PayDunya de la sonde dédiée pour le debugging.
+    payload["paydunya_circuit"] = paydunya_payload["paydunya_circuit"]
+    return payload, down
+
+
+# Healthcheck composite pour l'alerte AGRÉGÉE : 503 si AU MOINS `threshold`
+# fournisseurs externes sont down (défaut 2 sur 3). UptimeRobot/Render
+# pointent cette sonde : un fournisseur isolé qui flappe n'alerte pas, mais
+# une panne multi-fournisseurs (ou générale) déclenche immédiatement.
+@app.api_route("/monitor", methods=["GET", "HEAD"])
+async def monitor_composite(
+    threshold: int = Query(default=2, ge=1, le=3, description="Nombre de fournisseurs down déclenchant le 503"),
+):
+    """Healthcheck composite des 3 fournisseurs externes (PayDunya, Brevo,
+    Cloudinary) : 503 si AU MOINS `threshold` d'entre eux sont down
+    (défaut 2), 200 sinon. Payload consolidé listant l'état de chaque
+    fournisseur.
+
+    Returns:
+        dict: {service, circuit, total, down, threshold, providers,
+        paydunya_circuit, timestamp} — 503 quand down >= threshold.
+    """
+    payload, down = await _composite_monitor_payload()
+    payload["threshold"] = threshold
+    if len(down) >= threshold:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
+
+
 # Favicon & racine — cette API ne sert pas de frontend, mais les navigateurs/
 # bots/moniteurs pingent GET /favicon.ico et GET / par défaut. Sans handler
 # explicite, ce sont des 404 bruyants dans les logs Render. Un 204 (no
@@ -302,7 +380,11 @@ async def monitor_cloudinary():
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     """Répond 204 (no content) aux pings de favicon des navigateurs/bots pour
-    garder les logs propres (aucune forme de retour JSON)."""
+    garder les logs propres (aucune forme de retour JSON).
+
+    Returns:
+        Response: 204 No Content, corps vide.
+    """
     return Response(status_code=204)
 
 

@@ -30,6 +30,7 @@ class CommissionService {
     };
   }
 
+  /** @returns {Promise<{totalAmount, ownerCommission, workerAmount, commissionRate}>} */
   async calculateCommissions(totalAmount) {
     // Le taux EFFECTIF est toujours chargé avant le calcul (plus jamais le
     // 14% codé en dur si le backend en expose un autre).
@@ -47,6 +48,7 @@ class CommissionService {
     };
   }
 
+  /** @returns {Promise<object>} Config fournisseur (fallback local si échec). */
   async getProviderConfig() {
     try {
       return await paymentAPI.getConfig();
@@ -60,7 +62,8 @@ class CommissionService {
    * Charge le taux de commission EFFECTIF depuis le backend (/payments/config)
    * et met à jour COMMISSION_RATE / WORKER_RATE (cache). Fail-safe : si la
    * lecture échoue ou que la valeur est invalide, on garde le taux courant.
-   * Retourne le taux en fraction (ex: 0.2 = 20%).
+   *
+   * @returns {Promise<number>} Taux en fraction (ex: 0.2 = 20%).
    */
   async refreshCommissionRate() {
     // Mémoïsation : le taux n'est chargé qu'une fois (un seul fetch pour N
@@ -92,6 +95,7 @@ class CommissionService {
     return this.COMMISSION_RATE;
   }
 
+  /** @returns {Promise<object>} Devis de paiement (montant, commission...). */
   async getQuote({ amount, paymentMethod, country = 'senegal', workerId = null, jobId = null }) {
     try {
       return await paymentAPI.getQuote({
@@ -107,6 +111,7 @@ class CommissionService {
     }
   }
 
+  /** @returns {Promise<object>} Checkout créé (payment_id, checkout_url...). */
   async createCheckout({ amount, paymentMethod, country = 'senegal', workerId = null, jobId = null, returnUrl = null, cancelUrl = null }) {
     try {
       return await paymentAPI.createCheckout({
@@ -124,14 +129,17 @@ class CommissionService {
     }
   }
 
+  /** @returns {Promise<object>} Statut du paiement (status, payout_status...). */
   async getPaymentStatus(paymentId) {
     return paymentAPI.getPaymentStatus(paymentId);
   }
 
+  /** @returns {Promise<object>} Statut du paiement via token d'invoice. */
   async getPaymentStatusByToken(invoiceToken) {
     return paymentAPI.getPaymentStatusByToken(invoiceToken);
   }
 
+  /** @returns {Promise<Array<object>>} Historique des paiements ([] si échec). */
   async getMyPayments() {
     try {
       const response = await paymentAPI.getMyPayments();
@@ -142,6 +150,7 @@ class CommissionService {
     }
   }
 
+  /** @returns {Array<object>} Transactions stockées en localStorage. */
   getStoredTransactions() {
     try {
       const stored = localStorage.getItem('kojo_commission_transactions');
@@ -151,16 +160,19 @@ class CommissionService {
     }
   }
 
+  /** @returns {void} Transactions stockées en localStorage. */
   setStoredTransactions(transactions) {
     localStorage.setItem('kojo_commission_transactions', JSON.stringify(transactions || []));
   }
 
+  /** @returns {void} Transaction ajoutée (100 max conservées). */
   appendStoredTransaction(transaction) {
     const transactions = this.getStoredTransactions();
     transactions.unshift(transaction);
     this.setStoredTransactions(transactions.slice(0, 100));
   }
 
+  /** @returns {Promise<object>} {totalTransactions, totalCommissions, ...}. */
   async getCommissionStats() {
     // Rafraîchit le taux effectif avant de calculer (affichage local exact).
     await this.refreshCommissionRate();
@@ -186,16 +198,19 @@ class CommissionService {
     };
   }
 
+  /** @returns {object} Comptes de paiement du propriétaire. */
   getOwnerAccounts() {
     return this.OWNER_ACCOUNTS;
   }
 
+  /** @returns {void} Comptes propriétaire mis à jour (localStorage). */
   updateOwnerAccounts(newAccounts) {
     this.OWNER_ACCOUNTS = { ...this.OWNER_ACCOUNTS, ...newAccounts };
     localStorage.setItem('owner_accounts', JSON.stringify(this.OWNER_ACCOUNTS));
     devLog.info('✅ Comptes propriétaire mis à jour');
   }
 
+  /** @returns {void} Comptes propriétaire rechargés depuis localStorage. */
   loadOwnerAccounts() {
     try {
       const stored = localStorage.getItem('owner_accounts');
@@ -207,10 +222,12 @@ class CommissionService {
     }
   }
 
+  /** @returns {string} Identifiant de transaction unique. */
   generateTransactionId(prefix = 'TXN') {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7).toUpperCase()}`;
   }
 
+  /** @returns {Promise<object>} {success, transactionId, redirectUrl...}. */
   async simulateFullPayment(amount, paymentMethod, workerId, jobId = null, country = 'senegal') {
     const checkout = await this.createCheckout({
       amount,

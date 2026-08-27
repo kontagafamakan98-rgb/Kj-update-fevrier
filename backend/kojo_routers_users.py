@@ -616,7 +616,11 @@ async def add_portfolio_image(
 
 @router.get("/users/portfolio")
 async def get_portfolio(current_user: User = Depends(get_current_user)):
-    """Retourne le portfolio du travailleur courant (liste d'URLs)."""
+    """Retourne le portfolio du travailleur courant (liste d'URLs).
+
+    Returns:
+        dict: {portfolio_images: [urls]}. Liste vide si aucun portfolio.
+    """
     profile = await db.worker_profiles.find_one({"user_id": current_user.id})
     return {"portfolio_images": list((profile or {}).get("portfolio_images") or [])}
 
@@ -686,7 +690,12 @@ async def get_referral(current_user: User = Depends(get_current_user)):
     """Retourne le code de parrainage de l'utilisateur (le génère si absent),
     ainsi que le solde de récompense de parrainage et son historique.
 
-    Le parrainage est réservé aux TRAVAILLEURS (pas aux clients)."""
+    Le parrainage est réservé aux TRAVAILLEURS (pas aux clients).
+
+    Returns:
+        dict: {referral_code, invite_url, reward_balance,
+        reward_history, sponsor_reward, filleul_reward, withdraw_minimum}.
+    """
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Le parrainage est réservé aux travailleurs")
     code = await _ensure_referral_code(current_user.id)
