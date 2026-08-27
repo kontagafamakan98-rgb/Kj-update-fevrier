@@ -166,6 +166,32 @@ jobs:
           shellcheck .github/scripts/*.sh
           shellcheck backend/scripts/*.sh
 
+
+  # ─── Fly : comparaison doc↔prod des variables d'environnement ───────────
+  # Vérifie que fly.toml [env] (référence commitée) reste synchronisé avec
+  # l'environnement réellement servi par la machine Fly, et que chaque
+  # secret OBLIGATOIRE (documenté dans DEPLOY_FLYIO.md) a bien un digest
+  # déployé. Échoue en cas de DRIFT (fly.toml commité mais jamais
+  # redéployé) ou de secret manquant (config incomplète avant boot). Les
+  # valeurs des secrets restent illisibles (digests opaques) ; seul leur
+  # digest de présence/stabilité est vérifié.
+  fly-env-drift:
+    name: Fly env doc-prod (drift + secrets)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check fly.toml env vs runtime + secret presence
+        run: python .github/scripts/check-fly-env-drift.py
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
   # ─── Backend : tests Python (FakeDB + vrai MongoDB) ──────────────────────
   backend-tests:
     name: Backend tests (Python + MongoDB)
