@@ -123,33 +123,57 @@ describe('ProfileEditForm', () => {
     );
   });
 
-  it('convertit les compétences (texte séparé par virgules) en liste avant envoi', () => {
+  it('ajoute des compétences en tags (Entrée ou bouton Ajouter) et les envoie en liste', () => {
     const { onSave } = renderForm({ profile: { user_type: 'worker' } });
 
-    fireEvent.change(screen.getByLabelText('Compétences'), {
-      target: { value: 'Plomberie, Électricité, Peinture, ' },
-    });
+    const skillInput = screen.getByLabelText('Compétences');
+
+    // Ajout via la touche Entrée
+    fireEvent.change(skillInput, { target: { value: 'Plomberie' } });
+    fireEvent.keyDown(skillInput, { key: 'Enter' });
+
+    // Ajout via le bouton Ajouter
+    fireEvent.change(skillInput, { target: { value: 'Électricité' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }));
+
+    // Les chips s'affichent
+    expect(screen.getByText('Plomberie')).toBeInTheDocument();
+    expect(screen.getByText('Électricité')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     // Régression : le backend PUT /users/profile renvoie 400
     // « skills doit être une liste » quand skills est une chaîne.
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        skills: ['Plomberie', 'Électricité', 'Peinture'],
+        skills: ['Plomberie', 'Électricité'],
       })
     );
   });
 
-  it('envoie une liste vide quand le travailleur n\'a pas saisi de compétences', () => {
-    const { onSave } = renderForm({ profile: { user_type: 'worker', skills: ['Plomberie'] } });
+  it('préremplit les compétences existantes en chips et les envoie en liste', () => {
+    const { onSave } = renderForm({ profile: { user_type: 'worker', skills: ['Plomberie', 'Électricité'] } });
 
-    // Le champ prérempli affiche la liste jointe
-    expect(screen.getByLabelText('Compétences').value).toBe('Plomberie');
+    expect(screen.getByText('Plomberie')).toBeInTheDocument();
+    expect(screen.getByText('Électricité')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({ skills: ['Plomberie'] })
+      expect.objectContaining({ skills: ['Plomberie', 'Électricité'] })
+    );
+  });
+
+  it('supprime une compétence (chip ×) avant l\'envoi', () => {
+    const { onSave } = renderForm({ profile: { user_type: 'worker', skills: ['Plomberie', 'Électricité'] } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer Plomberie' }));
+
+    expect(screen.queryByText('Plomberie')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ skills: ['Électricité'] })
     );
   });
 

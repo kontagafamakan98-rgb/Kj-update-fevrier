@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import TagInput from '../components/TagInput';
 import { jobsAPI } from '../services/api';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
 import { getJobUiLabel } from '../utils/jobUiLocale';
@@ -36,7 +37,6 @@ export default function CreateJob() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [skillInput, setSkillInput] = useState('');
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
 
@@ -81,18 +81,6 @@ export default function CreateJob() {
     manualLocationEditedRef.current = false;
     setLocationError('');
     await autoDetectLocation({ silent: false });
-  };
-
-  const addSkill = () => {
-    const next = String(skillInput || '').trim();
-    if (!next) return;
-    if (formData.required_skills.includes(next)) return setSkillInput('');
-    setFormData((prev) => ({ ...prev, required_skills: [...prev.required_skills, next] }));
-    setSkillInput('');
-  };
-
-  const removeSkill = (skill) => {
-    setFormData((prev) => ({ ...prev, required_skills: prev.required_skills.filter((item) => item !== skill) }));
   };
 
   const handleSubmit = async (e) => {
@@ -197,17 +185,15 @@ export default function CreateJob() {
           <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder={`${ui.estimatedDuration} (${ui.optional.toLowerCase?.() || ui.optional})`} />
           <input type="datetime-local" name="deadline" value={formData.deadline} onChange={handleChange} className={inputClass} />
         </div>
-        <div className="flex gap-2">
-          <input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSkill(); } }} className={inputClass} placeholder={ui.skillPlaceholder} />
-          <button type="button" onClick={addSkill} className="rounded-xl bg-gray-900 px-4 py-3 font-semibold text-white">{ui.add}</button>
-        </div>
-        {formData.required_skills.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {formData.required_skills.map((skill) => (
-              <button key={skill} type="button" onClick={() => removeSkill(skill)} className="rounded-full bg-orange-50 border border-orange-200 px-3 py-1 text-sm text-orange-700">{skill} ×</button>
-            ))}
-          </div>
-        )}
+        <TagInput
+          value={formData.required_skills}
+          onChange={(next) => setFormData((prev) => ({ ...prev, required_skills: next }))}
+          placeholder={ui.skillPlaceholder}
+          addLabel={ui.add}
+          removeAriaPrefix={t('remove')}
+          max={20}
+          inputClassName={inputClass}
+        />
         <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_parts" checked={formData.mechanic_must_bring_parts} onChange={handleChange} /> {ui.workerBringsParts}</label>
         <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_tools" checked={formData.mechanic_must_bring_tools} onChange={handleChange} /> {ui.workerBringsTools}</label>
         <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder={`${ui.partsNotes} (${ui.optional.toLowerCase?.() || ui.optional})`} />
