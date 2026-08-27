@@ -84,16 +84,23 @@ describe('structuralFallbackCheck (repli hors-ligne du validateur vercel.json)',
 });
 
 describe('vercel.json RÉEL : rewrite du pré-rendu des fiches /jobs/:id', () => {
-  it('contient le rewrite /jobs/(.*) → /api/og-jobs/$1 AVANT le catch-all SPA', () => {
+  it('contient le rewrite /jobs/(.*) → /api/og-jobs/$1 AVANT le proxy /api/:path* et le catch-all SPA', () => {
     const rewrites = REAL_VERCEL_JSON.rewrites || [];
     const idxOg = rewrites.findIndex((r) => r && r.source === '/jobs/(.*)');
+    const idxProxy = rewrites.findIndex((r) => r && r.source === '/api/:path*');
     const idxCatchAll = rewrites.findIndex((r) => r && r.source === '/(.*)');
 
     // Le rewrite achemine bien les fiches vers la fonction og-jobs.
     expect(idxOg).toBeGreaterThanOrEqual(0);
     expect(rewrites[idxOg].destination).toBe('/api/og-jobs/$1');
-    // Il doit précéder le catch-all : sinon /jobs/:id tomberait sur index.html
-    // et les crawlers verraient la carte générique (régression silencieuse).
+    // Il doit précéder le proxy /api/:path* : sinon le chemin aiguillé
+    // (/api/og-jobs/$1) pourrait être capté par le proxy backend avant
+    // d'atteindre la fonction (RÉGRESSION constatée : la fonction n'était
+    // pas servie et /jobs/:id retombait sur le catch-all SPA).
+    expect(idxProxy).toBeGreaterThanOrEqual(0);
+    expect(idxOg).toBeLessThan(idxProxy);
+    // Et le catch-all : sinon /jobs/:id tomberait sur index.html et les
+    // crawlers verraient la carte générique (régression silencieuse).
     expect(idxCatchAll).toBeGreaterThanOrEqual(0);
     expect(idxOg).toBeLessThan(idxCatchAll);
   });

@@ -4,6 +4,10 @@
   "outputDirectory": "build",
   "rewrites": [
     {
+      "source": "/jobs/(.*)",
+      "destination": "/api/og-jobs/$1"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://kojo-backend.fly.dev/api/:path*"
     },
@@ -54,10 +58,6 @@
     {
       "source": "/payment/",
       "destination": "/payment.html"
-    },
-    {
-      "source": "/jobs/(.*)",
-      "destination": "/api/og-jobs/$1"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
