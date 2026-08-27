@@ -165,13 +165,14 @@ for (const route of ROUTES) {
   checked.push(`  ✓ ${route.path} → ${ogImage || '(absent)'}` + (squareImage ? ` (+ carré ${squareImage})` : ''));
 }
 
-// ── /jobs/:id — fiche mission (pré-rendu par la fonction Vercel) ─────────
-// La fonction api/og-jobs/[id].js sert le HTML de chaque fiche avec les méta
-// OG de la mission : og:image → carte backend (.png) + variante carrée
-// (-square.png) + og:title réel. On récupère un VRAI job sur l'API publique
-// du backend pour tester le chemin 200. Sans job en base, le chemin 200 est
-// impossible à vérifier (état des données, pas une régression) : on le signale
-// et on teste le chemin 404 (fonction déployée + aiguillage Vercel + noindex).
+// ── /jobs/:id — fiche mission (pré-rendu par le BACKEND) ─────────────────
+// Le backend (GET /api/og/jobs/{id}, kojo_routers_public.py) sert le HTML de
+// chaque fiche avec les méta OG de la mission : og:image → carte backend
+// (.png) + variante carrée (-square.png) + og:title réel — aiguillé par le
+// rewrite Vercel /jobs/(.*). On récupère un VRAI job sur l'API publique du
+// backend pour tester le chemin 200. Sans job en base, le chemin 200 est
+// impossible à vérifier (état des données, pas une régression) : on le
+// signale et on teste le chemin 404 (pré-rendu backend + aiguillage + noindex).
 let jobId = '';
 let jobTitle = '';
 try {
@@ -192,7 +193,7 @@ try {
 
 const jobDetailLabel = '/jobs/:id';
 if (!jobId) {
-  console.warn(`  ⚠️ ${jobDetailLabel} : aucun job sur ${BACKEND} — chemin 200 non vérifiable (état des données). Chemin 404 (fonction + rewrite + noindex) testé à la place.`);
+  console.warn(`  ⚠️ ${jobDetailLabel} : aucun job sur ${BACKEND} — chemin 200 non vérifiable (état des données). Chemin 404 (pré-rendu backend + rewrite + noindex) testé à la place.`);
 }
 
 const detailId = encodeURIComponent(jobId || 'check-nonexistent-job');
@@ -243,12 +244,12 @@ if (jobId) {
   // Chemin 404 : prouve que la fonction est déployée et le rewrite aiguille
   // /jobs/:id vers elle (sinon le catch-all SPA renverrait 200 + index.html).
   if (detailStatus !== 404) {
-    errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 404 pour un job inconnu (fonction non déployée ou rewrite cassé ?)`);
+    errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 404 pour un job inconnu (pré-rendu backend non déployé ou rewrite cassé ?)`);
   }
   if (!detailNoIndex) {
     errors.push(`[${jobDetailLabel}] x-robots-tag noindex absent sur le 404`);
   }
-  checked.push(`  ✓ ${jobDetailLabel} (404 + noindex — fonction déployée, chemin 200 non testé faute de job)`);
+  checked.push(`  ✓ ${jobDetailLabel} (404 + noindex — pré-rendu backend servi, chemin 200 non testé faute de job)`);
 }
 
 // ── Passe HTTP : dimensions réelles de chaque carte OG servie ─────────────
