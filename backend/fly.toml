@@ -30,29 +30,41 @@ primary_region = 'fra'
   # arrive via le proxy Fly avec Host *.fly.dev → servi normalement.
   TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev'
 
-[http_service]
+# Syntaxe complète [[services]] (et non [http_service]) : le raccourci
+# [http_service] ne sait exprimer QUE des checks HTTP (protocol http/https),
+# pas de check TCP — le déploiement échoue avec « HTTP protocol is not
+# included in the list ». Un check TCP est requis pour que le
+# TrustedHostMiddleware reste activable : les sondes HTTP de Fly traversent
+# le middleware et échouent en 400 « Invalid host header » sur le Host
+# interne. La disponibilité applicative (GET /health) reste couverte par les
+# moniteurs externes (UptimeRobot/Render) via le Host public *.fly.dev.
+[[services]]
   internal_port = 8080
-  force_https = true
   auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
   processes = ['app']
 
-  [http_service.concurrency]
+  [services.concurrency]
     type = 'connections'
     hard_limit = 50
     soft_limit = 20
 
-  # Health check TCP : simple connexion sur internal_port (8080). Un check
-  # HTTP traverserait le TrustedHostMiddleware et échouerait en 400 sur le
-  # Host des sondes internes Fly → TCP requis pour que le middleware reste
-  # activable. La disponibilité applicative (GET /health) reste couverte par
-  # les moniteurs externes (UptimeRobot/Render) via le Host public *.fly.dev.
-  [[http_service.checks]]
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ['http', 'tls']
+
+  # Health check TCP : simple connexion sur internal_port (8080), ne traverse
+  # pas le middleware → le TrustedHostMiddleware peut rester actif en prod.
+  [[services.tcp_checks]]
     interval = '30s'
     timeout = '5s'
     grace_period = '30s'
-    protocol = 'tcp'
 
 [[vm]]
   size = 'shared-cpu-1x'
