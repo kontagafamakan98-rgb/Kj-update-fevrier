@@ -43,7 +43,7 @@ if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
     else
       # Corps 200 : doit être une LISTE JSON de commentaires. Corps invalide,
       # structure inattendue ou aucun commentaire Vercel → repli.
-      LHCI_URL=$(cat "$GH_COMMENTS" | python3 -c "
+      LHCI_URL=$(python3 -c "
 import json, re, sys
 try:
     data = json.load(sys.stdin)
@@ -61,7 +61,7 @@ try:
             sys.exit()
 except Exception:
     sys.exit()
-")
+" < "$GH_COMMENTS")
       if [ -z "$LHCI_URL" ]; then
         echo "⚠️  Corps GitHub inexploitable (JSON invalide / pas une liste / aucun commentaire Vercel avec URL) → repli sur le build local"
       fi
