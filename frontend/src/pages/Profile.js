@@ -411,6 +411,13 @@ function ProfileView({ profile, t, pageT }) {
         </div>
       </div>
 
+      {profile.bio && (
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700">{pageT('bio')}</label>
+          <p className="mt-2 text-gray-900 whitespace-pre-line">{profile.bio}</p>
+        </div>
+      )}
+
       {skills.length > 0 && (
         <div className="mt-6">
           <label className="block text-sm font-medium text-gray-700">{pageT('skills')}</label>
