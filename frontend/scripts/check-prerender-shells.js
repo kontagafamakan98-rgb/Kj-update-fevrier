@@ -165,58 +165,18 @@ if (payment) {
   }
 }
 
-// 5. Fonction Vercel générée api/og-jobs/[id].js : générée à CHAQUE build par
-// le plugin generate-og-jobs-function (fichier gitignoré — s'il n'est pas
-// régénéré, la prod servirait une version périmée du pré-rendu ou un 404).
-// Vérifie que le fichier existe, qu'il est bien généré, qu'il embarque le
-// HTML de CE build (preuve que BASE_HTML n'est pas périmé) et que la logique
-// runtime clé (carte carrée, shell h1, 404 noindex) est intacte.
-const ogFnPath = path.join(process.cwd(), 'api', 'og-jobs', '[id].js');
-let ogFn = '';
-try {
-  ogFn = readFileSync(ogFnPath, 'utf8');
-} catch {
-  errors.push('api/og-jobs/[id].js INTROUVABLE (le plugin generate-og-jobs-function a-t-il tourné ?)');
-}
-if (ogFn) {
-  if (!ogFn.includes('AUTO-GÉNÉRÉ par vite.config.js')) {
-    errors.push('api/og-jobs/[id].js : en-tête AUTO-GÉNÉRÉ absent (fichier non généré par le plugin)');
-  }
-  // Chunk d\'entrée de CE build : s'il n'est pas embarqué dans BASE_HTML,
-  // la fonction servirait des assets périmés (hash changé entre builds).
-  const entryMatch = /<script type="module"[^>]*src="\/(assets\/index-[^"]+\.js)"/.exec(index);
-  if (entryMatch && !ogFn.includes(entryMatch[1])) {
-    errors.push(`api/og-jobs/[id].js : BASE_HTML périmé — chunk d\'entrée "${entryMatch[1]}" de CE build absent (la fonction date d\'un build antérieur)`);
-  }
-  // Logique runtime clé du pré-rendu des fiches : carte carrée (remplacement
-  // de la carte statique home + endpoint -square.png), shell h1, 404 noindex.
-  if (!ogFn.includes('og-square-1200x1200.png')) {
-    errors.push('api/og-jobs/[id].js : remplacement de la carte carrée statique absent');
-  }
-  if (!ogFn.includes('-square.png')) {
-    errors.push('api/og-jobs/[id].js : endpoint carré -square.png absent (og:image 1:1 des fiches)');
-  }
-  if (!ogFn.includes('x-robots-tag')) {
-    errors.push('api/og-jobs/[id].js : 404 noindex (x-robots-tag) absent');
-  }
-  if (!ogFn.includes('text-3xl font-bold text-gray-900')) {
-    errors.push('api/og-jobs/[id].js : shell h1 statique des fiches absent');
-  }
-  // GÉNÉRATION des méta OG par job : la fonction doit produire dynamiquement
-  // (setMeta) le titre, l'image et l'URL de chaque fiche — c'est l'essence du
-  // pré-rendu OG (les crawlers lisent ces balises, pas le JS). Si ces appels
-  // disparaissent (refactor, fichier périmé), les cartes de partage redeviennent
-  // génériques et le job CI doit échouer.
-  for (const tag of ['og:title', 'og:image', 'og:url']) {
-    if (!ogFn.includes(`setMeta(html, '${tag}'`)) {
-      errors.push(`api/og-jobs/[id].js : génération des méta ${tag} ABSENTE du code de la fonction`);
-    }
-  }
-}
+// 5. Fiches /jobs/:id : le pré-rendu HTML (méta OG de la mission + 404
+// noindex) est servi par le BACKEND — GET /api/og/jobs/{id} dans
+// kojo_routers_public.py, aiguillé par le rewrite Vercel
+// /jobs/(.*) → https://kojo-backend.fly.dev/api/og/jobs/$1 (vercel.json).
+// L'ancienne fonction serverless api/og-jobs/[id].js a été abandonnée
+// (Vercel ne collecte pas api/ en mode outputDirectory statique). La
+// couverture de ce pré-rendu vit dans les tests backend
+// (tests/test_seo_discovery.py::TestJobOgHtml) + le check check-og-images.
 
 if (errors.length) {
   console.error('❌ Pré-rendu par route invalide — ' + errors.length + ' problème(s) :');
   for (const e of errors) console.error('  ' + e);
   process.exit(1);
 }
-console.log('✅ Pré-rendu par route intact : index.html #root vide, jobs.html (shell h1), login.html (shell formulaire), register.html (shell formulaire), fonction Vercel api/og-jobs/[id].js générée et à jour.');
+console.log('✅ Pré-rendu par route intact : index.html #root vide, jobs.html (shell h1), login.html (shell formulaire), register.html (shell formulaire). Fiches /jobs/:id servies par le backend (GET /api/og/jobs/{id}).');

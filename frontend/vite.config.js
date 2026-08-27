@@ -2,7 +2,6 @@ import { defineConfig, loadEnv, transformWithEsbuild } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import fs from 'node:fs'
-import { buildOgJobsFunctionCode } from './scripts/og-jobs-function.js'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -76,31 +75,14 @@ export default defineConfig(({ mode }) => {
           fs.writeFileSync(htmlPath, html, 'utf8')
         },
       },
-      {
-        // Génère la fonction Vercel api/og-jobs/[id].js : pré-rendu À LA VOLÉE
-        // des fiches /jobs/:id (le pré-rendu statique ne peut pas couvrir une
-        // fiche par job). La fonction embarque le HTML final (CSS inliné + CSP
-        // + assets hashés), appelle le backend /api/jobs/:id, et sert le HTML
-        // avec les méta OG du job + le shell h1 statique. Vercel déploie le
-        // fichier (dossier api/) ; le rewrite /jobs/(.*) → /api/og-jobs/$1
-        // (vercel.json) achemine les fiches vers elle.
-        name: 'generate-og-jobs-function',
-        apply: 'build',
-        writeBundle(options, bundle) {
-          const htmlKey = Object.keys(bundle).find((k) => k.endsWith('index.html'))
-          if (!htmlKey) return
-          const outDir = options.dir
-          if (!outDir) return
-          const indexPath = path.join(outDir, htmlKey)
-          if (!fs.existsSync(indexPath)) return
-          const html = fs.readFileSync(indexPath, 'utf8')
-          const funcDir = path.join(outDir, '..', 'api', 'og-jobs')
-          fs.mkdirSync(funcDir, { recursive: true })
-          const code = buildOgJobsFunctionCode(html)
-          const out = path.join(funcDir, '[id].js')
-          fs.writeFileSync(out, code, 'utf8')
-        },
-      },
+      // NOTE : le pré-rendu des fiches /jobs/:id (og:image + titre réels de la
+      // mission, 404 noindex) est servi par le BACKEND
+      // (GET /api/og/jobs/{id} — kojo_routers_public.py) via le rewrite Vercel
+      // /jobs/(.*) → https://kojo-backend.fly.dev/api/og/jobs/$1. L'ancienne
+      // fonction serverless api/og-jobs/[id].js a été abandonnée : Vercel ne
+      // collecte PAS le dossier api/ quand outputDirectory est défini
+      // (déploiement traité comme 100% statique) — la fonction n'était jamais
+      // déployée et /jobs/:id retombait sur le catch-all SPA.
       {
         // Pré-rendu par route (crawlers sans JS) : pour les routes clés
         // (/jobs, /login), on émet un HTML statique par route (jobs.html,

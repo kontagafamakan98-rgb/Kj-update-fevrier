@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/jobs/(.*)",
-      "destination": "/api/og-jobs/$1"
+      "destination": "https://kojo-backend.fly.dev/api/og/jobs/$1"
     },
     {
       "source": "/api/:path*",
