@@ -10,10 +10,23 @@ donc ce qui l'est réellement :
      (config.env via l'API Machines) — détecte le DRIFT : un changement de
      fly.toml committé mais jamais redéployé, ou une valeur déployée qui
      diverge de ce qui est documenté.
-  2. Présence : chaque variable attendue par backend/kojo_settings.py (les
-     secrets) doit avoir un digest dans `fly secrets list` — détecte un
-     secret manquant (config incomplète avant un déploiement).
-  3. (Option) Snapshot commité des digests de secrets NON sensibles : un
+  2. Présence : chaque secret OBLIGATOIRE (bloc `fly secrets set` de
+     DEPLOY_FLYIO.md, sans défaut de repli dans le code) doit avoir un digest
+     dans `fly secrets set` — détecte un secret manquant (config incomplète
+     avant un déploiement).
+  3. DOUBLONS [env]↔secret : une clé présente à la fois dans fly.toml [env]
+     ET comme secret est un piège — sur Fly, le secret ÉCRASE [env] au même
+     nom, donc modifier fly.toml n'a plus d'effet (drift silencieux).
+     Historique : BACKEND_PUBLIC_URL et VERCEL_PROJECT_NAME étaient dupliqués
+     (secrets unset le 27/08/2026, fly.toml [env] = source unique).
+  4. ORPHELINS : un secret déployé mais référencé nulle part dans le dépôt
+     (ni .env.example, ni DEPLOY_FLYIO.md, ni kojo_settings.py) est un secret
+     mort ou une config non documentée — retirer ou documenter.
+  5. Couverture .env.example : chaque clé du template doit exister sur Fly
+     ([env] OU secret), sauf si elle est OPTIONNELLE (défaut de repli dans le
+     code, legacy GMAIL, alias) — détecte un secret ajouté au template mais
+     jamais posé sur Fly.
+  6. (Option) Snapshot commité des digests de secrets NON sensibles : un
      changement de digest d'une valeur censée être stable déclenche une
      alerte (rotation non documentée). Les clés réellement secrètes
      (tokens, clés privées) sont exclues — leur rotation est voulue.
@@ -55,6 +68,24 @@ SENSITIVE_KEYS = {
     "BREVO_API_KEY", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",
     "CLOUDINARY_API_SECRET", "VAPID_PRIVATE_KEY", "REDIS_URL",
     "GOOGLE_CLIENT_SECRET", "SENTRY_DSN",
+}
+
+# Clés OPTIONNELLES : leur absence sur Fly n'est PAS une divergence — soit le
+# code fournit un défaut de repli (BREVO_SENDER_NAME='KOJO', REFERRAL_*,
+# EMAIL_OTP_*), soit la fonctionnalité est désactivée sans elles (SENTRY_DSN,
+# GMAIL_* legacy déprécié au profit de Brevo, REDIS_URL → mémoire, CORS_ORIGINS
+# → défauts du code), soit ce sont des alias (FAMAKAN_OWNER_EMAIL,
+# PASSWORD_RESET_FROM_EMAIL).
+OPTIONAL_KEYS = {
+    "SENTRY_DSN", "PAYMENT_COMMISSION_RATE", "CORS_ORIGINS", "REDIS_URL",
+    "BREVO_SENDER_NAME",
+    "EMAIL_OTP_EXPIRY_MINUTES", "EMAIL_OTP_MAX_ATTEMPTS",
+    "EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "EMAIL_VERIFICATION_TOKEN_MINUTES",
+    "GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",
+    "GMAIL_SENDER_EMAIL", "GMAIL_SENDER_NAME",
+    "FAMAKAN_OWNER_EMAIL", "PASSWORD_RESET_FROM_EMAIL",
+    "REFERRAL_FILLEUL_REWARD", "REFERRAL_SPONSOR_REWARD",
+    "REFERRAL_WELCOME_FILLEUL_REWARD", "REFERRAL_WELCOME_SPONSOR_REWARD",
 }
 
 # Keys connues mais NON sensibles (valeur vérifiable côté doc). Leur digest
@@ -107,6 +138,27 @@ def parse_fly_toml_env(text):
 
 
 DEPLOY_DOC = REPO_ROOT / "backend" / "DEPLOY_FLYIO.md"
+ENV_EXAMPLE = REPO_ROOT / "backend" / ".env.example"
+
+
+def parse_env_example(text):
+    """Extrait les clés=valuers de .env.example → dict {NOM: valeur}.
+
+    Ignore les commentaires (#) et les lignes vides. Les valeurs peuvent
+    être vides (template de dev) — seule la PRÉSENCE de la clé compte pour
+    la couverture.
+    """
+    env = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key.isupper():
+            continue
+        env[key] = value.strip()
+    return env
 
 
 def has_nonempty_default(key):
@@ -254,6 +306,58 @@ def check_secret_presence(required, fly_secrets):
             )
 
 
+def check_duplicates(fly_toml_env, fly_secrets):
+    """Une clé présente à la fois dans fly.toml [env] ET comme secret Fly est
+    un piège : sur Fly, le secret ÉCRASE [env] au même nom. Modifier fly.toml
+    n'a alors plus AUCUN effet sur le runtime (drift silencieux — le secret
+    masque la valeur commitée).
+
+    Historique : BACKEND_PUBLIC_URL et VERCEL_PROJECT_NAME étaient dupliqués ;
+    les secrets ont été unset le 27/08/2026, fly.toml [env] étant la source
+    unique. Ce check empêche la régression.
+    """
+    for key in sorted(set(fly_toml_env) & set(fly_secrets)):
+        errors.append(
+            f"[DOUBLON {key}] présent dans fly.toml [env] ET comme secret — "
+            f"sur Fly le secret écrase [env] : modifier fly.toml n'a plus "
+            f"d'effet (drift silencieux). Unset le secret "
+            f"(fly secrets unset {key}) ou retire-le de [env]."
+        )
+
+
+def check_orphan_secrets(fly_secrets, known_keys):
+    """Un secret déployé mais référencé NUL PART dans le dépôt est soit un
+    secret mort (à retirer), soit une config non documentée (à ajouter aux
+    références) — les deux sont des écarts doc↔prod.
+
+    `known_keys` : union des clés de .env.example + DEPLOY_FLYIO.md +
+    kojo_settings.py (os.environ.get).
+    """
+    for key in sorted(set(fly_secrets) - known_keys):
+        errors.append(
+            f"[ORPHELIN {key}] secret déployé sur Fly mais référencé nulle part "
+            f"dans le dépôt (ni .env.example, ni DEPLOY_FLYIO.md, ni "
+            f"kojo_settings.py) — le retirer ou le documenter."
+        )
+
+
+def check_env_example_coverage(example_keys, fly_toml_env, fly_secrets):
+    """Chaque clé du template .env.example doit exister sur Fly ([env] OU
+    secret) — sauf si elle est OPTIONNELLE (défaut de repli dans le code,
+    legacy GMAIL, alias). Détecte un secret ajouté au template mais jamais
+    posé sur Fly (config incomplète avant un déploiement).
+    """
+    for key in sorted(example_keys - set(OPTIONAL_KEYS)):
+        if key in fly_toml_env or key in fly_secrets:
+            checked.append(f"  {OK} {key} couvert ({'[env]' if key in fly_toml_env else 'secret'})")
+        else:
+            errors.append(
+                f"[.env.example {key}] référencé dans le template mais NI [env] "
+                f"NI secret sur Fly — le poser (fly secrets set) ou l'ajouter "
+                f"à OPTIONAL_KEYS si un défaut de repli existe dans le code."
+            )
+
+
 _fly_toml_env_cache = None
 
 
@@ -266,6 +370,26 @@ def _fly_toml_env_once():
             if FLY_TOML.exists() else {}
         )
     return _fly_toml_env_cache
+
+
+_settings_refs_cache = None
+
+
+def _settings_referenced_keys():
+    """Met en cache l'ensemble des clés lues par kojo_settings.py via
+    os.environ.get — utilisées pour détecter les secrets ORPHELINS (déployés
+    mais référencés nulle part)."""
+    global _settings_refs_cache
+    if _settings_refs_cache is None:
+        refs = set()
+        if SETTINGS.exists():
+            text = SETTINGS.read_text(encoding="utf-8")
+            for name in re.findall(r"os\.environ\.get\(['\"]([A-Z0-9_]+)['\"]", text):
+                refs.add(name)
+            for name in re.findall(r"getenv\(['\"]([A-Z0-9_]+)['\"]", text):
+                refs.add(name)
+        _settings_refs_cache = refs
+    return _settings_refs_cache
 
 
 def check_snapshot(fly_secrets):
@@ -328,6 +452,22 @@ def main():
         check_secret_presence(req, fly_secrets)
         check_snapshot(fly_secrets)
         checked.append(f"  {OK} {len(fly_secrets)} secrets Fly listes")
+
+        # 4b) DOUBLONS [env]↔secret (le secret écrase [env] sur Fly)
+        check_duplicates(_fly_toml_env_once(), fly_secrets)
+
+        # 4c) ORPHELINS : secret déployé mais référencé nulle part
+        example_keys = set()
+        if ENV_EXAMPLE.exists():
+            example_keys = set(parse_env_example(ENV_EXAMPLE.read_text(encoding="utf-8")))
+        known = set(example_keys) | set(required) | _settings_referenced_keys()
+        check_orphan_secrets(fly_secrets, known)
+
+        # 4d) Couverture .env.example (chaque clé non-optionnelle existe sur Fly)
+        if ENV_EXAMPLE.exists():
+            check_env_example_coverage(
+                example_keys, _fly_toml_env_once(), fly_secrets
+            )
     except RuntimeError as exc:
         errors.append(str(exc))
 

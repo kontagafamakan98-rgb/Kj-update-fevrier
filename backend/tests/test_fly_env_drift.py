@@ -146,3 +146,81 @@ class TestSecretPresence:
         req = {"JWT_SECRET", "MONGO_URL"}
         check.check_secret_presence(req, {"JWT_SECRET": "d1", "MONGO_URL": "d2"})
         assert not check.errors, check.errors
+
+
+class TestParseEnvExample:
+    def test_extrait_cles_et_valeurs(self, check):
+        text = (
+            "# commentaire\n"
+            "APP_ENV=production\n"
+            "BACKEND_PUBLIC_URL=\n"
+            "# autre\n"
+            "MONGO_URL=mongodb://x\n"
+        )
+        env = check.parse_env_example(text)
+        assert env == {
+            "APP_ENV": "production",
+            "BACKEND_PUBLIC_URL": "",
+            "MONGO_URL": "mongodb://x",
+        }, env
+
+    def test_ignore_cles_non_majuscules(self, check):
+        env = check.parse_env_example("foo=bar\nAPP_ENV=x\n")
+        assert env == {"APP_ENV": "x"}, env
+
+
+class TestCheckDuplicates:
+    """RÉGRESSION : BACKEND_PUBLIC_URL et VERCEL_PROJECT_NAME étaient dupliqués
+    ([env] + secret) — le secret écrase [env] sur Fly, drift silencieux.
+    Les secrets ont été unset le 27/08/2026 ; ce test verrouille la détection."""
+
+    def test_doublon_detecte(self, check):
+        check.errors, check.checked = [], []
+        check.check_duplicates({"A": "1", "B": "2"}, {"B": "digest", "C": "digest"})
+        assert any("DOUBLON" in e and "B" in e for e in check.errors), check.errors
+        assert not any("A" in e for e in check.errors)
+
+    def test_pas_de_doublon(self, check):
+        check.errors, check.checked = [], []
+        check.check_duplicates({"A": "1"}, {"B": "digest"})
+        assert not check.errors, check.errors
+
+    def test_aucun_doublon_reel(self, check):
+        # L'état actuel du dépôt + prod ne doit avoir AUCUN doublon.
+        fly_env = check.parse_fly_toml_env(
+            check.FLY_TOML.read_text(encoding="utf-8")
+        )
+        check.errors, check.checked = [], []
+        # Sans accès aux secrets en CI locale, on vérifie la règle structurelle :
+        # les clés [env] ne doivent pas être listées dans le bloc secrets de la doc.
+        req = check.required_secrets_from_deploy_doc()
+        assert not (set(fly_env) & req), f"doublon [env]/doc: {set(fly_env) & req}"
+
+
+class TestCheckOrphanSecrets:
+    def test_orphelin_detecte(self, check):
+        check.errors, check.checked = [], []
+        check.check_orphan_secrets({"A": "d", "B": "d"}, {"A"})
+        assert any("ORPHELIN" in e and "B" in e for e in check.errors), check.errors
+
+    def test_pas_d_orphelin(self, check):
+        check.errors, check.checked = [], []
+        check.check_orphan_secrets({"A": "d"}, {"A"})
+        assert not check.errors, check.errors
+
+
+class TestCheckEnvExampleCoverage:
+    def test_manquant_detecte(self, check):
+        check.errors, check.checked = [], []
+        check.check_env_example_coverage({"A", "MISSING"}, {"A": "1"}, {})
+        assert any("MISSING" in e for e in check.errors), check.errors
+
+    def test_optionnels_ignores(self, check):
+        check.errors, check.checked = [], []
+        check.check_env_example_coverage({"A", "SENTRY_DSN", "REDIS_URL"}, {"A": "1"}, {})
+        assert not check.errors, check.errors
+
+    def test_couvert_aucune_erreur(self, check):
+        check.errors, check.checked = [], []
+        check.check_env_example_coverage({"A", "B"}, {"A": "1"}, {"B": "d"})
+        assert not check.errors, check.errors
