@@ -11,6 +11,7 @@ import {
 } from '../services/geolocationService';
 import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
+import TagInput from '../components/TagInput';
 import ConfirmModal from '../components/ConfirmModal';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
@@ -420,13 +421,15 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
     preferred_language: profile.preferred_language || 'fr',
     country: profile.country || 'senegal',
     bio: profile.bio || '',
-    // Le backend attend skills en LISTE mais le champ est saisi en texte
-    // libre (virgules) : on garde une chaîne dans le formulaire et on
-    // convertit en liste à l'envoi (voir handleSubmit). Un profil déjà
-    // stocké en liste (défensif) est joint en texte lisible.
+    // Le backend attend skills en LISTE : le champ est un éditeur de tags
+    // (chips) et skills reste une liste dans le formulaire, envoyée telle
+    // quelle à PUT /users/profile (qui rejette toute chaîne en 400).
+    // Défensif : une chaîne héritée d'un ancien profil est convertie.
     skills: Array.isArray(profile.skills)
-      ? profile.skills.join(', ')
-      : (profile.skills || ''),
+      ? [...profile.skills]
+      : (typeof profile.skills === 'string' && profile.skills
+        ? profile.skills.split(',').map((s) => s.trim()).filter(Boolean)
+        : []),
     profile_photo: profile.profile_photo || ''
   });
   const [success, setSuccess] = useState('');
@@ -465,12 +468,11 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // PUT /users/profile rejette skills en chaîne (400 « skills doit être
-    // une liste ») : on convertit le texte séparé par des virgules en liste
-    // (trim + suppression des entrées vides) avant l'envoi.
-    const skillsList = String(formData.skills || '')
-      .split(',')
-      .map((skill) => skill.trim())
+    // skills est déjà une liste (éditeur de tags) : normalisation légère
+    // (trim + suppression des entrées vides) avant l'envoi à PUT
+    // /users/profile, qui rejette toute chaîne avec un 400.
+    const skillsList = (formData.skills || [])
+      .map((skill) => String(skill).trim())
       .filter(Boolean);
     onSave({ ...formData, skills: skillsList });
   };
@@ -562,7 +564,16 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
           <div>
             <label htmlFor="skills" className="block text-sm font-medium text-gray-700">{pageT('skills')}</label>
-            <input id="skills" name="skills" autoComplete="off" value={formData.skills} onChange={handleChange} placeholder={pageT('skillsPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+            <TagInput
+              className="mt-1"
+              inputId="skills"
+              value={formData.skills}
+              onChange={(next) => setFormData((prev) => ({ ...prev, skills: next }))}
+              placeholder={pageT('skillsPlaceholder')}
+              addLabel={pageT('add')}
+              removeAriaPrefix={pageT('remove')}
+              max={20}
+            />
             <p className="mt-1 text-sm text-gray-500">{pageT('skillsHelp')}</p>
           </div>
         </div>
@@ -621,7 +632,6 @@ function WorkerProfileCreate({ onCreate, pageT }) {
     description: '',
     availability: true
   });
-  const [specialtyInput, setSpecialtyInput] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -633,17 +643,6 @@ function WorkerProfileCreate({ onCreate, pageT }) {
     setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  const addSpecialty = () => {
-    if (specialtyInput.trim() && !formData.specialties.includes(specialtyInput.trim())) {
-      setFormData((prev) => ({ ...prev, specialties: [...prev.specialties, specialtyInput.trim()] }));
-      setSpecialtyInput('');
-    }
-  };
-
-  const removeSpecialty = (specialty) => {
-    setFormData((prev) => ({ ...prev, specialties: prev.specialties.filter((item) => item !== specialty) }));
-  };
-
   return (
     <div className="bg-gray-50 p-6 rounded-lg">
       <p className="text-gray-600 mb-4">{pageT('createWorkerProfileHelp')}</p>
@@ -651,20 +650,15 @@ function WorkerProfileCreate({ onCreate, pageT }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="profile_specialty_input" className="block text-sm font-medium text-gray-700 mb-2">{pageT('specialties')}</label>
-          <div className="flex space-x-2">
-            <input id="profile_specialty_input" name="profile_specialty_input" type="text" autoComplete="off" value={specialtyInput} onChange={(e) => setSpecialtyInput(e.target.value)} className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('specialtyPlaceholder')} />
-            <button type="button" onClick={addSpecialty} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md">{pageT('add')}</button>
-          </div>
-          {formData.specialties.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {formData.specialties.map((specialty, index) => (
-                <span key={index} className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm flex items-center">
-                  {specialty}
-                  <button type="button" aria-label={`${pageT('remove')} ${specialty}`} onClick={() => removeSpecialty(specialty)} className="ml-2 text-orange-600 hover:text-orange-800">×</button>
-                </span>
-              ))}
-            </div>
-          )}
+          <TagInput
+            inputId="profile_specialty_input"
+            value={formData.specialties}
+            onChange={(next) => setFormData((prev) => ({ ...prev, specialties: next }))}
+            placeholder={pageT('specialtyPlaceholder')}
+            addLabel={pageT('add')}
+            removeAriaPrefix={pageT('remove')}
+            max={10}
+          />
         </div>
 
         <div>
