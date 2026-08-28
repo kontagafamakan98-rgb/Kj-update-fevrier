@@ -71,6 +71,29 @@ elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "${GITHUB_REF:-}" = "refs/heads/main
   LHCI_URL="https://kj-update-fevrier.vercel.app"
 fi
 
+# ── Détection de la protection de déploiement Vercel (Deployment Protection) ──
+# Sur les PR, l'app Vercel peut être protégée (SSO) : toutes les pages servent
+# alors l'interstitiel vercel.com (redirect vers vercel.com/login, ou og:image
+# "vercel.com/api/product-og?product=protected-deployment") au lieu de l'app.
+# Auditer ce mur de login n'a aucune valeur — on RETOMBE sur le build local
+# (le code de la PR). La prod (main) n'est jamais protégée : pas de probe.
+if [ -n "$LHCI_URL" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+  PROBE_BODY="$(mktemp)"
+  PROBE_URL="$(curl -sSL -o "$PROBE_BODY" -w "%{url_effective}" --max-time 20 "$LHCI_URL/" 2>/dev/null)" || PROBE_URL=""
+  PROTECTED=0
+  case "$PROBE_URL" in
+    *vercel.com/login*|*vercel.com/accounts*|*product-og*) PROTECTED=1 ;;
+  esac
+  if grep -q "protected-deployment" "$PROBE_BODY" 2>/dev/null; then PROTECTED=1; fi
+  rm -f "$PROBE_BODY"
+  if [ "$PROTECTED" = "1" ]; then
+    echo "⚠️  Preview Vercel PROTÉGÉE (Deployment Protection active, redirigée vers ${PROBE_URL:-<vide>}) → repli sur le build local (le code de la PR)"
+    LHCI_URL=""
+  else
+    echo "Preview Vercel accessible (aucune protection détectée) : $LHCI_URL"
+  fi
+fi
+
 if [ -n "$LHCI_URL" ]; then
   echo "LHCI_URL=$LHCI_URL" >> "$GITHUB_ENV"
   echo "Cible Lighthouse : $LHCI_URL"

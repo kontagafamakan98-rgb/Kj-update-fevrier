@@ -396,6 +396,35 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash .github/scripts/resolve-vercel-url.sh
 
+      # Si LHCI_URL est vide (aucune preview Vercel exploitable : preview
+      # PROTÉGÉE par Deployment Protection — détectée par resolve-vercel-url.sh
+      # — ou commentaire Vercel absent), on sert le BUILD LOCAL (contenu
+      # identique au déploiement) sur le port 4173 : check-og-images et lhci
+      # auditeront alors le code de la PR au lieu du mur de login Vercel.
+      # LHCI_URL est réécrite vers localhost → lighthouserc.cjs passe en mode
+      # url (les og:image des shells pré-rendus restent ABSOLUS vers la prod,
+      # les assertions OG restent valides). Serveur lancé en arrière-plan :
+      # nohup + log redirigé pour survivre aux steps suivants du job.
+      - name: Serve local build (repli preview Vercel indisponible)
+        working-directory: frontend
+        run: |
+          if [ -n "${LHCI_URL:-}" ]; then
+            echo "Preview Vercel à auditer : $LHCI_URL"
+            exit 0
+          fi
+          echo "Aucune preview Vercel exploitable → audit du build local (port 4173)"
+          nohup npx vite preview --port 4173 --strictPort > /tmp/vite-preview.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:4173/ >/dev/null 2>&1 && break
+            sleep 1
+          done
+          if ! curl -sf http://localhost:4173/ >/dev/null 2>&1; then
+            echo "::error::vite preview n'a pas démarré sur le port 4173"
+            cat /tmp/vite-preview.log
+            exit 1
+          fi
+          echo "LHCI_URL=http://localhost:4173" >> "$GITHUB_ENV"
+
       # Authentifie les pages protégées : se connecte au backend prod avec le
       # COMPTE CLIENT DÉDIÉ CI (secrets LHCI_CI_EMAIL/LHCI_CI_PASSWORD) et
       # stocke le token Bearer dans LHCI_AUTH_HEADER. Ce compte est isolé des

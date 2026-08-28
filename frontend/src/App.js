@@ -13,7 +13,6 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
-import ToastContainer from "./components/ToastContainer";
 import { PageSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
@@ -44,6 +43,12 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const EmailVerificationPage = lazy(() => import('./pages/EmailVerificationPage'));
 const PaymentVerificationPage = lazy(() => import('./pages/PaymentVerificationPage'));
 const CommissionDashboard = lazy(() => import('./pages/CommissionDashboard'));
+// ToastContainer (rendu + icônes + i18n toast) est lazy : l'état vit dans
+// ToastProvider (eager, léger) ; le RENDU n'est nécessaire qu'à l'apparition
+// du premier toast (après interaction utilisateur). Le chunk toast (renderer
+// + toastScopedI18n) sort ainsi du chunk d'entrée — l'index gzip s'allège.
+// fallback={null} : position fixed, rien à peindre avant les toasts.
+const ToastContainer = lazy(() => import('./components/ToastContainer'));
 const Support = lazy(() => import('./pages/Support'));
 const SupportAdmin = lazy(() => import('./pages/SupportAdmin'));
 
@@ -207,8 +212,10 @@ function AppRoutes() {
       {/* Main Navigation */}
       <Navbar />
       
-      {/* Toast Notifications */}
-      <ToastContainer />
+      {/* Toast Notifications — lazy (cf. déclaration plus haut) */}
+      <Suspense fallback={null}>
+        <ToastContainer />
+      </Suspense>
       
       {/* Geolocation Popup */}
       <CountryChangePopup />
