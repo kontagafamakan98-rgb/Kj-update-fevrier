@@ -199,7 +199,8 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | Garde | Prouvé qu'il peut échouer par |
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
-| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`) | tests Vitest dédiés |
+| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`) | tests Vitest dédiés |
+| `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de
@@ -238,6 +239,10 @@ chaque PR vers `main` (sauf mention contraire).
 - Manifeste PWA : chaque icône déclarée existe, dimensions et `purpose` exacts,
   « maskable » **prouvé par la mesure** (zone de sécurité + opacité).
 - Budgets de bundle (JS initial, plus gros chunk, poids total du build).
+- Dépendances des **scripts de CI** : chaque module importé par un fichier de
+  `scripts/` est déclaré en direct dans `package.json` (et le lock reproduit
+  `package.json` à l'identique, sans quoi `npm ci` refuse d'installer) —
+  `check-script-deps.js`, lancé dans la suite Vitest.
 
 **Rapport — informatif, ne bloque rien**
 - Les trois tailles mesurées (JS initial, plus gros chunk, build total) sont
@@ -254,6 +259,9 @@ chaque PR vers `main` (sauf mention contraire).
   obligatoires présents, doublons et orphelins détectés (nécessite
   `FLY_API_TOKEN` ; secrets déployés partiellement vérifiés, cf. F4).
 - `ci.yml` valide (syntaxe et sémantique actionlint) et scripts shell propres.
+- Aucune référence d'action sur une **branche** : chaque `uses:` vise un tag de
+  version ou un SHA (`check-workflow-pins.py`) — une référence non résoluble
+  fait échouer le job avant ses étapes (cf. `actionlint@v1`, 2026-08-27).
 - Les 4 contrôles du méta-test échouent bien sur une régression injectée.
 
 **Déploiement — `main` uniquement, et seulement si `backend/**` a changé**
@@ -266,7 +274,7 @@ chaque PR vers `main` (sauf mention contraire).
 | Registre npm | `npm ci` (4 jobs) | Job rouge, aucune atténuation |
 | PyPI | `pip install` (2 jobs) | Job rouge |
 | Docker Hub | service `mongo:7` | `backend-tests` rouge (service non démarré) |
-| GitHub Actions (marketplace) | `checkout@v4`, `setup-python@v5`, `setup-node@v4`, `setup-java@v4`, `upload-artifact@v4`, `setup-android@v3`, `paths-filter@v3`, `flyctl-actions/setup-flyctl@master` | Job rouge. **Seul `rhysd/actionlint` est épinglé (`v1.7.12`)** ; les autres sont des tags flottants, et `setup-flyctl@master` suit une **branche** — un changement amont s'applique sans revue |
+| GitHub Actions (marketplace) | `checkout@v4`, `setup-python@v5`, `setup-node@v4`, `setup-java@v4`, `upload-artifact@v4`, `setup-android@v3`, `paths-filter@v3`, `flyctl-actions/setup-flyctl@<SHA>` | Job rouge. Plus aucune référence de **branche** : `actionlint` était déjà épinglé (`v1.7.12`), `setup-flyctl` valait `@master` et est désormais épinglé sur un **SHA** (= tag `v1`, runtime node24) ; les autres restent des tags de version flottants (`@v4`), vérifiés par `check-workflow-pins.py` |
 | API Fly (`api.machines.dev`, `flyctl secrets list`, `flyctl ssh`) | `fly-env-drift` | Rouge (volontaire : échec bruyant plutôt que saut silencieux) |
 | API GitHub (commentaires de PR) | `resolve-vercel-url.sh` | **Bascule silencieuse en F2** (repli build local), borné par `--max-time 20 --retry 2` |
 | Vercel (preview + Deployment Protection) | idem | **F2** également : preview protégée ⇒ repli local |
@@ -275,6 +283,7 @@ chaque PR vers `main` (sauf mention contraire).
 | Android SDK / Gradle / AGP | `mobile-build` | Rouge, téléchargements longs |
 | API de commentaires GitHub | `bundle-size-report` | Rouge sur **ce job seulement** — il n'est pas requis, donc aucune fusion n'est bloquée ; les mesures restent dans le résumé du run |
 | Cache Actions (`actions/cache/restore` + `save@v4`) | `bundle-size-report` | Aucune référence disponible ⇒ rapport « première mesure », sans écarts — jamais un écart inventé |
+| **Arbre de dépendances transitif (hissage npm)** | tout `require('…')` d'un script de `scripts/` | Rouge auparavant, sans rapport avec le code : le job « Audits détectent les régressions » est tombé le 2026-08-27 sur `Cannot find module '@babel/parser'`, un paquet jamais déclaré et disponible seulement via `@vitejs/plugin-react` → `@babel/core`. Corrigé par une **déclaration en direct** (`@babel/parser`, `@babel/traverse`) et verrouillé par `check-script-deps.js` |
 
 Atténuations déjà en place, à ne pas casser : bornes réseau explicites dans
 `resolve-vercel-url.sh`, fallback toujours **journalisé** (jamais muet),
