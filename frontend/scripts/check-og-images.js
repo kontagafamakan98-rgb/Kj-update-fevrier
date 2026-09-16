@@ -173,6 +173,14 @@ for (const route of ROUTES) {
 // backend pour tester le chemin 200. Sans job en base, le chemin 200 est
 // impossible à vérifier (état des données, pas une régression) : on le
 // signale et on teste le chemin 404 (pré-rendu backend + aiguillage + noindex).
+//
+// Exception : sur le REPLI build local (preview Vercel indisponible ou
+// protégée — LHCI_URL = http://localhost:4173), le chemin /jobs/:id n'existe
+// pas : c'est le rewrite Vercel + le pré-rendu backend qui le servent, pas le
+// build statique (SPA fallback → index.html en 200, sans noindex). Les
+// assertions 404/noindex seraient donc des faux positifs → section ignorée.
+const isLocalBase = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(BASE);
+
 let jobId = '';
 let jobTitle = '';
 try {
@@ -192,64 +200,69 @@ try {
 }
 
 const jobDetailLabel = '/jobs/:id';
-if (!jobId) {
+if (isLocalBase) {
+  console.log(`  ⚠️ ${jobDetailLabel} : repli build local (${BASE}) — rewrite Vercel + pré-rendu backend absents du build statique, section ignorée (le chemin 200/404 est vérifié contre le déploiement Vercel réel)`);
+}
+if (!jobId && !isLocalBase) {
   console.warn(`  ⚠️ ${jobDetailLabel} : aucun job sur ${BACKEND} — chemin 200 non vérifiable (état des données). Chemin 404 (pré-rendu backend + rewrite + noindex) testé à la place.`);
 }
 
-const detailId = encodeURIComponent(jobId || 'check-nonexistent-job');
-const detailUrl = `${BASE}/jobs/${detailId}`;
-let detailStatus = 0;
-let detailHtml = '';
-let detailNoIndex = false;
-try {
-  const res = await fetch(detailUrl, {
-    redirect: 'follow',
-    headers: { 'user-agent': 'kojo-og-image-check/1.0' },
-    signal: AbortSignal.timeout(20000),
-  });
-  detailStatus = res.status;
-  detailNoIndex = (res.headers.get('x-robots-tag') || '').includes('noindex');
-  detailHtml = await res.text();
-} catch (err) {
-  errors.push(`[${jobDetailLabel}] fetch ${detailUrl} échoué : ${err.message}`);
-}
+if (!isLocalBase) {
+  const detailId = encodeURIComponent(jobId || 'check-nonexistent-job');
+  const detailUrl = `${BASE}/jobs/${detailId}`;
+  let detailStatus = 0;
+  let detailHtml = '';
+  let detailNoIndex = false;
+  try {
+    const res = await fetch(detailUrl, {
+      redirect: 'follow',
+      headers: { 'user-agent': 'kojo-og-image-check/1.0' },
+      signal: AbortSignal.timeout(20000),
+    });
+    detailStatus = res.status;
+    detailNoIndex = (res.headers.get('x-robots-tag') || '').includes('noindex');
+    detailHtml = await res.text();
+  } catch (err) {
+    errors.push(`[${jobDetailLabel}] fetch ${detailUrl} échoué : ${err.message}`);
+  }
 
-if (jobId) {
-  // Chemin 200 : la fonction doit injecter les méta OG de la mission.
-  if (detailStatus !== 200) {
-    errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 200 pour un job EXISTANT (fonction Vercel ou aiguillage cassé ?)`);
+  if (jobId) {
+    // Chemin 200 : la fonction doit injecter les méta OG de la mission.
+    if (detailStatus !== 200) {
+      errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 200 pour un job EXISTANT (fonction Vercel ou aiguillage cassé ?)`);
+    }
+    const ogImages = grabAll(detailHtml, 'property="og:image"');
+    const wide = ogImages[0] || '';
+    const square = ogImages.find((u) => u.includes('square')) || '';
+    const expectedWide = `${ORIGIN}/api/og/jobs/${detailId}.png`;
+    const expectedSquare = `${ORIGIN}/api/og/jobs/${detailId}-square.png`;
+    if (!wide.endsWith(expectedWide)) {
+      errors.push(`[${jobDetailLabel}] og:image mission inattendu : "${wide}" (attendu se terminant par "${expectedWide}")`);
+    }
+    if (!square.endsWith(expectedSquare)) {
+      errors.push(`[${jobDetailLabel}] variante carrée mission inattendue : "${square}" (attendu se terminant par "${expectedSquare}")`);
+    }
+    if (jobTitle && !detailHtml.includes(jobTitle)) {
+      errors.push(`[${jobDetailLabel}] og:title — titre de la mission "${jobTitle}" ABSENT du HTML servi`);
+    }
+    if (detailNoIndex) {
+      errors.push(`[${jobDetailLabel}] x-robots-tag noindex présent sur un job EXISTANT`);
+    }
+    // Cartes dynamiques du job (backend Pillow) : GET réel + dimensions.
+    if (isAbsolute(wide)) queueImageUrl(wide, jobDetailLabel);
+    if (isAbsolute(square)) queueImageUrl(square, jobDetailLabel);
+    checked.push(`  ✓ ${jobDetailLabel} → ${wide || '(absent)'}` + (square ? ` (+ carré ${square})` : '') + ` (job "${jobTitle || detailId}")`);
+  } else {
+    // Chemin 404 : prouve que la fonction est déployée et le rewrite aiguille
+    // /jobs/:id vers elle (sinon le catch-all SPA renverrait 200 + index.html).
+    if (detailStatus !== 404) {
+      errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 404 pour un job inconnu (pré-rendu backend non déployé ou rewrite cassé ?)`);
+    }
+    if (!detailNoIndex) {
+      errors.push(`[${jobDetailLabel}] x-robots-tag noindex absent sur le 404`);
+    }
+    checked.push(`  ✓ ${jobDetailLabel} (404 + noindex — pré-rendu backend servi, chemin 200 non testé faute de job)`);
   }
-  const ogImages = grabAll(detailHtml, 'property="og:image"');
-  const wide = ogImages[0] || '';
-  const square = ogImages.find((u) => u.includes('square')) || '';
-  const expectedWide = `${ORIGIN}/api/og/jobs/${detailId}.png`;
-  const expectedSquare = `${ORIGIN}/api/og/jobs/${detailId}-square.png`;
-  if (!wide.endsWith(expectedWide)) {
-    errors.push(`[${jobDetailLabel}] og:image mission inattendu : "${wide}" (attendu se terminant par "${expectedWide}")`);
-  }
-  if (!square.endsWith(expectedSquare)) {
-    errors.push(`[${jobDetailLabel}] variante carrée mission inattendue : "${square}" (attendu se terminant par "${expectedSquare}")`);
-  }
-  if (jobTitle && !detailHtml.includes(jobTitle)) {
-    errors.push(`[${jobDetailLabel}] og:title — titre de la mission "${jobTitle}" ABSENT du HTML servi`);
-  }
-  if (detailNoIndex) {
-    errors.push(`[${jobDetailLabel}] x-robots-tag noindex présent sur un job EXISTANT`);
-  }
-  // Cartes dynamiques du job (backend Pillow) : GET réel + dimensions.
-  if (isAbsolute(wide)) queueImageUrl(wide, jobDetailLabel);
-  if (isAbsolute(square)) queueImageUrl(square, jobDetailLabel);
-  checked.push(`  ✓ ${jobDetailLabel} → ${wide || '(absent)'}` + (square ? ` (+ carré ${square})` : '') + ` (job "${jobTitle || detailId}")`);
-} else {
-  // Chemin 404 : prouve que la fonction est déployée et le rewrite aiguille
-  // /jobs/:id vers elle (sinon le catch-all SPA renverrait 200 + index.html).
-  if (detailStatus !== 404) {
-    errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 404 pour un job inconnu (pré-rendu backend non déployé ou rewrite cassé ?)`);
-  }
-  if (!detailNoIndex) {
-    errors.push(`[${jobDetailLabel}] x-robots-tag noindex absent sur le 404`);
-  }
-  checked.push(`  ✓ ${jobDetailLabel} (404 + noindex — pré-rendu backend servi, chemin 200 non testé faute de job)`);
 }
 
 // ── Passe HTTP : dimensions réelles de chaque carte OG servie ─────────────
