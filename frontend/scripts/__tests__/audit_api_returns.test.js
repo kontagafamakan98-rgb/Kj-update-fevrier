@@ -38,6 +38,15 @@ function runAudit({ backendDir, servicesDir, strict = true }) {
   return { code: res.status, stdout: res.stdout, stderr: res.stderr };
 }
 
+// Chaque cas spawn un process Node complet : sous charge (runner CI saturé,
+// antivirus Windows…), le démarrage dépasse le délai vitest par défaut de 5 s
+// et le test tombe en « Test timed out in 5000ms » — un rouge ALÉATOIRE sans
+// rapport avec le code testé (déjà observé en local). On fixe donc un délai
+// explicite et généreux : un vrai blocage échoue toujours, mais le bruit de
+// démarrage ne fait plus rougir la CI.
+const SPAWN_TEST_TIMEOUT_MS = 30_000;
+const spawnTest = (name, fn) => it(name, fn, SPAWN_TEST_TIMEOUT_MS);
+
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -60,7 +69,7 @@ async def health():
 `;
 
 describe('audit_api_returns.cjs — les quatre sorties du CONTRAT', () => {
-  it('PASSE : bon verbe sur une route existante → exit 0', () => {
+  spawnTest('PASSE : bon verbe sur une route existante → exit 0', () => {
     const fx = makeFixture({
       backendPy: BACKEND_FIXTURE,
       serviceJs: `
@@ -78,7 +87,7 @@ export const probeService = {
     expect(stdout).not.toContain('[ECHEC]');
   });
 
-  it('ERREUR MÉTIER : verbe interdit sur route métier → exit 1 (bloquant même en défaut)', () => {
+  spawnTest('ERREUR MÉTIER : verbe interdit sur route métier → exit 1 (bloquant même en défaut)', () => {
     const fx = makeFixture({
       backendPy: BACKEND_FIXTURE,
       serviceJs: `
@@ -101,7 +110,7 @@ export const probeService = {
     expect(lax.code).toBe(1);
   });
 
-  it('WARNING INFRA : verbe interdit sur /health → non bloquant en défaut (exit 0)', () => {
+  spawnTest('WARNING INFRA : verbe interdit sur /health → non bloquant en défaut (exit 0)', () => {
     const fx = makeFixture({
       backendPy: BACKEND_FIXTURE,
       serviceJs: `
@@ -119,7 +128,7 @@ export const probeService = {
     expect(lax.stdout).toContain('hors périmètre');
   });
 
-  it('STRICT BLOQUANT : le même warning infra fait échouer avec --fail-on-warning (exit 1)', () => {
+  spawnTest('STRICT BLOQUANT : le même warning infra fait échouer avec --fail-on-warning (exit 1)', () => {
     const fx = makeFixture({
       backendPy: BACKEND_FIXTURE,
       serviceJs: `
@@ -138,7 +147,7 @@ export const probeService = {
 });
 
 describe('audit_api_returns.cjs — cas limites du CONTRAT', () => {
-  it('ERREUR MÉTIER : route introuvable (chemin inexistant) → exit 1', () => {
+  spawnTest('ERREUR MÉTIER : route introuvable (chemin inexistant) → exit 1', () => {
     const fx = makeFixture({
       backendPy: BACKEND_FIXTURE,
       serviceJs: `
@@ -155,7 +164,7 @@ export const probeService = {
     expect(stdout).toContain('route introuvable');
   });
 
-  it('ERREUR MÉTIER : api_route à methods explicites (GET/HEAD) rejette POST hors liste', () => {
+  spawnTest('ERREUR MÉTIER : api_route à methods explicites (GET/HEAD) rejette POST hors liste', () => {
     const fx = makeFixture({
       backendPy: `
 from fastapi import FastAPI
