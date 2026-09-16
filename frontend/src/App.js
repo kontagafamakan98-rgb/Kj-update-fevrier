@@ -14,7 +14,7 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
 import ToastContainer from "./components/ToastContainer";
-import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton } from "./components/SkeletonLoader";
+import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton, DashboardSkeleton, ProfileSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
@@ -240,10 +240,18 @@ function AppRoutes() {
             <Route path="/register" element={<Register />} />
             
             {/* Protected routes - lazy loaded */}
+            {/* /dashboard et /profile ont aussi leur skeleton Suspense DÉDIÉ :
+                leur phase de chargement des données affiche un shell structuré
+                (SkeletonDashboardShell / ProfileSkeleton) — le fallback
+                générique PageSkeleton (3 blocs courts) faisait sauter le footer
+                ancré au remplacement du chunk (CLS 0.149 / 0.112). Le squelette
+                dédié réplique ce shell → chaîne chunk→données→page stable. */}
             <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
+              <Suspense fallback={<DashboardSkeleton />}>
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              </Suspense>
             } />
             {/* Lecture des jobs PUBLIQUE (découverte sans compte) : les
                 actions (créer, postuler, accepter, supprimer) restent
@@ -270,9 +278,11 @@ function AppRoutes() {
               </ProtectedRoute>
             } />
             <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
+              <Suspense fallback={<ProfileSkeleton />}>
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              </Suspense>
             } />
             <Route path="/create-job" element={
               <ProtectedRoute>

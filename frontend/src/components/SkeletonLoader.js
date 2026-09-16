@@ -399,4 +399,153 @@ export const ForgotPasswordSkeleton = () => {
   );
 };
 
+// Squelette de page Dashboard — fallback du Suspense de la route /dashboard
+// (App.js). Réplique EXACTE de SkeletonDashboardShell (Dashboard.js, phase de
+// chargement des données) qui réplique elle-même le rendu final : le passage
+// skeleton-chunk → skeleton-données → page réelle ne déplace AUCUN élément
+// (footer ancré par le flex-1 du main, CLS ≈ 0). Le squelette vit dans le
+// chunk d'entrée : disponible avant l'arrivée du chunk lazy Dashboard.
+export const DashboardSkeleton = () => {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header d'accueil */}
+      <div className="mb-8">
+        <Skeleton className="h-8 w-64 max-w-full" />
+        <div className="mt-2">
+          <Skeleton className="h-4 w-80 max-w-full" />
+        </div>
+      </div>
+
+      {/* 4 cartes statistiques : même grille que le rendu final */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <Skeleton className="h-4 w-20" />
+                <div className="mt-3">
+                  <Skeleton className="h-7 w-28" />
+                </div>
+              </div>
+              <Skeleton className="h-12 w-12 rounded-xl" />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Section quick-actions : conteneur stable, contenu skeleton */}
+      <div className="bg-white rounded-lg shadow mb-8">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
+                <Skeleton className="h-11 w-11 rounded-xl" />
+                <Skeleton className="h-4 w-28" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Liste récente : header + lignes skeleton (même structure que la page) */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+        </div>
+        <div className="divide-y divide-gray-200">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-1/3 max-w-xs" />
+                  <div className="mt-2">
+                    <Skeleton className="h-3 w-full max-w-lg" />
+                  </div>
+                  <div className="flex items-center mt-3 space-x-4">
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </div>
+                </div>
+                <Skeleton className="h-5 w-5" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Squelette de page Profile — fallback du Suspense de la route /profile
+// (App.js). Réplique EXACTE de ProfileSkeleton (Profile.js, phase de
+// chargement des données — CLS mesuré 0.112 avant) : carte max-w-4xl, header
+// orange (photo ronde + nom), sections avis / infos personnelles 2×2 /
+// paiement / support. Le squelette vit dans le chunk d'entrée : disponible
+// avant l'arrivée du chunk lazy Profile.
+export const ProfileSkeleton = () => {
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        {/* Header orange / photo / nom */}
+        <div className="bg-orange-600 px-6 py-8">
+          <div className="flex items-center">
+            <Skeleton className="h-20 w-20 rounded-full bg-white/30 border-2 border-white" />
+            <div className="ml-6 flex-1">
+              <Skeleton className="h-7 w-56 max-w-full bg-white/30" />
+              <div className="mt-2">
+                <Skeleton className="h-4 w-40 bg-white/30" />
+              </div>
+              <div className="mt-3">
+                <Skeleton className="h-4 w-52 bg-white/30" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section avis */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+          <div className="mt-4">
+            <Skeleton className="h-4 w-3/4 max-w-md" />
+          </div>
+        </div>
+
+        {/* Section informations personnelles */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <div className="flex justify-between items-center mb-4">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index}>
+                <Skeleton className="h-4 w-20" />
+                <div className="mt-1">
+                  <Skeleton className="h-4 w-40" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sections bas de carte : paiement + support */}
+        <div className="px-6 py-6 border-b border-gray-200">
+          <Skeleton className="h-5 w-40" />
+          <div className="mt-4">
+            <Skeleton className="h-10 w-full rounded-lg" />
+          </div>
+        </div>
+
+        <div className="px-6 pb-6">
+          <Skeleton className="h-14 w-full rounded-2xl" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default Skeleton;
