@@ -59,6 +59,12 @@ export const PROD_ORIGIN = 'https://kj-update-fevrier.vercel.app';
  * @param {string} [options.origin]   Origin attendu des cartes backend (KOJO_ORIGIN).
  * @param {boolean} [options.quiet]   Tait la sortie de progression (tests).
  * @param {Function} [options.fetchImpl] `fetch` injectable (tests).
+ * @param {{id: string, title?: string}} [options.job] Mission IMPOSÉE à
+ *   vérifier, au lieu de prendre la première de la liste publique : utilisé par
+ *   scripts/check-og-job-200.js, qui crée une mission de test pour exercer la
+ *   branche 200 avec une fiche CONNUE (l'ordre de /api/jobs n'est pas garanti).
+ * @param {boolean} [options.onlyJob] Ne vérifier QUE la fiche mission (sauter
+ *   les routes statiques déjà couvertes par le run principal du check).
  * @returns {Promise<{ok: boolean, errors: string[], checked: string[],
  *   jobId: string, jobTitle: string, job200Exercised: boolean,
  *   localFallback: boolean, notices: string[]}>}
@@ -69,7 +75,10 @@ export async function runOgImageCheck({
   origin = process.env.KOJO_ORIGIN || PROD_ORIGIN,
   quiet = false,
   fetchImpl = fetch,
+  job = null,
+  onlyJob = false,
 } = {}) {
+  const pinnedJob = job && job.id ? { id: String(job.id), title: String(job.title || '') } : null;
   const BASE = String(base).trim().replace(/\/+$/, '');
   const BACKEND = String(backend).trim().replace(/\/+$/, '');
   const ORIGIN = String(origin).trim().replace(/\/+$/, '');
@@ -146,7 +155,7 @@ export async function runOgImageCheck({
     checked.push(`  ✓ og:image HTTP 200 ${width}x${height} (${contentType}) : ${url}`);
   }
 
-  for (const route of ROUTES) {
+  for (const route of onlyJob ? [] : ROUTES) {
     const url = `${BASE}${route.path}`;
     let html = '';
     try {
@@ -238,6 +247,13 @@ export async function runOgImageCheck({
       `c'est-à-dire sur les runs de main).`;
     notices.push(notice);
     log(`  ⚠️ ${notice}`);
+  } else if (pinnedJob) {
+    // Mission fournie par l'appelant : on vérifie CETTE fiche. C'est le seul
+    // moyen d'exercer la branche 200 de façon DÉTERMINISTE — dépendre de la
+    // première mission de la liste publique rendait le chemin 200 tributaire
+    // de l'état des données (et parfois absent).
+    jobId = pinnedJob.id;
+    jobTitle = pinnedJob.title;
   } else {
     try {
       const jres = await fetchImpl(`${BACKEND}/api/jobs?limit=1`, {
