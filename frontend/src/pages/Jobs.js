@@ -17,6 +17,7 @@ import CountrySelector from '../components/CountrySelector';
 import JobsMap from '../components/JobsMap';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
 import { usePageTitle, usePageOpenGraph, ogImageUrl } from '../utils/seo';
+import { makePublicJobsPrefetch } from '../utils/publicJobsPrefetch';
 
 function JobCard({ job, user, userType, appliedJobIds, t }) {
   const locationText = job.location_text || t('locationNotSpecified');
@@ -89,56 +90,16 @@ const JOBS_PAGE_SIZE = 12;
 // les filtres dépendent de l'utilisateur/URL, connus seulement au montage —
 // ils chargent comme avant. Un échec du préchargement est bénin : le cache
 // reste null et le composant recharge normalement.
-const PUBLIC_PREFETCH_PARAMS = { limit: JOBS_PAGE_SIZE, page: 1, status: 'open' };
-let publicJobsPrefetch = null; // { requestParams, promise } | null
-// null pendant le préchargement (en cours), un booléen ensuite. Évitée sous
-// jsdom/tests en vérifiant que l'environnement est un vrai navigateur.
-const canUseNetworkPrefetch =
-  typeof window !== 'undefined' &&
-  typeof window.localStorage !== 'undefined' &&
-  typeof navigator !== 'undefined' &&
-  !/jsdom/.test(String(navigator && navigator.userAgent));
-
-// Compare les params réels du composant à ceux du préchargement : on ne
-// réutilise le cache que pour la MÊME requête (decouverte, 1re page, open,
-// sans filtre/mine/ids). Tout écart → on recharge normalement.
-const matchesPublicPrefetch = (params) =>
-  params.limit === JOBS_PAGE_SIZE &&
-  params.page === 1 &&
-  params.status === 'open' &&
-  !params.q &&
-  !params.category &&
-  !params.mine &&
-  !params.ids;
-
-const kickPublicJobsPrefetch = () => {
-  if (!canUseNetworkPrefetch) return null;
-  if (publicJobsPrefetch && publicJobsPrefetch.promise) return publicJobsPrefetch;
-  const promise = jobsAPI
-    .getAll(PUBLIC_PREFETCH_PARAMS)
-    .then((response) => normalizeJobList(Array.isArray(response) ? response : response?.data || []))
-    .catch((error) => {
-      // Bénin : laisse le cache null pour que le composant recharge seul.
-      safeLog.warn('Public jobs prefetch failed (component will reload)', error);
-      return null;
-    });
-  publicJobsPrefetch = { requestParams: PUBLIC_PREFETCH_PARAMS, promise };
-  return publicJobsPrefetch;
-};
-
-// Consomme le préchargement depuis loadJobs : si la requête demandée
-// correspond à celle déjà lancée en parallèle ET que l'onglet réel est la
-// découverte, on l'attend au lieu d'en refaire une. Renvoie true si
-// consommé (aucun fetch nécessaire). Stores the normalized jobs + hasMore.
-const consumePublicJobsPrefetch = async (params) => {
-  if (!matchesPublicPrefetch(params)) return null;
-  if (!publicJobsPrefetch || !publicJobsPrefetch.promise) return null;
-  const jobs = await publicJobsPrefetch.promise;
-  // Réinitialise pour ne pas réutiliser ce cache sur une NAVIGATION ulterieure.
-  publicJobsPrefetch = null;
-  if (!jobs) return null; // échec → laisser loadJobs refaire sa propre requête
-  return { jobs, hasMore: jobs.length === JOBS_PAGE_SIZE };
-};
+// L'implémentation vit dans utils/publicJobsPrefetch.js (fabrique testable,
+// voir utils/__tests__/publicJobsPrefetch.test.js) : ici on l'instancie avec
+// les dépendances réelles de la page.
+const { kick: kickPublicJobsPrefetch, consume: consumePublicJobsPrefetch } =
+  makePublicJobsPrefetch({
+    jobsAPI,
+    normalizeJobList,
+    safeLog,
+    pageSize: JOBS_PAGE_SIZE,
+  });
 
 // Déclencher À L'ÉTAPE MODULE : dès que le chunk lazy Jobs est évalué, la
 // requête part EN PARALLÈLE du boot React et du montage (avant tout useEffect).
