@@ -23,6 +23,55 @@ from kojo_settings import VAPID_CLAIMS_EMAIL, validate_vapid_sub_claim
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
+# Domaines réservés (RFC 2606 / RFC 6761) : jamais une adresse de contact
+# réelle, donc jamais un défaut acceptable pour le claim `sub`.
+DOMAINES_PLACEHOLDER = (
+    "example.com",
+    "example.org",
+    "example.net",
+    "example",
+    "invalid",
+    "test",
+    "localhost",
+)
+
+
+def _domaine_du_claim(claim):
+    """Domaine d'un claim `sub` mailto: — None si ce n'est pas un mailto:."""
+    if not isinstance(claim, str) or not claim.lower().startswith("mailto:"):
+        return None
+    adresse = claim.split(":", 1)[1]
+    if "@" not in adresse:
+        return None
+    return adresse.rsplit("@", 1)[1].lower()
+
+
+def _est_placeholder(claim):
+    """True si le claim mailto: pointe un domaine réservé (ex. example.com).
+
+    Un claim https: n'est jamais un placeholder par construction (un domaine
+    réservé y serait au moins explicite).
+    """
+    domaine = _domaine_du_claim(claim)
+    if domaine is None:
+        return False
+    return any(domaine == d or domaine.endswith("." + d) for d in DOMAINES_PLACEHOLDER)
+
+
+def _defaut_du_code():
+    """Défaut littéral de VAPID_CLAIMS_EMAIL dans kojo_settings.py.
+
+    Lu dans la SOURCE (et non via l'import) pour rester un test du défaut même
+    si la variable d'environnement est définie localement ou en CI.
+    """
+    source = (BACKEND_DIR / "kojo_settings.py").read_text(encoding="utf-8")
+    match = re.search(
+        r"VAPID_CLAIMS_EMAIL\s*=\s*os\.environ\.get\(\s*['\"]VAPID_CLAIMS_EMAIL['\"]\s*,\s*['\"]([^'\"]*)['\"]",
+        source,
+    )
+    assert match, "défaut de VAPID_CLAIMS_EMAIL introuvable dans kojo_settings.py"
+    return match.group(1)
+
 
 class TestVapidSubClaimValid:
     def test_mailto_sans_espace(self):
@@ -94,3 +143,69 @@ class TestReferencesProd:
         content = doc_path.read_text(encoding="utf-8")
         for valeur in re.findall(r"VAPID_CLAIMS_EMAIL=(\S+)", content):
             assert validate_vapid_sub_claim(valeur)
+
+    def test_defaut_code_pas_un_placeholder(self):
+        # Le défaut littéral du code (utilisé quand l'env n'est pas définie)
+        # doit être une adresse RÉELLE : un domaine réservé passe le validateur
+        # de format tout en étant inutilisable — la panne VAPID redeviendrait
+        # silencieuse en cas de variable manquante sur Fly.
+        defaut = _defaut_du_code()
+        assert validate_vapid_sub_claim(defaut)
+        assert not _est_placeholder(defaut), (
+            f"défaut de VAPID_CLAIMS_EMAIL = domaine réservé ({defaut})"
+        )
+
+    def test_defaut_egal_reference_env_example(self):
+        env_path = BACKEND_DIR / ".env.example"
+        if not env_path.exists():
+            pytest.skip(".env.example absent")
+        match = re.search(
+            r"^VAPID_CLAIMS_EMAIL=(\S+)\s*$",
+            env_path.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        assert match, "VAPID_CLAIMS_EMAIL absent de .env.example"
+        assert _defaut_du_code() == match.group(1), (
+            f"défaut du code ({_defaut_du_code()}) != .env.example ({match.group(1)})"
+        )
+
+    def test_doc_deploiement_reprend_l_adresse_du_defaut(self):
+        doc_path = BACKEND_DIR / "DEPLOY_FLYIO.md"
+        if not doc_path.exists():
+            pytest.skip("DEPLOY_FLYIO.md absent")
+        adresse = _defaut_du_code()
+        assert adresse in doc_path.read_text(encoding="utf-8"), (
+            f"DEPLOY_FLYIO.md ne documente pas l'adresse par défaut du code ({adresse})"
+        )
+
+
+class TestDetecteurPlaceholder:
+    """Le garde anti-placeholder doit échouer sur de VRAIS placeholders.
+
+    Sans ce test, `test_defaut_code_pas_un_placeholder` pourrait passer parce
+    que le détecteur ne détecte rien du tout.
+    """
+
+    @pytest.mark.parametrize(
+        "claim",
+        [
+            "mailto:kojo@example.com",
+            "mailto:contact@example.org",
+            "mailto:dev@example.net",
+            "mailto:preprod@test",
+            "mailto:dev@localhost",
+            "mailto:x@sous.example.com",
+        ],
+    )
+    def test_detecte_les_domaines_reserves(self, claim):
+        assert _est_placeholder(claim)
+
+    @pytest.mark.parametrize(
+        "claim",
+        [
+            "mailto:kojoapp98@gmail.com",
+            "https://kojo.app/contact",
+        ],
+    )
+    def test_ne_detecte_pas_une_vraie_adresse(self, claim):
+        assert not _est_placeholder(claim)

@@ -276,7 +276,15 @@ VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '').strip()
 
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
 
-VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'mailto:kojo@example.com').strip()
+# Défaut = adresse de contact RÉELLE (cf. DEPLOY_FLYIO.md et .env.example).
+# Un placeholder du genre 'mailto:kojo@example.com' passait le validateur de
+# format tout en étant inutilisable : si la variable disparaissait de Fly, le
+# backend démarrait sans bruit avec un claim `sub` que Mozilla/Google rejettent
+# (401/403 sur l'authentification VAPID) — la panne silencieuse que le
+# validateur existe pour empêcher. Le défaut doit donc être une adresse qui
+# fonctionne vraiment, et rester aligné sur les références du dépôt
+# (verrouillé par tests/test_vapid_sub_claim.py::TestReferencesProd).
+VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'mailto:kojoapp98@gmail.com').strip()
 
 # Validateurs de format des variables d'env — extraits dans
 # kojo_env_validators.py (module stdlib-only, importable sans dépendances
