@@ -484,6 +484,38 @@ jobs:
         working-directory: frontend
         run: node scripts/check-og-images.js
 
+      # Verrouille les DEUX chemins de /jobs/:id. Chemin 200 : crée une mission
+      # de test avec le COMPTE CLIENT CI, vérifie la carte OG RÉELLE de cette
+      # mission (og:image wide + carrée, og:title présent, PNG 1200x630 /
+      # 1200x1200) puis la SUPPRIME — toujours, y compris si la vérification
+      # échoue (finally). Sans lui, ce chemin n'était exercé que les jours où
+      # une mission existait en base : check-og-images se rabattait alors sur le
+      # chemin 404. Toujours AVANT Lighthouse CI, pour que la mission de test
+      # ait disparu de la liste quand /jobs est audité (et parce qu'un échec de
+      # nettoyage doit bloquer le job, pas passer inaperçu).
+      # Chemin 404 (APRÈS le DELETE, donc plus aucun effet de bord en base) : la
+      # fiche doit répondre 404 + noindex, sa carte Pillow 404, et le sitemap ne
+      # plus la lister — une fiche morte restée en 200 garde sa carte et reste
+      # indexable. Contrepartie vérifiée AVANT suppression : la mission doit
+      # APPARAÎTRE dans le sitemap, sinon « absente du sitemap » serait vrai à
+      # vide. Les sondes post-suppression portent un paramètre de cache-busting
+      # car la fiche vivante est servie avec s-maxage=3600 (l'URL nue pourrait
+      # renvoyer un 200 sorti du cache CDN).
+      # Sur repli build local (LHCI_URL=localhost), le script ne fait RIEN
+      # (le rewrite /jobs/(.*) n'existe que sur le déploiement Vercel) : il
+      # sort en 0 avec un ::notice — aucune écriture en prod pour rien.
+      # LHCI_URL et LHCI_AUTH_HEADER sont déjà dans l'environnement (steps
+      # précédents, via $GITHUB_ENV) ; les secrets servent de repli si le
+      # jeton n'a pas été résolu.
+      - name: Check /jobs/:id OG path (create → 200 → delete → 404 + noindex + sitemap)
+        working-directory: frontend
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
+        run: node scripts/check-og-job-200.js
+
       # ubuntu-latest embarque Google Chrome : chrome-launcher le détecte
       # automatiquement (pas d'action d'installation nécessaire). LHCI_URL
       # (si définie) fait auditer l'URL Vercel réelle, sinon le build local.
