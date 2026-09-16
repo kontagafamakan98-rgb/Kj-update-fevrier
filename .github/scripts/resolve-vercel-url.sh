@@ -8,16 +8,16 @@
 # Robustesse : si l'API GitHub échoue (rate-limit HTTP 403, erreur réseau,
 # HTTP != 200) ou renvoie un corps inexploitable (JSON invalide, pas une
 # liste, aucun commentaire Vercel avec URL), on LOGGUE la cause et on RETOMBE
-# proprement sur le build local (LHCI_URL vide) — jamais d'échec de job pour
+# proprement sur le build local (KOJO_LHCI_BASE_URL vide) — jamais d'échec de job pour
 # une raison d'infrastructure, et le repli est toujours explicite dans les logs.
 #
-# Sortie : écrit LHCI_URL dans $GITHUB_ENV si résolue, sinon ne fait rien.
+# Sortie : écrit KOJO_LHCI_BASE_URL dans $GITHUB_ENV si résolue, sinon ne fait rien.
 set -u
 
 # GH_API_BASE est overridable (tests locaux) ; défaut : API publique GitHub.
 GH_API_BASE="${GH_API_BASE:-https://api.github.com}"
 
-LHCI_URL=""
+KOJO_LHCI_BASE_URL=""
 GH_COMMENTS="$(mktemp)"
 trap 'rm -f "$GH_COMMENTS"' EXIT
 
@@ -47,7 +47,7 @@ if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
     else
       # Corps 200 : doit être une LISTE JSON de commentaires. Corps invalide,
       # structure inattendue ou aucun commentaire Vercel → repli.
-      LHCI_URL=$(python3 -c "
+      KOJO_LHCI_BASE_URL=$(python3 -c "
 import json, re, sys
 try:
     data = json.load(sys.stdin)
@@ -66,13 +66,13 @@ try:
 except Exception:
     sys.exit()
 " < "$GH_COMMENTS")
-      if [ -z "$LHCI_URL" ]; then
+      if [ -z "$KOJO_LHCI_BASE_URL" ]; then
         echo "⚠️  Corps GitHub inexploitable (JSON invalide / pas une liste / aucun commentaire Vercel avec URL) → repli sur le build local"
       fi
     fi
   fi
 elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "${GITHUB_REF:-}" = "refs/heads/main" ]; then
-  LHCI_URL="https://kj-update-fevrier.vercel.app"
+  KOJO_LHCI_BASE_URL="https://kj-update-fevrier.vercel.app"
 fi
 
 # ── Détection de la protection de déploiement Vercel (Deployment Protection) ──
@@ -81,9 +81,9 @@ fi
 # "vercel.com/api/product-og?product=protected-deployment") au lieu de l'app.
 # Auditer ce mur de login n'a aucune valeur — on RETOMBE sur le build local
 # (le code de la PR). La prod (main) n'est jamais protégée : pas de probe.
-if [ -n "$LHCI_URL" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+if [ -n "$KOJO_LHCI_BASE_URL" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
   PROBE_BODY="$(mktemp)"
-  PROBE_URL="$(curl -sSL -o "$PROBE_BODY" -w "%{url_effective}" --max-time 20 "$LHCI_URL/" 2>/dev/null)" || PROBE_URL=""
+  PROBE_URL="$(curl -sSL -o "$PROBE_BODY" -w "%{url_effective}" --max-time 20 "$KOJO_LHCI_BASE_URL/" 2>/dev/null)" || PROBE_URL=""
   PROTECTED=0
   case "$PROBE_URL" in
     *vercel.com/login*|*vercel.com/accounts*|*product-og*) PROTECTED=1 ;;
@@ -92,15 +92,15 @@ if [ -n "$LHCI_URL" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
   rm -f "$PROBE_BODY"
   if [ "$PROTECTED" = "1" ]; then
     echo "⚠️  Preview Vercel PROTÉGÉE (Deployment Protection active, redirigée vers ${PROBE_URL:-<vide>}) → repli sur le build local (le code de la PR)"
-    LHCI_URL=""
+    KOJO_LHCI_BASE_URL=""
   else
-    echo "Preview Vercel accessible (aucune protection détectée) : $LHCI_URL"
+    echo "Preview Vercel accessible (aucune protection détectée) : $KOJO_LHCI_BASE_URL"
   fi
 fi
 
-if [ -n "$LHCI_URL" ]; then
-  echo "LHCI_URL=$LHCI_URL" >> "$GITHUB_ENV"
-  echo "Cible Lighthouse : $LHCI_URL"
+if [ -n "$KOJO_LHCI_BASE_URL" ]; then
+  echo "KOJO_LHCI_BASE_URL=$KOJO_LHCI_BASE_URL" >> "$GITHUB_ENV"
+  echo "Cible Lighthouse : $KOJO_LHCI_BASE_URL"
 else
   echo "URL Vercel non résolue → repli sur le build local"
 fi
