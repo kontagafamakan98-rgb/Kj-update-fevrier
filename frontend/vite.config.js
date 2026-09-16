@@ -763,6 +763,44 @@ export default defineConfig(({ mode }) => {
           }
           fs.writeFileSync(indexPath, withHomeShell, 'utf8')
 
+          // ── Gabarit des routes CLIENTES : app.html ──────────────────────
+          // Les routes sans pré-rendu (/dashboard, /profile, /support,
+          // /how-it-works, /messages, /create-job…) n'ont AUCUN contenu
+          // statique propre : leur servir index.html reviendrait à publier le
+          // shell de l'ACCUEIL sur dix URL différentes — h1, 300+ mots et
+          // liens internes de la home servis sous l'adresse /dashboard, c'est
+          // du contenu dupliqué (le défaut exact que l'audit SEO reprochait à
+          // l'accueil, déplacé sur les autres routes).
+          //
+          // app.html est donc le gabarit NU : #root vide (rien qui soit peint
+          // puis effacé au montage), titre/description neutres décrivant le
+          // SITE et non la page, et surtout AUCUN canonical. Le canonical
+          // statique "/" était un défaut connu (voir src/utils/seo.js) : un
+          // seul /app.html servant dix routes ne peut pas en déclarer un — le
+          // hook usePageTitle en pose un correct au runtime, et `ensureCanonical`
+          // crée la balise si elle est absente. Le JSON-LD (LocalBusiness,
+          // Organization, WebSite) est retiré pour la même raison : il décrit
+          // l'organisation une fois, sur la page d'accueil et sur elle seule.
+          const neutralTitle = 'Kojo'
+          const neutralDescription =
+            "Kojo met en relation clients et travailleurs qualifiés en Afrique de l'Ouest : plomberie, électricité, mécanique, construction, informatique et plus."
+          let appHtml = html
+            .replace(/(<title>)[^<]*(<\/title>)/, `$1${neutralTitle}$2`)
+            .replace(/\s*<link rel="canonical"[^>]*\/?>(?:<\/link>)?/, '')
+            .replace(/\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')
+          appHtml = setMeta(appHtml, 'description', neutralDescription)
+          appHtml = setMeta(appHtml, 'og:title', neutralTitle)
+          appHtml = setMeta(appHtml, 'og:description', neutralDescription)
+          appHtml = setMeta(appHtml, 'twitter:title', neutralTitle)
+          appHtml = setMeta(appHtml, 'twitter:description', neutralDescription)
+          if (appHtml.includes('<link rel="canonical"') || appHtml.includes('application/ld+json')) {
+            throw new Error(
+              'prerender-route-meta : app.html contient encore un canonical ou un JSON-LD — ' +
+                'le gabarit des routes clientes doit rester neutre (contenu dupliqué sinon)'
+            )
+          }
+          fs.writeFileSync(path.join(outDir, 'app.html'), appHtml, 'utf8')
+
           // ── Page 404 ────────────────────────────────────────────────
           // Servie par Vercel (statut 404) pour une URL qui ne correspond à
           // aucun fichier ni rewrite. Sans scripts : elle doit fonctionner

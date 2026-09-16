@@ -199,8 +199,16 @@ if (payment) {
 // (elle l'est par le mécanisme 404 de Vercel, avec un statut 404) — exiger une
 // règle « /404 » n'aurait aucun sens. Sa présence et son noindex sont vérifiés
 // par check-spa-routes.js.
+// app.html est exclue pour la raison inverse : c'est le gabarit NU partagé par
+// les routes clientes (/dashboard, /profile, /support…), pas une page. Il est
+// émis pour un CAS DE ROUTAGE, pas pour une URL « /app » qui n'existe pas — son
+// contrat (destinations attendues, #root vide, ni h1 ni canonical) appartient à
+// check-spa-routes.js.
 const prerenderedPages = readdirSync(buildDir)
-  .filter((name) => name.endsWith('.html') && !['index.html', '404.html'].includes(name))
+  .filter(
+    (name) =>
+      name.endsWith('.html') && !['index.html', '404.html', 'app.html'].includes(name)
+  )
   .sort();
 
 let vercelRewrites = null;

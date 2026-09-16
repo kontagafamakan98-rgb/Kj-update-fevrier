@@ -88,17 +88,30 @@ const CONFORMING_REWRITES = [
   { source: '/forgot-password/', destination: '/forgot-password.html' },
   { source: '/payment', destination: '/payment.html' },
   { source: '/payment/', destination: '/payment.html' },
-  { source: '/how-it-works', destination: '/index.html' },
-  { source: '/how-it-works/', destination: '/index.html' },
-  { source: '/dashboard', destination: '/index.html' },
-  { source: '/dashboard/', destination: '/index.html' },
-  { source: '/profile', destination: '/index.html' },
-  { source: '/profile/', destination: '/index.html' },
-  { source: '/photo-debug', destination: '/index.html' },
-  { source: '/photo-debug/', destination: '/index.html' },
-  { source: '/support', destination: '/index.html' },
-  { source: '/support/', destination: '/index.html' },
+  { source: '/how-it-works', destination: '/app.html' },
+  { source: '/how-it-works/', destination: '/app.html' },
+  { source: '/dashboard', destination: '/app.html' },
+  { source: '/dashboard/', destination: '/app.html' },
+  { source: '/profile', destination: '/app.html' },
+  { source: '/profile/', destination: '/app.html' },
+  { source: '/photo-debug', destination: '/app.html' },
+  { source: '/photo-debug/', destination: '/app.html' },
+  { source: '/support', destination: '/app.html' },
+  { source: '/support/', destination: '/app.html' },
 ];
+
+/** En-têtes de référence : les routes privées ne sont pas indexables. */
+const CONFORMING_HEADERS = [
+  { source: '/dashboard', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
+  { source: '/profile', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
+  { source: '/photo-debug', headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
+];
+
+/** Gabarit nu de référence (ce que produit le plugin de pré-rendu). */
+const APP_HTML_BODY =
+  '<!DOCTYPE html><html lang="fr"><head><title>Kojo</title>' +
+  '<meta name="description" content="Kojo met en relation clients et travailleurs." /></head>' +
+  '<body><div id="root"></div></body></html>';
 
 const NOT_FOUND_HTML =
   '<!DOCTYPE html><html lang="fr"><head><meta name="robots" content="noindex, follow" />' +
@@ -107,11 +120,14 @@ const NOT_FOUND_HTML =
 /** Fabrique un projet minimal (frontend/vercel.json + App.js + routeur backend). */
 function makeProject({
   rewrites = CONFORMING_REWRITES,
+  headers = CONFORMING_HEADERS,
   appSource = APP_SOURCE,
   router = true,
   notFound = NOT_FOUND_HTML,
   raw,
   index = true,
+  appHtml = APP_HTML_BODY,
+  extraBuildHtml = [],
 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'spa-routes-'));
   tempDirs.push(root);
@@ -121,11 +137,19 @@ function makeProject({
   fs.mkdirSync(buildDir, { recursive: true });
   fs.writeFileSync(
     path.join(frontendDir, 'vercel.json'),
-    raw !== undefined ? raw : JSON.stringify({ framework: 'vite', rewrites }, null, 2)
+    raw !== undefined ? raw : JSON.stringify({ framework: 'vite', rewrites, headers }, null, 2)
   );
   fs.writeFileSync(path.join(frontendDir, 'src', 'App.js'), appSource);
   if (index) fs.writeFileSync(path.join(buildDir, 'index.html'), '<div id="root"></div>');
   if (notFound !== null) fs.writeFileSync(path.join(buildDir, '404.html'), notFound);
+  if (appHtml !== null) fs.writeFileSync(path.join(buildDir, 'app.html'), appHtml);
+  // Pages pré-rendues attendues par le routage de référence.
+  for (const route of ['jobs', 'login', 'register', 'forgot-password', 'payment']) {
+    fs.writeFileSync(path.join(buildDir, `${route}.html`), '<div id="root"></div>');
+  }
+  for (const name of extraBuildHtml) {
+    fs.writeFileSync(path.join(buildDir, `${name}.html`), '<div id="root"></div>');
+  }
   const backendDir = path.join(root, 'backend');
   fs.mkdirSync(backendDir, { recursive: true });
   if (router) {
@@ -379,5 +403,106 @@ describe('check-spa-routes — découverte et cas dégradés', () => {
     expect(
       run(makeProject({ raw: JSON.stringify({ framework: 'vite' }) })).errors.join('\n')
     ).toContain('aucun rewrite');
+  });
+});
+
+// Le gabarit des routes clientes : c'est le point qui a réellement cassé en
+// production. index.html porte désormais le shell de l'ACCUEIL ; le servir à
+// /dashboard ou /support publiait le h1, les 300+ mots et les liens de la home
+// sous une dizaine d'adresses (contenu dupliqué), avec en plus un canonical
+// statique « / » sur toutes.
+describe('check-spa-routes — séparation des gabarits', () => {
+  it('accepte app.html comme gabarit des routes clientes', () => {
+    const result = run(makeProject());
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it('échoue si une route cliente est servie par index.html', () => {
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) => {
+        for (const rule of rewrites) {
+          if (rule.source === '/dashboard') rule.destination = SPA_INDEX;
+        }
+      }),
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('/app.html');
+    expect(errors).toContain('contenu dupliqu\u00e9');
+  });
+
+  it('échoue si une route cliente renvoie vers un .html inexistant', () => {
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) => {
+        for (const rule of rewrites) {
+          if (rule.source === '/support') rule.destination = '/support.html';
+        }
+      }),
+    });
+    expect(run(project).errors.join('\n')).toContain('/app.html');
+  });
+
+  it('échoue si build/app.html est absent ou n\'est plus un gabarit nu', () => {
+    expect(run(makeProject({ appHtml: null })).errors.join('\n')).toContain('app.html absent');
+
+    const withH1 = makeProject({
+      appHtml: APP_HTML_BODY.replace('<div id="root"></div>', '<div id="root"><h1>Titre</h1></div>'),
+    });
+    expect(run(withH1).errors.join('\n')).toContain('<h1>');
+
+    const withCanonical = makeProject({
+      appHtml: APP_HTML_BODY.replace(
+        '</head>',
+        '<link rel="canonical" href="https://kj-update-fevrier.vercel.app/" /></head>'
+      ),
+    });
+    expect(run(withCanonical).errors.join('\n')).toContain('canonical');
+
+    const withLdJson = makeProject({
+      appHtml: APP_HTML_BODY.replace(
+        '</head>',
+        '<script type="application/ld+json">{"@type":"LocalBusiness"}</script></head>'
+      ),
+    });
+    expect(run(withLdJson).errors.join('\n')).toContain('JSON-LD');
+
+    const filledRoot = makeProject({
+      appHtml: APP_HTML_BODY.replace('<div id="root"></div>', '<div id="root"><p>x</p></div>'),
+    });
+    expect(run(filledRoot).errors.join('\n')).toContain('VIDE');
+  });
+
+  it('échoue si une page pré-rendue est émise sans être déclarée', () => {
+    const project = makeProject({ extraBuildHtml: ['produits'] });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('produits');
+    expect(errors).toContain('PRERENDERED_ROUTES');
+  });
+});
+
+describe('check-spa-routes — routes privées non indexables', () => {
+  it('exige X-Robots-Tag noindex sur chaque route privée', () => {
+    const project = makeProject({
+      headers: CONFORMING_HEADERS.filter((entry) => entry.source !== '/profile'),
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('/profile');
+    expect(errors).toContain('X-Robots-Tag');
+  });
+
+  it('refuse un noindex détourné en index', () => {
+    const project = makeProject({
+      headers: CONFORMING_HEADERS.map((entry) =>
+        entry.source === '/dashboard'
+          ? { source: '/dashboard', headers: [{ key: 'X-Robots-Tag', value: 'index, follow' }] }
+          : entry
+      ),
+    });
+    expect(run(project).errors.join('\n')).toContain('noindex');
+  });
+
+  it('le dépôt réel protège toutes ses routes privées', () => {
+    const result = runSpaRoutesCheck();
+    expect(result.errors.filter((e) => e.includes('X-Robots-Tag'))).toEqual([]);
   });
 });

@@ -150,7 +150,7 @@ cd frontend && npm test
     { "source": "/jobs/", "destination": "/jobs.html" },
     { "source": "/jobs/(.*)", "destination": "https://kojo-backend.fly.dev/api/og/jobs/$1" },
     { "source": "/api/:path*", "destination": "https://kojo-backend.fly.dev/api/:path*" },
-    { "source": "/dashboard", "destination": "/index.html" }
+    { "source": "/dashboard", "destination": "/app.html" }
   ]
 }
 ```
@@ -170,6 +170,19 @@ cd frontend && npm test
   backend (`GET /api/og/jobs/{id}`, méta OG de la mission + 404 noindex), et le
   cycle complet la concernant est exercé sur les PR par
   `backend/tests/test_job_og_cycle.py`.
+- **deux gabarits, jamais confondus** : une page pré-rendue (`/jobs`, `/login`,
+  `/register`, `/forgot-password`, `/payment`) est servie par **son** `.html` ;
+  toute autre route cliente (`/dashboard`, `/profile`, `/support`,
+  `/how-it-works`…) est servie par **`app.html`**, un gabarit nu (`#root` vide,
+  pas de `<h1>`, pas de canonical, pas de JSON-LD). Servir `index.html` à ces
+  routes publierait le contenu de l'accueil — h1, texte, liens — sous une
+  dizaine d'adresses, avec un canonical statique « / » sur toutes : c'est du
+  contenu dupliqué, et `check-spa-routes.js` échoue désormais dans ce cas ;
+- **les routes privées ne sont pas indexables** : `/dashboard`, `/profile`,
+  `/messages`, `/create-job`, `/photo-debug`, `/email-verification`,
+  `/payment-verification`, `/commission-dashboard` et `/support-admin` portent
+  `X-Robots-Tag: noindex` (vérifié : l'en-tête est absent → CI rouge). Un
+  tableau de bord dans les résultats de recherche est une page vide.
 
 - **Variables d'env** (dashboard, onglet Settings → Environment Variables) :
   `VITE_API_URL=https://kojo-backend.fly.dev/api`
