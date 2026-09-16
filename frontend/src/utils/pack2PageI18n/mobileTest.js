@@ -63,7 +63,6 @@ en: {
 };
 dict.wo = withBase(dict.fr, {
 backToDashboard: 'Dellu ci dashboard',
-  title: 'Test mobile Kojo',
   appInfo: '📱 Xibaar ci app mobile bi',
   featuresImplemented: '✅ Fonkisiyon yu sampu',
   screensIntegrated: '📱 Ekran yi dugal nañu leen',

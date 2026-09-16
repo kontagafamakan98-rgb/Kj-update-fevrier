@@ -214,7 +214,7 @@ const EmailVerificationPage = () => {
 
   if (!userData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-full bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
           <div className="mt-4 text-orange-600 font-medium">{pageT('redirecting')}</div>
@@ -223,8 +223,7 @@ const EmailVerificationPage = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-8">
+  return (      <div className="min-h-full bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-3">📧 {pageT('title')}</h1>

@@ -9,7 +9,7 @@ export default function MobileTest() {
   const pageT = makeScopedTranslator(currentLanguage, t);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-full bg-gray-50">
       <header className="bg-orange-600 text-white p-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center space-x-4">

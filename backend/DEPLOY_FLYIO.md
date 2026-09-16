@@ -80,7 +80,7 @@ fly secrets set \
   les callbacks IPN PayDunya seraient construits sans domaine (donc cassés).
 - 📧 **`VAPID_CLAIMS_EMAIL`** (claim `sub` des notifications push, RFC 8292) :
   doit être une URI `mailto:` **sans espace** après le schéma
-  (`mailto:kojoapp98@gmail.com` ✅, `mailto: contact@kojo.app` ❌). La valeur
+  (`mailto:kojoapp98@gmail.com` ✅, `mailto: kojoapp98@gmail.com` ❌). La valeur
   déployée sur Fly est **`mailto:kojoapp98@gmail.com`** — elle doit rester
   identique à celle de `.env.example`. Un garde-fou CI
   (`backend/tests/test_vapid_sub_claim.py`) vérifie le format des références

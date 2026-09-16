@@ -28,7 +28,6 @@ fr: {
   specialtyPlaceholder: 'Ex: Plomberie, Électricité...',
   save: 'Enregistrer',
   cancel: 'Annuler',
-  errorPrefix: 'Erreur : ',
   description: 'Description'
 },
 en: {
@@ -57,7 +56,6 @@ en: {
   specialtyPlaceholder: 'Example: Plumbing, Electrical...',
   save: 'Save',
   cancel: 'Cancel',
-  errorPrefix: 'Error: ',
   description: 'Description'
 }
 };
