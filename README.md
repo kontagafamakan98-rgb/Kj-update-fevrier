@@ -228,6 +228,42 @@ accessible mais n'apparaît pas dans les branches) :
 > 2026) et `master` ont été **supprimées** : leur contenu est intégré ou
 > préservé dans les tags ci-dessus.
 
+### Protection de `main` (branche protégée)
+
+`main` est protégée par une règle GitHub : **aucun commit ne peut y entrer
+autrement que par une PR dont les 8 checks CI sont verts**. Concrètement :
+
+- **PR obligatoire** — les pushs directs sur `main` sont refusés par le serveur
+  (`GH006: Protected branch update failed … Changes must be made through a pull
+  request`), même pour l'administrateur du dépôt (protection appliquée aussi
+  aux admins : impossible de la contourner « par erreur »).
+- **8 checks requis**, exactement les jobs du workflow `CI` : `Audits détectent
+  les régressions`, `Backend tests (Python + MongoDB)`, `Fly env doc-prod (drift
+  + secrets)`, `Frontend tests + build (Node/Vite)`, `Lighthouse performance
+  budgets`, `Mobile build (Capacitor + Android)`, `Workflow lint (actionlint +
+  shellcheck)`, `Deploy backend to Fly.io`.
+- **Branche à jour exigée** (`strict`) : une PR verte mais calculée sur une base
+  périmée doit être mise à jour avant fusion — un vert obtenu sur un `main`
+  ancien ne suffit pas.
+- Pas d'approbation humaine exigée (contributeur unique, une auto-approbation
+  GitHub est impossible) : le garde-fou est **entièrement automatisé**.
+- Force-push et suppression de `main` désactivés.
+
+> **Pourquoi `Deploy backend to Fly.io` figure aussi dans la liste** : ce job ne
+> s'exécute que sur `main` ; sur une PR il est *skipped*, et GitHub considère
+> `success`, `skipped` et `neutral` comme des statuts réussis pour un check
+> requis. L'inclure ne bloque donc jamais une PR, mais garantit qu'un échec de
+> déploiement est bien visible dans l'historique des checks.
+
+Aucun filtre de chemins n'existe au niveau du workflow : **toute** PR vers
+`main` déclenche ces 8 jobs, donc un check requis n'est jamais « en attente »
+indéfiniment (cas typique de blocage avec une protection de branche).
+
+Pour modifier temporairement la règle (par ex. débloquer une urgence), passer
+par `Settings → Branches → main`, ou l'API
+`PUT /repos/{owner}/{repo}/branches/main/protection`. Une modification
+permanente de la règle se fait dans la même page et doit être reportée ici.
+
 ## Comptes de test
 
 Des comptes de démonstration existent en production (backend Fly.io) :
