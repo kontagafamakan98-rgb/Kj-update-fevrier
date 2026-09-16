@@ -3,6 +3,7 @@ import { Phone, Mail, MapPin, MessageCircle, Bot, Send, CheckCircle, ArrowLeft }
 import { supportAPI } from '../services/apiEndpoints';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { usePageTitle } from '../utils/seo';
 // Contact (N.A.P.) partagé avec le footer et le shell statique de l'accueil :
 // une seule source (src/config/contact.json) pour ne jamais publier deux
 // adresses ou deux numéros différents selon le canal.
@@ -608,8 +609,12 @@ function TicketTracker({ copy }) {
 }
 
 const Support = () => {
-  const { currentLanguage } = useLanguage();
+  const { currentLanguage, t } = useLanguage();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
+  // SEO de la route : /support est une page PUBLIQUE servie par le gabarit nu
+  // app.html (titre neutre, aucun canonical). Sans cet appel, elle resterait
+  // sans titre propre — y compris pour un crawler qui exécute le JavaScript.
+  usePageTitle(`${t('support')} — Kojo`, { description: t('supportHelp') });
   const [mode, setMode] = useState(null); // null | 'robot' | 'direct'
 
   return (
