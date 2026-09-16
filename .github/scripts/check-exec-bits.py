@@ -138,6 +138,11 @@ def check_path(repo_root, rel_path, is_executable=None, run=None):
     exécutable sur son système de fichiers, et un test doit pouvoir simuler
     « mode git correct, fichier non exécutable après checkout » sans dépendre de
     la plateforme.
+
+    Limite à connaître : sous Windows, la sonde par défaut (os.access X_OK)
+    répond toujours vrai pour un fichier ordinaire. Un « OK » obtenu sur un poste
+    Windows ne prouve donc PAS ce point-là du contrôle — seul un environnement
+    POSIX (le runner Linux) le vérifie réellement.
     """
     probe = is_executable or (lambda p: os.access(p, os.X_OK))
     target = Path(repo_root) / rel_path

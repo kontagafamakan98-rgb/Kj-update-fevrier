@@ -61,13 +61,23 @@ def _git(repo, *args):
 def _repo_with_gradlew(tmp_path, content=b"#!/bin/sh\necho ok\n", mode=None):
     """Crée un dépôt git minimal contenant frontend/android/gradlew.
 
-    ``mode`` vaut None (mode par défaut de `git add`, 100644 hors POSIX),
-    "100755" (bit posé via l'index) ou "100644" (explicitement retiré).
+    ``mode`` fait varier le mode ENREGISTRÉ DANS GIT : None (ce que `git add`
+    décide), "100755" (bit posé dans l'index) ou "100644" (bit retiré).
+
+    Le fichier sur disque est toujours posé à 0755, comme le fait un vrai
+    checkout quand l'index dit 100755. Deux échecs vus en CI (Linux) venaient de
+    là : avec un fichier en 0644 et un index en 100755, `git rm --cached` refuse
+    d'agir — « staged content different from both the file and the HEAD » — et la
+    sonde d'exécutabilité du garde échoue, à juste titre, au lieu de tester ce
+    que le cas visait. Windows ne pouvait pas le montrer : son système de
+    fichiers n'a pas de bit exécutable, donc le mode du disque y est toujours
+    « exécutable » pour Python.
     """
     repo = tmp_path / "depot"
     target = repo / "frontend" / "android" / "gradlew"
     target.parent.mkdir(parents=True)
     target.write_bytes(content)
+    os.chmod(target, 0o755)
     _git(repo.parent, "init", "-q", str(repo))
     _git(repo, "add", GRADLEW)
     if mode == "100755":
@@ -119,15 +129,23 @@ class TestModeGit:
         assert any("au lieu de 100755" in e for e in errors), errors
         assert any("update-index --chmod=+x" in e for e in errors), errors
 
+    @pytest.mark.skipif(
+        os.name != "nt",
+        reason="Comportement propre a NTFS : sur POSIX, `git add` enregistre "
+        "100755 des que le fichier est executable, donc il n'y a rien a signaler. "
+        "Ce cas documente la perte de mode typique d'un commit fait sous Windows.",
+    )
     def test_mode_par_defaut_non_executable_est_signale(self, check, tmp_path):
-        """`git add` hors POSIX enregistre 100644 : le garde doit refuser."""
+        """Sous Windows, `git add` enregistre 100644 : le garde doit refuser."""
         repo, _ = _repo_with_gradlew(tmp_path)
         errors, _ = check.check_path(repo, GRADLEW)
         assert any("100755" in e for e in errors), errors
 
     def test_fichier_non_suivi_par_git_est_signale(self, check, tmp_path):
         repo, target = _repo_with_gradlew(tmp_path, mode="100755")
-        _git(repo, "rm", "--cached", "-q", GRADLEW)
+        # -f : sans lui, git refuse si l'index et le fichier ont divergé (cas vu
+        # en CI sur un runner Linux).
+        _git(repo, "rm", "--cached", "-q", "-f", GRADLEW)
         assert target.exists(), "le fichier reste sur le disque, seul l'index change"
         errors, _ = check.check_path(repo, GRADLEW)
         assert any("n'est pas suivi par git" in e for e in errors), errors
