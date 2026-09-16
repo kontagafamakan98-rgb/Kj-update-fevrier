@@ -83,8 +83,10 @@ if (jobs) {
 // 3. login.html : shell formulaire + og:image dédié.
 const login = read('login.html');
 if (login) {
-  if (!login.includes('<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h2>')) {
-    errors.push('login.html : h2 « Connexion » absent du shell');
+  // Titre de PAGE en h1 (et non h2) : une page doit avoir UN h1, identique
+  // pour un crawler sans JavaScript et pour celui qui exécute le bundle.
+  if (!login.includes('<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h1>')) {
+    errors.push('login.html : h1 « Connexion » absent du shell');
   }
   if (!login.includes('id="email"')) {
     errors.push('login.html : champ e-mail absent du shell');
@@ -107,8 +109,8 @@ if (login) {
 // 4. register.html : shell formulaire (mode client) + modulepreload du chunk.
 const register = read('register.html');
 if (register) {
-  if (!register.includes('<h2 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h2>')) {
-    errors.push('register.html : h2 « Créer un compte » absent du shell');
+  if (!register.includes('<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>')) {
+    errors.push('register.html : h1 « Créer un compte » absent du shell');
   }
   if (!register.includes("S'inscrire avec Google")) {
     errors.push('register.html : bouton Google absent du shell');
@@ -142,8 +144,8 @@ if (register) {
 // 4bis. forgot-password.html : shell formulaire étape email (par défaut).
 const forgot = read('forgot-password.html');
 if (forgot) {
-  if (!forgot.includes('<h2 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h2>')) {
-    errors.push('forgot-password.html : h2 « Mot de passe oublié » absent du shell');
+  if (!forgot.includes('<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>')) {
+    errors.push('forgot-password.html : h1 « Mot de passe oublié » absent du shell');
   }
   if (!forgot.includes('id="reset-email"')) {
     errors.push('forgot-password.html : champ e-mail (reset-email) absent du shell');
@@ -177,6 +179,53 @@ if (payment) {
   }
   if (!payment.includes('https://kj-update-fevrier.vercel.app/og-image-1200x630.png')) {
     errors.push('payment.html : og:image générique manquant');
+  }
+}
+
+// 4quater. how-it-works.html : page PUBLIQUE de contenu (h1, étapes,
+// séquestre, FAQ). Avant son shell, elle était servie par le gabarit nu :
+// titre « Kojo », aucun h1, aucun canonical, un mot de contenu — invisible
+// pour un crawler sans JavaScript.
+const howItWorks = read('how-it-works.html');
+if (howItWorks) {
+  if (!howItWorks.includes('<h1 class="text-3xl md:text-4xl font-bold mb-4">Comment ça marche ?</h1>')) {
+    errors.push('how-it-works.html : h1 « Comment ça marche ? » absent du shell');
+  }
+  if (!howItWorks.includes('<details')) {
+    errors.push('how-it-works.html : FAQ (blocs <details>) absente du shell');
+  }
+  for (const anchor of ['href="/jobs"', 'href="/support"']) {
+    if (!howItWorks.includes(anchor)) {
+      errors.push(`how-it-works.html : lien interne ${anchor} absent (maillage du site)`);
+    }
+  }
+  if (!/<link rel="modulepreload"[^>]*href="[^"]*HowItWorks-[^"]*\.js"/.test(howItWorks)) {
+    errors.push('how-it-works.html : modulepreload du chunk HowItWorks absent');
+  }
+  if (!howItWorks.includes('https://kj-update-fevrier.vercel.app/how-it-works')) {
+    errors.push('how-it-works.html : canonical de la route absent');
+  }
+}
+
+// 4quinquies. support.html : page PUBLIQUE (contact + suivi de ticket).
+const support = read('support.html');
+if (support) {
+  if (!support.includes('<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>')) {
+    errors.push('support.html : h1 « Support » absent du shell');
+  }
+  if (!support.includes('Suivre une demande existante')) {
+    errors.push('support.html : carte de suivi (« Suivre une demande existante ») absente du shell');
+  }
+  for (const anchor of ['href="tel:', 'href="mailto:', 'wa.me', 'href="/how-it-works"']) {
+    if (!support.includes(anchor)) {
+      errors.push(`support.html : lien ${anchor} absent du shell (contact / maillage)`);
+    }
+  }
+  if (!/<link rel="modulepreload"[^>]*href="[^"]*Support-[^"]*\.js"/.test(support)) {
+    errors.push('support.html : modulepreload du chunk Support absent');
+  }
+  if (!support.includes('https://kj-update-fevrier.vercel.app/support')) {
+    errors.push('support.html : canonical de la route absent');
   }
 }
 

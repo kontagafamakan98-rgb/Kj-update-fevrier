@@ -391,7 +391,9 @@ const ForgotPassword = () => {
           <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">
             <span className="text-white text-2xl font-bold">✉️</span>
           </div>
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">{copy.title}</h2>
+          {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
+              shell statique du build (forgot-password.html). Classes inchangées. */}
+          <h1 className="mt-6 text-3xl font-extrabold text-gray-900">{copy.title}</h1>
           <p className="mt-3 text-sm text-gray-600">{copy.subtitle}</p>
         </div>
 

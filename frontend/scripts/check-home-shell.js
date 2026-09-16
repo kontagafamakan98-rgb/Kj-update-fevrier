@@ -53,7 +53,15 @@ export const DESCRIPTION_MAX = 160;
 export const MIN_WORDS = 300;
 // Pages pré-rendues qui ont leur PROPRE shell : le shell de l'accueil ne doit
 // pas s'y retrouver (et inversement).
-export const PRERENDERED_PAGES = ['jobs.html', 'login.html', 'register.html', 'forgot-password.html', 'payment.html'];
+export const PRERENDERED_PAGES = [
+  'jobs.html',
+  'login.html',
+  'register.html',
+  'forgot-password.html',
+  'payment.html',
+  'how-it-works.html',
+  'support.html',
+];
 
 /**
  * Contenu de `<div id="root">…`, jusqu'au `</div>` qui FERME ce div.
@@ -341,8 +349,49 @@ export function runHomeShellCheck(options = {}) {
     }
   }
 
+  // ── 10. Chaque page pré-rendue publie sa PROPRE description ────────────────
+  // Le plugin posait le titre, le canonical et les méta Open Graph par route,
+  // mais PAS la meta description : les pages pré-rendues publiaient donc toutes
+  // celle de l'accueil. Un moteur lisait la même description pour /jobs,
+  // /login, /register… — la description déclarée par route n'existait que dans
+  // og:description. Chaque page doit désormais avoir la sienne, bornée à 160
+  // caractères (au-delà, les moteurs tronquent).
+  const descriptionOf = (htmlIn) => {
+    const match = htmlIn.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/);
+    return match ? match[1] : '';
+  };
+  const homeDescription = descriptionOf(html);
+  const seen = new Map();
+  if (homeDescription) seen.set(homeDescription, ['index.html']);
+  for (const page of PRERENDERED_PAGES) {
+    const pagePath = path.join(buildDir, page);
+    if (!existsSync(pagePath)) continue;
+    const pageHtml = readFileSync(pagePath, 'utf8');
+    const pageDescription = descriptionOf(pageHtml);
+    if (!pageDescription.trim()) {
+      errors.push(`${page} : meta description absente (la page hérite de celle de l'accueil, ou n'en a aucune)`);
+      continue;
+    }
+    if (pageDescription.length > DESCRIPTION_MAX) {
+      errors.push(
+        `${page} : description de ${pageDescription.length} caractères (maximum ${DESCRIPTION_MAX}) — les moteurs la tronquent`
+      );
+    }
+    if (!seen.has(pageDescription)) seen.set(pageDescription, []);
+    seen.get(pageDescription).push(page);
+  }
+  for (const [, pages] of seen) {
+    if (pages.length > 1) {
+      errors.push(
+        `description DUPLIQUÉE entre ${pages.join(' et ')} : chaque page doit décrire son propre contenu ` +
+          '(une description recopiée n\'est pas un signal de qualité)'
+      );
+    }
+  }
+
   if (errors.length === 0) {
     notices.push(`shell d'accueil : 1 h1, ${words} mots, ${internalLinks} liens internes, N.A.P. et SEO local conformes`);
+    notices.push(`descriptions uniques sur ${seen.size} page(s) pré-rendue(s)`);
   }
 
   return { ok: errors.length === 0, errors, notices, words };

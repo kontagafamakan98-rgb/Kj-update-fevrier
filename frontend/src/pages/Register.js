@@ -379,9 +379,11 @@ export default function Register() {
           <div className="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">
             <span className="text-white text-2xl font-bold">K</span>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+          {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
+              shell statique du build (register.html). Classes inchangées. */}
+          <h1 className="mt-6 text-center text-3xl font-bold text-gray-900">
             {pageT('title')}
-          </h2>
+          </h1>
           <p className="mt-2 text-sm text-gray-600">
             {pageT('subtitle')}
           </p>

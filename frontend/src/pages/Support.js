@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin, MessageCircle, Bot, Send, CheckCircle, ArrowLeft } from 'lucide-react';
 import { supportAPI } from '../services/apiEndpoints';
 import { useAuth } from '../contexts/AuthContext';
@@ -611,9 +612,12 @@ function TicketTracker({ copy }) {
 const Support = () => {
   const { currentLanguage, t } = useLanguage();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
-  // SEO de la route : /support est une page PUBLIQUE servie par le gabarit nu
-  // app.html (titre neutre, aucun canonical). Sans cet appel, elle resterait
-  // sans titre propre — y compris pour un crawler qui exécute le JavaScript.
+  // SEO de la route : /support est une page PUBLIQUE servie par son PROPRE
+  // shell pré-rendu (support.html, plugin prerender-route-meta) depuis que le
+  // gabarit nu app.html ne concerne plus que les écrans connectés. Le titre et
+  // la description posés ici doivent donc rester les MÊMES que les méta
+  // statiques (src/i18n : support / supportHelp) ; un crawler qui exécute le
+  // JavaScript et un crawler qui ne l'exécute pas lisent alors la même chose.
   usePageTitle(`${t('support')} — Kojo`, { description: t('supportHelp') });
   const [mode, setMode] = useState(null); // null | 'robot' | 'direct'
 
@@ -662,6 +666,19 @@ const Support = () => {
       )}
 
       <DirectContactCard copy={copy} />
+
+      {/* Maillage interne : le support mène au fonctionnement du service et à
+          la liste des missions. Le shell statique (vite.config.js) rend
+          EXACTEMENT ce bloc — sinon la ligne disparaîtrait au montage React. */}
+      <p className="mt-6 text-center text-sm text-gray-500">
+        <Link to="/how-it-works" className="text-orange-600 underline underline-offset-2">
+          {t('howItWorksTitle')}
+        </Link>
+        {' · '}
+        <Link to="/jobs" className="text-orange-600 underline underline-offset-2">
+          {t('viewJobs')}
+        </Link>
+      </p>
     </div>
   );
 };
