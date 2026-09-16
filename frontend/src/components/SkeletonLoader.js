@@ -165,6 +165,17 @@ export const FormSkeleton = ({ fields = 4 }) => {
 // Skeleton de page générique — fallback du Suspense pour les routes lazy
 // (Home, Login, …) : première peinture rapide et stable, évite le « saut »
 // de layout quand la page réelle arrive.
+//
+// RÈGLE MESURÉE (probe CDP, 412×823) : ce fallback a une destination INCONNUE
+// (n'importe quelle route sans Suspense interne), il doit donc garder le
+// footer HORS de l'écran — en 100vh (+ pb-24 mobile) main vaut 919 px, footer
+// à 984 px, invisible pendant tout le chargement du chunk. En min-h-full le
+// footer remonterait au bas de la viewport (visibles sur les viewports hauts)
+// puis serait tiré vers le bas par une destination longue (main mesuré jusqu'à
+// 1946 px sur /dashboard) : CLS de l'ordre de 0,03-0,06. C'est l'inverse d'un
+// squelette DÉDIÉ (ForgotPasswordSkeleton, LoginSkeleton…), dont la
+// destination est connue et mesurée : lui doit faire EXACTEMENT la hauteur de
+// sa page (min-h-full + blocs calibrés) pour que le footer ne bouge pas.
 export const PageSkeleton = () => {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -361,37 +372,47 @@ export const LoginSkeleton = () => {
 // carte avec indicateur d'étapes, champ email, aide, bouton, lien retour)
 // pour servir de fallback Suspense à /forgot-password : swap sans saut de
 // hauteur (footer ancré stable), comme LoginSkeleton / JobsSkeleton.
+//
+// Calibré sur le DOM réel (probe CDP, viewport 412×823, langue fr) : la page
+// occupe 528 px de contenu (en-tête 168 = icône 56 + titre 36 + sous-titre
+// 40 ; carte 328 = p-6 + étapes 16 + form 192 + lien 24). Le squelette n'en
+// faisait que 464 px, sous l'espace libre de main (823 − navbar 65 − footer
+// 53 = 705 px) : main restait donc à 705 px alors que la page atteint
+// 192 + 528 = 720 px, et le footer montait de 770 à 785 px au swap (CLS
+// 0,0012). Les blocs reprennent maintenant les HAUTEURS RÉELLES des éléments
+// (et non plus des h-3/h-4 génériques) : main vaut 720 px dans les deux
+// phases, le footer ne bouge plus (CLS mesuré 0,0000).
 export const ForgotPasswordSkeleton = () => {
   return (
     <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <Skeleton className="mx-auto h-14 w-14 rounded-full" />
-          <Skeleton className="mx-auto mt-6 h-8 w-56" />
-          <Skeleton className="mx-auto mt-3 h-4 w-72" />
+          <Skeleton className="mx-auto mt-6 h-9 w-56" />
+          <Skeleton className="mx-auto mt-3 h-10 w-72" />
         </div>
 
         <div className="space-y-6 rounded-2xl bg-white p-6 shadow-md">
           {/* Indicateur d'étapes (1. Email / 2. Code / 3. Mot de passe) */}
           <div className="flex items-center justify-between">
             <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-3 w-14" />
+            <Skeleton className="h-4 w-14" />
             <Skeleton className="h-3 w-20" />
           </div>
 
           {/* Champ email + aide + bouton */}
           <div className="space-y-5">
             <div>
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="mt-1 h-10 w-full" />
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="mt-1 h-12 w-full" />
             </div>
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-12 w-full" />
           </div>
 
           {/* Lien retour vers /login */}
           <div className="text-center">
-            <Skeleton className="mx-auto h-4 w-36" />
+            <Skeleton className="mx-auto h-6 w-36" />
           </div>
         </div>
       </div>

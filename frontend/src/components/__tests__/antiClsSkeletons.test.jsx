@@ -101,7 +101,13 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     ['JobsSkeleton', JobsSkeleton, ['max-w-7xl']],
     ['JobDetailsSkeleton', JobDetailsSkeleton, ['max-w-7xl']],
     ['LoginSkeleton', LoginSkeleton, []],
-    ['ForgotPasswordSkeleton', ForgotPasswordSkeleton, []],
+    // Blocs calibrés sur le DOM réel de /forgot-password (probe CDP) : titre
+    // text-3xl → h-9, sous-titre et aide text-sm/text-xs repliés sur 2 lignes
+    // → h-10 / h-8, champ et bouton réels (48 px) → h-12, libellé text-sm →
+    // h-5, lien retour → h-6. sans ces hauteurs réelles, le squelette reste
+    // SOUS l'espace libre de main et c'est la page (720 px) qui déplace le
+    // footer de 15 px au swap (CLS 0,0012 → 0,0000 après calibration).
+    ['ForgotPasswordSkeleton', ForgotPasswordSkeleton, ['min-h-full', 'h-9', 'h-10', 'h-8', 'h-12', 'h-6']],
     ['DashboardSkeleton', DashboardSkeleton, []],
     ['ProfileSkeleton', ProfileSkeleton, []],
   ];
@@ -130,5 +136,53 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     expect(pulseCount(full.container) - pulseCount(content.container)).toBe(2); // h1 + sous-titre
     full.unmount();
     content.unmount();
+  });
+});
+
+// Les états de CHARGEMENT génériques (destination INCONNUE) suivent la règle
+// INVERSE de celle des pages, et c'est mesuré (probe CDP, 412×823, session
+// client sur le déploiement réel) :
+//   • ProtectedRoute (contrôle d'auth) et PageSkeleton (fallback de toute
+//     route sans Suspense interne) doivent garder le footer HORS de l'écran.
+//     En 100vh (+ pb-24 mobile) main vaut 919 px et le footer 984 px, hors
+//     écran pendant tout le chargement. En min-h-full le footer remontait à
+//     770 px (donc visible) pour les pages courtes — et sur les pages
+//     longues mesurées en prod (/dashboard main 1570-1946, /profile
+//     1401-1890, /messages 825) il était ensuite tiré de 865 à 1180 px plus
+//     bas : CLS prédit 0,064 contre 0,0010 mesuré (modèle validé sur quatre
+//     mesures : 0,0012 / 0,0042 / 0,0167 / 0,0000).
+//   • Un squelette DÉDIÉ (destination connue) fait l'inverse : il réplique
+//     exactement la hauteur de sa page, donc le footer peut rester visible,
+//     il ne BOUGE plus (c'est le cas de ForgotPasswordSkeleton ci-dessus).
+// Seul MobileLoader garde aussi min-h-screen pour une autre raison : il
+// REMPLACE tout le layout (App.js retourne tôt) — ni navbar ni footer.
+describe('anti-CLS — états de chargement génériques : footer hors écran (100vh)', () => {
+  const componentBody = (rel, startMarker, endMarker) => {
+    const source = fs.readFileSync(path.resolve(__dirname, rel), 'utf8');
+    const start = source.indexOf(startMarker);
+    expect(start, `marqueur « ${startMarker} » introuvable`).toBeGreaterThan(-1);
+    const end = source.indexOf(endMarker, start);
+    return source.slice(start, end === -1 ? source.length : end);
+  };
+
+  it('ProtectedRoute (App.js) garde son spinner en 100vh', () => {
+    const body = componentBody('../../App.js', 'function ProtectedRoute(', '\nfunction OwnerOnlyRoute(');
+    expect(
+      body,
+      'ProtectedRoute : min-h-screen absent — en min-h-full le footer devient visible pendant le contrôle d\'auth'
+    ).toContain('className="min-h-screen');
+    expect(
+      body,
+      'ProtectedRoute : min-h-full remet le footer dans le champ pendant le chargement'
+    ).not.toContain('className="min-h-full');
+  });
+
+  it('PageSkeleton (fallback Suspense générique) reste en 100vh', () => {
+    const body = componentBody('../SkeletonLoader.js', 'export const PageSkeleton', 'export const JobsSkeleton');
+    expect(
+      body,
+      'PageSkeleton : min-h-screen absent — destination inconnue, le footer doit rester hors écran'
+    ).toContain('className="min-h-screen');
+    expect(body).not.toContain('className="min-h-full');
   });
 });
