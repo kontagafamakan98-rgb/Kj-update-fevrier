@@ -11,11 +11,18 @@
  *   • build/login.html  → #root contient le shell formulaire (h2, champs,
  *     bouton) + og:image og-login.png.
  *
+ * Et surtout : chaque page PRÉ-RENDUE du build doit être ATTEIGNABLE via
+ * frontend/vercel.json (rewrites « /route » et « /route/ » → « /route.html »,
+ * catch-all en dernière position). Le plugin peut émettre login.html sans que
+ * Vercel ne le serve jamais : la route renverrait alors index.html, sans
+ * shell, et l'optimisation serait PERDUE EN SILENCE.
+ *
  * Échoue (exit 1) en cas de régression silencieuse : plugin
- * prerender-route-meta désactivé/supprimé, shell perdu, ou contenu statique
- * ajouté à l'index. Exécuté dans le job CI frontend-build après le build.
+ * prerender-route-meta désactivé/supprimé, shell perdu, contenu statique
+ * ajouté à l'index, ou route pré-rendue non routée par Vercel. Exécuté dans
+ * le job CI frontend-build après le build.
  */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const buildDir = path.join(process.cwd(), 'build');
@@ -174,9 +181,57 @@ if (payment) {
 // couverture de ce pré-rendu vit dans les tests backend
 // (tests/test_seo_discovery.py::TestJobOgHtml) + le check check-og-images.
 
+// 6. Chaque page pré-rendue doit être ATTEIGNABLE : le plugin émet
+// <route>.html, mais si frontend/vercel.json ne route pas « /route » (et
+// « /route/ ») vers ce fichier, Vercel sert index.html — le shell h1 n'est
+// jamais peint et l'optimisation LCP est silencieusement annulée. Aucune
+// autre vérification ne relie le build (ce qui est émis) au routage (ce qui
+// est servi) : c'est exactement le trou par lequel le lot peut régresser.
+const prerenderedPages = readdirSync(buildDir)
+  .filter((name) => name.endsWith('.html') && name !== 'index.html')
+  .sort();
+
+let vercelRewrites = null;
+try {
+  const vercelConfig = JSON.parse(readFileSync(path.join(process.cwd(), 'vercel.json'), 'utf8'));
+  vercelRewrites = Array.isArray(vercelConfig.rewrites) ? vercelConfig.rewrites : [];
+} catch (err) {
+  errors.push(`frontend/vercel.json illisible : ${err.message}`);
+}
+
+if (vercelRewrites) {
+  for (const file of prerenderedPages) {
+    const route = file.replace(/\.html$/, '');
+    for (const source of [`/${route}`, `/${route}/`]) {
+      const rule = vercelRewrites.find((r) => r && r.source === source);
+      if (!rule || rule.destination !== `/${file}`) {
+        errors.push(
+          `vercel.json : rewrite « ${source} » → « /${file} » absent ou erroné — ` +
+            `${file} ne serait jamais servi (shell perdu, optimisation LCP annulée)`
+        );
+      }
+    }
+  }
+
+  // Le catch-all doit rester la DERNIÈRE règle : placé avant, il capture les
+  // routes pré-rendues et Vercel ne sert plus que index.html.
+  const catchAllIndex = vercelRewrites.findIndex((r) => r && r.source === '/(.*)');
+  if (catchAllIndex !== -1 && catchAllIndex !== vercelRewrites.length - 1) {
+    errors.push(
+      'vercel.json : la règle catch-all « /(.*) » doit rester la DERNIÈRE ' +
+        '(sinon elle capture les routes pré-rendues)'
+    );
+  }
+}
+
 if (errors.length) {
   console.error('❌ Pré-rendu par route invalide — ' + errors.length + ' problème(s) :');
   for (const e of errors) console.error('  ' + e);
   process.exit(1);
 }
-console.log('✅ Pré-rendu par route intact : index.html #root vide, jobs.html (shell h1), login.html (shell formulaire), register.html (shell formulaire). Fiches /jobs/:id servies par le backend (GET /api/og/jobs/{id}).');
+console.log(
+  `✅ Pré-rendu par route intact : index.html #root vide, shells statiques vérifiés, ` +
+    `et les ${prerenderedPages.length} pages pré-rendues (${prerenderedPages.join(', ')}) ` +
+    `sont routées par vercel.json (catch-all en dernier). Fiches /jobs/:id servies ` +
+    `par le backend (GET /api/og/jobs/{id}).`
+);
