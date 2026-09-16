@@ -33,7 +33,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build`, puis **7 gardes sur les artefacts** (shells de pré-rendu, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
 | **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`. | **Oui, largement** : repli silencieux sur un build local, verrou `/jobs/:id` désactivé, budgets très permissifs (§3, F2/F3/F6). |
-| **Mobile build (Capacitor + Android)** | `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
+| **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
 
 ## 3. Les faux-verts : réussir sans avoir prouvé
@@ -114,12 +114,22 @@ les PR dont la preview est résolvable et non protégée.
   dans l'index depuis le commit `dcb4e43` (« CI mobile : rend gradlew exécutable
   (Permission denied) »), et `core.filemode=false` empêche tout checkout Windows
   de le dégrader au commit suivant. Le `chmod` ne compensait donc rien : il
-  rendait **vert** un job dont le bit aurait réellement disparu. Supprimé, donc
-  un bit perdu fait désormais échouer le step sur « Permission denied » — la
-  détection est le comportement voulu (`git update-index --chmod=+x` pour
-  réparer). Le shebang reste protégé en parallèle par `.gitattributes`
-  (`gradlew text eol=lf`) : un shebang en CRLF ferait échouer l'exécution même
-  avec le bit présent.
+  rendait **vert** un job dont le bit aurait réellement disparu. Supprimé : un
+  bit perdu fait donc échouer le job — c'est la détection voulue
+  (`git update-index --chmod=+x` pour réparer).
+- **Le diagnostic du bit est maintenant précoce et explicite** (ce qui referme
+  le point ci-dessus) : `check-exec-bits.py` tourne en premier step du job,
+  avant Node/Java/SDK, et répond en **0,17 s** là où le step APK ne démarre qu'à
+  **+39 s** (mesuré sur le run 35137466972) pour un build Gradle de ~95 s. Il
+  distingue trois pannes aux corrections différentes — mode perdu DANS GIT
+  (message avec la commande de réparation), mode correct mais bit non
+  matérialisé PAR LE CHECKOUT, et shebang absent ou en CRLF (qui échouerait même
+  avec le bit, la règle `eol=lf` de `.gitattributes` étant alors la cause). Il
+  échoue aussi, volontairement, quand il ne peut pas conclure (git absent,
+  fichier non suivi) : un garde ne doit jamais rassurer en silence. Verrouillé
+  par `backend/tests/test_exec_bits.py` (20 tests, dont deux en sous-processus
+  avec un encodage de console hostile — le premier chemin de succès plantait sur
+  un emoji hors cp1252 au lieu de conclure).
 - **Aucun artefact n'est publié** (contrairement à Lighthouse, qui uploade ses
   rapports en `if: always()`) : une fois le run terminé, l'APK produit est
   introuvable. Et il n'y a ni émulateur ni test d'instrumentation : le job établit
