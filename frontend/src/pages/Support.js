@@ -3,14 +3,10 @@ import { Phone, Mail, MapPin, MessageCircle, Bot, Send, CheckCircle, ArrowLeft }
 import { supportAPI } from '../services/apiEndpoints';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-
-const CONTACT = {
-  phone: '+18193003507',
-  phoneDisplay: '+1 819 300 3507',
-  email: 'Kojoapp98@gmail.com',
-  address: 'Hamdallaye ACI 2000, Bamako, Mali',
-  whatsappUrl: 'https://wa.me/18193003507',
-};
+// Contact (N.A.P.) partagé avec le footer et le shell statique de l'accueil :
+// une seule source (src/config/contact.json) pour ne jamais publier deux
+// adresses ou deux numéros différents selon le canal.
+import { CONTACT } from '../config/contact';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^\+?[0-9\s\-.]{6,20}$/;

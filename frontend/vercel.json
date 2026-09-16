@@ -4,6 +4,14 @@
   "outputDirectory": "build",
   "rewrites": [
     {
+      "source": "/jobs",
+      "destination": "/jobs.html"
+    },
+    {
+      "source": "/jobs/",
+      "destination": "/jobs.html"
+    },
+    {
       "source": "/jobs/(.*)",
       "destination": "https://kojo-backend.fly.dev/api/og/jobs/$1"
     },
@@ -18,14 +26,6 @@
     {
       "source": "/robots.txt",
       "destination": "https://kojo-backend.fly.dev/api/robots.txt"
-    },
-    {
-      "source": "/jobs",
-      "destination": "/jobs.html"
-    },
-    {
-      "source": "/jobs/",
-      "destination": "/jobs.html"
     },
     {
       "source": "/login",
@@ -59,7 +59,28 @@
       "source": "/payment/",
       "destination": "/payment.html"
     },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/how-it-works", "destination": "/index.html" },
+    { "source": "/how-it-works/", "destination": "/index.html" },
+    { "source": "/dashboard", "destination": "/index.html" },
+    { "source": "/dashboard/", "destination": "/index.html" },
+    { "source": "/messages", "destination": "/index.html" },
+    { "source": "/messages/", "destination": "/index.html" },
+    { "source": "/profile", "destination": "/index.html" },
+    { "source": "/profile/", "destination": "/index.html" },
+    { "source": "/create-job", "destination": "/index.html" },
+    { "source": "/create-job/", "destination": "/index.html" },
+    { "source": "/photo-debug", "destination": "/index.html" },
+    { "source": "/photo-debug/", "destination": "/index.html" },
+    { "source": "/email-verification", "destination": "/index.html" },
+    { "source": "/email-verification/", "destination": "/index.html" },
+    { "source": "/payment-verification", "destination": "/index.html" },
+    { "source": "/payment-verification/", "destination": "/index.html" },
+    { "source": "/commission-dashboard", "destination": "/index.html" },
+    { "source": "/commission-dashboard/", "destination": "/index.html" },
+    { "source": "/support", "destination": "/index.html" },
+    { "source": "/support/", "destination": "/index.html" },
+    { "source": "/support-admin", "destination": "/index.html" },
+    { "source": "/support-admin/", "destination": "/index.html" }
   ],
   "headers": [
     {

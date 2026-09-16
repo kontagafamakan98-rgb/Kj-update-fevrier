@@ -326,8 +326,13 @@ export async function runOgImageCheck({
       if (isAbsolute(square)) queueImageUrl(square, jobDetailLabel);
       checked.push(`  ✓ ${jobDetailLabel} → ${wide || '(absent)'}` + (square ? ` (+ carré ${square})` : '') + ` (job "${jobTitle || detailId}")`);
     } else {
-      // Chemin 404 : prouve que la fonction est déployée et le rewrite aiguille
-      // /jobs/:id vers elle (sinon le catch-all SPA renverrait 200 + index.html).
+      // Chemin 404 : un job inconnu doit répondre 404 + noindex. Attention à ce
+      // que ce 404 PROUVE depuis le 16/09/2026 : le catch-all SPA ayant été
+      // retiré (une URL inconnue répond désormais 404), un 404 ne suffit plus à
+      // démontrer que le rewrite /jobs/(.*) fonctionne — une règle supprimée
+      // donnerait le même code. C'est le chemin 200 (avec un vrai job, plus bas)
+      // qui l'établit, et frontend/scripts/check-spa-routes.js qui vérifie la
+      // présence du rewrite dans la configuration.
       if (detailStatus !== 404) {
         errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 404 pour un job inconnu (pré-rendu backend non déployé ou rewrite cassé ?)`);
       }
