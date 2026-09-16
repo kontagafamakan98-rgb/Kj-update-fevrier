@@ -1,0 +1,15 @@
+# ── Fins de ligne des SCRIPTS : LF partout, sur toutes les plateformes ───────
+# Ces dossiers contiennent des modules Node EXÉCUTÉS en CI (Linux, LF) et
+# IMPORTÉS par les tests vitest. Avec core.autocrlf=true (réglage par défaut
+# sous Windows), git rematérialise ces fichiers en CRLF : un shebang suivi d'un
+# CR (`#!/usr/bin/env node\r`) fait alors échouer l'import avec un
+# « SyntaxError: Invalid or unexpected token » — tests verts en CI, rouges en
+# local, sur du code identique. Mesuré et reproduit avec témoin :
+#   • copie CRLF AVEC shebang  → import KO
+#   • copie CRLF SANS shebang  → import OK
+# On fige donc eol=lf sur ces deux dossiers : le contenu committé et la copie
+# de travail sont identiques partout, ce qui supprime la classe entière de ces
+# faux rouges et l'état « modifié » fantôme qui bloque les changements de
+# branche.
+frontend/scripts/** text eol=lf
+.github/scripts/** text eol=lf

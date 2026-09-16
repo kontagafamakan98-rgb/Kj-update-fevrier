@@ -28,7 +28,11 @@ if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
   else
     # -o : corps dans un fichier temp ; -w : code HTTP sur stdout. Un échec
     # réseau (curl non-zero) est traduit en "000" pour un message explicite.
+    # --max-time/--retry BORNENT l'appel : sans délai, une API qui ne répond
+    # pas faisait pendre le job jusqu'au timeout du runner (rouge après des
+    # heures, sans diagnostic) au lieu du repli documenté ci-dessous.
     HTTP_CODE=$(curl -sS -o "$GH_COMMENTS" -w "%{http_code}" \
+      --max-time 20 --retry 2 --retry-delay 1 --retry-connrefused \
       -H "Authorization: Bearer ${GITHUB_TOKEN:-}" \
       -H "Accept: application/vnd.github+json" \
       -H "X-GitHub-Api-Version: 2022-11-28" \

@@ -25,6 +25,9 @@ import path from 'node:path';
 import Ajv from 'ajv';
 
 const SCHEMA_URL = 'https://openapi.vercel.sh/vercel.json';
+// Le schéma est mis en cache ; ce délai ne s'applique qu'au fetch initial (ou
+// après purge du cache).
+const SCHEMA_FETCH_TIMEOUT_MS = 10_000;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const VERCEL_JSON_PATH = path.join(ROOT, 'vercel.json');
 const CACHE_DIR = path.join(ROOT, 'node_modules', '.cache');
@@ -39,7 +42,11 @@ async function loadSchema() {
       console.warn(`⚠️ Cache du schéma illisible (${err.message}), re-fetch…`);
     }
   }
-  const res = await fetch(SCHEMA_URL);
+  // Délai BORNÉ : un réseau qui ne répond pas ne doit pas faire pendre le job
+  // jusqu'au timeout du runner (rouge au bout de plusieurs heures, sans
+  // diagnostic). À l'expiration, loadSchema lève et main() bascule sur le
+  // repli structurel embarqué — la validation reste utile, la CI reste verte.
+  const res = await fetch(SCHEMA_URL, { signal: AbortSignal.timeout(SCHEMA_FETCH_TIMEOUT_MS) });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} en récupérant ${SCHEMA_URL}`);
   }
