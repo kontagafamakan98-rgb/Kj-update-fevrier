@@ -337,11 +337,15 @@ jobs:
         working-directory: frontend
         run: node scripts/check-og-assets.js
 
+      # Budgets RÉELS (JS initial, plus gros chunk, build total) : l'ancienne
+      # version se contentait d'afficher `du -sh build/` et ne pouvait donc
+      # jamais échouer — un bundle doublé passait en vert. Les seuils sont
+      # documentés dans scripts/check-bundle-size.js (mesure du 16/09/2026 :
+      # 98,5 Ko gzip de JS initial, chunk vendor-sentry 156,4 Ko, build 2,81 Mo)
+      # et le check est couvert par scripts/__tests__/check-bundle-size.test.js.
       - name: Check bundle size
         working-directory: frontend
-        run: |
-          BUILD_SIZE=$(du -sh build/ | cut -f1)
-          echo "Bundle size: $BUILD_SIZE"
+        run: node scripts/check-bundle-size.js
 
   # ─── Performance : budgets Lighthouse CI (accueil + pages protégées) ─────
   # Audite le DÉPLOIEMENT VERCEL RÉEL en condition mobile simulée (Slow 4G
