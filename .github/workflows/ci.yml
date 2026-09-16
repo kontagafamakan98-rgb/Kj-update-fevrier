@@ -528,8 +528,17 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # android-actions/setup-android installe par défaut `tools platform-tools`
+      # (`packages`) ; or le paquet « tools » a été RETIRÉ du dépôt Android SDK :
+      # l'action échouait sur « Warning: Failed to find package 'tools' »
+      # (sdkmanager exit 1) avant même la compilation. On ne demande donc que
+      # les paquets qui existent encore ; AGP télécharge la plateforme 36
+      # (compileSdk, variables.gradle) au premier build, les licences étant
+      # acceptées juste en dessous.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       # compileSdk 36 (variables.gradle) : accepter les licences SDK une
       # fois pour toutes, puis laisser Gradle/AGP télécharger la plateforme
