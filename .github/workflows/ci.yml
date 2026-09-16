@@ -665,6 +665,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # EN PREMIER, avant Node/Java/SDK : ce contrôle répond en 0,17 s (mesuré)
+      # là où le step APK ne démarre qu'à +39 s du job (mesuré sur le run
+      # 35137466972, setup Node/Java/SDK inclus) et où le build Gradle dure
+      # ensuite ~95 s. Un bit exécutable perdu n'échouait donc que là, tard, sous
+      # la forme d'un « Permission denied » qui ne désignait pas la cause (le
+      # mode git du fichier). Le script distingue le mode perdu DANS GIT du bit
+      # non matérialisé PAR LE CHECKOUT, et vérifie aussi le shebang (un CRLF le
+      # casserait même avec le bit présent).
+      - name: Check executable bits (gradlew) before the Android setup
+        run: python3 .github/scripts/check-exec-bits.py
+
       - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
