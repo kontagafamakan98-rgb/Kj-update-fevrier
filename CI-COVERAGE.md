@@ -91,6 +91,7 @@ qu'après le merge, en production.
 |---|---|---|
 | Comportement du cycle (créer → 200 → supprimer → 404 + noindex + sitemap) | `backend/tests/test_job_og_cycle.py` (job `backend-tests`, check requis) | le fil complet contre le **code de la PR**, en processus (ASGI) |
 | Configuration de routage (rewrite `/jobs/(.*)` → backend, chaque route de production déclarée, URL inconnue → 404) | `frontend/scripts/check-spa-routes.js` (job `frontend-build`) | que la requête est bien **acheminée** vers cette route |
+| Séparation des gabarits (page pré-rendue → son `.html`, route cliente → `app.html` nu, jamais `index.html`) et `noindex` des routes privées | `frontend/scripts/check-spa-routes.js` (job `frontend-build`) | qu'aucune route ne publie le contenu de l'accueil sous sa propre adresse (contenu dupliqué), et qu'aucun tableau de bord n'est indexable |
 | Shell statique de l'accueil (h1, contenu, liens, N.A.P., SEO local) | `frontend/scripts/check-home-shell.js` (job `frontend-build`) | que la page d'accueil dit quelque chose à un crawler **sans JavaScript** |
 | Déploiement réel (rewrite Vercel, CDN, cache CDN, cache-busting) | `check-og-job-200.js`, sur `main` uniquement | l'état de la **production** après fusion |
 
@@ -243,8 +244,9 @@ chaque PR vers `main` (sauf mention contraire).
 - Suite `vitest` complète (aucun seuil de couverture, cf. §7).
 - Aucun endpoint fantôme dans les services (`audit_api_returns.cjs` strict).
 - Le build Vite aboutit avec `VITE_API_URL` de production.
-- Shells de pré-rendu présents dans `jobs.html` / `login.html`, `#root` vide dans
-  `index.html`.
+- Shells de pré-rendu présents dans `jobs.html` / `login.html` ; `#root` porte le
+  shell de l'accueil dans `index.html` et reste **vide** dans `app.html`, le
+  gabarit neutre des routes clientes (sans h1, sans canonical, sans JSON-LD).
 - Découpage `pack2PageI18n` toujours par scope (pas de chunk partagé ≥ 3
   dictionnaires).
 - Les groupes d'endpoints *lazy* restent hors du chunk d'entrée.
@@ -253,7 +255,14 @@ chaque PR vers `main` (sauf mention contraire).
   sitemap/robots proxifiés, **chaque route de production de `src/App.js`**
   déclarée dans ses deux formes (`/route` et `/route/`), aucun catch-all (une
   URL inconnue doit répondre **404**, pas 200) et aucune règle exacte masquée
-  par un motif placé avant.
+  par un motif placé avant. Contrôle supplémentaire : **chaque route est servie
+  par le bon gabarit** — sa page pré-rendue si elle en a une, `app.html` sinon,
+  et jamais `index.html` (qui porte le contenu de l'accueil) ; `app.html` doit
+  rester nu (pas de `<h1>`, pas de canonical, pas de JSON-LD, `#root` vide) et
+  toute page `.html` émise par le build doit être déclarée dans
+  `PRERENDERED_ROUTES`. Enfin, les routes privées (`/dashboard`, `/profile`,
+  `/messages`, `/create-job`, `/support-admin`…) portent `X-Robots-Tag:
+  noindex` : un tableau de bord indexé est une page vide dans les résultats.
 - Page d'accueil pré-rendue (`check-home-shell.js`) : un h1 unique reprenant
   `heroTitle`, `title` ≤ 60 et description ≤ 160, ≥ 300 mots, des liens
   internes, `tel:`/`mailto:`/WhatsApp, le N.A.P. identique à

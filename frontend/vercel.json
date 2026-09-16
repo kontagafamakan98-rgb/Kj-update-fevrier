@@ -59,28 +59,28 @@
       "source": "/payment/",
       "destination": "/payment.html"
     },
-    { "source": "/how-it-works", "destination": "/index.html" },
-    { "source": "/how-it-works/", "destination": "/index.html" },
-    { "source": "/dashboard", "destination": "/index.html" },
-    { "source": "/dashboard/", "destination": "/index.html" },
-    { "source": "/messages", "destination": "/index.html" },
-    { "source": "/messages/", "destination": "/index.html" },
-    { "source": "/profile", "destination": "/index.html" },
-    { "source": "/profile/", "destination": "/index.html" },
-    { "source": "/create-job", "destination": "/index.html" },
-    { "source": "/create-job/", "destination": "/index.html" },
-    { "source": "/photo-debug", "destination": "/index.html" },
-    { "source": "/photo-debug/", "destination": "/index.html" },
-    { "source": "/email-verification", "destination": "/index.html" },
-    { "source": "/email-verification/", "destination": "/index.html" },
-    { "source": "/payment-verification", "destination": "/index.html" },
-    { "source": "/payment-verification/", "destination": "/index.html" },
-    { "source": "/commission-dashboard", "destination": "/index.html" },
-    { "source": "/commission-dashboard/", "destination": "/index.html" },
-    { "source": "/support", "destination": "/index.html" },
-    { "source": "/support/", "destination": "/index.html" },
-    { "source": "/support-admin", "destination": "/index.html" },
-    { "source": "/support-admin/", "destination": "/index.html" }
+    { "source": "/how-it-works", "destination": "/app.html" },
+    { "source": "/how-it-works/", "destination": "/app.html" },
+    { "source": "/dashboard", "destination": "/app.html" },
+    { "source": "/dashboard/", "destination": "/app.html" },
+    { "source": "/messages", "destination": "/app.html" },
+    { "source": "/messages/", "destination": "/app.html" },
+    { "source": "/profile", "destination": "/app.html" },
+    { "source": "/profile/", "destination": "/app.html" },
+    { "source": "/create-job", "destination": "/app.html" },
+    { "source": "/create-job/", "destination": "/app.html" },
+    { "source": "/photo-debug", "destination": "/app.html" },
+    { "source": "/photo-debug/", "destination": "/app.html" },
+    { "source": "/email-verification", "destination": "/app.html" },
+    { "source": "/email-verification/", "destination": "/app.html" },
+    { "source": "/payment-verification", "destination": "/app.html" },
+    { "source": "/payment-verification/", "destination": "/app.html" },
+    { "source": "/commission-dashboard", "destination": "/app.html" },
+    { "source": "/commission-dashboard/", "destination": "/app.html" },
+    { "source": "/support", "destination": "/app.html" },
+    { "source": "/support/", "destination": "/app.html" },
+    { "source": "/support-admin", "destination": "/app.html" },
+    { "source": "/support-admin/", "destination": "/app.html" }
   ],
   "headers": [
     {
@@ -100,6 +100,51 @@
           "value": "public, max-age=0, must-revalidate"
         }
       ]
+    },
+    {
+      "source": "/app.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/dashboard",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/messages",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/profile",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/create-job",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/photo-debug",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/email-verification",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/payment-verification",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/commission-dashboard",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
+    },
+    {
+      "source": "/support-admin",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
     },
     {
       "source": "/push-sw.js",

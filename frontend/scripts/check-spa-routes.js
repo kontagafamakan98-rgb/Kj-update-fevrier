@@ -17,6 +17,14 @@
  *    **200** à toute URL inconnue (« soft 404 »). Chaque route SPA est donc
  *    déclarée nommément, et le reste tombe sur la page 404 de Vercel (statut
  *    404, `404.html` émis au build).
+ * 4. La SÉPARATION des gabarits : une page pré-rendue est servie par son
+ *    propre `.html`, toute autre route par `app.html` (nu), et **jamais** par
+ *    `index.html`. Servir `index.html` à `/dashboard` publiait le contenu de
+ *    l'accueil (h1, 300+ mots, liens internes) sous une dizaine d'adresses :
+ *    du contenu dupliqué, et un canonical statique "/" sur toutes ces routes.
+ * 5. Les routes PRIVÉES (dashboard, profil, messages, admin…) ne doivent pas
+ *    être indexables : `X-Robots-Tag: noindex` dans vercel.json. Un tableau de
+ *    bord indexé par un moteur, c'est une page vide dans les résultats.
  *
  * ── Les pièges vérifiés ──────────────────────────────────────────────────────
  *   • une route React absente de vercel.json → 404 en production (l'app ne la
@@ -30,7 +38,7 @@
  *
  * Usage : cd frontend && node scripts/check-spa-routes.js
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -47,6 +55,25 @@ export const JOB_REWRITE_SOURCE = '/jobs/(.*)';
 export const JOB_REWRITE_SUFFIX = '/api/og/jobs/$1';
 export const SPA_CATCH_ALL = '/(.*)';
 export const SPA_INDEX = '/index.html';
+// Gabarit NU des routes clientes (émis par vite.config.js) : aucun contenu de
+// page, aucun canonical, aucun JSON-LD — voir le plugin prerender-route-meta.
+export const APP_HTML = '/app.html';
+// Pages réellement pré-rendues dans le build : chacune a son propre fichier.
+// Toute autre route de production doit être servie par APP_HTML.
+export const PRERENDERED_ROUTES = ['jobs', 'login', 'register', 'forgot-password', 'payment'];
+// Routes non indexables : elles n'existent que pour un utilisateur connecté (ou
+// pour le support) et n'ont aucun contenu à montrer à un moteur.
+export const PRIVATE_ROUTES = [
+  '/dashboard',
+  '/messages',
+  '/profile',
+  '/create-job',
+  '/photo-debug',
+  '/email-verification',
+  '/payment-verification',
+  '/commission-dashboard',
+  '/support-admin',
+];
 export const APP_JS = 'src/App.js';
 // Routes volontairement NON routées : elles n'existent qu'en développement
 // (bloc `import.meta.env.DEV` de App.js) — les router en production exposerait
@@ -296,11 +323,16 @@ export function runSpaRoutesCheck(options = {}) {
   }
 
   // ── 5. Chaque route de production est routée (deux formes) ────────────────
+  // Les routes extraites servent aussi au point 6ter : une route privée qui
+  // n'existe plus dans App.js ne doit pas être réclamée à vercel.json (sinon on
+  // exigerait un en-tête pour une page qui n'est jamais servie).
+  let productionRoutes = [];
   const appPath = path.join(frontendDir, APP_JS);
   if (!existsSync(appPath)) {
     errors.push(`${APP_JS} introuvable : impossible de vérifier que chaque route React est routée`);
   } else {
     const { routes, devOnly } = parseAppRoutes(readFileSync(appPath, 'utf8'));
+    productionRoutes = routes;
     if (routes.length === 0) {
       errors.push(`${APP_JS} : aucune route extraite — le garde ne prouve rien (format des <Route> changé ?)`);
     }
@@ -318,9 +350,27 @@ export function runSpaRoutesCheck(options = {}) {
           errors.push(
             `vercel.json : aucune règle pour « ${source} » — cette route React répondrait **404** en production`
           );
-        } else if (typeof rule.destination !== 'string' || !/\.html$/.test(rule.destination)) {
+          continue;
+        }
+        const destination = String(rule.destination || '');
+        if (!/\.html$/.test(destination)) {
           errors.push(
             `vercel.json : la règle « ${source} » doit servir un fichier .html, pas « ${rule.destination} »`
+          );
+          continue;
+        }
+        // Le gabarit attendu dépend de la route : sa propre page pré-rendue
+        // si elle existe, sinon app.html — JAMAIS index.html.
+        const expected = PRERENDERED_ROUTES.includes(pathname.replace(/^\//, ''))
+          ? `/${pathname.replace(/^\//, '')}.html`
+          : APP_HTML;
+        if (destination !== expected) {
+          errors.push(
+            `vercel.json : « ${source} » est servie par « ${destination} » au lieu de « ${expected} »` +
+              (destination === SPA_INDEX
+                ? ' — servir index.html à une route cliente publie le contenu de l\'accueil' +
+                  ' (h1, mots, liens) sous cette adresse : contenu dupliqué'
+                : '')
           );
         }
       }
@@ -353,6 +403,53 @@ export function runSpaRoutesCheck(options = {}) {
     );
   }
 
+  // ── 6bis. index.html ne sert QUE « / » ───────────────────────────────────
+  // C'est la contrepartie du shell d'accueil désormais présent dans
+  // index.html : tant qu'aucune règle ne l'envoie ailleurs, il n'est peint que
+  // sur la racine. La règle ci-dessus (destination attendue) le vérifie route
+  // par route, celle-ci couvre les destinations orphelines (une règle ajoutée
+  // à la main vers index.html sans route React correspondante).
+  for (const rule of rewrites) {
+    if (rule && rule.destination === SPA_INDEX) {
+      errors.push(
+        `vercel.json : « ${rule.source} » → « ${SPA_INDEX} » — index.html porte le shell de ` +
+          'l\'accueil et ne doit être servi que sur « / » ; les routes clientes utilisent ' +
+          `« ${APP_HTML} »`
+      );
+    }
+  }
+
+  // ── 6ter. Routes privées non indexables ──────────────────────────────────
+  const headerRules = Array.isArray(config.headers) ? config.headers : [];
+  const robotsTagFor = (source) => {
+    for (const entry of headerRules) {
+      if (!entry || entry.source !== source || !Array.isArray(entry.headers)) continue;
+      const found = entry.headers.find(
+        (h) => h && String(h.key).toLowerCase() === 'x-robots-tag'
+      );
+      if (found) return String(found.value || '');
+    }
+    return null;
+  };
+  const privateRoutesInApp = PRIVATE_ROUTES.filter((route) => productionRoutes.includes(route));
+  if (productionRoutes.length > 0 && privateRoutesInApp.length === 0) {
+    errors.push(
+      'aucune route de PRIVATE_ROUTES ne correspond à une route de App.js : ce garde ne vérifie ' +
+        "plus rien (route renommée ?) — mettre à jour PRIVATE_ROUTES avec les noms réels"
+    );
+  }
+  for (const route of privateRoutesInApp) {
+    const tag = robotsTagFor(route);
+    if (tag === null) {
+      errors.push(
+        `vercel.json : la route privée « ${route} » n'a pas d'en-tête X-Robots-Tag — ` +
+          'un tableau de bord indexé est une page vide dans les résultats de recherche'
+      );
+    } else if (!/noindex/i.test(tag)) {
+      errors.push(`vercel.json : « ${route} » doit porter noindex, pas « ${tag} »`);
+    }
+  }
+
   // ── 7. La page 404 existe réellement dans le build et n'est pas indexable ─
   const notFoundPath = path.join(buildDir, '404.html');
   if (existsSync(buildDir)) {
@@ -360,6 +457,56 @@ export function runSpaRoutesCheck(options = {}) {
     if (!existsSync(path.join(buildDir, 'index.html'))) {
       errors.push('build/index.html absent : la racine du site ne serait servie par rien');
     }
+    // 7ter. Le gabarit des routes clientes existe et reste NU.
+    const appPathOnDisk = path.join(buildDir, 'app.html');
+    if (!existsSync(appPathOnDisk)) {
+      errors.push(
+        `build/app.html absent : toutes les routes clientes (${PRIVATE_ROUTES.join(', ')}, ` +
+          "/support, /how-it-works…) serviraient une page inexistante en production"
+      );
+    } else {
+      const appHtml = readFileSync(appPathOnDisk, 'utf8');
+      if (/<h1[\s>]/i.test(appHtml)) {
+        errors.push(
+          "build/app.html contient un <h1> : ce gabarit sert une dizaine de routes, il publierait " +
+            "le même titre de page partout (contenu dupliqué) — les titres des routes clientes " +
+            'sont posés au runtime par usePageTitle'
+        );
+      }
+      if (/rel="canonical"/i.test(appHtml)) {
+        errors.push(
+          'build/app.html contient un canonical : une seule valeur ne peut pas décrire dix routes ' +
+            '(le canonical par route est posé par usePageTitle)'
+        );
+      }
+      if (/application\/ld\+json/i.test(appHtml)) {
+        errors.push(
+          'build/app.html contient un JSON-LD : le schéma de l\'organisation se déclare une fois, ' +
+            'sur la page d\'accueil'
+        );
+      }
+      if (!/<div id="root"><\/div>/.test(appHtml)) {
+        errors.push(
+          'build/app.html doit garder <div id="root"></div> VIDE : c\'est un gabarit sans ' +
+            'contenu de page (React peint après le boot)'
+        );
+      }
+    }
+    // 7quater. Tout fichier .html pré-rendu doit être déclaré : sinon une page
+    // est générée par le build mais jamais servie par le routage.
+    for (const file of readdirSync(buildDir)) {
+      if (!file.endsWith('.html')) continue;
+      const route = file.replace(/\.html$/, '');
+      if (['index', '404', 'app'].includes(route)) continue;
+      if (!PRERENDERED_ROUTES.includes(route)) {
+        errors.push(
+          `build/${file} est pré-rendu mais absent de PRERENDERED_ROUTES : le routage ne le sert ` +
+            `pas (ou le sert au mauvais endroit) — déclarez « ${route} » dans le garde et dans ` +
+            'frontend/vercel.json'
+        );
+      }
+    }
+
     if (!existsSync(notFoundPath)) {
       errors.push('build/404.html absent : les URL inconnues n\'auraient pas de page dédiée (elles répondraient 404, mais sans contenu utile)');
     } else {
