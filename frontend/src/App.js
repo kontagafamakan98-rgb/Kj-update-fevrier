@@ -13,7 +13,7 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
-import { PageSkeleton } from "./components/SkeletonLoader";
+import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton, DashboardSkeleton, ProfileSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
@@ -234,32 +234,62 @@ function AppRoutes() {
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/login" element={
+              <Suspense fallback={<LoginSkeleton />}>
+                <Login />
+              </Suspense>
+            } />
+            <Route path="/forgot-password" element={
+              <Suspense fallback={<ForgotPasswordSkeleton />}>
+                <ForgotPassword />
+              </Suspense>
+            } />
             <Route path="/register" element={<Register />} />
             
             {/* Protected routes - lazy loaded */}
+            {/* /dashboard et /profile ont aussi leur skeleton Suspense DÉDIÉ :
+                leur phase de chargement des données affiche un shell structuré
+                (SkeletonDashboardShell / ProfileSkeleton) — le fallback
+                générique PageSkeleton (3 blocs courts) faisait sauter le footer
+                ancré au remplacement du chunk (CLS 0.149 / 0.112). Le squelette
+                dédié réplique ce shell → chaîne chunk→données→page stable. */}
             <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
+              <Suspense fallback={<DashboardSkeleton />}>
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              </Suspense>
             } />
             {/* Lecture des jobs PUBLIQUE (découverte sans compte) : les
                 actions (créer, postuler, accepter, supprimer) restent
                 réservées aux utilisateurs connectés — le backend refuse
                 toute mutation non authentifiée, et les pages affichent
                 une invitation à se connecter pour les actions. */}
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/jobs/:id" element={<JobDetails />} />
+            {/* /jobs et /jobs/:id ont des skeletons Suspense DÉDIÉS (grille de
+                cartes / détail structuré à hauteur réelle) : le fallback
+                générique (PageSkeleton, 3 blocs courts) laissait un saut de
+                ~118 px au remplacement du chunk → CLS résiduel sur /jobs. */}
+            <Route path="/jobs" element={
+              <Suspense fallback={<JobsSkeleton />}>
+                <Jobs />
+              </Suspense>
+            } />
+            <Route path="/jobs/:id" element={
+              <Suspense fallback={<JobDetailsSkeleton />}>
+                <JobDetails />
+              </Suspense>
+            } />
             <Route path="/messages" element={
               <ProtectedRoute>
                 <Messages />
               </ProtectedRoute>
             } />
             <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
+              <Suspense fallback={<ProfileSkeleton />}>
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              </Suspense>
             } />
             <Route path="/create-job" element={
               <ProtectedRoute>

@@ -30,7 +30,7 @@ class TestVapidSubClaimValid:
 
     def test_mailto_majuscule_schema(self):
         # RFC 6068 : les schémas d'URI sont insensibles à la casse.
-        assert validate_vapid_sub_claim("MAILTO:Contact@Kojo.app") == "MAILTO:Contact@Kojo.app"
+        assert validate_vapid_sub_claim("MAILTO:Kojoapp98@Gmail.com") == "MAILTO:Kojoapp98@Gmail.com"
 
     def test_https_valide(self):
         assert validate_vapid_sub_claim("https://kojo.app/contact") == "https://kojo.app/contact"
@@ -52,7 +52,7 @@ class TestVapidSubClaimInvalide:
             "mailto:  kojoapp98@gmail.com",  # deux espaces
             "https:// kojo.app",          # espace dans l'URL https
             "mailto:contact@",            # pas de domaine
-            "mailto:@kojo.app",           # pas de local-part
+            "mailto:@exemple.com",        # pas de local-part
             "mailto:",                    # rien après le préfixe
             "https://",                   # rien après le préfixe
             "http://kojo.app",            # http non autorisé (RFC 8292 : https OU mailto)

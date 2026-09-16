@@ -27,6 +27,8 @@ _CATEGORY_LABELS = {
     "gardening": "Jardinage",
     "tutoring": "Cours particuliers",
     "mechanics": "Mécanique",
+    "carpentry": "Menuiserie",
+    "computing": "Informatique",
     "general": "Services divers",
 }
 

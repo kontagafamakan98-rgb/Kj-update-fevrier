@@ -4,10 +4,6 @@ const withBase = (base, overrides) => ({ ...base, ...overrides });
 const dict = {
 fr: {
   searchPlaceholder: 'Titre ou description...',
-  categoryLabel: 'Catégorie',
-  statusLabel: 'Statut',
-  duration: 'Durée : {value}',
-  apply: 'Postuler',
   // Onglets et libellés de la liste : sans ces clés, makeScopedTranslator
   // retombait sur la clé brute (ex. « tabDiscover ») — l'onglet s'affichait
   // littéralement « tabDiscover » quelle que soit la langue.
@@ -24,10 +20,6 @@ fr: {
 },
 en: {
   searchPlaceholder: 'Title or description...',
-  categoryLabel: 'Category',
-  statusLabel: 'Status',
-  duration: 'Duration: {value}',
-  apply: 'Apply',
   tabDiscover: 'Discover',
   tabApplications: 'My applications',
   tabMissions: 'My jobs',
@@ -40,26 +32,11 @@ en: {
   noApplicationsYet: 'You have not applied to a job yet.'
 }
 };
-dict.wo = withBase(dict.fr, {
-searchPlaceholder: 'Tur walla melokaan...',
-  categoryLabel: 'Wàcc',
-  statusLabel: 'Tolluwaay',
-  duration: 'Yàgg: {value}',
-  apply: 'Dàgg'
+dict.wo = withBase(dict.fr, {  searchPlaceholder: 'Tur walla melokaan...'
 });
-dict.bm = withBase(dict.fr, {
-searchPlaceholder: 'Tɔgɔ walima fɔli...',
-  categoryLabel: 'Sugu',
-  statusLabel: 'Jateko',
-  duration: 'Waati: {value}',
-  apply: 'Hakɛ kɛ'
+dict.bm = withBase(dict.fr, {  searchPlaceholder: 'Tɔgɔ walima fɔli...'
 });
-dict.mos = withBase(dict.fr, {
-searchPlaceholder: 'Yʋʋr bɩ goama...',
-  categoryLabel: 'Buud',
-  statusLabel: 'Wẽnda',
-  duration: 'Waqt: {value}',
-  apply: 'Kos'
+dict.mos = withBase(dict.fr, {  searchPlaceholder: 'Yʋʋr bɩ goama...'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>

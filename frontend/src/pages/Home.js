@@ -41,7 +41,9 @@ export default function Home() {
     { key: 'cleaning', icon: '🧽' },
     { key: 'gardening', icon: '🌱' },
     { key: 'tutoring', icon: '📚' },
-    { key: 'mechanics', icon: '🔩' }
+    { key: 'mechanics', icon: '🔩' },
+    { key: 'carpentry', icon: '🪚' },
+    { key: 'computing', icon: '💻' }
   ];
 
   const countries = getAllCountries().map((country, index) => ({
