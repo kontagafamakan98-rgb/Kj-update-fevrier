@@ -548,4 +548,100 @@ export const ProfileSkeleton = () => {
   );
 };
 
+// Skeleton de la page Messages — réplique la structure réelle : conteneur
+// max-w-6xl py-8, titre h1 (text-2xl → 32 px) puis carte à deux volets de
+// 75vh (liste des conversations en colonne 320 px à partir de sm, volet de
+// conversation vide sinon). Partagé par le fallback Suspense de /messages ET
+// par le chargement des conversations : l'état de chargement interne
+// omettait le h1, qui apparaissait seulement une fois les données arrivées
+// (léger décalage du contenu).
+export const MessagesSkeleton = () => {
+  return (
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Titre de page réel (h1 text-2xl) */}
+      <Skeleton className="h-8 w-40 mb-4" />
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[75vh] flex">
+        {/* Colonne des conversations (pleine largeur sur mobile) */}
+        <div className="w-full sm:w-[320px] sm:flex-shrink-0 border-r border-gray-100 flex flex-col">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <div className="flex-1 overflow-hidden py-2">
+            <ListSkeleton count={6} type="message" />
+          </div>
+        </div>
+
+        {/* Volet conversation (masqué sur mobile tant qu'aucune n'est ouverte) */}
+        <div className="hidden sm:flex flex-1 items-center justify-center">
+          <Skeleton className="h-6 w-48" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Contenu de la page Paiement (cartes sous l'en-tête) — EXTRAIT de Payment.js :
+// la page n'a plus son propre squelette dupliqué, et le fallback Suspense de
+// /payment réutilise exactement ces hauteurs (aucun décalage au swap).
+// Carte quote (en-tête + 3 champs + bouton) puis carte paiements récents.
+export const PaymentContentSkeleton = () => {
+  return (
+    <div className="space-y-6">
+      {/* Carte quote : en-tête + 3 champs */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-6 w-32 rounded-full" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
+          </div>
+          <div>
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
+          </div>
+          <div>
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
+          </div>
+        </div>
+        {/* Bouton payer */}
+        <Skeleton className="h-11 w-48 mt-6 rounded-xl" />
+      </div>
+
+      {/* Carte paiements récents */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <Skeleton className="h-6 w-56" />
+        <div className="mt-4 space-y-3">
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Skeleton complet de la page Paiement (fallback Suspense de /payment) :
+// réplique l'enveloppe réelle (min-h-full bg-gray-50 py-8 + conteneur
+// max-w-6xl) et la carte de titre, puis le contenu ci-dessus — le swap
+// chunk → page ne déplace ni le footer ancré (flex-1, cf. App.js) ni les
+// cartes.
+export const PaymentSkeleton = () => {
+  return (
+    <div className="min-h-full bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4 space-y-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          {/* h1 text-3xl + sous-titre */}
+          <Skeleton className="h-9 w-72 max-w-full" />
+          <Skeleton className="h-6 w-96 max-w-full mt-2" />
+        </div>
+        <PaymentContentSkeleton />
+      </div>
+    </div>
+  );
+};
+
 export default Skeleton;

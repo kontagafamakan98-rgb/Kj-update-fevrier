@@ -4,6 +4,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import CommissionService from '../services/commissionService';
 import { safeLog } from '../utils/env';
+// Squelette des cartes de paiement : défini dans SkeletonLoader (et non plus
+// ici) pour que le fallback Suspense de /payment (PaymentSkeleton) et l'état
+// de chargement des données partagent EXACTEMENT les mêmes hauteurs.
+import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 
 const COPY = {
   fr: {
@@ -627,62 +631,10 @@ const Payment = () => {
             layout réel (carte titre + formulaire quote + carte paiements)
             pour que l'arrivée des données async (providerConfig, quote,
             payments) ne fasse pas bouger le footer — anti-CLS uniforme. */}
-        {loading && <PaymentPageSkeleton />}
+        {loading && <PaymentContentSkeleton />}
       </div>
     </div>
   );
 };
-
-// Skeleton structuré de la page Paiement : réplique les hauteurs des cartes
-// réelles (titre, status éventuel, formulaire quote, répartition, nouveau
-// paiement) pour rendre le swap chargement → données stable verticalement.
-const Skeleton = ({ className = '' }) => (
-  <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
-);
-
-function PaymentPageSkeleton() {
-  return (
-    <div className="space-y-6">
-      {/* Carte titre + sous-titre */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <Skeleton className="h-8 w-72 max-w-full" />
-        <Skeleton className="h-4 w-96 max-w-full mt-3" />
-      </div>
-
-      {/* Carte quote : en-tête + 3 champs */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-6 w-32 rounded-full" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
-          </div>
-          <div>
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
-          </div>
-          <div>
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-11 w-full mt-2 rounded-xl" />
-          </div>
-        </div>
-        {/* Bouton payer */}
-        <Skeleton className="h-11 w-48 mt-6 rounded-xl" />
-      </div>
-
-      {/* Carte paiements récents */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <Skeleton className="h-6 w-56" />
-        <div className="mt-4 space-y-3">
-          <Skeleton className="h-16 w-full rounded-xl" />
-          <Skeleton className="h-16 w-full rounded-xl" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default Payment;

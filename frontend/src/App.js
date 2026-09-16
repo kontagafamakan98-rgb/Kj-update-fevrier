@@ -13,7 +13,7 @@ import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
-import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton, DashboardSkeleton, ProfileSkeleton } from "./components/SkeletonLoader";
+import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton, DashboardSkeleton, ProfileSkeleton, MessagesSkeleton, PaymentSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
@@ -279,10 +279,18 @@ function AppRoutes() {
                 <JobDetails />
               </Suspense>
             } />
+            {/* /messages et /payment ont aussi un skeleton Suspense DÉDIÉ :
+                sans lui, le fallback générique (PageSkeleton) affichait 3
+                blocs courts là où ces pages rendent une carte de 75vh / des
+                cartes de formulaire, d'où un saut au remplacement du chunk.
+                Payment.js et Messages.js partagent ces squelettes avec leur
+                propre état de chargement (mêmes hauteurs dans les 2 phases). */}
             <Route path="/messages" element={
-              <ProtectedRoute>
-                <Messages />
-              </ProtectedRoute>
+              <Suspense fallback={<MessagesSkeleton />}>
+                <ProtectedRoute>
+                  <Messages />
+                </ProtectedRoute>
+              </Suspense>
             } />
             <Route path="/profile" element={
               <Suspense fallback={<ProfileSkeleton />}>
@@ -328,9 +336,11 @@ function AppRoutes() {
               </ProtectedRoute>
             } />
             <Route path="/payment" element={
-              <ProtectedRoute>
-                <Payment />
-              </ProtectedRoute>
+              <Suspense fallback={<PaymentSkeleton />}>
+                <ProtectedRoute>
+                  <Payment />
+                </ProtectedRoute>
+              </Suspense>
             } />
             <Route path="/email-verification" element={<EmailVerificationPage />} />
             <Route path="/payment-verification" element={<PaymentVerificationPage />} />
