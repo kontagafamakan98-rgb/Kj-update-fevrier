@@ -282,6 +282,8 @@ describe('check-og-images — repli build local', () => {
     expect(result.checked.join('\n')).not.toContain('/jobs/:id');
     expect(calls.some((u) => u.includes('/jobs/'))).toBe(false);
     expect(calls.some((u) => u.includes('stub-backend.test'))).toBe(false);
+    // La fiche mission n'est pas vérifiée ici : ça doit être annoncé.
+    expect(result.notices.join('\n')).toMatch(/n'a PAS été vérifiée par ce run/);
   });
 });
 

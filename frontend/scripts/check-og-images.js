@@ -228,8 +228,16 @@ export async function runOgImageCheck({
   let jobTitle = '';
   if (isLocalBase) {
     // Aucun intérêt à interroger le backend (et à le solliciter) quand la
-    // section est de toute façon ignorée.
-    log(`  ⚠️ ${jobDetailLabel} : repli build local (${BASE}) — rewrite Vercel + pré-rendu backend absents du build statique, section ignorée (le chemin 200/404 est vérifié contre le déploiement Vercel réel)`);
+    // section est de toute façon ignorée. La couverture manquante remonte en
+    // annotation : sur une PR (repli build local), le résumé du run doit dire
+    // que la fiche mission n'a PAS été vérifiée, pas seulement « vert ».
+    const notice =
+      `${jobDetailLabel} : audit du build local (${BASE}) — rewrite Vercel + ` +
+      `pré-rendu backend absents du build statique, la fiche mission n'a PAS ` +
+      `été vérifiée par ce run (elle l'est contre le déploiement Vercel réel, ` +
+      `c'est-à-dire sur les runs de main).`;
+    notices.push(notice);
+    log(`  ⚠️ ${notice}`);
   } else {
     try {
       const jres = await fetchImpl(`${BACKEND}/api/jobs?limit=1`, {
