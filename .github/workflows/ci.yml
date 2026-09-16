@@ -327,6 +327,16 @@ jobs:
         working-directory: frontend
         run: node scripts/check-api-split.js
 
+      # Garde-fou du lot Open Graph : le pré-rendu par route référence des
+      # cartes versionnées dans public/ (og-jobs, og-login, variantes carrées,
+      # favicon sombre) que scripts/gen-og-images.py régénère. Le check lit le
+      # manifeste DANS ce générateur (dimensions + pages) et échoue si un
+      # second générateur apparaît, si un PNG est manquant/invalide, s'il ne
+      # respecte pas ses dimensions ou si un og-*.png orphelin subsiste.
+      - name: Check Open Graph assets (generator + PNG dimensions)
+        working-directory: frontend
+        run: node scripts/check-og-assets.js
+
       - name: Check bundle size
         working-directory: frontend
         run: |
