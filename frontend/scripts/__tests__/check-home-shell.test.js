@@ -101,7 +101,13 @@ function makeProject({
   description = 'Trouvez un plombier, électricien ou mécanicien vérifié au Mali, au Sénégal ou en Côte d\'Ivoire.',
   body,
   indexHtml,
-  jobsHtml = '<div id="root"><h1>Emplois disponibles</h1></div>',
+  // Page pré-rendue de référence : un document COMPLET avec SA description
+  // (le garde refuse désormais une page qui publie celle de l'accueil).
+  jobsHtml = htmlPage({
+    title: 'Emplois disponibles — Kojo',
+    description: "Emplois et missions disponibles dans toute l'Afrique de l'Ouest.",
+    body: '<h1>Emplois disponibles</h1>',
+  }),
   contact = CONTACT,
   // « Mali » est présent dans l'adresse du N.A.P. de la fixture : le shell y
   // fait donc référence sans avoir à répéter chaque pays.
@@ -279,9 +285,35 @@ describe('check-home-shell — styles et fuite du shell', () => {
 
   it('échoue si le shell de l\'accueil fuit dans une page pré-rendue', () => {
     const project = makeProject({
-      jobsHtml: `<div id="root"><h1>${HERO_TITLE}</h1></div>`,
+      jobsHtml: htmlPage({
+        title: 'Emplois disponibles — Kojo',
+        description: 'Emplois et missions disponibles.',
+        body: `<h1>${HERO_TITLE}</h1>`,
+      }),
     });
     expect(run(project).errors.join('\n')).toContain("shell de l'ACCUEIL");
+  });
+
+  it('refuse une description recopiée de l\'accueil dans une page pré-rendue', () => {
+    // Régression réelle : le plugin n'écrivait pas la description par route —
+    // /jobs, /login, /register… publiaient celle de l'accueil.
+    const shared = 'Description recopiée partout.';
+    const project = makeProject({
+      description: shared,
+      jobsHtml: htmlPage({ title: 'Emplois', description: shared, body: '<h1>Emplois</h1>' }),
+    });
+    expect(run(project).errors.join('\n')).toContain('DUPLIQUÉE');
+  });
+
+  it('exige une description sur chaque page pré-rendue', () => {
+    const project = makeProject({
+      jobsHtml: htmlPage({
+        title: 'Emplois',
+        description: '',
+        body: '<h1>Emplois disponibles</h1>',
+      }),
+    });
+    expect(run(project).errors.join('\n')).toContain('description absente');
   });
 
   it('missingClasses ignore group/peer et les classes échappées', () => {

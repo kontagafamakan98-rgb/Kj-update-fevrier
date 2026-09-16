@@ -60,7 +60,18 @@ export const SPA_INDEX = '/index.html';
 export const APP_HTML = '/app.html';
 // Pages réellement pré-rendues dans le build : chacune a son propre fichier.
 // Toute autre route de production doit être servie par APP_HTML.
-export const PRERENDERED_ROUTES = ['jobs', 'login', 'register', 'forgot-password', 'payment'];
+export const PRERENDERED_ROUTES = [
+  'jobs',
+  'login',
+  'register',
+  'forgot-password',
+  'payment',
+  // Pages PUBLIQUES de contenu : elles ont leur propre shell depuis qu'elles ne
+  // doivent plus être servies par le gabarit nu (titre « Kojo », aucun h1). Le
+  // gabarit app.html ne concerne plus que les écrans connectés (noindex).
+  'how-it-works',
+  'support',
+];
 // Routes non indexables : elles n'existent que pour un utilisateur connecté (ou
 // pour le support) et n'ont aucun contenu à montrer à un moteur.
 export const PRIVATE_ROUTES = [
@@ -461,8 +472,8 @@ export function runSpaRoutesCheck(options = {}) {
     const appPathOnDisk = path.join(buildDir, 'app.html');
     if (!existsSync(appPathOnDisk)) {
       errors.push(
-        `build/app.html absent : toutes les routes clientes (${PRIVATE_ROUTES.join(', ')}, ` +
-          "/support, /how-it-works…) serviraient une page inexistante en production"
+        `build/app.html absent : toutes les routes clientes (${PRIVATE_ROUTES.join(', ')}) ` +
+          'serviraient une page inexistante en production'
       );
     } else {
       const appHtml = readFileSync(appPathOnDisk, 'utf8');

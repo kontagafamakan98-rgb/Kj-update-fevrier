@@ -178,7 +178,7 @@ const runCycle = (stub, overrides = {}) =>
 
 const originalEnv = { ...process.env };
 afterEach(() => {
-  for (const key of ['LHCI_AUTH_HEADER', 'LHCI_CI_EMAIL', 'LHCI_CI_PASSWORD', 'LHCI_TEST_EMAIL', 'LHCI_TEST_PASSWORD']) {
+  for (const key of ['KOJO_LHCI_AUTH_HEADER', 'LHCI_CI_EMAIL', 'LHCI_CI_PASSWORD', 'LHCI_TEST_EMAIL', 'LHCI_TEST_PASSWORD']) {
     if (originalEnv[key] === undefined) delete process.env[key];
     else process.env[key] = originalEnv[key];
   }
@@ -262,7 +262,7 @@ describe('cycle /jobs/:id — chemin 200', () => {
 
   it('échoue si aucun jeton n’est disponible (chemin 200 non vérifiable)', async () => {
     const stub = makeStub();
-    delete process.env.LHCI_AUTH_HEADER;
+    delete process.env.KOJO_LHCI_AUTH_HEADER;
     const result = await runCycle(stub, { token: '', email: '', password: '' });
 
     expect(result.ok).toBe(false);
@@ -366,16 +366,16 @@ describe('verrou 404 après suppression', () => {
 });
 
 describe('cycle /jobs/:id — jeton et charge utile', () => {
-  it('utilise LHCI_AUTH_HEADER quand aucun jeton explicite n’est fourni', async () => {
-    process.env.LHCI_AUTH_HEADER = JSON.stringify({ Authorization: 'Bearer jeton-du-job' });
+  it('utilise KOJO_LHCI_AUTH_HEADER quand aucun jeton explicite n’est fourni', async () => {
+    process.env.KOJO_LHCI_AUTH_HEADER = JSON.stringify({ Authorization: 'Bearer jeton-du-job' });
     const errors = [];
     const auth = await resolveAuthHeader({ backend: BACKEND, fetchImpl: makeStub().fetchImpl, errors });
     expect(auth).toBe('Bearer jeton-du-job');
     expect(errors).toEqual([]);
   });
 
-  it('se rabat sur le login du compte CI si LHCI_AUTH_HEADER est absent', async () => {
-    delete process.env.LHCI_AUTH_HEADER;
+  it('se rabat sur le login du compte CI si KOJO_LHCI_AUTH_HEADER est absent', async () => {
+    delete process.env.KOJO_LHCI_AUTH_HEADER;
     const calls = [];
     const fetchImpl = async (url, init = {}) => {
       calls.push({ url: String(url), method: (init.method || 'GET').toUpperCase() });
@@ -394,8 +394,8 @@ describe('cycle /jobs/:id — jeton et charge utile', () => {
     expect(errors).toEqual([]);
   });
 
-  it('signale un LHCI_AUTH_HEADER illisible sans bloquer le repli login', async () => {
-    process.env.LHCI_AUTH_HEADER = '{pas du json';
+  it('signale un KOJO_LHCI_AUTH_HEADER illisible sans bloquer le repli login', async () => {
+    process.env.KOJO_LHCI_AUTH_HEADER = '{pas du json';
     const errors = [];
     const auth = await resolveAuthHeader({
       backend: BACKEND,
@@ -405,7 +405,7 @@ describe('cycle /jobs/:id — jeton et charge utile', () => {
       errors,
     });
     expect(auth).toBe('Bearer jeton-login');
-    expect(errors.join(' | ')).toMatch(/LHCI_AUTH_HEADER illisible/);
+    expect(errors.join(' | ')).toMatch(/KOJO_LHCI_AUTH_HEADER illisible/);
   });
 
   it('construit une charge utile valide au regard de JobCreate', () => {

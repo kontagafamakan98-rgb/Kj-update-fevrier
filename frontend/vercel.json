@@ -59,8 +59,8 @@
       "source": "/payment/",
       "destination": "/payment.html"
     },
-    { "source": "/how-it-works", "destination": "/app.html" },
-    { "source": "/how-it-works/", "destination": "/app.html" },
+    { "source": "/how-it-works", "destination": "/how-it-works.html" },
+    { "source": "/how-it-works/", "destination": "/how-it-works.html" },
     { "source": "/dashboard", "destination": "/app.html" },
     { "source": "/dashboard/", "destination": "/app.html" },
     { "source": "/messages", "destination": "/app.html" },
@@ -77,8 +77,8 @@
     { "source": "/payment-verification/", "destination": "/app.html" },
     { "source": "/commission-dashboard", "destination": "/app.html" },
     { "source": "/commission-dashboard/", "destination": "/app.html" },
-    { "source": "/support", "destination": "/app.html" },
-    { "source": "/support/", "destination": "/app.html" },
+    { "source": "/support", "destination": "/support.html" },
+    { "source": "/support/", "destination": "/support.html" },
     { "source": "/support-admin", "destination": "/app.html" },
     { "source": "/support-admin/", "destination": "/app.html" }
   ],

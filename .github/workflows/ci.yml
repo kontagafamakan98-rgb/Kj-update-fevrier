@@ -564,7 +564,7 @@ jobs:
 
       # Résout l'URL du déploiement Vercel à auditer : commentaire Vercel
       # de la PR (API GitHub, sans token supplémentaire) ou URL de prod sur
-      # main. Sortie LHCI_URL → lighthouserc.cjs l'utilise comme collect.url
+      # main. Sortie KOJO_LHCI_BASE_URL → lighthouserc.cjs l'utilise comme collect.url
       # (repli build local si non résolue). Logique dans
       # .github/scripts/resolve-vercel-url.sh.
       - name: Resolve Vercel deployment URL
@@ -577,20 +577,27 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash .github/scripts/resolve-vercel-url.sh
 
-      # Si LHCI_URL est vide (aucune preview Vercel exploitable : preview
+      # Si KOJO_LHCI_BASE_URL est vide (aucune preview Vercel exploitable : preview
       # PROTÉGÉE par Deployment Protection — détectée par resolve-vercel-url.sh
       # — ou commentaire Vercel absent), on sert le BUILD LOCAL (contenu
       # identique au déploiement) sur le port 4173 : check-og-images et lhci
       # auditeront alors le code de la PR au lieu du mur de login Vercel.
-      # LHCI_URL est réécrite vers localhost → lighthouserc.cjs passe en mode
+      # KOJO_LHCI_BASE_URL est réécrite vers localhost → lighthouserc.cjs passe en mode
       # url (les og:image des shells pré-rendus restent ABSOLUS vers la prod,
       # les assertions OG restent valides). Serveur lancé en arrière-plan :
       # nohup + log redirigé pour survivre aux steps suivants du job.
+      #
+      # ⚠️ Le nom de la variable n'est PAS `LHCI_URL` : lhci active yargs
+      # `.env('LHCI')`, donc toute variable `LHCI_<x>` devient l'option `--<x>`
+      # du CLI. `LHCI_URL` devenait `--url`, une URL UNIQUE qui écrasait le
+      # tableau de 4 URLs de lighthouserc.cjs (constaté : « 1 URL(s) » auditées
+      # en CI, les pages protégées jamais mesurées). Le préfixe `KOJO_LHCI_`
+      # n'est capturé par aucun motif yargs, et un test l'exige.
       - name: Serve local build (repli preview Vercel indisponible)
         working-directory: frontend
         run: |
-          if [ -n "${LHCI_URL:-}" ]; then
-            echo "Preview Vercel à auditer : $LHCI_URL"
+          if [ -n "${KOJO_LHCI_BASE_URL:-}" ]; then
+            echo "Preview Vercel à auditer : $KOJO_LHCI_BASE_URL"
             exit 0
           fi
           echo "Aucune preview Vercel exploitable → audit du build local (port 4173)"
@@ -604,11 +611,11 @@ jobs:
             cat /tmp/vite-preview.log
             exit 1
           fi
-          echo "LHCI_URL=http://localhost:4173" >> "$GITHUB_ENV"
+          echo "KOJO_LHCI_BASE_URL=http://localhost:4173" >> "$GITHUB_ENV"
 
       # Authentifie les pages protégées : se connecte au backend prod avec le
       # COMPTE CLIENT DÉDIÉ CI (secrets LHCI_CI_EMAIL/LHCI_CI_PASSWORD) et
-      # stocke le token Bearer dans LHCI_AUTH_HEADER. Ce compte est isolé des
+      # stocke le token Bearer dans KOJO_LHCI_AUTH_HEADER. Ce compte est isolé des
       # comptes e2e partagés → l'état audité (/dashboard,/jobs,/profile) est
       # déterministe. Pendant la transition, on retombe sur les anciens
       # secrets LHCI_TEST_* s'ils sont encore définis. Les pages reçoivent cet
@@ -638,14 +645,14 @@ jobs:
           fi
           # JSON sérialisé pour l'env : {\"Authorization\": \"Bearer <token>\"}
           AUTH_HEADER=$(python3 -c "import json,sys; print(json.dumps({'Authorization': 'Bearer ' + sys.argv[1]}))" "$TOKEN")
-          echo "LHCI_AUTH_HEADER=$AUTH_HEADER" >> "$GITHUB_ENV"
+          echo "KOJO_LHCI_AUTH_HEADER=$AUTH_HEADER" >> "$GITHUB_ENV"
           echo "Token récupéré (${#TOKEN} chars, compte: $EMAIL)"
 
       # Vérifie que chaque page auditée sert un og:image ABSOLU et spécifique
       # par route — le HTML servi est exactement ce que reçoit un crawler sans
       # JS (le pré-rendu OG). Échoue le job (→ PR bloquée) si un og:image est
       # absent, relatif, ou ne correspond pas à la carte attendue de la route
-      # (/, /jobs, /login). LHCI_URL (résolue plus haut) est lue par le script
+      # (/, /jobs, /login). KOJO_LHCI_BASE_URL (résolue plus haut) est lue par le script
       # via process.env ; sans elle, repli sur le build local.
       - name: Check OG images per route (crawler view)
         working-directory: frontend
@@ -668,10 +675,10 @@ jobs:
       # vide. Les sondes post-suppression portent un paramètre de cache-busting
       # car la fiche vivante est servie avec s-maxage=3600 (l'URL nue pourrait
       # renvoyer un 200 sorti du cache CDN).
-      # Sur repli build local (LHCI_URL=localhost), le script ne fait RIEN
+      # Sur repli build local (KOJO_LHCI_BASE_URL=localhost), le script ne fait RIEN
       # (le rewrite /jobs/(.*) n'existe que sur le déploiement Vercel) : il
       # sort en 0 avec un ::notice — aucune écriture en prod pour rien.
-      # LHCI_URL et LHCI_AUTH_HEADER sont déjà dans l'environnement (steps
+      # KOJO_LHCI_BASE_URL et KOJO_LHCI_AUTH_HEADER sont déjà dans l'environnement (steps
       # précédents, via $GITHUB_ENV) ; les secrets servent de repli si le
       # jeton n'a pas été résolu.
       - name: Check /jobs/:id OG path (create → 200 → delete → 404 + noindex + sitemap)
@@ -684,13 +691,13 @@ jobs:
         run: node scripts/check-og-job-200.js
 
       # ubuntu-latest embarque Google Chrome : chrome-launcher le détecte
-      # automatiquement (pas d'action d'installation nécessaire). LHCI_URL
+      # automatiquement (pas d'action d'installation nécessaire). KOJO_LHCI_BASE_URL
       # (si définie) fait auditer l'URL Vercel réelle, sinon le build local.
-      # LHCI_AUTH_HEADER authentifie les pages /dashboard,/jobs,/profile.
+      # KOJO_LHCI_AUTH_HEADER authentifie les pages /dashboard,/jobs,/profile.
       - name: Run Lighthouse CI (collect + assert, budgets bloquants)
         working-directory: frontend
-        # LHCI_URL et LHCI_AUTH_HEADER sont dans l'env via $GITHUB_ENV (steps
-        # précédents) — lhci autorun lit process.env.LHCI_AUTH_HEADER.
+        # KOJO_LHCI_BASE_URL et KOJO_LHCI_AUTH_HEADER sont dans l'env via $GITHUB_ENV (steps
+        # précédents) — lhci autorun lit process.env.KOJO_LHCI_AUTH_HEADER.
         run: npx lhci autorun --config=lighthouserc.cjs
 
       # Rapports consultables dans les artifacts du run (utile pour

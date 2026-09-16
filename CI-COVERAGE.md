@@ -30,9 +30,9 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Workflow lint (actionlint + shellcheck)** | YAML/expressions de `ci.yml` invalides ; shellcheck sur `.github/scripts/*.sh` et `backend/scripts/*.sh` (les deux globs résolvent : `resolve-vercel-url.sh`, `loadtest_real_flow.sh`). | Non. Seul `rhysd/actionlint` est **épinglé** (`v1.7.12`). |
 | **Fly env doc-prod (drift + secrets)** | Formats des références du dépôt (`--refs-only`, sans réseau) ; drift `fly.toml` ↔ runtime ; secret obligatoire manquant ; doublon `[env]`↔secret ; secret orphelin ; clé `.env.example` absente de Fly. **Token absent → `exit 2` → job rouge** (échec bruyant, pas de saut). | Partiellement : les formats des **secrets déployés** (via `flyctl ssh`) et le snapshot de digests sont silencieusement inopérants (§3, F4). |
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict. | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
-| **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build`, puis **7 gardes sur les artefacts** (shells de pré-rendu, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
+| **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build`, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
-| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`. | **Oui, largement** : repli silencieux sur un build local, verrou `/jobs/:id` du déploiement réel désactivé (couvert ailleurs sur les PR depuis le 16/09/2026, §3, F3), budgets très permissifs (§3, F2/F6). |
+| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`. | **Oui** : repli silencieux sur un build local (seul l'accueil y est audité), verrou `/jobs/:id` du déploiement réel désactivé (couvert ailleurs sur les PR depuis le 16/09/2026, §3, F3), budgets calés sur des mesures réelles mais encore larges (§3, F6). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
 
@@ -62,7 +62,16 @@ commentaire de l'app Vercel. Il **échoue volontairement en douceur** : rate-lim
 GitHub (`403`), erreur réseau (`000`), HTTP ≠ 200, corps JSON inexploitable, ou
 preview **protégée** par Vercel Deployment Protection → il logue un `⚠️` et
 n'écrit **rien**. Le step suivant démarre alors `vite preview` sur le port 4173 et
-`LHCI_URL=http://localhost:4173`.
+`KOJO_LHCI_BASE_URL=http://localhost:4173`.
+
+Sur ce repli, **seul l'accueil** est audité par Lighthouse : `vite preview` ne
+sert pas les `.html` pré-rendus par route (il renvoie `index.html` pour toute
+route inconnue), donc y mesurer `/jobs` mesurerait l'accueil déguisé, et
+`/dashboard` l'accueil puis la redirection du 401 — des chiffres qui ne
+décrivent aucune page réelle. Le déploiement réel, lui, est audité sur les
+quatre URLs (`/`, `/dashboard`, `/jobs`, `/profile`, ces trois dernières
+authentifiées par le jeton Bearer du compte CI) : c'est là, et là seulement, que
+les budgets des pages protégées sont appliqués.
 
 Le job est vert, les mêmes assertions tournent — mais elles mesurent **un build
 statique servi en local**, pas le déploiement Vercel : ni CDN, ni redirections,
@@ -147,25 +156,65 @@ et son CDN) — inhérent : mettre en ligne une preview par PR est impossible ic
   introuvable. Et il n'y a ni émulateur ni test d'instrumentation : le job établit
   « le projet compile », jamais « l'application fonctionne ».
 
-### F6 — Les budgets Lighthouse sont réels mais très permissifs
+### F6 — Les budgets Lighthouse (re-calibrés sur des mesures le 16/09/2026)
 
-Les 5 assertions sont bien en `error` (elles bloquent), mais l'écart entre le
-seuil et la valeur calibrée est large — un budget n'attrape qu'une régression
-franche :
+Les 5 assertions sont en `error` (elles bloquent). Elles portaient sur des
+valeurs approximatives et **une seule URL** : le job mesurait l'accueil, jamais
+les pages protégées (voir F2bis). Correctif du 16/09/2026, puis relevé réel du
+déploiement, 3 runs par page, médianes :
 
-| Assertion | Seuil (`lighthouserc.cjs`) | Valeur calibrée (commentaire du fichier) | Marge |
-|---|---|---|---|
-| `categories:performance` | ≥ 0,85 | 0,95 accueil · 0,88-0,92 protégées | ~1 point de score |
-| `largest-contentful-paint` | ≤ 5 000 ms | ~2 500 ms accueil · ~3-3,6 s protégées | **~2×** |
-| `total-blocking-time` | ≤ 500 ms | ~10 ms accueil | **~50×** |
-| `first-contentful-paint` | ≤ 4 000 ms | ~1,8 s accueil | **~2×** |
-| `cumulative-layout-shift` | ≤ 0,1 | ~0,03 protégées après correctif | ~3× |
+| Page | score | FCP | LCP | TBT (médiane) | TBT par run | CLS |
+|---|---|---|---|---|---|---|
+| `/` | 0,99 | 1 263 ms | 1 263 ms | 1 ms | `2878, 1, 0` | 0,056 |
+| `/dashboard` | 0,98 | 1 395 ms | 2 386 ms | 0 ms | `0, 0, 0` | 0,001 |
+| `/jobs` | 0,94 | 969 ms | 2 057 ms | 30 ms | `665, 12, 30` | **0,135** |
+| `/profile` | 0,97 | 1 399 ms | 2 496 ms | 2 ms | `7, 2, 0` | 0,001 |
 
-Un TBT multiplié par 20 ou un LCP doublé passent au vert. C'est un choix assumé
-(absorber la variance du runner et de la 4G simulée), mais le garde protège
-contre une **effondrement**, pas contre une dérive. Le fichier le dit lui-même :
-la détection d'une régression *relative* exigerait un serveur LHCI, absent.
-`numberOfRuns: 2` (médiane de 2) lisse mal la variance.
+| Assertion | Seuil | Marge sur la pire médiane mesurée |
+|---|---|---|
+| `categories:performance` | ≥ 0,90 | 0,94 |
+| `largest-contentful-paint` | ≤ 3 500 ms | 1,40× |
+| `first-contentful-paint` | ≤ 2 500 ms | 1,79× |
+| `total-blocking-time` | ≤ 1 200 ms (déploiement) · 1 600 ms (repli local) | médianes ≤ 30 ms |
+| `cumulative-layout-shift` | ≤ 0,15 | **défaut connu /jobs : 0,135** |
+
+Deux points que ces chiffres imposent :
+
+- **le TBT d'un runner partagé est bimodal** (0-30 ms la plupart du temps,
+  jusqu'à 2 878 ms sur un run, pour la même page et le même commit). Le plafond
+  de 1 200 ms est donc au-dessus du bruit, pas au-dessus d'un objectif de
+  performance : avec `numberOfRuns: 2` et l'agrégation `optimistic` (minimum) qui
+  prévalaient, une seule mesure décidait du sort du job. Le passage à
+  **3 runs + médiane** est ce qui rend le budget interprétable.
+- **le CLS de /jobs est un défaut réel, mesuré et non corrigé** : 0,1353,
+  identique sur les 3 runs, au-dessus du seuil Lighthouse de 0,1 (le plafond du
+  job est relevé à 0,15 en conséquence, et la raison est écrite dans
+  `lighthouserc.cjs`). Le rapport n'attribue le décalage à aucun nœud ; la piste
+  est le shell pré-rendu de `/jobs` (`jobs.html`), qui ne contient que le
+  bandeau et le titre — la grille de cartes apparaît après le montage React, ce
+  qui déplace le contenu sous elle. Ce défaut était **invisible** jusqu'ici
+  parce que le job n'auditait qu'une URL.
+
+Un TBT 40× au-dessus de la médiane ou un LCP doublé passent encore au vert :
+la détection d'une régression *relative* exigerait un serveur LHCI, absent. Le
+garde attrape un **effondrement**, et il le fait désormais sur les 4 pages.
+
+### F2bis — Lighthouse n'auditait qu'UNE page, à cause d'un nom de variable
+
+`@lhci/cli` configure yargs avec `.env('LHCI')` : toute variable d'environnement
+`LHCI_<x>` est relue par le CLI comme l'option `--<x>`. Le job exportait
+`LHCI_URL` pour indiquer la base à auditer, et `lighthouserc.cjs` construisait un
+tableau de 4 URLs — mais `LHCI_URL` devenait l'option `--url` du collecteur, qui
+**écrase** ce tableau. Tous les runs affichaient « Checking assertions against
+1 URL(s) » : les pages `/dashboard`, `/jobs` et `/profile` n'ont jamais été
+auditées, leurs budgets ne mesuraient rien, et les faux-verts correspondants
+n'étaient pas visibles dans les logs.
+
+Corrigé par le renommage `KOJO_LHCI_BASE_URL` / `KOJO_LHCI_AUTH_HEADER` (hors du
+motif capturé par yargs), un garde qui interdit toute variable `LHCI_*` dans la
+configuration et dans le workflow
+(`frontend/scripts/__tests__/check-lhci-env.test.js`), et la première mesure
+réelle des quatre pages (tableau F6).
 
 ### F7 — `backend-tests` : deux chemins de production jamais exercés
 
@@ -244,9 +293,17 @@ chaque PR vers `main` (sauf mention contraire).
 - Suite `vitest` complète (aucun seuil de couverture, cf. §7).
 - Aucun endpoint fantôme dans les services (`audit_api_returns.cjs` strict).
 - Le build Vite aboutit avec `VITE_API_URL` de production.
-- Shells de pré-rendu présents dans `jobs.html` / `login.html` ; `#root` porte le
-  shell de l'accueil dans `index.html` et reste **vide** dans `app.html`, le
-  gabarit neutre des routes clientes (sans h1, sans canonical, sans JSON-LD).
+- Shells de pré-rendu présents dans **chaque** page pré-rendue (`jobs.html`,
+  `login.html`, `register.html`, `forgot-password.html`, `payment.html`,
+  `how-it-works.html`, `support.html` — h1, contenu, liens internes et
+  modulepreload du chunk de la route) ; `#root` porte le shell de l'accueil dans
+  `index.html` et reste **vide** dans `app.html`, le gabarit neutre des routes
+  clientes (sans h1, sans canonical, sans JSON-LD).
+- **Une description par page** (`check-home-shell.js`) : chaque page pré-rendue
+  publie sa propre meta description (≤ 160 caractères). Le plugin de pré-rendu
+  ne réécrivait que les méta Open Graph — les sept pages servaient donc la
+  description de l'accueil, et la route déclarait la sienne dans `og:description`
+  seulement. Une description identique sur deux pages échoue désormais en CI.
 - Découpage `pack2PageI18n` toujours par scope (pas de chunk partagé ≥ 3
   dictionnaires).
 - Les groupes d'endpoints *lazy* restent hors du chunk d'entrée.
@@ -267,8 +324,11 @@ chaque PR vers `main` (sauf mention contraire).
   `heroTitle`, `title` ≤ 60 et description ≤ 160, ≥ 300 mots, des liens
   internes, `tel:`/`mailto:`/WhatsApp, le N.A.P. identique à
   `src/config/contact.json`, les pays de `CountryDisplay.js`, un `LocalBusiness`
-  et une carte intégrée en lazy, et **chaque classe Tailwind du shell présente
-  dans le CSS du build**.
+  et une carte intégrée en lazy, **chaque classe Tailwind du shell présente dans
+  le CSS du build**, des descriptions **uniques** sur les pages pré-rendues, et
+  l'absence du shell d'accueil dans les autres pages (et inversement).
+  Ce sont exactement les critères d'un audit SEO « sans JavaScript » sur
+  l'accueil — vérifiés à chaque push plutôt qu'à la main.
 - Cartes OG : générateur unique, PNG présents et aux bonnes dimensions, aucun
   orphelin.
 - Famille d'icônes : empreintes de **pixels** conformes au manifeste, générateur

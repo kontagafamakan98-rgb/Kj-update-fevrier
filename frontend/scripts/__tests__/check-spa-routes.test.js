@@ -88,16 +88,16 @@ const CONFORMING_REWRITES = [
   { source: '/forgot-password/', destination: '/forgot-password.html' },
   { source: '/payment', destination: '/payment.html' },
   { source: '/payment/', destination: '/payment.html' },
-  { source: '/how-it-works', destination: '/app.html' },
-  { source: '/how-it-works/', destination: '/app.html' },
+  { source: '/how-it-works', destination: '/how-it-works.html' },
+  { source: '/how-it-works/', destination: '/how-it-works.html' },
   { source: '/dashboard', destination: '/app.html' },
   { source: '/dashboard/', destination: '/app.html' },
   { source: '/profile', destination: '/app.html' },
   { source: '/profile/', destination: '/app.html' },
   { source: '/photo-debug', destination: '/app.html' },
   { source: '/photo-debug/', destination: '/app.html' },
-  { source: '/support', destination: '/app.html' },
-  { source: '/support/', destination: '/app.html' },
+  { source: '/support', destination: '/support.html' },
+  { source: '/support/', destination: '/support.html' },
 ];
 
 /** En-têtes de référence : les routes privées ne sont pas indexables. */
@@ -144,7 +144,15 @@ function makeProject({
   if (notFound !== null) fs.writeFileSync(path.join(buildDir, '404.html'), notFound);
   if (appHtml !== null) fs.writeFileSync(path.join(buildDir, 'app.html'), appHtml);
   // Pages pré-rendues attendues par le routage de référence.
-  for (const route of ['jobs', 'login', 'register', 'forgot-password', 'payment']) {
+  for (const route of [
+    'jobs',
+    'login',
+    'register',
+    'forgot-password',
+    'payment',
+    'how-it-works',
+    'support',
+  ]) {
     fs.writeFileSync(path.join(buildDir, `${route}.html`), '<div id="root"></div>');
   }
   for (const name of extraBuildHtml) {
@@ -432,14 +440,29 @@ describe('check-spa-routes — séparation des gabarits', () => {
   });
 
   it('échoue si une route cliente renvoie vers un .html inexistant', () => {
+    // /dashboard n'a pas de pré-rendu : la servir par /dashboard.html (fichier
+    // jamais émis) doit être refusé — c'est le gabarit app.html qui est attendu.
     const project = makeProject({
       rewrites: withRewrites((rewrites) => {
         for (const rule of rewrites) {
-          if (rule.source === '/support') rule.destination = '/support.html';
+          if (rule.source === '/dashboard') rule.destination = '/dashboard.html';
         }
       }),
     });
     expect(run(project).errors.join('\n')).toContain('/app.html');
+  });
+
+  it('échoue si une page pré-rendue PUBLIQUE est renvoyée vers le gabarit nu', () => {
+    // Régression réelle : /support et /how-it-works servaient app.html (titre
+    // « Kojo », aucun h1, 1 mot). Le garde exige leur propre fichier.
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) => {
+        for (const rule of rewrites) {
+          if (rule.source === '/support') rule.destination = '/app.html';
+        }
+      }),
+    });
+    expect(run(project).errors.join('\n')).toContain('/support.html');
   });
 
   it('échoue si build/app.html est absent ou n\'est plus un gabarit nu', () => {

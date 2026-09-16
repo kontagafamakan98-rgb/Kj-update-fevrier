@@ -23,8 +23,12 @@
  * Sans cela, la branche 200 de /jobs/:id n'était exercée que les jours où une
  * mission existait en base — un garde jamais exécuté ne garde rien.
  *
- * Usage : LHCI_URL=https://x.vercel.app node scripts/check-og-images.js
- * (LHCI_URL par défaut : build local servi par `vite preview`, port 4173.)
+ * Usage : KOJO_LHCI_BASE_URL=https://x.vercel.app node scripts/check-og-images.js
+ * (par défaut : build local servi par `vite preview`, port 4173.)
+ *
+ * Le nom de la variable évite le préfixe `LHCI_` : lhci active yargs
+ * `.env('LHCI')`, donc `LHCI_URL` deviendrait l'option `--url` du collecteur
+ * Lighthouse (voir frontend/lighthouserc.cjs).
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -54,7 +58,7 @@ export const PROD_ORIGIN = 'https://kj-update-fevrier.vercel.app';
  * Exécute la vérification complète.
  *
  * @param {object} [options]
- * @param {string} [options.base]     Base du frontend servi (LHCI_URL).
+ * @param {string} [options.base]     Base du frontend servi (KOJO_LHCI_BASE_URL).
  * @param {string} [options.backend]  Base de l'API backend (KOJO_BACKEND_URL).
  * @param {string} [options.origin]   Origin attendu des cartes backend (KOJO_ORIGIN).
  * @param {boolean} [options.quiet]   Tait la sortie de progression (tests).
@@ -70,7 +74,7 @@ export const PROD_ORIGIN = 'https://kj-update-fevrier.vercel.app';
  *   localFallback: boolean, notices: string[]}>}
  */
 export async function runOgImageCheck({
-  base = process.env.LHCI_URL || DEFAULT_BASE,
+  base = process.env.KOJO_LHCI_BASE_URL || DEFAULT_BASE,
   backend = process.env.KOJO_BACKEND_URL || DEFAULT_BACKEND,
   origin = process.env.KOJO_ORIGIN || PROD_ORIGIN,
   quiet = false,
@@ -226,7 +230,7 @@ export async function runOgImageCheck({
   // croire que le chemin 200 a été validé serait pire que pas de check.
   //
   // Exception : sur le REPLI build local (preview Vercel indisponible ou
-  // protégée — LHCI_URL = http://localhost:4173), le chemin /jobs/:id n'existe
+  // protégée — KOJO_LHCI_BASE_URL = http://localhost:4173), le chemin /jobs/:id n'existe
   // pas : c'est le rewrite Vercel + le pré-rendu backend qui le servent, pas le
   // build statique (SPA fallback → index.html en 200, sans noindex). Les
   // assertions 404/noindex seraient donc des faux positifs → section ignorée.

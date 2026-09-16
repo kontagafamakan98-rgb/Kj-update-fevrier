@@ -426,7 +426,7 @@ export default defineConfig(({ mode }) => {
               + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">`
               + `<span class="text-white text-xl font-bold">K</span>`
               + `</div>`
-              + `<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h2>`
+              + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h1>`
               + `</div>`
               + `<form class="mt-8 space-y-6">`
               + `<div class="space-y-4">`
@@ -474,7 +474,7 @@ export default defineConfig(({ mode }) => {
               + `<div class="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">`
               + `<span class="text-white text-2xl font-bold">K</span>`
               + `</div>`
-              + `<h2 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h2>`
+              + `<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>`
               + `<p class="mt-2 text-sm text-gray-600">Rejoignez la communauté Kojo</p>`
               + `<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">`
               + `<div class="flex items-center justify-center py-2">`
@@ -571,7 +571,7 @@ export default defineConfig(({ mode }) => {
               + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">`
               + `<span class="text-white text-2xl font-bold">✉️</span>`
               + `</div>`
-              + `<h2 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h2>`
+              + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>`
               + `<p class="mt-3 text-sm text-gray-600">Recevez un code par email pour sécuriser votre compte et définir un nouveau mot de passe.</p>`
               + `</div>`
               + `<div class="bg-white rounded-2xl shadow-md p-6 space-y-6">`
@@ -614,6 +614,159 @@ export default defineConfig(({ mode }) => {
               + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">Voir les missions disponibles</div>`
               + `</div>`
               + `</div></div>`,
+            // HowItWorks : page PUBLIQUE de contenu, servie jusqu'ici par
+            // app.html — le gabarit NU (titre « Kojo », aucun h1, aucun
+            // canonical, 1 mot). Un crawler sans JavaScript n'y voyait donc
+            // RIEN, alors que la page explique le fonctionnement, le séquestre
+            // et répond aux questions fréquentes (matière à extraits
+            // enrichis). Le shell réplique les sections de
+            // src/pages/HowItWorks.js, avec les textes réels de fr.json (T()),
+            // dans le même ordre et les mêmes classes : la bascule au montage
+            // React est invisible.
+            'how-it-works': `<div class="h-16 bg-white border-b border-gray-200"></div>`
+              + `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white">`
+              + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center">`
+              + `<h1 class="text-3xl md:text-4xl font-bold mb-4">${esc(T('howItWorksTitle'))}</h1>`
+              + `<p class="text-lg opacity-90 max-w-2xl mx-auto">${esc(T('howItWorksHero'))}</p>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-white">`
+              + `<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">`
+              + `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`
+              + [
+                ['📝', 'howStep1Title', 'howStep1Desc'],
+                ['🛡️', 'howStep2Title', 'howStep2Desc'],
+                ['✅', 'howStep3Title', 'howStep3Desc'],
+              ]
+                .map(
+                  ([icon, titleKey, textKey]) =>
+                    `<div class="rounded-2xl border border-gray-100 shadow-sm p-6">` +
+                    `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${icon}</span></div>` +
+                    `<h2 class="text-lg font-semibold text-gray-900 text-center mb-3">${esc(T(titleKey))}</h2>` +
+                    `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
+                    `</div>`
+                )
+                .join('')
+              + `</div>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-gray-50">`
+              + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`
+              + `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">`
+              + `<div class="flex flex-col md:flex-row items-center gap-6">`
+              + `<div class="text-5xl">🛡️</div>`
+              + `<div>`
+              + `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowWhatTitle'))}</h2>`
+              + `<p class="text-emerald-800">${esc(T('escrowWhatText'))}</p>`
+              + `<ul class="mt-4 space-y-2 text-emerald-800 text-sm">`
+              + ['escrowGuarantee1', 'escrowGuarantee2', 'escrowGuarantee3', 'escrowGuarantee4']
+                .map((key) => `<li>${esc(T(key))}</li>`)
+                .join('')
+              + `</ul>`
+              + `</div>`
+              + `</div>`
+              + `</div>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-white">`
+              + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">`
+              + `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">${esc(T('faqTitle'))}</h2>`
+              + `<div class="space-y-4">`
+              + [1, 2, 3, 4, 5]
+                .map(
+                  (index) =>
+                    `<details class="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 group">` +
+                    `<summary class="cursor-pointer font-semibold text-gray-900 list-none flex items-center justify-between gap-4">` +
+                    `${esc(T(`faq${index}q`))}` +
+                    `<span class="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">+</span>` +
+                    `</summary>` +
+                    `<p class="mt-3 text-sm text-gray-600">${esc(T(`faq${index}a`))}</p>` +
+                    `</details>`
+                )
+                .join('')
+              + `</div>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">`
+              + `<div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">`
+              + `<h2 class="text-2xl md:text-3xl font-bold mb-4">${esc(T('readyToStart'))}</h2>`
+              + `<div class="flex flex-col sm:flex-row gap-4 justify-center">`
+              + `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transition">${esc(T('lookingForServices'))}</a>`
+              + `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T('offerServices'))}</a>`
+              + `</div>`
+              // Maillage interne : mêmes liens que ceux ajoutés au composant
+              // (HowItWorks.js) — les crawlers atteignent la liste des missions
+              // et le support depuis cette page de contenu.
+              + `<p class="mt-6 text-sm opacity-90">`
+              + `<a href="/jobs" class="underline underline-offset-2">${esc(T('viewJobs'))}</a>`
+              + ` · `
+              + `<a href="/support" class="underline underline-offset-2">${esc(T('support'))}</a>`
+              + `</p>`
+              + `</div>`
+              + `</section>`,
+            // Support : page PUBLIQUE (contact + suivi de ticket) qui était
+            // elle aussi servie par le gabarit nu. Le shell réplique l'état
+            // INITIAL de src/pages/Support.js (titre, carte de suivi vide,
+            // choix du canal, carte de contact) : même ordre, mêmes classes,
+            // mêmes hauteurs — le montage React ne décale rien.
+            support: `<div class="h-16 bg-white border-b border-gray-200"></div>`
+              + `<div class="max-w-2xl mx-auto px-4 py-8">`
+              + `<div class="mb-6 text-center">`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>`
+              + `<p class="text-gray-600">Une question, un problème ? Nous sommes là pour vous aider.</p>`
+              + `</div>`
+              + `<div class="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">`
+              + `<h2 class="text-lg font-semibold text-gray-900 mb-1">Suivre une demande existante</h2>`
+              + `<p class="text-sm text-gray-500 mb-4">Entrez votre n° de ticket et l'e-mail utilisé pour voir où en est votre demande.</p>`
+              + `<div class="flex flex-col sm:flex-row gap-2">`
+              + `<input type="text" readonly placeholder="N° de ticket (ex : 3fa85f64…)" aria-label="N° de ticket" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
+              + `<input type="email" readonly placeholder="Votre e-mail" aria-label="Votre e-mail" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
+              + `<div class="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white opacity-50">Vérifier le statut</div>`
+              + `</div>`
+              + `</div>`
+              + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`
+              + `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">`
+              + `<span class="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600">💬</span>`
+              + `<span class="font-semibold text-gray-900">Parler avec le robot</span>`
+              + `<span class="text-xs text-gray-500">L'assistant vous guide en quelques questions</span>`
+              + `</div>`
+              + `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">`
+              + `<span class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">📞</span>`
+              + `<span class="font-semibold text-gray-900">Contacter directement le support</span>`
+              + `<span class="text-xs text-gray-500">Appel, e-mail ou WhatsApp</span>`
+              + `</div>`
+              + `</div>`
+              + `<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">`
+              + `<h2 class="text-xl font-semibold text-gray-900 mb-1">Contacter directement le support</h2>`
+              + `<p class="text-sm text-gray-500 mb-5">Nous sommes joignables aux coordonnées ci-dessous.</p>`
+              + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
+              + `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Appeler</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
+              + `</a>`
+              + `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">WhatsApp</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
+              + `</a>`
+              + `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Envoyer un e-mail</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`
+              + `</a>`
+              + `<div class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`
+              + `</div>`
+              + `</div>`
+              + `</div>`
+              // Maillage interne : le support mène au fonctionnement du service
+              // et à la liste des missions (page utile pour un crawler qui
+              // arrive ici depuis une recherche de contact).
+              + `<p class="mt-6 text-center text-sm text-gray-500">`
+              + `<a href="/how-it-works" class="text-orange-600 underline underline-offset-2">${esc(T('howItWorksTitle'))}</a>`
+              + ` · `
+              + `<a href="/jobs" class="text-orange-600 underline underline-offset-2">${esc(T('viewJobs'))}</a>`
+              + `</p>`
+              + `</div>`,
           }
 
           const ROUTES = {
@@ -656,6 +809,22 @@ export default defineConfig(({ mode }) => {
               image: '/og-image-1200x630.png',
               imageSquare: '/og-square-1200x1200.png',
             },
+            // Titre et description repris À L'IDENTIQUE de ce que posent les
+            // pages au runtime (usePageTitle de HowItWorks.js / Support.js) :
+            // sinon un crawler sans JavaScript et un crawler qui exécute le JS
+            // liraient deux méta différentes pour la même URL.
+            'how-it-works': {
+              title: `${T('howItWorksTitle')} — Kojo`,
+              description: T('howItWorksHero'),
+              image: '/og-image-1200x630.png',
+              imageSquare: '/og-square-1200x1200.png',
+            },
+            support: {
+              title: `${T('support')} — Kojo`,
+              description: T('supportHelp'),
+              image: '/og-image-1200x630.png',
+              imageSquare: '/og-square-1200x1200.png',
+            },
           }
 
           // Remplace content="..." d'une meta mono ou multi-lignes.
@@ -680,6 +849,8 @@ export default defineConfig(({ mode }) => {
             register: /[\\/]pages[\\/]Register\.js$/,
             'forgot-password': /[\\/]pages[\\/]ForgotPassword\.js$/,
             payment: /[\\/]pages[\\/]Payment\.js$/,
+            'how-it-works': /[\\/]pages[\\/]HowItWorks\.js$/,
+            support: /[\\/]pages[\\/]Support\.js$/,
           }
           const chunkFiles = {}
           for (const [file, info] of Object.entries(bundle)) {
@@ -703,6 +874,14 @@ export default defineConfig(({ mode }) => {
               .replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${url}$2`)
             out = setMeta(out, 'og:title', meta.title)
             out = setMeta(out, 'og:description', meta.description)
+            // Description de la PAGE (et pas seulement og:description). Sans
+            // cette ligne, les sept pages pré-rendues héritaient de la
+            // description de l'accueil : pour un moteur, /jobs, /login,
+            // /register… décrivaient toutes la même chose. Le runtime ne la
+            // réécrit pas (usePageTitle n'est appelé avec une description que
+            // là où elle est identique à celle-ci) : statique et dynamique
+            // restent donc alignés.
+            out = setMeta(out, 'description', meta.description)
             out = setMeta(out, 'og:image', imageUrl)
             // Variante carrée : la carte carrée STATIQUE de la home (présente
             // dans index.html) est REMPLACÉE par celle de la route (bloc
@@ -764,9 +943,13 @@ export default defineConfig(({ mode }) => {
           fs.writeFileSync(indexPath, withHomeShell, 'utf8')
 
           // ── Gabarit des routes CLIENTES : app.html ──────────────────────
-          // Les routes sans pré-rendu (/dashboard, /profile, /support,
-          // /how-it-works, /messages, /create-job…) n'ont AUCUN contenu
-          // statique propre : leur servir index.html reviendrait à publier le
+          // Les routes sans pré-rendu (/dashboard, /profile, /messages,
+          // /create-job, /commission-dashboard…) n'ont AUCUN contenu statique
+          // propre — et aucune raison d'être indexées : ce sont des écrans
+          // connectés (noindex par X-Robots-Tag dans vercel.json). Les pages
+          // PUBLIQUES de contenu (/how-it-works, /support) ont, elles, leur
+          // propre shell depuis qu'elles ne doivent plus apparaître vides.
+          // Leur servir index.html reviendrait à publier le
           // shell de l'ACCUEIL sur dix URL différentes — h1, 300+ mots et
           // liens internes de la home servis sous l'adresse /dashboard, c'est
           // du contenu dupliqué (le défaut exact que l'audit SEO reprochait à
