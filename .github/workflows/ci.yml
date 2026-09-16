@@ -337,6 +337,34 @@ jobs:
         working-directory: frontend
         run: node scripts/check-og-assets.js
 
+      # Garde-fou de la famille « icônes » : les icônes PWA et le favicon clair,
+      # produits par public/icons/generate_icons.py. Ce générateur est en stdlib
+      # pure (ni police, ni Pillow), donc son résultat est comparable sur ce
+      # runner — encore faut-il comparer la bonne chose : la zlib variant d'une
+      # installation à l'autre, les OCTETS d'un PNG regénéré diffèrent de ceux
+      # committés alors que les PIXELS sont identiques (mesuré : 101 592 contre
+      # 101 049). Le check compare donc les empreintes de PIXELS du manifeste,
+      # REJOUE le générateur en dossier temporaire, et échoue aussi sur un
+      # favicon.ico invalide (celui qui était committé faisait 100 octets de
+      # zéros, alors qu'index.html le référence comme favicon principal), sur une
+      # copie qui diverge, sur un actif sans générateur modifié et sur une icône
+      # qui n'est déclarée par personne.
+      - name: Check generated icons family (pixels + manifest)
+        working-directory: frontend
+        run: node scripts/check-generated-icons.js
+
+      # Garde-fou du manifeste PWA : il déclarait « any maskable » sur ses deux
+      # icônes alors qu'AUCUNE ne tenait dans la zone de sécurité (contenu à un
+      # rayon de 0,495 pour une limite de 0,400) et que le fichier « -maskable »
+      # invoqué était un duplicata au pixel près de l'icône normale. Le check
+      # croise manifest.json avec l'inventaire de la famille (existence,
+      # dimensions, type, purpose) et exige qu'un « maskable » soit PROUVÉ par
+      # la mesure, dans les deux sens : aucune fausse revendication, et aucune
+      # variante fabriquée pour le masque qui ne serait jamais servie.
+      - name: Check PWA manifest (declared icons + maskable safe zone)
+        working-directory: frontend
+        run: node scripts/check-pwa-manifest.js
+
       # Budgets RÉELS (JS initial, plus gros chunk, build total) : l'ancienne
       # version se contentait d'afficher `du -sh build/` et ne pouvait donc
       # jamais échouer — un bundle doublé passait en vert. Les seuils sont
@@ -346,6 +374,99 @@ jobs:
       - name: Check bundle size
         working-directory: frontend
         run: node scripts/check-bundle-size.js
+
+  # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
+  # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou
+  # « dépassé ») : il ne dit pas COMBIEN un changement coûte, et ses seuils
+  # (~30-40 % de marge) laissent passer une dérive. Ce job publie les trois
+  # mesures réelles avec leur écart :
+  #   • vs la dernière mesure de `main` — « l'effet de cette PR par rapport à
+  #     la base », la référence étant transportée par le cache Actions ;
+  #   • vs la mesure précédente de CETTE PR — relue dans la charge utile du
+  #     commentaire précédent, donc « depuis le dernier push ».
+  # Si une référence manque, la colonne est omise et la raison est écrite
+  # dans le commentaire : un écart calculé contre une référence douteuse
+  # serait pire que pas d'écart du tout.
+  #
+  # Job ADVISORY : il ne fait PAS partie des 8 checks requis de la protection
+  # de branche, donc un échec ici ne bloque aucune fusion. Les mesures sont de
+  # toute façon écrites dans le résumé du run ($GITHUB_STEP_SUMMARY) : le
+  # commentaire n'est qu'un canal plus lisible, pas la seule trace.
+  bundle-size-report:
+    name: Bundle size report (PR comment)
+    runs-on: ubuntu-latest
+    needs: frontend-build
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Même commande et même env que frontend-build : les artefacts ne sont
+      # pas partagés entre jobs (aucun upload de build/), donc on rebuild —
+      # mais avec exactement les mêmes entrées, sinon les tailles mesurées ici
+      # et celles du garde ne seraient pas comparables entre elles.
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://kojo-backend.fly.dev/api
+        run: npm run build
+
+      # Référence = dernière mesure de `main`. La clé embarque le SHA (donc
+      # n'est jamais réutilisée telle quelle) et `restore-keys` sélectionne la
+      # plus récente : sur une PR, GitHub autorise la restauration des caches
+      # de la branche de base — c'est exactement « la mesure de main ».
+      # Absente au tout premier run : le rapport le dit au lieu d'inventer un
+      # écart (« première mesure »).
+      - name: Restore size baseline (main)
+        uses: actions/cache/restore@v4
+        with:
+          path: frontend/.bundle-size
+          key: bundle-size-baseline-${{ github.sha }}
+          restore-keys: |
+            bundle-size-baseline-
+
+      # Au premier run de `main`, .bundle-size/baseline.json n'existe pas : le
+      # script le détecte (existsSync) et rend un rapport sans écarts.
+      - name: Mesurer, comparer et publier (commentaire de PR)
+        working-directory: frontend
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node scripts/bundle-size-report.js \
+            --baseline .bundle-size/baseline.json \
+            --out .bundle-size/current.json \
+            --markdown .bundle-size/comment.md \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --post
+
+      # La mesure du run devient la référence des runs suivants — sur `main`
+      # UNIQUEMENT : sauvegarder aussi depuis les PR ferait proliférer des
+      # caches par PR et fausserait « la mesure de main ».
+      - name: Publish size baseline (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: frontend
+        run: cp .bundle-size/current.json .bundle-size/baseline.json
+
+      - name: Save size baseline (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: frontend/.bundle-size
+          key: bundle-size-baseline-${{ github.sha }}
 
   # ─── Performance : budgets Lighthouse CI (accueil + pages protégées) ─────
   # Audite le DÉPLOIEMENT VERCEL RÉEL en condition mobile simulée (Slow 4G
@@ -593,14 +714,20 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      # chmod défensif : le bit exécutable peut être perdu selon l'OS
-      # d'origine du commit (ici : Windows). Le fix durable est le mode
-      # 100755 sur gradlew dans git.
+      # Pas de `chmod +x gradlew` ici : le bit exécutable est porté par git
+      # (mode 100755 sur frontend/android/gradlew, commit dcb4e43) et le
+      # checkout des runners Linux le restitue — le mode du blob est 0755, donc
+      # ./gradlew s'exécute directement. Un chmod défensif faisait plus de mal
+      # que de bien : il rendait VERT un job dont le bit avait été perdu et
+      # masquait la régression. S'il disparaît à nouveau, ce step échouera sur
+      # « Permission denied » — c'est la détection voulue, la corriger est un
+      # `git update-index --chmod=+x frontend/android/gradlew`.
+      # Le shebang est protégé en parallèle par .gitattributes (`gradlew
+      # text eol=lf`) : un shebang en CRLF ferait échouer l'exécution même
+      # avec le bit présent.
       - name: Build debug APK
         working-directory: frontend/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
 
   # ─── Backend : déploiement Fly.io (verrouillé sur les tests backend) ─────
   # Déployé à chaque push sur main qui touche backend/ — MAIS uniquement si

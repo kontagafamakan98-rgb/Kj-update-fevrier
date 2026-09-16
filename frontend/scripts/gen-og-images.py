@@ -17,14 +17,38 @@ sombres (onglets navigateur en mode sombre, cartes de partage sur fond foncé).
 
 Usage (Pillow) :
     cd frontend && ../backend/.venv/Scripts/python scripts/gen-og-images.py
+
+Le script écrit aussi un MANIFESTE (scripts/og-assets.manifest.json) :
+dimensions, taille et empreinte SHA-256 de chaque PNG, empreinte de ce script,
+et polices réellement retenues. C'est ce manifeste que le garde CI
+(scripts/check-og-assets.js) confronte aux fichiers versionnés : une carte
+modifiée à la main, un texte changé sans régénération, ou des cartes
+régénérées avec une AUTRE police (aspect différent) font échouer la CI sans
+qu'il soit besoin de disposer des polices sur le runner.
+
+Options (pour régénérer ailleurs sans toucher à public/) :
+    --out-dir <dossier>   dossier de sortie des PNG (défaut : public/)
+    --manifest <fichier>  chemin du manifeste (défaut : scripts/og-assets.manifest.json)
 """
+import argparse
+import hashlib
+import json
 import os
 
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1200, 630
 SQUARE = 1200
+FAVICON = 512
+FAVICON_PATH = os.path.join('icons', 'icon-dark.png')
 OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
+MANIFEST_NAME = 'og-assets.manifest.json'
+MANIFEST_PATH = os.path.join(os.path.dirname(__file__), MANIFEST_NAME)
+
+# Polices réellement retenues, par graisse. Consignées dans le manifeste pour
+# que la CI puisse refuser des cartes régénérées avec une autre police :
+# l'image serait « à jour » du point de vue des fichiers, mais l'aspect des
+# cartes de partage aurait changé en silence.
 
 # --- Palette : même dégradé que la hero (orange-600 → red-600) ---
 TOP = (234, 88, 12)    # orange-600
@@ -55,6 +79,9 @@ def make_overlay(width, height):
     return overlay
 
 
+RESOLVED_FONTS = {}
+
+
 def load_font(size, bold=False):
     candidates = [
         "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",
@@ -62,11 +89,15 @@ def load_font(size, bold=False):
         "C:/Windows/Fonts/DejaVuSans-Bold.ttf" if bold else "C:/Windows/Fonts/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
+    weight = 'bold' if bold else 'regular'
     for p in candidates:
         try:
-            return ImageFont.truetype(p, size)
+            font = ImageFont.truetype(p, size)
+            RESOLVED_FONTS[weight] = os.path.basename(p)
+            return font
         except Exception:
             continue
+    RESOLVED_FONTS[weight] = 'PIL-default'
     return ImageFont.load_default()
 
 
@@ -235,25 +266,95 @@ SQUARE_VARIANTS = {
 }
 
 
-def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
+def manifest_entry(out_dir, rel_path, width, height, kind):
+    """Une carte du manifeste : dimensions, taille et empreinte du PNG écrit."""
+    with open(os.path.join(out_dir, rel_path), 'rb') as handle:
+        data = handle.read()
+    return {
+        'file': rel_path.replace(os.sep, '/'),
+        'width': width,
+        'height': height,
+        'format': kind,
+        'bytes': len(data),
+        'sha256': hashlib.sha256(data).hexdigest(),
+    }
+
+
+def generator_sha256(path):
+    """Empreinte du générateur : son contenu NORMALISÉ en LF, jamais ses octets bruts.
+
+    Le fin de ligne d'une copie de travail n'est pas une propriété du code : un
+    poste Windows matérialise les fichiers texte en CRLF, la CI Linux en LF, donc
+    hacher les octets bruts faisait dépendre le manifeste de la plateforme qui
+    l'a produit — la CI, qui lit le blob LF, croyait alors le manifeste périmé.
+    Ce script vit sous frontend/scripts/** (déjà figé en LF par .gitattributes),
+    mais la règle est ici pour que l'identité du générateur soit la même partout,
+    quel que soit le réglage `core.autocrlf` du poste qui régénère.
+    """
+    data = open(path, 'rb').read().replace(b'\r\n', b'\n')
+    return hashlib.sha256(data).hexdigest()
+
+
+def write_manifest(out_dir, manifest_path):
+    """Écrit le manifeste de reproductibilité que la CI confronte aux fichiers.
+
+    Aucune donnée volatile (date, version de Pillow) n'y figure : deux
+    exécutions dans le même environnement produisent le même fichier, donc le
+    manifeste ne bouge que si les cartes, leur contenu ou les polices changent.
+    """
+    assets = (
+        [manifest_entry(out_dir, name, W, H, 'wide') for name in VARIANTS]
+        + [manifest_entry(out_dir, name, SQUARE, SQUARE, 'carré') for name in SQUARE_VARIANTS]
+        + [manifest_entry(out_dir, FAVICON_PATH, FAVICON, FAVICON, 'favicon sombre')]
+    )
+    manifest = {
+        'generator': os.path.basename(__file__),
+        'generator_sha256': generator_sha256(__file__),
+        'fonts': {weight: RESOLVED_FONTS.get(weight) for weight in ('regular', 'bold')},
+        'assets': assets,
+    }
+    with open(manifest_path, 'w', encoding='utf-8', newline='\n') as handle:
+        json.dump(manifest, handle, indent=2, sort_keys=True, ensure_ascii=False)
+        handle.write('\n')
+    return manifest
+
+
+def main(out_dir=None, manifest_path=None):
+    out_dir = out_dir or OUT_DIR
+    manifest_path = manifest_path or MANIFEST_PATH
+    os.makedirs(out_dir, exist_ok=True)
     for filename, opts in VARIANTS.items():
         img = render_wide(**opts)
-        out = os.path.join(OUT_DIR, filename)
+        out = os.path.join(out_dir, filename)
         img.save(out, "PNG", optimize=True)
         print("OK ->", out, img.size)
     for filename, wide_name in SQUARE_VARIANTS.items():
         opts = VARIANTS[wide_name]
         img = render_square(**opts)
-        out = os.path.join(OUT_DIR, filename)
+        out = os.path.join(out_dir, filename)
         img.save(out, "PNG", optimize=True)
         print("OK ->", out, img.size)
-    favicon = make_dark_favicon(512)
-    out = os.path.join(OUT_DIR, 'icons', 'icon-dark.png')
+    favicon = make_dark_favicon(FAVICON)
+    out = os.path.join(out_dir, FAVICON_PATH)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     favicon.save(out, "PNG", optimize=True)
     print("OK ->", out, favicon.size)
 
+    manifest = write_manifest(out_dir, manifest_path)
+    print("MANIFESTE ->", manifest_path, "(%d cartes)" % len(manifest['assets']))
+
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(
+        description="Génère les cartes Open Graph de Kojo et leur manifeste de reproductibilité."
+    )
+    parser.add_argument(
+        "--out-dir", default=None,
+        help="dossier de sortie des PNG (défaut : public/)",
+    )
+    parser.add_argument(
+        "--manifest", default=None,
+        help="chemin du manifeste (défaut : scripts/og-assets.manifest.json)",
+    )
+    arguments = parser.parse_args()
+    main(out_dir=arguments.out_dir, manifest_path=arguments.manifest)

@@ -198,14 +198,39 @@ curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 
 
 ## CI
 
-`.github/workflows/ci.yml` (3 jobs) :
-- **backend-tests** : tests contre un vrai MongoDB (service container),
+`.github/workflows/ci.yml` (9 jobs, dont 8 requis sur `main`) :
+
+- **audit-regression-test** — méta-test : injecte une régression et exige que
+  chaque garde (docstrings, endpoints fantômes, `py_compile`, pyflakes) échoue.
+  Sans lui, un garde devenu aveugle resterait vert.
+- **workflow-lint** — `actionlint` sur les workflows + `shellcheck` sur les
+  scripts shell.
+- **fly-env-drift** — formats des références du dépôt (déterministe, sans
+  réseau), puis `fly.toml` ↔ runtime Fly : secrets obligatoires, doublons,
+  orphelins.
+- **backend-tests** — `pytest` contre un vrai MongoDB (service container),
   syntaxe Python (`py_compile`), **pyflakes (aucun nom non défini dans les
   modules `kojo_*` — garde-fou contre les imports manquants du découpage)**
-- **frontend-build** : tests Vitest + build Vite sur Node 24
-- **mobile-build** : `cap sync android` + build APK debug (Gradle 8.14 /
+- **frontend-build** — tests Vitest + build Vite sur Node 24, puis 7 gardes sur
+  les artefacts (shells de pré-rendu, splits i18n et `services/api`, cartes OG,
+  famille d'icônes, manifeste PWA, budgets de bundle)
+- **bundle-size-report** — publie en commentaire de PR les trois tailles
+  mesurées (JS initial, plus gros chunk, build total) avec l'écart vs la
+  dernière mesure de `main` et vs la mesure précédente de la PR. **Consultatif**
+  (hors checks requis) : il informe, le garde qui bloque est `check-bundle-size`
+- **lighthouse-ci** — budgets de performance sur l'accueil et les pages
+  protégées, authentifiées via le compte CI dédié (droits sur l'URL Vercel)
+- **mobile-build** — `cap sync android` + build APK debug (Gradle 8.14 /
   AGP 8.13, **Java 21** — requis par Capacitor 8, SDK Android) — valide la
   config Capacitor à chaque push
+- **deploy-fly** — `flyctl deploy` sur `main` uniquement, et seulement si
+  `backend/**` change
+
+> Ce que chaque job **prouve** réellement — et les cas où il peut réussir sans
+> rien vérifier (repli Lighthouse sur le build local, verrou `/jobs/:id`
+> désactivé, `deploy-fly` sauté faute de changement backend, budgets très
+> permissifs…) — est recensé dans [`CI-COVERAGE.md`](CI-COVERAGE.md), à relire
+> avant de conclure qu'un ✓ suffit.
 
 ## Branches
 
@@ -237,7 +262,9 @@ autrement que par une PR dont les 8 checks CI sont verts**. Concrètement :
   (`GH006: Protected branch update failed … Changes must be made through a pull
   request`), même pour l'administrateur du dépôt (protection appliquée aussi
   aux admins : impossible de la contourner « par erreur »).
-- **8 checks requis**, exactement les jobs du workflow `CI` : `Audits détectent
+- **8 checks requis** — le workflow en compte **9** : `Bundle size report (PR
+  comment)` en est volontairement **exclu** (il publie des mesures, il ne juge
+  rien) : `Audits détectent
   les régressions`, `Backend tests (Python + MongoDB)`, `Fly env doc-prod (drift
   + secrets)`, `Frontend tests + build (Node/Vite)`, `Lighthouse performance
   budgets`, `Mobile build (Capacitor + Android)`, `Workflow lint (actionlint +
@@ -256,7 +283,7 @@ autrement que par une PR dont les 8 checks CI sont verts**. Concrètement :
 > déploiement est bien visible dans l'historique des checks.
 
 Aucun filtre de chemins n'existe au niveau du workflow : **toute** PR vers
-`main` déclenche ces 8 jobs, donc un check requis n'est jamais « en attente »
+`main` déclenche ces 9 jobs, donc un check requis n'est jamais « en attente »
 indéfiniment (cas typique de blocage avec une protection de branche).
 
 Pour modifier temporairement la règle (par ex. débloquer une urgence), passer

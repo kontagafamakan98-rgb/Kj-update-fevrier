@@ -12,7 +12,12 @@
  *
  * Ce check :
  *   1. n'accepte QU'UN générateur OG dans scripts/ — deux scripts de
- *      génération finissent toujours par produire des cartes divergentes ;
+ *      génération finissent toujours par produire des cartes divergentes.
+ *      La détection se fait à deux étages : par le NOM (jeton « og » + verbe
+ *      de production, quelle que soit l'extension de script) et, pour un nom
+ *      anodin, par le CONTENU (le fichier écrit une image ET vise une carte
+ *      OG). Les scripts OG qui ne font que LIRE les cartes — les checkers —
+ *      sont déclarés explicitement dans OG_READ_ONLY_SCRIPTS ;
  *   2. lit le MANIFESTE DANS le générateur lui-même (dimensions des formats
  *      wide/carré, pages couvertes, taille du favicon) : aucune constante
  *      n'est dupliquée ici, donc le check ne peut pas diverger du script ;
@@ -20,16 +25,96 @@
  *      chunk IHDR) et porte EXACTEMENT les dimensions déclarées ;
  *   4. refuse tout og-*.png ORPHELIN dans public/ (présent mais absent du
  *      manifeste) : c'est un reliquat que le générateur ne sait pas reproduire.
+ *   5. confronte le MANIFESTE de reproductibilité (écrit par le générateur) aux
+ *      fichiers commités : empreinte SHA-256 de chaque carte, empreinte du
+ *      générateur, polices retenues. C'est ce qui rend la divergence — carte
+ *      retouchée à la main, texte changé sans régénération, cartes refaites
+ *      ailleurs avec une AUTRE police — détectable sur n'importe quel runner,
+ *      sans dépendre des polices installées.
  *
  * Usage : cd frontend && node scripts/check-og-assets.js
  */
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const GENERATOR_NAME = 'gen-og-images.py';
 
+// Scripts OG qui NE génèrent RIEN : ils LISENT les cartes pour les vérifier.
+// La liste est volontairement explicite, pour que la règle reste lisible :
+// tout script OG qui n'y figure pas est suspect d'être une seconde source de
+// vérité. Elle est verrouillée par un test de non-rot (chaque entrée doit
+// exister sur le disque, sinon la liste se remplirait de fantômes).
+export const OG_READ_ONLY_SCRIPTS = [
+  'check-og-assets.js',
+  'check-og-images.js',
+  'check-og-job-200.js',
+];
+
+const SCRIPT_EXTENSIONS = ['.py', '.js', '.mjs', '.cjs', '.ts', '.sh'];
+
+export const MANIFEST_NAME = 'og-assets.manifest.json';
+
+// Polices de l'environnement de RÉFÉRENCE : celles qui ont produit les PNG
+// commités (poste Windows, Arial). Le générateur retombe sinon sur DejaVu
+// (Linux) ou sur la police bitmap de Pillow, avec un aspect différent à
+// l'arrivée : le manifeste consigne la police retenue et ce garde refuse le
+// changement tant qu'il n'est pas assumé ici, en connaissance de cause.
+export const REFERENCE_FONTS = { regular: 'arial.ttf', bold: 'arialbd.ttf' };
+
+/**
+ * Étage 1 — le NOM. Un générateur doit le dire : un jeton « og » ET un verbe
+ * de production, dans n'importe quel ordre et pour n'importe quelle extension.
+ * C'est ce qui rattrape « generate-og-cards.py », « og-generator.py »,
+ * « build-og.js » ou « make-og-images.sh », que l'ancien motif
+ * /^gen[-_]?og.*\.py$/ (gen+og en tête, Python uniquement) laissait passer.
+ */
+export const nameLooksLikeOgGenerator = (name) => {
+  const ext = path.extname(name).toLowerCase();
+  if (!SCRIPT_EXTENSIONS.includes(ext)) return false;
+  const stem = name.slice(0, name.length - ext.length).toLowerCase();
+  const hasOgToken = /(?:^|[-_.])og(?:[-_.]|$)/.test(stem);
+  const hasVerb = /(?:^|[-_.])(?:gen|generate|generator|make|build|create|render|export)(?:[-_.]|$)/.test(
+    stem
+  );
+  return hasOgToken && hasVerb;
+};
+
+/**
+ * Étage 2 — le CONTENU, pour les noms qui ne disent rien (« cards.py »). Il
+ * faut les DEUX signaux : écrire une image (API d'écriture) ET viser une carte
+ * OG. Exiger les deux évite de confondre un lecteur qui mentionne forcément
+ * « og-*.png » avec un producteur ; les checkers connus sont de toute façon
+ * hors périmètre via OG_READ_ONLY_SCRIPTS.
+ */
+const WRITES_IMAGE = /\.save\(|writeFileSync\(|writeFile\(|createWriteStream\(|\.toBuffer\(|\.toFile\(|Image\.new\(|sharp\(/;
+const MENTIONS_OG_ASSET = /og-[a-z0-9-]*\.png|public\/og/i;
+
+export const contentLooksLikeOgGenerator = (source) =>
+  WRITES_IMAGE.test(source) && MENTIONS_OG_ASSET.test(source);
+
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Empreinte du générateur : son contenu NORMALISÉ en LF, jamais ses octets bruts.
+ *
+ * Le fin de ligne d'une copie de travail n'est pas une propriété du code. Un
+ * poste Windows matérialise les fichiers texte en CRLF, la CI Linux en LF : le
+ * même commit produisait donc deux empreintes, et la CI — qui lit le blob LF —
+ * croyait le manifeste périmé et refusait. Ce script vit sous
+ * frontend/scripts/** (déjà figé en LF par .gitattributes), mais la règle est
+ * ici pour que l'identité du générateur soit la même partout, quel que soit le
+ * réglage `core.autocrlf` du poste qui régénère.
+ *
+ * Le passage par latin1 (bijectif octet ↔ caractère) garantit que la
+ * normalisation reste strictement au niveau OCTET, sans supposer d'encodage —
+ * identique au `read_bytes().replace(b"\r\n", b"\n")` du générateur Python.
+ */
+const generatorFingerprint = (filePath) =>
+  createHash('sha256')
+    .update(Buffer.from(readFileSync(filePath).toString('latin1').replace(/\r\n/g, '\n'), 'latin1'))
+    .digest('hex');
 
 // Les clés d'un dictionnaire Python de premier niveau sont indentées de 4
 // espaces ; le bloc s'ouvre sur « Nom = { » en colonne 0 et se ferme sur une
@@ -72,33 +157,69 @@ export const runOgAssetsCheck = (opts = {}) => {
   // ── 1. Un seul générateur OG ──────────────────────────────────────────────
   // Toute variante de nom (gen_og_image.py, gen-og-cards.py, …) est détectée :
   // un second script signifierait deux sources de vérité pour les mêmes cartes.
-  const ogGenerators = readdirSync(scriptsDir)
-    .filter((name) => /^gen[-_]?og.*\.py$/i.test(name))
+  // Seuls les FICHIERS du dossier sont inspectés : le sous-dossier __tests__
+  // contient les fixtures du présent garde (noms de générateurs en chaînes,
+  // appels d'écriture factices) et ne doit évidemment pas se dénoncer lui-même.
+  const scriptFiles = readdirSync(scriptsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
     .sort();
 
-  if (!ogGenerators.includes(GENERATOR_NAME)) {
+  const hasCanonicalGenerator = scriptFiles.includes(GENERATOR_NAME);
+  if (!hasCanonicalGenerator) {
     fail(
       `générateur canonique absent : scripts/${GENERATOR_NAME} doit rester la ` +
         `source de vérité des cartes Open Graph`
     );
   }
-  const extraGenerators = ogGenerators.filter((name) => name !== GENERATOR_NAME);
-  if (extraGenerators.length > 0) {
-    fail(
-      `second générateur OG détecté (${extraGenerators.join(', ')}) : ` +
-        `une seule source de vérité est autorisée, scripts/${GENERATOR_NAME}`
-    );
+
+  for (const name of scriptFiles) {
+    if (name === GENERATOR_NAME) continue;
+    if (OG_READ_ONLY_SCRIPTS.includes(name)) continue;
+
+    let source = '';
+    try {
+      source = readFileSync(path.join(scriptsDir, name), 'utf8');
+    } catch {
+      // Fichier illisible (binaire, permissions) : le nom reste le seul signal.
+    }
+
+    if (nameLooksLikeOgGenerator(name)) {
+      fail(
+        `second générateur OG détecté (${name}) : son nom annonce un ` +
+          `générateur, or une seule source de vérité est autorisée, ` +
+          `scripts/${GENERATOR_NAME} — s'il ne fait que LIRE les cartes, ` +
+          `déclare-le dans OG_READ_ONLY_SCRIPTS`
+      );
+      continue;
+    }
+
+    if (contentLooksLikeOgGenerator(source)) {
+      fail(
+        `second générateur OG détecté (${name}) : ce fichier écrit une carte ` +
+          `OG, or une seule source de vérité est autorisée, ` +
+          `scripts/${GENERATOR_NAME} — s'il ne fait que LIRE les cartes, ` +
+          `déclare-le dans OG_READ_ONLY_SCRIPTS`
+      );
+    }
   }
 
   // ── 2. Manifeste lu dans le générateur ────────────────────────────────────
   const assets = [];
-  if (ogGenerators.includes(GENERATOR_NAME)) {
+  if (hasCanonicalGenerator) {
     const source = readFileSync(generatorPath, 'utf8');
 
     const wide = source.match(/^W,\s*H\s*=\s*(\d+),\s*(\d+)\s*$/m);
     const square = source.match(/^SQUARE\s*=\s*(\d+)\s*$/m);
-    const favicon = source.match(/make_dark_favicon\((\d+)\)/);
-    const faviconPath = source.match(/os\.path\.join\(OUT_DIR,\s*'([^']+)',\s*'([^']+)'\)/);
+    // La taille/le chemin du favicon peuvent être littéraux ou passer par les
+    // constantes du script (FAVICON, FAVICON_PATH) : les deux formes sont
+    // acceptées, sans quoi une extraction par simple retrait de constante
+    // ferait échouer le check pour de mauvaises raisons.
+    const favicon =
+      source.match(/make_dark_favicon\(\s*(\d+)\s*\)/) || source.match(/^FAVICON\s*=\s*(\d+)\s*$/m);
+    const faviconPath =
+      source.match(/os\.path\.join\(\s*OUT_DIR\s*,\s*'([^']+)',\s*'([^']+)'\s*\)/) ||
+      source.match(/^FAVICON_PATH\s*=\s*os\.path\.join\('([^']+)',\s*'([^']+)'\)\s*$/m);
     const widePages = blockKeys(source, 'VARIANTS');
     const squarePages = blockKeys(source, 'SQUARE_VARIANTS');
 
@@ -165,17 +286,120 @@ export const runOgAssetsCheck = (opts = {}) => {
     );
   }
 
+  // ── 5. Manifeste de reproductibilité confronté aux fichiers commités ──────
+  // Le générateur consigne à chaque exécution l'empreinte SHA-256 de chaque
+  // carte, la sienne et les polices retenues. Ces vérifications tournent sur
+  // n'importe quel runner (aucune police requise) : elles détectent la
+  // divergence RÉELLE entre les PNG versionnés et ce que le générateur produit.
+  const manifestPath = path.join(scriptsDir, MANIFEST_NAME);
+  if (!existsSync(manifestPath)) {
+    fail(
+      `manifeste ${MANIFEST_NAME} absent : exécute scripts/${GENERATOR_NAME} ` +
+        `puis committe le manifeste (c'est l'empreinte des cartes versionnées)`
+    );
+  } else {
+    let manifest = null;
+    try {
+      manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    } catch (error) {
+      fail(`${MANIFEST_NAME} illisible (JSON invalide) : ${error.message}`);
+    }
+
+    if (manifest) {
+      // 5a. Le générateur n'a pas changé depuis la génération des cartes.
+      if (existsSync(generatorPath)) {
+        const generatorSha = generatorFingerprint(generatorPath);
+        if (manifest.generator_sha256 !== generatorSha) {
+          fail(
+            `scripts/${GENERATOR_NAME} a changé depuis la dernière génération : ` +
+              `relance-le et committe le manifeste (et les PNG s'ils bougent)`
+          );
+        }
+      }
+
+      // 5b. Les cartes n'ont pas été refaites avec une autre police.
+      const fonts = manifest.fonts || {};
+      for (const [weight, expected] of Object.entries(REFERENCE_FONTS)) {
+        const recorded = fonts[weight];
+        if (recorded !== expected) {
+          fail(
+            `cartes générées avec la police « ${recorded} » (${weight}) au lieu de la ` +
+              `référence « ${expected} » : l'aspect des cartes de partage change — ` +
+              `régénère sur un poste avec la police de référence, ou mets à jour ` +
+              `REFERENCE_FONTS en connaissance de cause`
+          );
+        }
+      }
+
+      // 5c. Chaque carte commitée correspond à son empreinte.
+      const entries = Array.isArray(manifest.assets) ? manifest.assets : [];
+      const byFile = new Map(entries.map((entry) => [entry.file, entry]));
+      for (const asset of assets) {
+        const entry = byFile.get(asset.file);
+        if (!entry) {
+          fail(
+            `${MANIFEST_NAME} ne décrit pas public/${asset.file} : manifeste ` +
+              `périmé, relance scripts/${GENERATOR_NAME}`
+          );
+          continue;
+        }
+        const filePath = path.join(publicDir, asset.file);
+        if (!existsSync(filePath)) continue; // déjà signalé en 3.
+        const data = readFileSync(filePath);
+        const sha256 = createHash('sha256').update(data).digest('hex');
+        if (entry.sha256 !== sha256) {
+          fail(
+            `public/${asset.file} ne correspond plus au manifeste ` +
+              `(empreinte ${sha256.slice(0, 12)}… ≠ ${String(entry.sha256).slice(0, 12)}…) : ` +
+              `carte retouchée à la main ou non régénérée — relance ` +
+              `scripts/${GENERATOR_NAME} ; pour PROUVER la reproduction exacte sur ` +
+              `un poste avec la police de référence : node scripts/check-og-reproducible.js`
+          );
+          continue;
+        }
+        if (entry.bytes !== data.length) {
+          fail(
+            `public/${asset.file} : ${data.length} octets ≠ ${entry.bytes} annoncés par ` +
+              `${MANIFEST_NAME}`
+          );
+        }
+        if (entry.width !== asset.width || entry.height !== asset.height) {
+          fail(
+            `public/${asset.file} : dimensions du manifeste (${entry.width}×${entry.height}) ` +
+              `≠ celles déclarées par ${GENERATOR_NAME} (${asset.width}×${asset.height})`
+          );
+        }
+      }
+
+      // 5d. Le manifeste ne décrit pas de carte que le générateur a abandonnée.
+      if (hasCanonicalGenerator && assets.length > 0) {
+        const declared = new Set(assets.map((asset) => asset.file));
+        for (const entry of entries) {
+          if (!declared.has(entry.file)) {
+            fail(
+              `${MANIFEST_NAME} décrit ${entry.file}, que ${GENERATOR_NAME} ne déclare ` +
+                `plus : manifeste périmé`
+            );
+          }
+        }
+      }
+    }
+  }
+
   if (errors.length > 0) {
     logError(`❌ Cartes Open Graph non conformes (${errors.length} problème(s)) :`);
     for (const message of errors) logError(`   • ${message}`);
     return { ok: false, errors, assets };
   }
 
-  log(`Générateur unique : scripts/${GENERATOR_NAME} (${assets.length} PNG déclarés)`);
+  log(
+    `Générateur unique : scripts/${GENERATOR_NAME} ` +
+      `(${scriptFiles.length} fichiers inspectés, ${assets.length} PNG déclarés)`
+  );
   log(lines.join('\n'));
   log(
     `✅ Cartes Open Graph verrouillées : 1 seul générateur, ${assets.length} PNG aux ` +
-      `dimensions déclarées, aucun og-*.png orphelin dans public/`
+      `dimensions déclarées, empreintes conformes à ${MANIFEST_NAME}, aucun orphelin`
   );
   return { ok: true, errors, assets };
 };
