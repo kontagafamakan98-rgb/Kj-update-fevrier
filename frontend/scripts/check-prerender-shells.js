@@ -2,9 +2,13 @@
 /**
  * Vérifie que le pré-rendu par route est INTACT après `vite build` :
  *
- *   • build/index.html  → <div id="root"></div> VIDE (le shell SPA doit
- *     rester vide : React monte dans #root — du contenu statique ajouté ici
- *     casserait le montage ou créerait un double rendu).
+ *   • build/index.html  → #root contient le shell statique de l'ACCUEIL
+ *     (h1 + contenu + liens : c'est ce que voit un crawler sans JavaScript,
+ *     et le LCP de la page). index.html n'est plus servi que pour « / » —
+ *     le catch-all SPA ayant été retiré (une URL inconnue doit répondre 404),
+ *     le shell de l'accueil ne peut plus être peint à tort sur /dashboard.
+ *     React remplace ce contenu au montage (createRoot efface #root), comme
+ *     pour les pages ci-dessous.
  *   • build/jobs.html   → #root contient le shell h1 statique « Emplois
  *     disponibles » + placeholder navbar (LCP avant boot React) + og:image
  *     spécifique (og-jobs.png).
@@ -13,7 +17,7 @@
  *
  * Et surtout : chaque page PRÉ-RENDUE du build doit être ATTEIGNABLE via
  * frontend/vercel.json (rewrites « /route » et « /route/ » → « /route.html »,
- * catch-all en dernière position). Le plugin peut émettre login.html sans que
+ * et aucune règle masquée). Le plugin peut émettre login.html sans que
  * Vercel ne le serve jamais : la route renverrait alors index.html, sans
  * shell, et l'optimisation serait PERDUE EN SILENCE.
  *
@@ -37,14 +41,18 @@ const read = (name) => {
   }
 };
 
-// 1. index.html : #root doit être VIDE.
+// 1. index.html : #root doit porter le shell statique de l'accueil.
+// (Détail des invariants du shell — h1 unique, longueurs de méta, N.A.P.,
+// classes stylées — dans check-home-shell.js, qui échoue séparément.)
 const index = read('index.html');
 const rootMatch = index.match(/<div id="root">([\s\S]*?)<\/div>/);
 if (!rootMatch) {
   errors.push('index.html : <div id="root"> absent du HTML');
-} else if (rootMatch[1].trim() !== '') {
-  errors.push('index.html : <div id="root"> n\'est PAS vide (contenu statique ajouté ?)');
-}
+} else if (rootMatch[1].trim() === '') {
+  errors.push(
+    'index.html : <div id="root"> est VIDE — le shell statique de l\'accueil a disparu ' +
+      '(plugin prerender-route-meta désactivé ?) : sans lui, la page n\'a ni h1, ni contenu, ni lien'
+  );  }
 
 // 1bis. index.html : le chunk lazy de la page d'accueil (Home) doit être
 // préchargé en modulepreload — sinon le landing / (audité par les budgets
@@ -187,8 +195,12 @@ if (payment) {
 // jamais peint et l'optimisation LCP est silencieusement annulée. Aucune
 // autre vérification ne relie le build (ce qui est émis) au routage (ce qui
 // est servi) : c'est exactement le trou par lequel le lot peut régresser.
+// 404.html est volontairement EXCLUE : elle n'est pas servie par un rewrite
+// (elle l'est par le mécanisme 404 de Vercel, avec un statut 404) — exiger une
+// règle « /404 » n'aurait aucun sens. Sa présence et son noindex sont vérifiés
+// par check-spa-routes.js.
 const prerenderedPages = readdirSync(buildDir)
-  .filter((name) => name.endsWith('.html') && name !== 'index.html')
+  .filter((name) => name.endsWith('.html') && !['index.html', '404.html'].includes(name))
   .sort();
 
 let vercelRewrites = null;
@@ -213,13 +225,13 @@ if (vercelRewrites) {
     }
   }
 
-  // Le catch-all doit rester la DERNIÈRE règle : placé avant, il capture les
-  // routes pré-rendues et Vercel ne sert plus que index.html.
-  const catchAllIndex = vercelRewrites.findIndex((r) => r && r.source === '/(.*)');
-  if (catchAllIndex !== -1 && catchAllIndex !== vercelRewrites.length - 1) {
+  // Aucun catch-all « /(.*) » : c'est lui qui faisait répondre 200 à toute URL
+  // inconnue (soft 404) et qui masquait les routes ci-dessus. Une URL inconnue
+  // doit tomber sur la page 404 de Vercel (statut 404).
+  if (vercelRewrites.some((r) => r && r.source === '/(.*)')) {
     errors.push(
-      'vercel.json : la règle catch-all « /(.*) » doit rester la DERNIÈRE ' +
-        '(sinon elle capture les routes pré-rendues)'
+      'vercel.json : la règle catch-all « /(.*) » est revenue — elle capturerait les routes ' +
+        'pré-rendues ET ferait répondre 200 aux URL inconnues (soft 404)'
     );
   }
 }
@@ -230,8 +242,8 @@ if (errors.length) {
   process.exit(1);
 }
 console.log(
-  `✅ Pré-rendu par route intact : index.html #root vide, shells statiques vérifiés, ` +
+  `✅ Pré-rendu par route intact : shell d'accueil dans index.html, shells statiques vérifiés, ` +
     `et les ${prerenderedPages.length} pages pré-rendues (${prerenderedPages.join(', ')}) ` +
-    `sont routées par vercel.json (catch-all en dernier). Fiches /jobs/:id servies ` +
+    `sont routées par vercel.json (sans catch-all : URL inconnue → 404). Fiches /jobs/:id servies ` +
     `par le backend (GET /api/og/jobs/{id}).`
 );

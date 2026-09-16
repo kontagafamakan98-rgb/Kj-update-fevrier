@@ -141,16 +141,53 @@ cd frontend && npm test
   racine du repo n'est qu'un filet de sécurité si le Root Directory est vidé.
 
 ```json
-// frontend/vercel.json (lu par Vercel avec Root Directory = frontend)
+// frontend/vercel.json (lu par Vercel avec Root Directory = frontend) — extrait
 {
   "framework": "vite",
   "outputDirectory": "build",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/jobs", "destination": "/jobs.html" },
+    { "source": "/jobs/", "destination": "/jobs.html" },
+    { "source": "/jobs/(.*)", "destination": "https://kojo-backend.fly.dev/api/og/jobs/$1" },
+    { "source": "/api/:path*", "destination": "https://kojo-backend.fly.dev/api/:path*" },
+    { "source": "/dashboard", "destination": "/index.html" }
+  ]
 }
 ```
 
+**Contrat de routage (il est vérifié par `check-spa-routes.js` à chaque push) :**
+
+- **chaque route de `src/App.js` est déclarée nommément**, dans ses deux formes
+  (`/route` et `/route/`) ; une route oubliée répondrait **404** en production ;
+- **aucun catch-all `/(.*)` → `/index.html`** : il faisait répondre **200** à
+  toute URL inconnue (« soft 404 » : des centaines d'URL vides indexables).
+  Une URL inconnue tombe désormais sur `build/404.html` (statut **404**, noindex) ;
+- **l'ordre compte** : `/jobs` et `/jobs/` doivent précéder `/jobs/(.*)`, sinon
+  le motif les capture — c'était le cas jusqu'au 16/09/2026 et `/jobs/`
+  répondait alors **404 en JSON** (la page publique la plus visitée du site,
+  cassée pour tout lien avec slash final) ;
+- **`/jobs/:id` n'est pas une page du build** : elle est pré-rendue par le
+  backend (`GET /api/og/jobs/{id}`, méta OG de la mission + 404 noindex), et le
+  cycle complet la concernant est exercé sur les PR par
+  `backend/tests/test_job_og_cycle.py`.
+
 - **Variables d'env** (dashboard, onglet Settings → Environment Variables) :
   `VITE_API_URL=https://kojo-backend.fly.dev/api`
+
+**Variables optionnelles (SEO / analytics — aucune n'a de valeur par défaut,
+rien n'est activé si elles sont absentes) :**
+
+| Variable | Effet |
+|---|---|
+| `VITE_GA_MEASUREMENT_ID` (`G-XXXXXXX`) | Balise Google Analytics 4 injectée dans le HTML **statique** (donc visible des outils d'audit) + `gtag('config')` depuis `src/utils/analytics.js` (pas de script inline : la CSP est `script-src 'self'`) et événement `page_view` à chaque navigation SPA. Ajoute aussi les domaines GA à la CSP (`googletagmanager.com`, `google-analytics.com`). |
+| `VITE_PLAUSIBLE_DOMAIN` | Analytics Plausible (script externe chargé par le bundle). |
+| `VITE_GSC_VERIFICATION` | Jeton `google-site-verification` (Search Console) ajouté au HTML statique. |
+| `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_TIKTOK`, `VITE_SOCIAL_LINKEDIN`, `VITE_SOCIAL_YOUTUBE`, `VITE_SOCIAL_X` | URL complète (`https://…`) du profil : affiché dans le footer **et** dans le `sameAs` du `LocalBusiness`. Un réseau sans valeur n'apparaît nulle part (aucun profil n'est inventé). |
+
+Le contact publié (téléphone, e-mail, adresse) vit dans
+**`frontend/src/config/contact.json`** : la page Support, le footer React, le
+shell statique de l'accueil et le `LocalBusiness` le lisent tous — une seule
+adresse, sinon `check-home-shell.js` échoue.
 
 **Pièges à connaître (leçons du terrain)** :
 
@@ -164,11 +201,15 @@ cd frontend && npm test
   `buildCommand` (utiliser `npm run build`, alias de `vite build`).
 - ⚠️ `rootDirectory` n'est pas accepté par le schéma `vercel.json` (voir
   ci-dessus).
-- ⚠️ **Le catch-all `rewrites` est indispensable** : sans lui, tout
-  chargement direct d'une route SPA (`/payment`, `/register`, … retour du
-  back bouton depuis PayDunya) renvoie un 404 `x-vercel-error: NOT_FOUND`.
-  C'est le bug rencontré : le fichier de la racine n'était pas lu, donc le
-  rewrite n'était jamais dans les métadonnées de routage.
+- ⚠️ **Les rewrites doivent être dans `frontend/vercel.json`** (celui du Root
+  Directory) : le fichier à la racine du repo n'est pas lu, et un chargement
+  direct d'une route SPA (`/payment`, `/register`, retour du bouton depuis
+  PayDunya) renvoyait alors un 404 `x-vercel-error: NOT_FOUND`. C'est le bug
+  d'origine — sa correction n'exigeait pas un catch-all, mais la déclaration
+  explicite de chaque route (voir le contrat de routage ci-dessus).
+- ⚠️ **Un catch-all `/(.*)` masque les règles suivantes ET rend 200 sur des URL
+  inconnues** : ne pas le réintroduire pour « faire marcher » une route — la
+  déclarer. `check-spa-routes.js` échoue si un catch-all réapparaît.
 
 ### Vérification post-déploiement
 
@@ -180,6 +221,12 @@ curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/api/stats  #
 
 # Frontend
 curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 200
+curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/jobs   # 200 (jobs.html)
+curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/jobs/  # 200 (jobs.html)
+curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/inexistant-xyz  # 404 (404.html, noindex)
+# Accueil : un crawler sans JavaScript doit voir un h1, du contenu et des liens
+curl -s https://kj-update-fevrier.vercel.app/ | grep -c '<h1'                # 1
+curl -s https://kj-update-fevrier.vercel.app/ | grep -c 'href="tel:'        # 2
 ```
 
 ## Sécurité

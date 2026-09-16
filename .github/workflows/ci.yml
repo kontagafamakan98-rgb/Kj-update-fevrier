@@ -382,6 +382,35 @@ jobs:
         working-directory: frontend
         run: node scripts/check-pwa-manifest.js
 
+      # Garde-fou du ROUTAGE complet : le rewrite « /jobs/(.*) » → backend
+      # (route OG déclarée côté backend), le proxy /api, sitemap/robots, CHAQUE
+      # route de production de src/App.js (deux formes : /route et /route/),
+      # l'absence de catch-all (une URL inconnue doit répondre 404, pas 200),
+      # et les règles exactes rendues inatteignables par un motif placé avant
+      # (le bug réel : /jobs/ après /jobs/(.*) → 404 JSON en production).
+      # Sur les PR, le cycle complet de /jobs/:id est ignoré par
+      # check-og-job-200.js (preview Vercel protégée) : ce garde est le maillon
+      # de configuration qui manquait à l'appel, avec
+      # backend/tests/test_job_og_cycle.py pour le comportement.
+      - name: Check SPA routing (vercel.json rewrites, routes App.js, URL inconnue → 404)
+        working-directory: frontend
+        run: node scripts/check-spa-routes.js
+
+      # Garde-fou du shell statique de l'ACCUEIL : sans lui, le HTML servi à
+      # « / » ne contient que `<div id="root"></div>` — un crawler sans
+      # JavaScript y voit 19 mots, aucun h1, aucun lien interne, aucun lien de
+      # contact (mesuré par un audit SEO externe le 16/09/2026). Le shell
+      # reproduit Home.js avec les textes de src/i18n/fr.json ; ce check exige
+      # un h1 unique, un title ≤ 60, une description ≤ 160, ≥ 300 mots, des
+      # liens internes et tel:/mailto:, le N.A.P. identique à
+      # src/config/contact.json, le LocalBusiness, et que chaque classe
+      # Tailwind du shell existe bien dans le CSS du build (vite.config.js
+      # n'est PAS scanné par Tailwind : une classe inventée ne serait jamais
+      # stylée).
+      - name: Check home page static shell (h1, contenu, liens, N.A.P., SEO local)
+        working-directory: frontend
+        run: node scripts/check-home-shell.js
+
       # Budgets RÉELS (JS initial, plus gros chunk, build total) : l'ancienne
       # version se contentait d'afficher `du -sh build/` et ne pouvait donc
       # jamais échouer — un bundle doublé passait en vert. Les seuils sont

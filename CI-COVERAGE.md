@@ -32,7 +32,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict. | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build`, puis **7 gardes sur les artefacts** (shells de pré-rendu, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
-| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`. | **Oui, largement** : repli silencieux sur un build local, verrou `/jobs/:id` désactivé, budgets très permissifs (§3, F2/F3/F6). |
+| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`. | **Oui, largement** : repli silencieux sur un build local, verrou `/jobs/:id` du déploiement réel désactivé (couvert ailleurs sur les PR depuis le 16/09/2026, §3, F3), budgets très permissifs (§3, F2/F6). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
 
@@ -74,18 +74,29 @@ C'est le faux-vert le plus insidieux du workflow : **le mode de défaillance le
 plus probable (une API externe rate-limitée) est exactement celui qui dégrade
 silencieusement la portée du contrôle.**
 
-### F3 — Le verrou `/jobs/:id` s'éteint tout seul
+### F3 — Le verrou `/jobs/:id` s'éteint tout seul — **atténué le 16/09/2026**
 
 `check-og-job-200.js` crée une mission de test, vérifie la carte OG de la fiche,
 la supprime, puis exige 404 + noindex + carte 404 + disparition du sitemap. Sur
 repli build local (F2), le rewrite `/jobs/(.*)` de Vercel n'existe pas : le script
 sort en **`exit 0` avec un simple `::notice`** (« Cycle ignoré (base locale) »).
 
-Autrement dit, dans les runs où le déploiement n'a pas pu être résolu, le seul
-garde qui exerce le chemin 200 de `/jobs/:id` — celui qui avait été ajouté parce
-que ce chemin « n'était jamais exercé de façon déterministe » — **ne s'exécute
-pas**, et le job reste vert. Le verrou n'est réel que sur les pushes `main` et sur
-les PR dont la preview est résolvable et non protégée.
+Or ce repli concerne **toutes les PR** (la preview Vercel est protégée) : le
+cycle ne tournait donc jamais avant fusion, et une régression ne se voyait
+qu'après le merge, en production.
+
+**Depuis le 16/09/2026, le cycle est rejoué sur les PR, mais pas par ce script :**
+
+| Maillon | Où il tourne sur une PR | Ce qu'il prouve |
+|---|---|---|
+| Comportement du cycle (créer → 200 → supprimer → 404 + noindex + sitemap) | `backend/tests/test_job_og_cycle.py` (job `backend-tests`, check requis) | le fil complet contre le **code de la PR**, en processus (ASGI) |
+| Configuration de routage (rewrite `/jobs/(.*)` → backend, chaque route de production déclarée, URL inconnue → 404) | `frontend/scripts/check-spa-routes.js` (job `frontend-build`) | que la requête est bien **acheminée** vers cette route |
+| Shell statique de l'accueil (h1, contenu, liens, N.A.P., SEO local) | `frontend/scripts/check-home-shell.js` (job `frontend-build`) | que la page d'accueil dit quelque chose à un crawler **sans JavaScript** |
+| Déploiement réel (rewrite Vercel, CDN, cache CDN, cache-busting) | `check-og-job-200.js`, sur `main` uniquement | l'état de la **production** après fusion |
+
+Ce qui reste non couvert sur une PR est donc **le déploiement lui-même** (Vercel
+et son CDN) — inhérent : mettre en ligne une preview par PR est impossible ici
+(preview protégée). La configuration, elle, est désormais vérifiée avant merge.
 
 ### F4 — `fly-env-drift` : deux contrôles incapables de mordre
 
@@ -199,7 +210,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | Garde | Prouvé qu'il peut échouer par |
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
-| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`) | tests Vitest dédiés |
+| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`) | tests Vitest dédiés |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | **`check-prerender-shells.js`** | **rien** |
 
@@ -222,6 +233,11 @@ chaque PR vers `main` (sauf mention contraire).
 - Tous les endpoints documentés (`audit_docstrings.py --fail-on-warning`).
 - Suite `pytest` complète contre **un vrai MongoDB** : atomicité, index,
   opérateurs réels.
+- Cycle complet de la fiche `/jobs/:id` **y compris sur les PR** : création par
+  la cliente, fiche 200 + métadonnées OG, cartes wide/carrée 1200x630 et
+  1200x1200, suppression, puis 404 + noindex + cartes 404 + disparition du
+  sitemap, avec vérification que la mission est bien marquée supprimée en base
+  (`test_job_og_cycle.py`).
 
 **Frontend**
 - Suite `vitest` complète (aucun seuil de couverture, cf. §7).
@@ -232,6 +248,18 @@ chaque PR vers `main` (sauf mention contraire).
 - Découpage `pack2PageI18n` toujours par scope (pas de chunk partagé ≥ 3
   dictionnaires).
 - Les groupes d'endpoints *lazy* restent hors du chunk d'entrée.
+- Routage complet (`check-spa-routes.js`) : rewrite de la fiche `/jobs/:id` vers
+  la route OG déclarée par le backend, même backend que le proxy `/api`,
+  sitemap/robots proxifiés, **chaque route de production de `src/App.js`**
+  déclarée dans ses deux formes (`/route` et `/route/`), aucun catch-all (une
+  URL inconnue doit répondre **404**, pas 200) et aucune règle exacte masquée
+  par un motif placé avant.
+- Page d'accueil pré-rendue (`check-home-shell.js`) : un h1 unique reprenant
+  `heroTitle`, `title` ≤ 60 et description ≤ 160, ≥ 300 mots, des liens
+  internes, `tel:`/`mailto:`/WhatsApp, le N.A.P. identique à
+  `src/config/contact.json`, les pays de `CountryDisplay.js`, un `LocalBusiness`
+  et une carte intégrée en lazy, et **chaque classe Tailwind du shell présente
+  dans le CSS du build**.
 - Cartes OG : générateur unique, PNG présents et aux bonnes dimensions, aucun
   orphelin.
 - Famille d'icônes : empreintes de **pixels** conformes au manifeste, générateur

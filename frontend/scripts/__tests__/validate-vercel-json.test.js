@@ -84,25 +84,32 @@ describe('structuralFallbackCheck (repli hors-ligne du validateur vercel.json)',
 });
 
 describe('vercel.json RÉEL : rewrite du pré-rendu des fiches /jobs/:id', () => {
-  it('aiguille /jobs/(.*) vers le BACKEND (og HTML) AVANT le proxy /api/:path* et le catch-all SPA', () => {
+  it('aiguille /jobs/(.*) vers le BACKEND (og HTML) APRÈS /jobs et /jobs/, et AVANT le proxy /api/:path*', () => {
     const rewrites = REAL_VERCEL_JSON.rewrites || [];
     const idxOg = rewrites.findIndex((r) => r && r.source === '/jobs/(.*)');
     const idxProxy = rewrites.findIndex((r) => r && r.source === '/api/:path*');
-    const idxCatchAll = rewrites.findIndex((r) => r && r.source === '/(.*)');
+    const idxJobs = rewrites.findIndex((r) => r && r.source === '/jobs');
+    const idxJobsSlash = rewrites.findIndex((r) => r && r.source === '/jobs/');
 
     // Les fiches sont pré-rendues par le BACKEND (GET /api/og/jobs/{id},
     // kojo_routers_public.py) — plus de fonction serverless Vercel (jamais
     // déployée en mode outputDirectory statique).
     expect(idxOg).toBeGreaterThanOrEqual(0);
     expect(rewrites[idxOg].destination).toBe('https://kojo-backend.fly.dev/api/og/jobs/$1');
-    // Le rewrite doit précéder le proxy /api/:path* (ordre vérifié, aucune
-    // règle ne peut capturer le chemin avant lui)…
+    // /jobs et /jobs/ AVANT le motif : « /jobs/(.*) » capture aussi « /jobs/ »
+    // (le groupe peut être vide) — placées après, ces deux règles étaient
+    // inatteignables et /jobs/ répondait 404 en JSON (mesuré en production).
+    expect(idxJobs).toBeGreaterThanOrEqual(0);
+    expect(idxJobsSlash).toBeGreaterThanOrEqual(0);
+    expect(idxJobs).toBeLessThan(idxOg);
+    expect(idxJobsSlash).toBeLessThan(idxOg);
+    // Le rewrite précède le proxy /api/:path* (aucune règle ne capture le
+    // chemin avant lui)…
     expect(idxProxy).toBeGreaterThanOrEqual(0);
     expect(idxOg).toBeLessThan(idxProxy);
-    // …et le catch-all : sinon /jobs/:id tomberait sur index.html et les
-    // crawlers verraient la carte générique (régression silencieuse).
-    expect(idxCatchAll).toBeGreaterThanOrEqual(0);
-    expect(idxOg).toBeLessThan(idxCatchAll);
+    // …et AUCUN catch-all ne masque la fiche : il rendrait 200 + index.html
+    // (mauvaise carte OG) ET ferait répondre 200 aux URL inconnues.
+    expect(rewrites.findIndex((r) => r && r.source === '/(.*)')).toBe(-1);
   });
 
   it('le vercel.json réel passe le repli structurel (aucune clé interdite)', () => {
