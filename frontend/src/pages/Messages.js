@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { messagesAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
-import { ListSkeleton } from '../components/SkeletonLoader';
+import { MessagesSkeleton } from '../components/SkeletonLoader';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/messages';
 import { safeLog } from '../utils/env';
@@ -173,19 +173,10 @@ export default function Messages() {
   );
 
   if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[75vh] flex">
-          <div className="w-full sm:w-1/3 border-r border-gray-100 p-4">
-            <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
-            <ListSkeleton count={4} type="message" />
-          </div>
-          <div className="hidden sm:flex flex-1 items-center justify-center">
-            <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mx-auto"></div>
-          </div>
-        </div>
-      </div>
-    );
+    // Même squelette que le fallback Suspense de /messages (MessagesSkeleton) :
+    // les deux phases (chargement du chunk puis des conversations) affichent
+    // donc la même structure, h1 compris — le titre n'apparaît plus après coup.
+    return <MessagesSkeleton />;
   }
 
   return (
