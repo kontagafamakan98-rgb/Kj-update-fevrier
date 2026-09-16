@@ -237,7 +237,8 @@ curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 
 - **`main`** — branche de référence et de production (déploiements
   automatiques Vercel + Fly.io via la CI). Tout le développement passe par
   des branches dédiées fusionnées ici (PR). C'est la **seule** branche
-  restante du dépôt.
+  permanente du dépôt : les branches de travail sont temporaires et
+  disparaissent avec la PR (voir ci-dessous).
 
 **Historique antérieur à la réécriture du 15/08/2026** : les anciennes
 branches (`master`, `backup-pre-rewrite-20260815`) ont été remplacées par
@@ -252,6 +253,39 @@ accessible mais n'apparaît pas dans les branches) :
 > ⚠️ Les branches distantes `fix/pack4-native` (ancien travail i18n d'avril
 > 2026) et `master` ont été **supprimées** : leur contenu est intégré ou
 > préservé dans les tags ci-dessus.
+
+### Branches de travail : suppression automatique après fusion
+
+Le dépôt est réglé avec **« Automatically delete head branches »**
+(`delete_branch_on_merge = true`, activé le 16/09/2026) : une PR fusionnée
+**via GitHub** (interface ou API) supprime elle-même sa branche d'origine. Le
+nettoyage n'est donc plus une tâche manuelle qu'on peut oublier.
+
+Ce réglage ne couvre **que** les fusions faites côté GitHub. Une fusion
+faite en local puis poussée (`git merge` + `git push`) ne déclenche rien : la
+branche reste sur `origin` et doit être retirée à la main — c'est exactement
+ce qui est arrivé à `chore/ci-guards-assets-perf` et
+`chore/exec-bits-guard`, fusionnées puis supprimées manuellement. Pour un
+nettoyage immédiat :
+
+```bash
+# après une fusion locale, la branche est un ancêtre de main :
+git branch -d <branche>                      # refusé si non fusionnée
+git push origin --delete <branche>
+git fetch --prune                            # purge les références locales
+```
+
+Vérifier l'état réel des branches distantes (et non la mémoire de `git`) :
+
+```bash
+git ls-remote --heads origin                  # source de vérité
+git branch -r                                 # après un fetch --prune
+```
+
+Ce réglage est un paramètre du **dépôt**, pas du code : il n'est pas
+versionné et ne peut pas être vérifié par la CI (il faudrait un jeton
+administrateur). Pour le modifier : `Settings → General → Pull Requests`, ou
+`PATCH /repos/{owner}/{repo}` avec `{"delete_branch_on_merge": true}`.
 
 ### Protection de `main` (branche protégée)
 
