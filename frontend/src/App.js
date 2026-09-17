@@ -15,6 +15,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import NetworkStatus from "./components/NetworkStatus";
 import { PageSkeleton, JobsSkeleton, JobDetailsSkeleton, LoginSkeleton, ForgotPasswordSkeleton, DashboardSkeleton, ProfileSkeleton, MessagesSkeleton, PaymentSkeleton } from "./components/SkeletonLoader";
 import OwnerService from './services/ownerService';
+import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from './config/contact';
 import { isPWASupported, requestNotificationPermission } from "./utils/pwa";
 import { useNotifications } from './contexts/NotificationContext';
 
@@ -60,6 +61,17 @@ function ProtectedRoute({ children }) {
   
   if (loading) {
     return (
+      // anti-CLS mesuré (probe CDP, viewport 412×823) : ce bloc vit DANS
+      // main.flex-1, mais il représente un ÉTAT DE CHARGEMENT, pas une page —
+      // il doit donc GARDER LE FOOTER HORS DE L'ÉCRAN, pas le combler.
+      // En 100vh (+ pb-24 mobile) main vaut 919 px → footer à 984 px, invisible
+      // pendant tout le contrôle d'auth. En min-h-full main tombait à 705 px →
+      // footer à 770 px, donc VISIBLE, puis les pages protégées (main mesuré
+      // 1401-1946 px sur /dashboard, /profile, /messages) le tiraient 865 à
+      // 1180 px plus bas : CLS prédit 0,064 contre 0,0010 mesuré aujourd'hui
+      // (modèle validé sur 4 mesures : 0,0012 / 0,0042 / 0,0167 / 0,0000).
+      // Les pages, elles, suivent la règle inverse (min-h-full) — cf. le garde
+      // antiClsSkeletons : la règle dépend de ce que l'état doit recouvrir.
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
@@ -125,18 +137,22 @@ function LegalFooter() {
     fr: {
       legal: 'Politique de confidentialité',
       contact: 'Nous contacter',
+      itinerary: 'Itinéraire',
     },
     en: {
       legal: 'Privacy Policy',
       contact: 'Contact us',
+      itinerary: 'Directions',
     },
     wo: {
       legal: 'Politique de confidentialité',
       contact: 'Nous contacter',
+      itinerary: 'Itinéraire',
     },
     bm: {
       legal: 'Politique de confidentialité',
       contact: 'Nous contacter',
+      itinerary: 'Itinéraire',
     },
     mos: {
       legal: 'Politique de confidentialité',
@@ -147,13 +163,46 @@ function LegalFooter() {
 
   return (
     <footer className="border-t border-orange-100 bg-white/95 backdrop-blur-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">
-        <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
-          {labels.legal}
-        </a>
-        <Link to="/support" className="hover:text-orange-800 underline underline-offset-2">
-          {labels.contact}
-        </Link>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3">
+        {/* Liens cliquables tel:/mailto: + N.A.P. : ce sont eux qui rendent le
+            contact possible en un appui sur mobile (un audit d'accessibilité
+            et de référencement local les exige). Adresse, téléphone et e-mail
+            viennent de src/config/contact.json — la même source que la page
+            Support, le shell statique de l'accueil et le LocalBusiness. */}
+        <address className="not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600">
+          <span>{CONTACT.address}</span>
+          <a href={telHref} className="hover:text-orange-700 underline underline-offset-2">
+            {CONTACT.phoneDisplay}
+          </a>
+          <a href={mailtoHref} className="hover:text-orange-700 underline underline-offset-2 break-all">
+            {CONTACT.email}
+          </a>
+          <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-orange-700 underline underline-offset-2">
+            WhatsApp
+          </a>
+          <a href={CONTACT.mapsUrl} target="_blank" rel="noreferrer" className="hover:text-orange-700 underline underline-offset-2">
+            {labels.itinerary}
+          </a>
+        </address>
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">
+          <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
+            {labels.legal}
+          </a>
+          <Link to="/support" className="hover:text-orange-800 underline underline-offset-2">
+            {labels.contact}
+          </Link>
+          {SOCIAL_LINKS.map((social) => (
+            <a
+              key={social.key}
+              href={social.url}
+              target="_blank"
+              rel="me noreferrer"
+              className="hover:text-orange-800 underline underline-offset-2"
+            >
+              {social.label}
+            </a>
+          ))}
+        </div>
       </div>
     </footer>
   );

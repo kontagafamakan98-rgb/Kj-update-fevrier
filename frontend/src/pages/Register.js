@@ -373,15 +373,17 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center mb-8">
           <div className="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">
             <span className="text-white text-2xl font-bold">K</span>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+          {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
+              shell statique du build (register.html). Classes inchangées. */}
+          <h1 className="mt-6 text-center text-3xl font-bold text-gray-900">
             {pageT('title')}
-          </h2>
+          </h1>
           <p className="mt-2 text-sm text-gray-600">
             {pageT('subtitle')}
           </p>

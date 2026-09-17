@@ -101,7 +101,13 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     ['JobsSkeleton', JobsSkeleton, ['max-w-7xl']],
     ['JobDetailsSkeleton', JobDetailsSkeleton, ['max-w-7xl']],
     ['LoginSkeleton', LoginSkeleton, []],
-    ['ForgotPasswordSkeleton', ForgotPasswordSkeleton, []],
+    // Blocs calibrés sur le DOM réel de /forgot-password (probe CDP) : titre
+    // text-3xl → h-9, sous-titre et aide text-sm/text-xs repliés sur 2 lignes
+    // → h-10 / h-8, champ et bouton réels (48 px) → h-12, libellé text-sm →
+    // h-5, lien retour → h-6. sans ces hauteurs réelles, le squelette reste
+    // SOUS l'espace libre de main et c'est la page (720 px) qui déplace le
+    // footer de 15 px au swap (CLS 0,0012 → 0,0000 après calibration).
+    ['ForgotPasswordSkeleton', ForgotPasswordSkeleton, ['min-h-full', 'h-9', 'h-10', 'h-8', 'h-12', 'h-6']],
     ['DashboardSkeleton', DashboardSkeleton, []],
     ['ProfileSkeleton', ProfileSkeleton, []],
   ];
@@ -130,5 +136,98 @@ describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () 
     expect(pulseCount(full.container) - pulseCount(content.container)).toBe(2); // h1 + sous-titre
     full.unmount();
     content.unmount();
+  });
+});
+
+// Les états de CHARGEMENT génériques (destination INCONNUE) suivent la règle
+// INVERSE de celle des pages, et c'est mesuré (probe CDP, 412×823, session
+// client sur le déploiement réel) :
+//   • ProtectedRoute (contrôle d'auth) et PageSkeleton (fallback de toute
+//     route sans Suspense interne) doivent garder le footer HORS de l'écran.
+//     En 100vh (+ pb-24 mobile) main vaut 919 px et le footer 984 px, hors
+//     écran pendant tout le chargement. En min-h-full le footer remontait à
+//     770 px (donc visible) pour les pages courtes — et sur les pages
+//     longues mesurées en prod (/dashboard main 1570-1946, /profile
+//     1401-1890, /messages 825) il était ensuite tiré de 865 à 1180 px plus
+//     bas : CLS prédit 0,064 contre 0,0010 mesuré (modèle validé sur quatre
+//     mesures : 0,0012 / 0,0042 / 0,0167 / 0,0000).
+//   • Un squelette DÉDIÉ (destination connue) fait l'inverse : il réplique
+//     exactement la hauteur de sa page, donc le footer peut rester visible,
+//     il ne BOUGE plus (c'est le cas de ForgotPasswordSkeleton ci-dessus).
+// Seul MobileLoader garde aussi min-h-screen pour une autre raison : il
+// REMPLACE tout le layout (App.js retourne tôt) — ni navbar ni footer.
+describe('anti-CLS — états de chargement génériques : footer hors écran (100vh)', () => {
+  const componentBody = (rel, startMarker, endMarker) => {
+    const source = fs.readFileSync(path.resolve(__dirname, rel), 'utf8');
+    const start = source.indexOf(startMarker);
+    expect(start, `marqueur « ${startMarker} » introuvable`).toBeGreaterThan(-1);
+    const end = source.indexOf(endMarker, start);
+    return source.slice(start, end === -1 ? source.length : end);
+  };
+
+  it('ProtectedRoute (App.js) garde son spinner en 100vh', () => {
+    const body = componentBody('../../App.js', 'function ProtectedRoute(', '\nfunction OwnerOnlyRoute(');
+    expect(
+      body,
+      'ProtectedRoute : min-h-screen absent — en min-h-full le footer devient visible pendant le contrôle d\'auth'
+    ).toContain('className="min-h-screen');
+    expect(
+      body,
+      'ProtectedRoute : min-h-full remet le footer dans le champ pendant le chargement'
+    ).not.toContain('className="min-h-full');
+  });
+
+  it('PageSkeleton (fallback Suspense générique) reste en 100vh', () => {
+    const body = componentBody('../SkeletonLoader.js', 'export const PageSkeleton', 'export const JobsSkeleton');
+    expect(
+      body,
+      'PageSkeleton : min-h-screen absent — destination inconnue, le footer doit rester hors écran'
+    ).toContain('className="min-h-screen');
+    expect(body).not.toContain('className="min-h-full');
+  });
+});
+
+// Les pages qui rendent dans le shell de l'application (App.js :
+// `div.min-h-screen.flex.flex-col` > `main.flex-1` > page, avec LegalFooter)
+// doivent exprimer leur hauteur minimale en POURCENTAGE du conteneur
+// (`min-h-full`), jamais en hauteur de viewport (`min-h-screen`) : avec 100vh,
+// la page dépasse de la hauteur de la navbar ET du footer, ce qui crée un
+// défilement inutile et sort le footer du premier écran. Mesuré sur /register
+// à viewport 1280×4000 : 118 px de débordement et CLS 0,0165 avec min-h-screen,
+// 0 px et CLS 0,0081 avec min-h-full (aucun changement à viewport mobile, où le
+// contenu dépasse déjà l'écran).
+//
+// Hors liste (volontairement) : Home.js, HowItWorks.js et PhotoTest.js utilisent
+// encore min-h-screen — pages publiques dont la mise en page plein écran n'a pas
+// été auditée ici, donc pas de règle forcée sur elles.
+const PAGES_MIN_H_FULL = [
+  'Login.js',
+  'ForgotPassword.js',
+  'Register.js',
+  'Payment.js',
+  'CommissionDashboard.js',
+  'EmailVerificationPage.js',
+  'PaymentVerificationPage.js',
+  'MobileTest.js',
+];
+
+describe('anti-CLS — wrappers de page ancrés sur le shell flex-1 (min-h-full)', () => {
+  it('chaque page du shell utilise min-h-full et jamais min-h-screen', () => {
+    const offenders = [];
+    for (const page of PAGES_MIN_H_FULL) {
+      const source = fs.readFileSync(
+        path.resolve(__dirname, '../../pages', page),
+        'utf8'
+      );
+      if (!source.includes('min-h-full')) {
+        offenders.push(`${page} : min-h-full absent (le footer ancré ne sera pas comblé)`);
+      }
+      if (source.includes('min-h-screen')) {
+        offenders.push(
+          `${page} : min-h-screen présent (100vh → débordement navbar + footer, scroll inutile)`
+        );
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 });

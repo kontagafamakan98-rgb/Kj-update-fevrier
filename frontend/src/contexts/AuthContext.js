@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { authAPI, handleApiError, markSoftRedirectConsumed } from '../services/api';
+import { authAPI, handleApiError, markSoftRedirectConsumed, getAuthToken, hasSessionCookie } from '../services/api';
 import { devLog, safeLog } from '../utils/env';
 import kojoCache, { CACHE_KEYS } from '../utils/cache';
 import networkOptimizer from '../utils/networkOptimizer';
@@ -133,8 +133,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     // Amorçage de session au démarrage de l'app.
     // Le cookie de session httpOnly n'est pas lisible depuis JavaScript,
-    // surtout quand l'API est sur un autre domaine. On sonde donc /auth/me
-    // systématiquement; un 401 silencieux signifie simplement visiteur anonyme.
+    // surtout quand l'API est sur un autre domaine : c'est loadUser qui décide
+    // s'il y a lieu de sonder /auth/me (jeton OU cookie présent) — un visiteur
+    // anonyme ne déclenche donc AUCUNE requête réseau, et plus aucun 401 dans
+    // la console. Voir le court-circuit en tête de loadUser.
     // Migration privacy : purge les numéros de paiement stockés par une
     // ancienne version du code dans le profil localStorage.
     purgeStoredPaymentAccounts();
@@ -150,7 +152,9 @@ export function AuthProvider({ children }) {
 
   // Synchronisation multi-onglets : un changement de 'token' dans l'onglet A
   // (login, rotation, logout, purge 401) déclenche l'événement 'storage' dans
-  // les AUTRES onglets → on re-sonde la session. loadUser relit localStorage
+  // les AUTRES onglets → on re-sonde la session (le court-circuit anonyme de
+  // loadUser s'applique : une déconnexion dans un autre onglet purge le jeton
+  // → plus de sonde inutile). loadUser relit localStorage
   // ET le cookie httpOnly : si une session valide survit (ex. purge
   // auto-guérison d'un token stale alors que le cookie est bon), /auth/me
   // 200 restaure le profil SANS rechargement ; si la session est réellement
@@ -175,6 +179,29 @@ export function AuthProvider({ children }) {
 
   const loadUser = async () => {
     try {
+      // VISITEUR ANONYME : aucune sonde réseau.
+      // /auth/me est un endpoint protégé : le sonder sans session produisait un
+      // 401 INÉVITABLE à chaque chargement de page — visible dans la console du
+      // navigateur (« GET …/api/auth/me 401 ») et payé par TOUS les visiteurs
+      // non connectés, y compris les crawlers, sous forme d'un aller-retour
+      // cross-origin vers Fly avant le premier rendu.
+      //
+      // Une session ne peut vivre qu'à deux endroits : le jeton (localStorage /
+      // sessionStorage, agrégé par getAuthToken) ou le cookie httpOnly (détecté
+      // par son compagnon CSRF lisible, hasSessionCookie — vrai uniquement en
+      // même-origine/dev, voir la note AUTH de ownerService.js). Si les deux
+      // sont absents, il n'y a rien à récupérer côté serveur : le 401 est connu
+      // d'avance, on le court-circuite.
+      //
+      // Le cache « réseau pauvre » ci-dessous est volontairement hors de ce
+      // court-circuit : un profil en cache sans jeton est le vestige d'une
+      // session finie, et l'afficher donne un utilisateur fantôme dont tous les
+      // appels échouent — exactement ce que le handler 401 ci-dessous refuse.
+      if (!getAuthToken() && !hasSessionCookie()) {
+        setUser(null);
+        return;
+      }
+
       // Use cached profile if available for faster loading
       const cachedUser = kojoCache.get(CACHE_KEYS.USER_PROFILE);
       if (cachedUser && networkOptimizer.getQuality() === 'poor') {

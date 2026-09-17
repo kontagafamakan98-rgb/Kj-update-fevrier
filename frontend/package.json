@@ -28,6 +28,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate:vercel": "node scripts/validate-vercel-json.mjs",
+    "check:og-reproducible": "node scripts/check-og-reproducible.js",
+    "check:icons": "node scripts/check-generated-icons.js",
+    "check:pwa": "node scripts/check-pwa-manifest.js",
+    "report:bundle": "node scripts/bundle-size-report.js",
     "predeploy": "npm run validate:vercel"
   },
   "browserslist": {
@@ -43,6 +47,8 @@
     ]
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.8",
+    "@babel/traverse": "^7.29.8",
     "@capacitor/cli": "^8.3.1",
     "@lhci/cli": "^0.15.1",
     "@testing-library/jest-dom": "^6.6.3",

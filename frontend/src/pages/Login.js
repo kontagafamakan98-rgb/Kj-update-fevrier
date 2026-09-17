@@ -139,9 +139,14 @@ export default function Login() {
           <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">
             <span className="text-white text-xl font-bold">K</span>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          {/* Titre de PAGE en h1 (et non h2) : un audit SEO exige un h1 unique
+              par page, et un crawler qui exécute le JavaScript doit voir le même
+              niveau que le shell statique pré-rendu (login.html). Les classes
+              Tailwind sont identiques à celles d'origine — le rendu ne change
+              pas, seule la sémantique est corrigée. */}
+          <h1 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             {t('login')}
-          </h2>
+          </h1>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
