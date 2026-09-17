@@ -42,8 +42,8 @@ def test_extract_host_from_url_documented_none_cases():
     from kojo_core import extract_host_from_url
 
     # Hostname extrait, avec ou sans schéma
-    assert extract_host_from_url("https://kojo-backend.fly.dev") == "kojo-backend.fly.dev"
-    assert extract_host_from_url("kojo-backend.fly.dev") == "kojo-backend.fly.dev"
+    assert extract_host_from_url("https://api.kojoforafrica.cc.cd") == "api.kojoforafrica.cc.cd"
+    assert extract_host_from_url("api.kojoforafrica.cc.cd") == "api.kojoforafrica.cc.cd"
     assert extract_host_from_url("  https://api.kojo.sn/  ") == "api.kojo.sn"
     # Cas None documentés
     assert extract_host_from_url("") is None

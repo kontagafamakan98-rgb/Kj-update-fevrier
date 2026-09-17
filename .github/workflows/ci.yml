@@ -312,7 +312,7 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
-          VITE_API_URL: https://kojo-backend.fly.dev/api
+          VITE_API_URL: https://api.kojoforafrica.cc.cd/api
         run: npm run build
 
       # Vérifie le PRÉ-RENDU par route dans les artefacts de build : jobs.html
@@ -478,7 +478,7 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
-          VITE_API_URL: https://kojo-backend.fly.dev/api
+          VITE_API_URL: https://api.kojoforafrica.cc.cd/api
         run: npm run build
 
       # Référence = dernière mesure de `main`. La clé embarque le SHA (donc
@@ -597,7 +597,7 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
-          VITE_API_URL: https://kojo-backend.fly.dev/api
+          VITE_API_URL: https://api.kojoforafrica.cc.cd/api
         run: npm run build
 
       # Résout l'URL du déploiement Vercel à auditer : commentaire Vercel
@@ -822,7 +822,7 @@ jobs:
             echo "::error::Secrets LHCI_CI_EMAIL/LHCI_CI_PASSWORD (ou LHCI_TEST_* en transition) non définis — les pages protégées ne seront pas auditées"
             exit 1
           fi
-          LOGIN_JSON=$(curl -sS -X POST "https://kojo-backend.fly.dev/api/auth/login" \
+          LOGIN_JSON=$(curl -sS -X POST "https://api.kojoforafrica.cc.cd/api/auth/login" \
             -H "Content-Type: application/json" \
             -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
           TOKEN=$(printf '%s' "$LOGIN_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")

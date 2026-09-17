@@ -31,9 +31,9 @@ const CONFIG = {
   rewrites: [
     { source: '/jobs', destination: '/jobs.html' },
     { source: '/jobs/', destination: '/jobs.html' },
-    { source: '/jobs/(.*)', destination: 'https://kojo-backend.fly.dev/api/og/jobs/$1' },
-    { source: '/api/:path*', destination: 'https://kojo-backend.fly.dev/api/:path*' },
-    { source: '/sitemap.xml', destination: 'https://kojo-backend.fly.dev/api/sitemap.xml' },
+    { source: '/jobs/(.*)', destination: 'https://api.kojoforafrica.cc.cd/api/og/jobs/$1' },
+    { source: '/api/:path*', destination: 'https://api.kojoforafrica.cc.cd/api/:path*' },
+    { source: '/sitemap.xml', destination: 'https://api.kojoforafrica.cc.cd/api/sitemap.xml' },
     { source: '/register', destination: '/register.html' },
     { source: '/register/', destination: '/register.html' },
     { source: '/dashboard', destination: '/app.html' },
@@ -136,7 +136,7 @@ describe('vercel-rewrite-server — motifs (fidélité à Vercel)', () => {
     expect(matchRewrite(CONFIG.rewrites, '/jobs').destination).toBe('/jobs.html');
     expect(matchRewrite(CONFIG.rewrites, '/jobs/').destination).toBe('/jobs.html');
     expect(matchRewrite(CONFIG.rewrites, '/jobs/42').destination).toBe(
-      'https://kojo-backend.fly.dev/api/og/jobs/42'
+      'https://api.kojoforafrica.cc.cd/api/og/jobs/42'
     );
     expect(matchRewrite(CONFIG.rewrites, '/inconnu')).toBeNull();
   });
@@ -147,7 +147,7 @@ describe('vercel-rewrite-server — motifs (fidélité à Vercel)', () => {
   });
 
   it('ramène une destination absolue sur le backend local (chemin ET query conservés)', () => {
-    expect(retargetToBackend('https://kojo-backend.fly.dev/api/jobs?limit=1', 'http://127.0.0.1:9000')).toBe(
+    expect(retargetToBackend('https://api.kojoforafrica.cc.cd/api/jobs?limit=1', 'http://127.0.0.1:9000')).toBe(
       'http://127.0.0.1:9000/api/jobs?limit=1'
     );
   });

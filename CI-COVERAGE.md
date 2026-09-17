@@ -405,15 +405,24 @@ adresse, tous lisant `SITE_ORIGIN` de `scripts/site-meta.js`), `resolve-vercel-u
 `DEFAULT_SITE_BASE` — le repli de `_site_base()`, qui construit le sitemap et
 `robots.txt` — déjà pointé sur le domaine.
 
-**Une ligne reste en arrière, volontairement** : `fly.toml` garde
-`FRONTEND_APP_URL` sur l'ancien hôte tant que le runtime Fly ne l'a pas migré.
-Ce n'est pas un oubli : `fly-env-drift` (check REQUIS) compare la valeur de
-`fly.toml` au runtime déployé et refuse un PR qui la changerait avant le
-déploiement — et ce déploiement est conditionné à `main`. Changer cette ligne
-se fait donc AVEC le déploiement Fly (déclenché automatiquement par tout
-changement dans `backend/**` sur `main`), pas dans un PR isolé. D'ici là,
-`/sitemap.xml` et `/robots.txt` annoncent l'ancien hôte — qui redirige vers le
-domaine, donc sans page morte ni signal contradictoire.
+**Deux adresses publiques, désormais** (17/09/2026) : le site sur
+`kojoforafrica.cc.cd`, et le backend sur `api.kojoforafrica.cc.cd`, qui remplace
+`kojo-backend.fly.dev` partout où une URL est ANNONCÉE — callbacks IPN PayDunya
+compris, puisque `build_payment_callback_url()` et `build_disburse_callback_url()`
+les construisent à la création de chaque facture depuis `BACKEND_PUBLIC_URL` (rien
+à configurer dans le dashboard PayDunya). L'ancien hôte n'est pas éteint pour
+autant : il reste dans `TRUSTED_HOSTS` et continue de servir (applications
+mobiles déjà installées, moniteurs, rollback), mais plus rien ne le cite — sauf
+les bundles mobiles déjà construits, qu'un rebuild seul met à jour.
+
+Ces deux bascules ont suivi le même ordre, et ce n'est pas un détail : changer
+une valeur d'adresse dans `fly.toml` ne peut PAS se faire dans un PR isolé. Le
+check REQUIS `fly-env-drift` compare la valeur déployée à celle du fichier et
+refuse l'ordre inverse, et le déploiement Fly est déclenché par `main`. D'où
+« déployer d'abord, commiter ensuite » : `flyctl deploy` depuis la branche, puis
+le PR, qui passe alors au vert. Depuis la PR #41, la sonde publie le `canonical`
+servi et l'hôte annoncé par le sitemap, donc une bascule à moitié faite se voit
+dans le journal au lieu de se déduire d'une carte OG cassée.
 
 **Fermé le 17/09/2026 (preuve à l'appui)** : les trois profils sociaux réels ont
 été posés (`VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_X`,
@@ -609,7 +618,7 @@ chaque PR vers `main` (sauf mention contraire).
 | API Fly (`api.machines.dev`, `flyctl secrets list`, `flyctl ssh`) | `fly-env-drift` | Rouge (volontaire : échec bruyant plutôt que saut silencieux) |
 | API GitHub (commentaires de PR) | `resolve-vercel-url.sh` | **Bascule silencieuse en F2** (repli build local), borné par `--max-time 20 --retry 2` |
 | Vercel (preview + Deployment Protection) | idem | **F2** également : preview protégée ⇒ repli local |
-| Backend de production (`kojo-backend.fly.dev`) | `ci-auth`, `check-og-images`, `check-og-job-200` | Rouge (le login du compte CI échoue) |
+| Backend de production (`api.kojoforafrica.cc.cd`) | `ci-auth`, `check-og-images`, `check-og-job-200` | Rouge (le login du compte CI échoue) |
 | Vercel production | `check-og-images`, `check-og-job-200` | Rouge |
 | Android SDK / Gradle / AGP | `mobile-build` | Rouge, téléchargements longs |
 | API de commentaires GitHub | `bundle-size-report` | Rouge sur **ce job seulement** — il n'est pas requis, donc aucune fusion n'est bloquée ; les mesures restent dans le résumé du run |

@@ -19,7 +19,7 @@ describe('structuralFallbackCheck (repli hors-ligne du validateur vercel.json)',
       framework: 'vite',
       outputDirectory: 'build',
       rewrites: [
-        { source: '/api/:path*', destination: 'https://kojo-backend.fly.dev/api/:path*' },
+        { source: '/api/:path*', destination: 'https://api.kojoforafrica.cc.cd/api/:path*' },
         { source: '/(.*)', destination: '/index.html' },
       ],
       headers: [
@@ -34,7 +34,7 @@ describe('structuralFallbackCheck (repli hors-ligne du validateur vercel.json)',
       rewrites: [
         {
           source: '/api/:path*',
-          destination: 'https://kojo-backend.fly.dev/api/:path*',
+          destination: 'https://api.kojoforafrica.cc.cd/api/:path*',
           headers: [{ key: 'X-Forwarded-Host', value: '$host' }],
         },
       ],
@@ -95,7 +95,7 @@ describe('vercel.json RÉEL : rewrite du pré-rendu des fiches /jobs/:id', () =>
     // kojo_routers_public.py) — plus de fonction serverless Vercel (jamais
     // déployée en mode outputDirectory statique).
     expect(idxOg).toBeGreaterThanOrEqual(0);
-    expect(rewrites[idxOg].destination).toBe('https://kojo-backend.fly.dev/api/og/jobs/$1');
+    expect(rewrites[idxOg].destination).toBe('https://api.kojoforafrica.cc.cd/api/og/jobs/$1');
     // /jobs et /jobs/ AVANT le motif : « /jobs/(.*) » capture aussi « /jobs/ »
     // (le groupe peut être vide) — placées après, ces deux règles étaient
     // inatteignables et /jobs/ répondait 404 en JSON (mesuré en production).

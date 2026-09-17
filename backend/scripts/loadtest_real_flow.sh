@@ -22,7 +22,7 @@
 #     bash backend/scripts/loadtest_real_flow.sh
 # ============================================================================
 set -u
-BASE="${KOJO_LT_BASE:-https://kojo-backend.fly.dev}"
+BASE="${KOJO_LT_BASE:-https://api.kojoforafrica.cc.cd}"
 FLYCTL="${FLYCTL:-flyctl}"
 APP="${KOJO_LT_APP:-kojo-backend}"
 OUT=/tmp/lt

@@ -113,7 +113,7 @@ fly logs
 # doit renvoyer un 401 (échange refusé) et PAS un 503 (config absente).
 # Un 503 signifie que les secrets ne sont pas posés.
 curl -s -o /dev/null -w '%{http_code}\n' \
-  -X POST https://kojo-backend.fly.dev/api/auth/google \
+  -X POST https://api.kojoforafrica.cc.cd/api/auth/google \
   -H 'Content-Type: application/json' \
   -d '{"code":"invalid_code_placeholder_xxxxx"}'
 # 401 = GOOGLE_AUTH_ENABLED ✓ (l'échange est tenté) · 503 = secrets manquants

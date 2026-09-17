@@ -157,7 +157,7 @@ def validate_trusted_hosts(hosts_value, label="TRUSTED_HOSTS"):
     (kojo_core.py) via extract_host_from_url().
 
     Chaque entrée peut être :
-    - un nom d'hôte simple (ex. `kojo-backend.fly.dev`) ;
+    - un nom d'hôte simple (ex. `api.kojoforafrica.cc.cd`) ;
     - un motif joker `*.domaine` (ex. `*.internal`, `*.flycast.internal` —
       requis pour le trafic interne Fly des health checks) ;
     - une URL complète (le host en est extrait, ex. `https://api.kojo.app`).

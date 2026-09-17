@@ -260,12 +260,12 @@ class TestGoogleExchangeRedirectUri:
 
         with patch("kojo_routers_auth.GOOGLE_AUTH_ENABLED", True), \
              patch("kojo_routers_auth.GOOGLE_CLIENT_ID", TEST_GOOGLE_CLIENT_ID), \
-             patch("kojo_routers_auth.GOOGLE_REDIRECT_URI", "https://kojo-backend.fly.dev"), \
+             patch("kojo_routers_auth.GOOGLE_REDIRECT_URI", "https://api.kojoforafrica.cc.cd"), \
              patch("requests.post", side_effect=_fake_post), \
              patch("requests.get", side_effect=_fake_get):
             await _exchange_google_code("code-12345678901234567890", origin=None)
         # Repli sur GOOGLE_REDIRECT_URI (l'origine configurée en secret).
-        assert captured["redirect_uri"] == "https://kojo-backend.fly.dev"
+        assert captured["redirect_uri"] == "https://api.kojoforafrica.cc.cd"
 
     async def test_rejects_origin_with_path(self, client: AsyncClient):
         """Une origine avec chemin (ex: URL de callback) est rejetée → repli
@@ -284,14 +284,14 @@ class TestGoogleExchangeRedirectUri:
 
         with patch("kojo_routers_auth.GOOGLE_AUTH_ENABLED", True), \
              patch("kojo_routers_auth.GOOGLE_CLIENT_ID", TEST_GOOGLE_CLIENT_ID), \
-             patch("kojo_routers_auth.GOOGLE_REDIRECT_URI", "https://kojo-backend.fly.dev"), \
+             patch("kojo_routers_auth.GOOGLE_REDIRECT_URI", "https://api.kojoforafrica.cc.cd"), \
              patch("requests.post", side_effect=_fake_post), \
              patch("requests.get", side_effect=_fake_get):
             await _exchange_google_code(
                 "code-12345678901234567890",
                 origin="https://kj-update-fevrier.vercel.app/auth/google/callback",
             )
-        assert captured["redirect_uri"] == "https://kojo-backend.fly.dev"
+        assert captured["redirect_uri"] == "https://api.kojoforafrica.cc.cd"
 
 
 TEST_GOOGLE_CLIENT_ID = "test-client-id.apps.googleusercontent.com"

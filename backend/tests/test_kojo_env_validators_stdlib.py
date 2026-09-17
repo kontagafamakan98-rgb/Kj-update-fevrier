@@ -107,7 +107,7 @@ class TestImportSansDependances:
             "mod = importlib.util.module_from_spec(spec)\n"
             "spec.loader.exec_module(mod)\n"
             "# Preuve fonctionnelle : les 6 validateurs répondent.\n"
-            "assert mod.validate_https_url('https://kojo-backend.fly.dev') == 'https://kojo-backend.fly.dev'\n"
+            "assert mod.validate_https_url('https://api.kojoforafrica.cc.cd') == 'https://api.kojoforafrica.cc.cd'\n"
             "assert mod.validate_vapid_sub_claim('mailto:kojoapp98@gmail.com') == 'mailto:kojoapp98@gmail.com'\n"
             "assert mod.validate_mongo_url('mongodb+srv://u:p@h/db') == 'mongodb+srv://u:p@h/db'\n"
             "print('BARE-ENV-IMPORT-OK')\n"
