@@ -1,0 +1,154 @@
+{
+  "generator": "generate_icons.py",
+  "generator_sha256": "4086aa54014dcd46b1a14a7907943fdf3279a26ccc4cf10e2a9c82a6e3cfc227",
+  "paths_relative_to": "this manifest",
+  "pixel_rule": "Les empreintes « pixel_sha256 » couvrent le flux IDAT décompressé et dé-filtré : c'est l'invariant comparable entre machines, la compression zlib variant d'une installation à l'autre (101 592 octets committés contre 101 049 régénérés ici pour des pixels identiques).",
+  "source": {
+    "file": "icon-512x512.png",
+    "width": 512,
+    "height": 512,
+    "color_type": 6,
+    "pixel_sha256": "cbbf220384d9fd59dd58aa20ab11b1cb702915702bdd81f14f99b6a2e9373eb4"
+  },
+  "sizes": [
+    72,
+    96,
+    128,
+    144,
+    152,
+    192,
+    384,
+    512
+  ],
+  "favicon_sizes": [
+    16,
+    32,
+    48
+  ],
+  "outputs": [
+    {
+      "file": "icon-72x72.png",
+      "width": 72,
+      "height": 72,
+      "color_type": 6,
+      "pixel_sha256": "4c145876566588eb9f4f013ff69d713cd648029df049195c94a5d3216589066b"
+    },
+    {
+      "file": "icon-96x96.png",
+      "width": 96,
+      "height": 96,
+      "color_type": 6,
+      "pixel_sha256": "8b85f24602c18e79b6b051442c7398e086cb7d12fc5d70053e8f5296743f7b58"
+    },
+    {
+      "file": "icon-128x128.png",
+      "width": 128,
+      "height": 128,
+      "color_type": 6,
+      "pixel_sha256": "b58b4e6f931d3c17b6df7a3ed12dc0404863b1f315ff68850e21a0209a7230f9"
+    },
+    {
+      "file": "icon-144x144.png",
+      "width": 144,
+      "height": 144,
+      "color_type": 6,
+      "pixel_sha256": "ac1d25b48f77f5c5547ecbd8143eeed9d7acad55e61d4719e2e6b7c351be4156"
+    },
+    {
+      "file": "icon-152x152.png",
+      "width": 152,
+      "height": 152,
+      "color_type": 6,
+      "pixel_sha256": "5b950fc3a7586117cb31b68fc7eab0118116a1e2331fc518ef85ab2f9166f9c5"
+    },
+    {
+      "file": "icon-192x192.png",
+      "width": 192,
+      "height": 192,
+      "color_type": 6,
+      "pixel_sha256": "49dcbd4d02be17ad433a942585e2acdbf2c5290b81ce90a4fbf50e6db3f82244"
+    },
+    {
+      "file": "icon-384x384.png",
+      "width": 384,
+      "height": 384,
+      "color_type": 6,
+      "pixel_sha256": "d989978d08579af79e4eeba0620c2d76eb46ce82acbe2f7ce8682452de3a5fa9"
+    },
+    {
+      "file": "icon-512x512.png",
+      "width": 512,
+      "height": 512,
+      "color_type": 6,
+      "pixel_sha256": "cbbf220384d9fd59dd58aa20ab11b1cb702915702bdd81f14f99b6a2e9373eb4"
+    }
+  ],
+  "favicon": {
+    "file": "../favicon.ico",
+    "entries": [
+      {
+        "width": 16,
+        "height": 16,
+        "color_type": 6,
+        "pixel_sha256": "53904897c03da3c5b4e63dae8e7a1d42c454b89b9e8d9355bae8ca2a59b4d104"
+      },
+      {
+        "width": 32,
+        "height": 32,
+        "color_type": 6,
+        "pixel_sha256": "eb8505fea6b42d24431dc01a1370966bdab9fca13750883e6e18581b61d3614d"
+      },
+      {
+        "width": 48,
+        "height": 48,
+        "color_type": 6,
+        "pixel_sha256": "80438e369d98ed8db36fd5503e656bd018a8263aee51285224bc38cc024f8d41"
+      }
+    ]
+  },
+  "maskable": {
+    "sizes": [
+      192,
+      512
+    ],
+    "background": "#0f172a",
+    "safe_zone_radius": 0.4,
+    "content_radius_target": 0.38,
+    "source_content_radius": 0.4947,
+    "scale": 0.7682,
+    "outputs": [
+      {
+        "file": "icon-192x192-maskable.png",
+        "width": 192,
+        "height": 192,
+        "color_type": 6,
+        "pixel_sha256": "c2ec125f365181f00bd918be09aa38c1ce21f4e2fb25646ec129207b193ad13d",
+        "content_radius": 0.3776,
+        "opaque": true
+      },
+      {
+        "file": "icon-512x512-maskable.png",
+        "width": 512,
+        "height": 512,
+        "color_type": 6,
+        "pixel_sha256": "755654cb837bd721ba71a070e670c45a1548a9103c30c0cf6c0c55d6ef31ab2b",
+        "content_radius": 0.3789,
+        "opaque": true
+      }
+    ]
+  },
+  "unmanaged": [
+    {
+      "file": "kojo-icon.svg",
+      "bytes": 287,
+      "sha256": "6ce77ca2b23c84cb47681972cdadf5734e4efb19ebbcd1a6f9a0149ef1b8fcec",
+      "why": "icône vectorielle source (dessin, pas de génération)"
+    }
+  ],
+  "foreign": [
+    {
+      "file": "icon-dark.png",
+      "generated_by": "gen-og-images.py"
+    }
+  ]
+}
