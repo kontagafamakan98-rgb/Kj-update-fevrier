@@ -445,6 +445,15 @@ absente + la variable à poser), **sur `main` uniquement** et **sans jamais fair
 régression de code. Il refuse de conclure sur une base locale (les variables sont
 absentes par construction).
 
+La même sonde publie deux notices de plus sur l'ADRESSE : le `canonical` servi par
+l'accueil et l'hôte annoncé par le `/sitemap.xml`, tous deux confrontés à
+`SITE_ORIGIN` (`scripts/site-meta.js`). C'est la leçon de la migration du
+17/09/2026, où le HTML et le sitemap ont annoncé deux adresses différentes pendant
+des heures — le sitemap est servi par le backend Fly, dont le déploiement est
+indépendant de celui du frontend. Un écart est donc nommé (`ÉCART : l'origine
+attendue est …`) au lieu de se déduire d'une carte OG cassée, et sans bloquer
+davantage.
+
 Rejouer la mesure, sur la production comme sur un build local :
 
 ```bash
@@ -568,9 +577,11 @@ chaque PR vers `main` (sauf mention contraire).
   d'environnement (GA4, Search Console, Plausible, `sameAs` des réseaux
   sociaux) sont sondées sur le **HTML de production**, sur `main` uniquement
   (`scripts/check-seo-production.js`) : une annotation `::notice` par
-  intégration, avec la variable à poser quand elle manque. Aucun échec, jamais —
-  une configuration incomplète est un fait d'exploitation, pas une régression.
-  Cf. F9.
+  intégration, avec la variable à poser quand elle manque. La même sonde confronte
+  le `canonical` servi et l'hôte du `/sitemap.xml` à l'origine attendue, donc une
+  migration de domaine à moitié faite est nommée dans le journal. Aucun échec,
+  jamais — une configuration incomplète est un fait d'exploitation, pas une
+  régression. Cf. F9.
 
 **Références et configuration**
 - Formats des variables critiques dans `fly.toml [env]`, `.env.example` et
@@ -637,8 +648,10 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    oubliée sur Vercel reste un rouge d'audit externe, pas un rouge de CI.
    En faire un garde demanderait d'ajouter un mode d'échec au script : il a été
    volontairement écarté (la demande était de ne pas faire échouer la CI).
-   Deux autres limites : seule l'accueil est sondée (les six autres pages du
-   sitemap ne le sont pas), et un `Age` de cache non nul n'est pas détecté — le
+   Deux autres limites : seule l'accueil est sondée en HTML (les autres pages du
+   sitemap et leur `canonical` ne le sont pas — la sonde lit en revanche le
+   `/sitemap.xml` lui-même, pour l'hôte qu'il annonce), et un `Age` de cache non
+   nul n'est pas détecté — le
    HTML est servi en `must-revalidate`, donc l'edge revalide, mais la sonde ne
    le PROUVE pas (mesuré : `HIT` + `Age: 1` avec et sans `cache-control`).
 

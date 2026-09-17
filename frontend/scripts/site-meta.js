@@ -10,14 +10,34 @@
  * HTML, qui ne peut rien importer) reste vérifiée par les gardes de build, qui
  * publient CETTE origine ou échouent.
  *
- * Même cause pour la lecture des `<meta>` : chaque garde portait sa requête,
- * avec deux fragilités réelles — `content=` devait SUIVRE l'attribut cherché
- * (donc `<meta content="…" property="og:image">` était invisible), et seule la
- * citation double était acceptée.
+ * Même cause pour la lecture des balises du HTML servi : chaque garde portait sa
+ * requête, avec deux fragilités réelles — l'attribut cherché devait PRÉCÉDER
+ * `content=` (donc `<meta content="…" property="og:image">` était invisible), et
+ * seule la citation double était acceptée.
  */
 
 /** Origine publique canonique du site (l'alias Vercel y redirige en 308). */
 export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
+
+/**
+ * Attributs d'une balise, quel que soit leur ordre et le type de citation.
+ *
+ * ⚠️ La citation qui FERME doit être la même que celle qui ouvre : un motif du
+ * type `[\"']([^\"']*)[\"']` tronque toute valeur contenant une apostrophe — la
+ * description de l'accueil (« … en Côte d'Ivoire ») s'y lisait 104 caractères
+ * au lieu de 151, ce qui a publié un faux chiffre dans CI-COVERAGE.md (F9).
+ *
+ * @param {string} tag Balise complète, `<` compris.
+ * @returns {Object<string, string>} Attributs en minuscules, la dernière
+ *   occurrence gagnant (comme un analyseur HTML).
+ */
+function attributesOf(tag) {
+  const attributes = {};
+  for (const match of tag.matchAll(/([a-zA-Z-]+)\s*=\s*(\"([^\"]*)\"|'([^']*)')/g)) {
+    attributes[match[1].toLowerCase()] = match[3] !== undefined ? match[3] : match[4];
+  }
+  return attributes;
+}
 
 /**
  * Contenus des balises `<meta>` qui DÉCLARENT `key` — par `name=`, `property=`
@@ -28,11 +48,6 @@ export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
  * `og:image` est présente deux fois (variante large + carrée), c'est une liste
  * qui est renvoyée.
  *
- * ⚠️ La citation qui FERME doit être la même que celle qui ouvre : un motif du
- * type `["']([^"']*)["']` tronque toute valeur contenant une apostrophe — la
- * description de l'accueil (« … en Côte d'Ivoire ») s'y lisait 104 caractères
- * au lieu de 151, ce qui a publié un faux chiffre dans CI-COVERAGE.md (F9).
- *
  * @param {string} html HTML complet.
  * @param {string} key  Métadonnée cherchée (`og:image`, `description`, `robots`…).
  * @returns {string[]} Contenus (chaîne vide pour une balise sans `content`).
@@ -41,10 +56,7 @@ export function metaContents(html, key) {
   const wanted = String(key).toLowerCase();
   const contents = [];
   for (const tag of String(html).match(/<meta\b[^>]*>/gi) || []) {
-    const attributes = {};
-    for (const match of tag.matchAll(/([a-zA-Z-]+)\s*=\s*("([^"]*)"|'([^']*)')/g)) {
-      attributes[match[1].toLowerCase()] = match[3] !== undefined ? match[3] : match[4];
-    }
+    const attributes = attributesOf(tag);
     const declares =
       attributes.name === wanted ||
       attributes.property === wanted ||
@@ -63,6 +75,25 @@ export function metaContents(html, key) {
  */
 export function metaContent(html, key) {
   return metaContents(html, key)[0] || '';
+}
+
+/**
+ * `href` du `<link rel="canonical">` servi — l'adresse que la page réclame
+ * comme la sienne.
+ *
+ * C'est la valeur qui rend une migration de domaine visible : le HTML peut
+ * continuer d'annoncer l'ancien hôte après la bascule, et un crawler suit ce
+ * qu'il lit, pas ce qu'on croit avoir déployé.
+ *
+ * @param {string} html HTML complet.
+ * @returns {string} L'adresse annoncée, ou `''` si la balise est absente.
+ */
+export function canonicalHref(html) {
+  for (const tag of String(html).match(/<link\b[^>]*>/gi) || []) {
+    const attributes = attributesOf(tag);
+    if (String(attributes.rel || '').toLowerCase() === 'canonical') return attributes.href || '';
+  }
+  return '';
 }
 
 /**

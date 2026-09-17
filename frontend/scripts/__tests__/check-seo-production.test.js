@@ -21,6 +21,7 @@ const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-seo-production.js');
 
 // HTML « configuré » : ce que le plugin injecte quand les variables sont posées.
 const CONFIGURED_HTML = `<!doctype html><html><head>
+<link rel="canonical" href="https://kojoforafrica.cc.cd/" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://plausible.io">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ABC1234567"></script>
 <meta content="jeton-gsc-abc123" name="google-site-verification">
@@ -29,9 +30,18 @@ const CONFIGURED_HTML = `<!doctype html><html><head>
 
 // HTML « non configuré » : l'état de la production tant que Vercel n'a rien.
 const UNCONFIGURED_HTML = `<!doctype html><html><head>
+<link rel="canonical" href="https://kojoforafrica.cc.cd/" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
 <script type="application/ld+json">{"@type":"LocalBusiness","sameAs":[]}</script>
 </head><body><div id="root"></div></body></html>`;
+
+// Sitemap servi par le backend, tel qu'il sort de `_site_base()`.
+const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://kojoforafrica.cc.cd/</loc></url>
+  <url><loc>https://kojoforafrica.cc.cd/jobs</loc></url>
+  <url><loc>https://kojoforafrica.cc.cd/how-it-works</loc></url>
+</urlset>`;
 
 // Double fidèle d'une `Response` : `ok` fait partie du contrat, la sonde s'y fie
 // (`response.ok`), et un double qui l'omet testerait autre chose que la réalité.
@@ -89,7 +99,11 @@ describe('runSeoProductionReport — ce qu’il conclut, et ce qu’il refuse de
     });
     expect(result.skipped).toBe(false);
     expect(result.notices.filter((n) => n.includes('PRÉSENT'))).toHaveLength(4);
-    expect(result.notices.at(-1)).toContain('4/4 intégration(s) présente(s)');
+    // Le décompte ne compte QUE les intégrations : la section Domaine le suit,
+    // et un `at(-1)` deviendrait faux au premier notice ajouté après lui.
+    expect(result.notices.find((n) => n.includes('intégration(s) présente(s)'))).toContain(
+      '4/4',
+    );
   });
 
   it('nomme la variable à poser pour chaque intégration absente', async () => {
@@ -120,6 +134,59 @@ describe('runSeoProductionReport — ce qu’il conclut, et ce qu’il refuse de
     });
     expect(result.skipped).toBe(true);
     expect(result.notices.join()).toMatch(/accueil non lisible/);
+  });
+});
+
+describe('section Domaine — ce qui se détecte tout seul après une migration', () => {
+  const report = async (html, sitemapXml) => {
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      fetchImpl: stubFetch({ '/': html, ...(sitemapXml ? { '/sitemap.xml': sitemapXml } : {}) }),
+    });
+    expect(result.skipped).toBe(false);
+    return result.notices.join('\n');
+  };
+
+  it('dit « conforme » quand le canonical et le sitemap annoncent l’origine attendue', async () => {
+    const log = await report(CONFIGURED_HTML, SITEMAP_XML);
+    expect(log).toContain(`Domaine — canonical servi : ${SITE_ORIGIN}/ (conforme à l'origine attendue)`);
+    expect(log).toContain(`Domaine — sitemap : 3 URL, hôte annoncé ${SITE_ORIGIN} (conforme`);
+  });
+
+  it('nomme l’écart quand le HTML annonce encore l’ancien hôte', async () => {
+    const stale = CONFIGURED_HTML.replaceAll(SITE_ORIGIN, 'https://kj-update-fevrier.vercel.app');
+    const log = await report(stale, SITEMAP_XML);
+    expect(log).toMatch(/Domaine — canonical servi : https:\/\/kj-update-fevrier\.vercel\.app\/ — ÉCART/);
+    expect(log).toContain(`l'origine attendue est ${SITE_ORIGIN}`);
+  });
+
+  it('nomme l’écart quand le sitemap seul est resté sur l’ancien hôte', async () => {
+    // Le cas réel du 17/09/2026 : le frontend bascule, le sitemap est servi par
+    // un backend dont le déploiement est indépendant.
+    const log = await report(CONFIGURED_HTML, SITEMAP_XML.replaceAll(SITE_ORIGIN, 'https://kj-update-fevrier.vercel.app'));
+    expect(log).toMatch(/Domaine — sitemap : 3 URL, hôte annoncé https:\/\/kj-update-fevrier\.vercel\.app — ÉCART/);
+    expect(log).toContain(`Domaine — canonical servi : ${SITE_ORIGIN}/ (conforme`);
+  });
+
+  it('signale un canonical absent au lieu de le supposer présent', async () => {
+    const log = await report(CONFIGURED_HTML.replace(/<link rel="canonical"[^>]*>/, ''), SITEMAP_XML);
+    expect(log).toContain("Domaine — canonical : ABSENT de l'accueil");
+  });
+
+  it('lit le canonical quel que soit l’ordre des attributs et la citation', async () => {
+    // La fragilité réelle des motifs recopiés avant `site-meta.js`.
+    const html = CONFIGURED_HTML.replace(
+      /<link rel="canonical"[^>]*>/,
+      "<link href='https://kojoforafrica.cc.cd/' rel='canonical'>",
+    );
+    const log = await report(html, SITEMAP_XML);
+    expect(log).toContain(`Domaine — canonical servi : ${SITE_ORIGIN}/ (conforme`);
+  });
+
+  it('un sitemap illisible est dit, et ne fait pas perdre le reste du rapport', async () => {
+    const log = await report(CONFIGURED_HTML);
+    expect(log).toContain('Domaine — sitemap : non lisible (HTTP 404)');
+    expect(log).toContain('4/4 intégration(s) présente(s)');
   });
 });
 
