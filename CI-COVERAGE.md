@@ -373,28 +373,39 @@ production. Deux maillons manquaient :
    esbuild, donc l'import de `vite.config.js`). Échec prouvé par mutation :
    `if (false)` sur le test du `G-…` → 1 test rouge.
 
-**Diagnostic du 17/09/2026 (API Vercel, en lecture seule)** : le projet
-`kj-update-fevrier` porte **6 variables d'environnement** et aucune des quatre
-concernées — `VITE_GA_MEASUREMENT_ID`, `VITE_GSC_VERIFICATION`,
-`VITE_PLAUSIBLE_DOMAIN` et les six `VITE_SOCIAL_*` n'ont **jamais été
-configurées**. L'écart n'est donc ni un bug de build ni une variable marquée
-« Sensitive » : c'est une configuration jamais faite. Le projet n'a qu'un seul
-domaine (`kj-update-fevrier.vercel.app`, sous `vercel.app`) : la vérification
-Search Console par enregistrement DNS TXT n'est pas à la portée du propriétaire
-du domaine (il ne contrôle pas `vercel.app`), donc la balise meta
-(`VITE_GSC_VERIFICATION`) est la SEULE voie pour la Search Console.
+**Diagnostic du 17/09/2026 (API Vercel)** : le projet `kj-update-fevrier` portait
+**6 variables d'environnement** et aucune des quatre concernées —
+`VITE_GA_MEASUREMENT_ID`, `VITE_GSC_VERIFICATION`, `VITE_PLAUSIBLE_DOMAIN` et les
+six `VITE_SOCIAL_*` n'avaient **jamais été configurées**. L'écart n'était donc ni
+un bug de build ni une variable marquée « Sensitive » : une configuration jamais
+faite. Le projet n'a qu'un seul domaine (`kj-update-fevrier.vercel.app`, sous
+`vercel.app`) : la vérification Search Console par enregistrement DNS TXT n'est
+pas à la portée du propriétaire du domaine (il ne contrôle pas `vercel.app`),
+donc la balise meta (`VITE_GSC_VERIFICATION`) est la SEULE voie pour la Search
+Console.
 
-**Ce qui reste, et qui n'est pas dans le dépôt** : ces valeurs se posent dans
+**Fermé le 17/09/2026 (preuve à l'appui)** : les trois profils sociaux réels ont
+été posés (`VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_X`,
+cibles `production,preview`, type standard et donc relisible) puis la production
+redéployée. Vérifié sur le HTML servi : `"sameAs"` contient les trois URLs (donc
+visible d'un crawler sans JavaScript) et le bundle porte les trois mêmes URLs
+(liens du footer, rendus par React). La sonde est passée de `0/4` à `1/4`, avec
+la ligne « Liens sociaux : PRÉSENT — 3 profil(s) ». C'est la démonstration que la
+chaîne variable → build → HTML servi → vérification fonctionne de bout en bout.
+`VITE_SOCIAL_TIKTOK`, `LINKEDIN` et `YOUTUBE` restent volontairement vides :
+`contact.js` n'affiche aucun profil inventé.
+
+**Ce qui reste, et qui n'est pas dans le dépôt** : deux valeurs, et elles seules
+— `VITE_GA_MEASUREMENT_ID` et `VITE_GSC_VERIFICATION`. Elles se posent dans
 Vercel → Project Settings → Environment Variables, et exigent un redéploiement
 (les `VITE_*` sont inlinées au build). Les marquer « Sensitive » est inutile —
 mesuré : `VITE_GOOGLE_CLIENT_ID`, déclarée `type=sensitive`, apparaît en clair
 dans `/assets/index-*.js` de la production, la valeur n'étant « décryptable que
 pendant les déploiements » (doc Vercel) ; ce que ça coûte, c'est de ne plus
-pouvoir la RELIRE pour vérifier. Aucune commande du dépôt ne peut créer ces
-valeurs : elles dépendent d'un compte Google (propriété GA4, jeton Search
-Console) et de profils sociaux qui doivent **exister** — `contact.js` refuse
-d'afficher un profil inventé. Tant qu'elles manquent, l'audit restera rouge sur
-ces trois points, quel que soit l'état du code.
+pouvoir la RELIRE pour vérifier. Aucune commande du dépôt ne peut les créer :
+elles viennent d'un compte Google (une propriété GA4, un jeton Search Console).
+Tant qu'elles manquent, l'audit restera rouge sur l'analytics et la vérification
+Search Console, quel que soit l'état du code.
 
 **Ce que la CI en dit désormais** : `scripts/check-seo-production.js` lit l'accueil
 réellement servi et publie une annotation `::notice` par intégration (présente /
