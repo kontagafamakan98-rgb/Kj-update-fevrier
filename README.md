@@ -199,6 +199,12 @@ rien n'est activé si elles sont absentes) :**
 | `VITE_GSC_VERIFICATION` | Jeton `google-site-verification` (Search Console) ajouté au HTML statique. |
 | `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_TIKTOK`, `VITE_SOCIAL_LINKEDIN`, `VITE_SOCIAL_YOUTUBE`, `VITE_SOCIAL_X` | URL complète (`https://…`) du profil : affiché dans le footer **et** dans le `sameAs` du `LocalBusiness`. Un réseau sans valeur n'apparaît nulle part (aucun profil n'est inventé). |
 
+Ces variables sont aussi listées, prêtes à copier, dans
+**`frontend/.env.example`** (avec la façon d'obtenir chaque valeur) : un audit
+SEO qui réclame une balise analytics, une vérification Search Console ou des
+liens sociaux ne peut pas être satisfait sans elles — l'audit ne voit que le HTML
+servi, jamais le code.
+
 Le contact publié (téléphone, e-mail, adresse) vit dans
 **`frontend/src/config/contact.json`** : la page Support, le footer React, le
 shell statique de l'accueil et le `LocalBusiness` le lisent tous — une seule

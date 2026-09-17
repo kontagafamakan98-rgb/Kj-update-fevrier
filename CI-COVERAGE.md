@@ -288,6 +288,89 @@ déploiement qui démarre puis plante au boot est donc **vert**. La vérificatio
 `/health` renvoyant la version (`1.0.2`) a été faite **à la main** lors de sa mise
 en production — c'est précisément le maillon que la CI ne couvre pas.
 
+### F9 — Les intégrations SEO/analytics n'existent qu'au build : un audit externe a rougi sur du code vert
+
+Un audit SEO « sans JavaScript » a rendu le 17/09/2026 un rapport dont **dix
+erreurs sur treize** décrivaient un état **déjà corrigé**. Mesure du HTML
+réellement servi ce jour-là (`curl https://kj-update-fevrier.vercel.app/`,
+`X-Vercel-Cache: HIT`, `Last-Modified: Thu, 17 Sep 2026 02:40:42 GMT`) :
+
+| Ce que dit l'audit | Ce que sert la production |
+|---|---|
+| « Title too long (> 60 chars) » | `53` caractères |
+| « Meta description too long (> 160 chars) » | `104` caractères |
+| « No H1 heading » / « Heading structure issues » | **1** `h1` + **6** `h2` |
+| « Only 19 words (need 300+) » | **405** mots |
+| « No internal links found » | **20** liens internes |
+| « No clickable contact links » | **2** `tel:` + **2** `mailto:` (WhatsApp et « Itinéraire » en plus) |
+| « Soft 404 detected » | `/inconnue-xyz` → **404** + `noindex` |
+| « No local business schema » | `LocalBusiness` complet (N.A.P. + `hasMap`) |
+| « Address found, but phone not detected » | `+1 819 300 3507` en texte, en `tel:` et en `telephone` du schéma |
+| « No embedded map » | carte Google en `iframe` lazy (`mapsEmbedUrl`) |
+| « No GA or GTM found » | ❌ **absent — le point était réel** |
+| « No social media links found » | ❌ **absent — `"sameAs": []`** |
+| « No GSC verification meta tag » | ❌ **absent — la vraie limite** |
+
+Les dix premières lignes sont les symptômes du HTML **avant** le shell
+pré-rendu (PR #27 du 16/09/2026) : un crawler sans JavaScript n'y voyait que
+`<div id="root">`. L'indice décisif est le « 19 mots », qui est l'empreinte
+exacte citée dans l'en-tête de `check-home-shell.js` : le rapport décrivait donc
+un état d'avant correction, alors que ces points sont verrouillés à chaque push
+depuis (shell de l'accueil, 404 réels sans catch-all, etc.).
+
+Les trois derniers, en revanche, étaient **réels** — et c'est le faux-vert :
+`src/utils/analytics.js`, `VITE_GSC_VERIFICATION` et
+`src/config/social-networks.json` existaient, étaient documentés dans le README,
+et n'étaient vérifiés par **rien**. Le build de CI ne définit jamais ces
+variables (y injecter un `G-0000000000` mettrait une balise tierce dans
+l'artefact que Lighthouse audite et fausserait ses scores) : aucun test ne
+pouvait donc distinguer « intégration configurée et injectée » de « intégration
+silencieusement perdue ». Le seul signal restant était un audit externe, sur la
+production. Deux maillons manquaient :
+
+1. **`frontend/.env.example` ne mentionnait aucune de ces variables** — le
+   fichier que la documentation dit de copier ne décrivait que `VITE_API_URL` et
+   Sentry. L'intégration était implémentée mais introuvable pour qui configure le
+   déploiement. C'est vraisemblablement la raison pour laquelle la production n'a
+   jamais eu de balise GA ni de profil social.
+2. **Aucun test de l'injection.** `scripts/__tests__/seo-extras-injection.test.js`
+   pilote désormais le **vrai** plugin `inject-seo-extras` du **vrai**
+   `vite.config.js` (importé, jamais recopié) avec un environnement fabriqué, et
+   exige : balise `gtag/js?id=G-…` en `head`, meta `google-site-verification`,
+   `sameAs` peuplé des **seuls** profils `https://` déclarés, HTML intact sans
+   variable, refus d'un identifiant non `G-…`, et — le piège le plus sournois —
+   les origines GA (`googletagmanager.com`, `google-analytics.com`, `region1`)
+   **dans la CSP** dès que GA est activé, faute de quoi la balise serait servie
+   mais les collectes bloquées sans erreur visible. Le fichier déclare
+   `@vitest-environment node` (jsdom remplace `TextEncoder`/`Uint8Array` et casse
+   esbuild, donc l'import de `vite.config.js`). Échec prouvé par mutation :
+   `if (false)` sur le test du `G-…` → 1 test rouge.
+
+**Ce qui reste, et qui n'est pas dans le dépôt** : les trois valeurs
+(`VITE_GA_MEASUREMENT_ID`, `VITE_GSC_VERIFICATION`, `VITE_SOCIAL_*`) se posent
+dans Vercel → Project Settings → Environment Variables, ne doivent **pas** être
+marquées « Sensitive » (une variable sensible est illisible au build et
+l'intégration resterait désactivée) et exigent un redéploiement. Aucune commande
+du dépôt ne peut les poser : elles dépendent d'un compte Google (propriété GA4,
+Search Console) et de profils sociaux qui doivent **exister** — `contact.js`
+refuse d'afficher un profil inventé, et un faux profil nuirait au site plus qu'il
+ne l'aiderait. Tant qu'elles manquent, l'audit restera rouge sur ces trois
+points, quel que soit l'état du code.
+
+Rejouer la mesure, sur la production comme sur un build local :
+
+```bash
+# la production sert-elle les balises ?
+curl -sS https://kj-update-fevrier.vercel.app/ | grep -c googletagmanager   # 0 = non configuré
+curl -sS https://kj-update-fevrier.vercel.app/ | grep -o '"sameAs": \[[^]]*\]'
+
+# l'injection fonctionne-t-elle quand les variables sont posées ?
+cd frontend
+VITE_GA_MEASUREMENT_ID=G-TEST123456 VITE_GSC_VERIFICATION=jeton \
+VITE_SOCIAL_FACEBOOK=https://facebook.com/kojo-test npx vite build
+grep -c googletagmanager build/index.html   # 2 (balise + CSP relâchée)
+```
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -300,6 +383,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`) | tests Vitest dédiés |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
+| `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de
@@ -330,6 +414,12 @@ chaque PR vers `main` (sauf mention contraire).
 **Frontend**
 - Suite `vitest` complète (aucun seuil de couverture, cf. §7).
 - Aucun endpoint fantôme dans les services (`audit_api_returns.cjs` strict).
+- Les intégrations SEO/analytics du build ne peuvent plus se perdre en silence :
+  `seo-extras-injection.test.js` exige la balise GA4 dans le HTML statique, la
+  meta Search Console, le `sameAs` peuplé des seuls profils `https://`, et les
+  origines GA dans la CSP dès que GA est configuré (cf. F9). **Ce que la CI ne
+  peut pas vérifier, c'est que les valeurs existent sur Vercel** : le test
+  prouve le mécanisme, pas la configuration du déploiement (cf. §7).
 - Le build Vite aboutit avec `VITE_API_URL` de production.
 - Shells de pré-rendu présents dans **chaque** page pré-rendue (`jobs.html`,
   `login.html`, `register.html`, `forgot-password.html`, `payment.html`,
@@ -445,6 +535,15 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
 6. **`push` sur une branche de travail : aucun run** (§1).
 7. **Pas d'audit de dépendances** (ni `npm audit`, ni job équivalent) : une CVE
    dans les dépendances ne fait pas rougir la CI.
+8. **La configuration SEO/analytics de la production n'est pas sondée** (F9) :
+   aucun job ne lit le HTML servi pour vérifier la balise GA4, la meta Search
+   Console ou le `sameAs`. `seo-extras-injection.test.js` prouve que
+   l'injection fonctionne **si** les variables sont posées ; une variable
+   oubliée sur Vercel reste donc invisible jusqu'à un audit externe — c'est
+   exactement le chemin par lequel l'écart a été découvert le 17/09/2026. Un
+   sondage (informatif, non bloquant tant que la configuration n'est pas
+   faite) depuis le job `lighthouse-ci`, qui parle déjà à la production sur
+   `main`, fermerait ce dernier angle mort.
 
 ## 8. Tenir ce document à jour
 
