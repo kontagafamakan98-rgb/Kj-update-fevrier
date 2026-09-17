@@ -363,16 +363,38 @@ production. Deux maillons manquaient :
    esbuild, donc l'import de `vite.config.js`). Échec prouvé par mutation :
    `if (false)` sur le test du `G-…` → 1 test rouge.
 
-**Ce qui reste, et qui n'est pas dans le dépôt** : les trois valeurs
-(`VITE_GA_MEASUREMENT_ID`, `VITE_GSC_VERIFICATION`, `VITE_SOCIAL_*`) se posent
-dans Vercel → Project Settings → Environment Variables, ne doivent **pas** être
-marquées « Sensitive » (une variable sensible est illisible au build et
-l'intégration resterait désactivée) et exigent un redéploiement. Aucune commande
-du dépôt ne peut les poser : elles dépendent d'un compte Google (propriété GA4,
-Search Console) et de profils sociaux qui doivent **exister** — `contact.js`
-refuse d'afficher un profil inventé, et un faux profil nuirait au site plus qu'il
-ne l'aiderait. Tant qu'elles manquent, l'audit restera rouge sur ces trois
-points, quel que soit l'état du code.
+**Diagnostic du 17/09/2026 (API Vercel, en lecture seule)** : le projet
+`kj-update-fevrier` porte **6 variables d'environnement** et aucune des quatre
+concernées — `VITE_GA_MEASUREMENT_ID`, `VITE_GSC_VERIFICATION`,
+`VITE_PLAUSIBLE_DOMAIN` et les six `VITE_SOCIAL_*` n'ont **jamais été
+configurées**. L'écart n'est donc ni un bug de build ni une variable marquée
+« Sensitive » : c'est une configuration jamais faite. Le projet n'a qu'un seul
+domaine (`kj-update-fevrier.vercel.app`, sous `vercel.app`) : la vérification
+Search Console par enregistrement DNS TXT n'est pas à la portée du propriétaire
+du domaine (il ne contrôle pas `vercel.app`), donc la balise meta
+(`VITE_GSC_VERIFICATION`) est la SEULE voie pour la Search Console.
+
+**Ce qui reste, et qui n'est pas dans le dépôt** : ces valeurs se posent dans
+Vercel → Project Settings → Environment Variables, et exigent un redéploiement
+(les `VITE_*` sont inlinées au build). Les marquer « Sensitive » est inutile —
+mesuré : `VITE_GOOGLE_CLIENT_ID`, déclarée `type=sensitive`, apparaît en clair
+dans `/assets/index-*.js` de la production, la valeur n'étant « décryptable que
+pendant les déploiements » (doc Vercel) ; ce que ça coûte, c'est de ne plus
+pouvoir la RELIRE pour vérifier. Aucune commande du dépôt ne peut créer ces
+valeurs : elles dépendent d'un compte Google (propriété GA4, jeton Search
+Console) et de profils sociaux qui doivent **exister** — `contact.js` refuse
+d'afficher un profil inventé. Tant qu'elles manquent, l'audit restera rouge sur
+ces trois points, quel que soit l'état du code.
+
+**Ce que la CI en dit désormais** : `scripts/check-seo-production.js` lit le HTML
+réellement servi et publie une annotation `::notice` par intégration (présente /
+absente + la variable à poser), **sur `main` uniquement** et **sans jamais faire
+échouer le job** — l'absence de configuration est un fait d'exploitation, pas une
+régression de code. Il refuse de conclure sur une base locale (les variables sont
+absentes par construction) et envoie `cache-control: no-cache` (un hit d'edge
+avec un `Age` de 1110 s a déjà fait conclure sur une copie antérieure).
+`--fail-if-missing` existe pour le jour où les quatre valeurs sont posées : le
+rapport peut alors devenir un garde d'un mot.
 
 Rejouer la mesure, sur la production comme sur un build local :
 
@@ -493,6 +515,14 @@ chaque PR vers `main` (sauf mention contraire).
   garde : ce qui bloque reste `check-bundle-size.js`, dans `frontend-build`.
   Quand une référence manque, la colonne est omise et la raison est écrite —
   aucun écart n'est calculé contre une mesure douteuse.
+- Les quatre intégrations SEO/analytics configurées par variables
+  d'environnement (GA4, Search Console, Plausible, `sameAs` des réseaux
+  sociaux) sont sondées sur le **HTML de production**, sur `main` uniquement
+  (`scripts/check-seo-production.js`) : une annotation `::notice` par
+  intégration, avec la variable à poser quand elle manque. Aucun échec par
+  défaut — une configuration incomplète est un fait d'exploitation, pas une
+  régression — mais le rapport SAIT échouer (`--fail-if-missing`, prouvé en
+  test) le jour où les valeurs seront posées. Cf. F9.
 
 **Références et configuration**
 - Formats des variables critiques dans `fly.toml [env]`, `.env.example` et
@@ -552,15 +582,13 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
 6. **`push` sur une branche de travail : aucun run** (§1).
 7. **Pas d'audit de dépendances** (ni `npm audit`, ni job équivalent) : une CVE
    dans les dépendances ne fait pas rougir la CI.
-8. **La configuration SEO/analytics de la production n'est pas sondée** (F9) :
-   aucun job ne lit le HTML servi pour vérifier la balise GA4, la meta Search
-   Console ou le `sameAs`. `seo-extras-injection.test.js` prouve que
-   l'injection fonctionne **si** les variables sont posées ; une variable
-   oubliée sur Vercel reste donc invisible jusqu'à un audit externe — c'est
-   exactement le chemin par lequel l'écart a été découvert le 17/09/2026. Un
-   sondage (informatif, non bloquant tant que la configuration n'est pas
-   faite) depuis le job `lighthouse-ci`, qui parle déjà à la production sur
-   `main`, fermerait ce dernier angle mort.
+8. **La configuration SEO/analytics de la production est OBSERVÉE, pas
+   imposée** (F9) : `scripts/check-seo-production.js` lit le HTML réellement
+   servi sur `main` et publie une `::notice` par intégration absente. L'écart
+   n'est donc plus invisible — mais il ne bloque toujours rien : une variable
+   oubliée sur Vercel reste un rouge d'audit externe, pas un rouge de CI.
+   En faire un garde est un mot (`--fail-if-missing` dans `ci.yml`), à faire
+   le jour où GA4, Search Console et les profils sociaux sont configurés.
 
 ## 8. Tenir ce document à jour
 
