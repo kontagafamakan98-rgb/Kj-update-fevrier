@@ -311,12 +311,29 @@ réellement servi ce jour-là (`curl https://kj-update-fevrier.vercel.app/`,
 | « No social media links found » | ❌ **absent — `"sameAs": []`** |
 | « No GSC verification meta tag » | ❌ **absent — la vraie limite** |
 
-Les dix premières lignes sont les symptômes du HTML **avant** le shell
-pré-rendu (PR #27 du 16/09/2026) : un crawler sans JavaScript n'y voyait que
-`<div id="root">`. L'indice décisif est le « 19 mots », qui est l'empreinte
-exacte citée dans l'en-tête de `check-home-shell.js` : le rapport décrivait donc
-un état d'avant correction, alors que ces points sont verrouillés à chaque push
-depuis (shell de l'accueil, 404 réels sans catch-all, etc.).
+Ces dix lignes décrivent le HTML servi **avant le shell pré-rendu** (PR #27,
+`aa5efd9`, 16/09/2026) : un crawler sans JavaScript n'y voyait que
+`<div id="root">`. Empreinte mesurée le 17/09, sur `frontend/index.html` à
+`aa5efd9^` (c'est exactement ce que la production servait, le shell étant
+généré au build) comparé au build d'aujourd'hui :
+
+| Mesure | Avant PR #27 | Aujourd'hui |
+|---|---|---|
+| `<title>` | **65** caractères (> 60) | 53 |
+| meta description | 57 caractères | 104 |
+| `h1` | **0** | 1 |
+| mots visibles | **19** (11 + les 8 du `<noscript>`) | 405 |
+| liens `<a>` internes | **0** | 17 |
+| `tel:` / `mailto:` | **0 / 0** | 2 / 2 |
+| `LocalBusiness` | **absent** | présent |
+| `#root` | vide | shell de l'accueil |
+
+Le « 19 mots » du rapport est donc l'empreinte **exacte** de l'ancien HTML (il
+comptait le `<noscript>`) : l'audit a mesuré un état d'avant correction, pas le
+site actuel. Ces points sont verrouillés à chaque push depuis (shell de
+l'accueil, 404 réels sans catch-all, etc.) — un rapport qui les réclame encore
+vient d'un cache d'outil ou d'une copie antérieure au 16/09/2026, pas de la
+production.
 
 Les trois derniers, en revanche, étaient **réels** — et c'est le faux-vert :
 `src/utils/analytics.js`, `VITE_GSC_VERIFICATION` et
