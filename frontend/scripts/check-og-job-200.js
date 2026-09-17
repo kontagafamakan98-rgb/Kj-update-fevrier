@@ -12,20 +12,34 @@
  * exécuté ne garde rien : ce script crée sa propre mission, avec un titre
  * marqué, et la nettoie derrière lui.
  *
- * PÉRIMÈTRE : la fiche /jobs/:id n'existe QUE sur le déploiement Vercel (rewrite
- * /jobs/(.*) → backend). Sur un repli build local (base = localhost:4173), le
- * script ne fait RIEN : créer une mission en prod pour vérifier une URL qui ne
- * la sert pas serait une écriture inutile. Il sort en 0 avec un ::notice.
+ * PÉRIMÈTRE : ce script ne peut juger que ce que la base interrogée SERT
+ * réellement. La fiche /jobs/:id est servie par la table de rewrites de
+ * vercel.json (`/jobs/(.*)` → backend) : un serveur statique nu (vite preview,
+ * `serve`, un file://) répond 200 avec index.html et ne la sert pas — les
+ * assertions 404/noindex y seraient des faux positifs, et créer une mission
+ * pour vérifier une URL que la base ne sert pas serait une écriture inutile.
  *
- * Ce repli concerne TOUTES les PR (la preview Vercel est protégée, donc
- * resolve-vercel-url.sh retombe sur le build local) : le cycle n'y tournait
- * jamais, et une régression ne se voyait qu'après fusion. Le même fil est donc
- * rejoué EN PROCESSUS, sur le code de la PR, par
- * backend/tests/test_job_og_cycle.py (création → 200 → suppression → 404 +
- * noindex + sitemap), et le maillon de routage par
- * frontend/scripts/check-spa-routes.js (rewrite présent, route backend
- * déclarée, URL inconnue → 404). Ce script reste le seul à prouver le DÉPLOIEMENT réel (rewrite
- * Vercel + CDN + cache CDN) : les trois sont complémentaires, pas redondants.
+ * ── La couverture des PR, et pourquoi elle a changé le 17/09/2026 ───────────
+ * Cette capacité était DÉDUITE DE L'ADRESSE (`/^https?:\/\/(localhost|127\.0\.0\.1)/`
+ * → « on saute »). Juste tant que la seule base locale possible était `vite
+ * preview` — mais FAUSSE dès qu'une base locale ÉMULE la table de rewrites
+ * (scripts/vercel-rewrite-server.js, qui rejoue les rewrites de vercel.json
+ * devant le backend de la PR) : le serveur local servait bel et bien la fiche,
+ * alors que l'heuristique annonçait « localhost, donc non », et le cycle
+ * restait non exercé sur les PR en affichant un vert.
+ *
+ * La capacité est donc maintenant OBSERVÉE (sonde de comportement,
+ * baseServesJobOgRoute) : la fiche doit répondre 404 + noindex pour
+ * l'identifiant sonde, ce que seul un aiguillage réellement servi peut faire.
+ * Sur la pile locale « forme production » de la CI, le cycle s'exécute donc en
+ * vraies requêtes HTTP — création, fiche pré-rendue, cartes Pillow,
+ * suppression, verrou 404 — contre le CODE DE LA PR, pas seulement contre le
+ * déploiement réel une fois fusionné.
+ *
+ * Ce script reste le seul à prouver le DÉPLOIEMENT réel (rewrite Vercel + CDN +
+ * cache CDN) ; backend/tests/test_job_og_cycle.py rejoue le même fil en
+ * processus, et frontend/scripts/check-spa-routes.js vérifie la CONFIGURATION
+ * qui l'achemine. Les trois sont complémentaires, pas redondants.
  *
  * AUTHENTIFICATION : réutilise le jeton du compte CLIENT dédié CI — soit
  * KOJO_LHCI_AUTH_HEADER (déjà résolu par le job) soit un login avec
@@ -60,7 +74,7 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { runOgImageCheck, PROD_ORIGIN } from './check-og-images.js';
+import { runOgImageCheck, baseServesJobOgRoute, PROD_ORIGIN } from './check-og-images.js';
 
 export const DEFAULT_BASE = PROD_ORIGIN;
 export const DEFAULT_BACKEND = 'https://kojo-backend.fly.dev';
@@ -305,6 +319,7 @@ export async function assertDeletedJobUnreachable({
  * @returns {Promise<{ok: boolean, skipped: boolean, errors: string[],
  *   notices: string[], checked: string[], jobId: string, jobTitle: string,
  *   created: boolean, verified: boolean, deleted: boolean,
+ *   jobRoute: {serves: boolean, status: number, url: string, detail: string},
  *   postDelete: {detail: boolean, noindex: boolean, card: boolean, sitemap: boolean}}>}
  */
 export async function runOgJob200Cycle({
@@ -341,18 +356,25 @@ export async function runOgJob200Cycle({
     created: false,
     verified: false,
     deleted: false,
+    // Capacité observée de la base auditée (remplace l'ancien saut déduit de
+    // l'adresse : voir la sonde baseServesJobOgRoute dans check-og-images.js).
+    jobRoute: { serves: false, status: 0, url: '', detail: 'sonde non exécutée' },
     postDelete: { detail: false, noindex: false, card: false, sitemap: false },
   };
 
-  // Repli build local : le rewrite Vercel /jobs/(.*) n'existe pas, la fiche
-  // mission n'est pas servie. Créer une mission en prod n'apporterait rien.
-  const isLocalBase = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(BASE);
-  if (isLocalBase) {
+  // Capacité OBSERVÉE (et non déduite de l'adresse) : la base sert-elle
+  // réellement la fiche /jobs/:id ? Une base qui ne la sert pas ne peut pas
+  // être jugée sur cette route — ses 404 seraient des faux positifs, et la
+  // mission de test n'aurait aucune fiche à vérifier.
+  const jobRoute = await baseServesJobOgRoute({ base: BASE, fetchImpl });
+  result.jobRoute = jobRoute;
+  if (!jobRoute.serves) {
     result.skipped = true;
     result.ok = true;
     const notice =
-      `Cycle /jobs/:id IGNORÉ : base locale (${BASE}) — le rewrite Vercel et le pré-rendu backend ` +
-      `n'existent que sur le déploiement réel. Aucune mission de test créée. ` +
+      `Cycle /jobs/:id IGNORÉ : la base auditée (${BASE}) ne sert PAS la route backend ` +
+      `/jobs/:id (sonde ${jobRoute.url} → ${jobRoute.detail}) — ni rewrite Vercel, ni serveur ` +
+      `local émulant la table de vercel.json. Aucune mission de test créée. ` +
       `(Le cycle est couvert sur les PR par backend/tests/test_job_og_cycle.py et ` +
       `scripts/check-spa-routes.js ; ce script reste celui qui prouve le déploiement réel.)`;
     notices.push(notice);
@@ -516,7 +538,9 @@ if (isDirectRun) {
   if (result.ok) {
     console.log(
       result.skipped
-        ? '\n✅ Cycle /jobs/:id ignoré (base locale) — chemin 200 exercé sur le déploiement réel (runs de main),\n   et couvert sur les PR par backend/tests/test_job_og_cycle.py + scripts/check-spa-routes.js.'
+        ? `\n⚠️ Cycle /jobs/:id ignoré : ${result.jobRoute.detail}\n` +
+          '   Chemin 200 exercé sur le déploiement réel (runs de main), et couvert sur les PR par\n' +
+          '   backend/tests/test_job_og_cycle.py + scripts/check-spa-routes.js.'
         : `\n✅ Chemin 200 de /jobs/:id vérifié sur une mission réelle (${result.jobId}) — puis verrou 404 : ` +
           `fiche 404 + noindex, carte OG 404, absente du sitemap.`
     );

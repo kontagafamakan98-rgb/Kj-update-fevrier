@@ -5,11 +5,14 @@
  * ── Ce que ce garde protège, et pourquoi ─────────────────────────────────────
  * 1. La fiche /jobs/:id est servie par un REWRITE Vercel
  *    (`/jobs/(.*)` → backend `/api/og/jobs/$1`), pas par une page du build :
- *    sur `main`, le cycle complet est vérifié contre le déploiement réel par
- *    `check-og-job-200.js` ; sur une PR ce script s'arrête (preview protégée).
- *    Le comportement du backend est couvert en processus par
- *    `backend/tests/test_job_og_cycle.py` ; ce garde couvre le maillon qui
- *    manquait : la CONFIGURATION qui achemine la requête.
+ *    le cycle complet est vérifié contre le déploiement réel sur `main`, et
+ *    depuis le 17/09/2026 sur CHAQUE PR, contre une pile locale qui rejoue
+ *    cette même table de rewrites (`scripts/vercel-rewrite-server.js`) devant
+ *    le backend de la PR — `check-og-job-200.js` ne s'arrête plus sur une base
+ *    locale, il observe si elle sert la route (sonde 404 + noindex).
+ *    Le comportement du backend est aussi couvert en processus par
+ *    `backend/tests/test_job_og_cycle.py` ; ce garde couvre le maillon
+ *    complémentaire : la CONFIGURATION qui achemine la requête.
  * 2. Les pages pré-rendues (`/jobs`, `/login`, …) doivent être servies par
  *    leur `.html` — `check-prerender-shells.js` vérifie le fichier, ce garde
  *    vérifie qu'il est atteignable ET non masqué par une règle plus large.

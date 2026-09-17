@@ -24,7 +24,9 @@
  * mission existait en base — un garde jamais exécuté ne garde rien.
  *
  * Usage : KOJO_LHCI_BASE_URL=https://x.vercel.app node scripts/check-og-images.js
- * (par défaut : build local servi par `vite preview`, port 4173.)
+ * (par défaut : build local sur le port 4173 — valeur héritée de l'époque où le
+ * repli de la CI servait le build avec `vite preview` ; la CI passe désormais sa
+ * propre base, la pile locale de rewrites sur 4174.)
  *
  * Le nom de la variable évite le préfixe `LHCI_` : lhci active yargs
  * `.env('LHCI')`, donc `LHCI_URL` deviendrait l'option `--url` du collecteur
@@ -54,6 +56,61 @@ export const DEFAULT_BACKEND = 'https://kojo-backend.fly.dev';
 // domaine Vercel réel.
 export const PROD_ORIGIN = 'https://kj-update-fevrier.vercel.app';
 
+// Identifiant qui ne peut pas exister : sert de SONDE DE CAPACITÉ.
+export const PROBE_JOB_ID = '00000000-0000-4000-8000-000000000000';
+
+/**
+ * La base auditée sert-elle RÉELLEMENT la route backend /jobs/:id ?
+ *
+ * ── Pourquoi une sonde et plus une heuristique ──────────────────────────────
+ * La couverture de /jobs/:id était décidée par une heuristique d'ADRESSE
+ * (`/^https?:\/\/(localhost|127\.0\.0\.1)/` → « pas de rewrite, on saute »).
+ * Elle était juste tant que la seule base locale possible était `vite preview`,
+ * qui ne sert effectivement aucune règle de vercel.json. Mais elle devenait
+ * FAUSSE — dans le sens dangereux — dès qu'une base locale émule la table de
+ * rewrites (scripts/vercel-rewrite-server.js) : la sonde de comportement dit
+ * « la route est servie », l'heuristique disait « localhost, donc non », et le
+ * chemin 200 restait non exercé sur les PR en affichant un vert.
+ *
+ * La règle est donc désormais OBSERVÉE et non devinée : une fiche inconnue
+ * servie par le pré-rendu backend répond 404 AVEC noindex (x-robots-tag ou
+ * méta robots — kojo_routers_public.py). Un serveur statique sans rewrite
+ * répond au mieux un 200 HTML sans noindex (repli SPA) : la sonde les
+ * distingue, quelle que soit l'adresse.
+ *
+ * @param {object} [options]
+ * @param {string} [options.base] Base à sonder (frontend servi).
+ * @param {Function} [options.fetchImpl] `fetch` injectable (tests).
+ * @param {number} [options.timeoutMs] Délai de la sonde.
+ * @returns {Promise<{serves: boolean, status: number, url: string, detail: string}>}
+ */
+export async function baseServesJobOgRoute({ base, fetchImpl = fetch, timeoutMs = 15000 } = {}) {
+  const clean = String(base).trim().replace(/\/+$/, '');
+  const url = `${clean}/jobs/${PROBE_JOB_ID}`;
+  try {
+    const res = await fetchImpl(url, {
+      redirect: 'follow',
+      headers: { 'user-agent': 'kojo-job-og-probe/1.0' },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const robots = res.headers.get('x-robots-tag') || '';
+    const body = res.status === 404 ? await res.text() : '';
+    const noindex =
+      /noindex/i.test(robots) || /<meta[^>]+name=["']robots["'][^>]*noindex/i.test(body);
+    const serves = res.status === 404 && noindex;
+    return {
+      serves,
+      status: res.status,
+      url,
+      detail: serves
+        ? '404 + noindex (pré-rendu backend servi)'
+        : `HTTP ${res.status}${noindex ? ' avec noindex mais pas 404' : ' sans 404 + noindex'} (route backend /jobs/:id non servie par cette base)`,
+    };
+  } catch (error) {
+    return { serves: false, status: 0, url, detail: `injoignable (${error.message})` };
+  }
+}
+
 /**
  * Exécute la vérification complète.
  *
@@ -71,7 +128,8 @@ export const PROD_ORIGIN = 'https://kj-update-fevrier.vercel.app';
  *   les routes statiques déjà couvertes par le run principal du check).
  * @returns {Promise<{ok: boolean, errors: string[], checked: string[],
  *   jobId: string, jobTitle: string, job200Exercised: boolean,
- *   localFallback: boolean, notices: string[]}>}
+ *   jobRoute: {serves: boolean, status: number, url: string, detail: string},
+ *   jobRouteServed: boolean, notices: string[]}>}
  */
 export async function runOgImageCheck({
   base = process.env.KOJO_LHCI_BASE_URL || DEFAULT_BASE,
@@ -234,21 +292,25 @@ export async function runOgImageCheck({
   // pas : c'est le rewrite Vercel + le pré-rendu backend qui le servent, pas le
   // build statique (SPA fallback → index.html en 200, sans noindex). Les
   // assertions 404/noindex seraient donc des faux positifs → section ignorée.
-  const isLocalBase = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(BASE);
+  // Capacité observée (et non devinée d'après l'adresse) : voir
+  // baseServesJobOgRoute. Une base qui ne sert pas la route backend ne peut
+  // pas être jugée sur /jobs/:id — ses 404 seraient des faux positifs.
+  const jobRoute = await baseServesJobOgRoute({ base: BASE, fetchImpl });
+  const servesJobOg = jobRoute.serves;
 
   const jobDetailLabel = '/jobs/:id';
   let jobId = '';
   let jobTitle = '';
-  if (isLocalBase) {
+  if (!servesJobOg) {
     // Aucun intérêt à interroger le backend (et à le solliciter) quand la
     // section est de toute façon ignorée. La couverture manquante remonte en
-    // annotation : sur une PR (repli build local), le résumé du run doit dire
-    // que la fiche mission n'a PAS été vérifiée, pas seulement « vert ».
+    // annotation : le résumé du run doit dire que la fiche mission n'a PAS été
+    // vérifiée, pas seulement « vert ».
     const notice =
-      `${jobDetailLabel} : audit du build local (${BASE}) — rewrite Vercel + ` +
-      `pré-rendu backend absents du build statique, la fiche mission n'a PAS ` +
-      `été vérifiée par ce run (elle l'est contre le déploiement Vercel réel, ` +
-      `c'est-à-dire sur les runs de main).`;
+      `${jobDetailLabel} : la base auditée (${BASE}) ne sert PAS la route backend ` +
+      `/jobs/:id (sonde ${jobRoute.url} → ${jobRoute.detail}) — rewrite Vercel + ` +
+      `pré-rendu backend absents, la fiche mission n'a PAS été vérifiée par ce run ` +
+      `(elle l'est contre le déploiement Vercel réel, c'est-à-dire sur les runs de main).`;
     notices.push(notice);
     log(`  ⚠️ ${notice}`);
   } else if (pinnedJob) {
@@ -284,7 +346,7 @@ export async function runOgImageCheck({
     }
   }
 
-  if (!isLocalBase) {
+  if (servesJobOg) {
     const detailId = encodeURIComponent(jobId || 'check-nonexistent-job');
     const detailUrl = `${BASE}/jobs/${detailId}`;
     let detailStatus = 0;
@@ -357,14 +419,14 @@ export async function runOgImageCheck({
   log('Vérification og:image par route (base : ' + BASE + ') :');
   log(checked.join('\n'));
 
-  const job200Exercised = Boolean(jobId) && !isLocalBase;
+  const job200Exercised = Boolean(jobId) && servesJobOg;
 
   if (errors.length) {
     logError('\n❌ og:image invalide — ' + errors.length + ' problème(s) :');
     for (const e of errors) logError('  ' + e);
   } else {
-    const coverage = isLocalBase
-      ? '/jobs/:id NON vérifié (repli build local)'
+    const coverage = !servesJobOg
+      ? `/jobs/:id NON vérifié (cette base ne sert pas la route backend — sonde : ${jobRoute.detail})`
       : job200Exercised
         ? '/jobs/:id vérifié sur une mission réelle (branche 200)'
         : '/jobs/:id vérifié sur le chemin 404 uniquement (aucune mission en base)';
@@ -382,7 +444,11 @@ export async function runOgImageCheck({
     jobId,
     jobTitle,
     job200Exercised,
-    localFallback: isLocalBase,
+    // Capacité observée de la base auditée (remplace l'ancien `localFallback`,
+    // qui déduisait la couverture de l'adresse et se trompait sur toute base
+    // locale émulant les rewrites).
+    jobRoute,
+    jobRouteServed: servesJobOg,
   };
 }
 

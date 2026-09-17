@@ -3,6 +3,11 @@
  *
  * Audite plusieurs pages :
  *   • l'accueil (/) — publique
+ *   • les 2 pages d'authentification PUBLIQUES /register et /forgot-password —
+ *     ajoutées pour verrouiller les gains CLS des PR #19 (wrapper Register
+ *     aligné sur `min-h-full`) et #20 (ForgotPasswordSkeleton calibré sur la
+ *     hauteur réelle de sa page). Sans elles dans le collect, le budget CLS ne
+ *     portait sur AUCUNE des deux pages que ces PR ont corrigées ;
  *   • les pages PROTÉGÉES /dashboard, /jobs, /profile — authentifiées via un
  *     token Bearer obtenu par le job CI (login avec le COMPTE CLIENT DÉDIÉ CI
  *     stocké dans les secrets GitHub LHCI_CI_EMAIL / LHCI_CI_PASSWORD). Ce
@@ -29,9 +34,10 @@
  *
  * Budgets calibrés sur les mesures CI réelles :
  *   Accueil, servi par le CDN Vercel : TBT < 500 ms (budget strict conservé).
- *   Accueil, servi par `vite preview` sur un runner partagé : 516 ms puis
+ *   Accueil, servi par le repli local sur un runner partagé : 516 ms puis
  *     1397 ms POUR LE MÊME COMMIT — d'où le plafond propre au repli local.
- * Les pages protégées reçoivent l'en-tête Bearer du job CI.
+ * Toutes les pages auditées reçoivent l'en-tête Bearer du job CI (nécessaire aux
+ * pages protégées, inoffensif sur les pages publiques).
  *
  * Note : détecter une « régression » relative nécessiterait un serveur LHCI ;
  * sans infrastructure, les budgets absolus jouent ce rôle : tout run sous les
@@ -47,33 +53,62 @@ const authHeader = (process.env.KOJO_LHCI_AUTH_HEADER || '').trim();
 const localBase = 'http://localhost:4173';
 
 // Pages auditées selon ce qui est réellement servi :
-//  • DÉPLOIEMENT réel → l'accueil + les 3 pages protégées (authentifiées par le
-//    jeton du compte CI) ;
-//  • repli « build local » → l'accueil SEUL. Le repli sert le build sur un
-//    `vite preview`, qui ne sait pas servir les `.html` pré-rendus par route :
-//    `/jobs` et `/login` y renvoient index.html (repli SPA), donc mesurer ces
-//    URLs mesurerait la page d'accueil déguisée — et /dashboard mesurerait
-//    l'accueil puis la redirection du 401. Les shells de /jobs, /login et
-//    /register restent vérifiés, page par page, par check-prerender-shells.js
-//    et check-og-images.js.
-const PUBLIC_PATHS = ['/'];
-const PROTECTED_PATHS = ['/', '/dashboard', '/jobs', '/profile'];
-const urls = (baseUrl ? PROTECTED_PATHS : PUBLIC_PATHS).map((p) =>
+//  • DÉPLOIEMENT réel → les 6 pages dont on mesure la stabilité de mise en page :
+//    l'accueil, les 2 pages d'auth PUBLIQUES (/register, /forgot-password) et
+//    les 3 pages protégées (rendues avec l'état du compte CI, cf. le jeton
+//    Bearer plus bas) ;
+//  • repli local (base absente ou LOOPBACK) → l'accueil SEUL. Le repli local
+//    sert le build hors du déploiement : la table de rewrites y est rejouée par
+//    scripts/vercel-rewrite-server.js, donc les routes existent bien, mais le
+//    build est compilé avec `VITE_API_URL` = backend de PROD. Auditer /jobs,
+//    /login, /register ou /forgot-password y mesurerait autre chose que ces
+//    pages (données absentes, puis redirection vers /login pour les pages
+//    protégées). Les shells de ces routes restent vérifiés, page par page, par
+//    check-prerender-shells.js et par check-og-images.js (qui exécute, lui, la
+//    fiche /jobs/:id quand la base la sert — voir les PR du 17/09/2026).
+//
+// ⚠️ Deux noms, deux significations : `DEPLOYMENT_PATHS` = URLs auditées quand
+// un VRAI déploiement est disponible (le Bearer y est inoffensif sur les pages
+// publiques) ; `LOCAL_FALLBACK_PATHS` = URLs réellement servies par le repli.
+const LOCAL_FALLBACK_PATHS = ['/'];
+const DEPLOYMENT_PATHS = [
+  '/',
+  '/register',
+  '/forgot-password',
+  '/dashboard',
+  '/jobs',
+  '/profile',
+];
+// Le repli « build local » n'est pas seulement l'ABSENCE d'URL : depuis le
+// 17/09/2026, la CI sert le build depuis une adresse LOOPBACK
+// (`http://127.0.0.1:4174`, le serveur qui rejoue la table de rewrites de
+// vercel.json) pour y exercer le cycle /jobs/:id en vraies requêtes HTTP sur
+// chaque PR — et cette adresse est passée ici via KOJO_LHCI_BASE_URL. Une
+// adresse loopback reste le repli local : le build y est compilé avec
+// `VITE_API_URL` = backend de prod, donc les pages protégées n'ont pas de
+// données réelles à mesurer (elles redirigent vers /login), et le plafond TBT
+// élargi d'un runner partagé doit continuer de s'appliquer.
+const targetIsLocal =
+  !baseUrl || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(baseUrl);
+const auditedPaths = targetIsLocal ? LOCAL_FALLBACK_PATHS : DEPLOYMENT_PATHS;
+const urls = auditedPaths.map((p) =>
   p === '/' ? `${baseUrl || localBase}/` : `${baseUrl || localBase}${p}`
 );
 
 // En-têtes à appliquer lors du collect (couvert par l'audit des pages
-// protégées). Un seul jeu d'headers s'applique à toutes les URLs : l'accueil
-// les ignore sans incidence (Bearer inoffensif sur une route publique).
+// protégées). Un seul jeu d'headers s'applique à toutes les URLs : l'accueil,
+// /register et /forgot-password les ignorent sans incidence (Bearer inoffensif
+// sur une route publique — aucune de ces pages ne redirige un visiteur déjà
+// authentifié).
 const extraHeaders = authHeader
   ? (() => { try { return JSON.parse(authHeader); } catch (_e) { return {}; } })()
   : {};
 
-// Le repli local s'audite via l'URL (le job CI y sert déjà le build sur le
-// port 4173) plutôt que via `staticDistDir` : LHCI lancerait sinon SON serveur
+// Le repli local s'audite via l'URL (le job CI y sert déjà le build, sur
+// 4174 depuis le 17/09/2026 ; `localBase` ne sert plus que si aucune URL n'est
+// fournie) plutôt que via `staticDistDir` : LHCI lancerait sinon SON serveur
 // statique sur un port libre, différent de celui que `check-og-images.js`
 // interroge — deux serveurs, deux contenus à diagnostiquer.
-const targetIsLocal = !baseUrl;
 
 module.exports = {
   ci: {
@@ -108,8 +143,8 @@ module.exports = {
         // LCP : pire médiane mesurée 2496 ms (marge ~1,4×).
         'largest-contentful-paint': ['error', { maxNumericValue: 3500 }],
         // TBT : interactivité. 500 ms sur le déploiement réel (mesuré vert sur
-        // main). Sur le repli « vite preview » d'un runner partagé, le MÊME
-        // commit a mesuré 516 ms puis 1397 ms : un plafond de 500 y est une
+        // main). Sur le repli local d'un runner partagé, le MÊME commit a
+        // mesuré 516 ms puis 1397 ms : un plafond de 500 y est une
         // pièce de monnaie, pas un budget. Le plafond du repli est donc plus
         // large et documenté ici, plutôt que de laisser la CI rougir au hasard
         // (le budget strict reste appliqué partout où un vrai déploiement est
@@ -119,6 +154,14 @@ module.exports = {
           { maxNumericValue: targetIsLocal ? 1600 : 1200 },
         ],
         // CLS : seuil de passage Lighthouse (0.1).
+        // Ce plafond est GLOBAL (il n'y a qu'un jeu d'assertions pour toutes les
+        // URLs, cf. `assertMatrix` dans @lhci/cli) : 0.15 couvre /register,
+        // /forgot-password, /dashboard et /profile, dont les CLS mesurés sont
+        // très en-dessous — il n'attrape donc qu'un EFFONDREMENT, pas la
+        // régression fine que les PR #19/#20 ont corrigée (0,0165 et 0,0012).
+        // Un plafond par route exige `assertMatrix` (exclusif de `assertions`
+        // et `aggregationMethod`) et des valeurs MESURÉES : à faire une fois le
+        // premier relevé des deux pages auth disponible.
         // Plafond porté à 0.15 à cause d'un défaut réel, MESURÉ et non corrigé :
         // /jobs déplace un élément visible de 0.1353 (identique sur les 3 runs
         // du 16/09/2026, contre le déploiement réel). Le rapport Lighthouse

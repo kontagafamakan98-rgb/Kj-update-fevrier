@@ -62,12 +62,20 @@ const response = ({ status = 200, headers = {}, body = '' }) => {
 };
 
 const JOB = { id: 'aaaa1111-bbbb-4222-8333-cccc44445555', title: 'Reparation ordinateur portable' };
+// Identifiant de SONDE : le check demande une fiche qui ne peut pas exister et
+// en déduit si la base auditée sert réellement la route /jobs/:id (404 +
+// noindex) — c'est cette observation, et non l'adresse, qui décide si la
+// section est exécutée (un serveur local de rewrites sert la route).
+const PROBE_ID = '00000000-0000-4000-8000-000000000000';
+const PROBE_PATH = `/jobs/${PROBE_ID}`;
 
 // Routes statiques conformes (cartes en file pour la passe HTTP).
-const staticRoutes = () => {
+// `base` = adresse AUDITÉE (elle varie : déploiement réel, serveur local) ;
+// ORIGIN reste l'origin des cartes og:image déclarées dans les shells.
+const staticRoutes = (base = ORIGIN) => {
   const map = {};
   for (const route of ROUTES) {
-    map[`${ORIGIN}${route.path}`] = {
+    map[`${base}${route.path}`] = {
       body: pageHtml({
         og: `${ORIGIN}${route.image || '/og-image-1200x630.png'}`,
         square: route.imageSquare ? `${ORIGIN}${route.imageSquare}` : '',
@@ -77,8 +85,8 @@ const staticRoutes = () => {
   return map;
 };
 
-const defaultMap = () => ({
-  ...staticRoutes(),
+const defaultMap = (base = ORIGIN) => ({
+  ...staticRoutes(base),
   [`${ORIGIN}/og-image-1200x630.png`]: { body: fakePng(1200, 630), headers: { 'content-type': 'image/png' } },
   [`${ORIGIN}/og-square-1200x1200.png`]: { body: fakePng(1200, 1200), headers: { 'content-type': 'image/png' } },
   [`${ORIGIN}/og-jobs.png`]: { body: fakePng(1200, 630), headers: { 'content-type': 'image/png' } },
@@ -91,7 +99,7 @@ const defaultMap = () => ({
     headers: { 'content-type': 'application/json' },
   },
   // Fiche mission : pré-rendu backend (chemin 200).
-  [`${ORIGIN}/jobs/${JOB.id}`]: { body: detailHtml({ id: JOB.id, title: JOB.title }) },
+  [`${base}/jobs/${JOB.id}`]: { body: detailHtml({ id: JOB.id, title: JOB.title }) },
   [`${ORIGIN}/api/og/jobs/${JOB.id}.png`]: {
     body: fakePng(1200, 630),
     headers: { 'content-type': 'image/png' },
@@ -101,12 +109,33 @@ const defaultMap = () => ({
     headers: { 'content-type': 'image/png' },
   },
   // Fiche inconnue : pré-rendu backend en 404 + noindex.
-  [`${ORIGIN}/jobs/check-nonexistent-job`]: {
+  [`${base}/jobs/check-nonexistent-job`]: {
+    status: 404,
+    body: '<html><head><meta name="robots" content="noindex, nofollow" /></head></html>',
+    headers: { 'x-robots-tag': 'noindex, nofollow' },
+  },
+  // Sonde de capacité : cette base SERT la route /jobs/:id (pré-rendu backend
+  // servi, comme le déploiement réel et comme le serveur local de la CI).
+  [`${base}${PROBE_PATH}`]: {
     status: 404,
     body: '<html><head><meta name="robots" content="noindex, nofollow" /></head></html>',
     headers: { 'x-robots-tag': 'noindex, nofollow' },
   },
 });
+
+// Base statique NUE (vite preview, `serve`, un serveur de fichiers) : elle ne
+// connaît AUCUNE règle de vercel.json. Elle répond à tout — y compris
+// /jobs/<id> — par le repli SPA (200 + index.html), et ne doit donc jamais
+// être jugée sur la fiche mission : ses 404 seraient des faux positifs.
+const staticOnlyMap = (base = ORIGIN) => {
+  const map = defaultMap(base);
+  delete map[`${base}/jobs/${JOB.id}`];
+  delete map[`${base}/jobs/check-nonexistent-job`];
+  // Le repli SPA d'un serveur statique : 200 + coquille vide, et SURTOUT aucun
+  // noindex — c'est ce que la sonde distingue d'un vrai aiguillage.
+  map[`${base}${PROBE_PATH}`] = { status: 200, body: '<html><div id="root"></div></html>' };
+  return map;
+};
 
 const makeFetch = (map, calls = []) => async (url) => {
   calls.push(String(url));
@@ -274,16 +303,33 @@ describe('check-og-images — routes statiques', () => {
   });
 });
 
-describe('check-og-images — repli build local', () => {
-  it('ignore la section /jobs/:id (le rewrite Vercel n existe pas en local)', async () => {
-    const { result, calls } = await run(defaultMap(), { base: 'http://localhost:4173' });
+describe('check-og-images — capacité de la base auditée (observée, pas devinée)', () => {
+  it('ignore la section /jobs/:id quand la base ne la sert PAS (serveur statique nu)', async () => {
+    const { result, calls } = await run(staticOnlyMap());
 
-    expect(result.localFallback).toBe(true);
+    expect(result.jobRouteServed).toBe(false);
+    // La sonde a bien été posée : c'est elle qui décide, pas l'adresse.
+    expect(calls).toContain(`${ORIGIN}${PROBE_PATH}`);
     expect(result.checked.join('\n')).not.toContain('/jobs/:id');
-    expect(calls.some((u) => u.includes('/jobs/'))).toBe(false);
+    // Aucune AUTRE sonde : pas de fiche interrogée, pas de backend sollicité.
+    expect(calls.filter((u) => u.includes('/jobs/'))).toEqual([`${ORIGIN}${PROBE_PATH}`]);
     expect(calls.some((u) => u.includes('stub-backend.test'))).toBe(false);
     // La fiche mission n'est pas vérifiée ici : ça doit être annoncé.
     expect(result.notices.join('\n')).toMatch(/n'a PAS été vérifiée par ce run/);
+  });
+
+  it('exécute la section /jobs/:id sur une base LOCALE qui sert la route (serveur de rewrites de la CI)', async () => {
+    // Même situation que le repli de la CI depuis le 17/09/2026 : l'adresse est
+    // locale, mais la table de verrous de vercel.json est rejouée devant le
+    // backend de la PR — la fiche existe donc, et l'heuristique d'adresse
+    // (supprimée) aurait fait sauter le seul run qui pouvait l'exercer.
+    const localBase = 'http://127.0.0.1:4174';
+    const { result, calls } = await run(defaultMap(localBase), { base: localBase });
+
+    expect(result.jobRouteServed).toBe(true);
+    expect(result.job200Exercised).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(calls).toContain(`${localBase}/jobs/${JOB.id}`);
   });
 });
 
