@@ -21,6 +21,9 @@ import {
 const BASE = 'https://stub-frontend.test';
 const BACKEND = 'https://stub-backend.test';
 const ORIGIN = 'https://stub-origin.test';
+// Identifiant de sonde demandé par le script : la base qui répond 404 +
+// noindex le sert ; les autres (serveur statique nu) ne sont pas jugées.
+const PROBE_ID = '00000000-0000-4000-8000-000000000000';
 const JOB_ID = 'aaaa1111-bbbb-4222-8333-cccc44445555';
 const JOB_TITLE = `${TEST_JOB_TITLE_PREFIX} 2026-09-16T00:00:00.000Z`;
 
@@ -79,6 +82,11 @@ const makeStub = ({
   sitemapStatus = 200,
   sitemapBeforeIncludesJob = true,
   sitemapAfterDeleteIncludesJob = false,
+  // La base auditée sert-elle la route /jobs/:id ? C'est ce que la SONDE
+  // observe (sonde de capacité dans check-og-images.js) : le déploiement réel
+  // et le serveur local de rewrites de la CI répondent 404 + noindex, un
+  // serveur statique nu répond 200 + index.html.
+  servesJobRoute = true,
 } = {}) => {
   const calls = [];
   const sequence = [];
@@ -110,7 +118,21 @@ const makeStub = ({
       return response({ status: deleteStatus, body: JSON.stringify({ message: 'ok', job_id: jobId }) });
     }
 
-    if (target.startsWith(`${BASE}/jobs/${jobId}`)) {
+    // Reconnu par son CHEMIN (pas par l'adresse) : les tests font varier la
+    // base auditée (déploiement réel, serveur local de rewrites, statique nu)
+    // et la sonde doit rester la même.
+    if (parsed.pathname === `/jobs/${PROBE_ID}`) {
+      sequence.push('probe');
+      return servesJobRoute
+        ? response({
+            status: 404,
+            headers: { 'x-robots-tag': 'noindex', 'cache-control': 'no-store' },
+            body: '<html><head><meta name="robots" content="noindex, nofollow" /></head></html>',
+          })
+        : response({ status: 200, body: '<html><div id="root"></div></html>' });
+    }
+
+    if (parsed.pathname === `/jobs/${jobId}`) {
       sequence.push(postDeleteProbe ? 'detail-after-delete' : 'detail');
       if (postDeleteProbe) {
         // Fiche supprimée : 404 (no-store) + noindex, comme le backend réel.
@@ -194,8 +216,9 @@ describe('cycle /jobs/:id — chemin 200', () => {
     expect(result.verified).toBe(true);
     expect(result.deleted).toBe(true);
     expect(result.jobId).toBe(JOB_ID);
-    // Ordre : création → fiche → cartes → suppression.
-    expect(stub.sequence[0]).toBe('create');
+    // Ordre : sonde de capacité → création → fiche → cartes → suppression.
+    expect(stub.sequence[0]).toBe('probe');
+    expect(stub.sequence[1]).toBe('create');
     expect(stub.sequence).toContain('image');
     expect(stub.sequence.indexOf('delete')).toBeGreaterThan(stub.sequence.indexOf('detail'));
     // La mission est bien supprimée côté « backend ».
@@ -249,15 +272,38 @@ describe('cycle /jobs/:id — chemin 200', () => {
     expect(result.errors.join(' | ')).toContain(JOB_ID);
   });
 
-  it('ne touche à rien sur une base locale (repli build : pas de rewrite /jobs/:id)', async () => {
+  it('s EXÉCUTE sur une base locale qui sert la route (serveur de rewrites de la CI)', async () => {
+    // Le repli de la CI n'est plus un `vite preview` nu : c'est le serveur qui
+    // rejoue la table de vercel.json devant le backend de la PR, donc un
+    // cycle COMPLET en vraies requêtes HTTP sur chaque PR. L'heuristique
+    // d'adresse qui sautait sur `localhost` est ce qui rendait ce run
+    // impossible : seule la sonde de capacité peut le distinguer d'un serveur
+    // statique.
     const stub = makeStub();
+    const result = await runCycle(stub, { base: 'http://127.0.0.1:4174' });
+
+    expect(result.ok, result.errors.join('\n')).toBe(true);
+    expect(result.skipped).toBe(false);
+    expect(result.jobRoute.serves).toBe(true);
+    expect(result.created).toBe(true);
+    expect(result.deleted).toBe(true);
+    expect(stub.calls.some((c) => c.method === 'POST')).toBe(true);
+    expect(stub.calls.some((c) => c.method === 'DELETE')).toBe(true);
+  });
+
+  it('ne touche à rien quand la base ne sert PAS la route (serveur statique nu)', async () => {
+    const stub = makeStub({ servesJobRoute: false });
     const result = await runCycle(stub, { base: 'http://localhost:4173' });
 
     expect(result.ok).toBe(true);
     expect(result.skipped).toBe(true);
+    expect(result.jobRoute.serves).toBe(false);
     expect(result.created).toBe(false);
-    expect(stub.calls).toEqual([]); // aucune requête, donc aucune mission créée
+    // Seule la sonde a été posée : aucune mission créée, aucune écriture.
+    expect(stub.calls.map((c) => c.method)).toEqual(['GET']);
+    expect(stub.calls[0].url).toBe(`http://localhost:4173/jobs/${PROBE_ID}`);
     expect(result.notices.join(' | ')).toMatch(/IGNORÉ/);
+    expect(result.notices.join(' | ')).toMatch(/ne sert PAS la route backend/);
   });
 
   it('échoue si aucun jeton n’est disponible (chemin 200 non vérifiable)', async () => {

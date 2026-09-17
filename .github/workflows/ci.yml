@@ -399,10 +399,10 @@ jobs:
       # l'absence de catch-all (une URL inconnue doit répondre 404, pas 200),
       # et les règles exactes rendues inatteignables par un motif placé avant
       # (le bug réel : /jobs/ après /jobs/(.*) → 404 JSON en production).
-      # Sur les PR, le cycle complet de /jobs/:id est ignoré par
-      # check-og-job-200.js (preview Vercel protégée) : ce garde est le maillon
-      # de configuration qui manquait à l'appel, avec
-      # backend/tests/test_job_og_cycle.py pour le comportement.
+      # Ce garde couvre la CONFIGURATION qui achemine la requête ; le cycle
+      # complet, lui, tourne désormais sur chaque PR contre la pile locale du
+      # job lighthouse-ci (check-og-job-200.js) et en processus via
+      # backend/tests/test_job_og_cycle.py.
       - name: Check SPA routing (vercel.json rewrites, routes App.js, URL inconnue → 404)
         working-directory: frontend
         run: node scripts/check-spa-routes.js
@@ -525,12 +525,16 @@ jobs:
           path: frontend/.bundle-size
           key: bundle-size-baseline-${{ github.sha }}
 
-  # ─── Performance : budgets Lighthouse CI (accueil + pages protégées) ─────
+  # ─── Performance : budgets Lighthouse CI (6 pages : accueil, auth, protégées) ─
   # Audite le DÉPLOIEMENT VERCEL RÉEL en condition mobile simulée (Slow 4G
   # + CPU 4x) et BLOQUE la PR si un budget est dépassé.
   #
   # URLs auditées (multi-URL, cf. frontend/lighthouserc.cjs) :
   #   • /          — accueil (publique)
+  #   • /register, /forgot-password — pages d'authentification PUBLIQUES, dont
+  #     le CLS a été corrigé par les PR #19 (wrapper Register en min-h-full) et
+  #     #20 (ForgotPasswordSkeleton calibré) : les auditer est ce qui empêche la
+  #     correction de régresser sans que personne ne le voie.
   #   • /dashboard, /jobs, /profile — pages PROTÉGÉES, authentifiées via un
   #     token Bearer obtenu en se connectant avec le COMPTE CLIENT DÉDIÉ CI
   #     (secrets LHCI_CI_EMAIL / LHCI_CI_PASSWORD). Ce compte est distinct des
@@ -544,12 +548,34 @@ jobs:
   #   • pull_request → l'app GitHub « Vercel » poste un commentaire avec
   #     l'URL de preview ; on la lit via l'API GitHub (GITHUB_TOKEN auto).
   #   • main (push) → URL de production kj-update-fevrier.vercel.app.
-  #   • Sinon → repli sur le build local servi statiquement (contenu
-  #     identique au déploiement).
+  #   • Sinon → repli sur une pile LOCALE « forme production » : MongoDB +
+  #     backend de la PR + serveur local qui rejoue la table de rewrites de
+  #     vercel.json devant le build (cf. plus bas).
+  #
+  # ── Le cycle /jobs/:id s'exécute désormais SUR LES PR ──────────────────────
+  # La fiche mission n'existe que par le rewrite `/jobs/(.*)` → backend. Sur une
+  # PR, la preview Vercel est protégée : resolve-vercel-url.sh retombait sur un
+  # serveur statique nu, qui ne sert pas cette route, et check-og-job-200.js
+  # sortait en 0 avec un ::notice — le cycle HTTP (création → fiche OG →
+  # suppression → 404 + noindex + sitemap) ne tournait donc JAMAIS sur une PR,
+  # et une régression ne se voyait qu'après fusion.
+  # Le repli local rejoue maintenant la CONFIGURATION de production (la table
+  # de rewrites, lue dans vercel.json) devant le CODE de la PR : le cycle
+  # s'exécute en vraies requêtes HTTP, sur une base MongoDB jetable, sans
+  # écriture en production et sans aucun secret supplémentaire.
   lighthouse-ci:
     name: Lighthouse performance budgets
     runs-on: ubuntu-latest
     needs: frontend-build
+
+    # MongoDB éphémère du repli local : c'est LUI qui rend le cycle /jobs/:id
+    # possible sur une PR (création / suppression / sitemap). Aucun accès à une
+    # base distante, donc aucune écriture en production depuis une PR.
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
 
     steps:
       - uses: actions/checkout@v4
@@ -588,41 +614,164 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash .github/scripts/resolve-vercel-url.sh
 
-      # Si KOJO_LHCI_BASE_URL est vide (aucune preview Vercel exploitable : preview
-      # PROTÉGÉE par Deployment Protection — détectée par resolve-vercel-url.sh
-      # — ou commentaire Vercel absent), on sert le BUILD LOCAL (contenu
-      # identique au déploiement) sur le port 4173 : check-og-images et lhci
-      # auditeront alors le code de la PR au lieu du mur de login Vercel.
-      # KOJO_LHCI_BASE_URL est réécrite vers localhost → lighthouserc.cjs passe en mode
-      # url (les og:image des shells pré-rendus restent ABSOLUS vers la prod,
-      # les assertions OG restent valides). Serveur lancé en arrière-plan :
-      # nohup + log redirigé pour survivre aux steps suivants du job.
+      # ── Repli local « forme production » (aucune preview Vercel exploitable) ─
+      # Preview PROTÉGÉE par Deployment Protection (détectée par
+      # resolve-vercel-url.sh) ou commentaire Vercel absent : on rejoue en local
+      # ce que Vercel fait, devant le code de la PR.
       #
+      # Les quatre steps suivants ne tournent QUE dans ce cas (`if` sur la
+      # variable écrite par le résolveur : un déploiement réel audité sur main
+      # n'a pas besoin de tout ça).
       # ⚠️ Le nom de la variable n'est PAS `LHCI_URL` : lhci active yargs
       # `.env('LHCI')`, donc toute variable `LHCI_<x>` devient l'option `--<x>`
       # du CLI. `LHCI_URL` devenait `--url`, une URL UNIQUE qui écrasait le
-      # tableau de 4 URLs de lighthouserc.cjs (constaté : « 1 URL(s) » auditées
+      # tableau d'URLs de lighthouserc.cjs (constaté : « 1 URL(s) » auditées
       # en CI, les pages protégées jamais mesurées). Le préfixe `KOJO_LHCI_`
       # n'est capturé par aucun motif yargs, et un test l'exige.
-      - name: Serve local build (repli preview Vercel indisponible)
-        working-directory: frontend
+      - name: Set up Python 3.11 (repli local)
+        if: ${{ !env.KOJO_LHCI_BASE_URL }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # Le BACKEND DE LA PR est lancé pour de vrai (uvicorn) : c'est lui qui
+      # sert le pré-rendu de la fiche /jobs/:id et les cartes Pillow, donc le
+      # code backend de la PR est exercé en HTTP, pas seulement en processus.
+      - name: Install backend dependencies (repli local)
+        if: ${{ !env.KOJO_LHCI_BASE_URL }}
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      # Compte client VÉRIFIÉ dans la base jetable : POST /api/jobs exige
+      # user_type=client et DELETE /api/jobs/:id exige d'être la propriétaire.
+      # Le mot de passe est généré à chaque run et ne quitte jamais le runner
+      # (il ne protège qu'une MongoDB éphémère) : aucune valeur que seul
+      # l'utilisateur possède n'est nécessaire pour exercer ce cycle.
+      - name: Provision the local CI client account (repli local)
+        if: ${{ !env.KOJO_LHCI_BASE_URL }}
+        working-directory: backend
         run: |
-          if [ -n "${KOJO_LHCI_BASE_URL:-}" ]; then
-            echo "Preview Vercel à auditer : $KOJO_LHCI_BASE_URL"
-            exit 0
-          fi
-          echo "Aucune preview Vercel exploitable → audit du build local (port 4173)"
-          nohup npx vite preview --port 4173 --strictPort > /tmp/vite-preview.log 2>&1 &
+          set -euo pipefail
+          # Le service container MongoDB met quelques secondes à accepter les
+          # connexions : sans cette attente, la provision échouerait au hasard
+          # du démarrage (serverSelectionTimeoutMS = 10 s du script).
+          MONGO_READY=""
           for _ in $(seq 1 30); do
-            curl -sf http://localhost:4173/ >/dev/null 2>&1 && break
+            if python -c "import pymongo; pymongo.MongoClient('mongodb://localhost:27017', serverSelectionTimeoutMS=1000).admin.command('ping')" 2>/dev/null; then
+              MONGO_READY=1
+              break
+            fi
             sleep 1
           done
-          if ! curl -sf http://localhost:4173/ >/dev/null 2>&1; then
-            echo "::error::vite preview n'a pas démarré sur le port 4173"
-            cat /tmp/vite-preview.log
+          if [ -z "$MONGO_READY" ]; then
+            echo "::error::MongoDB (service container) injoignable sur localhost:27017"
             exit 1
           fi
-          echo "KOJO_LHCI_BASE_URL=http://localhost:4173" >> "$GITHUB_ENV"
+          PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$PASSWORD"
+          # Domaine RÉEL (kojo.sn, comme les fixtures de backend/tests) et non
+          # un domaine réservé (`.test`, `.example`…) : /api/auth/login valide
+          # l'adresse avec pydantic/email-validator, qui refuse les domaines à
+          # usage spécial — mesuré sur le run du 17/09/2026.
+          echo "KOJO_LHCI_LOCAL_EMAIL=ci-og-cycle@kojo.sn" >> "$GITHUB_ENV"
+          echo "KOJO_LHCI_LOCAL_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"
+          CI_PASSWORD="$PASSWORD" python scripts/provision_ci_test_account.py \
+            "mongodb://localhost:27017/kojo_lhci_ci" "ci-og-cycle@kojo.sn"
+
+      # Backend local + serveur de rewrites, puis PREUVE que la pile sert
+      # réellement la fiche /jobs/:id (sonde 404 + noindex) : sans ce contrôle,
+      # une pile mal démarrée ferait « ignorer » le cycle en vert, c'est-à-dire
+      # exactement le trou qu'on ferme.
+      #
+      # FRONTEND_APP_URL = l'adresse de CE serveur : le pré-rendu backend
+      # construit les og:image et le canonical de la fiche à partir d'elle, et
+      # check-og-job-200.js compare les deux (KOJO_ORIGIN).
+      # KOJO_BACKEND_URL = le backend LOCAL : la création et la suppression de
+      # la mission de test ne touchent donc jamais la production.
+      #
+      # Serveurs en arrière-plan : nohup + log redirigé pour survivre aux steps
+      # suivants (les logs sont publiés en artifact en cas d'échec).
+      - name: Serve local stack (backend + table de rewrites de vercel.json)
+        if: ${{ !env.KOJO_LHCI_BASE_URL }}
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          LOCAL_BASE="http://127.0.0.1:4174"
+          LOCAL_BACKEND="http://127.0.0.1:8000"
+
+          nohup env \
+            MONGO_URL="mongodb://localhost:27017" \
+            DB_NAME="kojo_lhci_ci" \
+            APP_ENV="test" \
+            REDIS_URL="" \
+            DISABLE_TRUSTED_HOST_MIDDLEWARE="true" \
+            EMAIL_PROVIDER="none" \
+            JWT_SECRET="$(openssl rand -hex 32)" \
+            EMAIL_OTP_SECRET="$(openssl rand -hex 32)" \
+            FRONTEND_APP_URL="$LOCAL_BASE" \
+            uvicorn server:app --host 127.0.0.1 --port 8000 \
+            > /tmp/kojo-local-backend.log 2>&1 &
+
+          for _ in $(seq 1 45); do
+            curl -sf "$LOCAL_BACKEND/health" >/dev/null 2>&1 && break
+            sleep 1
+          done
+          if ! curl -sf "$LOCAL_BACKEND/health" >/dev/null 2>&1; then
+            echo "::error::le backend local n'a pas répondu sur $LOCAL_BACKEND/health"
+            tail -50 /tmp/kojo-local-backend.log
+            exit 1
+          fi
+
+          nohup node ../frontend/scripts/vercel-rewrite-server.js \
+            --port 4174 --root ../frontend/build \
+            --config ../frontend/vercel.json --backend "$LOCAL_BACKEND" \
+            > /tmp/kojo-local-rewrites.log 2>&1 &
+
+          for _ in $(seq 1 30); do
+            curl -sf "$LOCAL_BASE/" >/dev/null 2>&1 && break
+            sleep 1
+          done
+          if ! curl -sf "$LOCAL_BASE/" >/dev/null 2>&1; then
+            echo "::error::le serveur de rewrites n'a pas répondu sur $LOCAL_BASE"
+            tail -50 /tmp/kojo-local-rewrites.log
+            exit 1
+          fi
+
+          # Sonde de capacité : la fiche inconnue doit répondre 404 + noindex.
+          # C'est la MÊME observation que celle des scripts (elle décide si le
+          # cycle s'exécute) : la vérifier ici nomme la cause au lieu de laisser
+          # le cycle s'annoncer « ignoré ».
+          PROBE_HEADERS="$(curl -sS -D - -o /dev/null "$LOCAL_BASE/jobs/00000000-0000-4000-8000-000000000000")"
+          PROBE_STATUS="$(printf '%s' "$PROBE_HEADERS" | head -1 | awk '{print $2}')"
+          if [ "$PROBE_STATUS" != "404" ] || ! printf '%s' "$PROBE_HEADERS" | grep -qi 'noindex'; then
+            echo "::error::la pile locale ne sert pas la route /jobs/:id (HTTP $PROBE_STATUS) — le cycle ne pourrait pas s'exécuter"
+            printf '%s\n' "$PROBE_HEADERS" | head -20
+            exit 1
+          fi
+          echo "Sonde /jobs/:id : 404 + noindex (pré-rendu backend servi par la pile locale)"
+
+          # Jeton du compte local : le cycle et l'audit des pages protégées
+          # utilisent le même en-tête que sur un déploiement réel.
+          LOGIN_JSON="$(curl -sS -X POST "$LOCAL_BACKEND/api/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$KOJO_LHCI_LOCAL_EMAIL\",\"password\":\"$KOJO_LHCI_LOCAL_PASSWORD\"}")"
+          TOKEN="$(printf '%s' "$LOGIN_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin).get('access_token',''))")"
+          if [ -z "$TOKEN" ]; then
+            echo "::error::login du compte CI local échoué — réponse: ${LOGIN_JSON:0:200}"
+            exit 1
+          fi
+          AUTH_HEADER="$(python3 -c "import json,sys; print(json.dumps({'Authorization': 'Bearer ' + sys.argv[1]}))" "$TOKEN")"
+
+          {
+            echo "KOJO_LHCI_BASE_URL=$LOCAL_BASE"
+            echo "KOJO_BACKEND_URL=$LOCAL_BACKEND"
+            echo "KOJO_ORIGIN=$LOCAL_BASE"
+            echo "KOJO_LHCI_AUTH_HEADER=$AUTH_HEADER"
+            echo "KOJO_LHCI_LOCAL_STACK=1"
+          } >> "$GITHUB_ENV"
+          echo "Pile locale prête : $LOCAL_BASE (build frontend + $LOCAL_BACKEND + table de rewrites)"
 
       # Authentifie les pages protégées : se connecte au backend prod avec le
       # COMPTE CLIENT DÉDIÉ CI (secrets LHCI_CI_EMAIL/LHCI_CI_PASSWORD) et
@@ -634,6 +783,9 @@ jobs:
       # (sinon /auth/me → 401 et redirection vers /login).
       - name: Authenticate CI test account (fetch Bearer token)
         id: ci-auth
+        # Le repli local a déjà posé son propre jeton (compte provisionné dans
+        # la base jetable) : les secrets ne servent que sur un déploiement réel.
+        if: env.KOJO_LHCI_LOCAL_STACK != '1'
         env:
           LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
           LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
@@ -663,8 +815,10 @@ jobs:
       # par route — le HTML servi est exactement ce que reçoit un crawler sans
       # JS (le pré-rendu OG). Échoue le job (→ PR bloquée) si un og:image est
       # absent, relatif, ou ne correspond pas à la carte attendue de la route
-      # (/, /jobs, /login). KOJO_LHCI_BASE_URL (résolue plus haut) est lue par le script
-      # via process.env ; sans elle, repli sur le build local.
+      # (/, /jobs, /login). KOJO_LHCI_BASE_URL (résolue plus haut : déploiement
+      # réel, sinon pile locale) est lue par le script via process.env. Le script
+      # OBSERVE si la base auditée sert /jobs/:id (sonde 404 + noindex) : sur la
+      # pile locale elle le sert, donc la fiche y est vérifiée aussi.
       - name: Check OG images per route (crawler view)
         working-directory: frontend
         run: node scripts/check-og-images.js
@@ -686,12 +840,16 @@ jobs:
       # vide. Les sondes post-suppression portent un paramètre de cache-busting
       # car la fiche vivante est servie avec s-maxage=3600 (l'URL nue pourrait
       # renvoyer un 200 sorti du cache CDN).
-      # Sur repli build local (KOJO_LHCI_BASE_URL=localhost), le script ne fait RIEN
-      # (le rewrite /jobs/(.*) n'existe que sur le déploiement Vercel) : il
-      # sort en 0 avec un ::notice — aucune écriture en prod pour rien.
-      # KOJO_LHCI_BASE_URL et KOJO_LHCI_AUTH_HEADER sont déjà dans l'environnement (steps
-      # précédents, via $GITHUB_ENV) ; les secrets servent de repli si le
-      # jeton n'a pas été résolu.
+      # Ce script ne saute QUE si la base auditée ne sert pas la route (sonde de
+      # capacité) : un serveur statique nu. La pile locale du repli REJOUE la
+      # table de rewrites devant le backend de la PR, donc le cycle s'y exécute
+      # — c'est ce qui ferme le seul trou de couverture des PR. La mission de
+      # test est créée et supprimée dans la MongoDB JETABLE du job
+      # (KOJO_BACKEND_URL = backend local) : aucune écriture en production.
+      # KOJO_LHCI_BASE_URL, KOJO_BACKEND_URL, KOJO_ORIGIN et
+      # KOJO_LHCI_AUTH_HEADER sont déjà dans l'environnement (steps précédents,
+      # via $GITHUB_ENV) ; les secrets servent de repli si le jeton n'a pas été
+      # résolu par le login du déploiement réel.
       - name: Check /jobs/:id OG path (create → 200 → delete → 404 + noindex + sitemap)
         working-directory: frontend
         env:
@@ -703,7 +861,10 @@ jobs:
 
       # ubuntu-latest embarque Google Chrome : chrome-launcher le détecte
       # automatiquement (pas d'action d'installation nécessaire). KOJO_LHCI_BASE_URL
-      # (si définie) fait auditer l'URL Vercel réelle, sinon le build local.
+      # (si définie) fait auditer l'URL Vercel réelle, sinon la pile locale —
+      # adresse LOOPBACK, que lighthouserc.cjs traite comme le repli local (audit
+      # de l'accueil seul, plafond TBT élargi) : les pages protégées n'ont pas
+      # de données réelles derrière un serveur local.
       # KOJO_LHCI_AUTH_HEADER authentifie les pages /dashboard,/jobs,/profile.
       - name: Run Lighthouse CI (collect + assert, budgets bloquants)
         working-directory: frontend
@@ -720,6 +881,19 @@ jobs:
         with:
           name: lighthouse-reports
           path: frontend/lhci-reports
+
+      # Journaux de la pile locale (démarrage uvicorn, requêtes de rewrites) :
+      # sans eux, un rouge sur le repli ne dit pas si c'est le backend, le
+      # serveur de rewrites ou le cycle qui a échoué.
+      - name: Upload local stack logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-stack-logs
+          if-no-files-found: ignore
+          path: |
+            /tmp/kojo-local-backend.log
+            /tmp/kojo-local-rewrites.log
 
   # ─── Mobile : Capacitor sync + build Android debug ───────────────────────
   mobile-build:

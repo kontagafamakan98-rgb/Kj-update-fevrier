@@ -32,7 +32,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict. | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build`, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
-| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`. | **Oui** : repli silencieux sur un build local (seul l'accueil y est audité), verrou `/jobs/:id` du déploiement réel désactivé (couvert ailleurs sur les PR depuis le 16/09/2026, §3, F3), budgets calés sur des mesures réelles mais encore larges (§3, F6). |
+| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles mais encore larges (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
 
@@ -61,52 +61,78 @@ que si un `backend/**` a changé, ou par un `workflow_dispatch` manuel.
 commentaire de l'app Vercel. Il **échoue volontairement en douceur** : rate-limit
 GitHub (`403`), erreur réseau (`000`), HTTP ≠ 200, corps JSON inexploitable, ou
 preview **protégée** par Vercel Deployment Protection → il logue un `⚠️` et
-n'écrit **rien**. Le step suivant démarre alors `vite preview` sur le port 4173 et
-`KOJO_LHCI_BASE_URL=http://localhost:4173`.
+n'écrit **rien**. Le job démarre alors, dans une MongoDB jetable, le **backend de
+la PR** et `frontend/scripts/vercel-rewrite-server.js` (qui rejoue la table de
+rewrites de `vercel.json`), puis annonce `KOJO_LHCI_BASE_URL=http://127.0.0.1:4174`
+— le repli n'est plus un serveur statique nu (voir F3).
 
-Sur ce repli, **seul l'accueil** est audité par Lighthouse : `vite preview` ne
-sert pas les `.html` pré-rendus par route (il renvoie `index.html` pour toute
-route inconnue), donc y mesurer `/jobs` mesurerait l'accueil déguisé, et
-`/dashboard` l'accueil puis la redirection du 401 — des chiffres qui ne
-décrivent aucune page réelle. Le déploiement réel, lui, est audité sur les
-quatre URLs (`/`, `/dashboard`, `/jobs`, `/profile`, ces trois dernières
-authentifiées par le jeton Bearer du compte CI) : c'est là, et là seulement, que
-les budgets des pages protégées sont appliqués.
+Sur ce repli, **seul l'accueil** est audité par Lighthouse : l'adresse est
+loopback, et `lighthouserc.cjs` y voit le repli local (le build est compilé avec
+l'API de prod, donc `/jobs` et `/dashboard` mesurés là-bas décriraient l'accueil
+déguisé et une redirection vers `/login` — des chiffres qui ne décrivent aucune
+page réelle). Le déploiement réel, lui, est audité sur les six
+URLs (`/`, `/register`, `/forgot-password`, `/dashboard`, `/jobs`, `/profile`,
+ces trois dernières authentifiées par le jeton Bearer du compte CI) : c'est là,
+et là seulement, que les budgets des pages protégées sont appliqués.
 
 Le job est vert, les mêmes assertions tournent — mais elles mesurent **un build
-statique servi en local**, pas le déploiement Vercel : ni CDN, ni redirections,
-ni cache d'edge, ni latence réseau. Une régression qui n'existe que sur le
-déploiement réel (poids de la mise en cache d'edge, `s-maxage`, compression
-négociée) passe donc au vert.
+servi en local**, pas le déploiement Vercel : ni CDN, ni redirections, ni cache
+d'edge, ni latence réseau. Une régression qui n'existe que sur le déploiement
+réel (`s-maxage`, cache distribué, redirections) passe donc au vert. C'est la
+raison d'être du repli « forme production » de F3 : il ferme le trou de
+**comportement** (le cycle HTTP), pas celui de la **latence** — laquelle
+n'existe que sur le déploiement, et reste auditée sur `main`.
 
 C'est le faux-vert le plus insidieux du workflow : **le mode de défaillance le
 plus probable (une API externe rate-limitée) est exactement celui qui dégrade
 silencieusement la portée du contrôle.**
 
-### F3 — Le verrou `/jobs/:id` s'éteint tout seul — **atténué le 16/09/2026**
+### F3 — Le verrou `/jobs/:id` s'éteignait tout seul — **fermé le 17/09/2026**
 
 `check-og-job-200.js` crée une mission de test, vérifie la carte OG de la fiche,
 la supprime, puis exige 404 + noindex + carte 404 + disparition du sitemap. Sur
 repli build local (F2), le rewrite `/jobs/(.*)` de Vercel n'existe pas : le script
-sort en **`exit 0` avec un simple `::notice`** (« Cycle ignoré (base locale) »).
-
+sortait en **`exit 0` avec un simple `::notice`** (« Cycle ignoré (base locale) »).
 Or ce repli concerne **toutes les PR** (la preview Vercel est protégée) : le
 cycle ne tournait donc jamais avant fusion, et une régression ne se voyait
 qu'après le merge, en production.
 
-**Depuis le 16/09/2026, le cycle est rejoué sur les PR, mais pas par ce script :**
+Atténué le 16/09/2026 par deux gardes complémentaires, puis **fermé le
+17/09/2026** : le repli local ne sert plus un serveur statique nu, mais une
+**pile « forme production »** — MongoDB jetable + backend de la PR (uvicorn) +
+`frontend/scripts/vercel-rewrite-server.js`, qui **rejoue la table de rewrites de
+`vercel.json`** (lue dans le fichier, jamais recopiée) devant le build. Le cycle
+s'exécute donc en vraies requêtes HTTP **sur chaque PR**, sans écriture en
+production (la mission de test naît et meurt dans la base éphémère du job) et
+sans secret supplémentaire.
 
 | Maillon | Où il tourne sur une PR | Ce qu'il prouve |
 |---|---|---|
-| Comportement du cycle (créer → 200 → supprimer → 404 + noindex + sitemap) | `backend/tests/test_job_og_cycle.py` (job `backend-tests`, check requis) | le fil complet contre le **code de la PR**, en processus (ASGI) |
+| Cycle HTTP complet sur la pile locale (création → fiche pré-rendue → cartes Pillow → suppression → 404 + noindex + sitemap) | `check-og-job-200.js` (job `lighthouse-ci`, check requis) | le fil **de bout en bout**, en HTTP, contre le code de la PR **et** contre la table de rewrites de `vercel.json` |
+| Comportement du cycle | `backend/tests/test_job_og_cycle.py` (job `backend-tests`, check requis) | le même fil en processus (ASGI) : les deux se recoupent, aucun des deux ne dépend de l'autre |
 | Configuration de routage (rewrite `/jobs/(.*)` → backend, chaque route de production déclarée, URL inconnue → 404) | `frontend/scripts/check-spa-routes.js` (job `frontend-build`) | que la requête est bien **acheminée** vers cette route |
-| Séparation des gabarits (page pré-rendue → son `.html`, route cliente → `app.html` nu, jamais `index.html`) et `noindex` des routes privées | `frontend/scripts/check-spa-routes.js` (job `frontend-build`) | qu'aucune route ne publie le contenu de l'accueil sous sa propre adresse (contenu dupliqué), et qu'aucun tableau de bord n'est indexable |
-| Shell statique de l'accueil (h1, contenu, liens, N.A.P., SEO local) | `frontend/scripts/check-home-shell.js` (job `frontend-build`) | que la page d'accueil dit quelque chose à un crawler **sans JavaScript** |
+| Fidélité de l'émulateur (motifs, ordre des règles, slash final, en-têtes, 404 sans catch-all, proxy des destinations absolues, compression) | `frontend/scripts/__tests__/vercel-rewrite-server.test.js` | que le vert du cycle local ne vient pas d'un serveur **plus permissif** que Vercel |
 | Déploiement réel (rewrite Vercel, CDN, cache CDN, cache-busting) | `check-og-job-200.js`, sur `main` uniquement | l'état de la **production** après fusion |
 
+La décision « la base auditée sert-elle la fiche ? » est **observée**, pas
+déduite de l'adresse : les deux scripts interrogent une fiche inexistante et
+exigent 404 + noindex (`baseServesJobOgRoute`). C'est cet abandon de
+l'heuristique `localhost → on saute` qui a rendu la fermeture possible — elle
+était VRAIE tant que le seul repli possible était `vite preview`, et fausse dès
+qu'un serveur local rejoue les rewrites. Si la pile locale ne sert pas la route,
+le job échoue **avant** les checks (sonde explicite dans le workflow) : un cycle
+« ignoré » ne peut plus passer pour un cycle vérifié.
+
+Un détail de fidélité compte pour la suite : le repli local sert désormais aussi
+l'audit Lighthouse (adresse loopback → `lighthouserc.cjs` reste en mode repli,
+audit de l'accueil seul), donc le serveur de rewrites **compresse en gzip** comme
+Vercel. Sans cela, Lighthouse aurait mesuré des bundles non compressés et fait
+rougir l'audit pour une raison d'émulateur.
+
 Ce qui reste non couvert sur une PR est donc **le déploiement lui-même** (Vercel
-et son CDN) — inhérent : mettre en ligne une preview par PR est impossible ici
-(preview protégée). La configuration, elle, est désormais vérifiée avant merge.
+et son CDN : TLS, cache distribué, règles géographiques) — inhérent : mettre en
+ligne une preview par PR est impossible ici (preview protégée). Le comportement
+et la configuration sont, eux, vérifiés avant merge.
 
 ### F4 — `fly-env-drift` : deux contrôles incapables de mordre
 
@@ -195,17 +221,29 @@ Deux points que ces chiffres imposent :
   qui déplace le contenu sous elle. Ce défaut était **invisible** jusqu'ici
   parce que le job n'auditait qu'une URL.
 
+**Ajout du 17/09/2026 — `/register` et `/forgot-password` dans le collect :** les
+deux pages d'auth publiques dont les PR #19 (wrapper `Register` en `min-h-full`,
+CLS 0,0165 → 0,0081 au probe 1280×4000) et #20 (`ForgotPasswordSkeleton`
+calibré, CLS 0,0012 → 0,0000 au probe 412×823) ont corrigé la stabilité de mise
+en page ne figuraient dans **aucune** URL auditée. Leurs budgets sont donc pour
+l'instant ceux du collect commun (CLS ≤ 0,15), ce qui n'attrape qu'un
+**effondrement** : la régression exacte que ces PR ont corrigée (≈ 0,016) y passe
+sans être vue. Un plafond CLS propre à ces deux routes demande `assertMatrix`
+(exclusif de `assertions`/`aggregationMethod` dans `@lhci/cli`) et des valeurs
+**mesurées** — donc un premier relevé des deux pages, qui sera disponible dans le
+rapport Lighthouse uploadé en artifact du prochain run.
+
 Un TBT 40× au-dessus de la médiane ou un LCP doublé passent encore au vert :
 la détection d'une régression *relative* exigerait un serveur LHCI, absent. Le
-garde attrape un **effondrement**, et il le fait désormais sur les 4 pages.
+garde attrape un **effondrement**, et il le fait désormais sur les 6 pages.
 
 ### F2bis — Lighthouse n'auditait qu'UNE page, à cause d'un nom de variable
 
 `@lhci/cli` configure yargs avec `.env('LHCI')` : toute variable d'environnement
 `LHCI_<x>` est relue par le CLI comme l'option `--<x>`. Le job exportait
 `LHCI_URL` pour indiquer la base à auditer, et `lighthouserc.cjs` construisait un
-tableau de 4 URLs — mais `LHCI_URL` devenait l'option `--url` du collecteur, qui
-**écrase** ce tableau. Tous les runs affichaient « Checking assertions against
+tableau d'URLs (une par page) — mais `LHCI_URL` devenait l'option `--url` du
+collecteur, qui **écrase** ce tableau. Tous les runs affichaient « Checking assertions against
 1 URL(s) » : les pages `/dashboard`, `/jobs` et `/profile` n'ont jamais été
 auditées, leurs budgets ne mesuraient rien, et les faux-verts correspondants
 n'étaient pas visibles dans les logs.
@@ -214,7 +252,7 @@ Corrigé par le renommage `KOJO_LHCI_BASE_URL` / `KOJO_LHCI_AUTH_HEADER` (hors d
 motif capturé par yargs), un garde qui interdit toute variable `LHCI_*` dans la
 configuration et dans le workflow
 (`frontend/scripts/__tests__/check-lhci-env.test.js`), et la première mesure
-réelle des quatre pages (tableau F6).
+réelle des pages auditées (tableau F6).
 
 ### F7 — `backend-tests` : deux chemins de production jamais exercés
 
