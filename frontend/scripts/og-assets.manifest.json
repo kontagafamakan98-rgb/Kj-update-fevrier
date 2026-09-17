@@ -1,0 +1,66 @@
+{
+  "assets": [
+    {
+      "bytes": 32491,
+      "file": "og-image-1200x630.png",
+      "format": "wide",
+      "height": 630,
+      "sha256": "217c2daad556e68f9d1864277ebc15f0d81353f02be6efc6ab9ffc44724292fb",
+      "width": 1200
+    },
+    {
+      "bytes": 40013,
+      "file": "og-jobs.png",
+      "format": "wide",
+      "height": 630,
+      "sha256": "c1a8a0bcc49973b20b7cf4f3930ed7982c3932e93b19ec23557066aa1efd4693",
+      "width": 1200
+    },
+    {
+      "bytes": 35853,
+      "file": "og-login.png",
+      "format": "wide",
+      "height": 630,
+      "sha256": "da1332cb5a1f587a84dcf439d8328509790989b1f84f79ed0bb1e9eb3f3f588c",
+      "width": 1200
+    },
+    {
+      "bytes": 37245,
+      "file": "og-square-1200x1200.png",
+      "format": "carré",
+      "height": 1200,
+      "sha256": "a7b186c31041df3cd05f79fe3263213712c097854cc7c8412c731cdfdbfd8ab5",
+      "width": 1200
+    },
+    {
+      "bytes": 43523,
+      "file": "og-jobs-square.png",
+      "format": "carré",
+      "height": 1200,
+      "sha256": "2889793e4877b7d1b09e9e37e4acf9019e49a17181fda5528708eebb3bd89916",
+      "width": 1200
+    },
+    {
+      "bytes": 39366,
+      "file": "og-login-square.png",
+      "format": "carré",
+      "height": 1200,
+      "sha256": "f8b7e12d4ccc97d5340cf675f09c5e5b517d1af0aac240045e6b214f749877d0",
+      "width": 1200
+    },
+    {
+      "bytes": 27941,
+      "file": "icons/icon-dark.png",
+      "format": "favicon sombre",
+      "height": 512,
+      "sha256": "061847c3566d31375589b95af5f9d61b523346e2dd500e023af15c100753e4bd",
+      "width": 512
+    }
+  ],
+  "fonts": {
+    "bold": "arialbd.ttf",
+    "regular": "arial.ttf"
+  },
+  "generator": "gen-og-images.py",
+  "generator_sha256": "f6e871e76c4acee61c40e2c5a43720d15b42418eb462d2241f622e6389577e37"
+}

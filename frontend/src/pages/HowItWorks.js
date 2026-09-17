@@ -128,6 +128,19 @@ export default function HowItWorks() {
               {t('offerServices')}
             </Link>
           </div>
+          {/* Maillage interne : depuis cette page de contenu, un crawler (et
+              un visiteur) atteint la liste des missions et le support. Le
+              shell statique (vite.config.js) rend EXACTEMENT le même bloc —
+              sinon la ligne disparaîtrait au montage React. */}
+          <p className="mt-6 text-sm opacity-90">
+            <Link to="/jobs" className="underline underline-offset-2">
+              {t('viewJobs')}
+            </Link>
+            {' · '}
+            <Link to="/support" className="underline underline-offset-2">
+              {t('support')}
+            </Link>
+          </p>
         </div>
       </section>
     </div>

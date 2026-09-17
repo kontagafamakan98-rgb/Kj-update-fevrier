@@ -10,6 +10,9 @@
  *   sauvegarde (l'unique source du 'user' stocké est la réponse backend) ni
  *   les numéros de paiement (sanitisation privacy).
  * - Un 401 au bootstrap ne laisse aucun utilisateur fantôme dans le stockage.
+ * - Un VISITEUR ANONYME (ni jeton, ni cookie) ne sonde JAMAIS /auth/me : la
+ *   requête était un 401 garanti à chaque chargement de page, visible dans la
+ *   console du navigateur et payé par tous les visiteurs non connectés.
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -28,6 +31,12 @@ vi.mock('../../services/api', () => ({
   // listener 'kojo:unauthorized'). Export réel de api.js — mocké en no-op,
   // le comportement est couvert par le test dédié "kojo:unauthorized".
   markSoftRedirectConsumed: vi.fn(),
+  // Détection de session réellement branchée sur le stockage : le court-circuit
+  // anonyme de loadUser est ainsi testé sur son vrai critère (jeton présent ou
+  // non), pas sur une doublure qui répondrait toujours la même chose.
+  getAuthToken: vi.fn(() => localStorage.getItem('token') || ''),
+  // Cookie CSRF lisible : TOUJOURS absent en web cross-origin (Vercel → Fly).
+  hasSessionCookie: vi.fn(() => false),
 }));
 
 import { markSoftRedirectConsumed } from '../../services/api';
@@ -63,10 +72,11 @@ const FRESH_USER = {
 
 // Sonde : expose le pays de l'utilisateur React ET le bouton de rechargement.
 const Probe = () => {
-  const { user, loadUser } = useAuth();
+  const { user, loadUser, loading } = useAuth();
   return (
     <div>
       <span data-testid="country">{user?.country || 'none'}</span>
+      <span data-testid="loading">{String(loading)}</span>
       <button onClick={() => loadUser()}>reload</button>
     </div>
   );
@@ -98,6 +108,9 @@ describe('AuthContext — cohérence du snapshot localStorage user', () => {
     // Session ouverte depuis longtemps : le snapshot stocké porte encore le
     // pays d'origine (Sénégal) alors que le backend renvoie désormais Mali
     // (pays mis à jour depuis le formulaire de profil).
+    // Session ouverte : le jeton est la marque d'une session vivante — sans
+    // lui, loadUser ne sonde plus (visiteur anonyme).
+    localStorage.setItem('token', 'jeton-de-session');
     localStorage.setItem(
       'user',
       JSON.stringify({ id: 'user-1', country: 'senegal', user_type: 'client' })
@@ -116,6 +129,7 @@ describe('AuthContext — cohérence du snapshot localStorage user', () => {
   });
 
   it('ne stocke jamais les numéros de paiement dans le snapshot (sanitisation conservée)', async () => {
+    localStorage.setItem('token', 'jeton-de-session');
     authAPI.getProfile.mockResolvedValue({
       ...FRESH_USER,
       payment_accounts: { orange_money: '+22370000000' },
@@ -131,6 +145,7 @@ describe('AuthContext — cohérence du snapshot localStorage user', () => {
   });
 
   it('401 au bootstrap → aucun utilisateur fantôme stocké (snapshot purgé)', async () => {
+    localStorage.setItem('token', 'jeton-de-session');
     localStorage.setItem(
       'user',
       JSON.stringify({ id: 'user-1', country: 'senegal', user_type: 'client' })
@@ -145,8 +160,36 @@ describe('AuthContext — cohérence du snapshot localStorage user', () => {
     expect(localStorage.getItem('user')).toBeNull();
   });
 
+  it('visiteur anonyme (ni jeton, ni cookie) → aucune sonde /auth/me', async () => {
+    // Cas dominant en production : la majorité des chargements de page sont des
+    // visiteurs non connectés (accueil, /jobs, /login, crawlers). La sonde y
+    // répondait 401 à coup sûr — un aller-retour cross-origin inutile et une
+    // ligne rouge dans la console du navigateur, à chaque page vue.
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('none'));
+    expect(authAPI.getProfile).not.toHaveBeenCalled();
+    // Et l'état d'amorçage se termine : l'app ne reste pas bloquée en loading.
+    expect(screen.getByTestId('loading').textContent).toBe('false');
+  });
+
+  it('jeton présent → la sonde /auth/me EST faite (et un 401 purge la session)', async () => {
+    // Contre-épreuve du test précédent : le court-circuit ne doit pas rendre
+    // l'app aveugle à une session réellement ouverte.
+    localStorage.setItem('token', 'jeton-de-session');
+    authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));
+    expect(authAPI.getProfile).toHaveBeenCalledTimes(1);
+  });
+
   it('le signal kojo:unauthorized vide user (redirection SPA douce, sans rechargement)', async () => {
     // Session valide au départ : l'utilisateur est connecté côté React.
+    localStorage.setItem('token', 'jeton-de-session');
     authAPI.getProfile.mockResolvedValue({ ...FRESH_USER });
     renderProvider();
     await waitFor(() => expect(screen.getByTestId('country').textContent).toBe('mali'));

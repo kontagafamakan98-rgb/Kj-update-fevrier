@@ -186,3 +186,48 @@ describe('anti-CLS — états de chargement génériques : footer hors écran (1
     expect(body).not.toContain('className="min-h-full');
   });
 });
+
+// Les pages qui rendent dans le shell de l'application (App.js :
+// `div.min-h-screen.flex.flex-col` > `main.flex-1` > page, avec LegalFooter)
+// doivent exprimer leur hauteur minimale en POURCENTAGE du conteneur
+// (`min-h-full`), jamais en hauteur de viewport (`min-h-screen`) : avec 100vh,
+// la page dépasse de la hauteur de la navbar ET du footer, ce qui crée un
+// défilement inutile et sort le footer du premier écran. Mesuré sur /register
+// à viewport 1280×4000 : 118 px de débordement et CLS 0,0165 avec min-h-screen,
+// 0 px et CLS 0,0081 avec min-h-full (aucun changement à viewport mobile, où le
+// contenu dépasse déjà l'écran).
+//
+// Hors liste (volontairement) : Home.js, HowItWorks.js et PhotoTest.js utilisent
+// encore min-h-screen — pages publiques dont la mise en page plein écran n'a pas
+// été auditée ici, donc pas de règle forcée sur elles.
+const PAGES_MIN_H_FULL = [
+  'Login.js',
+  'ForgotPassword.js',
+  'Register.js',
+  'Payment.js',
+  'CommissionDashboard.js',
+  'EmailVerificationPage.js',
+  'PaymentVerificationPage.js',
+  'MobileTest.js',
+];
+
+describe('anti-CLS — wrappers de page ancrés sur le shell flex-1 (min-h-full)', () => {
+  it('chaque page du shell utilise min-h-full et jamais min-h-screen', () => {
+    const offenders = [];
+    for (const page of PAGES_MIN_H_FULL) {
+      const source = fs.readFileSync(
+        path.resolve(__dirname, '../../pages', page),
+        'utf8'
+      );
+      if (!source.includes('min-h-full')) {
+        offenders.push(`${page} : min-h-full absent (le footer ancré ne sera pas comblé)`);
+      }
+      if (source.includes('min-h-screen')) {
+        offenders.push(
+          `${page} : min-h-screen présent (100vh → débordement navbar + footer, scroll inutile)`
+        );
+      }
+    }
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+});

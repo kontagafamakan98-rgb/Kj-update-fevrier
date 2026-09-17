@@ -9,14 +9,25 @@
  *
  *   1. JS INITIAL — somme gzip des chunks référencés par build/index.html
  *      (ce que le navigateur télécharge avant de peindre la première route).
- *      Mesure du 16/09/2026 : 98,5 Ko gzip (index 37,7 + vendor-react-dom 40,7
+ *      Mesure du 16/09/2026 : 99,2 Ko gzip (index 38,4 + vendor-react-dom 40,7
  *      + vendor-router 13,4 + vendor-react 2,8 + Home 2,3 + vendor 1,6).
- *   2. PLUS GROS CHUNK — mesure : vendor-sentry 156,4 Ko gzip.
- *   3. BUILD TOTAL (brut, tous fichiers) — mesure : 2,81 Mo.
+ *      Le SDK Sentry n'y figure plus : il était le plus gros chunk du build
+ *      (482 715 o brut / 159 751 o gzip) parce que `await import()` renvoyait
+ *      l'espace de noms entier, ce qui empêchait Rollup d'élaguer ses exports
+ *      (replay, feedback, profiler…). Le déstructurer au site d'appel a ramené
+ *      ce chunk à 87 044 o / 29 538 o gzip (−82 %), et son initialisation est
+ *      désormais différée après interaction (voir src/utils/sentry.js).
+ *   2. PLUS GROS CHUNK — mesure : vendor-leaflet 47,5 Ko gzip.
+ *   3. BUILD TOTAL (brut, tous fichiers) — mesure : 2,28 Mo.
  *
- * Les seuils laissent ~30-40 % de marge : ils n'échouent pas sur la variance
- * d'arrondi de Vite, mais attrapent une régression de structure (un chunk
- * entier qui revient dans le chemin critique, un vendor dupliqué, etc.).
+ * Les seuils n'échouent pas sur la variance d'arrondi de Vite, mais attrapent
+ * une régression de structure (un chunk entier qui revient dans le chemin
+ * critique, un vendor dupliqué, la réapparition d'un SDK non élagué, etc.).
+ * Ils ont été calibrés quand le plus gros chunk était à 156 Ko ; après le
+ * correctif Sentry la marge du 2e budget est devenue très large (47,5 Ko pour
+ * 200 Ko). Elle est laissée telle quelle à dessein : un seuil resserré au ras
+ * de la mesure courante produirait des rouges sur la simple croissance d'une
+ * dépendance (leaflet), pas sur une régression de structure.
  * Le check est une fonction exportée (convention des autres gardes) : il est
  * testé par scripts/__tests__/check-bundle-size.test.js sur des fixtures, donc
  * il n'a pas besoin d'un build réel pour être vérifié.

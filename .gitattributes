@@ -1,15 +1,95 @@
-# ── Fins de ligne des SCRIPTS : LF partout, sur toutes les plateformes ───────
-# Ces dossiers contiennent des modules Node EXÉCUTÉS en CI (Linux, LF) et
-# IMPORTÉS par les tests vitest. Avec core.autocrlf=true (réglage par défaut
-# sous Windows), git rematérialise ces fichiers en CRLF : un shebang suivi d'un
-# CR (`#!/usr/bin/env node\r`) fait alors échouer l'import avec un
-# « SyntaxError: Invalid or unexpected token » — tests verts en CI, rouges en
-# local, sur du code identique. Mesuré et reproduit avec témoin :
-#   • copie CRLF AVEC shebang  → import KO
-#   • copie CRLF SANS shebang  → import OK
-# On fige donc eol=lf sur ces deux dossiers : le contenu committé et la copie
-# de travail sont identiques partout, ce qui supprime la classe entière de ces
-# faux rouges et l'état « modifié » fantôme qui bloque les changements de
-# branche.
+# ── Fins de ligne et nature des fichiers ─────────────────────────────────────
+# Objectif : le contenu committé et la copie de travail doivent être IDENTIQUES
+# sur toutes les plateformes, pour qu'un test vert en local ne puisse pas être
+# rouge en CI (et l'inverse) à cause d'un simple `\r`.
+#
+# Sans ces règles, `core.autocrlf=true` — le défaut sous Windows — rematérialise
+# les fichiers texte en CRLF : la CI (Linux) et un poste Windows voient alors des
+# OCTETS différents pour le même commit. Deux dégâts mesurés dans ce dépôt :
+#   • un script Node dont le shebang devient « #!/usr/bin/env node\r » échoue à
+#     l'import : « SyntaxError: Invalid or unexpected token ». Test vert en CI,
+#     rouge en local, sur du code identique. Reproduit avec témoin : copie CRLF
+#     AVEC shebang → import KO ; copie CRLF SANS shebang → import OK ;
+#   • les générateurs d'images consignent leur PROPRE empreinte SHA-256 dans un
+#     manifeste. Hachée sur des octets CRLF, elle ne correspond plus au blob LF
+#     que la CI matérialise : le garde croit le manifeste périmé et refuse.
+#
+# La règle générale fige donc LF pour tout fichier texte ; les lignes suivantes
+# rendent l'intention EXPLICITE là où elle est structurante, pour qu'un futur
+# rétrécissement de la règle générale ne puisse pas rouvrir ces brèches.
+* text=auto eol=lf
+
+# ── Scripts : le cas où le CRLF casse réellement ─────────────────────────────
+# Shebang, `set -e`, exécution directe, modules importés par vitest. C'est la
+# classe de panne qui a motivé ce fichier. `gradlew` n'a PAS d'extension mais EST
+# un script shell exécuté par la CI Linux : une conversion le casserait.
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.jsx text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+gradlew text eol=lf
+# Conservé explicitement (en plus de la règle générale) : ces deux dossiers sont
+# ceux où un CRLF a déjà produit un faux rouge.
 frontend/scripts/** text eol=lf
 .github/scripts/** text eol=lf
+
+# ── Scripts batch Windows : CRLF est leur format natif ───────────────────────
+# cmd.exe se comporte mal avec un .bat en LF (sauts de bloc, libellés). Ce sont
+# les SEULS fichiers texte volontairement en CRLF, et ils ne tournent jamais en
+# CI : le forcer en LF serait le bug, pas le correctif.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# ── Texte, au-delà de la règle générale ──────────────────────────────────────
+# Explicite pour que ces types restent en LF même si `* text=auto` changeait.
+*.json text eol=lf
+*.md text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.svg text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+*.ini text eol=lf
+*.example text eol=lf
+Dockerfile text eol=lf
+# Projets et configuration natifs (Android / iOS) : lus par des outils, jamais
+# réécrits par eux dans ce dépôt — LF, comme le reste.
+*.gradle text eol=lf
+*.properties text eol=lf
+*.pro text eol=lf
+*.plist text eol=lf
+*.pbxproj text eol=lf
+*.storyboard text eol=lf
+*.xcconfig text eol=lf
+*.swift text eol=lf
+*.java text eol=lf
+
+# ── Binaires : aucune conversion, jamais ─────────────────────────────────────
+# `binary` vaut `-text -diff` : git cesse de deviner, n'applique aucun filtre de
+# fin de ligne et ne tente pas de diff textuel. Une conversion silencieuse
+# corromprait une image (les octets SONT l'image — c'est exactement ce que
+# vérifient les manifestes d'empreintes de cette famille), et un paquet signé
+# comme un APK ou un keystore deviendrait invalide.
+*.png binary
+*.ico binary
+*.webp binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svgz binary
+*.jar binary
+*.docx binary
+*.zip binary
+*.apk binary
+*.aab binary
+*.keystore binary
+*.jks binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary

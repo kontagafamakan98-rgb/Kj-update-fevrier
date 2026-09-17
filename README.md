@@ -141,16 +141,68 @@ cd frontend && npm test
   racine du repo n'est qu'un filet de sécurité si le Root Directory est vidé.
 
 ```json
-// frontend/vercel.json (lu par Vercel avec Root Directory = frontend)
+// frontend/vercel.json (lu par Vercel avec Root Directory = frontend) — extrait
 {
   "framework": "vite",
   "outputDirectory": "build",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/jobs", "destination": "/jobs.html" },
+    { "source": "/jobs/", "destination": "/jobs.html" },
+    { "source": "/jobs/(.*)", "destination": "https://kojo-backend.fly.dev/api/og/jobs/$1" },
+    { "source": "/api/:path*", "destination": "https://kojo-backend.fly.dev/api/:path*" },
+    { "source": "/dashboard", "destination": "/app.html" }
+  ]
 }
 ```
 
+**Contrat de routage (il est vérifié par `check-spa-routes.js` à chaque push) :**
+
+- **chaque route de `src/App.js` est déclarée nommément**, dans ses deux formes
+  (`/route` et `/route/`) ; une route oubliée répondrait **404** en production ;
+- **aucun catch-all `/(.*)` → `/index.html`** : il faisait répondre **200** à
+  toute URL inconnue (« soft 404 » : des centaines d'URL vides indexables).
+  Une URL inconnue tombe désormais sur `build/404.html` (statut **404**, noindex) ;
+- **l'ordre compte** : `/jobs` et `/jobs/` doivent précéder `/jobs/(.*)`, sinon
+  le motif les capture — c'était le cas jusqu'au 16/09/2026 et `/jobs/`
+  répondait alors **404 en JSON** (la page publique la plus visitée du site,
+  cassée pour tout lien avec slash final) ;
+- **`/jobs/:id` n'est pas une page du build** : elle est pré-rendue par le
+  backend (`GET /api/og/jobs/{id}`, méta OG de la mission + 404 noindex), et le
+  cycle complet la concernant est exercé sur les PR par
+  `backend/tests/test_job_og_cycle.py`.
+- **deux gabarits, jamais confondus** : une page pré-rendue (`/jobs`, `/login`,
+  `/register`, `/forgot-password`, `/payment`, `/how-it-works`, `/support`) est
+  servie par **son** `.html`, avec SA description (une description recopiée de
+  l'accueil d'une page à l'autre fait échouer `check-home-shell.js`) ; toute
+  autre route cliente (`/dashboard`, `/profile`, `/messages`, `/create-job`…)
+  est servie par **`app.html`**, un gabarit nu (`#root` vide, pas de `<h1>`, pas
+  de canonical, pas de JSON-LD). Servir `index.html` à ces routes publierait le
+  contenu de l'accueil — h1, texte, liens — sous une dizaine d'adresses, avec un
+  canonical statique « / » sur toutes : c'est du contenu dupliqué, et
+  `check-spa-routes.js` échoue désormais dans ce cas ;
+- **les routes privées ne sont pas indexables** : `/dashboard`, `/profile`,
+  `/messages`, `/create-job`, `/photo-debug`, `/email-verification`,
+  `/payment-verification`, `/commission-dashboard` et `/support-admin` portent
+  `X-Robots-Tag: noindex` (vérifié : l'en-tête est absent → CI rouge). Un
+  tableau de bord dans les résultats de recherche est une page vide.
+
 - **Variables d'env** (dashboard, onglet Settings → Environment Variables) :
   `VITE_API_URL=https://kojo-backend.fly.dev/api`
+
+**Variables optionnelles (SEO / analytics — aucune n'a de valeur par défaut,
+rien n'est activé si elles sont absentes) :**
+
+| Variable | Effet |
+|---|---|
+| `VITE_GA_MEASUREMENT_ID` (`G-XXXXXXX`) | Balise Google Analytics 4 injectée dans le HTML **statique** (donc visible des outils d'audit) + `gtag('config')` depuis `src/utils/analytics.js` (pas de script inline : la CSP est `script-src 'self'`) et événement `page_view` à chaque navigation SPA. Ajoute aussi les domaines GA à la CSP (`googletagmanager.com`, `google-analytics.com`). |
+| `VITE_PLAUSIBLE_DOMAIN` | Analytics Plausible (script externe chargé par le bundle). |
+| `VITE_GSC_VERIFICATION` | Jeton `google-site-verification` (Search Console) ajouté au HTML statique. |
+| `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_TIKTOK`, `VITE_SOCIAL_LINKEDIN`, `VITE_SOCIAL_YOUTUBE`, `VITE_SOCIAL_X` | URL complète (`https://…`) du profil : affiché dans le footer **et** dans le `sameAs` du `LocalBusiness`. Un réseau sans valeur n'apparaît nulle part (aucun profil n'est inventé). |
+
+Le contact publié (téléphone, e-mail, adresse) vit dans
+**`frontend/src/config/contact.json`** : la page Support, le footer React, le
+shell statique de l'accueil et le `LocalBusiness` le lisent tous — une seule
+adresse, sinon `check-home-shell.js` échoue.
 
 **Pièges à connaître (leçons du terrain)** :
 
@@ -164,11 +216,15 @@ cd frontend && npm test
   `buildCommand` (utiliser `npm run build`, alias de `vite build`).
 - ⚠️ `rootDirectory` n'est pas accepté par le schéma `vercel.json` (voir
   ci-dessus).
-- ⚠️ **Le catch-all `rewrites` est indispensable** : sans lui, tout
-  chargement direct d'une route SPA (`/payment`, `/register`, … retour du
-  back bouton depuis PayDunya) renvoie un 404 `x-vercel-error: NOT_FOUND`.
-  C'est le bug rencontré : le fichier de la racine n'était pas lu, donc le
-  rewrite n'était jamais dans les métadonnées de routage.
+- ⚠️ **Les rewrites doivent être dans `frontend/vercel.json`** (celui du Root
+  Directory) : le fichier à la racine du repo n'est pas lu, et un chargement
+  direct d'une route SPA (`/payment`, `/register`, retour du bouton depuis
+  PayDunya) renvoyait alors un 404 `x-vercel-error: NOT_FOUND`. C'est le bug
+  d'origine — sa correction n'exigeait pas un catch-all, mais la déclaration
+  explicite de chaque route (voir le contrat de routage ci-dessus).
+- ⚠️ **Un catch-all `/(.*)` masque les règles suivantes ET rend 200 sur des URL
+  inconnues** : ne pas le réintroduire pour « faire marcher » une route — la
+  déclarer. `check-spa-routes.js` échoue si un catch-all réapparaît.
 
 ### Vérification post-déploiement
 
@@ -180,6 +236,12 @@ curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/api/stats  #
 
 # Frontend
 curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 200
+curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/jobs   # 200 (jobs.html)
+curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/jobs/  # 200 (jobs.html)
+curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/inexistant-xyz  # 404 (404.html, noindex)
+# Accueil : un crawler sans JavaScript doit voir un h1, du contenu et des liens
+curl -s https://kj-update-fevrier.vercel.app/ | grep -c '<h1'                # 1
+curl -s https://kj-update-fevrier.vercel.app/ | grep -c 'href="tel:'        # 2
 ```
 
 ## Sécurité
@@ -198,21 +260,47 @@ curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 
 
 ## CI
 
-`.github/workflows/ci.yml` (3 jobs) :
-- **backend-tests** : tests contre un vrai MongoDB (service container),
+`.github/workflows/ci.yml` (9 jobs, dont 8 requis sur `main`) :
+
+- **audit-regression-test** — méta-test : injecte une régression et exige que
+  chaque garde (docstrings, endpoints fantômes, `py_compile`, pyflakes) échoue.
+  Sans lui, un garde devenu aveugle resterait vert.
+- **workflow-lint** — `actionlint` sur les workflows + `shellcheck` sur les
+  scripts shell.
+- **fly-env-drift** — formats des références du dépôt (déterministe, sans
+  réseau), puis `fly.toml` ↔ runtime Fly : secrets obligatoires, doublons,
+  orphelins.
+- **backend-tests** — `pytest` contre un vrai MongoDB (service container),
   syntaxe Python (`py_compile`), **pyflakes (aucun nom non défini dans les
   modules `kojo_*` — garde-fou contre les imports manquants du découpage)**
-- **frontend-build** : tests Vitest + build Vite sur Node 24
-- **mobile-build** : `cap sync android` + build APK debug (Gradle 8.14 /
+- **frontend-build** — tests Vitest + build Vite sur Node 24, puis 7 gardes sur
+  les artefacts (shells de pré-rendu, splits i18n et `services/api`, cartes OG,
+  famille d'icônes, manifeste PWA, budgets de bundle)
+- **bundle-size-report** — publie en commentaire de PR les trois tailles
+  mesurées (JS initial, plus gros chunk, build total) avec l'écart vs la
+  dernière mesure de `main` et vs la mesure précédente de la PR. **Consultatif**
+  (hors checks requis) : il informe, le garde qui bloque est `check-bundle-size`
+- **lighthouse-ci** — budgets de performance sur l'accueil et les pages
+  protégées, authentifiées via le compte CI dédié (droits sur l'URL Vercel)
+- **mobile-build** — `cap sync android` + build APK debug (Gradle 8.14 /
   AGP 8.13, **Java 21** — requis par Capacitor 8, SDK Android) — valide la
   config Capacitor à chaque push
+- **deploy-fly** — `flyctl deploy` sur `main` uniquement, et seulement si
+  `backend/**` change
+
+> Ce que chaque job **prouve** réellement — et les cas où il peut réussir sans
+> rien vérifier (repli Lighthouse sur le build local, verrou `/jobs/:id`
+> désactivé, `deploy-fly` sauté faute de changement backend, budgets très
+> permissifs…) — est recensé dans [`CI-COVERAGE.md`](CI-COVERAGE.md), à relire
+> avant de conclure qu'un ✓ suffit.
 
 ## Branches
 
 - **`main`** — branche de référence et de production (déploiements
   automatiques Vercel + Fly.io via la CI). Tout le développement passe par
   des branches dédiées fusionnées ici (PR). C'est la **seule** branche
-  restante du dépôt.
+  permanente du dépôt : les branches de travail sont temporaires et
+  disparaissent avec la PR (voir ci-dessous).
 
 **Historique antérieur à la réécriture du 15/08/2026** : les anciennes
 branches (`master`, `backup-pre-rewrite-20260815`) ont été remplacées par
@@ -228,6 +316,39 @@ accessible mais n'apparaît pas dans les branches) :
 > 2026) et `master` ont été **supprimées** : leur contenu est intégré ou
 > préservé dans les tags ci-dessus.
 
+### Branches de travail : suppression automatique après fusion
+
+Le dépôt est réglé avec **« Automatically delete head branches »**
+(`delete_branch_on_merge = true`, activé le 16/09/2026) : une PR fusionnée
+**via GitHub** (interface ou API) supprime elle-même sa branche d'origine. Le
+nettoyage n'est donc plus une tâche manuelle qu'on peut oublier.
+
+Ce réglage ne couvre **que** les fusions faites côté GitHub. Une fusion
+faite en local puis poussée (`git merge` + `git push`) ne déclenche rien : la
+branche reste sur `origin` et doit être retirée à la main — c'est exactement
+ce qui est arrivé à `chore/ci-guards-assets-perf` et
+`chore/exec-bits-guard`, fusionnées puis supprimées manuellement. Pour un
+nettoyage immédiat :
+
+```bash
+# après une fusion locale, la branche est un ancêtre de main :
+git branch -d <branche>                      # refusé si non fusionnée
+git push origin --delete <branche>
+git fetch --prune                            # purge les références locales
+```
+
+Vérifier l'état réel des branches distantes (et non la mémoire de `git`) :
+
+```bash
+git ls-remote --heads origin                  # source de vérité
+git branch -r                                 # après un fetch --prune
+```
+
+Ce réglage est un paramètre du **dépôt**, pas du code : il n'est pas
+versionné et ne peut pas être vérifié par la CI (il faudrait un jeton
+administrateur). Pour le modifier : `Settings → General → Pull Requests`, ou
+`PATCH /repos/{owner}/{repo}` avec `{"delete_branch_on_merge": true}`.
+
 ### Protection de `main` (branche protégée)
 
 `main` est protégée par une règle GitHub : **aucun commit ne peut y entrer
@@ -237,7 +358,9 @@ autrement que par une PR dont les 8 checks CI sont verts**. Concrètement :
   (`GH006: Protected branch update failed … Changes must be made through a pull
   request`), même pour l'administrateur du dépôt (protection appliquée aussi
   aux admins : impossible de la contourner « par erreur »).
-- **8 checks requis**, exactement les jobs du workflow `CI` : `Audits détectent
+- **8 checks requis** — le workflow en compte **9** : `Bundle size report (PR
+  comment)` en est volontairement **exclu** (il publie des mesures, il ne juge
+  rien) : `Audits détectent
   les régressions`, `Backend tests (Python + MongoDB)`, `Fly env doc-prod (drift
   + secrets)`, `Frontend tests + build (Node/Vite)`, `Lighthouse performance
   budgets`, `Mobile build (Capacitor + Android)`, `Workflow lint (actionlint +
@@ -256,7 +379,7 @@ autrement que par une PR dont les 8 checks CI sont verts**. Concrètement :
 > déploiement est bien visible dans l'historique des checks.
 
 Aucun filtre de chemins n'existe au niveau du workflow : **toute** PR vers
-`main` déclenche ces 8 jobs, donc un check requis n'est jamais « en attente »
+`main` déclenche ces 9 jobs, donc un check requis n'est jamais « en attente »
 indéfiniment (cas typique de blocage avec une protection de branche).
 
 Pour modifier temporairement la règle (par ex. débloquer une urgence), passer

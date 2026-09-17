@@ -1,0 +1,8 @@
+[
+  { "key": "facebook", "label": "Facebook", "env": "VITE_SOCIAL_FACEBOOK" },
+  { "key": "instagram", "label": "Instagram", "env": "VITE_SOCIAL_INSTAGRAM" },
+  { "key": "tiktok", "label": "TikTok", "env": "VITE_SOCIAL_TIKTOK" },
+  { "key": "linkedin", "label": "LinkedIn", "env": "VITE_SOCIAL_LINKEDIN" },
+  { "key": "youtube", "label": "YouTube", "env": "VITE_SOCIAL_YOUTUBE" },
+  { "key": "x", "label": "X (Twitter)", "env": "VITE_SOCIAL_X" }
+]
