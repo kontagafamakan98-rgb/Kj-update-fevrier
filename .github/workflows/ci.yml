@@ -614,6 +614,30 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash .github/scripts/resolve-vercel-url.sh
 
+      # ── Sonde SEO de la PRODUCTION — main uniquement, INFORMATIVE ──────────
+      # Quatre intégrations réclamées par un audit SEO (balise GA4, meta Search
+      # Console, `sameAs` des profils sociaux, domaines GA/Plausible dans la CSP)
+      # n'existent que si leur variable est définie AU MOMENT DU BUILD. Le build
+      # de CI ne les définit jamais — une balise tierce dans l'artefact audité
+      # fausserait les scores Lighthouse — donc `seo-extras-injection.test.js`
+      # prouve l'INJECTION, jamais la CONFIGURATION : une variable oubliée sur
+      # Vercel ne se voyait que par un audit externe (F9 de CI-COVERAGE.md,
+      # constaté le 17/09/2026 : les quatre étaient absentes du projet).
+      #
+      # Cette sonde lit le HTML réellement servi et publie un `::notice` par
+      # intégration (présente / absente + la variable à poser). Elle ne fait
+      # JAMAIS échouer le job : une configuration incomplète est un fait
+      # d'exploitation, pas une régression de code. `--fail-if-missing` existe
+      # pour le jour où les valeurs seront posées (bascule d'un mot ici).
+      #
+      # main uniquement : sur une PR, la base peut être une preview ou la pile
+      # locale, et un « absent » n'y dirait rien de la production (le script
+      # refuse d'ailleurs de conclure sur une base loopback).
+      - name: Sonde SEO de la production (informatif, main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: frontend
+        run: node scripts/check-seo-production.js
+
       # ── Repli local « forme production » (aucune preview Vercel exploitable) ─
       # Preview PROTÉGÉE par Deployment Protection (détectée par
       # resolve-vercel-url.sh) ou commentaire Vercel absent : on rejoue en local

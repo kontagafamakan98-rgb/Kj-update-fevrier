@@ -32,6 +32,7 @@
     "check:icons": "node scripts/check-generated-icons.js",
     "check:pwa": "node scripts/check-pwa-manifest.js",
     "report:bundle": "node scripts/bundle-size-report.js",
+    "check:seo-production": "node scripts/check-seo-production.js",
     "predeploy": "npm run validate:vercel"
   },
   "browserslist": {
