@@ -671,10 +671,14 @@ jobs:
           fi
           PASSWORD="$(openssl rand -hex 24)"
           echo "::add-mask::$PASSWORD"
-          echo "KOJO_LHCI_LOCAL_EMAIL=ci-og-cycle@kojo.test" >> "$GITHUB_ENV"
+          # Domaine RÉEL (kojo.sn, comme les fixtures de backend/tests) et non
+          # un domaine réservé (`.test`, `.example`…) : /api/auth/login valide
+          # l'adresse avec pydantic/email-validator, qui refuse les domaines à
+          # usage spécial — mesuré sur le run du 17/09/2026.
+          echo "KOJO_LHCI_LOCAL_EMAIL=ci-og-cycle@kojo.sn" >> "$GITHUB_ENV"
           echo "KOJO_LHCI_LOCAL_PASSWORD=$PASSWORD" >> "$GITHUB_ENV"
           CI_PASSWORD="$PASSWORD" python scripts/provision_ci_test_account.py \
-            "mongodb://localhost:27017/kojo_lhci_ci" "ci-og-cycle@kojo.test"
+            "mongodb://localhost:27017/kojo_lhci_ci" "ci-og-cycle@kojo.sn"
 
       # Backend local + serveur de rewrites, puis PREUVE que la pile sert
       # réellement la fiche /jobs/:id (sonde 404 + noindex) : sans ce contrôle,
