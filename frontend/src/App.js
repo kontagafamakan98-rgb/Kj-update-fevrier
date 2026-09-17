@@ -61,6 +61,17 @@ function ProtectedRoute({ children }) {
   
   if (loading) {
     return (
+      // anti-CLS mesuré (probe CDP, viewport 412×823) : ce bloc vit DANS
+      // main.flex-1, mais il représente un ÉTAT DE CHARGEMENT, pas une page —
+      // il doit donc GARDER LE FOOTER HORS DE L'ÉCRAN, pas le combler.
+      // En 100vh (+ pb-24 mobile) main vaut 919 px → footer à 984 px, invisible
+      // pendant tout le contrôle d'auth. En min-h-full main tombait à 705 px →
+      // footer à 770 px, donc VISIBLE, puis les pages protégées (main mesuré
+      // 1401-1946 px sur /dashboard, /profile, /messages) le tiraient 865 à
+      // 1180 px plus bas : CLS prédit 0,064 contre 0,0010 mesuré aujourd'hui
+      // (modèle validé sur 4 mesures : 0,0012 / 0,0042 / 0,0167 / 0,0000).
+      // Les pages, elles, suivent la règle inverse (min-h-full) — cf. le garde
+      // antiClsSkeletons : la règle dépend de ce que l'état doit recouvrir.
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
