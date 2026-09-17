@@ -85,12 +85,12 @@ describe('getBackendBaseUrl — priorité des sources', () => {
     expect(getBackendBaseUrl()).toBe('http://localhost:8000');
   });
 
-  it('défaut absolu : https://kojo-backend.fly.dev (sans window)', () => {
+  it('défaut absolu : https://api.kojoforafrica.cc.cd (sans window)', () => {
     vi.stubEnv('VITE_API_URL', '');
     vi.stubEnv('VITE_API_BASE_URL', '');
     vi.stubEnv('VITE_BACKEND_URL', '');
     vi.stubGlobal('window', undefined);
-    expect(getBackendBaseUrl()).toBe('https://kojo-backend.fly.dev');
+    expect(getBackendBaseUrl()).toBe('https://api.kojoforafrica.cc.cd');
   });
 });
 

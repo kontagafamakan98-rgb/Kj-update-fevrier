@@ -73,7 +73,7 @@ cd frontend && npm test
 
 ### Backend — Fly.io (production actuelle, ~0 $/mois)
 
-- **App** : `kojo-backend` — `https://kojo-backend.fly.dev`
+- **App** : `kojo-backend` — `https://api.kojoforafrica.cc.cd`
 - **Config** : `backend/fly.toml` (machine `shared-cpu-1x`, **256 Mo** — dans
   l'allocation gratuite de 3 VMs 256 Mo ; le backend tient en ~21 Mo RSS).
 - **Déploiement** : poussé par la CI (`.github/workflows/ci.yml`, job
@@ -89,7 +89,7 @@ cd frontend && npm test
 | `JWT_SECRET` | ✅ en prod | Fail-fast : le serveur refuse de démarrer sans lui |
 | `EMAIL_OTP_SECRET` | ✅ en prod | Fail-fast identique à `JWT_SECRET` |
 | `APP_ENV` | ✅ | `production` (désactive `/docs`, active HSTS, CORS strict) |
-| `BACKEND_PUBLIC_URL` | ✅ | **`https://kojo-backend.fly.dev`** — TrustedHost + callbacks IPN PayDunya |
+| `BACKEND_PUBLIC_URL` | ✅ | **`https://api.kojoforafrica.cc.cd`** — TrustedHost + callbacks IPN PayDunya |
 | `DB_NAME` | | défaut `kojo_db` |
 | `VERCEL_PROJECT_NAME` | recommandé | **`kj-update-fevrier`** — restreint le CORS aux seuls domaines du projet Vercel Kojo |
 | `REDIS_URL` | | Rate-limiting partagé multi-workers (optionnel, 1 worker = mémoire suffit) |
@@ -150,8 +150,8 @@ cd frontend && npm test
   "rewrites": [
     { "source": "/jobs", "destination": "/jobs.html" },
     { "source": "/jobs/", "destination": "/jobs.html" },
-    { "source": "/jobs/(.*)", "destination": "https://kojo-backend.fly.dev/api/og/jobs/$1" },
-    { "source": "/api/:path*", "destination": "https://kojo-backend.fly.dev/api/:path*" },
+    { "source": "/jobs/(.*)", "destination": "https://api.kojoforafrica.cc.cd/api/og/jobs/$1" },
+    { "source": "/api/:path*", "destination": "https://api.kojoforafrica.cc.cd/api/:path*" },
     { "source": "/dashboard", "destination": "/app.html" }
   ]
 }
@@ -189,7 +189,7 @@ cd frontend && npm test
   tableau de bord dans les résultats de recherche est une page vide.
 
 - **Variables d'env** (dashboard, onglet Settings → Environment Variables) :
-  `VITE_API_URL=https://kojo-backend.fly.dev/api`
+  `VITE_API_URL=https://api.kojoforafrica.cc.cd/api`
 
 **Variables optionnelles (SEO / analytics — aucune n'a de valeur par défaut,
 rien n'est activé si elles sont absentes) :**
@@ -238,9 +238,9 @@ adresse, sinon `check-home-shell.js` échoue.
 
 ```bash
 # Backend — le nouveau code est en prod si :
-curl -s https://kojo-backend.fly.dev/health   # {"status":"healthy","database":"connected",...}
-curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/docs   # 404
-curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/api/stats  # 403/401 sans token
+curl -s https://api.kojoforafrica.cc.cd/health   # {"status":"healthy","database":"connected",...}
+curl -s -o /dev/null -w '%{http_code}' https://api.kojoforafrica.cc.cd/docs   # 404
+curl -s -o /dev/null -w '%{http_code}' https://api.kojoforafrica.cc.cd/api/stats  # 403/401 sans token
 
 # Frontend
 curl -s -o /dev/null -w '%{http_code}' https://kojoforafrica.cc.cd   # 200

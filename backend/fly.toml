@@ -15,8 +15,10 @@ primary_region = 'fra'
   FRONTEND_APP_URL = 'https://kojoforafrica.cc.cd'
   VERCEL_PROJECT_NAME = 'kj-update-fevrier'
   # URL publique du backend → callbacks IPN PayDunya (et hôtes de confiance si
-  # le TrustedHostMiddleware reste activé)
-  BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev'
+  # le TrustedHostMiddleware reste activé). Hôte Kojo depuis le 17/09/2026 :
+  # `kojo-backend.fly.dev` reste servi (applications mobiles déjà installées,
+  # moniteurs, rollback) mais n'est plus ANNONCÉ nulle part.
+  BACKEND_PUBLIC_URL = 'https://api.kojoforafrica.cc.cd'
   # TrustedHostMiddleware : ACTIF en prod (secret DISABLE_TRUSTED_HOST_MIDDLEWARE
   # retiré le 27/08/2026, plan exécuté : health check passé en TCP ci-dessous
   # puis `fly secrets unset DISABLE_TRUSTED_HOST_MIDDLEWARE`). Les checks HTTP
@@ -28,7 +30,7 @@ primary_region = 'fra'
   # dérivés de FRONTEND_APP_URL / BACKEND_PUBLIC_URL / CORS_ORIGINS /
   # TRUSTED_HOSTS : le trafic public (Vercel, moniteurs UptimeRobot/Render)
   # arrive via le proxy Fly avec Host *.fly.dev → servi normalement.
-  TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev'
+  TRUSTED_HOSTS = '*.internal,*.flycast.internal,kojo-backend.fly.dev,api.kojoforafrica.cc.cd'
 
 # Syntaxe complète [[services]] (et non [http_service]) : le raccourci
 # [http_service] ne sait exprimer QUE des checks HTTP (protocol http/https),

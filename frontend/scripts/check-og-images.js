@@ -51,7 +51,7 @@ export const ROUTES = [
 ];
 
 export const DEFAULT_BASE = 'http://localhost:4173';
-export const DEFAULT_BACKEND = 'https://kojo-backend.fly.dev';
+export const DEFAULT_BACKEND = 'https://api.kojoforafrica.cc.cd';
 
 // Identifiant qui ne peut pas exister : sert de SONDE DE CAPACITÉ.
 export const PROBE_JOB_ID = '00000000-0000-4000-8000-000000000000';

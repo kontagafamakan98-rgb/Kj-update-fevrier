@@ -76,10 +76,10 @@ function R() {
 const CONFORMING_REWRITES = [
   { source: '/jobs', destination: '/jobs.html' },
   { source: '/jobs/', destination: '/jobs.html' },
-  { source: JOB_REWRITE_SOURCE, destination: `https://kojo-backend.fly.dev${JOB_REWRITE_SUFFIX}` },
-  { source: '/api/:path*', destination: 'https://kojo-backend.fly.dev/api/:path*' },
-  { source: '/sitemap.xml', destination: 'https://kojo-backend.fly.dev/api/sitemap.xml' },
-  { source: '/robots.txt', destination: 'https://kojo-backend.fly.dev/api/robots.txt' },
+  { source: JOB_REWRITE_SOURCE, destination: `https://api.kojoforafrica.cc.cd${JOB_REWRITE_SUFFIX}` },
+  { source: '/api/:path*', destination: 'https://api.kojoforafrica.cc.cd/api/:path*' },
+  { source: '/sitemap.xml', destination: 'https://api.kojoforafrica.cc.cd/api/sitemap.xml' },
+  { source: '/robots.txt', destination: 'https://api.kojoforafrica.cc.cd/api/robots.txt' },
   { source: '/login', destination: '/login.html' },
   { source: '/login/', destination: '/login.html' },
   { source: '/register', destination: '/register.html' },
@@ -350,7 +350,7 @@ describe('check-spa-routes — la fiche /jobs/:id', () => {
       rewrites: withRewrites((rewrites) => {
         for (const rule of rewrites) {
           if (rule.source === JOB_REWRITE_SOURCE) {
-            rule.destination = 'https://kojo-backend.fly.dev/api/jobs/$1';
+            rule.destination = 'https://api.kojoforafrica.cc.cd/api/jobs/$1';
           }
         }
       }),

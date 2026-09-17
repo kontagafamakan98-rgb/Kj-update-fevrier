@@ -36,7 +36,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 class TestValidateHttpsUrl:
     def test_url_valide_simple(self):
-        assert validate_https_url("https://kojo-backend.fly.dev") == "https://kojo-backend.fly.dev"
+        assert validate_https_url("https://api.kojoforafrica.cc.cd") == "https://api.kojoforafrica.cc.cd"
 
     def test_url_valide_avec_path(self):
         assert validate_https_url("https://kj-update-fevrier.vercel.app/support") == "https://kj-update-fevrier.vercel.app/support"
@@ -44,7 +44,7 @@ class TestValidateHttpsUrl:
     def test_slash_final_strippe(self):
         # RÉGRESSION : un slash final sur BACKEND_PUBLIC_URL casse les callbacks
         # (double slash) — le validateur normalise au lieu d'échouer.
-        assert validate_https_url("https://kojo-backend.fly.dev/") == "https://kojo-backend.fly.dev"
+        assert validate_https_url("https://api.kojoforafrica.cc.cd/") == "https://api.kojoforafrica.cc.cd"
 
     def test_espaces_externes_strippes(self):
         assert validate_https_url("  https://kojo.app  ") == "https://kojo.app"
@@ -114,8 +114,8 @@ class TestValidateTrustedHosts:
 
     def test_motifs_joker_fly(self):
         # Valeur réelle de production (backend/fly.toml [env]).
-        assert validate_trusted_hosts("*.internal,*.flycast.internal,kojo-backend.fly.dev") == [
-            "*.internal", "*.flycast.internal", "kojo-backend.fly.dev",
+        assert validate_trusted_hosts("*.internal,*.flycast.internal,api.kojoforafrica.cc.cd") == [
+            "*.internal", "*.flycast.internal", "api.kojoforafrica.cc.cd",
         ]
 
     def test_entrees_strippees(self):

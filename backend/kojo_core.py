@@ -462,7 +462,7 @@ def get_client_ip(request: Request) -> str:
 def extract_host_from_url(raw_url: str) -> Optional[str]:
     """Extrait le hostname d'une URL, en tolérant l'absence de schéma.
 
-    Retourne le hostname (ex: 'kojo-backend.fly.dev') ou None si l'entrée est
+    Retourne le hostname (ex: 'api.kojoforafrica.cc.cd') ou None si l'entrée est
     vide/blank ou que l'URL est invalide (urlparse ne trouve pas de hostname) —
     les appelants (build_trusted_hosts) doivent ignorer silencieusement None.
     """

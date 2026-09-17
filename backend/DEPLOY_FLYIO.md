@@ -33,7 +33,7 @@ fly launch --no-deploy
 ```
 
 - **Nom de l'app** : `kojo-backend` (ou personnaliser, ex. `kojo-backend-03az`).
-  C'est ce nom qui forme votre URL : `https://kojo-backend.fly.dev`.
+  C'est ce nom qui forme votre URL : `https://api.kojoforafrica.cc.cd`.
 - **Région** : choisir **`fra`** (Francfort) — meilleure latence pour
   l'Afrique de l'Ouest (~100 ms depuis Dakar). Vérifier les régions
   disponibles avec `fly platform regions` (Johannesburg `jnb` existe aussi).
@@ -49,7 +49,7 @@ fly secrets set \
   "MONGO_URL=mongodb+srv://..." \
   "JWT_SECRET=..." \
   "EMAIL_OTP_SECRET=..." \
-  "BACKEND_PUBLIC_URL=https://kojo-backend.fly.dev" \
+  "BACKEND_PUBLIC_URL=https://api.kojoforafrica.cc.cd" \
   "OWNER_EMAIL=..." \
   "OWNER_INITIAL_PASSWORD=..." \
   "OWNER_USER_ID=..." \
@@ -111,13 +111,13 @@ fly deploy
 
 ```bash
 # Health check (attendre "database": "connected")
-curl -s https://kojo-backend.fly.dev/health
+curl -s https://api.kojoforafrica.cc.cd/health
 
 # /docs doit être en 404 (APP_ENV=production)
-curl -s -o /dev/null -w '%{http_code}\n' https://kojo-backend.fly.dev/docs
+curl -s -o /dev/null -w '%{http_code}\n' https://api.kojoforafrica.cc.cd/docs
 
 # Racine
-curl -s https://kojo-backend.fly.dev/
+curl -s https://api.kojoforafrica.cc.cd/
 ```
 
 Logs : `fly logs` · État : `fly status`
@@ -163,7 +163,7 @@ Le frontend pointe encore vers Render (`VITE_API_URL`). Le changer dans le
 dashboard Vercel (Settings → Environment Variables) :
 
 ```
-VITE_API_URL=https://kojo-backend.fly.dev/api
+VITE_API_URL=https://api.kojoforafrica.cc.cd/api
 ```
 
 > ⚠️ Faire la bascule **au moment voulu** : tant que Render tourne, le
@@ -186,7 +186,7 @@ auprès de PayDunya (jamais de confiance au payload).
 - Rollback : `fly releases` puis `fly rollback <id>`.
 - Les machines ne s'arrêtent jamais (`auto_stop_machines = false`) : pas de
   cold start, **plus besoin d'UptimeRobot en anti-sleep** (à garder seulement
-  en moniteur d'alerte sur `https://kojo-backend.fly.dev/health`).
+  en moniteur d'alerte sur `https://api.kojoforafrica.cc.cd/health`).
 
 ## 8. Auto-déploiement GitHub Actions (comme l'auto-deploy Render)
 

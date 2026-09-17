@@ -14,7 +14,7 @@
 //      (injecté par vite.config.js via `define`, depuis les variables
 //      d'environnement REACT_APP_* du build)
 //   4. repli dev : localhost:8000 quand on est sur localhost (port ≠ 8000)
-//   5. défaut : https://kojo-backend.fly.dev
+//   5. défaut : https://api.kojoforafrica.cc.cd
 //
 // Convention : VITE_API_URL / REACT_APP_BACKEND_URL peuvent être définis AVEC
 // ou SANS le suffixe /api (les deux conventions coexistent). getBackendBaseUrl
@@ -25,7 +25,7 @@
 // *.vercel.app est sur la Public Suffix List → le navigateur REFUSE les
 // cookies de session y étant posés, ce qui cassait le login en production
 // (boucle 401 → /login, même en navigation privée). Le frontend appelle
-// donc le backend Fly EN CROSS-ORIGINE DIRECT (kojo-backend.fly.dev), où le
+// donc le backend Fly EN CROSS-ORIGINE DIRECT (api.kojoforafrica.cc.cd), où le
 // cookie SameSite=None est posé sur un domaine normal et fonctionne (mode
 // prévu par le backend). Le proxy même-origine Vercel reste réactivable
 // via VITE_USE_SAME_ORIGIN_API=true, mais UNIQUEMENT avec un domaine custom
@@ -33,7 +33,7 @@
 // ============================================================================
 
 const trimTrailingSlashes = (value = '') => String(value || '').replace(/\/+$/, '');
-const DEFAULT_REMOTE_BACKEND_URL = 'https://kojo-backend.fly.dev';
+const DEFAULT_REMOTE_BACKEND_URL = 'https://api.kojoforafrica.cc.cd';
 
 // En production, le proxy Vercel rend l'API même-origine par défaut. En dev
 // local, on garde le comportement cross-origin vers localhost:8000 (le dev
@@ -55,7 +55,7 @@ const isSameOriginApiProd = () => {
   // Par défaut : FALSE. En production sur un domaine *.vercel.app (Public
   // Suffix List), le navigateur REFUSE les cookies de session posés sur ce
   // domaine → login en boucle (401 → /login), y compris en navigation privée.
-  // On appelle donc le backend Fly EN CROSS-ORIGIN DIRECT (kojo-backend.fly.dev)
+  // On appelle donc le backend Fly EN CROSS-ORIGIN DIRECT (api.kojoforafrica.cc.cd)
   // : le cookie SameSite=None y est posé sur un domaine normal (non
   // public-suffix) et fonctionne. C'est le mode prévu par le backend
   // (kojo_settings : « cross-site, SameSite=None »). Le proxy même-origine

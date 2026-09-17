@@ -20,9 +20,9 @@ export default defineConfig(({ mode }) => {
   // comme repli pour le mode direct (mobile Capacitor, debug, ou si le
   // proxy est désactivé via VITE_USE_SAME_ORIGIN_API=false).
   const rawApiUrl = (env.VITE_API_URL || env.VITE_API_BASE_URL || env.VITE_BACKEND_URL || '').trim()
-  let apiOrigin = 'https://kojo-backend.fly.dev'
+  let apiOrigin = 'https://api.kojoforafrica.cc.cd'
   try {
-    apiOrigin = new URL(rawApiUrl || 'https://kojo-backend.fly.dev/api').origin
+    apiOrigin = new URL(rawApiUrl || 'https://api.kojoforafrica.cc.cd/api').origin
   } catch (_error) {
     // URL invalide : on garde l'origin par défaut
   }
@@ -78,7 +78,7 @@ export default defineConfig(({ mode }) => {
       // NOTE : le pré-rendu des fiches /jobs/:id (og:image + titre réels de la
       // mission, 404 noindex) est servi par le BACKEND
       // (GET /api/og/jobs/{id} — kojo_routers_public.py) via le rewrite Vercel
-      // /jobs/(.*) → https://kojo-backend.fly.dev/api/og/jobs/$1. L'ancienne
+      // /jobs/(.*) → https://api.kojoforafrica.cc.cd/api/og/jobs/$1. L'ancienne
       // fonction serverless api/og-jobs/[id].js a été abandonnée : Vercel ne
       // collecte PAS le dossier api/ quand outputDirectory est défini
       // (déploiement traité comme 100% statique) — la fonction n'était jamais

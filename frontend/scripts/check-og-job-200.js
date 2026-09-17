@@ -78,7 +78,7 @@ import { runOgImageCheck, baseServesJobOgRoute } from './check-og-images.js';
 import { SITE_ORIGIN, declaresNoIndex } from './site-meta.js';
 
 export const DEFAULT_BASE = SITE_ORIGIN;
-export const DEFAULT_BACKEND = 'https://kojo-backend.fly.dev';
+export const DEFAULT_BACKEND = 'https://api.kojoforafrica.cc.cd';
 // Étiquette du verrou post-suppression (contrôlé après le DELETE).
 export const POST_DELETE_LABEL = '/jobs/:id (après suppression)';
 // Préfixe repérable pour un humain qui tomberait sur une mission laissée en

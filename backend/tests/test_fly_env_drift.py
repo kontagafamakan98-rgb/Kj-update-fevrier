@@ -254,9 +254,9 @@ class TestSanitizeError:
 
 class TestCheckDeployedFormats:
     PUBLIC_OK = {
-        "BACKEND_PUBLIC_URL": "https://kojo-backend.fly.dev",
+        "BACKEND_PUBLIC_URL": "https://api.kojoforafrica.cc.cd",
         "FRONTEND_APP_URL": "https://kj-update-fevrier.vercel.app",
-        "TRUSTED_HOSTS": "*.internal,kojo-backend.fly.dev",
+        "TRUSTED_HOSTS": "*.internal,api.kojoforafrica.cc.cd",
     }
     SECRETS_OK = {
         "CORS_ORIGINS": "https://kj-update-fevrier.vercel.app",
@@ -282,7 +282,7 @@ class TestCheckDeployedFormats:
         # IPN — le validateur normalise, mais le runtime ne normalise pas : la
         # valeur déployée brute doit être signalée comme NON normalisée.
         check.errors, check.checked = [], []
-        public = dict(self.PUBLIC_OK, BACKEND_PUBLIC_URL="https://kojo-backend.fly.dev/")
+        public = dict(self.PUBLIC_OK, BACKEND_PUBLIC_URL="https://api.kojoforafrica.cc.cd/")
         check.check_deployed_formats(public, {})
         assert any("NON normalisée" in e for e in check.errors), check.errors
 
@@ -369,8 +369,8 @@ class TestCheckReferenceFormats:
         self._load_real_repo(
             check, tmp_path,
             toml_override=lambda t: t.replace(
-                "BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev'",
-                "BACKEND_PUBLIC_URL = 'https://kojo-backend.fly.dev/'",
+                "BACKEND_PUBLIC_URL = 'https://api.kojoforafrica.cc.cd'",
+                "BACKEND_PUBLIC_URL = 'https://api.kojoforafrica.cc.cd/'",
             ),
         )
         check.errors, check.checked = [], []

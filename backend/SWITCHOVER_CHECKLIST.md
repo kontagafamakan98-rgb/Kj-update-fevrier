@@ -14,10 +14,10 @@ donc la bascule est sans risque de divergence).
 - [ ] **Carte bancaire ajoutée sur Fly** (sinon la machine s'arrête après 5 min) :
       Dashboard Fly → Billing. Vérif : `fly status` ne montre pas « trial ».
 - [ ] **Backend Fly healthy** :
-      `curl https://kojo-backend.fly.dev/health` → `"database":"connected"`
+      `curl https://api.kojoforafrica.cc.cd/health` → `"database":"connected"`
 - [ ] **Frontend Vercel pointe vers Fly** :
       Vercel → projet → Settings → Environment Variables → `VITE_API_URL`
-      doit valoir `https://kojo-backend.fly.dev/api` (puis redeploy).
+      doit valoir `https://api.kojoforafrica.cc.cd/api` (puis redeploy).
 - [ ] **CI `deploy-fly` passe** (le secret `FLY_API_TOKEN` est un *Repository
       secret*, pas un *Environment*) : dernier run GitHub Actions en vert.
 - [ ] **Clés VAPID valides** (notifications push) : le backend renvoie une clé
@@ -80,7 +80,7 @@ nouvelle URL (le frontend pointe déjà vers Fly) :
 ## Étape 3 — UptimeRobot sur la nouvelle URL
 
 1. UptimeRobot → Dashboard → ton moniteur existant → **Edit**.
-2. **URL** → `https://kojo-backend.fly.dev/health`.
+2. **URL** → `https://api.kojoforafrica.cc.cd/health`.
 3. **Type** : HTTP(S) → **Keyword** : `healthy` (ou `database`).
 4. **Intervalle** : 5 min (le plus fréquent gratuit) — **plus besoin
    d'anti-sleep** : les machines Fly ne s'endorment jamais.
@@ -91,7 +91,7 @@ nouvelle URL (le frontend pointe déjà vers Fly) :
 
 ## Étape 4 — Post-bascule (vérifications finales)
 
-- [ ] `curl https://kojo-backend.fly.dev/health` → healthy (même après la
+- [ ] `curl https://api.kojoforafrica.cc.cd/health` → healthy (même après la
       suppression de Render)
 - [ ] Le **frontend fonctionne toujours** (Vercel → Fly) : connexion réelle
       depuis ton téléphone (réseau mobile, pas juste le PC)

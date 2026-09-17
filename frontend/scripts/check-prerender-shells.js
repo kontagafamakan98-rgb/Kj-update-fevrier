@@ -233,7 +233,7 @@ if (support) {
 // 5. Fiches /jobs/:id : le pré-rendu HTML (méta OG de la mission + 404
 // noindex) est servi par le BACKEND — GET /api/og/jobs/{id} dans
 // kojo_routers_public.py, aiguillé par le rewrite Vercel
-// /jobs/(.*) → https://kojo-backend.fly.dev/api/og/jobs/$1 (vercel.json).
+// /jobs/(.*) → https://api.kojoforafrica.cc.cd/api/og/jobs/$1 (vercel.json).
 // L'ancienne fonction serverless api/og-jobs/[id].js a été abandonnée
 // (Vercel ne collecte pas api/ en mode outputDirectory statique). La
 // couverture de ce pré-rendu vit dans les tests backend
