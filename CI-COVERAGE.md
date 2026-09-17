@@ -292,7 +292,7 @@ en production — c'est précisément le maillon que la CI ne couvre pas.
 
 Un audit SEO « sans JavaScript » a rendu le 17/09/2026 un rapport dont **dix
 erreurs sur treize** décrivaient un état **déjà corrigé**. Mesure du HTML
-réellement servi ce jour-là (`curl https://kj-update-fevrier.vercel.app/`,
+réellement servi ce jour-là (`curl https://kojoforafrica.cc.cd/`,
 `X-Vercel-Cache: HIT`, `Last-Modified: Thu, 17 Sep 2026 02:40:42 GMT`) :
 
 | Ce que dit l'audit | Ce que sert la production |
@@ -378,11 +378,41 @@ production. Deux maillons manquaient :
 `VITE_GA_MEASUREMENT_ID`, `VITE_GSC_VERIFICATION`, `VITE_PLAUSIBLE_DOMAIN` et les
 six `VITE_SOCIAL_*` n'avaient **jamais été configurées**. L'écart n'était donc ni
 un bug de build ni une variable marquée « Sensitive » : une configuration jamais
-faite. Le projet n'a qu'un seul domaine (`kj-update-fevrier.vercel.app`, sous
-`vercel.app`) : la vérification Search Console par enregistrement DNS TXT n'est
-pas à la portée du propriétaire du domaine (il ne contrôle pas `vercel.app`),
-donc la balise meta (`VITE_GSC_VERIFICATION`) est la SEULE voie pour la Search
-Console.
+faite. À cette date, le projet ne portait qu'un seul domaine
+(`kj-update-fevrier.vercel.app`, sous `vercel.app`) : la vérification Search
+Console par enregistrement DNS TXT était hors de portée du propriétaire (il ne
+contrôle pas `vercel.app`), la balise meta (`VITE_GSC_VERIFICATION`) étant la
+SEULE voie.
+
+**Domaine propre — 17/09/2026** : `kojoforafrica.cc.cd` (suffixe gratuit DNSHE
+sous `cc.cd`) est désormais l'adresse publique du site. Vérifié AVANT de
+brancher : `.ccd` n'existe pas dans la zone racine IANA, tandis que `cc.cd` est
+publiquement délégué (`a/b.ns.dnshe.org`) **et listé dans la Public Suffix
+List** (section DNSHE) — donc Google traite `kojoforafrica.cc.cd` comme un
+domaine à part entière, et Vercel le classe en apex (`apexName` = le domaine,
+renvoyé par l'API). La vérification Search Console par **DNS TXT** (propriété
+Domaine) est donc redevenue possible, en plus de la balise meta.
+Enregistrement `A 76.76.21.21` (valeur `recommendedIPv4` renvoyée par l'API
+Vercel), et `kj-update-fevrier.vercel.app` **redirige** vers le domaine : une
+seule adresse canonique, pour le crawl comme pour les partages.
+
+Le domaine n'existe qu'à une seule place par surface — `index.html` (canonical,
+OG, Twitter, JSON-LD), `vite.config.js` (origine du pré-rendu par route), les
+gardes `check-prerender-shells.js` / `check-og-images.js` /
+`check-seo-production.js` (qui échouent si le build repart sur l'ancienne
+adresse), `resolve-vercel-url.sh` (base Lighthouse de `main`), et côté backend
+`DEFAULT_SITE_BASE` — le repli de `_site_base()`, qui construit le sitemap et
+`robots.txt` — déjà pointé sur le domaine.
+
+**Une ligne reste en arrière, volontairement** : `fly.toml` garde
+`FRONTEND_APP_URL` sur l'ancien hôte tant que le runtime Fly ne l'a pas migré.
+Ce n'est pas un oubli : `fly-env-drift` (check REQUIS) compare la valeur de
+`fly.toml` au runtime déployé et refuse un PR qui la changerait avant le
+déploiement — et ce déploiement est conditionné à `main`. Changer cette ligne
+se fait donc AVEC le déploiement Fly (déclenché automatiquement par tout
+changement dans `backend/**` sur `main`), pas dans un PR isolé. D'ici là,
+`/sitemap.xml` et `/robots.txt` annoncent l'ancien hôte — qui redirige vers le
+domaine, donc sans page morte ni signal contradictoire.
 
 **Fermé le 17/09/2026 (preuve à l'appui)** : les trois profils sociaux réels ont
 été posés (`VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_X`,
@@ -418,8 +448,8 @@ Rejouer la mesure, sur la production comme sur un build local :
 
 ```bash
 # la production sert-elle les balises ?
-curl -sS https://kj-update-fevrier.vercel.app/ | grep -c googletagmanager   # 0 = non configuré
-curl -sS https://kj-update-fevrier.vercel.app/ | grep -o '"sameAs": \[[^]]*\]'
+curl -sS https://kojoforafrica.cc.cd/ | grep -c googletagmanager   # 0 = non configuré
+curl -sS https://kojoforafrica.cc.cd/ | grep -o '"sameAs": \[[^]]*\]'
 
 # l'injection fonctionne-t-elle quand les variables sont posées ?
 cd frontend

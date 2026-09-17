@@ -207,7 +207,7 @@ GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
 
 # URL de callback déclarée dans la console Google Cloud (OAuth 2.0 Client IDs).
-# Pour Vercel : https://kj-update-fevrier.vercel.app/auth/google/callback
+# Pour Vercel : https://kojoforafrica.cc.cd/auth/google/callback
 # Pour le dev local : http://localhost:3000/auth/google/callback
 GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', '').strip()
 

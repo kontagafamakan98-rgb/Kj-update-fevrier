@@ -350,6 +350,6 @@ describe('check-og-images — constantes', () => {
   });
 
   it('l origin par défaut est le domaine de prod (les cartes backend y pointent)', () => {
-    expect(PROD_ORIGIN).toBe('https://kj-update-fevrier.vercel.app');
+    expect(PROD_ORIGIN).toBe('https://kojoforafrica.cc.cd');
   });
 });

@@ -45,7 +45,8 @@ Projet Vercel : `kj-update-fevrier` (répertoire racine `frontend/`).
 > 🔓 Le DSN frontend est **public par design** : il est embarqué dans le
 > bundle JS que tous les visiteurs téléchargent. La protection se configure
 > dans Sentry (Settings → Security & Privacy → **Allowed Domains** :
-> `*.vercel.app`) pour que seuls vos domaines puissent envoyer des événements.
+> `kojoforafrica.cc.cd`, `*.vercel.app`) pour que seuls vos domaines puissent
+> envoyer des événements.
 
 ---
 

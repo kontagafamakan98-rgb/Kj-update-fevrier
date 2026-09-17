@@ -39,13 +39,18 @@ configuration des credentials Google et leur injection dans l'environnement.
    OAuth client ID** :
    - **Application type : Web application**.
    - **Authorized JavaScript origins** (pour le flux popup) :
-     - `https://kj-update-fevrier.vercel.app`
+     - `https://kojoforafrica.cc.cd`
      - `http://localhost:3000` (dev local)
    - **Authorized redirect URIs** : en mode popup, l'échange du code utilise
      l'**origine** de la page comme `redirect_uri` — déclarer donc l'origine
      SANS chemin :
-     - `https://kj-update-fevrier.vercel.app`
+     - `https://kojoforafrica.cc.cd`
      - `http://localhost:3000`
+   - ⚠️ **Domaine public depuis le 17/09/2026** : c'est
+     `https://kojoforafrica.cc.cd` qui doit être déclarée ci-dessus (et dans
+     `GOOGLE_REDIRECT_URI`). Une origine non déclarée = `redirect_uri_mismatch`
+     au retour du popup. L'ancien alias `kj-update-fevrier.vercel.app` peut y
+     rester tant que la redirection est en place.
    - Créer → noter le **Client ID** et le **Client secret**.
 
 > ⚠️ Le **même** `client_id` est utilisé côté frontend (bouton) ET côté backend
@@ -62,7 +67,7 @@ Poser les 3 secrets sur l'app Fly (depuis `backend/`) :
 fly secrets set \
   "GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com" \
   "GOOGLE_CLIENT_SECRET=GOCSPX-..." \
-  "GOOGLE_REDIRECT_URI=https://kj-update-fevrier.vercel.app"
+  "GOOGLE_REDIRECT_URI=https://kojoforafrica.cc.cd"
 ```
 
 Puis redéployer :
@@ -82,7 +87,7 @@ fly deploy
 > **Point clé — l'échange du code utilise l'ORIGINE, pas une URL de callback.**
 > En mode popup (Google Identity Services, `initCodeClient`), Google **ignore**
 > `redirect_uri` côté client et utilise **l'origine de la page appelante** comme
-> `redirect_uri` du code (ex: `https://kj-update-fevrier.vercel.app`). À
+> `redirect_uri` du code (ex: `https://kojoforafrica.cc.cd`). À
 > l'échange (`/token`), le backend doit donc envoyer cette **même origine** —
 > pas une URL de callback comme `/auth/google/callback` (sinon
 > `redirect_uri_mismatch`).
@@ -91,7 +96,7 @@ fly deploy
 > **header `Origin`** de la requête (le proxy même-origine Vercel le transmet
 > tel quel) et l'utilise comme `redirect_uri` de l'échange. `GOOGLE_REDIRECT_URI`
 > sert de **repli** pour les clients non navigateur (sans header Origin) :
-> mettez-y l'origine `https://kj-update-fevrier.vercel.app`.
+> mettez-y l'origine `https://kojoforafrica.cc.cd`.
 >
 > ⚠️ L'origine doit être déclarée dans la console Google (Étape 1) — à la fois
 > en **Authorized JavaScript origin** ET en **Authorized redirect URI** — sinon
@@ -152,7 +157,7 @@ Le client_id peut être injecté à chaud (utile pendant la phase de test) :
 
 ## Étape 4 — Vérifier de bout en bout
 
-1. Ouvrir `https://kj-update-fevrier.vercel.app` (en incognito).
+1. Ouvrir `https://kojoforafrica.cc.cd` (en incognito).
 2. Aller sur **Connexion** → cliquer **« Continuer avec Google »**.
 3. Choisir un compte Google → la popup se ferme → l'utilisateur est connecté.
 4. **Première connexion** : le compte est créé (sans OTP email — l'email Google
@@ -186,7 +191,7 @@ Le client_id peut être injecté à chaud (utile pendant la phase de test) :
   secrets puis `fly deploy`.
 - **`redirect_uri_mismatch`** → l'échange a envoyé un `redirect_uri` non
   déclaré. Vérifier que l'**origine** du frontend (ex:
-  `https://kj-update-fevrier.vercel.app`) est bien dans les **Authorized
+  `https://kojoforafrica.cc.cd`) est bien dans les **Authorized
   redirect URIs** ET les **Authorized JavaScript origins** de la console
   Google, et que `GOOGLE_REDIRECT_URI` (Fly) contient cette même origine.
 - **401 « Jeton Google invalide »** → l'audience de l'id_token ne correspond pas

@@ -72,7 +72,7 @@ except Exception:
     fi
   fi
 elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "${GITHUB_REF:-}" = "refs/heads/main" ]; then
-  KOJO_LHCI_BASE_URL="https://kj-update-fevrier.vercel.app"
+  KOJO_LHCI_BASE_URL="https://kojoforafrica.cc.cd"
 fi
 
 # ── Détection de la protection de déploiement Vercel (Deployment Protection) ──
