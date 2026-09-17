@@ -13,12 +13,8 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import {
-  INTEGRATIONS,
-  PROD_ORIGIN,
-  analyzeSeoServedHtml,
-  runSeoProductionReport,
-} from '../check-seo-production.js';
+import { INTEGRATIONS, analyzeSeoServedHtml, runSeoProductionReport } from '../check-seo-production.js';
+import { SITE_ORIGIN } from '../site-meta.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-seo-production.js');
@@ -88,7 +84,7 @@ describe('analyse du HTML servi', () => {
 describe('runSeoProductionReport — ce qu’il conclut, et ce qu’il refuse de conclure', () => {
   it('publie 4/4 quand les quatre intégrations sont présentes', async () => {
     const result = await runSeoProductionReport({
-      base: PROD_ORIGIN,
+      base: SITE_ORIGIN,
       fetchImpl: stubFetch({ '/': CONFIGURED_HTML }),
     });
     expect(result.skipped).toBe(false);
@@ -98,7 +94,7 @@ describe('runSeoProductionReport — ce qu’il conclut, et ce qu’il refuse de
 
   it('nomme la variable à poser pour chaque intégration absente', async () => {
     const result = await runSeoProductionReport({
-      base: PROD_ORIGIN,
+      base: SITE_ORIGIN,
       fetchImpl: stubFetch({ '/': UNCONFIGURED_HTML }),
     });
     const report = result.notices.join('\n');
@@ -119,7 +115,7 @@ describe('runSeoProductionReport — ce qu’il conclut, et ce qu’il refuse de
 
   it('un accueil injoignable ne fait pas conclure « absent »', async () => {
     const result = await runSeoProductionReport({
-      base: PROD_ORIGIN,
+      base: SITE_ORIGIN,
       fetchImpl: stubFetch({}, { fail: true }),
     });
     expect(result.skipped).toBe(true);

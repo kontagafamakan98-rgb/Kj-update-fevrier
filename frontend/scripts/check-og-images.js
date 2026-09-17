@@ -34,6 +34,7 @@
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } from './site-meta.js';
 
 // Routes auditées par lighthouserc.cjs + /login (pré-rendue, carte dédiée).
 // `image` = fichier wide attendu (URL absolue qui doit se terminer par ce
@@ -51,10 +52,6 @@ export const ROUTES = [
 
 export const DEFAULT_BASE = 'http://localhost:4173';
 export const DEFAULT_BACKEND = 'https://kojo-backend.fly.dev';
-// Origin des cartes servies par le pré-rendu backend (og:image des fiches
-// mission). Surchargeable pour les tests (stubs) — en CI/prod c'est le
-// domaine Vercel réel.
-export const PROD_ORIGIN = 'https://kojoforafrica.cc.cd';
 
 // Identifiant qui ne peut pas exister : sert de SONDE DE CAPACITÉ.
 export const PROBE_JOB_ID = '00000000-0000-4000-8000-000000000000';
@@ -95,8 +92,7 @@ export async function baseServesJobOgRoute({ base, fetchImpl = fetch, timeoutMs 
     });
     const robots = res.headers.get('x-robots-tag') || '';
     const body = res.status === 404 ? await res.text() : '';
-    const noindex =
-      /noindex/i.test(robots) || /<meta[^>]+name=["']robots["'][^>]*noindex/i.test(body);
+    const noindex = declaresNoIndex(body, robots);
     const serves = res.status === 404 && noindex;
     return {
       serves,
@@ -134,7 +130,7 @@ export async function baseServesJobOgRoute({ base, fetchImpl = fetch, timeoutMs 
 export async function runOgImageCheck({
   base = process.env.KOJO_LHCI_BASE_URL || DEFAULT_BASE,
   backend = process.env.KOJO_BACKEND_URL || DEFAULT_BACKEND,
-  origin = process.env.KOJO_ORIGIN || PROD_ORIGIN,
+  origin = process.env.KOJO_ORIGIN || SITE_ORIGIN,
   quiet = false,
   fetchImpl = fetch,
   job = null,
@@ -153,18 +149,6 @@ export async function runOgImageCheck({
   const errors = [];
   const checked = [];
   const notices = [];
-
-  const grab = (html, attr) => {
-    const re = new RegExp(`<meta[^>]*${attr}[^>]*content="([^"]*)"`);
-    const m = html.match(re);
-    return m ? m[1] : '';
-  };
-
-  // Toutes les occurrences d'un attribut meta (og:image apparaît en wide + carré).
-  const grabAll = (html, attr) => {
-    const re = new RegExp(`<meta[^>]*${attr}[^>]*content="([^"]*)"`, 'g');
-    return [...html.matchAll(re)].map((m) => m[1]);
-  };
 
   const isAbsolute = (value) => /^https?:\/\//.test(value || '');
 
@@ -236,9 +220,9 @@ export async function runOgImageCheck({
       continue;
     }
 
-    const ogImages = grabAll(html, 'property="og:image"');
+    const ogImages = metaContents(html, 'og:image');
     const ogImage = ogImages[0] || '';
-    const twitterImage = grab(html, 'name="twitter:image"');
+    const twitterImage = metaContent(html, 'twitter:image');
 
     if (!ogImage) {
       errors.push(`[${route.path}] og:image ABSENT du HTML servi`);
@@ -370,7 +354,7 @@ export async function runOgImageCheck({
       if (detailStatus !== 200) {
         errors.push(`[${jobDetailLabel}] HTTP ${detailStatus} attendu 200 pour un job EXISTANT (fonction Vercel ou aiguillage cassé ?)`);
       }
-      const ogImages = grabAll(detailHtml, 'property="og:image"');
+      const ogImages = metaContents(detailHtml, 'og:image');
       const wide = ogImages[0] || '';
       const square = ogImages.find((u) => u.includes('square')) || '';
       const expectedWide = `${ORIGIN}/api/og/jobs/${detailId}.png`;

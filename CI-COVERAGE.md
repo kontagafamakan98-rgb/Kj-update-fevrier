@@ -338,9 +338,10 @@ contient une apostrophe (« en Côte d'Ivoire »). Un parseur qui accepte `"` OU
 comme fermeture de valeur tronque la valeur au premier apostrophe et annonce
 « 104 caractères » là où il y en a 151 en ligne — la première version de ce
 tableau a publié ce faux chiffre. Un parseur correct exige la MÊME citation pour
-ouvrir et fermer ; c'est ce que font `check-home-shell.js` (`content="([^"]*)"`)
-et `check-seo-production.js` (`metaContent()`), et c'est pourquoi la CI était
-verte à juste titre. Les mesures ci-dessus ont été refaites avec ce parseur. Ces points sont verrouillés à chaque push depuis (shell de
+ouvrir et fermer ; c'est ce que fait `scripts/site-meta.js` (`metaContents()`), désormais seul
+propriétaire de cette lecture — `check-home-shell.js` et
+`check-seo-production.js` ne portent plus chacun leur motif — et c'est pourquoi
+la CI était verte à juste titre. Les mesures ci-dessus ont été refaites avec ce parseur. Ces points sont verrouillés à chaque push depuis (shell de
 l'accueil, 404 réels sans catch-all, etc.) — un rapport qui les réclame encore
 vient d'un cache d'outil ou d'une copie antérieure au 16/09/2026, pas de la
 production.
@@ -400,7 +401,7 @@ Le domaine n'existe qu'à une seule place par surface — `index.html` (canonica
 OG, Twitter, JSON-LD), `vite.config.js` (origine du pré-rendu par route), les
 gardes `check-prerender-shells.js` / `check-og-images.js` /
 `check-seo-production.js` (qui échouent si le build repart sur l'ancienne
-adresse), `resolve-vercel-url.sh` (base Lighthouse de `main`), et côté backend
+adresse, tous lisant `SITE_ORIGIN` de `scripts/site-meta.js`), `resolve-vercel-url.sh` (base Lighthouse de `main`), et côté backend
 `DEFAULT_SITE_BASE` — le repli de `_site_base()`, qui construit le sitemap et
 `robots.txt` — déjà pointé sur le domaine.
 
