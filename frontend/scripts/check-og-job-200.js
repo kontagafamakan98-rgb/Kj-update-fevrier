@@ -13,12 +13,22 @@
  * marqué, et la nettoie derrière lui.
  *
  * PÉRIMÈTRE : la fiche /jobs/:id n'existe QUE sur le déploiement Vercel (rewrite
- * /jobs/(.*) → backend). Sur un repli build local (LHCI_URL=localhost), le
+ * /jobs/(.*) → backend). Sur un repli build local (base = localhost:4173), le
  * script ne fait RIEN : créer une mission en prod pour vérifier une URL qui ne
  * la sert pas serait une écriture inutile. Il sort en 0 avec un ::notice.
  *
+ * Ce repli concerne TOUTES les PR (la preview Vercel est protégée, donc
+ * resolve-vercel-url.sh retombe sur le build local) : le cycle n'y tournait
+ * jamais, et une régression ne se voyait qu'après fusion. Le même fil est donc
+ * rejoué EN PROCESSUS, sur le code de la PR, par
+ * backend/tests/test_job_og_cycle.py (création → 200 → suppression → 404 +
+ * noindex + sitemap), et le maillon de routage par
+ * frontend/scripts/check-spa-routes.js (rewrite présent, route backend
+ * déclarée, URL inconnue → 404). Ce script reste le seul à prouver le DÉPLOIEMENT réel (rewrite
+ * Vercel + CDN + cache CDN) : les trois sont complémentaires, pas redondants.
+ *
  * AUTHENTIFICATION : réutilise le jeton du compte CLIENT dédié CI — soit
- * LHCI_AUTH_HEADER (déjà résolu par le job) soit un login avec
+ * KOJO_LHCI_AUTH_HEADER (déjà résolu par le job) soit un login avec
  * LHCI_CI_EMAIL/LHCI_CI_PASSWORD. POST /api/jobs exige user_type=client, et
  * DELETE /api/jobs/:id exige d'être la cliente propriétaire : le compte CI est
  * un client vérifié, donc les deux passent.
@@ -45,7 +55,7 @@
  * cache-busting (?kojo_cb=…) : mesuré en prod, la query ne change que la clé de
  * cache du CDN, pas le handler (404 identique avec et sans).
  *
- * Usage : LHCI_URL=https://… node scripts/check-og-job-200.js
+ * Usage : KOJO_LHCI_BASE_URL=https://… node scripts/check-og-job-200.js
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -97,20 +107,20 @@ export const buildTestJobPayload = (stamp) => ({
 });
 
 /**
- * Résout l'en-tête d'autorisation : jeton explicite → LHCI_AUTH_HEADER (posé
+ * Résout l'en-tête d'autorisation : jeton explicite → KOJO_LHCI_AUTH_HEADER (posé
  * par le job CI) → login du compte CI.
  * @returns {Promise<string>} « Bearer … » ou '' si aucune source n'aboutit.
  */
 export async function resolveAuthHeader({ backend, token = '', email = '', password = '', fetchImpl = fetch, errors = [] }) {
   if (token) return `Bearer ${token}`;
 
-  const raw = (process.env.LHCI_AUTH_HEADER || '').trim();
+  const raw = (process.env.KOJO_LHCI_AUTH_HEADER || '').trim();
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.Authorization) return String(parsed.Authorization);
     } catch (_e) {
-      errors.push("LHCI_AUTH_HEADER illisible (JSON invalide) — repli sur le login du compte CI");
+      errors.push("KOJO_LHCI_AUTH_HEADER illisible (JSON invalide) — repli sur le login du compte CI");
     }
   }
 
@@ -282,7 +292,7 @@ export async function assertDeletedJobUnreachable({
  * Cycle complet : créer → vérifier → supprimer.
  *
  * @param {object} [options]
- * @param {string} [options.base]   Base frontend servie (LHCI_URL).
+ * @param {string} [options.base]   Base frontend servie (KOJO_LHCI_BASE_URL).
  * @param {string} [options.backend] Base backend (KOJO_BACKEND_URL).
  * @param {string} [options.origin] Origin des cartes OG (KOJO_ORIGIN).
  * @param {string} [options.token]  Jeton Bearer explicite (sinon env/login).
@@ -298,7 +308,7 @@ export async function assertDeletedJobUnreachable({
  *   postDelete: {detail: boolean, noindex: boolean, card: boolean, sitemap: boolean}}>}
  */
 export async function runOgJob200Cycle({
-  base = process.env.LHCI_URL || DEFAULT_BASE,
+  base = process.env.KOJO_LHCI_BASE_URL || DEFAULT_BASE,
   backend = process.env.KOJO_BACKEND_URL || DEFAULT_BACKEND,
   origin = process.env.KOJO_ORIGIN || PROD_ORIGIN,
   token = '',
@@ -342,7 +352,9 @@ export async function runOgJob200Cycle({
     result.ok = true;
     const notice =
       `Cycle /jobs/:id IGNORÉ : base locale (${BASE}) — le rewrite Vercel et le pré-rendu backend ` +
-      `n'existent que sur le déploiement réel. Aucune mission de test créée.`;
+      `n'existent que sur le déploiement réel. Aucune mission de test créée. ` +
+      `(Le cycle est couvert sur les PR par backend/tests/test_job_og_cycle.py et ` +
+      `scripts/check-spa-routes.js ; ce script reste celui qui prouve le déploiement réel.)`;
     notices.push(notice);
     log(`  ⚠️ ${notice}`);
     return result;
@@ -351,7 +363,7 @@ export async function runOgJob200Cycle({
   const auth = await resolveAuthHeader({ backend: BACKEND, token, email, password, fetchImpl, errors });
   if (!auth) {
     errors.push(
-      'Aucun jeton disponible (LHCI_AUTH_HEADER absent et login CI impossible) — impossible de créer ' +
+      'Aucun jeton disponible (KOJO_LHCI_AUTH_HEADER absent et login CI impossible) — impossible de créer ' +
         'la mission de test, donc le chemin 200 reste NON vérifié.'
     );
     return result;
@@ -504,7 +516,7 @@ if (isDirectRun) {
   if (result.ok) {
     console.log(
       result.skipped
-        ? '\n✅ Cycle /jobs/:id ignoré (base locale) — chemin 200 exercé sur le déploiement réel (runs de main).'
+        ? '\n✅ Cycle /jobs/:id ignoré (base locale) — chemin 200 exercé sur le déploiement réel (runs de main),\n   et couvert sur les PR par backend/tests/test_job_og_cycle.py + scripts/check-spa-routes.js.'
         : `\n✅ Chemin 200 de /jobs/:id vérifié sur une mission réelle (${result.jobId}) — puis verrou 404 : ` +
           `fiche 404 + noindex, carte OG 404, absente du sitemap.`
     );

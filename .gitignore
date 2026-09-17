@@ -88,6 +88,11 @@ kojo-jobs-*-report.txt
 /*_audit*.py
 /audit_*.py
 
+# Mesures du rapport de taille du bundle (job CI `bundle-size-report`) :
+# frontend/.bundle-size/ reçoit les mesures et le corps du commentaire à
+# chaque run. Jamais versionné — c'est un transport, pas une source.
+.bundle-size/
+
 # Harnais, sondes et sorties d'outils des sessions d'audit/mesure locales.
 # Ce ne sont PAS des tests ni des scripts CI : les vrais gardes-fous restent
 # suivis (frontend/scripts/check-*.js, frontend/src/utils/__tests__/*.test.js)
