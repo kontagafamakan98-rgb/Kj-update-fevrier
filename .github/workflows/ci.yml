@@ -627,8 +627,7 @@ jobs:
       # Cette sonde lit le HTML réellement servi et publie un `::notice` par
       # intégration (présente / absente + la variable à poser). Elle ne fait
       # JAMAIS échouer le job : une configuration incomplète est un fait
-      # d'exploitation, pas une régression de code. `--fail-if-missing` existe
-      # pour le jour où les valeurs seront posées (bascule d'un mot ici).
+      # d'exploitation, pas une régression de code.
       #
       # main uniquement : sur une PR, la base peut être une preview ou la pile
       # locale, et un « absent » n'y dirait rien de la production (le script

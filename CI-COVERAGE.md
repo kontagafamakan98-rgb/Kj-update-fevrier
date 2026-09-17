@@ -396,15 +396,12 @@ Console) et de profils sociaux qui doivent **exister** — `contact.js` refuse
 d'afficher un profil inventé. Tant qu'elles manquent, l'audit restera rouge sur
 ces trois points, quel que soit l'état du code.
 
-**Ce que la CI en dit désormais** : `scripts/check-seo-production.js` lit le HTML
+**Ce que la CI en dit désormais** : `scripts/check-seo-production.js` lit l'accueil
 réellement servi et publie une annotation `::notice` par intégration (présente /
 absente + la variable à poser), **sur `main` uniquement** et **sans jamais faire
 échouer le job** — l'absence de configuration est un fait d'exploitation, pas une
 régression de code. Il refuse de conclure sur une base locale (les variables sont
-absentes par construction) et envoie `cache-control: no-cache` (un hit d'edge
-avec un `Age` de 1110 s a déjà fait conclure sur une copie antérieure).
-`--fail-if-missing` existe pour le jour où les quatre valeurs sont posées : le
-rapport peut alors devenir un garde d'un mot.
+absentes par construction).
 
 Rejouer la mesure, sur la production comme sur un build local :
 
@@ -529,10 +526,9 @@ chaque PR vers `main` (sauf mention contraire).
   d'environnement (GA4, Search Console, Plausible, `sameAs` des réseaux
   sociaux) sont sondées sur le **HTML de production**, sur `main` uniquement
   (`scripts/check-seo-production.js`) : une annotation `::notice` par
-  intégration, avec la variable à poser quand elle manque. Aucun échec par
-  défaut — une configuration incomplète est un fait d'exploitation, pas une
-  régression — mais le rapport SAIT échouer (`--fail-if-missing`, prouvé en
-  test) le jour où les valeurs seront posées. Cf. F9.
+  intégration, avec la variable à poser quand elle manque. Aucun échec, jamais —
+  une configuration incomplète est un fait d'exploitation, pas une régression.
+  Cf. F9.
 
 **Références et configuration**
 - Formats des variables critiques dans `fly.toml [env]`, `.env.example` et
@@ -593,12 +589,16 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
 7. **Pas d'audit de dépendances** (ni `npm audit`, ni job équivalent) : une CVE
    dans les dépendances ne fait pas rougir la CI.
 8. **La configuration SEO/analytics de la production est OBSERVÉE, pas
-   imposée** (F9) : `scripts/check-seo-production.js` lit le HTML réellement
+   imposée** (F9) : `scripts/check-seo-production.js` lit l'accueil réellement
    servi sur `main` et publie une `::notice` par intégration absente. L'écart
    n'est donc plus invisible — mais il ne bloque toujours rien : une variable
    oubliée sur Vercel reste un rouge d'audit externe, pas un rouge de CI.
-   En faire un garde est un mot (`--fail-if-missing` dans `ci.yml`), à faire
-   le jour où GA4, Search Console et les profils sociaux sont configurés.
+   En faire un garde demanderait d'ajouter un mode d'échec au script : il a été
+   volontairement écarté (la demande était de ne pas faire échouer la CI).
+   Deux autres limites : seule l'accueil est sondée (les six autres pages du
+   sitemap ne le sont pas), et un `Age` de cache non nul n'est pas détecté — le
+   HTML est servi en `must-revalidate`, donc l'edge revalide, mais la sonde ne
+   le PROUVE pas (mesuré : `HIT` + `Age: 1` avec et sans `cache-control`).
 
 ## 8. Tenir ce document à jour
 
