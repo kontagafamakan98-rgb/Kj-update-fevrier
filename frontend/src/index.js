@@ -3,11 +3,14 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import * as serviceWorkerRegistration from "./serviceWorkerRegistration";
-import { initSentry } from "./utils/sentry";
+import { initSentryOnInteraction } from "./utils/sentry";
 import { initAnalytics } from "./utils/analytics";
 
-// Sentry en premier (no-op si non configuré via VITE_SENTRY_DSN)
-initSentry();
+// Sentry : armé tout de suite (tampon des erreurs précoces + écouteurs
+// passifs) mais le SDK n'est TÉLÉCHARGÉ qu'à la première interaction, pour ne
+// pas concurrencer le premier rendu. No-op si VITE_SENTRY_ENABLED != 'true'.
+// Détail et contreparties : utils/sentry.js.
+initSentryOnInteraction();
 // Analytics (no-op si VITE_PLAUSIBLE_DOMAIN non défini — script externe
 // chargé via src, compatible CSP script-src 'self')
 initAnalytics();

@@ -2,9 +2,13 @@
 /**
  * Vérifie que le pré-rendu par route est INTACT après `vite build` :
  *
- *   • build/index.html  → <div id="root"></div> VIDE (le shell SPA doit
- *     rester vide : React monte dans #root — du contenu statique ajouté ici
- *     casserait le montage ou créerait un double rendu).
+ *   • build/index.html  → #root contient le shell statique de l'ACCUEIL
+ *     (h1 + contenu + liens : c'est ce que voit un crawler sans JavaScript,
+ *     et le LCP de la page). index.html n'est plus servi que pour « / » —
+ *     le catch-all SPA ayant été retiré (une URL inconnue doit répondre 404),
+ *     le shell de l'accueil ne peut plus être peint à tort sur /dashboard.
+ *     React remplace ce contenu au montage (createRoot efface #root), comme
+ *     pour les pages ci-dessous.
  *   • build/jobs.html   → #root contient le shell h1 statique « Emplois
  *     disponibles » + placeholder navbar (LCP avant boot React) + og:image
  *     spécifique (og-jobs.png).
@@ -13,7 +17,7 @@
  *
  * Et surtout : chaque page PRÉ-RENDUE du build doit être ATTEIGNABLE via
  * frontend/vercel.json (rewrites « /route » et « /route/ » → « /route.html »,
- * catch-all en dernière position). Le plugin peut émettre login.html sans que
+ * et aucune règle masquée). Le plugin peut émettre login.html sans que
  * Vercel ne le serve jamais : la route renverrait alors index.html, sans
  * shell, et l'optimisation serait PERDUE EN SILENCE.
  *
@@ -37,14 +41,18 @@ const read = (name) => {
   }
 };
 
-// 1. index.html : #root doit être VIDE.
+// 1. index.html : #root doit porter le shell statique de l'accueil.
+// (Détail des invariants du shell — h1 unique, longueurs de méta, N.A.P.,
+// classes stylées — dans check-home-shell.js, qui échoue séparément.)
 const index = read('index.html');
 const rootMatch = index.match(/<div id="root">([\s\S]*?)<\/div>/);
 if (!rootMatch) {
   errors.push('index.html : <div id="root"> absent du HTML');
-} else if (rootMatch[1].trim() !== '') {
-  errors.push('index.html : <div id="root"> n\'est PAS vide (contenu statique ajouté ?)');
-}
+} else if (rootMatch[1].trim() === '') {
+  errors.push(
+    'index.html : <div id="root"> est VIDE — le shell statique de l\'accueil a disparu ' +
+      '(plugin prerender-route-meta désactivé ?) : sans lui, la page n\'a ni h1, ni contenu, ni lien'
+  );  }
 
 // 1bis. index.html : le chunk lazy de la page d'accueil (Home) doit être
 // préchargé en modulepreload — sinon le landing / (audité par les budgets
@@ -75,8 +83,10 @@ if (jobs) {
 // 3. login.html : shell formulaire + og:image dédié.
 const login = read('login.html');
 if (login) {
-  if (!login.includes('<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h2>')) {
-    errors.push('login.html : h2 « Connexion » absent du shell');
+  // Titre de PAGE en h1 (et non h2) : une page doit avoir UN h1, identique
+  // pour un crawler sans JavaScript et pour celui qui exécute le bundle.
+  if (!login.includes('<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h1>')) {
+    errors.push('login.html : h1 « Connexion » absent du shell');
   }
   if (!login.includes('id="email"')) {
     errors.push('login.html : champ e-mail absent du shell');
@@ -99,8 +109,8 @@ if (login) {
 // 4. register.html : shell formulaire (mode client) + modulepreload du chunk.
 const register = read('register.html');
 if (register) {
-  if (!register.includes('<h2 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h2>')) {
-    errors.push('register.html : h2 « Créer un compte » absent du shell');
+  if (!register.includes('<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>')) {
+    errors.push('register.html : h1 « Créer un compte » absent du shell');
   }
   if (!register.includes("S'inscrire avec Google")) {
     errors.push('register.html : bouton Google absent du shell');
@@ -134,8 +144,8 @@ if (register) {
 // 4bis. forgot-password.html : shell formulaire étape email (par défaut).
 const forgot = read('forgot-password.html');
 if (forgot) {
-  if (!forgot.includes('<h2 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h2>')) {
-    errors.push('forgot-password.html : h2 « Mot de passe oublié » absent du shell');
+  if (!forgot.includes('<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>')) {
+    errors.push('forgot-password.html : h1 « Mot de passe oublié » absent du shell');
   }
   if (!forgot.includes('id="reset-email"')) {
     errors.push('forgot-password.html : champ e-mail (reset-email) absent du shell');
@@ -172,6 +182,53 @@ if (payment) {
   }
 }
 
+// 4quater. how-it-works.html : page PUBLIQUE de contenu (h1, étapes,
+// séquestre, FAQ). Avant son shell, elle était servie par le gabarit nu :
+// titre « Kojo », aucun h1, aucun canonical, un mot de contenu — invisible
+// pour un crawler sans JavaScript.
+const howItWorks = read('how-it-works.html');
+if (howItWorks) {
+  if (!howItWorks.includes('<h1 class="text-3xl md:text-4xl font-bold mb-4">Comment ça marche ?</h1>')) {
+    errors.push('how-it-works.html : h1 « Comment ça marche ? » absent du shell');
+  }
+  if (!howItWorks.includes('<details')) {
+    errors.push('how-it-works.html : FAQ (blocs <details>) absente du shell');
+  }
+  for (const anchor of ['href="/jobs"', 'href="/support"']) {
+    if (!howItWorks.includes(anchor)) {
+      errors.push(`how-it-works.html : lien interne ${anchor} absent (maillage du site)`);
+    }
+  }
+  if (!/<link rel="modulepreload"[^>]*href="[^"]*HowItWorks-[^"]*\.js"/.test(howItWorks)) {
+    errors.push('how-it-works.html : modulepreload du chunk HowItWorks absent');
+  }
+  if (!howItWorks.includes('https://kj-update-fevrier.vercel.app/how-it-works')) {
+    errors.push('how-it-works.html : canonical de la route absent');
+  }
+}
+
+// 4quinquies. support.html : page PUBLIQUE (contact + suivi de ticket).
+const support = read('support.html');
+if (support) {
+  if (!support.includes('<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>')) {
+    errors.push('support.html : h1 « Support » absent du shell');
+  }
+  if (!support.includes('Suivre une demande existante')) {
+    errors.push('support.html : carte de suivi (« Suivre une demande existante ») absente du shell');
+  }
+  for (const anchor of ['href="tel:', 'href="mailto:', 'wa.me', 'href="/how-it-works"']) {
+    if (!support.includes(anchor)) {
+      errors.push(`support.html : lien ${anchor} absent du shell (contact / maillage)`);
+    }
+  }
+  if (!/<link rel="modulepreload"[^>]*href="[^"]*Support-[^"]*\.js"/.test(support)) {
+    errors.push('support.html : modulepreload du chunk Support absent');
+  }
+  if (!support.includes('https://kj-update-fevrier.vercel.app/support')) {
+    errors.push('support.html : canonical de la route absent');
+  }
+}
+
 // 5. Fiches /jobs/:id : le pré-rendu HTML (méta OG de la mission + 404
 // noindex) est servi par le BACKEND — GET /api/og/jobs/{id} dans
 // kojo_routers_public.py, aiguillé par le rewrite Vercel
@@ -187,8 +244,20 @@ if (payment) {
 // jamais peint et l'optimisation LCP est silencieusement annulée. Aucune
 // autre vérification ne relie le build (ce qui est émis) au routage (ce qui
 // est servi) : c'est exactement le trou par lequel le lot peut régresser.
+// 404.html est volontairement EXCLUE : elle n'est pas servie par un rewrite
+// (elle l'est par le mécanisme 404 de Vercel, avec un statut 404) — exiger une
+// règle « /404 » n'aurait aucun sens. Sa présence et son noindex sont vérifiés
+// par check-spa-routes.js.
+// app.html est exclue pour la raison inverse : c'est le gabarit NU partagé par
+// les routes clientes (/dashboard, /profile, /support…), pas une page. Il est
+// émis pour un CAS DE ROUTAGE, pas pour une URL « /app » qui n'existe pas — son
+// contrat (destinations attendues, #root vide, ni h1 ni canonical) appartient à
+// check-spa-routes.js.
 const prerenderedPages = readdirSync(buildDir)
-  .filter((name) => name.endsWith('.html') && name !== 'index.html')
+  .filter(
+    (name) =>
+      name.endsWith('.html') && !['index.html', '404.html', 'app.html'].includes(name)
+  )
   .sort();
 
 let vercelRewrites = null;
@@ -213,13 +282,13 @@ if (vercelRewrites) {
     }
   }
 
-  // Le catch-all doit rester la DERNIÈRE règle : placé avant, il capture les
-  // routes pré-rendues et Vercel ne sert plus que index.html.
-  const catchAllIndex = vercelRewrites.findIndex((r) => r && r.source === '/(.*)');
-  if (catchAllIndex !== -1 && catchAllIndex !== vercelRewrites.length - 1) {
+  // Aucun catch-all « /(.*) » : c'est lui qui faisait répondre 200 à toute URL
+  // inconnue (soft 404) et qui masquait les routes ci-dessus. Une URL inconnue
+  // doit tomber sur la page 404 de Vercel (statut 404).
+  if (vercelRewrites.some((r) => r && r.source === '/(.*)')) {
     errors.push(
-      'vercel.json : la règle catch-all « /(.*) » doit rester la DERNIÈRE ' +
-        '(sinon elle capture les routes pré-rendues)'
+      'vercel.json : la règle catch-all « /(.*) » est revenue — elle capturerait les routes ' +
+        'pré-rendues ET ferait répondre 200 aux URL inconnues (soft 404)'
     );
   }
 }
@@ -230,8 +299,8 @@ if (errors.length) {
   process.exit(1);
 }
 console.log(
-  `✅ Pré-rendu par route intact : index.html #root vide, shells statiques vérifiés, ` +
+  `✅ Pré-rendu par route intact : shell d'accueil dans index.html, shells statiques vérifiés, ` +
     `et les ${prerenderedPages.length} pages pré-rendues (${prerenderedPages.join(', ')}) ` +
-    `sont routées par vercel.json (catch-all en dernier). Fiches /jobs/:id servies ` +
+    `sont routées par vercel.json (sans catch-all : URL inconnue → 404). Fiches /jobs/:id servies ` +
     `par le backend (GET /api/og/jobs/{id}).`
 );

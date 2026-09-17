@@ -122,7 +122,289 @@ export default defineConfig(({ mode }) => {
             month: 'long',
             year: 'numeric',
           }).format(new Date())
+
+          // ── Données partagées avec l'application ────────────────────────
+          // Contact (N.A.P.) et réseaux sociaux sont lus depuis les MÊMES
+          // fichiers que le runtime React (src/config/) : le footer et le HTML
+          // statique ne peuvent pas publier deux adresses différentes.
+          const readJson = (relative) =>
+            JSON.parse(fs.readFileSync(path.join(process.cwd(), relative), 'utf8'))
+          const contact = readJson('src/config/contact.json')
+          const socialNetworks = readJson('src/config/social-networks.json')
+          const siteFr = readJson('src/i18n/fr.json')
+
+          // Une clé i18n absente doit CASSER le build : un shell amputé
+          // (titre manquant, section vide) passerait sinon pour un succès et
+          // viderait l'optimisation SEO sans que personne ne le voie.
+          const T = (key) => {
+            const value = siteFr[key]
+            if (typeof value !== 'string' || !value.trim()) {
+              throw new Error(
+                `prerender-route-meta : clé i18n « ${key} » absente de src/i18n/fr.json (shell accueil)`
+              )
+            }
+            return value
+          }
+          const esc = (value) =>
+            String(value)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+
+          const socialLinks = socialNetworks
+            .map(({ label, env: envName }) => ({ label, url: String(env[envName] || '').trim() }))
+            .filter((social) => /^https:\/\//.test(social.url))
+
+          // ── Shell statique de l'ACCUEIL (index.html) ────────────────────
+          // Mêmes sections et MÊMES classes que src/pages/Home.js, avec les
+          // textes réels de src/i18n/fr.json : un crawler sans JavaScript voit
+          // un titre h1, du contenu et des liens internes, et l'utilisateur
+          // voit la page avant le boot de React (createRoot efface #root au
+          // montage, les classes identiques rendent la bascule invisible).
+          //
+          // ⚠️ Les classes Tailwind utilisées ici doivent EXISTER ailleurs
+          // dans les sources scannées (tailwind.config.cjs ne scanne pas ce
+          // fichier) : elles sont donc copiées de Home.js / Support.js /
+          // App.js, et check-home-shell.js échoue si l'une manque au CSS.
+          //
+          // Les 4 pays reprennent COUNTRIES (src/components/CountryDisplay.js) :
+          // le garde CI vérifie que la liste du shell correspond toujours.
+          const HOME_COUNTRIES = [
+            { name: 'Mali', flag: '🇲🇱', color: 'bg-green-100' },
+            { name: 'Sénégal', flag: '🇸🇳', color: 'bg-yellow-100' },
+            { name: 'Burkina Faso', flag: '🇧🇫', color: 'bg-red-100' },
+            { name: "Côte d'Ivoire", flag: '🇨🇮', color: 'bg-orange-100' },
+          ]
+          // Catégories : mêmes clés que Home.js (canoniques côté backend).
+          const HOME_CATEGORIES = [
+            { key: 'general', icon: '🛠️' },
+            { key: 'plumbing', icon: '🔧' },
+            { key: 'electrical', icon: '⚡' },
+            { key: 'construction', icon: '🏗️' },
+            { key: 'cleaning', icon: '🧽' },
+            { key: 'gardening', icon: '🌱' },
+            { key: 'tutoring', icon: '📚' },
+            { key: 'mechanics', icon: '🔩' },
+            { key: 'carpentry', icon: '🪚' },
+            { key: 'computing', icon: '💻' },
+          ]
+
+          const homeShell = [
+            // Placeholder navbar (hauteur réelle) — comme les shells /jobs et
+            // /login : le marqueur visuel est en place dès le premier paint.
+            `<div class="h-16 bg-white border-b border-gray-200"></div>`,
+            `<div class="min-h-screen">`,
+
+            // Hero : le h1 est l'élément LCP de l'accueil.
+            `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white relative overflow-hidden">`,
+            `<div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">`,
+            `<div class="text-center">`,
+            `<h1 class="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight">${esc(T('heroTitle'))}</h1>`,
+            `<p class="text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto">${esc(T('heroSubtitle'))}</p>`,
+            `<div class="flex flex-col sm:flex-row gap-4 justify-center items-center">`,
+            `<a href="/register" class="w-full sm:w-auto bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold text-lg shadow-lg transform transition hover:scale-105">${esc(T('getStarted'))}</a>`,
+            `<a href="/jobs" class="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold text-lg transition">${esc(T('viewJobs'))}</a>`,
+            `</div>`,
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Pays couverts
+            `<section class="py-12 md:py-16 bg-white">`,
+            `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<div class="text-center mb-12">`,
+            `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('availableIn4Countries'))}</h2>`,
+            `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('kojoConnectsDescription'))}</p>`,
+            `</div>`,
+            `<div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">`,
+            ...HOME_COUNTRIES.map(
+              (country) =>
+                `<div class="${country.color} rounded-2xl p-6 text-center shadow-md">` +
+                `<div class="flex justify-center mb-3">` +
+                `<div class="w-14 h-10 md:w-20 md:h-14 rounded shadow-sm flex items-center justify-center text-3xl">${country.flag}</div>` +
+                `</div>` +
+                `<h3 class="font-semibold text-gray-900 text-sm md:text-base">${esc(country.name)}</h3>` +
+                `<p class="text-xs text-gray-600 mt-1">${esc(T('servicesAvailable'))}</p>` +
+                `</div>`
+            ),
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Catégories (liens INTERNES réels, avec le filtre de la liste)
+            `<section class="py-12 md:py-16 bg-gray-50">`,
+            `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<div class="text-center mb-12">`,
+            `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('popularServices'))}</h2>`,
+            `<p class="text-gray-600">${esc(T('findServiceYouNeed'))}</p>`,
+            `</div>`,
+            `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">`,
+            ...HOME_CATEGORIES.map(
+              (category) =>
+                `<a href="/jobs?category=${category.key}" class="bg-white rounded-2xl shadow-md p-6 text-center hover:shadow-lg transform transition hover:scale-105">` +
+                `<div class="text-3xl md:text-4xl mb-3">${category.icon}</div>` +
+                `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.key))}</h3>` +
+                `</a>`
+            ),
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Trois promesses
+            `<section class="py-12 md:py-16 bg-white">`,
+            `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">`,
+            ...[
+              ['💼', 'findWork', 'findWorkDescription'],
+              ['🤝', 'connect', 'connectDescription'],
+              ['💰', 'securePayments', 'securePaymentsDescription'],
+            ].map(
+              ([icon, titleKey, textKey]) =>
+                `<div class="text-center">` +
+                `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><span class="text-2xl">${icon}</span></div>` +
+                `<h3 class="text-xl font-semibold mb-4 text-gray-900">${esc(T(titleKey))}</h3>` +
+                `<p class="text-gray-600">${esc(T(textKey))}</p>` +
+                `</div>`
+            ),
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Comment ça marche
+            `<section class="py-12 md:py-16 bg-gray-50">`,
+            `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<div class="text-center mb-12">`,
+            `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('howItWorksTitle'))}</h2>`,
+            `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeHowItWorksSubtitle'))}</p>`,
+            `</div>`,
+            `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`,
+            ...[
+              ['1️⃣', 'homeStep1Title', 'homeStep1Desc'],
+              ['2️⃣', 'homeStep2Title', 'homeStep2Desc'],
+              ['3️⃣', 'homeStep3Title', 'homeStep3Desc'],
+            ].map(
+              ([icon, titleKey, textKey]) =>
+                `<div class="bg-white rounded-2xl shadow-md p-6 text-center">` +
+                `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${icon}</span></div>` +
+                `<h3 class="text-lg font-semibold mb-2 text-gray-900">${esc(T(titleKey))}</h3>` +
+                `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
+                `</div>`
+            ),
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Séquestre (confiance)
+            `<section class="py-12 md:py-16 bg-white">`,
+            `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">`,
+            `<div class="flex flex-col md:flex-row items-center gap-6">`,
+            `<div class="text-5xl">🛡️</div>`,
+            `<div class="text-center md:text-left">`,
+            `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`,
+            `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`,
+            `<p class="text-emerald-700 mt-3 text-sm">${esc(T('escrowTrustBullets'))}</p>`,
+            `<a href="/how-it-works" class="mt-4 inline-block rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">${esc(T('learnMore'))}</a>`,
+            `</div>`,
+            `</div>`,
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Appel à l'action
+            `<section class="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">`,
+            `<div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">`,
+            `<h2 class="text-2xl md:text-3xl lg:text-4xl font-bold mb-6">${esc(T('joinThousands'))}</h2>`,
+            `<p class="text-lg md:text-xl mb-8 opacity-90">${esc(T('startConnectingToday'))}</p>`,
+            `<div class="flex flex-col sm:flex-row gap-4 justify-center">`,
+            `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transform transition hover:scale-105">${esc(T('lookingForServices'))}</a>`,
+            `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T('offerServices'))}</a>`,
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Chiffres (valeurs de repli de Home.js avant /public/stats, pour
+            // que le remplacement par React ne décale rien).
+            `<section class="py-12 bg-gray-50">`,
+            `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">`,
+            ...[
+              ['1 000+', 'activeWorkers'],
+              ['500+', 'completedProjects'],
+              ['4', 'countriesCovered'],
+              ['24/7', 'customerSupport'],
+            ].map(
+              ([value, labelKey]) =>
+                `<div>` +
+                `<div class="text-3xl md:text-4xl font-bold text-orange-600 mb-2">${esc(value)}</div>` +
+                `<div class="text-sm md:text-base text-gray-600">${esc(T(labelKey))}</div>` +
+                `</div>`
+            ),
+            `</div>`,
+            `</div>`,
+            `</section>`,
+
+            // Contact (N.A.P. + liens cliquables) : section réelle, pas un
+            // bloc caché — elle est aussi dans le footer React, donc elle
+            // survit au montage.
+            `<section class="py-12 md:py-16 bg-white">`,
+            `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<div class="text-center mb-12">`,
+            `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Nous contacter</h2>`,
+            `<p class="text-gray-600 max-w-2xl mx-auto">L'équipe Kojo vous répond par téléphone, par e-mail ou sur WhatsApp, du lundi au samedi, pour toute question sur une mission, un paiement ou votre compte.</p>`,
+            `</div>`,
+            `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">`,
+            `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+            `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`,
+            `<div><div class="text-sm font-semibold text-gray-900">Appeler le support</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+            `</a>`,
+            `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+            `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`,
+            `<div><div class="text-sm font-semibold text-gray-900">WhatsApp</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+            `</a>`,
+            `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+            `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`,
+            `<div><div class="text-sm font-semibold text-gray-900">Envoyer un e-mail</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
+            `</a>`,
+            `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+            `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`,
+            `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
+            `</a>`,
+            `</div>`,
+            // Carte intégrée (SEO local). loading=lazy : l'iframe ne concurrence
+            // pas le LCP, et pour un utilisateur avec JavaScript elle est
+            // remplacée par React avant même de se charger.
+            `<iframe src="${esc(contact.mapsEmbedUrl)}" title="Carte — Kojo, ${esc(contact.address)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" class="mt-8 w-full rounded-xl border border-gray-200" style="height:320px;border:0;"></iframe>`,
+            `</div>`,
+            `</section>`,
+            `</div>`,
+
+            // Pied de page (mêmes liens que le footer React : légaux, contact,
+            // supports sociaux déclarés).
+            `<footer class="border-t border-orange-100 bg-white/95 backdrop-blur-sm">`,
+            `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3">`,
+            `<address class="not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600">`,
+            `<span>${esc(contact.address)}</span>`,
+            `<a href="tel:${esc(contact.phone)}" class="hover:text-orange-700 underline underline-offset-2">${esc(contact.phoneDisplay)}</a>`,
+            `<a href="mailto:${esc(contact.email)}" class="hover:text-orange-700 underline underline-offset-2 break-all">${esc(contact.email)}</a>`,
+            `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">WhatsApp</a>`,
+            `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">Itinéraire</a>`,
+            `</address>`,
+            `<div class="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">`,
+            `<a href="/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx" target="_blank" rel="noreferrer" class="hover:text-orange-800 underline underline-offset-2">Politique de confidentialité</a>`,
+            `<a href="/support" class="hover:text-orange-800 underline underline-offset-2">Nous contacter</a>`,
+            ...socialLinks.map(
+              (social) =>
+                `<a href="${esc(social.url)}" target="_blank" rel="me noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(social.label)}</a>`
+            ),
+            `</div>`,
+            `</div>`,
+            `</footer>`,
+          ].join('')
+
           const SHELLS = {
+            home: homeShell,
             jobs: `<div class="h-16 bg-white border-b border-gray-200"></div>`
               + `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">`
               + `<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">`
@@ -144,7 +426,7 @@ export default defineConfig(({ mode }) => {
               + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">`
               + `<span class="text-white text-xl font-bold">K</span>`
               + `</div>`
-              + `<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h2>`
+              + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h1>`
               + `</div>`
               + `<form class="mt-8 space-y-6">`
               + `<div class="space-y-4">`
@@ -192,7 +474,7 @@ export default defineConfig(({ mode }) => {
               + `<div class="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">`
               + `<span class="text-white text-2xl font-bold">K</span>`
               + `</div>`
-              + `<h2 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h2>`
+              + `<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>`
               + `<p class="mt-2 text-sm text-gray-600">Rejoignez la communauté Kojo</p>`
               + `<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">`
               + `<div class="flex items-center justify-center py-2">`
@@ -289,7 +571,7 @@ export default defineConfig(({ mode }) => {
               + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">`
               + `<span class="text-white text-2xl font-bold">✉️</span>`
               + `</div>`
-              + `<h2 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h2>`
+              + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>`
               + `<p class="mt-3 text-sm text-gray-600">Recevez un code par email pour sécuriser votre compte et définir un nouveau mot de passe.</p>`
               + `</div>`
               + `<div class="bg-white rounded-2xl shadow-md p-6 space-y-6">`
@@ -332,6 +614,159 @@ export default defineConfig(({ mode }) => {
               + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">Voir les missions disponibles</div>`
               + `</div>`
               + `</div></div>`,
+            // HowItWorks : page PUBLIQUE de contenu, servie jusqu'ici par
+            // app.html — le gabarit NU (titre « Kojo », aucun h1, aucun
+            // canonical, 1 mot). Un crawler sans JavaScript n'y voyait donc
+            // RIEN, alors que la page explique le fonctionnement, le séquestre
+            // et répond aux questions fréquentes (matière à extraits
+            // enrichis). Le shell réplique les sections de
+            // src/pages/HowItWorks.js, avec les textes réels de fr.json (T()),
+            // dans le même ordre et les mêmes classes : la bascule au montage
+            // React est invisible.
+            'how-it-works': `<div class="h-16 bg-white border-b border-gray-200"></div>`
+              + `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white">`
+              + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center">`
+              + `<h1 class="text-3xl md:text-4xl font-bold mb-4">${esc(T('howItWorksTitle'))}</h1>`
+              + `<p class="text-lg opacity-90 max-w-2xl mx-auto">${esc(T('howItWorksHero'))}</p>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-white">`
+              + `<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">`
+              + `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`
+              + [
+                ['📝', 'howStep1Title', 'howStep1Desc'],
+                ['🛡️', 'howStep2Title', 'howStep2Desc'],
+                ['✅', 'howStep3Title', 'howStep3Desc'],
+              ]
+                .map(
+                  ([icon, titleKey, textKey]) =>
+                    `<div class="rounded-2xl border border-gray-100 shadow-sm p-6">` +
+                    `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${icon}</span></div>` +
+                    `<h2 class="text-lg font-semibold text-gray-900 text-center mb-3">${esc(T(titleKey))}</h2>` +
+                    `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
+                    `</div>`
+                )
+                .join('')
+              + `</div>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-gray-50">`
+              + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`
+              + `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">`
+              + `<div class="flex flex-col md:flex-row items-center gap-6">`
+              + `<div class="text-5xl">🛡️</div>`
+              + `<div>`
+              + `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowWhatTitle'))}</h2>`
+              + `<p class="text-emerald-800">${esc(T('escrowWhatText'))}</p>`
+              + `<ul class="mt-4 space-y-2 text-emerald-800 text-sm">`
+              + ['escrowGuarantee1', 'escrowGuarantee2', 'escrowGuarantee3', 'escrowGuarantee4']
+                .map((key) => `<li>${esc(T(key))}</li>`)
+                .join('')
+              + `</ul>`
+              + `</div>`
+              + `</div>`
+              + `</div>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-white">`
+              + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">`
+              + `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">${esc(T('faqTitle'))}</h2>`
+              + `<div class="space-y-4">`
+              + [1, 2, 3, 4, 5]
+                .map(
+                  (index) =>
+                    `<details class="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 group">` +
+                    `<summary class="cursor-pointer font-semibold text-gray-900 list-none flex items-center justify-between gap-4">` +
+                    `${esc(T(`faq${index}q`))}` +
+                    `<span class="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">+</span>` +
+                    `</summary>` +
+                    `<p class="mt-3 text-sm text-gray-600">${esc(T(`faq${index}a`))}</p>` +
+                    `</details>`
+                )
+                .join('')
+              + `</div>`
+              + `</div>`
+              + `</section>`
+              + `<section class="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">`
+              + `<div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">`
+              + `<h2 class="text-2xl md:text-3xl font-bold mb-4">${esc(T('readyToStart'))}</h2>`
+              + `<div class="flex flex-col sm:flex-row gap-4 justify-center">`
+              + `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transition">${esc(T('lookingForServices'))}</a>`
+              + `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T('offerServices'))}</a>`
+              + `</div>`
+              // Maillage interne : mêmes liens que ceux ajoutés au composant
+              // (HowItWorks.js) — les crawlers atteignent la liste des missions
+              // et le support depuis cette page de contenu.
+              + `<p class="mt-6 text-sm opacity-90">`
+              + `<a href="/jobs" class="underline underline-offset-2">${esc(T('viewJobs'))}</a>`
+              + ` · `
+              + `<a href="/support" class="underline underline-offset-2">${esc(T('support'))}</a>`
+              + `</p>`
+              + `</div>`
+              + `</section>`,
+            // Support : page PUBLIQUE (contact + suivi de ticket) qui était
+            // elle aussi servie par le gabarit nu. Le shell réplique l'état
+            // INITIAL de src/pages/Support.js (titre, carte de suivi vide,
+            // choix du canal, carte de contact) : même ordre, mêmes classes,
+            // mêmes hauteurs — le montage React ne décale rien.
+            support: `<div class="h-16 bg-white border-b border-gray-200"></div>`
+              + `<div class="max-w-2xl mx-auto px-4 py-8">`
+              + `<div class="mb-6 text-center">`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>`
+              + `<p class="text-gray-600">Une question, un problème ? Nous sommes là pour vous aider.</p>`
+              + `</div>`
+              + `<div class="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">`
+              + `<h2 class="text-lg font-semibold text-gray-900 mb-1">Suivre une demande existante</h2>`
+              + `<p class="text-sm text-gray-500 mb-4">Entrez votre n° de ticket et l'e-mail utilisé pour voir où en est votre demande.</p>`
+              + `<div class="flex flex-col sm:flex-row gap-2">`
+              + `<input type="text" readonly placeholder="N° de ticket (ex : 3fa85f64…)" aria-label="N° de ticket" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
+              + `<input type="email" readonly placeholder="Votre e-mail" aria-label="Votre e-mail" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
+              + `<div class="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white opacity-50">Vérifier le statut</div>`
+              + `</div>`
+              + `</div>`
+              + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`
+              + `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">`
+              + `<span class="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600">💬</span>`
+              + `<span class="font-semibold text-gray-900">Parler avec le robot</span>`
+              + `<span class="text-xs text-gray-500">L'assistant vous guide en quelques questions</span>`
+              + `</div>`
+              + `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">`
+              + `<span class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">📞</span>`
+              + `<span class="font-semibold text-gray-900">Contacter directement le support</span>`
+              + `<span class="text-xs text-gray-500">Appel, e-mail ou WhatsApp</span>`
+              + `</div>`
+              + `</div>`
+              + `<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">`
+              + `<h2 class="text-xl font-semibold text-gray-900 mb-1">Contacter directement le support</h2>`
+              + `<p class="text-sm text-gray-500 mb-5">Nous sommes joignables aux coordonnées ci-dessous.</p>`
+              + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
+              + `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Appeler</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
+              + `</a>`
+              + `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">WhatsApp</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
+              + `</a>`
+              + `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Envoyer un e-mail</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`
+              + `</a>`
+              + `<div class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`
+              + `</div>`
+              + `</div>`
+              + `</div>`
+              // Maillage interne : le support mène au fonctionnement du service
+              // et à la liste des missions (page utile pour un crawler qui
+              // arrive ici depuis une recherche de contact).
+              + `<p class="mt-6 text-center text-sm text-gray-500">`
+              + `<a href="/how-it-works" class="text-orange-600 underline underline-offset-2">${esc(T('howItWorksTitle'))}</a>`
+              + ` · `
+              + `<a href="/jobs" class="text-orange-600 underline underline-offset-2">${esc(T('viewJobs'))}</a>`
+              + `</p>`
+              + `</div>`,
           }
 
           const ROUTES = {
@@ -374,6 +809,22 @@ export default defineConfig(({ mode }) => {
               image: '/og-image-1200x630.png',
               imageSquare: '/og-square-1200x1200.png',
             },
+            // Titre et description repris À L'IDENTIQUE de ce que posent les
+            // pages au runtime (usePageTitle de HowItWorks.js / Support.js) :
+            // sinon un crawler sans JavaScript et un crawler qui exécute le JS
+            // liraient deux méta différentes pour la même URL.
+            'how-it-works': {
+              title: `${T('howItWorksTitle')} — Kojo`,
+              description: T('howItWorksHero'),
+              image: '/og-image-1200x630.png',
+              imageSquare: '/og-square-1200x1200.png',
+            },
+            support: {
+              title: `${T('support')} — Kojo`,
+              description: T('supportHelp'),
+              image: '/og-image-1200x630.png',
+              imageSquare: '/og-square-1200x1200.png',
+            },
           }
 
           // Remplace content="..." d'une meta mono ou multi-lignes.
@@ -398,6 +849,8 @@ export default defineConfig(({ mode }) => {
             register: /[\\/]pages[\\/]Register\.js$/,
             'forgot-password': /[\\/]pages[\\/]ForgotPassword\.js$/,
             payment: /[\\/]pages[\\/]Payment\.js$/,
+            'how-it-works': /[\\/]pages[\\/]HowItWorks\.js$/,
+            support: /[\\/]pages[\\/]Support\.js$/,
           }
           const chunkFiles = {}
           for (const [file, info] of Object.entries(bundle)) {
@@ -421,6 +874,14 @@ export default defineConfig(({ mode }) => {
               .replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${url}$2`)
             out = setMeta(out, 'og:title', meta.title)
             out = setMeta(out, 'og:description', meta.description)
+            // Description de la PAGE (et pas seulement og:description). Sans
+            // cette ligne, les sept pages pré-rendues héritaient de la
+            // description de l'accueil : pour un moteur, /jobs, /login,
+            // /register… décrivaient toutes la même chose. Le runtime ne la
+            // réécrit pas (usePageTitle n'est appelé avec une description que
+            // là où elle est identique à celle-ci) : statique et dynamique
+            // restent donc alignés.
+            out = setMeta(out, 'description', meta.description)
             out = setMeta(out, 'og:image', imageUrl)
             // Variante carrée : la carte carrée STATIQUE de la home (présente
             // dans index.html) est REMPLACÉE par celle de la route (bloc
@@ -462,6 +923,102 @@ export default defineConfig(({ mode }) => {
             }
             fs.writeFileSync(path.join(outDir, `${route}.html`), out, 'utf8')
           }
+
+          // ── Shell de l'ACCUEIL dans index.html ─────────────────────────
+          // index.html n'est plus servi que pour « / » : le catch-all SPA a
+          // été retiré de frontend/vercel.json (les routes ont chacune leur
+          // rewrite, et une URL inconnue doit répondre 404). Le shell de
+          // l'accueil peut donc vivre dans index.html sans être peint à tort
+          // sur /dashboard ou /profile — ce qui était la raison de garder
+          // #root vide jusqu'ici.
+          const withHomeShell = html.replace(
+            '<div id="root"></div>',
+            `<div id="root">${homeShell}</div>`
+          )
+          if (withHomeShell === html) {
+            throw new Error(
+              'prerender-route-meta : <div id="root"></div> introuvable dans index.html — shell accueil NON injecté'
+            )
+          }
+          fs.writeFileSync(indexPath, withHomeShell, 'utf8')
+
+          // ── Gabarit des routes CLIENTES : app.html ──────────────────────
+          // Les routes sans pré-rendu (/dashboard, /profile, /messages,
+          // /create-job, /commission-dashboard…) n'ont AUCUN contenu statique
+          // propre — et aucune raison d'être indexées : ce sont des écrans
+          // connectés (noindex par X-Robots-Tag dans vercel.json). Les pages
+          // PUBLIQUES de contenu (/how-it-works, /support) ont, elles, leur
+          // propre shell depuis qu'elles ne doivent plus apparaître vides.
+          // Leur servir index.html reviendrait à publier le
+          // shell de l'ACCUEIL sur dix URL différentes — h1, 300+ mots et
+          // liens internes de la home servis sous l'adresse /dashboard, c'est
+          // du contenu dupliqué (le défaut exact que l'audit SEO reprochait à
+          // l'accueil, déplacé sur les autres routes).
+          //
+          // app.html est donc le gabarit NU : #root vide (rien qui soit peint
+          // puis effacé au montage), titre/description neutres décrivant le
+          // SITE et non la page, et surtout AUCUN canonical. Le canonical
+          // statique "/" était un défaut connu (voir src/utils/seo.js) : un
+          // seul /app.html servant dix routes ne peut pas en déclarer un — le
+          // hook usePageTitle en pose un correct au runtime, et `ensureCanonical`
+          // crée la balise si elle est absente. Le JSON-LD (LocalBusiness,
+          // Organization, WebSite) est retiré pour la même raison : il décrit
+          // l'organisation une fois, sur la page d'accueil et sur elle seule.
+          const neutralTitle = 'Kojo'
+          const neutralDescription =
+            "Kojo met en relation clients et travailleurs qualifiés en Afrique de l'Ouest : plomberie, électricité, mécanique, construction, informatique et plus."
+          let appHtml = html
+            .replace(/(<title>)[^<]*(<\/title>)/, `$1${neutralTitle}$2`)
+            .replace(/\s*<link rel="canonical"[^>]*\/?>(?:<\/link>)?/, '')
+            .replace(/\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/g, '')
+          appHtml = setMeta(appHtml, 'description', neutralDescription)
+          appHtml = setMeta(appHtml, 'og:title', neutralTitle)
+          appHtml = setMeta(appHtml, 'og:description', neutralDescription)
+          appHtml = setMeta(appHtml, 'twitter:title', neutralTitle)
+          appHtml = setMeta(appHtml, 'twitter:description', neutralDescription)
+          if (appHtml.includes('<link rel="canonical"') || appHtml.includes('application/ld+json')) {
+            throw new Error(
+              'prerender-route-meta : app.html contient encore un canonical ou un JSON-LD — ' +
+                'le gabarit des routes clientes doit rester neutre (contenu dupliqué sinon)'
+            )
+          }
+          fs.writeFileSync(path.join(outDir, 'app.html'), appHtml, 'utf8')
+
+          // ── Page 404 ────────────────────────────────────────────────
+          // Servie par Vercel (statut 404) pour une URL qui ne correspond à
+          // aucun fichier ni rewrite. Sans scripts : elle doit fonctionner
+          // même si le bundle échoue à se charger. noindex : une page 404
+          // indexée est un « soft 404 ».
+          const notFoundPage = [
+            '<!DOCTYPE html>',
+            '<html lang="fr">',
+            '<head>',
+            '<meta charset="utf-8" />',
+            '<meta name="viewport" content="width=device-width, initial-scale=1" />',
+            '<meta name="robots" content="noindex, follow" />',
+            '<title>Page introuvable — Kojo</title>',
+            '<style>',
+            'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#f9fafb;color:#111827}',
+            'main{max-width:640px;margin:0 auto;padding:4rem 1.5rem;text-align:center}',
+            'h1{font-size:1.875rem;margin:0 0 1rem}',
+            'p{color:#4b5563;line-height:1.6}',
+            'nav{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;margin-top:2rem}',
+            'a{color:#ea580c;font-weight:600}',
+            '</style>',
+            '</head>',
+            '<body>',
+            '<main>',
+            '<h1>Page introuvable</h1>',
+            '<p>Cette adresse n\'existe pas (ou plus) sur Kojo. La mission a peut-être été clôturée, ou le lien est incomplet.</p>',
+            '<nav>',
+            '<a href="/">Accueil</a>',
+            '<a href="/jobs">Voir les emplois disponibles</a>',
+            '<a href="/how-it-works">Comment ça marche ?</a>',
+            `<a href="mailto:${contact.email}">Nous contacter</a>`,
+            '</nav>',
+            `</main></body></html>`,
+          ].join('')
+          fs.writeFileSync(path.join(outDir, '404.html'), notFoundPage, 'utf8')
         },
       },
       {
@@ -525,6 +1082,77 @@ export default defineConfig(({ mode }) => {
         },
       },
       {
+        // ── SEO : extras injectés dans le HTML STATIQUE (build seulement) ──
+        // Ces balises doivent être présentes dans le HTML **servi**, pas
+        // ajoutées par le bundle : un crawler qui n'exécute pas JavaScript
+        // (c'est le cas de tous les analyseurs SEO « no-JS ») ne verrait
+        // jamais un script injecté au runtime. Chaque élément ne s'active que
+        // si sa variable d'environnement est définie — aucune valeur par
+        // défaut, aucun identifiant codé en dur.
+        name: 'inject-seo-extras',
+        apply: 'build',
+        transformIndexHtml(html) {
+          const tags = [];
+
+          // Google Analytics 4 : la balise EXTERNE est statique (détectable
+          // par les outils d'audit) ; le `gtag('config')` est émis par le
+          // module bundlé src/utils/analytics.js — pas de script inline, qui
+          // serait bloqué par la CSP `script-src 'self'` et afficherait une
+          // erreur console à chaque chargement.
+          const gaId = String(env.VITE_GA_MEASUREMENT_ID || '').trim();
+          if (/^G-[A-Z0-9]+$/i.test(gaId)) {
+            tags.push({
+              tag: 'script',
+              attrs: {
+                async: true,
+                src: `https://www.googletagmanager.com/gtag/js?id=${gaId}`,
+              },
+              injectTo: 'head',
+            });
+          }
+
+          // Vérification Google Search Console : le jeton est propre à chaque
+          // propriété, il ne peut donc venir que des variables d'environnement.
+          const gscVerification = String(env.VITE_GSC_VERIFICATION || '').trim();
+          if (gscVerification) {
+            tags.push({
+              tag: 'meta',
+              attrs: {
+                name: 'google-site-verification',
+                content: gscVerification,
+              },
+              injectTo: 'head',
+            });
+          }
+
+          // `sameAs` du LocalBusiness : profils sociaux réellement déclarés.
+          let output = html;
+          try {
+            const networks = JSON.parse(
+              fs.readFileSync(
+                path.join(process.cwd(), 'src/config/social-networks.json'),
+                'utf8'
+              )
+            );
+            const declared = networks
+              .map(({ env: envName }) => String(env[envName] || '').trim())
+              .filter((url) => /^https:\/\//.test(url));
+            if (declared.length > 0) {
+              output = output.replace(
+                '"sameAs": []',
+                `"sameAs": ${JSON.stringify(declared)}`
+              );
+            }
+          } catch (error) {
+            throw new Error(
+              `inject-seo-extras : social-networks.json illisible (${error.message})`
+            );
+          }
+
+          return { html: output, tags };
+        },
+      },
+      {
         // CSP injectée UNIQUEMENT en build de production (le dev Vite a besoin
         // de scripts inline/HMR). Durcissement XSS : bloque les scripts
         // externes injectés et eval, sans casser le bundling Vite.
@@ -541,11 +1169,34 @@ export default defineConfig(({ mode }) => {
           // « Impossible de charger le SDK Google » (script.onerror).
           const scriptSrc = ["'self'", 'https://accounts.google.com']
           if (plausibleDomain) scriptSrc.push('https://plausible.io')
+          // Google Analytics 4 : uniquement si un identifiant est configuré
+          // (sinon surface d'attaque inutile). googletagmanager.com sert
+          // gtag.js ; les collectes partent vers google-analytics.com
+          // (connect-src) et une balise de repli est chargée en <img>
+          // (img-src) — sans ces trois entrées, GA serait bloqué en silence.
+          const gaMeasurementId = String(env.VITE_GA_MEASUREMENT_ID || '').trim()
+          const gaEnabled = /^G-[A-Z0-9]+$/i.test(gaMeasurementId)
+          if (gaEnabled) scriptSrc.push('https://www.googletagmanager.com')
+          const connectSrc = ["'self'", apiOrigin, 'https://accounts.google.com']
+          const imgSrc = [
+            "'self'",
+            'data:',
+            'blob:',
+            'https://res.cloudinary.com',
+            'https://tile.openstreetmap.org',
+          ]
+          if (gaEnabled) {
+            connectSrc.push(
+              'https://www.google-analytics.com',
+              'https://region1.google-analytics.com'
+            )
+            imgSrc.push('https://www.google-analytics.com')
+          }
           const csp = [
             "default-src 'self'",
             `script-src ${scriptSrc.join(' ')}`,
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob: https://res.cloudinary.com https://tile.openstreetmap.org",
+            `img-src ${imgSrc.join(' ')}`,
             // Géolocalisation 100% centralisée derrière le backend Kojo :
             // détection IP (/geolocation/detect), reverse geocoding
             // (/geolocation/reverse) et base villes/quartiers
@@ -553,7 +1204,7 @@ export default defineConfig(({ mode }) => {
             // appel direct à ipapi.co / ipinfo.io / nominatim depuis le
             // navigateur → connect-src réduit au strict minimum (Google
             // Identity Services ajouté pour le SSO).
-            `connect-src 'self' ${apiOrigin} https://accounts.google.com`,
+            `connect-src ${connectSrc.join(' ')}`,
             // Cartes : les aperçus de localisation sont des iframes
             // (CreateJob / JobCreateModal → buildMapEmbedUrl) Google Maps ou
             // OpenStreetMap. Sans frame-src, default-src 'self' les bloque
@@ -649,6 +1300,15 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/setupTests.js',
       css: true,
+      // Marge sur le délai par défaut (5 s). Plusieurs gardes CI testent des
+      // scripts qui LANCENT un sous-processus Node/Python (check-bundle-size,
+      // check-script-deps, check-generated-icons, check-spa-routes…) : sous la
+      // charge de 33 fichiers exécutés en parallèle, leur démarrage dépasse
+      // régulièrement 5 s sur une machine de développement — alors qu'ils
+      // passent seuls en moins d'une seconde. Trois faux rouges de ce type ont
+      // été observés le 16/09/2026 ; un timeout de test qui dépend de la charge
+      // de la machine n'est pas un test, c'est une loterie.
+      testTimeout: 20000,
     },
   }
 })

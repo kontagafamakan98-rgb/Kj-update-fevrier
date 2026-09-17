@@ -1,16 +1,14 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin, MessageCircle, Bot, Send, CheckCircle, ArrowLeft } from 'lucide-react';
 import { supportAPI } from '../services/apiEndpoints';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-
-const CONTACT = {
-  phone: '+18193003507',
-  phoneDisplay: '+1 819 300 3507',
-  email: 'Kojoapp98@gmail.com',
-  address: 'Hamdallaye ACI 2000, Bamako, Mali',
-  whatsappUrl: 'https://wa.me/18193003507',
-};
+import { usePageTitle } from '../utils/seo';
+// Contact (N.A.P.) partagé avec le footer et le shell statique de l'accueil :
+// une seule source (src/config/contact.json) pour ne jamais publier deux
+// adresses ou deux numéros différents selon le canal.
+import { CONTACT } from '../config/contact';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^\+?[0-9\s\-.]{6,20}$/;
@@ -612,8 +610,15 @@ function TicketTracker({ copy }) {
 }
 
 const Support = () => {
-  const { currentLanguage } = useLanguage();
+  const { currentLanguage, t } = useLanguage();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
+  // SEO de la route : /support est une page PUBLIQUE servie par son PROPRE
+  // shell pré-rendu (support.html, plugin prerender-route-meta) depuis que le
+  // gabarit nu app.html ne concerne plus que les écrans connectés. Le titre et
+  // la description posés ici doivent donc rester les MÊMES que les méta
+  // statiques (src/i18n : support / supportHelp) ; un crawler qui exécute le
+  // JavaScript et un crawler qui ne l'exécute pas lisent alors la même chose.
+  usePageTitle(`${t('support')} — Kojo`, { description: t('supportHelp') });
   const [mode, setMode] = useState(null); // null | 'robot' | 'direct'
 
   return (
@@ -661,6 +666,19 @@ const Support = () => {
       )}
 
       <DirectContactCard copy={copy} />
+
+      {/* Maillage interne : le support mène au fonctionnement du service et à
+          la liste des missions. Le shell statique (vite.config.js) rend
+          EXACTEMENT ce bloc — sinon la ligne disparaîtrait au montage React. */}
+      <p className="mt-6 text-center text-sm text-gray-500">
+        <Link to="/how-it-works" className="text-orange-600 underline underline-offset-2">
+          {t('howItWorksTitle')}
+        </Link>
+        {' · '}
+        <Link to="/jobs" className="text-orange-600 underline underline-offset-2">
+          {t('viewJobs')}
+        </Link>
+      </p>
     </div>
   );
 };

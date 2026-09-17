@@ -158,6 +158,19 @@ jobs:
       - name: Lint workflows (actionlint)
         uses: rhysd/actionlint@v1.7.12
 
+      # Épinglage des `uses:` : chaque référence d'action doit viser un tag de
+      # VERSION ou un SHA, jamais une branche. Une référence non résoluble fait
+      # échouer le job AVANT ses étapes — c'est arrivé le 2026-08-27 avec
+      # `rhysd/actionlint@v1` (« Unable to resolve action »), un rouge
+      # d'infrastructure sans rapport avec le code. Voir
+      # .github/scripts/check-workflow-pins.py.
+      #
+      # `python3` (et non `python`) : ce job n'installe pas Python via
+      # setup-python, seule la commande `python3` de l'image du runner est
+      # garantie — le script est en stdlib pure, aucun paquet à installer.
+      - name: Check action pins (no branch refs)
+        run: python3 .github/scripts/check-workflow-pins.py
+
       # shellcheck (pré-installé sur ubuntu-latest) : analyse statique des
       # scripts shell du dépôt. Échoue sur les erreurs (les warnings restent
       # informatifs — comportement par défaut de shellcheck).
@@ -195,10 +208,14 @@ jobs:
       - name: Audit formats des références (refs-only)
         run: python .github/scripts/check-fly-env-drift.py --refs-only
 
-      # flyctl est requis par le check (flyctl secrets list). Même action que
-      # le job deploy-fly — tag @master non épinglé, cohérent avec deploy-fly.
+      # flyctl est requis par le check (flyctl secrets list). Référence ÉPINGLÉE
+      # sur un SHA (= tag v1, runtime node24) : elle valait @master, une branche
+      # qui suit le travail amont sans revue et peut disparaître (cf. le rouge
+      # `actionlint@v1` du 2026-08-27 : un `uses:` non résoluble fait échouer le
+      # job avant ses étapes). L'action installe `flyctl` en version latest par
+      # défaut, donc épingler l'ACTION ne fige pas la CLI.
       - name: Setup flyctl
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
 
       - name: Check fly.toml env vs runtime + secret presence
         run: python .github/scripts/check-fly-env-drift.py
@@ -348,6 +365,63 @@ jobs:
         working-directory: frontend
         run: node scripts/check-og-assets.js
 
+      # Garde-fou de la famille « icônes » : les icônes PWA et le favicon clair,
+      # produits par public/icons/generate_icons.py. Ce générateur est en stdlib
+      # pure (ni police, ni Pillow), donc son résultat est comparable sur ce
+      # runner — encore faut-il comparer la bonne chose : la zlib variant d'une
+      # installation à l'autre, les OCTETS d'un PNG regénéré diffèrent de ceux
+      # committés alors que les PIXELS sont identiques (mesuré : 101 592 contre
+      # 101 049). Le check compare donc les empreintes de PIXELS du manifeste,
+      # REJOUE le générateur en dossier temporaire, et échoue aussi sur un
+      # favicon.ico invalide (celui qui était committé faisait 100 octets de
+      # zéros, alors qu'index.html le référence comme favicon principal), sur une
+      # copie qui diverge, sur un actif sans générateur modifié et sur une icône
+      # qui n'est déclarée par personne.
+      - name: Check generated icons family (pixels + manifest)
+        working-directory: frontend
+        run: node scripts/check-generated-icons.js
+
+      # Garde-fou du manifeste PWA : il déclarait « any maskable » sur ses deux
+      # icônes alors qu'AUCUNE ne tenait dans la zone de sécurité (contenu à un
+      # rayon de 0,495 pour une limite de 0,400) et que le fichier « -maskable »
+      # invoqué était un duplicata au pixel près de l'icône normale. Le check
+      # croise manifest.json avec l'inventaire de la famille (existence,
+      # dimensions, type, purpose) et exige qu'un « maskable » soit PROUVÉ par
+      # la mesure, dans les deux sens : aucune fausse revendication, et aucune
+      # variante fabriquée pour le masque qui ne serait jamais servie.
+      - name: Check PWA manifest (declared icons + maskable safe zone)
+        working-directory: frontend
+        run: node scripts/check-pwa-manifest.js
+
+      # Garde-fou du ROUTAGE complet : le rewrite « /jobs/(.*) » → backend
+      # (route OG déclarée côté backend), le proxy /api, sitemap/robots, CHAQUE
+      # route de production de src/App.js (deux formes : /route et /route/),
+      # l'absence de catch-all (une URL inconnue doit répondre 404, pas 200),
+      # et les règles exactes rendues inatteignables par un motif placé avant
+      # (le bug réel : /jobs/ après /jobs/(.*) → 404 JSON en production).
+      # Sur les PR, le cycle complet de /jobs/:id est ignoré par
+      # check-og-job-200.js (preview Vercel protégée) : ce garde est le maillon
+      # de configuration qui manquait à l'appel, avec
+      # backend/tests/test_job_og_cycle.py pour le comportement.
+      - name: Check SPA routing (vercel.json rewrites, routes App.js, URL inconnue → 404)
+        working-directory: frontend
+        run: node scripts/check-spa-routes.js
+
+      # Garde-fou du shell statique de l'ACCUEIL : sans lui, le HTML servi à
+      # « / » ne contient que `<div id="root"></div>` — un crawler sans
+      # JavaScript y voit 19 mots, aucun h1, aucun lien interne, aucun lien de
+      # contact (mesuré par un audit SEO externe le 16/09/2026). Le shell
+      # reproduit Home.js avec les textes de src/i18n/fr.json ; ce check exige
+      # un h1 unique, un title ≤ 60, une description ≤ 160, ≥ 300 mots, des
+      # liens internes et tel:/mailto:, le N.A.P. identique à
+      # src/config/contact.json, le LocalBusiness, et que chaque classe
+      # Tailwind du shell existe bien dans le CSS du build (vite.config.js
+      # n'est PAS scanné par Tailwind : une classe inventée ne serait jamais
+      # stylée).
+      - name: Check home page static shell (h1, contenu, liens, N.A.P., SEO local)
+        working-directory: frontend
+        run: node scripts/check-home-shell.js
+
       # Budgets RÉELS (JS initial, plus gros chunk, build total) : l'ancienne
       # version se contentait d'afficher `du -sh build/` et ne pouvait donc
       # jamais échouer — un bundle doublé passait en vert. Les seuils sont
@@ -357,6 +431,99 @@ jobs:
       - name: Check bundle size
         working-directory: frontend
         run: node scripts/check-bundle-size.js
+
+  # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
+  # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou
+  # « dépassé ») : il ne dit pas COMBIEN un changement coûte, et ses seuils
+  # (~30-40 % de marge) laissent passer une dérive. Ce job publie les trois
+  # mesures réelles avec leur écart :
+  #   • vs la dernière mesure de `main` — « l'effet de cette PR par rapport à
+  #     la base », la référence étant transportée par le cache Actions ;
+  #   • vs la mesure précédente de CETTE PR — relue dans la charge utile du
+  #     commentaire précédent, donc « depuis le dernier push ».
+  # Si une référence manque, la colonne est omise et la raison est écrite
+  # dans le commentaire : un écart calculé contre une référence douteuse
+  # serait pire que pas d'écart du tout.
+  #
+  # Job ADVISORY : il ne fait PAS partie des 8 checks requis de la protection
+  # de branche, donc un échec ici ne bloque aucune fusion. Les mesures sont de
+  # toute façon écrites dans le résumé du run ($GITHUB_STEP_SUMMARY) : le
+  # commentaire n'est qu'un canal plus lisible, pas la seule trace.
+  bundle-size-report:
+    name: Bundle size report (PR comment)
+    runs-on: ubuntu-latest
+    needs: frontend-build
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Même commande et même env que frontend-build : les artefacts ne sont
+      # pas partagés entre jobs (aucun upload de build/), donc on rebuild —
+      # mais avec exactement les mêmes entrées, sinon les tailles mesurées ici
+      # et celles du garde ne seraient pas comparables entre elles.
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://kojo-backend.fly.dev/api
+        run: npm run build
+
+      # Référence = dernière mesure de `main`. La clé embarque le SHA (donc
+      # n'est jamais réutilisée telle quelle) et `restore-keys` sélectionne la
+      # plus récente : sur une PR, GitHub autorise la restauration des caches
+      # de la branche de base — c'est exactement « la mesure de main ».
+      # Absente au tout premier run : le rapport le dit au lieu d'inventer un
+      # écart (« première mesure »).
+      - name: Restore size baseline (main)
+        uses: actions/cache/restore@v4
+        with:
+          path: frontend/.bundle-size
+          key: bundle-size-baseline-${{ github.sha }}
+          restore-keys: |
+            bundle-size-baseline-
+
+      # Au premier run de `main`, .bundle-size/baseline.json n'existe pas : le
+      # script le détecte (existsSync) et rend un rapport sans écarts.
+      - name: Mesurer, comparer et publier (commentaire de PR)
+        working-directory: frontend
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node scripts/bundle-size-report.js \
+            --baseline .bundle-size/baseline.json \
+            --out .bundle-size/current.json \
+            --markdown .bundle-size/comment.md \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --post
+
+      # La mesure du run devient la référence des runs suivants — sur `main`
+      # UNIQUEMENT : sauvegarder aussi depuis les PR ferait proliférer des
+      # caches par PR et fausserait « la mesure de main ».
+      - name: Publish size baseline (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: frontend
+        run: cp .bundle-size/current.json .bundle-size/baseline.json
+
+      - name: Save size baseline (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: frontend/.bundle-size
+          key: bundle-size-baseline-${{ github.sha }}
 
   # ─── Performance : budgets Lighthouse CI (accueil + pages protégées) ─────
   # Audite le DÉPLOIEMENT VERCEL RÉEL en condition mobile simulée (Slow 4G
@@ -408,7 +575,7 @@ jobs:
 
       # Résout l'URL du déploiement Vercel à auditer : commentaire Vercel
       # de la PR (API GitHub, sans token supplémentaire) ou URL de prod sur
-      # main. Sortie LHCI_URL → lighthouserc.cjs l'utilise comme collect.url
+      # main. Sortie KOJO_LHCI_BASE_URL → lighthouserc.cjs l'utilise comme collect.url
       # (repli build local si non résolue). Logique dans
       # .github/scripts/resolve-vercel-url.sh.
       - name: Resolve Vercel deployment URL
@@ -421,20 +588,27 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: bash .github/scripts/resolve-vercel-url.sh
 
-      # Si LHCI_URL est vide (aucune preview Vercel exploitable : preview
+      # Si KOJO_LHCI_BASE_URL est vide (aucune preview Vercel exploitable : preview
       # PROTÉGÉE par Deployment Protection — détectée par resolve-vercel-url.sh
       # — ou commentaire Vercel absent), on sert le BUILD LOCAL (contenu
       # identique au déploiement) sur le port 4173 : check-og-images et lhci
       # auditeront alors le code de la PR au lieu du mur de login Vercel.
-      # LHCI_URL est réécrite vers localhost → lighthouserc.cjs passe en mode
+      # KOJO_LHCI_BASE_URL est réécrite vers localhost → lighthouserc.cjs passe en mode
       # url (les og:image des shells pré-rendus restent ABSOLUS vers la prod,
       # les assertions OG restent valides). Serveur lancé en arrière-plan :
       # nohup + log redirigé pour survivre aux steps suivants du job.
+      #
+      # ⚠️ Le nom de la variable n'est PAS `LHCI_URL` : lhci active yargs
+      # `.env('LHCI')`, donc toute variable `LHCI_<x>` devient l'option `--<x>`
+      # du CLI. `LHCI_URL` devenait `--url`, une URL UNIQUE qui écrasait le
+      # tableau de 4 URLs de lighthouserc.cjs (constaté : « 1 URL(s) » auditées
+      # en CI, les pages protégées jamais mesurées). Le préfixe `KOJO_LHCI_`
+      # n'est capturé par aucun motif yargs, et un test l'exige.
       - name: Serve local build (repli preview Vercel indisponible)
         working-directory: frontend
         run: |
-          if [ -n "${LHCI_URL:-}" ]; then
-            echo "Preview Vercel à auditer : $LHCI_URL"
+          if [ -n "${KOJO_LHCI_BASE_URL:-}" ]; then
+            echo "Preview Vercel à auditer : $KOJO_LHCI_BASE_URL"
             exit 0
           fi
           echo "Aucune preview Vercel exploitable → audit du build local (port 4173)"
@@ -448,11 +622,11 @@ jobs:
             cat /tmp/vite-preview.log
             exit 1
           fi
-          echo "LHCI_URL=http://localhost:4173" >> "$GITHUB_ENV"
+          echo "KOJO_LHCI_BASE_URL=http://localhost:4173" >> "$GITHUB_ENV"
 
       # Authentifie les pages protégées : se connecte au backend prod avec le
       # COMPTE CLIENT DÉDIÉ CI (secrets LHCI_CI_EMAIL/LHCI_CI_PASSWORD) et
-      # stocke le token Bearer dans LHCI_AUTH_HEADER. Ce compte est isolé des
+      # stocke le token Bearer dans KOJO_LHCI_AUTH_HEADER. Ce compte est isolé des
       # comptes e2e partagés → l'état audité (/dashboard,/jobs,/profile) est
       # déterministe. Pendant la transition, on retombe sur les anciens
       # secrets LHCI_TEST_* s'ils sont encore définis. Les pages reçoivent cet
@@ -482,27 +656,59 @@ jobs:
           fi
           # JSON sérialisé pour l'env : {\"Authorization\": \"Bearer <token>\"}
           AUTH_HEADER=$(python3 -c "import json,sys; print(json.dumps({'Authorization': 'Bearer ' + sys.argv[1]}))" "$TOKEN")
-          echo "LHCI_AUTH_HEADER=$AUTH_HEADER" >> "$GITHUB_ENV"
+          echo "KOJO_LHCI_AUTH_HEADER=$AUTH_HEADER" >> "$GITHUB_ENV"
           echo "Token récupéré (${#TOKEN} chars, compte: $EMAIL)"
 
       # Vérifie que chaque page auditée sert un og:image ABSOLU et spécifique
       # par route — le HTML servi est exactement ce que reçoit un crawler sans
       # JS (le pré-rendu OG). Échoue le job (→ PR bloquée) si un og:image est
       # absent, relatif, ou ne correspond pas à la carte attendue de la route
-      # (/, /jobs, /login). LHCI_URL (résolue plus haut) est lue par le script
+      # (/, /jobs, /login). KOJO_LHCI_BASE_URL (résolue plus haut) est lue par le script
       # via process.env ; sans elle, repli sur le build local.
       - name: Check OG images per route (crawler view)
         working-directory: frontend
         run: node scripts/check-og-images.js
 
+      # Verrouille les DEUX chemins de /jobs/:id. Chemin 200 : crée une mission
+      # de test avec le COMPTE CLIENT CI, vérifie la carte OG RÉELLE de cette
+      # mission (og:image wide + carrée, og:title présent, PNG 1200x630 /
+      # 1200x1200) puis la SUPPRIME — toujours, y compris si la vérification
+      # échoue (finally). Sans lui, ce chemin n'était exercé que les jours où
+      # une mission existait en base : check-og-images se rabattait alors sur le
+      # chemin 404. Toujours AVANT Lighthouse CI, pour que la mission de test
+      # ait disparu de la liste quand /jobs est audité (et parce qu'un échec de
+      # nettoyage doit bloquer le job, pas passer inaperçu).
+      # Chemin 404 (APRÈS le DELETE, donc plus aucun effet de bord en base) : la
+      # fiche doit répondre 404 + noindex, sa carte Pillow 404, et le sitemap ne
+      # plus la lister — une fiche morte restée en 200 garde sa carte et reste
+      # indexable. Contrepartie vérifiée AVANT suppression : la mission doit
+      # APPARAÎTRE dans le sitemap, sinon « absente du sitemap » serait vrai à
+      # vide. Les sondes post-suppression portent un paramètre de cache-busting
+      # car la fiche vivante est servie avec s-maxage=3600 (l'URL nue pourrait
+      # renvoyer un 200 sorti du cache CDN).
+      # Sur repli build local (KOJO_LHCI_BASE_URL=localhost), le script ne fait RIEN
+      # (le rewrite /jobs/(.*) n'existe que sur le déploiement Vercel) : il
+      # sort en 0 avec un ::notice — aucune écriture en prod pour rien.
+      # KOJO_LHCI_BASE_URL et KOJO_LHCI_AUTH_HEADER sont déjà dans l'environnement (steps
+      # précédents, via $GITHUB_ENV) ; les secrets servent de repli si le
+      # jeton n'a pas été résolu.
+      - name: Check /jobs/:id OG path (create → 200 → delete → 404 + noindex + sitemap)
+        working-directory: frontend
+        env:
+          LHCI_CI_EMAIL: ${{ secrets.LHCI_CI_EMAIL }}
+          LHCI_CI_PASSWORD: ${{ secrets.LHCI_CI_PASSWORD }}
+          LHCI_TEST_EMAIL: ${{ secrets.LHCI_TEST_EMAIL }}
+          LHCI_TEST_PASSWORD: ${{ secrets.LHCI_TEST_PASSWORD }}
+        run: node scripts/check-og-job-200.js
+
       # ubuntu-latest embarque Google Chrome : chrome-launcher le détecte
-      # automatiquement (pas d'action d'installation nécessaire). LHCI_URL
+      # automatiquement (pas d'action d'installation nécessaire). KOJO_LHCI_BASE_URL
       # (si définie) fait auditer l'URL Vercel réelle, sinon le build local.
-      # LHCI_AUTH_HEADER authentifie les pages /dashboard,/jobs,/profile.
+      # KOJO_LHCI_AUTH_HEADER authentifie les pages /dashboard,/jobs,/profile.
       - name: Run Lighthouse CI (collect + assert, budgets bloquants)
         working-directory: frontend
-        # LHCI_URL et LHCI_AUTH_HEADER sont dans l'env via $GITHUB_ENV (steps
-        # précédents) — lhci autorun lit process.env.LHCI_AUTH_HEADER.
+        # KOJO_LHCI_BASE_URL et KOJO_LHCI_AUTH_HEADER sont dans l'env via $GITHUB_ENV (steps
+        # précédents) — lhci autorun lit process.env.KOJO_LHCI_AUTH_HEADER.
         run: npx lhci autorun --config=lighthouserc.cjs
 
       # Rapports consultables dans les artifacts du run (utile pour
@@ -522,6 +728,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # EN PREMIER, avant Node/Java/SDK : ce contrôle répond en 0,17 s (mesuré)
+      # là où le step APK ne démarre qu'à +39 s du job (mesuré sur le run
+      # 35137466972, setup Node/Java/SDK inclus) et où le build Gradle dure
+      # ensuite ~95 s. Un bit exécutable perdu n'échouait donc que là, tard, sous
+      # la forme d'un « Permission denied » qui ne désignait pas la cause (le
+      # mode git du fichier). Le script distingue le mode perdu DANS GIT du bit
+      # non matérialisé PAR LE CHECKOUT, et vérifie aussi le shebang (un CRLF le
+      # casserait même avec le bit présent).
+      - name: Check executable bits (gradlew) before the Android setup
+        run: python3 .github/scripts/check-exec-bits.py
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -572,14 +789,20 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      # chmod défensif : le bit exécutable peut être perdu selon l'OS
-      # d'origine du commit (ici : Windows). Le fix durable est le mode
-      # 100755 sur gradlew dans git.
+      # Pas de `chmod +x gradlew` ici : le bit exécutable est porté par git
+      # (mode 100755 sur frontend/android/gradlew, commit dcb4e43) et le
+      # checkout des runners Linux le restitue — le mode du blob est 0755, donc
+      # ./gradlew s'exécute directement. Un chmod défensif faisait plus de mal
+      # que de bien : il rendait VERT un job dont le bit avait été perdu et
+      # masquait la régression. S'il disparaît à nouveau, ce step échouera sur
+      # « Permission denied » — c'est la détection voulue, la corriger est un
+      # `git update-index --chmod=+x frontend/android/gradlew`.
+      # Le shebang est protégé en parallèle par .gitattributes (`gradlew
+      # text eol=lf`) : un shebang en CRLF ferait échouer l'exécution même
+      # avec le bit présent.
       - name: Build debug APK
         working-directory: frontend/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon
 
   # ─── Backend : déploiement Fly.io (verrouillé sur les tests backend) ─────
   # Déployé à chaque push sur main qui touche backend/ — MAIS uniquement si
@@ -620,7 +843,7 @@ jobs:
       # backend (l'utilisateur a explicitement demandé le run).
       - name: Setup flyctl
         if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # v1 (node24)
 
       # --remote-only : le build se fait sur les builders distants de Fly
       # (Depot), pas de Docker nécessaire sur le runner. fly.toml et
