@@ -90,6 +90,21 @@ describe('analyse du HTML servi', () => {
     expect(metaContent('<meta name="description" content="x">', 'google-site-verification')).toBe('');
   });
 
+  // Le piège qui a fait publier un faux chiffre dans CI-COVERAGE.md : une valeur
+  // contenant une apostrophe. Si la citation fermante pouvait être différente de
+  // l'ouvrante, la description de l'accueil se lirait « Besoin d » — et une meta
+  // Search Console tronquée passerait pour un jeton valide.
+  it('ne tronque pas une valeur contenant une apostrophe', () => {
+    // Cas réel (description de l'accueil) : valeur entre GUILLEMETS doubles.
+    const value = "Besoin d'aide ? Contactez le support Kojo";
+    expect(metaContent(`<meta name="description" content="${value}">`, 'description')).toBe(value);
+    // Et l'attribut en apostrophes, avec une valeur SANS apostrophe (une valeur
+    // entre apostrophes qui contient une apostrophe est du HTML ambigu : le
+    // parseur s'arrête là, et c'est correct).
+    expect(metaContent('<meta content="jeton-gsc" name="google-site-verification">', 'google-site-verification')).toBe('jeton-gsc');
+    expect(metaContent("<meta content='jeton-gsc' name='google-site-verification'>", 'google-site-verification')).toBe('jeton-gsc');
+  });
+
   it('ne retient que les profils https du sameAs, et supporte un JSON illisible', () => {
     expect(socialProfiles('{"sameAs":["https://facebook.com/x","http://insecure.test"]}')).toEqual([
       'https://facebook.com/x',

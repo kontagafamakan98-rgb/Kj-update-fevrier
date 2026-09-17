@@ -298,7 +298,7 @@ réellement servi ce jour-là (`curl https://kj-update-fevrier.vercel.app/`,
 | Ce que dit l'audit | Ce que sert la production |
 |---|---|
 | « Title too long (> 60 chars) » | `53` caractères |
-| « Meta description too long (> 160 chars) » | `104` caractères |
+| « Meta description too long (> 160 chars) » | `151` caractères |
 | « No H1 heading » / « Heading structure issues » | **1** `h1` + **6** `h2` |
 | « Only 19 words (need 300+) » | **405** mots |
 | « No internal links found » | **20** liens internes |
@@ -320,7 +320,7 @@ généré au build) comparé au build d'aujourd'hui :
 | Mesure | Avant PR #27 | Aujourd'hui |
 |---|---|---|
 | `<title>` | **65** caractères (> 60) | 53 |
-| meta description | 57 caractères | 104 |
+| meta description | **170** caractères (> 160) | 151 |
 | `h1` | **0** | 1 |
 | mots visibles | **19** (11 + les 8 du `<noscript>`) | 405 |
 | liens `<a>` internes | **0** | 17 |
@@ -329,8 +329,18 @@ généré au build) comparé au build d'aujourd'hui :
 | `#root` | vide | shell de l'accueil |
 
 Le « 19 mots » du rapport est donc l'empreinte **exacte** de l'ancien HTML (il
-comptait le `<noscript>`) : l'audit a mesuré un état d'avant correction, pas le
-site actuel. Ces points sont verrouillés à chaque push depuis (shell de
+comptait le `<noscript>`), et les deux longueurs signalées étaient réellement
+hors bornes (65 > 60 et 170 > 160) : l'audit a mesuré un état d'avant correction,
+pas le site actuel.
+
+⚠️ **Piège de mesure, rencontré en écrivant cette ligne** : la description
+contient une apostrophe (« en Côte d'Ivoire »). Un parseur qui accepte `"` OU `'`
+comme fermeture de valeur tronque la valeur au premier apostrophe et annonce
+« 104 caractères » là où il y en a 151 en ligne — la première version de ce
+tableau a publié ce faux chiffre. Un parseur correct exige la MÊME citation pour
+ouvrir et fermer ; c'est ce que font `check-home-shell.js` (`content="([^"]*)"`)
+et `check-seo-production.js` (`metaContent()`), et c'est pourquoi la CI était
+verte à juste titre. Les mesures ci-dessus ont été refaites avec ce parseur. Ces points sont verrouillés à chaque push depuis (shell de
 l'accueil, 404 réels sans catch-all, etc.) — un rapport qui les réclame encore
 vient d'un cache d'outil ou d'une copie antérieure au 16/09/2026, pas de la
 production.
