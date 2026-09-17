@@ -54,7 +54,7 @@ export const DEFAULT_BACKEND = 'https://kojo-backend.fly.dev';
 // Origin des cartes servies par le pré-rendu backend (og:image des fiches
 // mission). Surchargeable pour les tests (stubs) — en CI/prod c'est le
 // domaine Vercel réel.
-export const PROD_ORIGIN = 'https://kj-update-fevrier.vercel.app';
+export const PROD_ORIGIN = 'https://kojoforafrica.cc.cd';
 
 // Identifiant qui ne peut pas exister : sert de SONDE DE CAPACITÉ.
 export const PROBE_JOB_ID = '00000000-0000-4000-8000-000000000000';

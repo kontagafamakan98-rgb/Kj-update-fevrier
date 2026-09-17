@@ -23,7 +23,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Domaine de production (même valeur que check-og-images.js).
-export const PROD_ORIGIN = 'https://kj-update-fevrier.vercel.app';
+export const PROD_ORIGIN = 'https://kojoforafrica.cc.cd';
 
 // Les quatre intégrations, et la variable d'environnement qui les active.
 export const INTEGRATIONS = [

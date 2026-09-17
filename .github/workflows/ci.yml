@@ -547,7 +547,8 @@ jobs:
   # dans les secrets, on a depuis ajouté LHCI_TEST_*) :
   #   • pull_request → l'app GitHub « Vercel » poste un commentaire avec
   #     l'URL de preview ; on la lit via l'API GitHub (GITHUB_TOKEN auto).
-  #   • main (push) → URL de production kj-update-fevrier.vercel.app.
+  #   • main (push) → URL de production kojoforafrica.cc.cd (alias Vercel :
+  #     kj-update-fevrier.vercel.app redirige vers ce domaine).
   #   • Sinon → repli sur une pile LOCALE « forme production » : MongoDB +
   #     backend de la PR + serveur local qui rejoue la table de rewrites de
   #     vercel.json devant le build (cf. plus bas).

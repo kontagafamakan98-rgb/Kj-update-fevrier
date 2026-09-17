@@ -427,9 +427,10 @@ async def get_job_og_html(job_id: str):
     )
 
 # Base du site pour le sitemap/robots. En production, FRONTEND_APP_URL doit
-# pointer vers le domaine public Vercel ; repli sur le domaine Fly du backend
-# (utilisateur derrière le proxy /api, jamais pour le vrai crawl).
-DEFAULT_SITE_BASE = "https://kj-update-fevrier.vercel.app"
+# pointer vers le domaine public (kojoforafrica.cc.cd, alias Vercel) ; repli sur
+# le domaine Fly du backend (utilisateur derrière le proxy /api, jamais pour le
+# vrai crawl).
+DEFAULT_SITE_BASE = "https://kojoforafrica.cc.cd"
 
 def _site_base() -> str:
     base = (FRONTEND_APP_URL or DEFAULT_SITE_BASE).rstrip('/')

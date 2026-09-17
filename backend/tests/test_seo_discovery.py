@@ -41,9 +41,9 @@ class TestSitemapDynamic:
         body = resp.text
 
         # Les URLs statiques + les fiches publiques sont présentes.
-        assert "<loc>https://kj-update-fevrier.vercel.app/</loc>" in body
-        assert f"<loc>https://kj-update-fevrier.vercel.app/jobs/{open_job['id']}</loc>" in body
-        assert f"<loc>https://kj-update-fevrier.vercel.app/jobs/{in_progress_id}</loc>" in body
+        assert "<loc>https://kojoforafrica.cc.cd/</loc>" in body
+        assert f"<loc>https://kojoforafrica.cc.cd/jobs/{open_job['id']}</loc>" in body
+        assert f"<loc>https://kojoforafrica.cc.cd/jobs/{in_progress_id}</loc>" in body
 
         # Cache court appliqué.
         assert "max-age=3600" in resp.headers.get("cache-control", "")
@@ -69,7 +69,7 @@ class TestSitemapDynamic:
         resp = await client.get("/api/robots.txt")
         assert resp.status_code == 200
         body = resp.text
-        assert "Sitemap: https://kj-update-fevrier.vercel.app/sitemap.xml" in body
+        assert "Sitemap: https://kojoforafrica.cc.cd/sitemap.xml" in body
         # La découverte publique ne doit plus être bloquée pour les crawlers.
         assert "Disallow: /jobs" not in body
 

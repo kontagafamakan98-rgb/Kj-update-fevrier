@@ -107,7 +107,7 @@ export default defineConfig(({ mode }) => {
           const html = fs.readFileSync(indexPath, 'utf8')
 
           // Origin du site (doit matcher og:url statique d'index.html).
-          const origin = 'https://kj-update-fevrier.vercel.app'
+          const origin = 'https://kojoforafrica.cc.cd'
 
           // Shell statique injecté dans <div id="root"> : réplique EXACTEMENT
           // le premier rendu de la page (placeholder navbar h-16 + header h1)

@@ -42,7 +42,7 @@ from httpx import AsyncClient
 
 from tests.conftest import BASE_JOB, BASE_USER, auth_headers, db_find_one
 
-SITE_BASE = "https://kj-update-fevrier.vercel.app"
+SITE_BASE = "https://kojoforafrica.cc.cd"
 
 
 def _png_dimensions(content: bytes) -> tuple:

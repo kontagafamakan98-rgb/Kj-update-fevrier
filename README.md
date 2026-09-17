@@ -131,7 +131,9 @@ cd frontend && npm test
 
 ### Frontend — Vercel
 
-- **Projet** : `kj-update-fevrier` — **prod : `https://kj-update-fevrier.vercel.app`**
+- **Projet** : `kj-update-fevrier` — **prod : `https://kojoforafrica.cc.cd`**
+  (l'ancien `kj-update-fevrier.vercel.app` y redirige : une seule adresse
+  canonique, pour le canonical/OG/sitemap comme pour le crawl)
 - **Root Directory = `frontend`** — réglage **du dashboard** (Settings →
   General → Root Directory). ⚠️ **Ce n'est PAS une clé valide de `vercel.json`**
   : l'ajouter au fichier casse le déploiement avec l'erreur de schéma
@@ -241,13 +243,13 @@ curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/docs   # 404
 curl -s -o /dev/null -w '%{http_code}' https://kojo-backend.fly.dev/api/stats  # 403/401 sans token
 
 # Frontend
-curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app   # 200
-curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/jobs   # 200 (jobs.html)
-curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/jobs/  # 200 (jobs.html)
-curl -s -o /dev/null -w '%{http_code}' https://kj-update-fevrier.vercel.app/inexistant-xyz  # 404 (404.html, noindex)
+curl -s -o /dev/null -w '%{http_code}' https://kojoforafrica.cc.cd   # 200
+curl -s -o /dev/null -w '%{http_code}' https://kojoforafrica.cc.cd/jobs   # 200 (jobs.html)
+curl -s -o /dev/null -w '%{http_code}' https://kojoforafrica.cc.cd/jobs/  # 200 (jobs.html)
+curl -s -o /dev/null -w '%{http_code}' https://kojoforafrica.cc.cd/inexistant-xyz  # 404 (404.html, noindex)
 # Accueil : un crawler sans JavaScript doit voir un h1, du contenu et des liens
-curl -s https://kj-update-fevrier.vercel.app/ | grep -c '<h1'                # 1
-curl -s https://kj-update-fevrier.vercel.app/ | grep -c 'href="tel:'        # 2
+curl -s https://kojoforafrica.cc.cd/ | grep -c '<h1'                # 1
+curl -s https://kojoforafrica.cc.cd/ | grep -c 'href="tel:'        # 2
 ```
 
 ## Sécurité
