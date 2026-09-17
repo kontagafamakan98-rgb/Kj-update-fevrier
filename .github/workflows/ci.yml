@@ -333,6 +333,17 @@ jobs:
         working-directory: frontend
         run: node scripts/check-pack2-chunks.js
 
+      # Hygiène des dictionnaires pack2PageI18n : une clé qu'aucune page
+      # consommatrice n'appelle (pageT statique/dynamique ou clé d'erreur
+      # littérale) et un override wo/bm/mos identique à fr (déjà hérité via
+      # withBase) sont du poids mort dans le chunk lazy de la page. Ces deux
+      # dérives avaient été corrigées à la main dans le scope register ; ce
+      # check permanent remplace l'audit manuel (audit-all-scopes.tmp.cjs) que
+      # personne ne lançait. Il échoue le job si l'une réapparaît.
+      - name: Check pack2PageI18n i18n hygiene (unused keys + redundant overrides)
+        working-directory: frontend
+        run: node scripts/check-pack2-i18n-hygiene.js
+
       # Garde-fou du découpage services/api vs services/apiEndpoints : les
       # groupes d'endpoints LAZY (jobsAPI, usersAPI, paymentAPI…) doivent
       # rester confinés dans apiEndpoints — importés uniquement par les pages
