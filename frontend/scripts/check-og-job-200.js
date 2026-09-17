@@ -74,9 +74,10 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { runOgImageCheck, baseServesJobOgRoute, PROD_ORIGIN } from './check-og-images.js';
+import { runOgImageCheck, baseServesJobOgRoute } from './check-og-images.js';
+import { SITE_ORIGIN, declaresNoIndex } from './site-meta.js';
 
-export const DEFAULT_BASE = PROD_ORIGIN;
+export const DEFAULT_BASE = SITE_ORIGIN;
 export const DEFAULT_BACKEND = 'https://kojo-backend.fly.dev';
 // Étiquette du verrou post-suppression (contrôlé après le DELETE).
 export const POST_DELETE_LABEL = '/jobs/:id (après suppression)';
@@ -252,7 +253,7 @@ export async function assertDeletedJobUnreachable({
     );
   }
 
-  const noindex = /noindex/i.test(robots) || /<meta[^>]+name=["']robots["'][^>]*noindex/i.test(html);
+  const noindex = declaresNoIndex(html, robots);
   if (noindex) {
     lock.noindex = true;
   } else {
@@ -325,7 +326,7 @@ export async function assertDeletedJobUnreachable({
 export async function runOgJob200Cycle({
   base = process.env.KOJO_LHCI_BASE_URL || DEFAULT_BASE,
   backend = process.env.KOJO_BACKEND_URL || DEFAULT_BACKEND,
-  origin = process.env.KOJO_ORIGIN || PROD_ORIGIN,
+  origin = process.env.KOJO_ORIGIN || SITE_ORIGIN,
   token = '',
   email = process.env.LHCI_CI_EMAIL || process.env.LHCI_TEST_EMAIL || '',
   password = process.env.LHCI_CI_PASSWORD || process.env.LHCI_TEST_PASSWORD || '',

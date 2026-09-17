@@ -21,9 +21,7 @@
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-
-// Domaine de production (même valeur que check-og-images.js).
-export const PROD_ORIGIN = 'https://kojoforafrica.cc.cd';
+import { SITE_ORIGIN, metaContent } from './site-meta.js';
 
 // Les quatre intégrations, et la variable d'environnement qui les active.
 export const INTEGRATIONS = [
@@ -39,26 +37,6 @@ const LOOPBACK = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?
 // `public, max-age=0, must-revalidate`, donc l'edge revalide avant de répondre
 // (mesuré le 17/09/2026 : `HIT` + `Age: 1` avec et sans l'en-tête).
 const PROBE_HEADERS = { 'user-agent': 'kojo-seo-production-probe/1.0' };
-
-/**
- * Contenu d'une `<meta name="…">`, quel que soit l'ordre des attributs.
- *
- * ⚠️ La citation qui FERME doit être la même que celle qui ouvre. Un motif du
- * type `["']([^"']*)["']` tronque toute valeur contenant une apostrophe : la
- * description de l'accueil (« … en Côte d'Ivoire ») s'y lisait 104 caractères
- * au lieu de 151, ce qui a publié un faux chiffre dans CI-COVERAGE.md (F9).
- */
-function metaContent(html, name) {
-  const wanted = String(name).toLowerCase();
-  for (const tag of String(html).match(/<meta\b[^>]*>/gi) || []) {
-    const attrs = {};
-    for (const attribute of tag.matchAll(/([a-zA-Z-]+)\s*=\s*("([^"]*)"|'([^']*)')/g)) {
-      attrs[attribute[1].toLowerCase()] = attribute[3] !== undefined ? attribute[3] : attribute[4];
-    }
-    if ((attrs.name || '').toLowerCase() === wanted) return attrs.content || '';
-  }
-  return '';
-}
 
 /**
  * Ce que le HTML servi contient réellement.
@@ -104,13 +82,13 @@ function noticeFor({ key, label, env }, state) {
 
 /**
  * @param {object} [options]
- * @param {string} [options.base] Base sondée (KOJO_LHCI_BASE_URL, sinon PROD_ORIGIN).
+ * @param {string} [options.base] Base sondée (KOJO_LHCI_BASE_URL, sinon SITE_ORIGIN).
  * @param {Function} [options.fetchImpl] `fetch` injectable (tests).
  * @returns {Promise<{skipped: boolean, notices: string[]}>} `skipped` : rien à
  *   conclure (base locale, ou accueil injoignable) — jamais un échec.
  */
 export async function runSeoProductionReport({
-  base = process.env.KOJO_LHCI_BASE_URL || PROD_ORIGIN,
+  base = process.env.KOJO_LHCI_BASE_URL || SITE_ORIGIN,
   fetchImpl = fetch,
 } = {}) {
   const cleanBase = String(base).trim().replace(/\/+$/, '');

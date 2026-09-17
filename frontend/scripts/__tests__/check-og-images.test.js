@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { runOgImageCheck, ROUTES, PROD_ORIGIN } from '../check-og-images';
+import { runOgImageCheck, ROUTES } from '../check-og-images';
 
 // Tests du garde-fou « og:image par route » (scripts/check-og-images.js).
 //
@@ -349,7 +349,4 @@ describe('check-og-images — constantes', () => {
     }
   });
 
-  it('l origin par défaut est le domaine de prod (les cartes backend y pointent)', () => {
-    expect(PROD_ORIGIN).toBe('https://kojoforafrica.cc.cd');
-  });
 });

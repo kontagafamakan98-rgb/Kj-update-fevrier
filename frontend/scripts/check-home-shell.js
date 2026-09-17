@@ -40,6 +40,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { metaContent } from './site-meta.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(__dirname, '..');
@@ -210,7 +211,7 @@ export function runHomeShellCheck(options = {}) {
 
   // ── 2. Longueurs de titre et de description ───────────────────────────────
   const title = (html.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || '';
-  const description = (html.match(/<meta\s+name="description"\s+content="([^"]*)"/) || [])[1] || '';
+  const description = metaContent(html, 'description');
   if (!title.trim()) {
     errors.push('index.html : <title> vide');
   } else if (title.length > TITLE_MAX) {
@@ -356,18 +357,14 @@ export function runHomeShellCheck(options = {}) {
   // /login, /register… — la description déclarée par route n'existait que dans
   // og:description. Chaque page doit désormais avoir la sienne, bornée à 160
   // caractères (au-delà, les moteurs tronquent).
-  const descriptionOf = (htmlIn) => {
-    const match = htmlIn.match(/<meta[^>]*name="description"[^>]*content="([^"]*)"/);
-    return match ? match[1] : '';
-  };
-  const homeDescription = descriptionOf(html);
+  const homeDescription = metaContent(html, 'description');
   const seen = new Map();
   if (homeDescription) seen.set(homeDescription, ['index.html']);
   for (const page of PRERENDERED_PAGES) {
     const pagePath = path.join(buildDir, page);
     if (!existsSync(pagePath)) continue;
     const pageHtml = readFileSync(pagePath, 'utf8');
-    const pageDescription = descriptionOf(pageHtml);
+    const pageDescription = metaContent(pageHtml, 'description');
     if (!pageDescription.trim()) {
       errors.push(`${page} : meta description absente (la page hérite de celle de l'accueil, ou n'en a aucune)`);
       continue;

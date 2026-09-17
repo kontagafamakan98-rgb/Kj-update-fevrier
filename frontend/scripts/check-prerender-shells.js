@@ -28,6 +28,7 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { SITE_ORIGIN } from './site-meta.js';
 
 const buildDir = path.join(process.cwd(), 'build');
 const errors = [];
@@ -75,7 +76,7 @@ if (jobs) {
   if (!jobs.includes('class="h-16 bg-white border-b border-gray-200"')) {
     errors.push('jobs.html : placeholder navbar (h-16) absent du shell');
   }
-  if (!jobs.includes('https://kojoforafrica.cc.cd/og-jobs.png')) {
+  if (!jobs.includes(`${SITE_ORIGIN}/og-jobs.png`)) {
     errors.push('jobs.html : og:image og-jobs.png manquant');
   }
 }
@@ -94,7 +95,7 @@ if (login) {
   if (!login.includes('bg-orange-600">Connexion</div>')) {
     errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');
   }
-  if (!login.includes('https://kojoforafrica.cc.cd/og-login.png')) {
+  if (!login.includes(`${SITE_ORIGIN}/og-login.png`)) {
     errors.push('login.html : og:image og-login.png manquant');
   }
   // Le chunk lazy de Login doit être préchargé (modulepreload) dans le HTML
@@ -136,7 +137,7 @@ if (register) {
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Register-[^"]*\.js"/.test(register)) {
     errors.push('register.html : modulepreload du chunk Register absent');
   }
-  if (!register.includes('https://kojoforafrica.cc.cd/og-image-1200x630.png')) {
+  if (!register.includes(`${SITE_ORIGIN}/og-image-1200x630.png`)) {
     errors.push('register.html : og:image générique manquant');
   }
 }
@@ -156,7 +157,7 @@ if (forgot) {
   if (!/<link rel="modulepreload"[^>]*href="[^"]*ForgotPassword-[^"]*\.js"/.test(forgot)) {
     errors.push('forgot-password.html : modulepreload du chunk ForgotPassword absent');
   }
-  if (!forgot.includes('https://kojoforafrica.cc.cd/og-image-1200x630.png')) {
+  if (!forgot.includes(`${SITE_ORIGIN}/og-image-1200x630.png`)) {
     errors.push('forgot-password.html : og:image générique manquant');
   }
 }
@@ -177,7 +178,7 @@ if (payment) {
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Payment-[^"]*\.js"/.test(payment)) {
     errors.push('payment.html : modulepreload du chunk Payment absent');
   }
-  if (!payment.includes('https://kojoforafrica.cc.cd/og-image-1200x630.png')) {
+  if (!payment.includes(`${SITE_ORIGIN}/og-image-1200x630.png`)) {
     errors.push('payment.html : og:image générique manquant');
   }
 }
@@ -202,7 +203,7 @@ if (howItWorks) {
   if (!/<link rel="modulepreload"[^>]*href="[^"]*HowItWorks-[^"]*\.js"/.test(howItWorks)) {
     errors.push('how-it-works.html : modulepreload du chunk HowItWorks absent');
   }
-  if (!howItWorks.includes('https://kojoforafrica.cc.cd/how-it-works')) {
+  if (!howItWorks.includes(`${SITE_ORIGIN}/how-it-works`)) {
     errors.push('how-it-works.html : canonical de la route absent');
   }
 }
@@ -224,7 +225,7 @@ if (support) {
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Support-[^"]*\.js"/.test(support)) {
     errors.push('support.html : modulepreload du chunk Support absent');
   }
-  if (!support.includes('https://kojoforafrica.cc.cd/support')) {
+  if (!support.includes(`${SITE_ORIGIN}/support`)) {
     errors.push('support.html : canonical de la route absent');
   }
 }
