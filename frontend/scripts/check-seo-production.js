@@ -93,13 +93,19 @@ export const isLoopbackBase = (base) => LOOPBACK.test(String(base || '').trim())
 /**
  * Contenu d'une `<meta name="…">`, quel que soit l'ordre des attributs.
  * (Vite sérialise `name` puis `content`, mais l'ordre n'est pas un contrat.)
+ *
+ * ⚠️ La citation qui FERME doit être la même que celle qui ouvre. Un motif du
+type `["']([^"']*)["']` accepte n'importe laquelle des deux et tronque donc
+toute valeur contenant une apostrophe — la description de l'accueil
+(« … en Côte d'Ivoire ») se lit alors « 104 caractères » au lieu de 151,
+ce qui a fait publier un faux chiffre dans CI-COVERAGE.md (cf. F9).
  */
 export function metaContent(html, name) {
   const wanted = String(name).toLowerCase();
   for (const tag of String(html).match(/<meta\b[^>]*>/gi) || []) {
     const attrs = {};
-    for (const attribute of tag.matchAll(/([a-zA-Z-]+)\s*=\s*["']([^"']*)["']/g)) {
-      attrs[attribute[1].toLowerCase()] = attribute[2];
+    for (const attribute of tag.matchAll(/([a-zA-Z-]+)\s*=\s*("([^"]*)"|'([^']*)')/g)) {
+      attrs[attribute[1].toLowerCase()] = attribute[3] !== undefined ? attribute[3] : attribute[4];
     }
     if ((attrs.name || '').toLowerCase() === wanted) return attrs.content || '';
   }
