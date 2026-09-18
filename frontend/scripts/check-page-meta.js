@@ -81,7 +81,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { GENERIC_CARD, dedicatedCardsFrom } from '../src/config/og-cards.js';
 import { PAGE_META, pageMetaKeys } from '../src/config/page-meta.js';
-import { SITE_ORIGIN, metaContent, metaContents } from './site-meta.js';
+import { SITE_ORIGIN, metaContent, metaContents, shellFileFor } from './site-meta.js';
 import { ROUTES as AUDITED_ROUTES } from './check-og-images.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -379,7 +379,7 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
     );
   } else {
     for (const [route, keys] of Object.entries(table)) {
-      const shell = route === '/' ? 'index.html' : `${route.slice(1)}.html`;
+      const shell = shellFileFor(route);
       const full = path.join(buildDir, shell);
       if (!fs.existsSync(full)) {
         errors.push(

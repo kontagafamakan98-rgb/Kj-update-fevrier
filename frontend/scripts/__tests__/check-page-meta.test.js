@@ -23,6 +23,7 @@ import path from 'path';
 import { assertPagesAnnounceTheirMeta, runPageMetaCheck } from '../check-page-meta';
 import { PAGE_META } from '../../src/config/page-meta';
 import { GENERIC_CARD, dedicatedCardsFrom } from '../../src/config/og-cards';
+import { shellFileFor } from '../site-meta';
 
 const FRONTEND = path.resolve(__dirname, '..', '..');
 const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
@@ -47,7 +48,9 @@ const PAGE_NAMES = {
   '/support': 'Support',
 };
 
-const shellFilePath = (route) => (route === '/' ? 'build/index.html' : `build/${route.slice(1)}.html`);
+// La correspondance route → fichier est celle du build et des gardes
+// (scripts/site-meta.js) : la fixture ne la redéclare pas, elle l'importe.
+const shellFilePath = (route) => `build/${shellFileFor(route)}`;
 
 // Cartes déduites du manifeste de la FIXTURE (dédiées + générique).
 let fixtureCards = {};

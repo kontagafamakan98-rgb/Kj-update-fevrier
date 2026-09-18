@@ -14,6 +14,10 @@
  * requête, avec deux fragilités réelles — l'attribut cherché devait PRÉCÉDER
  * `content=` (donc `<meta content="…" property="og:image">` était invisible), et
  * seule la citation double était acceptée.
+ *
+ * Et pour la correspondance route → fichier de coquille (`shellFileFor`) : elle
+ * était écrite dans le build ET dans trois gardes, plus une liste de fichiers
+ * recopiée — voir sa définition.
  */
 
 /** Origine publique canonique du site (l'alias Vercel y redirige en 308). */
@@ -34,6 +38,25 @@ export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
  * fait, dont aucune n'était comparée à l'origine du site.
  */
 export const API_ORIGIN = 'https://api.kojoforafrica.cc.cd';
+
+/**
+ * Fichier de coquille pré-rendue qui SERT une route — la seule définition de
+ * cette correspondance.
+ *
+ * Elle était écrite SIX fois : par le build qui écrit les fichiers
+ * (`vite.config.js`), par les deux gardes qui les relisent (`check-page-meta.js`,
+ * `check-prerender-shells.js`), par la liste `PRERENDERED_PAGES` écrite à la main
+ * dans `check-home-shell.js`, par le routage attendu de `check-spa-routes.js`, et
+ * dans la fixture du test de `check-page-meta.js`. Une copie qui dérive de
+ * quelques caractères ne casse rien tout de suite : elle fait chercher un fichier
+ * qui n'existe pas (ou ignorer un fichier écrit), donc la vérification porte sur
+ * du vide au lieu de rougir.
+ *
+ * @param {string} route Route publique, slash initial compris (« / », « /jobs »).
+ * @returns {string} Nom du fichier dans `build/` (« index.html », « jobs.html »).
+ */
+export const shellFileFor = (route) =>
+  route === '/' ? 'index.html' : `${route.slice(1)}.html`;
 
 /**
  * Attributs d'une balise, quel que soit leur ordre et le type de citation.
