@@ -29,7 +29,7 @@ const RESOLVER = path.join(REPO_ROOT, '.github', 'scripts', 'resolve-vercel-url.
 const readConfig = () => fs.readFileSync(CONFIG, 'utf8');
 
 /** Noms des variables lues par la config (`process.env.X`). */
-export const envVarsReadByConfig = (source) =>
+const envVarsReadByConfig = (source) =>
   [...source.matchAll(/process\.env\.([A-Z0-9_]+)/g)].map((m) => m[1]);
 
 describe('lighthouserc — variables d’environnement hors du motif capturé par yargs', () => {

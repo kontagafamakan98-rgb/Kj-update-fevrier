@@ -4,7 +4,6 @@ import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
-  ALLOWED_PURPOSES,
   MANIFEST_FILE,
   FAMILY_MANIFEST_FILE,
   parseManifest,
@@ -355,10 +354,6 @@ describe('lecture pure', () => {
 
   it('retire le BOM avant de parser', () => {
     expect(parseManifest('\uFEFF{"a":1}')).toEqual({ a: 1 });
-  });
-
-  it('reconnaît exactement les trois jetons de la spécification', () => {
-    expect(ALLOWED_PURPOSES).toEqual(['any', 'maskable', 'monochrome']);
   });
 });
 

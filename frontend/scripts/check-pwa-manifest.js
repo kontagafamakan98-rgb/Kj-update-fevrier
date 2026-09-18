@@ -46,7 +46,7 @@ export const FAMILY_DIR = 'public/icons';
 export const FAMILY_MANIFEST_FILE = 'public/icons/icons-assets.manifest.json';
 
 // Jetons de « purpose » reconnus par la spécification des Web App Manifests.
-export const ALLOWED_PURPOSES = ['any', 'maskable', 'monochrome'];
+const ALLOWED_PURPOSES = ['any', 'maskable', 'monochrome'];
 
 // Convention de nom des variantes fabriquées pour les masques.
 export const MASKABLE_NAME = /-maskable\.png$/;

@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { runOgImageCheck, ROUTES } from '../check-og-images';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { runOgImageCheck, ROUTES, lighthouseAuditedPaths } from '../check-og-images';
 
 // Tests du garde-fou « og:image par route » (scripts/check-og-images.js).
 //
@@ -158,6 +161,8 @@ const run = async (map, overrides = {}) => {
 };
 
 let consoleError;
+// Dossiers temporaires créés par les tests (configs Lighthouse jetables).
+const tempDirs = [];
 
 beforeEach(() => {
   // Le check imprime ses erreurs (utile en CI) : on tait la sortie en test.
@@ -168,6 +173,7 @@ beforeEach(() => {
 afterEach(() => {
   consoleError.mockRestore();
   vi.restoreAllMocks();
+  for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
 describe('check-og-images — branche 200 (mission réellement en base)', () => {
@@ -303,6 +309,46 @@ describe('check-og-images — routes statiques', () => {
   });
 });
 
+describe('check-og-images — une seule table route → carte OG', () => {
+  const withConfig = (source) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'og-lhci-'));
+    const file = path.join(dir, 'lighthouserc.cjs');
+    fs.writeFileSync(file, source, 'utf8');
+    tempDirs.push(dir);
+    return file;
+  };
+
+  it('couvre TOUTE route auditée par Lighthouse CI, /forgot-password compris', async () => {
+    // Écart réel jusqu'au 18/09/2026 : /forgot-password était auditée (budget
+    // CLS des PR #19/#20) mais absente de la table des cartes, donc sa carte
+    // n'était vérifiée par personne. Ce test échoue si elle disparaît à nouveau.
+    const audited = lighthouseAuditedPaths();
+    expect(audited).toEqual(expect.arrayContaining(['/forgot-password', '/register', '/jobs']));
+
+    const declared = new Set(ROUTES.map((route) => route.path));
+    expect(audited.filter((p) => !declared.has(p))).toEqual([]);
+  });
+
+  it("échoue si une route auditée n'a pas de carte déclarée", async () => {
+    const config = withConfig(
+      "const DEPLOYMENT_PATHS = ['/', '/une-route-sans-carte'];\nmodule.exports = {};\n"
+    );
+    const { result } = await run(defaultMap(), { lighthouseConfig: config });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain('/une-route-sans-carte');
+  });
+
+  it('échoue, avec un message explicite, quand la liste auditée est illisible', async () => {
+    const { result } = await run(defaultMap(), {
+      lighthouseConfig: withConfig('module.exports = {};\n'),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/DEPLOYMENT_PATHS illisible/);
+  });
+});
+
 describe('check-og-images — capacité de la base auditée (observée, pas devinée)', () => {
   it('ignore la section /jobs/:id quand la base ne la sert PAS (serveur statique nu)', async () => {
     const { result, calls } = await run(staticOnlyMap());
@@ -333,20 +379,3 @@ describe('check-og-images — capacité de la base auditée (observée, pas devi
   });
 });
 
-describe('check-og-images — constantes', () => {
-  it('vérifie les routes auditées par lighthouserc (garde anti-désynchronisation)', () => {
-    expect(ROUTES.map((r) => r.path)).toEqual([
-      '/',
-      '/jobs',
-      '/login',
-      '/register',
-      '/dashboard',
-      '/profile',
-    ]);
-    // Les routes à carte dédiée portent leur variante carrée (réseaux 1:1).
-    for (const route of ROUTES.filter((r) => r.image)) {
-      expect(route.imageSquare).toBeTruthy();
-    }
-  });
-
-});

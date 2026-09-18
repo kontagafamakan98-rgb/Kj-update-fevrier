@@ -7,7 +7,6 @@ import {
   discoverScopes,
   parseDict,
   analyzeScope,
-  analyzeAllScopes,
   runPack2I18nHygieneCheck,
 } from '../check-pack2-i18n-hygiene';
 

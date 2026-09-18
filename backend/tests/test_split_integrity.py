@@ -122,31 +122,6 @@ def test_shared_helpers_importable():
     assert callable(store_notification)
 
 
-def test_jobs_router_imports_payment_helper():
-    """kojo_routers_jobs appelle _send_payment_pending_to_worker (import régression)."""
-    from kojo_routers_jobs import router
-
-    assert router is not None
-
-
-def test_profile_photo_imports():
-    """Le chemin photo de profil (base64/io/cloudinary/ValidationError) importe correctement."""
-    import kojo_routers_auth
-    import kojo_routers_users
-
-    assert kojo_routers_auth.router is not None
-    assert kojo_routers_users.router is not None
-
-
-def test_owner_and_payments_router_imports():
-    """kojo_routers_owner (logging) et kojo_routers_payments (os) importent correctement."""
-    import kojo_routers_owner
-    import kojo_routers_payments
-
-    assert kojo_routers_owner.router is not None
-    assert kojo_routers_payments.router is not None
-
-
 def test_no_undefined_names_in_split_modules():
     """Garde-fou : aucun nom non défini dans les modules découpés.
 

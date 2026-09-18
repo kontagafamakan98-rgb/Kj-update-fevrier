@@ -15,6 +15,10 @@
  *   • build/login.html  → #root contient le shell formulaire (h2, champs,
  *     bouton) + og:image og-login.png.
  *
+ * La carte og:image attendue de chaque coquille n'est PAS recopiée ici : elle
+ * est lue dans la table unique (scripts/check-og-images.js), partagée avec
+ * vite.config.js qui écrit les coquilles — les deux ne peuvent plus diverger.
+ *
  * Et surtout : chaque page PRÉ-RENDUE du build doit être ATTEIGNABLE via
  * frontend/vercel.json (rewrites « /route » et « /route/ » → « /route.html »,
  * et aucune règle masquée). Le plugin peut émettre login.html sans que
@@ -29,17 +33,26 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { SITE_ORIGIN } from './site-meta.js';
+// Table UNIQUE de la correspondance route → carte OG, partagée avec
+// vite.config.js qui écrit ces coquilles : la carte de chaque shell est LUE
+// ici et non recopiée (voir la section « og:image » plus bas).
+import { ROUTES as OG_CARD_ROUTES } from './check-og-images.js';
 
 const buildDir = path.join(process.cwd(), 'build');
 const errors = [];
 
+// Coquilles lues, indexées par nom de fichier : la section og:image dérive le
+// nom attendu du chemin de la route (« /jobs » → jobs.html, « / » → index.html).
+const shells = {};
+
 const read = (name) => {
   try {
-    return readFileSync(path.join(buildDir, name), 'utf8');
+    shells[name] = readFileSync(path.join(buildDir, name), 'utf8');
   } catch {
     errors.push(`build/${name} introuvable (le build a-t-il tourné ?)`);
-    return '';
+    shells[name] = '';
   }
+  return shells[name];
 };
 
 // 1. index.html : #root doit porter le shell statique de l'accueil.
@@ -76,9 +89,6 @@ if (jobs) {
   if (!jobs.includes('class="h-16 bg-white border-b border-gray-200"')) {
     errors.push('jobs.html : placeholder navbar (h-16) absent du shell');
   }
-  if (!jobs.includes(`${SITE_ORIGIN}/og-jobs.png`)) {
-    errors.push('jobs.html : og:image og-jobs.png manquant');
-  }
 }
 
 // 3. login.html : shell formulaire + og:image dédié.
@@ -94,9 +104,6 @@ if (login) {
   }
   if (!login.includes('bg-orange-600">Connexion</div>')) {
     errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');
-  }
-  if (!login.includes(`${SITE_ORIGIN}/og-login.png`)) {
-    errors.push('login.html : og:image og-login.png manquant');
   }
   // Le chunk lazy de Login doit être préchargé (modulepreload) dans le HTML
   // pré-rendu : sans lui, le navigateur waterfall le chunk (entrée → vendor →
@@ -137,9 +144,6 @@ if (register) {
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Register-[^"]*\.js"/.test(register)) {
     errors.push('register.html : modulepreload du chunk Register absent');
   }
-  if (!register.includes(`${SITE_ORIGIN}/og-image-1200x630.png`)) {
-    errors.push('register.html : og:image générique manquant');
-  }
 }
 
 // 4bis. forgot-password.html : shell formulaire étape email (par défaut).
@@ -156,9 +160,6 @@ if (forgot) {
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*ForgotPassword-[^"]*\.js"/.test(forgot)) {
     errors.push('forgot-password.html : modulepreload du chunk ForgotPassword absent');
-  }
-  if (!forgot.includes(`${SITE_ORIGIN}/og-image-1200x630.png`)) {
-    errors.push('forgot-password.html : og:image générique manquant');
   }
 }
 
@@ -177,9 +178,6 @@ if (payment) {
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Payment-[^"]*\.js"/.test(payment)) {
     errors.push('payment.html : modulepreload du chunk Payment absent');
-  }
-  if (!payment.includes(`${SITE_ORIGIN}/og-image-1200x630.png`)) {
-    errors.push('payment.html : og:image générique manquant');
   }
 }
 
@@ -227,6 +225,27 @@ if (support) {
   }
   if (!support.includes(`${SITE_ORIGIN}/support`)) {
     errors.push('support.html : canonical de la route absent');
+  }
+}
+
+// 4sexies. og:image de CHAQUE coquille, lu dans la table UNIQUE.
+// Cette correspondance était recopiée ici en dur (og-jobs.png, og-login.png,
+// og-image-1200x630.png ×3) : c'était une seconde copie de la table de
+// scripts/check-og-images.js, qui pouvait diverger en silence — changer une
+// carte là-bas laissait ces attentes figées sur l'ancienne. Et deux pages
+// (how-it-works, support) n'étaient vérifiées nulle part.
+// Le nom de fichier se déduit du chemin (« /jobs » → jobs.html, « / » →
+// index.html) ; les routes sans coquille (/dashboard, /profile, servies par
+// app.html) sont ignorées faute de fichier.
+for (const route of OG_CARD_ROUTES) {
+  const name = route.path === '/' ? 'index.html' : `${route.path.slice(1)}.html`;
+  const html = shells[name];
+  if (!html) continue;
+  if (!html.includes(`${SITE_ORIGIN}${route.image}`)) {
+    errors.push(
+      `${name} : og:image ${route.image} manquant (carte déclarée pour ${route.path} ` +
+        'dans la table de scripts/check-og-images.js)'
+    );
   }
 }
 

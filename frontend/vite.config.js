@@ -3,6 +3,16 @@ import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import fs from 'node:fs'
 
+// Correspondance route → carte OG : SOURCE UNIQUE dans scripts/check-og-images.js,
+// qui est aussi le module vérifiant le HTML servi. Le build n'en garde aucune
+// copie (deux tables divergeaient) : une route pré-rendue absente de cette table
+// fait échouer le build, plutôt que de publier un og:image troué.
+import { ROUTES as OG_CARD_ROUTES } from './scripts/check-og-images.js'
+
+const OG_CARDS = Object.fromEntries(
+  OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
+)
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const publicEnv = {
@@ -774,40 +784,26 @@ export default defineConfig(({ mode }) => {
               title: 'Emplois disponibles — Kojo',
               description:
                 "Trouvez un travailleur qualifié près de chez vous : emplois, missions et talents disponibles dans toute l'Afrique de l'Ouest.",
-              image: '/og-jobs.png',
-              // Variante CARRÉE (1200x1200) pour les réseaux qui recadrent en
-              // vignette 1:1 (WhatsApp/Telegram/LinkedIn/aperçus Twitter).
-              imageSquare: '/og-jobs-square.png',
             },
             login: {
               title: 'Connexion — Kojo',
               description:
                 'Accédez à votre compte client ou travailleur Kojo et suivez vos missions en un clic.',
-              image: '/og-login.png',
-              imageSquare: '/og-login-square.png',
             },
             register: {
               title: 'Créer un compte — Kojo',
               description:
                 "Inscrivez-vous sur Kojo comme client ou travailleur et rejoignez la communauté de services en Afrique de l'Ouest.",
-              // Pas de carte dédiée : la carte générique de l'accueil (cohérent
-              // avec les autres pages catch-all).
-              image: '/og-image-1200x630.png',
-              imageSquare: '/og-square-1200x1200.png',
             },
             'forgot-password': {
               title: 'Mot de passe oublié — Kojo',
               description:
                 'Recevez un code par email pour sécuriser votre compte et définir un nouveau mot de passe.',
-              image: '/og-image-1200x630.png',
-              imageSquare: '/og-square-1200x1200.png',
             },
             payment: {
               title: 'Paiements sécurisés — Kojo',
               description:
                 'Payez en toute sécurité par Orange Money, Wave ou carte bancaire sur Kojo.',
-              image: '/og-image-1200x630.png',
-              imageSquare: '/og-square-1200x1200.png',
             },
             // Titre et description repris À L'IDENTIQUE de ce que posent les
             // pages au runtime (usePageTitle de HowItWorks.js / Support.js) :
@@ -816,14 +812,10 @@ export default defineConfig(({ mode }) => {
             'how-it-works': {
               title: `${T('howItWorksTitle')} — Kojo`,
               description: T('howItWorksHero'),
-              image: '/og-image-1200x630.png',
-              imageSquare: '/og-square-1200x1200.png',
             },
             support: {
               title: `${T('support')} — Kojo`,
               description: T('supportHelp'),
-              image: '/og-image-1200x630.png',
-              imageSquare: '/og-square-1200x1200.png',
             },
           }
 
@@ -867,8 +859,17 @@ export default defineConfig(({ mode }) => {
           )
 
           for (const [route, meta] of Object.entries(ROUTES)) {
+            // Carte OG de la route : lue dans la table unique. Sans entrée, le
+            // shell publierait `content="…undefined"` — on échoue ici.
+            const card = OG_CARDS[`/${route}`]
+            if (!card) {
+              throw new Error(
+                `prerender-route-meta : la route pré-rendue « /${route} » n'a pas de carte OG déclarée ` +
+                  "dans scripts/check-og-images.js (ROUTES) — ajouter l'entrée"
+              )
+            }
             const url = `${origin}/${route}`
-            const imageUrl = `${origin}${meta.image}`
+            const imageUrl = `${origin}${card.image}`
             let out = html
               .replace(/(<title>)[^<]*(<\/title>)/, `$1${meta.title}$2`)
               .replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${url}$2`)
@@ -888,18 +889,16 @@ export default defineConfig(({ mode }) => {
             // identifié par height="1200" — la carte wide a height="630").
             // Les crawlers qui recadrent en 1:1 lisent les dimensions
             // déclarées et choisissent la variante adaptée à leur rendu.
-            if (meta.imageSquare) {
-              const squareUrl = `${origin}${meta.imageSquare}`
-              const squareBlock =
-                `<meta property="og:image" content="${squareUrl}" />` +
-                `<meta property="og:image:width" content="1200" />` +
-                `<meta property="og:image:height" content="1200" />` +
-                `<meta property="og:image:type" content="image/png" />`
-              out = out.replace(
-                /<meta property="og:image"[^>]*\/>\s*<meta property="og:image:width" content="1200"[^>]*\/>\s*<meta property="og:image:height" content="1200"[^>]*\/>\s*<meta property="og:image:type" content="image\/png"[^>]*\/>/,
-                squareBlock
-              )
-            }
+            const squareUrl = `${origin}${card.imageSquare}`
+            const squareBlock =
+              `<meta property="og:image" content="${squareUrl}" />` +
+              `<meta property="og:image:width" content="1200" />` +
+              `<meta property="og:image:height" content="1200" />` +
+              `<meta property="og:image:type" content="image/png" />`
+            out = out.replace(
+              /<meta property="og:image"[^>]*\/>\s*<meta property="og:image:width" content="1200"[^>]*\/>\s*<meta property="og:image:height" content="1200"[^>]*\/>\s*<meta property="og:image:type" content="image\/png"[^>]*\/>/,
+              squareBlock
+            )
             out = setMeta(out, 'og:url', url)
             out = setMeta(out, 'twitter:title', meta.title)
             out = setMeta(out, 'twitter:description', meta.description)

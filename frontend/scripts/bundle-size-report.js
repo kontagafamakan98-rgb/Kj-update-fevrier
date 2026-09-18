@@ -40,7 +40,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
 import { BUDGETS, checkBundleSize } from './check-bundle-size.js';
 
