@@ -701,8 +701,11 @@ chaque PR vers `main` (sauf mention contraire).
   par le bon gabarit** — sa page pré-rendue si elle en a une, `app.html` sinon,
   et jamais `index.html` (qui porte le contenu de l'accueil) ; `app.html` doit
   rester nu (pas de `<h1>`, pas de canonical, pas de JSON-LD, `#root` vide) et
-  toute page `.html` émise par le build doit être déclarée dans
-  `PRERENDERED_ROUTES`. Enfin, les routes privées (`/dashboard`, `/profile`,
+  toute page `.html` émise par le build doit correspondre à une route de la table
+  des textes (`src/config/page-meta.js`) — c'est LÀ qu'une page se déclare, et la
+  liste des pages pré-rendues du garde en **DÉRIVE** au lieu d'être recopiée :
+  une route ajoutée à la table change le gabarit attendu sans qu'aucune autre
+  liste soit à mettre à jour. Enfin, les routes privées (`/dashboard`, `/profile`,
   `/messages`, `/create-job`, `/support-admin`…) portent `X-Robots-Tag:
   noindex` : un tableau de bord indexé est une page vide dans les résultats.
 - Page d'accueil pré-rendue (`check-home-shell.js`) : un h1 unique reprenant
