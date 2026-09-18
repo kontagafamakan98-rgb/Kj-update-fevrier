@@ -14,7 +14,8 @@
  * seul côté passait (l'onglet du navigateur et la carte de partage ne disaient
  * plus la même chose).
  *
- * Ce garde exécute les DEUX implémentations sur la même mission de référence :
+ * Ce garde exécute les DEUX implémentations sur CHACUNE des missions de référence
+ * (`CONTRACT_JOBS`) :
  *
  *   • le PRÉ-RENDU : il importe `backend/kojo_job_og.py` avec un interpréteur
  *     Python quelconque (le module n'a aucune dépendance : ni FastAPI, ni
@@ -29,6 +30,15 @@
  * celle que le crawler retient comme la bonne, donc elle divergerait du HTML
  * servi exactement de la même façon qu'un titre.
  *
+ * ── Le jeu de référence, et pourquoi il existe ─────────────────────────────
+ * L'UNITÉ de la coupe à 150 est ce qui a motivé le jeu : JavaScript compte des
+ * unités UTF-16, Python des points de code, et les deux comptes coïncident tant
+ * que le texte reste dans le plan multilingue de base — accents compris. Un
+ * caractère ASTRAL les sépare. Le jeu place donc la frontière tour à tour sur un
+ * accent, un emoji du plan de base, un astral, et avant un astral : le contrat
+ * exige l'égalité des deux côtés, donc revenir à `slice` (unités UTF-16) le fait
+ * rougir au lieu de publier un demi-caractère dans la balise.
+ *
  * INTERPRÉTEUR : le module étant sans dépendance, n'importe quel Python convient
  * (venv du dépôt, `python3`, `python`). En CI, l'image du runner en fournit un —
  * donc l'absence d'interpréteur y est une ERREUR, pas un silence : un garde qui
@@ -42,7 +52,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { jobSeo } from '../src/utils/jobSeo.js';
+import { DESCRIPTION_LIMIT, jobSeo } from '../src/utils/jobSeo.js';
 import { canonicalHref, metaContent, metaContents } from './site-meta.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,22 +62,94 @@ const REPO_ROOT = path.resolve(FRONTEND_DIR, '..');
 export const PRERENDER_MODULE = 'backend/kojo_job_og.py';
 
 /**
- * Mission de référence — UNE définition, donnée aux deux côtés.
+ * Insère `char` au (index + 1)ième POINT DE CODE de `text`.
  *
- * Elle porte ce que le contrat doit traverser sans se perdre : une apostrophe
- * typographique et un « & » (les deux sont ÉCHAPPÉS dans le HTML, donc le garde
- * doit décoder ce qu'un crawler lit, pas comparer des entités), et une
- * description de plus de 150 caractères (la coupe et le « … » font partie du
- * contrat : les deux côtés doivent couper au même endroit).
+ * Sert à poser la frontière de la coupe exactement là où elle départage les deux
+ * règles : au 150e point de code (`DESCRIPTION_LIMIT - 1`).
  */
-export const FIXTURE_JOB = {
-  id: '11111111-1111-4111-8111-111111111111',
-  title: "Réparation d'une fuite & rebouchage du plafond",
-  description:
-    "Fuite lente au plafond du salon, sous la salle de bain : tache qui s'agrandit " +
-    "depuis une semaine, placo gonfle au-dessus de la porte-fenetre. Il faut localiser " +
-    "l'origine, ouvrir proprement, reparer la canalisation et reboucher avant peinture.",
+const insertAtCodePoint = (text, index, char) => {
+  const points = Array.from(text);
+  return [...points.slice(0, index), char, ...points.slice(index)].join('');
 };
+
+/**
+ * Les missions de RÉFÉRENCE du contrat — UNE définition, donnée aux deux côtés.
+ *
+ * Le jeu existe pour éprouver la coupe de la description LÀ OÙ LES DEUX LANGAGES
+ * POURRAIENT COMPTER DIFFÉREMMENT : JavaScript compte des unités UTF-16 (`slice`,
+ * `length`), Python des POINTS DE CODE (`[:150]`, `len`). Tant que le texte reste
+ * dans le plan multilingue de base, les deux comptes COÏNCIDENT — les accents
+ * compris, et c'est ce qui rendait la divergence invisible. Un caractère ASTRAL
+ * (emoji hors BMP, deux unités UTF-16) les sépare : la coupe tombait un cran plus
+ * tôt d'un côté, et au MILIEU de la paire de surrogates quand la frontière était
+ * pile dessus — un demi-caractère publié dans la balise, donc deux descriptions
+ * différentes selon le canal (l'onglet et la carte de partage). La frontière des
+ * 150 est donc placée tour à tour sur un accent, sur un emoji du plan de base, sur
+ * un astral, et avant un astral.
+ *
+ * Ce que chaque mission doit aussi traverser sans se perdre : une apostrophe
+ * typographique et un « & » (les deux sont ÉCHAPPÉS dans le HTML, donc le garde
+ * doit décoder ce qu'un crawler LIT au lieu de comparer des entités).
+ */
+
+// Description d'appui des cas de frontière : le 150e point de code y est le « è »
+// de « gouttières » (mesuré, pas supposé — les tests le vérifient).
+const ACCENTED_DESCRIPTION =
+  "Réfection complète d'un toit en tôle ondulée à Ouagadougou : dépose des plaques " +
+  'rouillées, remplacement des fixations, étanchéité à refaire et gouttières à reprendre ' +
+  'avant la saison des pluies.';
+
+/**
+ * Le jeu est aussi la ENTRÉE des cas non triviaux du contrat : chaque mission a
+ * un identifiant distinct, donc une carte et un canonical distincts, et le garde
+ * exige l'égalité des deux côtés pour CHACUNE.
+ */
+export const CONTRACT_JOBS = [
+  {
+    label: 'apostrophe et « & »',
+    covers: 'texte échappé dans le HTML, description de plus de 150 points de code',
+    id: '11111111-1111-4111-8111-111111111111',
+    title: "Réparation d'une fuite & rebouchage du plafond",
+    description:
+      "Fuite lente au plafond du salon, sous la salle de bain : tache qui s'agrandit " +
+      "depuis une semaine, placo gonfle au-dessus de la porte-fenetre. Il faut localiser " +
+      "l'origine, ouvrir proprement, reparer la canalisation et reboucher avant peinture.",
+  },
+  {
+    label: 'accents à la frontière',
+    covers: 'le 150e point de code est un accent, avec des accents avant et après la coupe',
+    id: '22222222-2222-4222-8222-222222222222',
+    title: "Réfection d'une toiture en tôle ondulée — étage",
+    description: ACCENTED_DESCRIPTION,
+  },
+  {
+    label: 'emoji BMP à la frontière',
+    covers: 'emoji du plan de base (1 unité UTF-16) au 150e point de code : les comptes coïncident',
+    id: '33333333-3333-4333-8333-333333333333',
+    title: 'Tri des cartons ☕ après déménagement',
+    description: insertAtCodePoint(ACCENTED_DESCRIPTION, DESCRIPTION_LIMIT - 1, '☕'),
+  },
+  {
+    label: 'astral à la frontière',
+    covers: 'caractère astral (2 unités UTF-16) au 150e point de code : la paire tombe sur la coupe',
+    id: '44444444-4444-4444-8444-444444444444',
+    title: 'Nettoyage de fin de chantier 😀 à Ouagadougou',
+    description: insertAtCodePoint(ACCENTED_DESCRIPTION, DESCRIPTION_LIMIT - 1, '😀'),
+  },
+  {
+    label: 'astral avant la frontière',
+    covers: 'caractère astral AVANT la coupe : le décompte UTF-16 décale la frontière d’un caractère',
+    id: '55555555-5555-4555-8555-555555555555',
+    title: 'Évacuation des gravats 🚚 et remise en état',
+    description: insertAtCodePoint(ACCENTED_DESCRIPTION, 99, '🚚'),
+  },
+];
+
+/**
+ * La mission de référence HISTORIQUE du contrat — la première du jeu. Gardée
+ * nommée : les tests et les messages la citent depuis l'origine.
+ */
+export const FIXTURE_JOB = CONTRACT_JOBS[0];
 
 /** Interpréteurs candidats : explicite, puis le venv du dépôt, puis le PATH. */
 export const PYTHON_CANDIDATES = [
@@ -144,6 +226,27 @@ const ENTITIES = [
 export const decodeEntities = (value) =>
   ENTITIES.reduce((text, [entity, char]) => text.split(entity).join(char), String(value || ''));
 
+/**
+ * Vrai si `value` contient un DEMI-CARACTÈRE : une demi-paire de surrogates
+ * orpheline. C'est la signature d'une coupe par UNITÉS UTF-16 au milieu d'un
+ * caractère astral — ce que fait `String.prototype.slice`, et ce qui publiait la
+ * moitié d'un emoji dans la balise (le navigateur l'affiche « »).
+ */
+export const hasLoneSurrogate = (value) => {
+  const text = String(value || '');
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      i += 1; // paire valide : on saute le bas de la paire
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
+};
+
 /** Texte de `<title>`, décodé. */
 export const htmlTitle = (html) => decodeEntities((/<title>([^<]*)<\/title>/i.exec(String(html)) || [])[1]);
 
@@ -176,9 +279,20 @@ export const compareJobOg = ({ app, html, base }) => {
     errors.push(`titre : le pré-rendu annonce « ${title} », l'application « ${app.title} »`);
   }
   if (description !== app.description) {
+    // Longueurs comptées en POINTS DE CODE — l'unité que la coupe des deux côtés
+    // utilise. En unités UTF-16, un texte à caractères astraux afficherait des
+    // nombres qui ne correspondent à AUCUNE des deux coupes.
+    const points = (value) => Array.from(value).length;
+    // Un « » dans un message ne dit pas d'où il vient : nommer la cause quand
+    // elle est là — une coupe faite sur une unité UTF-16, au milieu d'un astral.
+    const halfCharacter = hasLoneSurrogate(description) || hasLoneSurrogate(app.description);
     errors.push(
-      `description : le pré-rendu annonce ${description.length} caractères, l'application ` +
-        `${app.description.length} — « ${description} » ≠ « ${app.description} »`
+      `description : le pré-rendu annonce ${points(description)} points de code, l'application ` +
+        `${points(app.description)} — « ${description} » ≠ « ${app.description} »` +
+        (halfCharacter
+          ? ' — un côté publie un DEMI-CARACTÈRE : la coupe s’est faite sur une unité UTF-16, '
+              + 'au milieu d’un caractère astral'
+          : '')
     );
   }
   if (images[0] !== expectedWide) {
@@ -256,21 +370,27 @@ export const runJobOgContractCheck = (opts = {}) => {
     return { ok: errors.length === 0, errors, notices, checked, python: '' };
   }
 
-  const { html, error } = renderPrerenderedPage({ python, base, root });
-  if (error) errors.push(error);
+  checked.push(`  interpréteur  ${python} → ${PRERENDER_MODULE} (aucune dépendance)`);
 
-  const app = jobSeo(FIXTURE_JOB);
-  if (!error) {
-    for (const problem of compareJobOg({ app, html, base })) errors.push(problem);
+  // CHAQUE mission du jeu passe par les DEUX implémentations, puis est comparée :
+  // une seule mission ne dirait rien d'un pré-rendu qui n'a jamais traversé de
+  // caractère astral (c'est exactement le cas que personne ne couvrait).
+  for (const job of CONTRACT_JOBS) {
+    const { html, error } = renderPrerenderedPage({ python, job, base, root });
+    if (error) {
+      errors.push(`[${job.label}] ${error}`);
+      continue;
+    }
+    const app = jobSeo(job);
+    for (const problem of compareJobOg({ app, html, base })) {
+      errors.push(`[${job.label}] ${problem}`);
+    }
+    checked.push(
+      `  ✓ ${job.label} : « ${app.title} » — description ${Array.from(app.description).length} ` +
+        `points de code (source ${Array.from(job.description).length}), carte wide + carrée ` +
+        `-square.png, canonical/og:url (${job.covers})`
+    );
   }
-
-  checked.push(`  interpréteur     ${python} → ${PRERENDER_MODULE} (aucune dépendance)`);
-  checked.push(`  mission          ${FIXTURE_JOB.id} (« ${FIXTURE_JOB.title} »)`);
-  checked.push(`  titre            « ${app.title} »`);
-  checked.push(`  description      ${app.description.length} caractères, coupe et « … » des deux côtés`);
-  checked.push(`  carte            ${base}${app.card} + variante carrée -square.png`);
-  checked.push(`  canonical/og:url ${base}${app.canonicalPath}`);
-  checked.push('  og:/twitter:     titre et description identiques sur les quatre balises');
 
   if (errors.length > 0) {
     logError(`❌ Contrat app ↔ pré-rendu de /jobs/:id NON tenu (${errors.length} problème(s)) :`);
@@ -285,8 +405,9 @@ export const runJobOgContractCheck = (opts = {}) => {
 
   log(checked.join('\n'));
   log(
-    `✅ Contrat /jobs/:id tenu hors ligne : titre, description, carte, canonical et og:url ` +
-      `identiques entre l'application et le pré-rendu (aucun serveur, aucune base de données).`
+    `✅ Contrat /jobs/:id tenu hors ligne sur ${CONTRACT_JOBS.length} missions de référence : ` +
+      'titre, description (coupe en points de code), carte, canonical et og:url identiques entre ' +
+      "l'application et le pré-rendu (aucun serveur, aucune base de données)."
   );
   return { ok: true, errors, notices, checked, python };
 };
