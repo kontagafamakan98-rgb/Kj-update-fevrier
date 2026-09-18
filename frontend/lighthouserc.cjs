@@ -43,11 +43,21 @@
  * sans infrastructure, les budgets absolus jouent ce rôle : tout run sous les
  * seuils fait échouer la PR.
  *
+ * CLS : les budgets sont PAR ROUTE (voir scripts/lhci-cls-budgets.cjs et son
+ * en-tête : table mesurée, marges justifiées, et refus d'auditer une page sans
+ * budget). Le plafond global de 0,15 a été remplacé le 18/09/2026 : il tolérait
+ * la régression fine des pages d'auth (0,0165 mesuré sur /register avant #19).
+ *
  * Variables d'env injectées par le job CI :
  *   KOJO_LHCI_BASE_URL     base (ex https://x.vercel.app ou http://localhost:4173)
  *   KOJO_LHCI_AUTH_HEADER  JSON {"Authorization": "Bearer <token>"} pour les pages
  *                          protégées. Vide si non fourni.
  */
+// Les budgets CLS PAR ROUTE et la matrice d'assertions : propriété de
+// scripts/lhci-cls-budgets.cjs (la table mesurée vit avec sa justification, et
+// un test l'éprouve contre le résolveur de @lhci/utils lui-même).
+const { CLS_BUDGETS, clsAssertionMatrix } = require('./scripts/lhci-cls-budgets.cjs');
+
 const baseUrl = (process.env.KOJO_LHCI_BASE_URL || '').trim().replace(/\/$/, '');
 const authHeader = (process.env.KOJO_LHCI_AUTH_HEADER || '').trim();
 const localBase = 'http://localhost:4173';
@@ -151,15 +161,21 @@ module.exports = {
       },
     },
     assert: {
-      aggregationMethod: 'median',
-      assertions: {
-        // ── Budgets calés sur des MESURES du déploiement réel ──────────────
-        // Relevé du 16/09/2026, 3 runs par page (médianes) :
-        //   page        score  FCP ms  LCP ms  TBT ms (médiane, détail)   CLS
-        //   /           0,99    1263    1263       1  [2878, 1, 0]       0,056
-        //   /dashboard  0,98    1395    2386       0  [0, 0, 0]          0,001
-        //   /jobs       0,94     969    2057      30  [665, 12, 30]      0,135
-        //   /profile    0,97    1399    2496       2  [7, 2, 0]          0,001
+      // ── Un budget CLS PAR ROUTE, plus un socle commun ───────────────────
+      // `assertMatrix` est EXCLUSIF d'`assertions`, `preset`, `budgetsFile` et
+      // `aggregationMethod` (@lhci/utils/src/assertions.js lève « Cannot use
+      // assertMatrix with other options ») : l'agrégation par MÉDIANE est donc
+      // portée par CHAQUE entrée, sinon lhci refuserait la config. La table des
+      // budgets CLS — et les mesures qui les justifient — vit dans
+      // scripts/lhci-cls-budgets.cjs ; une page auditée sans budget MESURÉ fait
+      // échouer le chargement de cette config (voir clsAssertionMatrix).
+      assertMatrix: clsAssertionMatrix(auditedPaths, {
+        // ── Socle commun, mesuré le 16/09/2026 (3 runs par page, médianes) ──
+        //   page        score  FCP ms  LCP ms  TBT ms (médiane, détail)
+        //   /           0,99    1263    1263       1  [2878, 1, 0]
+        //   /dashboard  0,98    1395    2386       0  [0, 0, 0]
+        //   /jobs       0,94     969    2057      30  [665, 12, 30]
+        //   /profile    0,97    1399    2496       2  [7, 2, 0]
         // Les TBT par run montrent la distribution réelle d'un runner partagé :
         // 0-30 ms le plus souvent, jusqu'à 2878 ms sur un run. C'est pourquoi
         // numberOfRuns=3 et l'agrégation par MÉDIANE sont indispensables : une
@@ -178,27 +194,9 @@ module.exports = {
           'error',
           { maxNumericValue: targetIsLocal ? 1600 : 1200 },
         ],
-        // CLS : seuil de passage Lighthouse (0.1).
-        // Ce plafond est GLOBAL (il n'y a qu'un jeu d'assertions pour toutes les
-        // URLs, cf. `assertMatrix` dans @lhci/cli) : 0.15 couvre /register,
-        // /forgot-password, /dashboard et /profile, dont les CLS mesurés sont
-        // très en-dessous — il n'attrape donc qu'un EFFONDREMENT, pas la
-        // régression fine que les PR #19/#20 ont corrigée (0,0165 et 0,0012).
-        // Un plafond par route exige `assertMatrix` (exclusif de `assertions`
-        // et `aggregationMethod`) et des valeurs MESURÉES : à faire une fois le
-        // premier relevé des deux pages auth disponible.
-        // Plafond porté à 0.15 à cause d'un défaut réel, MESURÉ et non corrigé :
-        // /jobs déplace un élément visible de 0.1353 (identique sur les 3 runs
-        // du 16/09/2026, contre le déploiement réel). Le rapport Lighthouse
-        // n'attribue ce décalage à aucun nœud, et il n'apparaissait jamais
-        // auparavant parce que ce job n'auditait qu'une URL (voir le correctif
-        // du préfixe environnemental ci-dessus). À resserrer dès que le
-        // décalage est corrigé — voir la section « défauts connus » de
-        // CI-COVERAGE.md.
-        'cumulative-layout-shift': ['error', { maxNumericValue: 0.15 }],
         // FCP : pire médiane mesurée 1399 ms (marge ~1,8×).
         'first-contentful-paint': ['error', { maxNumericValue: 2500 }],
-      },
+      }),
     },
     upload: {
       target: 'filesystem',

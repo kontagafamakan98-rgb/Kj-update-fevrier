@@ -202,7 +202,7 @@ déploiement, 3 runs par page, médianes :
 | `largest-contentful-paint` | ≤ 3 500 ms | 1,40× |
 | `first-contentful-paint` | ≤ 2 500 ms | 1,79× |
 | `total-blocking-time` | ≤ 1 200 ms (déploiement) · 1 600 ms (repli local) | médianes ≤ 30 ms |
-| `cumulative-layout-shift` | ≤ 0,15 | **défaut connu /jobs : 0,135** |
+| `cumulative-layout-shift` | **un budget PAR ROUTE** (0,01 → 0,06 selon la page) | pire médiane mesurée : 0,0450 (`/dashboard`, `/payment`, `/profile`) |
 
 Deux points que ces chiffres imposent :
 
@@ -212,30 +212,71 @@ Deux points que ces chiffres imposent :
   performance : avec `numberOfRuns: 2` et l'agrégation `optimistic` (minimum) qui
   prévalaient, une seule mesure décidait du sort du job. Le passage à
   **3 runs + médiane** est ce qui rend le budget interprétable.
-- **le CLS de /jobs est un défaut réel, mesuré et non corrigé** : 0,1353,
-  identique sur les 3 runs, au-dessus du seuil Lighthouse de 0,1 (le plafond du
-  job est relevé à 0,15 en conséquence, et la raison est écrite dans
-  `lighthouserc.cjs`). Le rapport n'attribue le décalage à aucun nœud ; la piste
-  est le shell pré-rendu de `/jobs` (`jobs.html`), qui ne contient que le
-  bandeau et le titre — la grille de cartes apparaît après le montage React, ce
-  qui déplace le contenu sous elle. Ce défaut était **invisible** jusqu'ici
-  parce que le job n'auditait qu'une URL.
+- **le CLS de /jobs était un défaut réel** : 0,1353 le 16/09/2026, identique
+  sur les 3 runs, au-dessus du seuil Lighthouse de 0,1. Le plafond global avait
+  été relevé à 0,15 en conséquence, ce qui rendait /jobs tolérant à presque
+  n'importe quoi. **Il n'apparaît plus** : 0,0000 sur les 27 runs du 17-18/09, et
+  son budget est désormais 0,01 — l'état d'alors ne passerait plus.
 
 **Ajout du 17/09/2026 — `/register` et `/forgot-password` dans le collect :** les
 deux pages d'auth publiques dont les PR #19 (wrapper `Register` en `min-h-full`,
 CLS 0,0165 → 0,0081 au probe 1280×4000) et #20 (`ForgotPasswordSkeleton`
 calibré, CLS 0,0012 → 0,0000 au probe 412×823) ont corrigé la stabilité de mise
-en page ne figuraient dans **aucune** URL auditée. Leurs budgets sont donc pour
-l'instant ceux du collect commun (CLS ≤ 0,15), ce qui n'attrape qu'un
-**effondrement** : la régression exacte que ces PR ont corrigée (≈ 0,016) y passe
-sans être vue. Un plafond CLS propre à ces deux routes demande `assertMatrix`
-(exclusif de `assertions`/`aggregationMethod` dans `@lhci/cli`) et des valeurs
-**mesurées** — donc un premier relevé des deux pages, qui sera disponible dans le
-rapport Lighthouse uploadé en artifact du prochain run.
+en page ne figuraient dans **aucune** URL auditée. Les ajouter ne suffisait pas :
+elles recevaient le plafond commun (0,15), donc la régression exacte que ces deux
+PR ont corrigée (≈ 0,016) y passait encore sans être vue.
+
+**Correctif du 18/09/2026 — un budget CLS PAR ROUTE (`assertMatrix`) :** le
+plafond global est remplacé par une table **mesurée** — 10 routes, valeurs lues
+dans les rapports Lighthouse réellement archivés (artifacts `lighthouse-reports`
+de 9 jobs de `main` et 8 jobs de PR, 3 runs par page, agrégation par médiane) :
+
+| Route | Valeurs CLS par run (runs) | Budget |
+|---|---|---|
+| `/` | 0,0000 (27 prod + 24 repli local) | 0,01 |
+| `/register` | 0,0088 (27) | **0,015** |
+| `/forgot-password` | 0,0000 (27) | 0,01 |
+| `/login` | 0,0000 (17), 0,1762 (1, non reproduit) | 0,02 |
+| `/how-it-works`, `/support` | 0,0000 (18) | 0,01 |
+| `/jobs` | 0,0000 (27) | 0,01 |
+| `/dashboard`, `/payment`, `/profile` | 0,0450 (18-27) | 0,06 |
+
+`/register` est le point de la passe : à 0,015, la valeur 0,0165 d'avant #19
+**échoue**, à 1,7× au-dessus de sa mesure stable. Les trois marges (1,7× sur
+`/register`, 1,33× sur les trois pages à 0,0450, un cran au-dessus des zéros
+pour `/login` à cause de son run isolé) sont écrites dans
+`frontend/scripts/lhci-cls-budgets.cjs`, avec les compteurs de runs.
+
+Trois propriétés sont tenues par des tests plutôt que par la relecture :
+
+- `assertMatrix` est **exclusif** d'`assertions`/`aggregationMethod` dans
+  `@lhci/utils` ; l'agrégation par médiane est donc portée par chaque entrée, et
+  un retour du plafond global dans `lighthouserc.cjs` est refusé ;
+- chaque page auditée a **son** entrée, et le socle (sans motif) ne porte aucun
+  budget CLS — sinon les deux se cumuleraient et le plus large gagnerait ;
+- une page auditée **sans budget mesuré** fait échouer le **chargement** de la
+  config : elle serait sinon mesurée sans plafond, c'est-à-dire le trou que la
+  passe ferme.
+
+Preuves rejouées sur les 30 rapports **réels** du dernier run de `main`
+(`KOJO_LHCI_BASE_URL=https://kojoforafrica.cc.cd npx lhci assert`, `.lighthouseci/`
+reconstruit depuis l'artifact `lighthouse-reports`) :
+
+```
+30 mesures intactes                  → « All results processed! »  (10 URLs)  exit 0
+/register porté à 0,05 sur 2 runs/3  → « expected: <=0.015  found: 0.05 »     exit 1
+  (le MÊME jeu de mesures sous l'ancien plafond 0,15 : « All results processed » exit 0)
+page auditée sans budget mesuré      → la config LÈVE en la nommant           exit 1
+```
+
+La variable est nécessaire pour rejouer ces lignes : sans `KOJO_LHCI_BASE_URL`,
+lhci retombe sur le repli local (l'accueil seul), donc la matrice ne couvre qu'une
+page.
 
 Un TBT 40× au-dessus de la médiane ou un LCP doublé passent encore au vert :
 la détection d'une régression *relative* exigerait un serveur LHCI, absent. Le
-garde attrape un **effondrement**, et il le fait désormais sur les 10 pages.
+garde attrape un **effondrement**, sauf sur le CLS où il attrape désormais la
+régression fine de chaque page.
 
 ### F2bis — Lighthouse n'auditait qu'UNE page, à cause d'un nom de variable
 
@@ -252,7 +293,10 @@ Corrigé par le renommage `KOJO_LHCI_BASE_URL` / `KOJO_LHCI_AUTH_HEADER` (hors d
 motif capturé par yargs), un garde qui interdit toute variable `LHCI_*` dans la
 configuration et dans le workflow
 (`frontend/scripts/__tests__/check-lhci-env.test.js`), et la première mesure
-réelle des pages auditées (tableau F6).
+réelle des pages auditées (tableau F6). Les budgets CLS par route ont leur propre
+garde, `frontend/scripts/__tests__/lhci-cls-budgets.test.js`, qui demande ses
+verdicts à `getAllAssertionResults` de `@lhci/utils` — le code que le job exécute
+lui-même.
 
 ### F7 — `backend-tests` : deux chemins de production jamais exercés
 

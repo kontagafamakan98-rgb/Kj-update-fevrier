@@ -145,15 +145,22 @@ describe('lighthouserc — sélection des pages auditées', () => {
     expect(Number(m[1])).toBeGreaterThan(Number(m[2]));
   });
 
-  it('documente le plafond CLS relevé et la raison (défaut /jobs)', () => {
+  it('ne déclare plus AUCUN plafond CLS ici : il appartient à sa table par route', () => {
+    // Le plafond CLS GLOBAL (0,15) est ce que la passe du 18/09/2026 a retiré :
+    // il tolérait la régression fine des pages d'auth (0,0165 mesuré sur
+    // /register avant #19). Le réintroduire ici serait un retour en arrière
+    // silencieux — lhci l'accepterait, à côté de la matrice. Les budgets
+    // eux-mêmes sont dans scripts/lhci-cls-budgets.cjs, et c'est
+    // lhci-cls-budgets.test.js qui éprouve leurs verdicts.
     const source = readConfig();
-    expect(source).toMatch(/cumulative-layout-shift': \['error', \{ maxNumericValue: 0\.15 \}\]/);
-    expect(source).toContain('0.1353');
+    expect(source).not.toMatch(/cumulative-layout-shift': \['error'/);
+    expect(source).toMatch(/require\('\.\/scripts\/lhci-cls-budgets\.cjs'\)/);
   });
 
-  it('collecte 3 runs et agrège par médiane', () => {
-    const source = readConfig();
-    expect(source).toMatch(/numberOfRuns:\s*3/);
-    expect(source).toMatch(/aggregationMethod:\s*'median'/);
+  it('collecte 3 runs', () => {
+    // L'agrégation par médiane — indispensable sur un runner partagé — est
+    // portée par CHAQUE entrée de la matrice, donc vérifiée là où la matrice se
+    // construit : scripts/__tests__/lhci-cls-budgets.test.js.
+    expect(readConfig()).toMatch(/numberOfRuns:\s*3/);
   });
 });
