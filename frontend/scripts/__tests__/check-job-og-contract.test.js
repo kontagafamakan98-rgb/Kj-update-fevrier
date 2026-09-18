@@ -18,9 +18,9 @@ import { jobSeo } from '../../src/utils/jobSeo';
 // Tests du garde « contrat app ↔ pré-rendu de /jobs/:id » (hors ligne) :
 //   - le HTML comparé est celui du MODULE DE PRODUCTION (backend/kojo_job_og.py),
 //     pas une fixture écrite ici : un test qui recopierait la forme du HTML
-//     pourrait être vert avec un pré-rendu qui ne la produit plus ;
-//   - chaque moitié du contrat est prouvée capable d'échouer (titre, carte,
-//     variante carrée, description) sur ce même HTML, par mutation d'un seul côté ;
+//     pourrait être vert avec un pré-rendu qui ne la produit plus ;//   - chaque moitié du contrat est prouvée capable d'échouer (titre, carte,
+//     variante carrée, description, canonical) sur ce même HTML, par mutation
+//     d'un seul côté ;
 //   - l'absence d'interpréteur Python est une ERREUR en CI et un simple avis
 //     ailleurs : un garde qui ne s'exécute pas ne garde rien.
 
@@ -78,6 +78,27 @@ describe.skipIf(!hasPrerender)('check-job-og-contract — ce qui doit échouer',
     expect(withoutSquare).not.toBe(realHtml);
     const errors = compareJobOg({ app, html: withoutSquare, base: BASE });
     expect(errors.join('\n')).toMatch(/carte carrée : le pré-rendu annonce « \(absente\) »/);
+  });
+
+  it('détecte une URL de fiche divergente (canonical ET og:url) — des DEUX côtés', () => {
+    // Côté application : c'est le chemin que /jobs/:id annonce au runtime —
+    // celui qui restait figé sur la fiche PRÉCÉDENTE quand l'identifiant
+    // changeait sans remonter le composant (cf. usePageMeta.test.jsx).
+    const appSide = compareJobOg({ app: { ...app, canonicalPath: '/jobs/autre' }, html: realHtml, base: BASE });
+    expect(appSide.join('\n')).toMatch(new RegExp(`canonical : le pré-rendu annonce « ${BASE}/jobs/${FIXTURE_JOB.id} »`));
+    expect(appSide.join('\n')).toMatch(/og:url : le pré-rendu annonce/);
+
+    // Côté pré-rendu : une balise ABSENTE doit être nommée, pas confondue avec
+    // une comparaison vide (le pré-rendu d'avant ne portait pas de canonical).
+    const withoutCanonical = realHtml.replace(/\s*<link rel="canonical"[^>]*\/>/, '');
+    expect(withoutCanonical).not.toBe(realHtml);
+    expect(compareJobOg({ app, html: withoutCanonical, base: BASE }).join('\n'))
+      .toMatch(/canonical : le pré-rendu annonce « \(absent\) »/);
+
+    const withoutOgUrl = realHtml.replace(/\s*<meta property="og:url"[^>]*\/>/, '');
+    expect(withoutOgUrl).not.toBe(realHtml);
+    expect(compareJobOg({ app, html: withoutOgUrl, base: BASE }).join('\n'))
+      .toMatch(/og:url : le pré-rendu annonce « \(absente\) »/);
   });
 
   it('détecte une description coupée à un autre endroit', () => {

@@ -14,7 +14,7 @@ import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
 import { JobDetailsSkeleton } from '../components/SkeletonLoader';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
-import { usePageTitle, usePageOpenGraph, ogImageUrl } from '../utils/seo';
+import { usePageTitle, usePageOpenGraph, absoluteUrl } from '../utils/seo';
 import { jobSeo } from '../utils/jobSeo';
 import {
   extractProposalId,
@@ -167,7 +167,11 @@ export default function JobDetails() {
   // chargement, seule la carte est connue (l'identifiant EST dans l'URL), donc
   // elle est annoncée dès le premier rendu.
   const seo = jobSeo(job || { id });
-  usePageTitle(seo.title || t('jobDetailsTitleFallback'));
+  // `canonicalPath` : la fiche change d'identifiant SANS remonter le composant,
+  // donc l'URL de la page doit venir du rendu courant — sinon le canonical
+  // reste posé sur la mission précédente (Google consolide alors la nouvelle
+  // vers l'ancienne).
+  usePageTitle(seo.title || t('jobDetailsTitleFallback'), { canonicalPath: seo.canonicalPath });
   // OG dynamique : un lien /jobs/:id partagé (WhatsApp, Facebook) montre le
   // titre et la description réels de la mission au lieu du texte générique.
   usePageOpenGraph({
@@ -175,10 +179,14 @@ export default function JobDetails() {
     description:
       seo.description ||
       'Trouvez des services et travailleurs en Afrique de l\'Ouest : plomberie, électricité, mécanique, construction.',
+    // L'URL partagée EST celle de la fiche (le canonical, la même valeur) :
+    // laissée au défaut du hook, elle serait relue à chaque rejeu d'effet — donc
+    // juste tant que le titre change d'une mission à l'autre.
+    url: seo.canonicalPath ? absoluteUrl(seo.canonicalPath) : undefined,
     // Carte OG DYNAMIQUE générée par le backend (Pillow) : PNG 1200x630 avec
     // le TITRE RÉEL de la mission. Le rewrite Vercel /api/* → Fly achemine
     // l'appel ; le crawler récupère une vraie image (pas une data: URL).
-    image: seo.card ? ogImageUrl(seo.card) : undefined,
+    image: seo.card ? absoluteUrl(seo.card) : undefined,
   });
 
   useEffect(() => {

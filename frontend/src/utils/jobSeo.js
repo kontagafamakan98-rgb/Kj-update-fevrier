@@ -24,10 +24,11 @@
  *   parce que la carte ne dépend pas du chargement (l'identifiant de la route
  *   suffit). Les autres champs valent alors '' : une fiche sans titre n'annonce
  *   pas de titre.
- * @returns {{title: string, description: string, card: string}} Titre et
- *   description prêts à publier (chaîne vide = rien à annoncer, l'appelant garde
- *   alors son texte de repli), et le CHEMIN de la carte (l'URL absolue est
- *   ajoutée par ogImageUrl — les crawlers l'exigent).
+ * @returns {{title: string, description: string, card: string, canonicalPath: string}}
+ *   Titre et description prêts à publier (chaîne vide = rien à annoncer,
+ *   l'appelant garde alors son texte de repli), le CHEMIN de la carte (l'URL
+ *   absolue est ajoutée par absoluteUrl — les crawlers l'exigent) et le CHEMIN
+ *   canonique de la fiche.
  */
 export const jobSeo = (job) => {
   const title = (job && job.title) || '';
@@ -41,5 +42,13 @@ export const jobSeo = (job) => {
       ? `${description.slice(0, 150)}${description.length > 150 ? '…' : ''}`
       : '',
     card: job && job.id ? `/api/og/jobs/${job.id}.png` : '',
+    // L'URL canonique de la fiche — la même pour le pré-rendu (kojo_job_og.py)
+    // et pour le contrat hors ligne (scripts/check-job-og-contract.js). Elle ne
+    // dépend pas du chargement (l'identifiant EST dans la route), donc la page
+    // l'annonce dès le premier rendu : sans cela, /jobs/:id garderait le
+    // canonical « / » d'index.html jusqu'à l'arrivée de la mission — et, en
+    // changeant d'identifiant sans remonter le composant, celui de la mission
+    // précédente.
+    canonicalPath: job && job.id ? `/jobs/${job.id}` : '',
   };
 };

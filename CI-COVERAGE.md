@@ -611,10 +611,10 @@ application  src/utils/jobSeo.js              → le titre, la description et la
 ```
 
 Puis l'égalité est exigée sur le titre (`<title>`, `og:title`, `twitter:title`),
-la description (les quatre balises, coupe à 150 caractères + « … » comprise) et la
+la description (les quatre balises, coupe à 150 caractères + « … » comprise), la
 carte (`og:image` wide **et** carrée, `twitter:image`) — la carrée étant dérivée
 de la carte de l'APPLICATION, pour qu'un renommage d'un seul côté fasse échouer
-les deux assertions.
+les deux assertions — et l'URL de la page, `canonical` et `og:url` (F11).
 
 Deux points de méthode que l'exécution a imposés :
 
@@ -629,11 +629,41 @@ Deux points de méthode que l'exécution a imposés :
 
 **Preuves** : le dépôt est vert (`runJobOgContractCheck` → 0 erreur, mission
 réelle) ; les mutations sont exercées par `scripts/__tests__/check-job-og-contract.test.js`
-(10 tests) sur le HTML du **module de production** — titre renommé d'un côté,
+(11 tests) sur le HTML du **module de production** — titre renommé d'un côté,
 carte renommée, variante carrée retirée, description coupée d'un caractère de
-plus, mission sans annonce côté application —, et un interpréteur absent est une
+plus, canonical divergent ou absent, mission sans annonce côté application —, et
+un interpréteur absent est une
 **erreur en CI** (::notice hors CI, un poste sans Python ne devant pas voir rouge
 pour cette seule raison).
+
+### F11 — Le `canonical` d'une fiche mission restait figé sur la fiche précédente — **fermé le 18/09/2026**
+
+`usePageTitle` posait le canonical **au montage** (`useEffect(…, [])`) en lisant
+`window.location.pathname`. Cela suffit pour les routes statiques — changer de
+route remonte le composant. `/jobs/:id` est la seule route DYNAMIQUE : passer à
+une autre fiche ne remonte rien (seul le paramètre change), donc le
+`<link rel="canonical">` restait posé sur la **première** fiche ouverte.
+Conséquence : Google consolide la fiche réellement consultée vers une autre
+adresse, c'est-à-dire fait sortir de l'index celle que le visiteur vient de voir.
+Invisible partout ailleurs : titre, description, carte et `og:url` suivaient, eux,
+le rendu courant.
+
+Le chemin canonique vient désormais du rendu courant : `src/utils/jobSeo.js`
+l'expose (`canonicalPath` — la même URL que celle du pré-rendu, à côté du titre, de
+la description et de la carte, tous dérivés du même identifiant), `JobDetails.js`
+le passe au hook, et `usePageOpenGraph` reçoit la même valeur pour `og:url` (laissée
+au défaut, elle était relue à chaque rejeu d'effet — donc juste tant que le titre
+changeait d'une mission à l'autre). Le garde hors ligne de F10 compare maintenant
+les deux balises au HTML du pré-rendu.
+
+**Preuves** : `src/utils/__tests__/usePageMeta.test.jsx` rend la fiche sur
+`/jobs/<A>` puis la `rerender` sur `/jobs/<B>` **sans démontage** — le canonical
+doit suivre ; sous la version d'avant (canonical posé au montage), ce test échoue
+(`expected …/jobs/aaaa1111… to be …/jobs/dddd6666…`) et passe après restauration à
+l'octet. Côté garde : la balise `canonical` du **module de production** pointée sur
+une autre fiche fait échouer le contrat (`exit 1`, écart nommé), restauration
+vérifiée par `cmp` ; les mutations pures (chemin applicatif changé, `canonical`
+absent, `og:url` absente) sont dans `scripts/__tests__/check-job-og-contract.test.js`.
 
 ## 4. Gardes jamais prouvés
 
@@ -646,7 +676,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
-| `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 5 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, annonce applicative vide), et l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
+| `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide), et l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète) |

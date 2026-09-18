@@ -123,7 +123,7 @@ const cleanTree = (extraCards = []) => {
   write(
     'src/pages/JobDetails.js',
     'import { usePageOpenGraph } from "../utils/seo";\n' +
-      'usePageOpenGraph({\n  title: job?.title,\n  image: id ? ogImageUrl(`/api/og/jobs/${id}.png`) : undefined,\n});\n'
+      'usePageOpenGraph({\n  title: job?.title,\n  image: id ? absoluteUrl(`/api/og/jobs/${id}.png`) : undefined,\n});\n'
   );
   write(
     'src/App.js',
@@ -168,7 +168,7 @@ describe('check-page-meta — le cas sain', () => {
 describe('check-page-meta — règle A (aucune déclaration hors table)', () => {
   it('échoue quand une page écrit une carte en dur', () => {
     cleanTree();
-    write('src/pages/Jobs.js', "image: ogImageUrl('/og-login.png'),\n");
+    write('src/pages/Jobs.js', "image: absoluteUrl('/og-login.png'),\n");
 
     const result = run();
 

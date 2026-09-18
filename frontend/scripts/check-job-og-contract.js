@@ -25,7 +25,9 @@
  *
  * Puis il exige l'égalité — titre, description, carte — et la présence des deux
  * cartes du pré-rendu (la variante carrée que les réseaux qui recadrent en 1:1
- * lisent).
+ * lisent). L'URL de la page est comparée aussi (`canonical` et `og:url`) : c'est
+ * celle que le crawler retient comme la bonne, donc elle divergerait du HTML
+ * servi exactement de la même façon qu'un titre.
  *
  * INTERPRÉTEUR : le module étant sans dépendance, n'importe quel Python convient
  * (venv du dépôt, `python3`, `python`). En CI, l'image du runner en fournit un —
@@ -41,7 +43,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { jobSeo } from '../src/utils/jobSeo.js';
-import { metaContent, metaContents } from './site-meta.js';
+import { canonicalHref, metaContent, metaContents } from './site-meta.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = path.resolve(FRONTEND_DIR, '..');
@@ -153,7 +155,7 @@ export const htmlTitle = (html) => decodeEntities((/<title>([^<]*)<\/title>/i.ex
  * dépôt.
  *
  * @param {object} options
- * @param {{title: string, description: string, card: string}} options.app Valeur de `jobSeo`.
+ * @param {{title: string, description: string, card: string, canonicalPath: string}} options.app Valeur de `jobSeo`.
  * @param {string} options.html HTML pré-rendu de la MÊME mission.
  * @param {string} options.base Origine servant le pré-rendu (`https://…`).
  * @returns {string[]} Problèmes trouvés (vide = contrat tenu).
@@ -203,6 +205,24 @@ export const compareJobOg = ({ app, html, base }) => {
   if (twitterImage !== expectedWide) {
     errors.push(`twitter:image : le pré-rendu annonce « ${twitterImage} », l'application « ${expectedWide} »`);
   }
+  // L'URL de la page — canonical (l'adresse sous laquelle elle demande à être
+  // indexée) et og:url (celle que le réseau social affiche) : la MÊME des deux
+  // côtés. Le pré-rendu la construit sur la route (kojo_job_og.py),
+  // l'application sur l'identifiant affiché (src/utils/jobSeo.js) — un écart
+  // ferait indexer ou partager la fiche sous une autre adresse que celle ouverte.
+  const expectedUrl = app.canonicalPath ? `${base}${app.canonicalPath}` : '';
+  if (!expectedUrl) {
+    errors.push("l'application n'annonce AUCUNE URL canonique pour cette mission");
+  } else {
+    const canonical = canonicalHref(html);
+    if (canonical !== expectedUrl) {
+      errors.push(`canonical : le pré-rendu annonce « ${canonical || '(absent)'} », l'application « ${expectedUrl} »`);
+    }
+    const ogUrl = decodeEntities(metaContent(html, 'og:url'));
+    if (ogUrl !== expectedUrl) {
+      errors.push(`og:url : le pré-rendu annonce « ${ogUrl || '(absente)'} », l'application « ${expectedUrl} »`);
+    }
+  }
   return errors;
 };
 
@@ -249,6 +269,7 @@ export const runJobOgContractCheck = (opts = {}) => {
   checked.push(`  titre            « ${app.title} »`);
   checked.push(`  description      ${app.description.length} caractères, coupe et « … » des deux côtés`);
   checked.push(`  carte            ${base}${app.card} + variante carrée -square.png`);
+  checked.push(`  canonical/og:url ${base}${app.canonicalPath}`);
   checked.push('  og:/twitter:     titre et description identiques sur les quatre balises');
 
   if (errors.length > 0) {
@@ -264,8 +285,8 @@ export const runJobOgContractCheck = (opts = {}) => {
 
   log(checked.join('\n'));
   log(
-    `✅ Contrat /jobs/:id tenu hors ligne : titre, description et carte identiques entre ` +
-      `l'application et le pré-rendu (aucun serveur, aucune base de données).`
+    `✅ Contrat /jobs/:id tenu hors ligne : titre, description, carte, canonical et og:url ` +
+      `identiques entre l'application et le pré-rendu (aucun serveur, aucune base de données).`
   );
   return { ok: true, errors, notices, checked, python };
 };
