@@ -4,18 +4,25 @@ import { pageMetaKeys } from '../config/page-meta';
 import { useLanguage } from '../contexts/LanguageContext';
 
 // SEO par route (SPA) : met à jour document.title, la meta description ET le
-// <link rel="canonical"> quand le composant monte.
+// <link rel="canonical"> au rendu — et le suit quand la route change de DONNÉE
+// sans changer de chemin (/jobs/:A → /jobs/:B).
 //
 // IMPORTANT : le canonical statique d'index.html pointe vers "/" pour TOUTES
 // les routes — Google consoliderait sinon chaque page vers la home. Ce hook
 // le remplace par l'URL réelle de la route courante (origin + pathname), ce
 // qui corrige l'indexation des pages publiques comme /how-it-works.
-// Limite connue : un crawler sans JavaScript voit encore le canonical "/"
-// (le HTML initial n'est pas pré-rendu par route).
+// Limite connue : un crawler sans JavaScript voit le canonical "/" sur les routes
+// qui ne sont pas pré-rendues ; les coquilles statiques et la fiche mission
+// (/jobs/:id) sont servies pré-rendues, avec leur propre canonical.
 
-const getCurrentUrl = () => {
-  if (typeof window === 'undefined') return '';
-  return `${window.location.origin}${window.location.pathname}`;
+// URL ABSOLUE d'un chemin servi par le site (origine + chemin). Sans argument :
+// la route COURANTE. Les crawlers de partage (LinkedIn, Facebook, Twitter,
+// WhatsApp) refusent une URL relative dans og:image — une URL relative serait
+// ignorée ou résolue de façon incohérente — et le canonical de la route
+// courante s'écrit de la même façon.
+export const absoluteUrl = (path = '') => {
+  if (typeof window === 'undefined' || !window.location.origin) return path;
+  return `${window.location.origin}${path || window.location.pathname}`;
 };
 
 const ensureCanonical = () => {
@@ -38,7 +45,7 @@ const ensureMetaDescription = () => {
   return meta;
 };
 
-export const usePageTitle = (title, { description } = {}) => {
+export const usePageTitle = (title, { description, canonicalPath } = {}) => {
   // Titre
   useEffect(() => {
     if (!title) return undefined;
@@ -60,40 +67,29 @@ export const usePageTitle = (title, { description } = {}) => {
     };
   }, [description]);
 
-  // Canonical par route : corrige le canonical statique "/" d'index.html. Une
-  // seule URL est possible — celle de la route courante — donc ce hook ne prend
-  // aucun paramètre : une page ne peut pas déclarer le canonical d'une autre.
-  // Limite connue : posé au montage du composant, il ne suit pas un changement
-  // d'identifiant DANS la même route (/jobs/:id → /jobs/:autre).
+  // Canonical par route : corrige le canonical statique "/" d'index.html.
+  //
+  // `canonicalPath` : une route DYNAMIQUE (/jobs/:id) change d'identifiant sans
+  // remonter le composant, donc la route courante lue au montage devient fausse
+  // — le canonical restait figé sur la fiche PRÉCÉDENTE, et Google consolidait
+  // la nouvelle vers l'ancienne. Le chemin vient donc du rendu courant, et
+  // l'effet le suit. Sans paramètre (routes statiques), l'URL de la route
+  // courante suffit : le montage y coïncide avec la navigation.
   useEffect(() => {
-    const url = getCurrentUrl();
+    const url = absoluteUrl(canonicalPath);
     if (!url) return undefined;
     ensureCanonical().setAttribute('href', url);
     return undefined;
-  }, []);
-};
-
-// Image OG par page, servie depuis le dossier public/. On renvoie une URL
-// ABSOLUE (origine + chemin) : les crawlers de partage (LinkedIn, Facebook,
-// Twitter, WhatsApp) exigent une URL complète dans og:image — une URL
-// relative serait ignorée ou résolue de façon incohérente.
-export const ogImageUrl = (path) => {
-  if (typeof window !== 'undefined' && window.location.origin) {
-    return `${window.location.origin}${path}`;
-  }
-  return path;
+  }, [canonicalPath]);
 };
 
 // Carte OG d'une route, lue dans la table UNIQUE (src/config/og-cards.js) — la
 // même que celle des coquilles pré-rendues. Sans argument, elle suit la route
 // COURANTE : une page ne peut donc pas annoncer la carte d'une autre route, et
 // changer une carte se fait à un seul endroit (le shell et le runtime suivent).
-const ogCardUrl = (route) => ogImageUrl(ogCardFor(route).image);
+const ogCardUrl = (route) => absoluteUrl(ogCardFor(route).image);
 
-const DEFAULT_OG_IMAGE =
-  typeof window !== 'undefined' && window.location.origin
-    ? `${window.location.origin}/icons/icon-512x512.png`
-    : '/icons/icon-512x512.png';
+const DEFAULT_OG_IMAGE = absoluteUrl('/icons/icon-512x512.png');
 
 const ensureMeta = (selector, attr, value) => {
   let meta = document.querySelector(selector);
@@ -129,7 +125,7 @@ export const usePageOpenGraph = ({
       'og:title': title,
       'og:description': description || '',
       'og:image': image || DEFAULT_OG_IMAGE,
-      'og:url': url || getCurrentUrl(),
+      'og:url': url || absoluteUrl(),
       'twitter:title': title,
       'twitter:description': description || '',
       'twitter:image': image || DEFAULT_OG_IMAGE,

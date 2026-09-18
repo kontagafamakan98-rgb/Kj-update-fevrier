@@ -12,7 +12,8 @@ import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { LanguageProvider } from '../../contexts/LanguageContext';
-import { usePageMeta } from '../seo';
+import { usePageMeta, usePageTitle } from '../seo';
+import { jobSeo } from '../jobSeo';
 import { PAGE_META } from '../../config/page-meta';
 import { ogCardFor } from '../../config/og-cards';
 import fr from '../../i18n/fr.json';
@@ -21,6 +22,8 @@ const content = (key) => {
   const el = document.querySelector(`meta[name="${key}"], meta[property="${key}"]`);
   return el ? el.getAttribute('content') || '' : '';
 };
+
+const canonical = () => document.querySelector('link[rel="canonical"]')?.getAttribute('href') || '';
 
 const Announce = () => {
   usePageMeta();
@@ -72,8 +75,31 @@ describe('usePageMeta — le runtime annonce la table', () => {
 
     expect(content('og:image')).toBe(`${window.location.origin}${ogCardFor('/login').image}`);
     expect(content('twitter:image')).toBe(`${window.location.origin}${ogCardFor('/login').image}`);
-    const canonical = document.querySelector('link[rel="canonical"]');
-    expect(canonical?.getAttribute('href')).toBe(`${window.location.origin}/login`);
+    expect(canonical()).toBe(`${window.location.origin}/login`);
+  });
+
+  it('suit un changement d’identifiant DANS la même route (/jobs/:id → /jobs/:autre)', () => {
+    // React Router ne remonte PAS la page quand seul le paramètre change : le
+    // canonical doit donc venir du rendu courant. Posé une fois au montage, il
+    // restait sur la fiche PRÉCÉDENTE, et Google consolidait la nouvelle vers
+    // l'ancienne — la fiche réellement consultée sortait de l'index.
+    const premiere = 'aaaa1111-bbbb-4222-8333-cccc44445555';
+    const seconde = 'dddd6666-eeee-4777-8888-ffff99990000';
+    window.history.replaceState({}, '', `/jobs/${premiere}`);
+    const { rerender } = render(
+      <LanguageProvider>
+        <JobRoute id={premiere} />
+      </LanguageProvider>
+    );
+    expect(canonical()).toBe(`${window.location.origin}/jobs/${premiere}`);
+
+    window.history.replaceState({}, '', `/jobs/${seconde}`);
+    rerender(
+      <LanguageProvider>
+        <JobRoute id={seconde} />
+      </LanguageProvider>
+    );
+    expect(canonical()).toBe(`${window.location.origin}/jobs/${seconde}`);
   });
 
   it('ne touche à RIEN pour une route absente de la table', () => {
@@ -102,5 +128,12 @@ describe('usePageMeta — le runtime annonce la table', () => {
 
 const JobMeta = () => {
   usePageMeta({ title: 'Réparation ordinateur — Kojo', description: 'Mission à Bamako' });
+  return <div>mission</div>;
+};
+
+/** La fiche mission telle que JobDetails la câble : seo → canonicalPath. */
+const JobRoute = ({ id }) => {
+  const seo = jobSeo({ id });
+  usePageTitle(seo.title || 'Mission — Kojo', { canonicalPath: seo.canonicalPath });
   return <div>mission</div>;
 };
