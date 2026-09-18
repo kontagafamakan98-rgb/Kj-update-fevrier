@@ -95,6 +95,115 @@ fly secrets set \
   ```
   Le client Redis se ré-initialise paresseusement si Redis était brièvement
   down au boot (plus besoin de redéployer pour le récupérer).
+- 📧 **Expéditeur transactionnel SUR LE DOMAINE** : `BREVO_SENDER_EMAIL` doit
+  valoir une adresse du domaine (`noreply@kojoforafrica.cc.cd`), jamais une
+  adresse Gmail. Brevo envoie sous l'identité déclarée dans le payload : une
+  adresse Gmail n'applique ni SPF, ni DKIM, ni DMARC du domaine (d'où les
+  emails en spam).
+
+  Le domaine porte **quatre** enregistrements, tous publiés chez DNSHE. Brevo
+  ne distribue plus une clé DKIM en TXT : il donne deux **CNAME** vers sa
+  propre infrastructure, qui sert la clé publique (et permet de la faire
+  tourner sans republier d'enregistrement) :
+
+  | Nom | Type | Valeur |
+  |---|---|---|
+  | `@` | TXT | `v=spf1 include:spf.brevo.com ~all` |
+  | `brevo1._domainkey` | CNAME | `b1.kojoforafrica-cc-cd.dkim.brevo.com` |
+  | `brevo2._domainkey` | CNAME | `b2.kojoforafrica-cc-cd.dkim.brevo.com` |
+  | `@` | TXT | `brevo-code:a433622abb3dee4d75550ea815ebca1e` |
+  | `_dmarc` | TXT | `v=DMARC1; p=quarantine; pct=10; rua=mailto:rua@dmarc.brevo.com` |
+
+  Les valeurs exactes se relisent avec
+  `GET https://api.brevo.com/v3/senders/domains/kojoforafrica.cc.cd`
+  (en-tête `api-key`) — jamais de mémoire, Brevo les régénère par compte.
+
+  ⚠️ **Un script qui appelle Brevo (ou l'API DNSHE) doit poser un `User-Agent`
+  explicite** : Cloudflare protège les deux et répond
+  `403 browser_signature_banned` (erreur 1010) à la signature d'`urllib`. Le
+  backend, lui, utilise `requests` et passe — d'où un symptôme qui n'apparaît
+  que dans les outils d'exploitation, jamais en production.
+
+  ⚠️ **L'ordre compte** : publier SPF + DKIM + `brevo-code`, **authentifier le
+  domaine dans Brevo** (`PUT /senders/domains/{domaine}/authenticate`), ajouter
+  l'expéditeur (`POST /senders`), et seulement ensuite changer
+  `BREVO_SENDER_EMAIL` sur Fly. Brevo refuse d'envoyer depuis un expéditeur non
+  vérifié : dans l'autre sens, la bascule coupe les emails de production (OTP,
+  resets, reçus).
+  Vérifier aussi `PASSWORD_RESET_FROM_EMAIL` — quand il est posé, il ÉCRASE
+  l'expéditeur (`sender_email = PASSWORD_RESET_FROM_EMAIL or BREVO_SENDER_EMAIL`).
+
+  🪜 **La politique DMARC monte par paliers**, publiés et datés par
+  `backend/scripts/dmarc_policy.py`. Un saut direct à `p=quarantine`
+  déciderait sur une impression : il suffit d'un expéditeur légitime oublié
+  (une adresse « Envoyer en tant que » dans une boîte, un outil qui signe sans
+  DKIM aligné) pour envoyer ses messages en quarantaine sans que personne ne le
+  voie avant la plainte d'un utilisateur.
+
+  | Étape | Record publié | Durée minimale dans l'étape |
+  |---|---|---|
+  | `observe` | `p=none` | aucune |
+  | `canary` | `p=quarantine; pct=10` | 7 jours |
+  | `half` | `p=quarantine; pct=50` | 3 jours |
+  | `full` | `p=quarantine` | — |
+
+  ```bash
+  export DNSHE_API_KEY=… DNSHE_API_SECRET=…        # API Management du domaine
+  python backend/scripts/dmarc_policy.py show      # état réel + ce qui est permis
+  python backend/scripts/dmarc_policy.py ramp      # palier suivant (refusé si trop tôt)
+  python backend/scripts/dmarc_policy.py rollback  # ⏪ retour immédiat à p=none
+  ```
+
+  État déployé le 18/09/2026 : étape **`canary`** (`p=quarantine; pct=10`), TTL
+  ramené à **300 s** — c'est lui qui borne le temps de retour arrière.
+
+  ⚠️ `pct` est déprécié par DMARCbis et certains récepteurs l'ignorent : pour
+  eux, `pct=10` vaut `p=quarantine` plein. D'où l'observation à chaque palier —
+  et d'où `rollback`.
+
+  **Revenir en arrière si un mail légitime est touché** : `rollback` republie
+  `p=none` sans délai, garde `rua` en place pour continuer à recevoir les
+  rapports pendant le diagnostic, et note la nouvelle date. À savoir :
+  `p=quarantine` met en **quarantaine**, il ne rejette pas — le message reste
+  récupérable dans le dossier « spam » du destinataire, et c'est ce signal qui
+  déclenche le retour arrière.
+
+  L'horloge du délai vit dans `backend/scripts/dmarc_policy.state.json` :
+  **l'API DNSHE n'horodate pas ses enregistrements** (aucun `created_at` ni
+  `updated_at` sur un TXT listé), donc le record ne peut pas dire depuis quand
+  il est en place. Si cet état ne décrit pas l'étape constatée, `ramp` REFUSE de
+  monter plutôt que de supposer qu'on a observé — `rollback` repart alors d'une
+  étape datée.
+
+  🧪 **Vérifier, plutôt que supposer** — `.github/scripts/check-email-auth.py`
+  (job `fly-env-drift`, `main` uniquement) envoie un OTP via l'API de
+  PRODUCTION vers un alias Gmail dédié (`boîte+kojo-probe-<jeton>@gmail.com`),
+  puis lit l'en-tête `Authentication-Results` que Gmail pose à la RÉCEPTION et
+  échoue si `spf`, `dkim` ou `dmarc` n'est pas `pass`. C'est elle qui fournit la
+  preuve attendue avant chaque `ramp` ci-dessus : un palier ne se monte pas sur
+  une impression, mais sur des verdicts lus chez un vrai récepteur.
+
+  Pourquoi une boîte réelle : une boîte jetable reçoit le message mais
+  n'enregistre AUCUN verdict (mesuré sur mail.tm : zéro `Authentication-Results`,
+  zéro `Received-SPF`), et recalculer DKIM sur la copie reçue est impossible —
+  le récepteur réécrit le corps, donc le `bh` signé ne correspond plus à celui
+  qu'on recalcule. L'octet signé n'existe qu'à la réception.
+
+  Deux secrets GitHub l'activent — **et seulement GitHub** : les ajouter à
+  `.env.example` les rendrait obligatoires sur Fly (`check-fly-env-drift.py`
+  exige que toute clé de `.env.example` soit déployée) :
+
+  | Secret | Valeur |
+  |---|---|
+  | `KOJO_PROBE_IMAP_USER` | adresse de la boîte de test (ex. `kojoapp98@gmail.com`) |
+  | `KOJO_PROBE_IMAP_PASSWORD` | **mot de passe d'application** Gmail (Compte Google → Sécurité → Mots de passe des applications ; validation en deux étapes requise) |
+
+  Sans ces secrets, la sonde publie une `::notice` « NON EXÉCUTÉE » et sort en
+  0 : un run qui n'a rien vérifié se lit comme tel. Avec eux, une boîte
+  injoignable ou un verdict non `pass` font échouer le job — volontairement.
+- 📬 **`BREVO_REPLY_TO_EMAIL`** (optionnel, défaut `kojoapp98@gmail.com`) :
+  boîte qui reçoit les RÉPONSES, l'adresse d'envoi du domaine n'ayant pas de
+  boîte. La vider désactive l'en-tête (les réponses repartent à l'expéditeur).
 - Optionnels : `SENTRY_DSN`, `PAYMENT_COMMISSION_RATE`,
   `EMAIL_OTP_*`, `CORS_ORIGINS`, `TRUSTED_HOSTS` (pour un domaine
   personnalisé type `api.kojo.app`).
@@ -204,6 +313,11 @@ Prérequis (une seule fois) :
    ```
 2. L'ajouter comme secret du dépôt GitHub : **Settings → Secrets and
    variables → Actions → New repository secret** → nom `FLY_API_TOKEN`.
+
+Le dépôt porte deux autres secrets, pour la sonde email (jamais des variables
+Fly, cf. la section « Expéditeur transactionnel ») : `KOJO_PROBE_IMAP_USER` et
+`KOJO_PROBE_IMAP_PASSWORD`. Tant qu'ils manquent, le job `fly-env-drift` reste
+vert en PUBLIANT que l'authentification email n'a pas été vérifiée.
 
 Détails : build distant (`--remote-only`, pas de Docker sur le runner),
 `needs: backend-tests` + filtre `dorny/paths-filter` sur `backend/**`,

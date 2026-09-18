@@ -100,10 +100,11 @@ SENSITIVE_KEYS = {
 # EMAIL_OTP_*), soit la fonctionnalité est désactivée sans elles (SENTRY_DSN,
 # GMAIL_* legacy déprécié au profit de Brevo, REDIS_URL → mémoire, CORS_ORIGINS
 # → défauts du code), soit ce sont des alias (FAMAKAN_OWNER_EMAIL,
-# PASSWORD_RESET_FROM_EMAIL).
+# PASSWORD_RESET_FROM_EMAIL, BREVO_REPLY_TO_EMAIL — optionnelle avec un défaut
+# non vide dans le code, donc posable sans être exigée).
 OPTIONAL_KEYS = {
     "SENTRY_DSN", "PAYMENT_COMMISSION_RATE", "CORS_ORIGINS", "REDIS_URL",
-    "BREVO_SENDER_NAME",
+    "BREVO_SENDER_NAME", "BREVO_REPLY_TO_EMAIL",
     "EMAIL_OTP_EXPIRY_MINUTES", "EMAIL_OTP_MAX_ATTEMPTS",
     "EMAIL_OTP_RESEND_COOLDOWN_SECONDS", "EMAIL_VERIFICATION_TOKEN_MINUTES",
     "GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN",

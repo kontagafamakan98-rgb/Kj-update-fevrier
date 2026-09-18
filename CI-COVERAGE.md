@@ -591,6 +591,16 @@ chaque PR vers `main` (sauf mention contraire).
   migration de domaine à moitié faite est nommée dans le journal. Aucun échec,
   jamais — une configuration incomplète est un fait d'exploitation, pas une
   régression. Cf. F9.
+- L'**authentification du domaine pour l'email** (SPF, DKIM, DMARC) est
+  vérifiée sur un message RÉELLEMENT reçu, sur `main` uniquement
+  (`.github/scripts/check-email-auth.py`, job `fly-env-drift`) : un OTP part par
+  l'API de production vers un alias Gmail dédié, et la sonde lit
+  l'`Authentication-Results` que Gmail pose à la réception. Une boîte jetable ne
+  convient pas — elle n'écrit aucun verdict (mesuré sur mail.tm), et recalculer
+  DKIM sur la copie reçue est impossible puisque le récepteur réécrit le corps.
+  Sans les secrets `KOJO_PROBE_IMAP_*`, la sonde publie une `::notice` et sort
+  en 0 (elle dit qu'elle n'a PAS vérifié) ; avec eux, un verdict non `pass`
+  fait rougir le job.
 
 **Références et configuration**
 - Formats des variables critiques dans `fly.toml [env]`, `.env.example` et
@@ -616,6 +626,7 @@ chaque PR vers `main` (sauf mention contraire).
 | Docker Hub | service `mongo:7` | `backend-tests` rouge (service non démarré) |
 | GitHub Actions (marketplace) | `checkout@v4`, `setup-python@v5`, `setup-node@v4`, `setup-java@v4`, `upload-artifact@v4`, `setup-android@v3`, `paths-filter@v3`, `flyctl-actions/setup-flyctl@<SHA>` | Job rouge. Plus aucune référence de **branche** : `actionlint` était déjà épinglé (`v1.7.12`), `setup-flyctl` valait `@master` et est désormais épinglé sur un **SHA** (= tag `v1`, runtime node24) ; les autres restent des tags de version flottants (`@v4`), vérifiés par `check-workflow-pins.py` |
 | API Fly (`api.machines.dev`, `flyctl secrets list`, `flyctl ssh`) | `fly-env-drift` | Rouge (volontaire : échec bruyant plutôt que saut silencieux) |
+| Gmail IMAP (`imap.gmail.com`) + API de production | `fly-env-drift`, sonde email (main only) | Rouge si la boîte est injoignable ou si un verdict n'est pas `pass` (volontaire : une vérification qui ne peut pas s'exécuter doit se voir). **Sans** les secrets `KOJO_PROBE_IMAP_*`, la sonde s'annule en publiant une `::notice` — elle ne sort jamais verte sans avoir rien lu |
 | API GitHub (commentaires de PR) | `resolve-vercel-url.sh` | **Bascule silencieuse en F2** (repli build local), borné par `--max-time 20 --retry 2` |
 | Vercel (preview + Deployment Protection) | idem | **F2** également : preview protégée ⇒ repli local |
 | Backend de production (`api.kojoforafrica.cc.cd`) | `ci-auth`, `check-og-images`, `check-og-job-200` | Rouge (le login du compte CI échoue) |
