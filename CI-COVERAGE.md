@@ -703,6 +703,53 @@ réels — page qui n'annonce rien, page qui déclare son texte elle-même, plus
 violations nommées d'un coup — et qu'**aucun artefact n'est requis** : l'arbre de
 test est joué sans `build/`, exactement ce que la CI ne pouvait pas faire.
 
+### F13 — Une route ni publique ni privée passait en silence — **fermé le 18/09/2026**
+
+`check-spa-routes.js` tenait sa liste de routes privées **écrite à la main**
+(`PRIVATE_ROUTES` : `/dashboard`, `/messages`, …) et n'en vérifiait que
+l'intersection avec `src/App.js`. Une page ajoutée à l'application et oubliée
+dans cette liste n'appartenait donc à **aucun** des deux ensembles : servie par
+`app.html` — le gabarit nu, dont la coquille porte
+`<meta name="robots" content="index, follow">` — sans `X-Robots-Tag`, donc
+indexable sous le titre neutre « Kojo » et vide de contenu. Rien ne le disait.
+
+**Mesuré avant le correctif** : une route `/nouvelle-page` ajoutée à
+`src/App.js` et routée vers `/app.html` (les deux formes) laissait le garde en
+`exit 0` — `✅ Routage verrouillé … 19 routes React de production routées`.
+
+La liste **dérive** maintenant du routage (`privateRoutesOf(routes, rewrites)`) :
+est publique une route dont les textes sont déclarés dans
+`src/config/page-meta.js` (le build lui écrit sa coquille) **ou** qu'un rewrite
+envoie au **backend**, qui la pré-rend (la fiche `/jobs/:id`) ; privée, tout le
+reste — c'est-à-dire servie par `app.html`, donc tenue au noindex. Ajouter une
+page oblige désormais à **choisir**, et le message nomme les deux issues.
+
+**Preuves** (sur le dépôt réel, chaque fichier restauré à l'octet et vérifié par
+`cmp`) :
+
+```
+/nouvelle-page dans App.js, servie par /app.html, aucun en-tête
+  → exit 1 : « la route « /nouvelle-page » n'est déclarée NI publique NI privée … Choisir : déclarer
+    ses textes dans src/config/page-meta.js …, ou ajouter « X-Robots-Tag: noindex, follow » … »
+
+la même page avec ses textes dans src/config/page-meta.js (donc PUBLIQUE)
+  → exit 1, mais sur l'autre branche : « « /nouvelle-page » est servie par « /app.html » au lieu de
+    « /nouvelle-page.html » » — plus aucune demande de noindex
+
+la liste dérivée sur le dépôt réel
+  → /dashboard /messages /profile /create-job /photo-debug /email-verification
+    /payment-verification /commission-dashboard /support-admin
+    ← identique, dans l'ordre, aux neuf routes qui étaient recopiées à la main
+```
+
+Trois mutations rejouées sur `check-spa-routes.js` (restauré à l'octet, `cmp`) :
+dérivation neutralisée → **5 tests rouges** ; exclusion du noindex « `/(.*)` »
+retirée → le test qui l'exige rougit ; et la page ni déclarée ni privée du dépôt
+réel, qui passait en `exit 0`, tombe en `exit 1`. Le noindex doit **viser** la
+route : un motif qui la capture (`/dashboard/(.*)` pour `/dashboard/:onglet`)
+suffit, mais `/(.*)` ne compte pas — il couvre la racine, donc tout le site, et
+désindexerait les pages publiques au lieu de protéger celle-là.
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -719,6 +766,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (33 tests : les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète, page privée de son `usePageMeta()` → `npm run build` en **1**, §3 F12) |
 | `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
+| la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
@@ -922,9 +970,12 @@ chaque PR vers `main` (sauf mention contraire).
   des textes (`src/config/page-meta.js`) — c'est LÀ qu'une page se déclare, et la
   liste des pages pré-rendues du garde en **DÉRIVE** au lieu d'être recopiée :
   une route ajoutée à la table change le gabarit attendu sans qu'aucune autre
-  liste soit à mettre à jour. Enfin, les routes privées (`/dashboard`, `/profile`,
-  `/messages`, `/create-job`, `/support-admin`…) portent `X-Robots-Tag:
-  noindex` : un tableau de bord indexé est une page vide dans les résultats.
+  liste soit à mettre à jour. Enfin, les routes privées (tout ce qui n'est ni
+  déclaré dans cette table ni pré-rendu par le backend : `/dashboard`,
+  `/profile`, `/messages`, `/support-admin`…) portent `X-Robots-Tag: noindex` :
+  un tableau de bord indexé est une page vide dans les résultats. Cette liste-là
+  aussi **DÉRIVE du routage** — ajouter une page oblige à choisir entre publique
+  et privée, et le garde refuse l'entre-deux (§3 F13).
 - Page d'accueil pré-rendue (`check-home-shell.js`) : un h1 unique reprenant
   `heroTitle`, `title` ≤ 60 et description ≤ 160, ≥ 300 mots, des liens
   internes, `tel:`/`mailto:`/WhatsApp, le N.A.P. identique à

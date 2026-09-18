@@ -13,6 +13,7 @@ import {
   matchesPattern,
   parseAppRoutes,
   patternToRegex,
+  privateRoutesOf,
   runSpaRoutesCheck,
 } from '../check-spa-routes';
 
@@ -25,6 +26,9 @@ import {
 //     (/route et /route/) — une route non routée répond 404 en production ;
 //   • une règle exacte placée après une règle à motif qui la capture est
 //     inatteignable (le bug réel : /jobs/ après /jobs/(.*) → 404 JSON) ;
+//   • une page ni déclarée publique (ses textes dans src/config/page-meta.js)
+//     ni déclarée privée (X-Robots-Tag) fait ÉCHOUER le garde, qui demande
+//     explicitement laquelle des deux elle est ;
 //   • les routes gardées par import.meta.env.DEV ne sont pas routées ;
 //   • un vercel.json absent/illisible, un 404.html manquant ou indexable, une
 //     route backend disparue : tout cela ÉCHOUE.
@@ -507,6 +511,58 @@ describe('check-spa-routes — séparation des gabarits', () => {
 });
 
 describe('check-spa-routes — routes privées non indexables', () => {
+  it('dérive le privé du routage : textes déclarés = publique, backend = publique', () => {
+    // « /login » publie ses textes, « /jobs/:id » est pré-rendue par le backend
+    // (rewrite hors build) : publiques toutes les deux. Le reste est privé, et
+    // c'est cette dérivation qui remplace la liste écrite à la main.
+    expect(privateRoutesOf(['/login', '/jobs/:id', '/dashboard'], CONFORMING_REWRITES)).toEqual([
+      '/dashboard',
+    ]);
+  });
+
+  it('échoue sur une page ni publique ni privée, en nommant les deux choix', () => {
+    // La page ajoutée est routée (donc servie) et pourtant rien ne dit si elle
+    // est indexable : c'est EXACTEMENT l'état qui passait en silence avant.
+    const project = makeProject({
+      appSource: APP_SOURCE.replace(
+        '      <Route path="/photo-debug"',
+        '      <Route path="/nouvelle-page" element={<Support />} />\n      <Route path="/photo-debug"'
+      ),
+      rewrites: withRewrites((rewrites) => [
+        ...rewrites,
+        { source: '/nouvelle-page', destination: '/app.html' },
+        { source: '/nouvelle-page/', destination: '/app.html' },
+      ]),
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('/nouvelle-page');
+    expect(errors).toContain('src/config/page-meta.js');
+    expect(errors).toContain('X-Robots-Tag');
+  });
+
+  it('n’accepte un noindex que s’il VISE la route, pas « /(.*) »', () => {
+    const appSource = APP_SOURCE.replace(
+      '      <Route path="/dashboard"',
+      '      <Route path="/dashboard/:onglet" element={<Dashboard />} />\n      <Route path="/dashboard"'
+    );
+    const withTag = (source) =>
+      makeProject({
+        appSource,
+        headers: [
+          ...CONFORMING_HEADERS,
+          { source, headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }] },
+        ],
+      });
+    // Un motif qui capture la route à paramètre suffit (« dashboard/:onglet »
+    // ne peut pas être nommée exactement dans vercel.json).
+    expect(run(withTag('/dashboard/(.*)')).errors.join('\n')).not.toContain(
+      'X-Robots-Tag'
+    );
+    // Mais un noindex qui couvre la racine — donc tout le site — ne compte pas :
+    // il désindexerait les pages publiques au lieu de protéger celle-ci.
+    expect(run(withTag('/(.*)')).errors.join('\n')).toContain('/dashboard/:onglet');
+  });
+
   it('exige X-Robots-Tag noindex sur chaque route privée', () => {
     const project = makeProject({
       headers: CONFORMING_HEADERS.filter((entry) => entry.source !== '/profile'),
