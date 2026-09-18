@@ -362,13 +362,16 @@ jobs:
         working-directory: frontend
         run: node scripts/check-prerender-shells.js
 
-      # Les DEUX canaux qui publient og:image — la coquille pré-rendue (build) et
-      # les pages au runtime — doivent annoncer la même carte, lue dans la table
-      # unique src/config/og-cards.js. Avant ce garde, chacun la déclarait de son
-      # côté (ex. /login) : changer l'image d'un seul côté ne cassait rien.
-      - name: Check OG cards agree (runtime pages ↔ prerendered shells)
+      # Les DEUX canaux qui publient les métadonnées d'une page — la coquille
+      # pré-rendue (build) et les pages au runtime — doivent annoncer le même
+      # titre, la même description et la même carte, lus dans les tables uniques
+      # src/config/page-meta.js et og-cards.js. Avant ce garde, chacun les
+      # déclarait de son côté (ex. /login) : changer un texte ou une image d'un
+      # seul côté ne cassait rien, et /register n'annonçait aucun texte au
+      # runtime (l'onglet gardait le titre de la page précédente).
+      - name: Check page meta agrees (runtime pages ↔ prerendered shells)
         working-directory: frontend
-        run: node scripts/check-og-runtime-cards.js
+        run: node scripts/check-page-meta.js
 
       # Régression « chunk partagé pack2PageI18n » : le découpage par scope
       # (un dictionnaire par page lazy) ne doit pas réapparaître comme chunk

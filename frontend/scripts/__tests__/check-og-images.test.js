@@ -5,7 +5,8 @@ import path from 'path';
 import { runOgImageCheck, ROUTES, deriveRoutes, lighthouseAuditedPaths } from '../check-og-images';
 // La table des cartes appartient à src/config/og-cards.js : les scripts la
 // LISENT, ils ne la possèdent pas (c'est elle que les pages utilisent aussi).
-import { GENERIC_CARD, DEDICATED_CARDS } from '../../src/config/og-cards';
+import { GENERIC_CARD, dedicatedCardsFrom } from '../../src/config/og-cards';
+import manifest from '../../scripts/og-assets.manifest.json';
 
 // Tests du garde-fou « og:image par route » (scripts/check-og-images.js).
 //
@@ -334,7 +335,12 @@ describe('check-og-images — la table route → carte DÉRIVE des pages du proj
     // Une carte dédiée pour une page hors liste serait silencieusement perdue
     // (personne ne la vérifierait) : c'est le seul écart qui survit à la
     // dérivation, donc il est verrouillé.
-    const orphans = Object.keys(DEDICATED_CARDS).filter((p) => !audited.includes(p));
+    // Les cartes dédiées sont DÉDUITES des fichiers présents : le test lit la
+    // même donnée que le build (manifeste du générateur), sans liste de pages.
+    const dedicated = Object.keys(
+      dedicatedCardsFrom((manifest.assets || []).map((asset) => asset.file)).cards
+    );
+    const orphans = dedicated.filter((p) => !audited.includes(p));
     expect(orphans).toEqual([]);
   });
 

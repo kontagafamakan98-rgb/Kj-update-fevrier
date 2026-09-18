@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { ogCardFor } from '../config/og-cards';
+import { pageMetaKeys } from '../config/page-meta';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // SEO par route (SPA) : met à jour document.title, la meta description ET le
 // <link rel="canonical"> quand le composant monte.
@@ -36,7 +38,7 @@ const ensureMetaDescription = () => {
   return meta;
 };
 
-export const usePageTitle = (title, { description, canonical } = {}) => {
+export const usePageTitle = (title, { description } = {}) => {
   // Titre
   useEffect(() => {
     if (!title) return undefined;
@@ -58,16 +60,18 @@ export const usePageTitle = (title, { description, canonical } = {}) => {
     };
   }, [description]);
 
-  // Canonical par route : corrige le canonical statique "/" d'index.html
+  // Canonical par route : corrige le canonical statique "/" d'index.html. Une
+  // seule URL est possible — celle de la route courante — donc ce hook ne prend
+  // aucun paramètre : une page ne peut pas déclarer le canonical d'une autre.
+  // Limite connue : posé au montage du composant, il ne suit pas un changement
+  // d'identifiant DANS la même route (/jobs/:id → /jobs/:autre).
   useEffect(() => {
-    const url = canonical || getCurrentUrl();
+    const url = getCurrentUrl();
     if (!url) return undefined;
     ensureCanonical().setAttribute('href', url);
     return undefined;
-  }, [canonical]);
+  }, []);
 };
-
-export const buildPageTitle = (suffix) => (suffix ? `${suffix} — Kojo` : 'Kojo — Services et travailleurs en Afrique de l\'Ouest');
 
 // Image OG par page, servie depuis le dossier public/. On renvoie une URL
 // ABSOLUE (origine + chemin) : les crawlers de partage (LinkedIn, Facebook,
@@ -84,7 +88,7 @@ export const ogImageUrl = (path) => {
 // même que celle des coquilles pré-rendues. Sans argument, elle suit la route
 // COURANTE : une page ne peut donc pas annoncer la carte d'une autre route, et
 // changer une carte se fait à un seul endroit (le shell et le runtime suivent).
-export const ogCardUrl = (route) => ogImageUrl(ogCardFor(route).image);
+const ogCardUrl = (route) => ogImageUrl(ogCardFor(route).image);
 
 const DEFAULT_OG_IMAGE =
   typeof window !== 'undefined' && window.location.origin
@@ -145,5 +149,40 @@ export const usePageOpenGraph = ({
       });
     };
   }, [title, description, url]);
+};
+
+/**
+ * Titre, description, canonical et méta Open Graph/Twitter de la ROUTE COURANTE.
+ *
+ * C'est le point d'entrée des pages : les textes viennent de la table UNIQUE
+ * (src/config/page-meta.js pour les textes, src/config/og-cards.js pour la
+ * carte), donc ce que la page publie après montage est, par construction, ce que
+ * la coquille pré-rendue publie dans le HTML servi — et un titre renommé d'un
+ * côté ne peut pas survivre dans l'autre (scripts/check-page-meta.js échoue).
+ *
+ * Sans argument, elle suit la route COURANTE : une page ne peut donc pas
+ * annoncer le texte d'une autre route — l'erreur que produisait /register, qui
+ * n'annonçait RIEN et gardait le titre de la page précédente après une
+ * navigation interne.
+ *
+ * @param {object} [overrides] Textes propres à une DONNÉE et non à une route
+ *   (une fiche mission n'a de titre qu'une fois la mission chargée).
+ * @param {string} [overrides.title]       Titre propre.
+ * @param {string} [overrides.description] Description propre.
+ * @param {string} [overrides.image]       Carte propre (ex. carte dynamique).
+ */
+export const usePageMeta = ({ title: titleOverride, description: descriptionOverride, image } = {}) => {
+  const { t } = useLanguage();
+  const keys = pageMetaKeys();
+  // Résolu AVANT les hooks : les effets comparent des CHAÎNES (stables d'un
+  // rendu à l'autre), pas la fonction t — recréée à chaque rendu du fournisseur.
+  const title = titleOverride || (keys ? t(keys.title) : '');
+  const description = descriptionOverride || (keys?.description ? t(keys.description) : '');
+  // La description va aux DEUX endroits : <meta name="description"> (ce que lit
+  // un moteur) et og:description (ce que lit un réseau social). Le hook de titre
+  // reçoit donc aussi la description — sans elle, le runtime laissait en place
+  // celle de la page précédente pendant que la coquille en publiait une autre.
+  usePageTitle(title, { description });
+  usePageOpenGraph({ title, description, image: image || ogCardUrl() });
 };
 

@@ -9,6 +9,12 @@ import fs from 'node:fs'
 // fait échouer le build, plutôt que de publier un og:image troué.
 import { ROUTES as OG_CARD_ROUTES } from './scripts/check-og-images.js'
 
+// Textes publiés par route (titre + description) : SOURCE UNIQUE dans
+// src/config/page-meta.js — lue AUSSI par les pages au runtime (usePageMeta).
+// Une clé absente de src/i18n/fr.json casse le build (T() plus bas) au lieu de
+// publier un titre vide.
+import { PAGE_META } from './src/config/page-meta.js'
+
 // Identité publique du site : origine canonique ET origine de l'API, possédées
 // par scripts/site-meta.js. Le build n'en garde aucune copie — leur PAIRE est ce
 // que le backend doit autoriser en CORS (scripts/check-cors-preflight.js).
@@ -155,7 +161,8 @@ export default defineConfig(({ mode }) => {
             const value = siteFr[key]
             if (typeof value !== 'string' || !value.trim()) {
               throw new Error(
-                `prerender-route-meta : clé i18n « ${key} » absente de src/i18n/fr.json (shell accueil)`
+                `prerender-route-meta : clé i18n « ${key} » absente de src/i18n/fr.json ` +
+                  '(shells pré-rendus : texte de route ou accueil)'
               )
             }
             return value
@@ -804,45 +811,11 @@ export default defineConfig(({ mode }) => {
               + `</div>`,
           }
 
-          const ROUTES = {
-            jobs: {
-              title: 'Emplois disponibles — Kojo',
-              description:
-                "Trouvez un travailleur qualifié près de chez vous : emplois, missions et talents disponibles dans toute l'Afrique de l'Ouest.",
-            },
-            login: {
-              title: 'Connexion — Kojo',
-              description:
-                'Accédez à votre compte client ou travailleur Kojo et suivez vos missions en un clic.',
-            },
-            register: {
-              title: 'Créer un compte — Kojo',
-              description:
-                "Inscrivez-vous sur Kojo comme client ou travailleur et rejoignez la communauté de services en Afrique de l'Ouest.",
-            },
-            'forgot-password': {
-              title: 'Mot de passe oublié — Kojo',
-              description:
-                'Recevez un code par email pour sécuriser votre compte et définir un nouveau mot de passe.',
-            },
-            payment: {
-              title: 'Paiements sécurisés — Kojo',
-              description:
-                'Payez en toute sécurité par Orange Money, Wave ou carte bancaire sur Kojo.',
-            },
-            // Titre et description repris À L'IDENTIQUE de ce que posent les
-            // pages au runtime (usePageTitle de HowItWorks.js / Support.js) :
-            // sinon un crawler sans JavaScript et un crawler qui exécute le JS
-            // liraient deux méta différentes pour la même URL.
-            'how-it-works': {
-              title: `${T('howItWorksTitle')} — Kojo`,
-              description: T('howItWorksHero'),
-            },
-            support: {
-              title: `${T('support')} — Kojo`,
-              description: T('supportHelp'),
-            },
-          }
+          // Titre et description par route : plus AUCUN texte écrit ici.
+          // La table UNIQUE est src/config/page-meta.js (clés i18n), la même que
+          // lit le runtime via usePageMeta() — donc un texte corrigé d'un côté
+          // ne peut plus laisser l'autre annoncer l'ancien (la coquille et la
+          // page sont comparées hors ligne par scripts/check-page-meta.js).
 
           // Remplace content="..." d'une meta mono ou multi-lignes.
           const setMeta = (htmlIn, key, value) => {
@@ -883,34 +856,59 @@ export default defineConfig(({ mode }) => {
             [...html.matchAll(/<link rel="modulepreload"[^>]*href="([^"]+)"/g)].map((m) => m[1])
           )
 
-          for (const [route, meta] of Object.entries(ROUTES)) {
-            // Carte OG de la route : lue dans la table unique, qui DÉRIVE des
-            // pages du projet (DEPLOYMENT_PATHS de lighthouserc.cjs). Une route
-            // pré-rendue absente de cette liste n'a pas de carte : c'est le
-            // garde-fou qui empêche d'écrire une coquille que rien ne surveille.
-            const card = OG_CARDS[`/${route}`]
+          // ── Coquilles par route : la liste EST la table des textes ────────
+          // Une route pré-rendue est une route qui publie un titre et une
+          // description (src/config/page-meta.js). La carte OG, elle, DÉRIVE des
+          // pages du projet (DEPLOYMENT_PATHS de lighthouserc.cjs) : une route
+          // de la table sans carte fait échouer le build plutôt que de publier
+          // une coquille sans og:image que rien ne surveillerait.
+          // ── Le texte d'une route, écrit par UNE fonction ───────────────────
+          // Titre, `name="title"`, description, og:* et twitter:* viennent tous
+          // de src/config/page-meta.js, résolu dans src/i18n/fr.json — T() casse
+          // le build si une clé manque. index.html (la route « / ») et les sept
+          // coquilles passent par ici : un texte ajouté à la table ne peut donc
+          // pas être publié par l'un et oublié par l'autre.
+          //
+          // La description va AUSSI sur `name="description"`, pas seulement sur
+          // og:description : sans elle, les sept pages pré-rendues héritaient de
+          // celle de l'accueil (pour un moteur, /jobs, /login, /register…
+          // décrivaient toutes la même chose).
+          const writeRouteText = (htmlIn, routePath) => {
+            const keys = PAGE_META[routePath]
+            const title = T(keys.title)
+            const description = T(keys.description)
+            let out = htmlIn.replace(/(<title>)[^<]*(<\/title>)/, `$1${title}$2`)
+            for (const [key, value] of [
+              ['title', title],
+              ['description', description],
+              ['og:title', title],
+              ['og:description', description],
+              ['twitter:title', title],
+              ['twitter:description', description],
+            ]) {
+              out = setMeta(out, key, value)
+            }
+            return out
+          }
+
+          for (const routePath of Object.keys(PAGE_META)) {
+            if (routePath === '/') continue // index.html : le MÊME texte, écrit plus bas
+            const route = routePath.slice(1)
+            const card = OG_CARDS[routePath]
             if (!card) {
               throw new Error(
-                `prerender-route-meta : la route pré-rendue « /${route} » est absente des pages du projet ` +
-                  '(lighthouserc.cjs, DEPLOYMENT_PATHS) — la table des cartes OG en dérive. ' +
-                  'Ajouter la route là-bas (elle y est auditée par Lighthouse), ou retirer sa coquille.'
+                `prerender-route-meta : la route pré-rendue « ${routePath} » a un titre/description ` +
+                  '(src/config/page-meta.js) mais aucune carte OG — la table des cartes en dérive ' +
+                  '(lighthouserc.cjs, DEPLOYMENT_PATHS). Ajouter la route là-bas (elle y est auditée ' +
+                  'par Lighthouse), ou retirer son texte.'
               )
             }
             const url = `${origin}/${route}`
             const imageUrl = `${origin}${card.image}`
-            let out = html
-              .replace(/(<title>)[^<]*(<\/title>)/, `$1${meta.title}$2`)
-              .replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${url}$2`)
-            out = setMeta(out, 'og:title', meta.title)
-            out = setMeta(out, 'og:description', meta.description)
-            // Description de la PAGE (et pas seulement og:description). Sans
-            // cette ligne, les sept pages pré-rendues héritaient de la
-            // description de l'accueil : pour un moteur, /jobs, /login,
-            // /register… décrivaient toutes la même chose. Le runtime ne la
-            // réécrit pas (usePageTitle n'est appelé avec une description que
-            // là où elle est identique à celle-ci) : statique et dynamique
-            // restent donc alignés.
-            out = setMeta(out, 'description', meta.description)
+            let out = writeRouteText(html, routePath).replace(
+              /(<link rel="canonical" href=")[^"]*(")/,
+              `$1${url}$2`
+            )
             out = setMeta(out, 'og:image', imageUrl)
             // Variante carrée : la carte carrée STATIQUE de la home (présente
             // dans index.html) est REMPLACÉE par celle de la route (bloc
@@ -928,8 +926,6 @@ export default defineConfig(({ mode }) => {
               squareBlock
             )
             out = setMeta(out, 'og:url', url)
-            out = setMeta(out, 'twitter:title', meta.title)
-            out = setMeta(out, 'twitter:description', meta.description)
             out = setMeta(out, 'twitter:url', url)
             out = setMeta(out, 'twitter:image', imageUrl)
             // Shell statique du LCP : injecté dans <div id="root"> (vide à
@@ -967,7 +963,9 @@ export default defineConfig(({ mode }) => {
               'prerender-route-meta : <div id="root"></div> introuvable dans index.html — shell accueil NON injecté'
             )
           }
-          fs.writeFileSync(indexPath, withHomeShell, 'utf8')
+          // index.html porte le texte de « / » : même fonction que les sept
+          // coquilles, donc les deux canaux ne peuvent pas diverger.
+          fs.writeFileSync(indexPath, writeRouteText(withHomeShell, '/'), 'utf8')
 
           // ── Gabarit des routes CLIENTES : app.html ──────────────────────
           // Les routes sans pré-rendu (/dashboard, /profile, /messages,

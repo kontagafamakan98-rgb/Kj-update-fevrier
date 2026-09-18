@@ -530,7 +530,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
-| `check-og-runtime-cards.js` | `scripts/__tests__/check-og-runtime-cards.test.js` (les 3 règles savent échouer, leurs exemptions, périmètre vide refusé) + mutation rejouée à la main le 18/09/2026 |
+| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète) |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
 
@@ -554,23 +554,61 @@ module disparu, fait rougir le garde en nommant la cause), vérifiée par mutati
 le 18/09/2026 — frontend : `src/App.js` et `src/services/api.js` ; backend :
 `.github/scripts/check-exec-bits.py`.
 
-Deux canaux publient `og:image` pour la même URL : le HTML **pré-rendu** (écrit par
-`vite.config.js`, vérifié en HTTP par `check-og-images.js`) et le **runtime** (les
-pages, après montage, via `src/utils/seo.js`). Chacun déclarait sa carte de son
-côté — `/login` un chemin dans `src/pages/Login.js`, un autre dans la table des
-coquilles — sans qu'aucun test ne relie les deux : changer l'image d'un seul côté
-ne cassait rien, et un crawler (HTML pré-rendu) aurait annoncé une autre carte
-qu'un navigateur (page exécutée). La table unique vit maintenant dans
-`src/config/og-cards.js` — sans dépendance, donc lisible par le build ET par le
-bundle (même arrangement que `src/config/contact.js`) — et
-`scripts/check-og-runtime-cards.js` (job frontend, après le build) l'impose :
-aucun chemin de carte écrit en dur dans `src/` (hors de la table), dans
-`src/pages/` la carte se déduit de l'URL courante (`ogCardUrl()` sans argument,
-donc une page ne peut pas annoncer la carte d'une autre route), et chaque
-coquille de `build/` annonce EXACTEMENT la carte de la table (wide + carrée). Les
-routes sans coquille (`/dashboard`, `/profile`, servies par `app.html`) sont
-NOMMÉES en notice plutôt que passées sous silence, et l'absence de build ou de
-coquille est une erreur — un vert n'est pas permis quand rien n'a été lu.
+Deux canaux publient les métadonnées d'une page — `og:image`, `<title>`, `meta
+description` — : le HTML **pré-rendu** (écrit par `vite.config.js`, vérifié en HTTP
+par `check-og-images.js`) et le **runtime** (les pages, après montage, via
+`src/utils/seo.js`). Chacun les déclarait de son côté — `/login` un chemin de
+carte dans `src/pages/Login.js`, et une table de titres EN FRANÇAIS EN DUR dans
+`vite.config.js` alors que la page lisait `src/i18n/fr.json` — sans qu'aucun test
+ne relie les deux : changer un texte ou une image d'un seul côté ne cassait rien,
+et un crawler (HTML pré-rendu) aurait annoncé autre chose qu'un navigateur (page
+exécutée). Pire : `/register`, `/forgot-password` et `/payment` portaient un titre
+dans leur coquille et AUCUN au runtime — après une navigation interne, l'onglet
+gardait le titre de la page précédente.
+
+Les tables uniques vivent dans `src/config/` — sans dépendance, donc lisibles par
+le build ET par le bundle (même arrangement que `src/config/contact.js`) :
+`page-meta.js` (route → clés i18n du titre et de la description, 8 routes),
+`og-cards.js` (route → cartes wide/carrée) et `route-path.js` (normalisation d'un
+chemin, partagée par les deux).
+
+Quelles pages ont un VISUEL DÉDIÉ n'est plus une liste écrite à la main : elle se
+DÉDUIT des cartes présentes. `public/og-<page>.png` + sa variante carrée
+`og-<page>-square.png` — le nom du fichier EST la déclaration, lu par le build, par
+le runtime et par le garde (manifeste du générateur, le même fichier que
+`check-og-assets.js` confronte aux PNG par empreinte SHA-256). Ajouter une carte
+n'ajoute donc **aucune ligne de code** : mesuré le 18/09/2026 en déposant
+`og-support.png` + `og-support-square.png` comme le ferait `gen-og-images.py`, le
+build a publié la nouvelle carte dans `support.html` et le garde l'a nommée
+(`/support → /og-support.png`) sans qu'aucun fichier `.js` ou `.jsx` ne soit
+touché. Deux listes vivaient auparavant ici et dans le générateur : une carte
+ajoutée dans `public/` restait annoncée par personne, et le commit de la carte
+seule passait pour un succès.
+
+`scripts/check-page-meta.js` (job frontend, après
+le build) impose six règles, chacune capable d'échouer :
+
+1. aucune déclaration hors table — ni chemin de carte ni clé i18n de
+   `page-meta.js` écrit en dur dans `src/` ;
+2. une page qui sert une route de la table n'appelle pas les hooks bas niveau
+   (`usePageTitle` / `usePageOpenGraph`) : elle passe par `usePageMeta()` ;
+3. chaque route de la table a une page qui annonce son texte — le routage est LU
+   dans `src/App.js`, jamais recopié (deux listes qui se comparent, c'est l'écart
+   qui se répare au lieu de disparaître) ;
+4. chaque coquille de `build/` annonce EXACTEMENT le titre, la description, les
+   variantes `og:`/`twitter:`/`name=title` ET la carte de la table (résolus dans
+   `fr.json`, la langue des coquilles) ;
+5. zéro coquille comparée est une ERREUR — jamais un vert quand rien n'a été lu ;
+6. une carte dédiée PRÉSENTE est complète et utilisée : une carte large sans sa
+   variante carrée, ou une carte pour une page qui n'est pas pré-rendue (donc
+   annoncée par aucune coquille), est une erreur — sinon la page retomberait sans
+   bruit sur la carte générique, c'est-à-dire exactement l'oubli que la déduction
+   doit rendre impossible.
+
+Les routes servies par le gabarit nu (`/dashboard`, `/profile` — noindex) sont
+NOMMÉES en notice plutôt que passées sous silence, et les fiches `/jobs/:id`,
+dont le texte vient de la MISSION (il n'existe pas avant la requête), gardent leur
+carte dynamique, vérifiée en HTTP contre le déploiement.
 
 Le seul garde d'existence qui gardait autre chose qu'un module — la liste
 d'exceptions `OG_READ_ONLY_SCRIPTS` de `check-og-assets.js` — a été SUPPRIMÉ
