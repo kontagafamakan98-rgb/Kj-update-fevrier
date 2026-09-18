@@ -20,6 +20,12 @@ import { PAGE_META } from './src/config/page-meta.js'
 // que le backend doit autoriser en CORS (scripts/check-cors-preflight.js).
 import { API_ORIGIN, SITE_ORIGIN } from './scripts/site-meta.js'
 
+// « Une page de route publique annonce-t-elle ses métadonnées ? » : les règles
+// qui ne lisent QUE les sources sont jouées ICI, par le build (voir le plugin
+// require-page-meta plus bas) — la CI les rejoue après le build, mais un oubli
+// partait alors en pré-déploiement avant d'être rattrapé.
+import { assertPagesAnnounceTheirMeta } from './scripts/check-page-meta.js'
+
 const OG_CARDS = Object.fromEntries(
   OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
 )
@@ -50,6 +56,22 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      {
+        // Une page de route PUBLIQUE qui n'annonce pas ses métadonnées fait
+        // ÉCHOUER le build : `npm run build` refuse de produire un bundle dans
+        // cet état, au lieu de le laisser partir et de le voir rouge en CI une
+        // fois le build terminé. Les règles jouées ici (A/B/C de
+        // scripts/check-page-meta.js) ne lisent que les sources — App.js, la
+        // table src/config/page-meta.js et les pages — donc le build peut les
+        // trancher avant d'écrire le premier octet. `apply: 'build'` : le
+        // serveur de dev reste utilisable, on n'est pas arrêté à l'itération par
+        // un garde de publication (la CI, elle, rejoue tout, coquilles comprises).
+        name: 'require-page-meta',
+        apply: 'build',
+        buildStart() {
+          assertPagesAnnounceTheirMeta()
+        },
+      },
       react(),
       {
         name: 'treat-js-files-as-jsx',
