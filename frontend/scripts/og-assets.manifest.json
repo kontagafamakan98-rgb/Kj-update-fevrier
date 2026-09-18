@@ -9,22 +9,6 @@
       "width": 1200
     },
     {
-      "bytes": 40013,
-      "file": "og-jobs.png",
-      "format": "wide",
-      "height": 630,
-      "sha256": "c1a8a0bcc49973b20b7cf4f3930ed7982c3932e93b19ec23557066aa1efd4693",
-      "width": 1200
-    },
-    {
-      "bytes": 35853,
-      "file": "og-login.png",
-      "format": "wide",
-      "height": 630,
-      "sha256": "da1332cb5a1f587a84dcf439d8328509790989b1f84f79ed0bb1e9eb3f3f588c",
-      "width": 1200
-    },
-    {
       "bytes": 37245,
       "file": "og-square-1200x1200.png",
       "format": "carré",
@@ -33,11 +17,27 @@
       "width": 1200
     },
     {
+      "bytes": 40013,
+      "file": "og-jobs.png",
+      "format": "wide",
+      "height": 630,
+      "sha256": "c1a8a0bcc49973b20b7cf4f3930ed7982c3932e93b19ec23557066aa1efd4693",
+      "width": 1200
+    },
+    {
       "bytes": 43523,
       "file": "og-jobs-square.png",
       "format": "carré",
       "height": 1200,
       "sha256": "2889793e4877b7d1b09e9e37e4acf9019e49a17181fda5528708eebb3bd89916",
+      "width": 1200
+    },
+    {
+      "bytes": 35853,
+      "file": "og-login.png",
+      "format": "wide",
+      "height": 630,
+      "sha256": "da1332cb5a1f587a84dcf439d8328509790989b1f84f79ed0bb1e9eb3f3f588c",
       "width": 1200
     },
     {
@@ -57,10 +57,11 @@
       "width": 512
     }
   ],
+  "cards_sha256": "b6c4c39f94b978315af0d97f72a8d0e2fe94fe3c5347ce85940d7bd58975ac3e",
   "fonts": {
     "bold": "arialbd.ttf",
     "regular": "arial.ttf"
   },
   "generator": "gen-og-images.py",
-  "generator_sha256": "f6e871e76c4acee61c40e2c5a43720d15b42418eb462d2241f622e6389577e37"
+  "generator_sha256": "951dabfb52fcb22529132e827ba81e115ed00c12bc201d6166f38a080639931e"
 }

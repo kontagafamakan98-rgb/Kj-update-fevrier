@@ -18,13 +18,19 @@ sombres (onglets navigateur en mode sombre, cartes de partage sur fond foncé).
 Usage (Pillow) :
     cd frontend && ../backend/.venv/Scripts/python scripts/gen-og-images.py
 
+Le TEXTE de chaque carte ne vit PAS ici : un fichier de données par carte
+décrit son contenu et ses deux fichiers de sortie, dans scripts/og-cards/.
+Ajouter une carte dédiée est donc un AJOUT DE DONNÉES (un fichier JSON de plus,
+pui relancer ce script) et jamais une édition de code — les cartes se lisent par
+découverte du dossier, triées par nom de fichier.
+
 Le script écrit aussi un MANIFESTE (scripts/og-assets.manifest.json) :
 dimensions, taille et empreinte SHA-256 de chaque PNG, empreinte de ce script,
-et polices réellement retenues. C'est ce manifeste que le garde CI
-(scripts/check-og-assets.js) confronte aux fichiers versionnés : une carte
-modifiée à la main, un texte changé sans régénération, ou des cartes
-régénérées avec une AUTRE police (aspect différent) font échouer la CI sans
-qu'il soit besoin de disposer des polices sur le runner.
+empreinte des fichiers de données, et polices réellement retenues. C'est ce
+manifeste que le garde CI (scripts/check-og-assets.js) confronte aux fichiers
+versionnés : une carte modifiée à la main, un texte changé sans régénération, ou
+des cartes régénérées avec une AUTRE police (aspect différent) font échouer la CI
+sans qu'il soit besoin de disposer des polices sur le runner.
 
 Options (pour régénérer ailleurs sans toucher à public/) :
     --out-dir <dossier>   dossier de sortie des PNG (défaut : public/)
@@ -44,6 +50,7 @@ FAVICON_PATH = os.path.join('icons', 'icon-dark.png')
 OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
 MANIFEST_NAME = 'og-assets.manifest.json'
 MANIFEST_PATH = os.path.join(os.path.dirname(__file__), MANIFEST_NAME)
+CARDS_DIR = os.path.join(os.path.dirname(__file__), 'og-cards')
 
 # Polices réellement retenues, par graisse. Consignées dans le manifeste pour
 # que la CI puisse refuser des cartes régénérées avec une autre police :
@@ -237,33 +244,24 @@ def make_dark_favicon(size=512):
     return img.convert("RGBA")
 
 
-# Contenus identiques entre les formats wide et carré, par page.
-VARIANTS = {
-    # Home = défaut.
-    "og-image-1200x630.png": {
-        "tagline_lines": ["Services et travailleurs en Afrique de l'Ouest"],
-        "sub_lines": ["Mali · Sénégal · Burkina Faso · Côte d'Ivoire"],
-        "accent_tag": None,
-    },
-    # Page /jobs : vitrine des offres et talents.
-    "og-jobs.png": {
-        "tagline_lines": ["Trouvez un travailleur qualifié", "près de chez vous"],
-        "sub_lines": ["Emplois · Missions · Talents dans toute l'Afrique de l'Ouest"],
-        "accent_tag": "Parcourir les offres →",
-    },
-    # Page /login : accès compte client & travailleur.
-    "og-login.png": {
-        "tagline_lines": ["Accédez à votre compte"],
-        "sub_lines": ["Clients & travailleurs · Suivez vos missions en un clic"],
-        "accent_tag": "Se connecter ou créer un compte →",
-    },
-}
+def load_cards():
+    """Les cartes à dessiner, lues une par une dans scripts/og-cards/*.json.
 
-SQUARE_VARIANTS = {
-    "og-square-1200x1200.png": "og-image-1200x630.png",
-    "og-jobs-square.png": "og-jobs.png",
-    "og-login-square.png": "og-login.png",
-}
+    Découverte du dossier, triée par nom de fichier : ajouter une carte, c'est
+    déposer un fichier ici. Chaque carte nomme ses DEUX sorties (`wide` et
+    `square`) et son contenu (`tagline`, `sub`, `accent`) : les fichiers de sortie
+    sont dans la donnée, pas dans une convention devinée par le code, parce que
+    la carte générique (`og-image-1200x630.png`) ne suit aucune convention de nom
+    de page — c'est précisément ce qui la distingue d'une carte dédiée, dont le
+    nom de fichier DÉCLARE la route (voir src/config/og-cards.js).
+    """
+    cards = []
+    for name in sorted(os.listdir(CARDS_DIR)):
+        if not name.endswith('.json'):
+            continue
+        with open(os.path.join(CARDS_DIR, name), encoding='utf-8') as handle:
+            cards.append(json.load(handle))
+    return cards
 
 
 def manifest_entry(out_dir, rel_path, width, height, kind):
@@ -278,6 +276,29 @@ def manifest_entry(out_dir, rel_path, width, height, kind):
         'bytes': len(data),
         'sha256': hashlib.sha256(data).hexdigest(),
     }
+
+
+def cards_sha256():
+    """Empreinte du CONTENU des cartes, sur leurs octets NORMALISÉS en LF.
+
+    L'empreinte du générateur ne suffit plus à détecter un texte changé : le
+    texte n'est plus dans le générateur. Sans cette seconde empreinte, changer
+    une accroche sans relancer le script laisserait le manifeste « frais » — les
+    PNG seraient périmés et la CI dirait vert.
+
+    Le nom du fichier entre dans l'empreinte : renommer une carte change ce que
+    la carte DIT au garde (`og-jobs.png` désigne la page /jobs), donc ce n'est pas
+    la même recette. Les fichiers sont parcourus triés par nom pour que deux
+    machines produisent la même empreinte.
+    """
+    digest = hashlib.sha256()
+    for name in sorted(os.listdir(CARDS_DIR)):
+        if not name.endswith('.json'):
+            continue
+        with open(os.path.join(CARDS_DIR, name), 'rb') as handle:
+            data = handle.read().replace(b'\r\n', b'\n')
+        digest.update(name.encode('utf-8') + b'\n' + data)
+    return digest.hexdigest()
 
 
 def generator_sha256(path):
@@ -295,21 +316,29 @@ def generator_sha256(path):
     return hashlib.sha256(data).hexdigest()
 
 
-def write_manifest(out_dir, manifest_path):
+def write_manifest(out_dir, manifest_path, cards):
     """Écrit le manifeste de reproductibilité que la CI confronte aux fichiers.
 
     Aucune donnée volatile (date, version de Pillow) n'y figure : deux
     exécutions dans le même environnement produisent le même fichier, donc le
     manifeste ne bouge que si les cartes, leur contenu ou les polices changent.
+    L'ordre du tableau suit celui des cartes lues : il rend le diff lisible quand
+    une carte s'ajoute, et aucun consommateur n'en dépend (le garde et
+    src/config/og-cards.js indexent par nom de fichier).
     """
-    assets = (
-        [manifest_entry(out_dir, name, W, H, 'wide') for name in VARIANTS]
-        + [manifest_entry(out_dir, name, SQUARE, SQUARE, 'carré') for name in SQUARE_VARIANTS]
-        + [manifest_entry(out_dir, FAVICON_PATH, FAVICON, FAVICON, 'favicon sombre')]
-    )
+    assets = [
+        entry
+        for card in cards
+        for entry in (
+            manifest_entry(out_dir, card['wide'], W, H, 'wide'),
+            manifest_entry(out_dir, card['square'], SQUARE, SQUARE, 'carré'),
+        )
+    ]
+    assets.append(manifest_entry(out_dir, FAVICON_PATH, FAVICON, FAVICON, 'favicon sombre'))
     manifest = {
         'generator': os.path.basename(__file__),
         'generator_sha256': generator_sha256(__file__),
+        'cards_sha256': cards_sha256(),
         'fonts': {weight: RESOLVED_FONTS.get(weight) for weight in ('regular', 'bold')},
         'assets': assets,
     }
@@ -323,15 +352,14 @@ def main(out_dir=None, manifest_path=None):
     out_dir = out_dir or OUT_DIR
     manifest_path = manifest_path or MANIFEST_PATH
     os.makedirs(out_dir, exist_ok=True)
-    for filename, opts in VARIANTS.items():
-        img = render_wide(**opts)
-        out = os.path.join(out_dir, filename)
+    cards = load_cards()
+    for card in cards:
+        img = render_wide(card['tagline'], card['sub'], card['accent'])
+        out = os.path.join(out_dir, card['wide'])
         img.save(out, "PNG", optimize=True)
         print("OK ->", out, img.size)
-    for filename, wide_name in SQUARE_VARIANTS.items():
-        opts = VARIANTS[wide_name]
-        img = render_square(**opts)
-        out = os.path.join(out_dir, filename)
+        img = render_square(card['tagline'], card['sub'], card['accent'])
+        out = os.path.join(out_dir, card['square'])
         img.save(out, "PNG", optimize=True)
         print("OK ->", out, img.size)
     favicon = make_dark_favicon(FAVICON)
@@ -340,7 +368,7 @@ def main(out_dir=None, manifest_path=None):
     favicon.save(out, "PNG", optimize=True)
     print("OK ->", out, favicon.size)
 
-    manifest = write_manifest(out_dir, manifest_path)
+    manifest = write_manifest(out_dir, manifest_path, cards)
     print("MANIFESTE ->", manifest_path, "(%d cartes)" % len(manifest['assets']))
 
 

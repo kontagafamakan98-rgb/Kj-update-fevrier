@@ -89,8 +89,8 @@ export function deriveRoutes(paths) {
           `DEPLOYMENT_PATHS) : ${orphans
             .map((route) => `${DEDICATED_CARDS[route].image} → ${route}`)
             .join(', ')} — une carte se déclare par son nom de fichier, mais elle ne peut ` +
-          `servir qu'une page qui existe. Corriger le slug de la carte ` +
-          `(scripts/gen-og-images.py) ou déclarer la page dans les pages du projet.`
+          `servir qu'une page qui existe. Corriger le slug de la carte dans son ` +
+          `fichier de données (scripts/og-cards/) ou déclarer la page dans les pages du projet.`
       );
     }
   }

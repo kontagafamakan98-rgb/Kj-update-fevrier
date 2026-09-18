@@ -18,19 +18,21 @@
  *      anodin, par le CONTENU (le fichier écrit une image ET vise une carte
  *      OG). Il faut les DEUX signaux : un checker qui ne fait que LIRE les
  *      cartes n'écrit pas d'image, donc il n'a jamais besoin d'exception ;
- *   2. lit le MANIFESTE DANS le générateur lui-même (dimensions des formats
- *      wide/carré, pages couvertes, taille du favicon) : aucune constante
- *      n'est dupliquée ici, donc le check ne peut pas diverger du script ;
+ *   2. lit les DÉCLARATIONS DANS les données (un fichier par carte sous
+ *      scripts/og-cards/, qui nomme ses sorties) et les DIMENSIONS DANS le
+ *      générateur lui-même (formats wide/carré, taille du favicon) : aucune
+ *      constante n'est dupliquée ici, donc le check ne peut pas diverger ;
  *   3. vérifie que chaque PNG attendu existe, est un VRAI PNG (signature +
  *      chunk IHDR) et porte EXACTEMENT les dimensions déclarées ;
  *   4. refuse tout og-*.png ORPHELIN dans public/ (présent mais absent du
  *      manifeste) : c'est un reliquat que le générateur ne sait pas reproduire.
  *   5. confronte le MANIFESTE de reproductibilité (écrit par le générateur) aux
  *      fichiers commités : empreinte SHA-256 de chaque carte, empreinte du
- *      générateur, polices retenues. C'est ce qui rend la divergence — carte
- *      retouchée à la main, texte changé sans régénération, cartes refaites
- *      ailleurs avec une AUTRE police — détectable sur n'importe quel runner,
- *      sans dépendre des polices installées.
+ *      générateur, empreinte du CONTENU des cartes, polices retenues. C'est ce
+ *      qui rend la divergence — carte retouchée à la main, texte changé sans
+ *      régénération, cartes refaites ailleurs avec une AUTRE police —
+ *      détectable sur n'importe quel runner, sans dépendre des polices
+ *      installées.
  *
  * Usage : cd frontend && node scripts/check-og-assets.js
  */
@@ -45,6 +47,10 @@ export const GENERATOR_NAME = 'gen-og-images.py';
 const SCRIPT_EXTENSIONS = ['.py', '.js', '.mjs', '.cjs', '.ts', '.sh'];
 
 export const MANIFEST_NAME = 'og-assets.manifest.json';
+
+// Le contenu des cartes : un fichier JSON par carte, à côté du générateur.
+// Ajouter une carte dédiée, c'est ajouter un fichier ici — jamais toucher au code.
+export const CARDS_DIR_NAME = 'og-cards';
 
 // Polices de l'environnement de RÉFÉRENCE : celles qui ont produit les PNG
 // commités (poste Windows, Arial). Le générateur retombe sinon sur DejaVu
@@ -106,17 +112,74 @@ const generatorFingerprint = (filePath) =>
     .update(Buffer.from(readFileSync(filePath).toString('latin1').replace(/\r\n/g, '\n'), 'latin1'))
     .digest('hex');
 
-// Les clés d'un dictionnaire Python de premier niveau sont indentées de 4
-// espaces ; le bloc s'ouvre sur « Nom = { » en colonne 0 et se ferme sur une
-// accolade en colonne 0 (ancrage ligne pour ne pas confondre VARIANTS avec
-// SQUARE_VARIANTS, qui contient la même sous-chaîne).
-export const blockKeys = (source, blockName) => {
-  const open = source.match(new RegExp(`^${blockName} = \\{`, 'm'));
-  if (!open) return null;
-  const rest = source.slice(open.index);
-  const end = rest.indexOf('\n}');
-  const block = end === -1 ? rest : rest.slice(0, end);
-  return [...block.matchAll(/^\s{4}"([^"]+\.png)":/gm)].map((match) => match[1]);
+/**
+ * Le contenu des cartes, lu dans les fichiers de DONNÉES du dossier des cartes.
+ *
+ * Un fichier par carte, parcouru trié par nom : c'est la source de vérité de la
+ * liste des PNG. Chaque carte nomme ses DEUX sorties ; une carte qui n'en nomme
+ * qu'une est signalée nommément plutôt que sautée en silence — sinon elle
+ * sortirait du périmètre vérifié sans que rien ne le dise.
+ */
+export const readDeclaredCards = (cardsDir) => {
+  if (!existsSync(cardsDir)) {
+    return {
+      cards: [],
+      errors: [
+        `${CARDS_DIR_NAME}/ absent : une carte se déclare par un fichier JSON ` +
+          `qui nomme ses sorties (voir scripts/${GENERATOR_NAME})`,
+      ],
+    };
+  }
+  const errors = [];
+  const cards = [];
+  for (const name of readdirSync(cardsDir).filter((file) => file.endsWith('.json')).sort()) {
+    let data = null;
+    try {
+      data = JSON.parse(readFileSync(path.join(cardsDir, name), 'utf8'));
+    } catch (error) {
+      errors.push(`${CARDS_DIR_NAME}/${name} illisible (JSON invalide) : ${error.message}`);
+      continue;
+    }
+    const missing = ['wide', 'square'].filter((key) => typeof data[key] !== 'string');
+    if (missing.length > 0) {
+      errors.push(
+        `${CARDS_DIR_NAME}/${name} ne nomme pas ${missing.join(' ni ')} : une carte ` +
+          `nomme ses DEUX sorties (wide et square)`
+      );
+      continue;
+    }
+    cards.push({ name, wide: data.wide, square: data.square });
+  }
+  if (cards.length === 0 && errors.length === 0) {
+    errors.push(`${CARDS_DIR_NAME}/ ne contient aucun fichier *.json : aucune carte à vérifier`);
+  }
+  return { cards, errors };
+};
+
+/**
+ * Empreinte du CONTENU des cartes : même recette OCTET POUR OCTET que
+ * `cards_sha256()` du générateur (nom de fichier + LF + contenu normalisé en LF,
+ * fichiers triés).
+ *
+ * Le texte n'est plus dans le générateur, donc l'empreinte du générateur ne peut
+ * plus le couvrir : sans celle-ci, changer une accroche sans relancer le script
+ * laisserait des PNG périmés derrière un manifeste « frais », et la CI dirait
+ * vert sur des cartes que plus personne ne peut reproduire.
+ */
+const cardsFingerprint = (cardsDir) => {
+  const names = existsSync(cardsDir)
+    ? readdirSync(cardsDir).filter((name) => name.endsWith('.json')).sort()
+    : [];
+  const digest = createHash('sha256');
+  for (const name of names) {
+    const data = readFileSync(path.join(cardsDir, name))
+      .toString('latin1')
+      .replace(/\r\n/g, '\n');
+    digest.update(Buffer.from(name, 'utf8'));
+    digest.update('\n');
+    digest.update(Buffer.from(data, 'latin1'));
+  }
+  return digest.digest('hex');
 };
 
 // Lecture minimale d'un PNG : signature + premier chunk (IHDR), qui porte les
@@ -207,24 +270,26 @@ export const runOgAssetsCheck = (opts = {}) => {
     const faviconPath =
       source.match(/os\.path\.join\(\s*OUT_DIR\s*,\s*'([^']+)',\s*'([^']+)'\s*\)/) ||
       source.match(/^FAVICON_PATH\s*=\s*os\.path\.join\('([^']+)',\s*'([^']+)'\)\s*$/m);
-    const widePages = blockKeys(source, 'VARIANTS');
-    const squarePages = blockKeys(source, 'SQUARE_VARIANTS');
-
     if (!wide) fail(`${GENERATOR_NAME} : constante « W, H = … » introuvable`);
     if (!square) fail(`${GENERATOR_NAME} : constante « SQUARE = … » introuvable`);
     if (!favicon) fail(`${GENERATOR_NAME} : appel make_dark_favicon(<taille>) introuvable`);
-    if (widePages === null) fail(`${GENERATOR_NAME} : dictionnaire VARIANTS introuvable`);
-    if (squarePages === null) fail(`${GENERATOR_NAME} : dictionnaire SQUARE_VARIANTS introuvable`);
     if (!faviconPath) fail(`${GENERATOR_NAME} : chemin du favicon sombre introuvable`);
 
-    if (wide && widePages) {
-      for (const file of widePages) {
-        assets.push({ file, width: Number(wide[1]), height: Number(wide[2]), format: 'wide' });
+    // La LISTE des cartes vient des données, les DIMENSIONS du code : chacune des
+    // deux sources est lue là où elle fait autorité, et aucune n'est recopiée ici.
+    const declared = readDeclaredCards(path.join(scriptsDir, CARDS_DIR_NAME));
+    for (const message of declared.errors) fail(message);
+    for (const card of declared.cards) {
+      if (wide) {
+        assets.push({ file: card.wide, width: Number(wide[1]), height: Number(wide[2]), format: 'wide' });
       }
-    }
-    if (square && squarePages) {
-      for (const file of squarePages) {
-        assets.push({ file, width: Number(square[1]), height: Number(square[1]), format: 'carré' });
+      if (square) {
+        assets.push({
+          file: card.square,
+          width: Number(square[1]),
+          height: Number(square[1]),
+          format: 'carré',
+        });
       }
     }
     if (favicon && faviconPath) {
@@ -302,6 +367,16 @@ export const runOgAssetsCheck = (opts = {}) => {
               `relance-le et committe le manifeste (et les PNG s'ils bougent)`
           );
         }
+      }
+
+      // 5a-bis. Le CONTENU des cartes n'a pas changé depuis la génération.
+      const cardsSha = cardsFingerprint(path.join(scriptsDir, CARDS_DIR_NAME));
+      if (manifest.cards_sha256 !== cardsSha) {
+        fail(
+          `le contenu des cartes (${CARDS_DIR_NAME}/) a changé depuis la dernière ` +
+            `génération : relance scripts/${GENERATOR_NAME} et committe le manifeste ` +
+            `(et les PNG s'ils bougent)`
+        );
       }
 
       // 5b. Les cartes n'ont pas été refaites avec une autre police.
