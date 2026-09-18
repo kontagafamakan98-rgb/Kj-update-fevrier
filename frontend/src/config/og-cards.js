@@ -71,7 +71,14 @@ export const dedicatedCardsFrom = (files) => {
 
 // La table servie par le build ET par le runtime : ni l'un ni l'autre ne connaît
 // la liste des pages, seulement le nom des fichiers présents.
-const DEDICATED_CARDS = dedicatedCardsFrom((manifest.assets || []).map((asset) => asset.file)).cards;
+//
+// Exportée pour le seul contrôle que ce module NE PEUT PAS faire : une carte
+// dédiée qui ne désigne aucune page du projet. La liste des pages vit dans
+// lighthouserc.cjs, donc le refus est du côté qui les confronte
+// (scripts/check-og-images.js, deriveRoutes — appelé au chargement du build).
+export const DEDICATED_CARDS = dedicatedCardsFrom(
+  (manifest.assets || []).map((asset) => asset.file)
+).cards;
 
 /**
  * Carte de la route donnée (générique si elle n'a pas de visuel dédié).

@@ -7,7 +7,8 @@
  * OG en DÉRIVE (`ROUTES`, plus bas) : vite.config.js l'importe pour écrire les
  * coquilles pré-rendues, donc le producteur, le vérificateur et le périmètre
  * Lighthouse ne peuvent plus diverger — une page pré-rendue absente de la liste
- * fait ÉCHOUER le build (voir deriveRoutes).
+ * fait ÉCHOUER le build, et une carte dédiée qui ne désigne aucune de ces pages
+ * aussi (voir deriveRoutes).
  *
  * Pour chaque route de la table, fetch le HTML SERVI (ce que reçoit un crawler
  * sans JS) et vérifie :
@@ -49,7 +50,8 @@ import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } f
 // (et le build qui l'importe) n'en garde AUCUNE copie, donc la coquille
 // pré-rendue et la page au runtime ne peuvent pas annoncer deux cartes
 // différentes. Ici on ne fait que DÉRIVER la table des pages du projet.
-import { ogCardFor } from '../src/config/og-cards.js';
+import { DEDICATED_CARDS, ogCardFor } from '../src/config/og-cards.js';
+import { normalizeRoute } from '../src/config/route-path.js';
 
 /**
  * Table route → carte, à partir des routes à couvrir.
@@ -61,9 +63,37 @@ import { ogCardFor } from '../src/config/og-cards.js';
  * Exportée séparément pour être éprouvable : la table du module, elle, est
  * calculée une fois au chargement depuis la config réelle.
  *
+ * ── Ce qui ÉCHOUE ici, et pas seulement dans un test ───────────────────────
+ * Une carte dédiée se déclare par son SEUL nom de fichier (`public/og-x.png`) :
+ * personne n'écrit `/x` nulle part. Si `/x` n'est pas une page du projet, la carte
+ * ne servirait aucune page et la dérivation la perdrait EN SILENCE — un PNG livré,
+ * jamais annoncé par le build, jamais vérifié (le slug mal orthographié est le cas
+ * réaliste : il produit une carte morte que rien ne signale). Le refus est donc
+ * dans la fonction, pas dans un test : elle s'exécute au CHARGEMENT de ce module,
+ * que `vite.config.js` importe pour écrire les coquilles — `vite build` échoue —
+ * comme check-prerender-shells.js et check-page-meta.js, qui dérivent la table.
+ *
+ * `paths === null` (config illisible) n'est pas jugé ici : il n'y a alors aucune
+ * liste à confronter, et runOgImageCheck en fait une erreur explicite (plus bas).
+ *
  * @param {string[]|null} paths Chemins à couvrir (null = config illisible).
+ * @throws {Error} Une carte dédiée désigne une page absente de `paths`.
  */
 export function deriveRoutes(paths) {
+  if (paths) {
+    const pages = new Set(paths.map(normalizeRoute));
+    const orphans = Object.keys(DEDICATED_CARDS).filter((route) => !pages.has(route));
+    if (orphans.length) {
+      throw new Error(
+        `carte(s) dédiée(s) pour une page absente des pages du projet (lighthouserc.cjs, ` +
+          `DEPLOYMENT_PATHS) : ${orphans
+            .map((route) => `${DEDICATED_CARDS[route].image} → ${route}`)
+            .join(', ')} — une carte se déclare par son nom de fichier, mais elle ne peut ` +
+          `servir qu'une page qui existe. Corriger le slug de la carte ` +
+          `(scripts/gen-og-images.py) ou déclarer la page dans les pages du projet.`
+      );
+    }
+  }
   return (paths || []).map((routePath) => ({ path: routePath, ...ogCardFor(routePath) }));
 }
 

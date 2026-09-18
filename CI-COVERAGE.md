@@ -552,6 +552,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète) |
+| `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
 
@@ -606,6 +607,19 @@ touché. Deux listes vivaient auparavant ici et dans le générateur : une carte
 ajoutée dans `public/` restait annoncée par personne, et le commit de la carte
 seule passait pour un succès.
 
+Le revers de cette déduction est traité au même endroit : une carte dédiée dont le
+slug ne correspond à AUCUNE page du projet (`lighthouserc.cjs`, `DEPLOYMENT_PATHS`)
+fait ÉCHOUER la dérivation elle-même, donc `vite build` — pas seulement un test.
+C'est un PNG livré que le build perdrait en silence (le slug mal orthographié est
+le cas réaliste) ; le seul indice serait « la page reçoit la carte générique », ce
+qui est le comportement normal de toutes les autres pages. Prouvé le 18/09/2026 en
+ajoutant `og-produits.png` + sa variante au manifeste seul : `npm run build` est
+sorti en 1 avec le slug nommé, et les trois gardes qui dérivent la table
+(`check-og-images`, `check-prerender-shells`, `check-page-meta`) ont refusé de
+tourner sur cet état avant d'avoir rien vérifié. Limite assumée : `paths === null`
+(config illisible) n'est pas jugé là — il n'y a alors aucune liste à confronter, et
+c'est `runOgImageCheck` qui en fait une erreur explicite.
+
 `scripts/check-page-meta.js` (job frontend, après
 le build) impose six règles, chacune capable d'échouer :
 
@@ -621,10 +635,12 @@ le build) impose six règles, chacune capable d'échouer :
    `fr.json`, la langue des coquilles) ;
 5. zéro coquille comparée est une ERREUR — jamais un vert quand rien n'a été lu ;
 6. une carte dédiée PRÉSENTE est complète et utilisée : une carte large sans sa
-   variante carrée, ou une carte pour une page qui n'est pas pré-rendue (donc
-   annoncée par aucune coquille), est une erreur — sinon la page retomberait sans
-   bruit sur la carte générique, c'est-à-dire exactement l'oubli que la déduction
-   doit rendre impossible.
+   variante carrée, ou une carte pour une page du projet **qui n'est pas
+   pré-rendue** (`/dashboard` : auditée, mais servie par le gabarit nu — le cas
+   « absente des pages du projet » n'arrive jamais jusqu'ici, il arrête la
+   dérivation), est une erreur — sinon la page retomberait sans bruit sur la carte
+   générique, c'est-à-dire exactement l'oubli que la déduction doit rendre
+   impossible.
 
 Les routes servies par le gabarit nu (`/dashboard`, `/profile` — noindex) sont
 NOMMÉES en notice plutôt que passées sous silence, et les fiches `/jobs/:id`,
