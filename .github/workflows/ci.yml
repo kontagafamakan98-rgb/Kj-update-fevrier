@@ -397,6 +397,20 @@ jobs:
         working-directory: frontend
         run: node scripts/check-page-meta.js
 
+      # Une fiche mission (/jobs/:id) n'a pas de coquille pré-rendue à comparer :
+      # son HTML est produit par le backend À LA REQUÊTE. Son contrat app ↔
+      # pré-rendu n'était donc vérifié qu'en HTTP, contre un serveur debout et
+      # une mission réellement créée en base — jamais sur une PR dont le
+      # pré-déploiement est protégé, et jamais contre ce que l'APPLICATION
+      # annonce. Ce garde exécute les deux implémentations sur une mission de
+      # référence : le pré-rendu en important backend/kojo_job_og.py (module sans
+      # dépendance, donc importable avec le python3 du runner), l'application en
+      # appelant src/utils/jobSeo.js. Il échoue si un titre, une description ou
+      # une carte ne dit plus la même chose des deux côtés.
+      - name: Check job OG contract (app ↔ prerender, offline)
+        working-directory: frontend
+        run: node scripts/check-job-og-contract.js
+
       # Régression « chunk partagé pack2PageI18n » : le découpage par scope
       # (un dictionnaire par page lazy) ne doit pas réapparaître comme chunk
       # commun portant ≥ 3 dictionnaires (l'ancien monolithe ~60 kB chargé

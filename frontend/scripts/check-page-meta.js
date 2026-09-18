@@ -59,8 +59,11 @@
  * gabarit nu app.html (/dashboard, /profile — noindex) publient un titre neutre
  * VOLONTAIREMENT différent de celui de leur page ; ils sont NOMMÉS en notice
  * plutôt que passés sous silence. Les fiches /jobs/:id portent le texte de la
- * MISSION, qui n'existe pas avant la requête : leur carte est vérifiée en HTTP
- * contre le déploiement (scripts/check-og-images.js).
+ * MISSION, qui n'existe pas avant la requête : elles n'ont donc pas de table à
+ * confronter ici. Elles ont leur propre garde — scripts/check-job-og-contract.js
+ * compare, sur une mission de référence et SANS serveur, le HTML du pré-rendu
+ * (backend/kojo_job_og.py) à ce que l'application annonce (src/utils/jobSeo.js) —
+ * et scripts/check-og-images.js vérifie en plus le déploiement réel en HTTP.
  *
  * Usage : node scripts/check-page-meta.js
  */
