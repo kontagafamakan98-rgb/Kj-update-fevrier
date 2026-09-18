@@ -150,34 +150,71 @@ def send_probe_email(backend: str, alias: str, timeout: float = 30.0) -> str:
         raise RuntimeError(f"HTTP {error.code} sur {SEND_PATH} : {detail}") from error
 
 
-def fetch_probe_headers(creds: dict, alias: str, timeout: float = 180.0, poll: float = 10.0) -> bytes:
+def open_inbox(creds: dict):
+    """Ouvre une session IMAP et sélectionne INBOX en LECTURE SEULE.
+
+    Une erreur de connexion ou d'identification remonte telle quelle : elle est
+    définitive (mot de passe révoqué, IMAP désactivé) et doit arrêter la sonde
+    immédiatement, pas être retentée jusqu'au délai.
+    """
+    box = imaplib.IMAP4_SSL(
+        creds["host"], IMAP_PORT, ssl_context=ssl.create_default_context(), timeout=45
+    )
+    try:
+        box.login(creds["user"], creds["password"])
+        box.select("INBOX", readonly=True)
+    except Exception:
+        try:
+            box.logout()
+        except Exception:  # noqa: BLE001 — un logout raté ne masque pas l'erreur d'origine
+            pass
+        raise
+    return box
+
+
+def fetch_probe_headers(creds: dict, alias: str, timeout: float = 180.0, poll: float = 10.0,
+                        imap_factory=None, sleep=time.sleep) -> bytes:
     """Attend le message de l'alias et renvoie ses EN-TÊTES bruts.
 
     `BODY.PEEK[HEADER]` : on ne marque pas le message comme lu (la boîte reste
     utilisable à la main) et on ne télécharge pas un corps inutile.
+
+    ⚠️ Une session NEUVE à chaque essai, et non une session gardée ouverte.
+    Mesuré le 18/09/2026 sur la boîte réelle, avec le MÊME message : une session
+    ouverte AVANT l'arrivée ne le voit jamais (240 s d'essais sans le voir),
+    tandis qu'une session ouverte après le trouve en 14 s. La livraison, elle,
+    est immédiate (`INTERNALDATE` = `Date` d'émission à 1 s près) : l'ancienne
+    optimisation « une seule connexion pour épargner Gmail » faisait donc
+    échouer la sonde à tous les coups en accusant la livraison.
+
+    Une erreur d'IDENTIFICATION interrompt la sonde immédiatement (cf.
+    `open_inbox`) ; une session qui tombe en cours de route est simplement
+    remplacée au tour suivant.
     """
+    open_box = imap_factory or open_inbox
     deadline = time.monotonic() + timeout
-    # UNE connexion, interrogée en boucle : Gmail limite les connexions IMAP
-    # simultanées et les reconnexions répétées d'une sonde le font bloquer.
-    with imaplib.IMAP4_SSL(creds["host"], IMAP_PORT, ssl_context=ssl.create_default_context(), timeout=45) as box:
-        box.login(creds["user"], creds["password"])
+    while True:
+        # Hors du `try` : une identification refusée est définitive et doit
+        # arrêter la sonde tout de suite, pas être retentée jusqu'au délai.
+        box = open_box(creds)
         try:
-            box.select("INBOX", readonly=True)
-            while True:
-                typ, data = box.search(None, "TO", f'"{alias}"')
-                if typ == "OK" and data and data[0].split():
-                    number = data[0].split()[-1]
-                    typ, fetched = box.fetch(number, "(BODY.PEEK[HEADER])")
-                    if typ == "OK" and fetched and isinstance(fetched[0], tuple):
-                        return fetched[0][1]
-                if time.monotonic() >= deadline:
-                    raise TimeoutError(f"aucun message pour {alias} après {int(timeout)} s")
-                time.sleep(poll)
+            typ, data = box.search(None, "TO", f'"{alias}"')
+            if typ == "OK" and data and data[0].split():
+                number = data[0].split()[-1]
+                typ, fetched = box.fetch(number, "(BODY.PEEK[HEADER])")
+                if typ == "OK" and fetched and isinstance(fetched[0], tuple) and fetched[0][1]:
+                    return fetched[0][1]
+        except imaplib.IMAP4.error:
+            # Session morte en cours de route : on en rouvre une au tour suivant.
+            pass
         finally:
             try:
                 box.logout()
-            except Exception:  # noqa: BLE001 — un logout raté ne doit pas masquer le verdict
+            except Exception:  # noqa: BLE001 — un logout raté ne masque pas le verdict
                 pass
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"aucun message pour {alias} après {int(timeout)} s")
+        sleep(poll)
 
 
 def main(argv=None) -> int:
@@ -206,8 +243,18 @@ def main(argv=None) -> int:
 
     try:
         headers = fetch_probe_headers(creds, alias, timeout=args.timeout)
-    except (TimeoutError, imaplib.IMAP4.error, OSError, ssl.SSLError) as error:
-        print(f"::error title=Message non lu::{error}")
+    except imaplib.IMAP4.error as error:
+        # Définitif, et rien à voir avec la lecture d'un message : le titre le dit.
+        print(
+            f"::error title=Identification IMAP refusée::{error} — vérifier "
+            "KOJO_PROBE_IMAP_USER (adresse complète de la boîte) et "
+            "KOJO_PROBE_IMAP_PASSWORD (mot de passe d'APPLICATION de 16 lettres ; un mot de "
+            "passe de compte Google est refusé en IMAP)."
+        )
+        return 1
+    except (TimeoutError, OSError, ssl.SSLError) as error:
+        print(f"::error title=Message non livré::{error} — l'envoi de production a répondu 200, "
+              "donc c'est la livraison qui manque, pas l'authentification du message.")
         return 1
 
     verdicts, transcript = authentication_verdicts(headers)

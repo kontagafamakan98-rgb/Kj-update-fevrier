@@ -146,3 +146,135 @@ class TestAliasEtAnnulation:
         assert creds["host"] == "imap.gmail.com"
         assert creds["user"] == "kojoapp98@gmail.com"
         assert creds["password"] == "abcd efgh"
+
+
+class FausseSession:
+    """Session IMAP simulée : `search` répond selon le numéro d'essai.
+
+    Un double fidèle, et non un simple mouchard : la sonde n'utilise que
+    `search` (TO), `fetch` (BODY.PEEK[HEADER]) et `logout`, donc le double doit
+    porter exactement ce contrat — dont la forme `(typ, [(bytes, bytes)])` de
+    `fetch`, qu'un double approximatif ne reproduirait pas.
+    """
+
+    def __init__(self, entete=None):
+        self.entete = entete
+        self.logout_appele = False
+
+    def search(self, *_args):
+        return ("OK", [b"12"] if self.entete else [b""])
+
+    def fetch(self, *_args):
+        return ("OK", [(b"12 (BODY[HEADER] {0}", self.entete or b"")])
+
+    def logout(self):
+        self.logout_appele = True
+
+
+class SessionPerdue(FausseSession):
+    def search(self, *_args):
+        raise probe_error()
+
+
+def probe_error():
+    import imaplib
+
+    return imaplib.IMAP4.error("session morte")
+
+
+class TestSessionsNeuveAChaqueEssai:
+    """Le défaut mesuré le 18/09/2026 : une session gardée ouverte ne voit
+    JAMAIS le message arrivé après son ouverture (240 s d'essais), alors qu'une
+    session ouverte après le trouve en 14 s — même message, mêmes identifiants.
+    La sonde doit donc rouvrir une session à chaque essai.
+    """
+
+    def test_rouvre_une_session_a_chaque_essai(self, probe):
+        sessions = []
+
+        def fabrique(_creds):
+            # La première session ne voit rien, la deuxième trouve le message.
+            session = FausseSession(entete=b"Authentication-Results: mx.google.com; dkim=pass\r\n")
+            if not sessions:
+                session.entete = None
+            sessions.append(session)
+            return session
+
+        entete = probe.fetch_probe_headers(
+            {"host": "imap.test", "user": "u@test.dev", "password": "p"},
+            "u+kojo-probe-1@test.dev",
+            timeout=30,
+            imap_factory=fabrique,
+            sleep=lambda _s: None,
+        )
+
+        assert entete.startswith(b"Authentication-Results")
+        assert len(sessions) == 2, "une session neuve doit etre ouverte a chaque essai"
+        assert all(session.logout_appele for session in sessions), "chaque session est refermee"
+
+    def test_une_session_qui_tombe_ne_condamne_pas_la_sonde(self, probe):
+        sessions = []
+
+        def fabrique(_creds):
+            session = SessionPerdue() if not sessions else FausseSession(entete=b"Authentication-Results: ok\r\n")
+            sessions.append(session)
+            return session
+
+        entete = probe.fetch_probe_headers(
+            {"host": "imap.test", "user": "u@test.dev", "password": "p"},
+            "u+kojo-probe-1@test.dev",
+            timeout=30,
+            imap_factory=fabrique,
+            sleep=lambda _s: None,
+        )
+
+        assert entete == b"Authentication-Results: ok\r\n"
+        assert len(sessions) == 2
+
+    def test_un_refus_didentification_remonte_immediatement(self, probe):
+        """Un mot de passe refusé est définitif : le retenter en boucle ferait
+        attendre le délai complet pour un diagnostic qui tient en un message.
+        """
+        import imaplib
+
+        essais = []
+
+        def fabrique(_creds):
+            essais.append(1)
+            raise imaplib.IMAP4.error("[AUTHENTICATIONFAILED] Invalid credentials (Failure)")
+
+        with pytest.raises(imaplib.IMAP4.error):
+            probe.fetch_probe_headers(
+                {"host": "imap.test", "user": "u@test.dev", "password": "faux"},
+                "u+kojo-probe-1@test.dev",
+                timeout=30,
+                imap_factory=fabrique,
+                sleep=lambda _s: None,
+            )
+
+        assert len(essais) == 1, "un refus d'identification ne se retente pas"
+
+    def test_epuise_le_delai_en_rouvrant_des_sessions(self, probe):
+        sessions = []
+        horloge = iter([0, 0, 0, 5, 10, 20, 30])  # délai de 20 s franchi au 6e contrôle
+
+        def fabrique(_creds):
+            session = FausseSession()
+            sessions.append(session)
+            return session
+
+        original = probe.time.monotonic
+        probe.time.monotonic = lambda: next(horloge, 30)
+        try:
+            with pytest.raises(TimeoutError):
+                probe.fetch_probe_headers(
+                    {"host": "imap.test", "user": "u@test.dev", "password": "p"},
+                    "u+kojo-probe-1@test.dev",
+                    timeout=20,
+                    imap_factory=fabrique,
+                    sleep=lambda _s: None,
+                )
+        finally:
+            probe.time.monotonic = original
+
+        assert len(sessions) >= 2, "plusieurs sessions avant d'abandonner"
