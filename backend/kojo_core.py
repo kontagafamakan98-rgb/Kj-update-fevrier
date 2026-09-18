@@ -505,6 +505,72 @@ def build_trusted_hosts() -> List[str]:
 
     return sorted(hosts)
 
+# Origines de DÉVELOPPEMENT (vite/`npm start` sur la machine du développeur).
+# Elles restent dans `allow_origins` quel que soit l'environnement — c'est le
+# comportement historique, et un navigateur distant ne peut pas usurper une
+# origine `localhost`.
+WEST_AFRICA_ORIGINS = [
+    "http://localhost:3000",
+    "https://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+
+def normalize_origin(value: str) -> Optional[str]:
+    """Origine CORS normalisée (`https://host`), ou None si inutilisable.
+
+    Un slash final ne matche JAMAIS l'en-tête `Origin` d'un navigateur :
+    `CORS_ORIGINS=https://kojo.example/` configurait donc une origine qui ne
+    correspondait à rien, sans aucun signal. On le supprime plutôt que de
+    laisser une panne silencieuse. Une valeur sans schéma est lue en `https`.
+    """
+    candidate = (value or "").strip().rstrip("/")
+    if not candidate:
+        return None
+    if "://" not in candidate:
+        candidate = f"https://{candidate}"
+    scheme, _, rest = candidate.partition("://")
+    if scheme not in {"http", "https"} or not rest or "/" in rest:
+        return None
+    return candidate
+
+
+def build_allowed_origins(frontend_url: Optional[str] = None, cors_value: Optional[str] = None,
+                          env: Optional[Dict[str, str]] = None) -> List[str]:
+    """Origines EXACTES autorisées par le middleware CORS.
+
+    `FRONTEND_APP_URL` en fait partie. Elle ne l'était pas : la liste valait
+    `WEST_AFRICA_ORIGINS + CORS_ORIGINS`, donc l'adresse canonique du frontend
+    n'était prise en compte que si quelqu'un l'avait recopiée dans
+    `CORS_ORIGINS`. Tant que le frontend vivait sous `*.vercel.app`, le motif
+    Vercel (`allow_origin_regex`) le couvrait — le trou restait invisible.
+    Le 18/09/2026 le frontend est passé sur `https://kojoforafrica.cc.cd` :
+    plus de motif qui matche, plus d'origine exacte déclarée, et tous les
+    appels portant un en-tête personnalisé (statistiques, géolocalisation) ont
+    été bloqués par le préflight — `400` « Disallowed CORS origin », sans
+    aucune erreur serveur.
+
+    Args:
+        frontend_url: surcharge de `FRONTEND_APP_URL` (tests).
+        cors_value: surcharge de `CORS_ORIGINS` (tests).
+        env: environnement à lire au lieu de `os.environ` (tests).
+
+    Returns:
+        Liste ordonnée sans doublon ; les entrées inutilisables sont ignorées.
+    """
+    env = os.environ if env is None else env
+    frontend = FRONTEND_APP_URL if frontend_url is None else frontend_url
+    cors_raw = env.get("CORS_ORIGINS", "") if cors_value is None else cors_value
+
+    candidates = list(WEST_AFRICA_ORIGINS) + [frontend] + str(cors_raw or "").split(",")
+    origins: List[str] = []
+    for candidate in candidates:
+        origin = normalize_origin(candidate)
+        if origin and origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 def get_rate_limit_bucket(path: str) -> tuple[str, int, int]:
     if path.startswith("/api/auth/email/") or path.startswith("/api/auth/password/"):
         return ("auth-otp", 12, 5)
