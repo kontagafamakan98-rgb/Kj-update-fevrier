@@ -64,16 +64,23 @@ export function socialAnchorsFrom(html, declared) {
       /* URL déjà écartée du sameAs */
     }
   }
-  const hrefs = [...String(html).matchAll(/<a\b[^>]*\shref="(https?:\/\/[^"]+)"/gi)].map(
-    (match) => match[1]
-  );
-  return [...new Set(hrefs.filter((href) => {
-    try {
-      return hosts.has(new URL(href).host);
-    } catch (_error) {
-      return false;
-    }
-  }))];
+  const source = String(html);
+  const count = (chunk) =>
+    [...chunk.matchAll(/<a\b[^>]*\shref="(https?:\/\/[^"]+)"/gi)].filter((match) => {
+      try {
+        return hosts.has(new URL(match[1]).host);
+      } catch (_error) {
+        return false;
+      }
+    }).length;
+  // Les OCCURRENCES, pas les URL distinctes : le même profil est publié deux
+  // fois (bloc « Suivez-nous » du corps + pied de page), et un décompte dédoublonné
+  // afficherait le même chiffre avant et après l'ajout du bloc — une mesure qui
+  // ne bouge pas ne prouve rien. La part d'AVANT le pied de page est ce qui dit
+  // si un crawler voit les liens dans le corps de page.
+  const total = count(source);
+  const body = count(source.split(/<footer\b/i)[0]);
+  return { total, body };
 }
 
 /**
@@ -102,7 +109,7 @@ export function analyzeSeoServedHtml(html = '') {
       present: social.length > 0,
       value: social.join(', '),
       count: social.length,
-      anchors: socialAnchorsFrom(source, social).length,
+      ...socialAnchorsFrom(source, social),
     },
   };
 }
@@ -118,8 +125,9 @@ export function noticeFor({ key, label, env }, state) {
       : key === 'gsc'
         ? `jeton ${String(state.value).slice(0, 8)}…`
         : key === 'social'
-          ? `${state.count} profil(s) dans le sameAs, ${state.anchors} lien(s) dans le HTML servi` +
-            (state.anchors === 0
+          ? `${state.count} profil(s) dans le sameAs, ${state.total} lien(s) dans le HTML servi ` +
+            `(dont ${state.body} dans le corps, avant le pied de page)` +
+            (state.total === 0
               ? " — AUCUN lien social dans le HTML brut : un crawler sans JavaScript ne peut pas les voir (bloc social du shell pré-rendu et footer)"
               : '')
           : 'CSP script-src ouverte (script injecté par le bundle)';

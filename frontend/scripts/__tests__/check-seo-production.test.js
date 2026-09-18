@@ -26,7 +26,7 @@ const CONFIGURED_HTML = `<!doctype html><html><head>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ABC1234567"></script>
 <meta content="jeton-gsc-abc123" name="google-site-verification">
 <script type="application/ld+json">{"@type":"LocalBusiness","sameAs":["https://www.facebook.com/kojo","http://insecure.test"]}</script>
-</head><body><div id="root"><a href="https://www.facebook.com/kojo" rel="me noreferrer">Facebook</a></div></body></html>`;
+</head><body><div id="root"><a href="https://www.facebook.com/kojo" rel="me noreferrer">Facebook</a></div><footer><a href="https://www.facebook.com/kojo" rel="me noreferrer">Facebook</a></footer></body></html>`;
 
 // HTML « non configuré » : l'état de la production tant que Vercel n'a rien.
 const UNCONFIGURED_HTML = `<!doctype html><html><head>
@@ -60,24 +60,36 @@ describe('analyse du HTML servi', () => {
     expect(analysis.gsc).toEqual({ present: true, value: 'jeton-gsc-abc123' });
     expect(analysis.plausible.present).toBe(true);
     // Le http:// du sameAs est écarté : un lien mixte n'a rien à y faire.
-    // `anchors` compte les liens du HTML SERVI vers un hôte déclaré : un
-    // `sameAs` rempli sans lien visible pour un crawler sans JavaScript.
+    // `total` compte les OCCURRENCES dans le HTML servi, `body` celles d'AVANT
+    // le pied de page : le même profil publié deux fois (bloc du corps + footer)
+    // doit se voir — un décompte dédoublonné ne bougerait pas à l'ajout du bloc.
     expect(analysis.social).toEqual({
       present: true,
       value: 'https://www.facebook.com/kojo',
       count: 1,
-      anchors: 1,
+      total: 2,
+      body: 1,
     });
   });
 
-  it('un sameAs déclaré sans lien dans le corps est dit invisible, pas présent', () => {
+  it('un sameAs déclaré sans aucun lien est dit invisible, pas présent', () => {
     // Le cas que ce décompte existe pour nommer : la configuration est là, le
     // crawler ne voit rien.
-    const withoutLinks = CONFIGURED_HTML.replace(/<a href="[^"]+"[^>]*>[^<]*<\/a>/, '');
-    expect(analyzeSeoServedHtml(withoutLinks).social.anchors).toBe(0);
+    const withoutLinks = CONFIGURED_HTML.replace(/<a href="[^"]+"[^>]*>[^<]*<\/a>/g, '');
+    expect(analyzeSeoServedHtml(withoutLinks).social.total).toBe(0);
     expect(noticeFor(INTEGRATIONS[3], analyzeSeoServedHtml(withoutLinks).social)).toContain(
       'AUCUN lien social dans le HTML brut',
     );
+  });
+
+  it('ne compte que les hôtes que le sameAs déclare', () => {
+    // Un lien vers un profil non déclaré (ou vers un domaine quelconque) n'est
+    // pas un profil du site : le compter ferait dire « présent » à tort.
+    const withStranger = CONFIGURED_HTML.replace(
+      '</body>',
+      '<a href="https://instagram.com/quelquun">Instagram</a></body>',
+    );
+    expect(analyzeSeoServedHtml(withStranger).social.total).toBe(2);
   });
 
   it('ne voit rien dans le HTML non configuré', () => {
