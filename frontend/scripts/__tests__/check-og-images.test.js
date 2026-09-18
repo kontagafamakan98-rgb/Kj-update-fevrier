@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { runOgImageCheck, ROUTES, lighthouseAuditedPaths } from '../check-og-images';
+import {
+  runOgImageCheck,
+  ROUTES,
+  GENERIC_CARD,
+  DEDICATED_CARDS,
+  deriveRoutes,
+  lighthouseAuditedPaths,
+} from '../check-og-images';
 
 // Tests du garde-fou « og:image par route » (scripts/check-og-images.js).
 //
@@ -309,7 +316,7 @@ describe('check-og-images — routes statiques', () => {
   });
 });
 
-describe('check-og-images — une seule table route → carte OG', () => {
+describe('check-og-images — la table route → carte DÉRIVE des pages du projet', () => {
   const withConfig = (source) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'og-lhci-'));
     const file = path.join(dir, 'lighthouserc.cjs');
@@ -318,34 +325,59 @@ describe('check-og-images — une seule table route → carte OG', () => {
     return file;
   };
 
-  it('couvre TOUTE route auditée par Lighthouse CI, /forgot-password compris', async () => {
-    // Écart réel jusqu'au 18/09/2026 : /forgot-password était auditée (budget
-    // CLS des PR #19/#20) mais absente de la table des cartes, donc sa carte
-    // n'était vérifiée par personne. Ce test échoue si elle disparaît à nouveau.
+  it("n'a plus qu'UNE liste : la table EST celle des pages du projet", () => {
+    // Écart réel jusqu'au 18/09/2026 : deux listes coexistaient — les pages
+    // auditées par Lighthouse et les pages à carte OG — et rien ne les
+    // empêchait de diverger : /forgot-password était auditée (budget CLS des
+    // PR #19/#20) pendant que sa carte n'était vérifiée par personne.
     const audited = lighthouseAuditedPaths();
-    expect(audited).toEqual(expect.arrayContaining(['/forgot-password', '/register', '/jobs']));
-
-    const declared = new Set(ROUTES.map((route) => route.path));
-    expect(audited.filter((p) => !declared.has(p))).toEqual([]);
-  });
-
-  it("échoue si une route auditée n'a pas de carte déclarée", async () => {
-    const config = withConfig(
-      "const DEPLOYMENT_PATHS = ['/', '/une-route-sans-carte'];\nmodule.exports = {};\n"
+    expect(audited).toEqual(
+      expect.arrayContaining(['/forgot-password', '/register', '/jobs'])
     );
-    const { result } = await run(defaultMap(), { lighthouseConfig: config });
-
-    expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toContain('/une-route-sans-carte');
+    expect(ROUTES.map((route) => route.path)).toEqual(audited);
+    // Une carte dédiée pour une page hors liste serait silencieusement perdue
+    // (personne ne la vérifierait) : c'est le seul écart qui survit à la
+    // dérivation, donc il est verrouillé.
+    const orphans = Object.keys(DEDICATED_CARDS).filter((p) => !audited.includes(p));
+    expect(orphans).toEqual([]);
   });
 
-  it('échoue, avec un message explicite, quand la liste auditée est illisible', async () => {
-    const { result } = await run(defaultMap(), {
-      lighthouseConfig: withConfig('module.exports = {};\n'),
-    });
+  it('donne la carte dédiée aux pages qui en ont une, la générique à toutes les autres', () => {
+    expect(deriveRoutes(['/jobs', '/register', '/login'])).toEqual([
+      { path: '/jobs', image: '/og-jobs.png', imageSquare: '/og-jobs-square.png' },
+      { path: '/register', ...GENERIC_CARD },
+      { path: '/login', image: '/og-login.png', imageSquare: '/og-login-square.png' },
+    ]);
+  });
+
+  it("vérifie AUSSI la carte d'une page auditée sans visuel dédié", async () => {
+    // Avant, une page auditée sans carte déclarée était signalée par une
+    // comparaison de listes ; maintenant elle est réellement VÉRIFIÉE, avec la
+    // carte générique. Ce test le prouve sur un `fetch` stub.
+    const map = defaultMap();
+    map[`${ORIGIN}/nouvelle-page`] = {
+      body: pageHtml({
+        og: `${ORIGIN}${GENERIC_CARD.image}`,
+        square: `${ORIGIN}${GENERIC_CARD.imageSquare}`,
+      }),
+    };
+    const { result, calls } = await run(map, { routes: deriveRoutes(['/', '/nouvelle-page']) });
+
+    expect(result.ok).toBe(true);
+    expect(calls).toContain(`${ORIGIN}/nouvelle-page`);
+  });
+
+  it('échoue, en le nommant, quand la liste des pages est illisible (faux vert)', async () => {
+    // La dérivation rend ce faux vert possible : une config illisible donne une
+    // table VIDE, donc un contrôle qui ne porte sur rien. Il doit le dire au
+    // lieu de passer en vert.
+    const config = withConfig('module.exports = {};\n');
+    expect(lighthouseAuditedPaths(config)).toBe(null);
+
+    const { result } = await run(defaultMap(), { routes: deriveRoutes(null) });
 
     expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toMatch(/DEPLOYMENT_PATHS illisible/);
+    expect(result.errors.join('\n')).toMatch(/aucune page lue dans lighthouserc\.cjs/);
   });
 });
 

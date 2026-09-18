@@ -85,17 +85,21 @@ describe('lighthouserc — sélection des pages auditées', () => {
 
   // Ce qu'il faut verrouiller : un déploiement réel est audité sur toutes les
   // pages dont on veut suivre le CLS — pages protégées comprises (sinon leurs
-  // budgets ne mesurent rien) et les 2 pages d'auth publiques corrigées par les
-  // PR #19/#20 (/register, /forgot-password) — tandis que le repli build local
-  // n'audite que des pages réellement servies.
+  // budgets ne mesurent rien) et les pages PUBLIQUES, dont /register et
+  // /forgot-password corrigées par les PR #19/#20 — tandis que le repli build
+  // local n'audite que des pages réellement servies.
   it('audite les pages d’un déploiement réel (dont /register et /forgot-password)', () => {
     const paths = pathsOf(readConfig(), 'DEPLOYMENT_PATHS');
     expect(paths).toEqual([
       '/',
+      '/jobs',
+      '/login',
       '/register',
       '/forgot-password',
+      '/payment',
+      '/how-it-works',
+      '/support',
       '/dashboard',
-      '/jobs',
       '/profile',
     ]);
   });
@@ -112,7 +116,7 @@ describe('lighthouserc — sélection des pages auditées', () => {
   it('traite une base LOOPBACK comme le repli local (la CI y sert la table de rewrites)', () => {
     // Depuis le 17/09/2026 la CI passe une URL loopback à ce config pour y
     // exercer le cycle /jobs/:id en HTTP. Sans cette règle, Lighthouse y
-    // auditerait les 6 pages prévues pour un VRAI déploiement : /dashboard,
+    // auditerait les 10 pages prévues pour un VRAI déploiement : /dashboard,
     // /jobs et /profile y redirigent vers /login (le build est compilé avec
     // l'API de prod) — des mesures qui ne décrivent aucune page, avec le
     // plafond TBT strict d'un déploiement au lieu de celui du repli.
@@ -122,7 +126,7 @@ describe('lighthouserc — sélection des pages auditées', () => {
     expect(m[1]).toMatch(/!baseUrl/);
     // La règle est LUE et exécutée, pas recopiée : un motif qui ne
     // reconnaîtrait pas 127.0.0.1 (l'adresse réellement utilisée par la CI)
-    // ferait échouer ce test, au lieu de laisser passer six pages auditées.
+    // ferait échouer ce test, au lieu de laisser passer dix pages auditées.
     const literal = /(\/\^[\s\S]*?\/)\.test\(baseUrl\)/.exec(m[1]);
     expect(literal, 'motif loopback introuvable dans targetIsLocal').not.toBeNull();
     const matcher = new RegExp(literal[1].slice(1, -1));

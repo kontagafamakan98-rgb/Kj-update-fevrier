@@ -2,21 +2,23 @@
 /**
  * Vérification OG des pages auditées par Lighthouse CI (job lighthouse-ci).
  *
- * La correspondance route → carte OG vit ICI et nulle part ailleurs (`ROUTES`) :
- * vite.config.js l'importe pour écrire les coquilles pré-rendues, donc le
- * producteur et le vérificateur ne peuvent plus diverger — et une route
- * pré-rendue absente de la table fait ÉCHOUER le build.
+ * La liste des routes vient des PAGES DU PROJET (`DEPLOYMENT_PATHS` de
+ * lighthouserc.cjs, lues par lighthouseAuditedPaths) et la table route → carte
+ * OG en DÉRIVE (`ROUTES`, plus bas) : vite.config.js l'importe pour écrire les
+ * coquilles pré-rendues, donc le producteur, le vérificateur et le périmètre
+ * Lighthouse ne peuvent plus diverger — une page pré-rendue absente de la liste
+ * fait ÉCHOUER le build (voir deriveRoutes).
  *
  * Pour chaque route de la table, fetch le HTML SERVI (ce que reçoit un crawler
  * sans JS) et vérifie :
  *   1. la meta og:image est présente ;
  *   2. elle est en URL ABSOLUE (https://…) — une URL relative est ignorée
  *      par les crawlers de partage ;
- *   3. elle pointe vers la carte DÉCLARÉE pour cette route, et la variante
- *      CARRÉE déclarée est elle aussi présente ;
+ *   3. elle pointe vers la carte dérivée pour cette route, et la variante
+ *      CARRÉE dérivée est elle aussi présente ;
  *   4. twitter:image est aussi absolue.
- * Et, avant tout appel réseau : toute route auditée par lighthouserc.cjs doit
- * figurer dans la table (garde de couverture, voir lighthouseAuditedPaths).
+ * Et, avant tout appel réseau : la table n'est pas vide (une liste illisible ne
+ * doit pas produire un contrôle qui ne vérifie rien).
  * Puis, pour /jobs/:id (fiche mission pré-rendue par le backend), valide la
  * carte DYNAMIQUE de la mission (méta OG réelles + cartes Pillow wide/carrée)
  * lorsqu'une mission existe, et le chemin 404 (noindex) sinon.
@@ -44,37 +46,40 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } from './site-meta.js';
 
-// ── SOURCE UNIQUE de la correspondance route → carte OG ────────────────────
-// `vite.config.js` importe ce tableau et n'en garde AUCUNE copie : il écrit les
-// coquilles pré-rendues à partir d'ici, et refuse de builder une route
-// pré-rendue qui n'y figure pas (sinon og:image serait absente du shell).
-//
-// `image` = carte wide attendue (l'URL servie doit se terminer par ce chemin) ;
-// `imageSquare` = variante CARRÉE 1200x1200 (réseaux qui recadrent en 1:1).
-// Chaque route du build a une carte : les pages sans visuel dédié portent la
-// carte GÉNÉRIQUE de l'accueil, déclarée explicitement plutôt que sous-entendue
-// — c'est ce qui permet de la vérifier page par page au lieu de n'exiger
-// qu'une URL absolue, et de figer la carte des routes servies par app.html
-// (dérivé d'index.html, donc de cette même carte).
+// ── Ce qui reste ici : QUELLES pages ont un visuel dédié ────────────────────
+// La liste des routes n'est plus recopiée : `ROUTES` (plus bas) DÉRIVE des
+// pages du projet lues dans lighthouserc.cjs. Une page auditée sans carte
+// dédiée reçoit la carte générique — donc elle est vérifiée, jamais oubliée.
+// `image` = carte wide attendue ; `imageSquare` = variante CARRÉE 1200x1200
+// (réseaux qui recadrent en 1:1).
 export const GENERIC_CARD = {
   image: '/og-image-1200x630.png',
   imageSquare: '/og-square-1200x1200.png',
 };
 
-export const ROUTES = [
-  { path: '/', ...GENERIC_CARD },
-  { path: '/jobs', image: '/og-jobs.png', imageSquare: '/og-jobs-square.png' },
-  { path: '/login', image: '/og-login.png', imageSquare: '/og-login-square.png' },
-  { path: '/register', ...GENERIC_CARD },
-  { path: '/forgot-password', ...GENERIC_CARD },
-  { path: '/payment', ...GENERIC_CARD },
-  { path: '/how-it-works', ...GENERIC_CARD },
-  { path: '/support', ...GENERIC_CARD },
-  // Servies par app.html : aucun visuel dédié, la carte générique est celle
-  // qu'elles héritent d'index.html.
-  { path: '/dashboard', ...GENERIC_CARD },
-  { path: '/profile', ...GENERIC_CARD },
-];
+export const DEDICATED_CARDS = {
+  '/jobs': { image: '/og-jobs.png', imageSquare: '/og-jobs-square.png' },
+  '/login': { image: '/og-login.png', imageSquare: '/og-login-square.png' },
+};
+
+/**
+ * Table route → carte, à partir des routes à couvrir.
+ *
+ * `vite.config.js` importe le résultat et n'en garde AUCUNE copie : il écrit les
+ * coquilles pré-rendues à partir d'ici, et refuse de builder une route qui n'y
+ * figure pas (sinon og:image serait absente du shell).
+ *
+ * Exportée séparément pour être éprouvable : la table du module, elle, est
+ * calculée une fois au chargement depuis la config réelle.
+ *
+ * @param {string[]|null} paths Chemins à couvrir (null = config illisible).
+ */
+export function deriveRoutes(paths) {
+  return (paths || []).map((routePath) => ({
+    path: routePath,
+    ...(DEDICATED_CARDS[routePath] || GENERIC_CARD),
+  }));
+}
 
 // Résolu au niveau module, comme check-home-shell.js : sous vitest,
 // `import.meta.url` n'est pas exploitable pour construire une URL relative.
@@ -85,19 +90,18 @@ const LIGHTHOUSERC_PATH = path.resolve(
 );
 
 /**
- * Routes que Lighthouse CI audite, lues dans lighthouserc.cjs.
+ * Pages du projet, lues dans lighthouserc.cjs — SOURCE UNIQUE des routes.
  *
  * ── Pourquoi les lire au lieu de les recopier ──────────────────────────────
  * /forgot-password était auditée (budget CLS des PR #19/#20) mais ABSENTE de
  * la table des cartes : sa carte OG n'était vérifiée par personne. Recopier la
- * liste ici aurait recréé exactement le même écart ; la lire rend l'écart
- * impossible à ignorer, puisque runOgImageCheck échoue dès qu'une route
- * auditée n'a pas de carte déclarée.
+ * liste ici aurait recréé exactement le même écart ; la DÉRIVER le rend
+ * impossible — il n'y a plus deux ensembles à comparer.
  *
  * `DEPLOYMENT_PATHS` et non la liste effective du run : cette dernière vaut
  * ['/'] quand aucune base n'est fournie (repli local de Lighthouse), ce qui
- * viderait la garde de son sens. On veut les pages à surveiller, pas celles du
- * run en cours.
+ * viderait la table de son sens. On veut les pages du projet, pas celles du run
+ * en cours.
  *
  * @param {string} [configPath] Chemin de la config (injectable pour les tests).
  * @returns {string[]|null} Chemins audités, ou null si illisible — l'appelant
@@ -115,6 +119,10 @@ export function lighthouseAuditedPaths(configPath = LIGHTHOUSERC_PATH) {
   const paths = [...block[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
   return paths.length ? paths : null;
 }
+
+// La table du module : elle exige LIGHTHOUSERC_PATH, donc elle est calculée
+// APRÈS la lecture (avant, elle laissait une dépendance dans le vide).
+export const ROUTES = deriveRoutes(lighthouseAuditedPaths());
 
 export const DEFAULT_BASE = 'http://localhost:4173';
 // Origine de l'API : propriété de scripts/site-meta.js (avec SITE_ORIGIN, car
@@ -190,8 +198,8 @@ export async function baseServesJobOgRoute({ base, fetchImpl = fetch, timeoutMs 
  *   branche 200 avec une fiche CONNUE (l'ordre de /api/jobs n'est pas garanti).
  * @param {boolean} [options.onlyJob] Ne vérifier QUE la fiche mission (sauter
  *   les routes statiques déjà couvertes par le run principal du check).
- * @param {string} [options.lighthouseConfig] Config Lighthouse dont on lit les
- *   routes auditées (injectable pour les tests).
+ * @param {Array} [options.routes] Table route → carte à vérifier (défaut :
+ *   `ROUTES`, dérivée des pages du projet ; injectable pour les tests).
  * @returns {Promise<{ok: boolean, errors: string[], checked: string[],
  *   jobId: string, jobTitle: string, job200Exercised: boolean,
  *   jobRoute: {serves: boolean, status: number, url: string, detail: string},
@@ -205,7 +213,7 @@ export async function runOgImageCheck({
   fetchImpl = fetch,
   job = null,
   onlyJob = false,
-  lighthouseConfig = LIGHTHOUSERC_PATH,
+  routes = ROUTES,
 } = {}) {
   const pinnedJob = job && job.id ? { id: String(job.id), title: String(job.title || '') } : null;
   const BASE = String(base).trim().replace(/\/+$/, '');
@@ -272,29 +280,19 @@ export async function runOgImageCheck({
     checked.push(`  ✓ og:image HTTP 200 ${width}x${height} (${contentType}) : ${url}`);
   }
 
-  // ── Garde de couverture : toute route AUDITÉE par Lighthouse doit avoir sa
-  // carte déclarée ci-dessus. Sans elle, une page dont on surveille pourtant le
-  // rendu peut servir n'importe quel og:image sans que rien ne le voie — le cas
-  // réel de /forgot-password, auditée pour son CLS et absente de la table.
-  if (!onlyJob) {
-    const audited = lighthouseAuditedPaths(lighthouseConfig);
-    if (!audited) {
-      errors.push(
-        'lighthouserc.cjs : liste DEPLOYMENT_PATHS illisible — impossible de vérifier que chaque route auditée a une carte OG déclarée'
-      );
-    } else {
-      const declared = new Set(ROUTES.map((route) => route.path));
-      const withoutCard = audited.filter((routePath) => !declared.has(routePath));
-      if (withoutCard.length) {
-        errors.push(
-          `route(s) auditée(s) par Lighthouse CI sans carte OG déclarée : ${withoutCard.join(', ')} — ` +
-            "ajouter l'entrée dans ROUTES (scripts/check-og-images.js) ou retirer la route de DEPLOYMENT_PATHS (lighthouserc.cjs)"
-        );
-      }
-    }
+  // ── Garde de non-vacuité : la table dérive des pages du projet, donc une
+  // liste illisible ne laisse PAS une garde muette mais un contrôle qui ne
+  // porte sur rien. C'est le seul faux vert que la dérivation rend possible —
+  // et il est nommé ici plutôt que traversé en silence (le build, lui, échoue
+  // aussi : une coquille pré-rendue sans carte l'arrête).
+  if (!onlyJob && routes.length === 0) {
+    errors.push(
+      'aucune page lue dans lighthouserc.cjs (DEPLOYMENT_PATHS illisible ou vide) : la table ' +
+        'route → carte en DÉRIVE, donc ce contrôle ne porterait sur aucune page'
+    );
   }
 
-  for (const route of onlyJob ? [] : ROUTES) {
+  for (const route of onlyJob ? [] : routes) {
     const url = `${BASE}${route.path}`;
     let html = '';
     try {

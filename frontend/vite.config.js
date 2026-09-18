@@ -884,13 +884,16 @@ export default defineConfig(({ mode }) => {
           )
 
           for (const [route, meta] of Object.entries(ROUTES)) {
-            // Carte OG de la route : lue dans la table unique. Sans entrée, le
-            // shell publierait `content="…undefined"` — on échoue ici.
+            // Carte OG de la route : lue dans la table unique, qui DÉRIVE des
+            // pages du projet (DEPLOYMENT_PATHS de lighthouserc.cjs). Une route
+            // pré-rendue absente de cette liste n'a pas de carte : c'est le
+            // garde-fou qui empêche d'écrire une coquille que rien ne surveille.
             const card = OG_CARDS[`/${route}`]
             if (!card) {
               throw new Error(
-                `prerender-route-meta : la route pré-rendue « /${route} » n'a pas de carte OG déclarée ` +
-                  "dans scripts/check-og-images.js (ROUTES) — ajouter l'entrée"
+                `prerender-route-meta : la route pré-rendue « /${route} » est absente des pages du projet ` +
+                  '(lighthouserc.cjs, DEPLOYMENT_PATHS) — la table des cartes OG en dérive. ' +
+                  'Ajouter la route là-bas (elle y est auditée par Lighthouse), ou retirer sa coquille.'
               )
             }
             const url = `${origin}/${route}`

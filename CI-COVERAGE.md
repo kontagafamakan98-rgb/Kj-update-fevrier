@@ -235,7 +235,7 @@ rapport Lighthouse uploadé en artifact du prochain run.
 
 Un TBT 40× au-dessus de la médiane ou un LCP doublé passent encore au vert :
 la détection d'une régression *relative* exigerait un serveur LHCI, absent. Le
-garde attrape un **effondrement**, et il le fait désormais sur les 6 pages.
+garde attrape un **effondrement**, et il le fait désormais sur les 10 pages.
 
 ### F2bis — Lighthouse n'auditait qu'UNE page, à cause d'un nom de variable
 

@@ -53,10 +53,10 @@ const authHeader = (process.env.KOJO_LHCI_AUTH_HEADER || '').trim();
 const localBase = 'http://localhost:4173';
 
 // Pages auditées selon ce qui est réellement servi :
-//  • DÉPLOIEMENT réel → les 6 pages dont on mesure la stabilité de mise en page :
-//    l'accueil, les 2 pages d'auth PUBLIQUES (/register, /forgot-password) et
-//    les 3 pages protégées (rendues avec l'état du compte CI, cf. le jeton
-//    Bearer plus bas) ;
+//  • DÉPLOIEMENT réel → les 10 pages dont on mesure la stabilité de mise en page :
+//    l'accueil, les pages PUBLIQUES (/login, /register, /forgot-password,
+//    /how-it-works, /support, /jobs) et les pages protégées (rendues avec l'état
+//    du compte CI, cf. le jeton Bearer plus bas) ;
 //  • repli local (base absente ou LOOPBACK) → l'accueil SEUL. Le repli local
 //    sert le build hors du déploiement : la table de rewrites y est rejouée par
 //    scripts/vercel-rewrite-server.js, donc les routes existent bien, mais le
@@ -70,13 +70,35 @@ const localBase = 'http://localhost:4173';
 // ⚠️ Deux noms, deux significations : `DEPLOYMENT_PATHS` = URLs auditées quand
 // un VRAI déploiement est disponible (le Bearer y est inoffensif sur les pages
 // publiques) ; `LOCAL_FALLBACK_PATHS` = URLs réellement servies par le repli.
+//
+// ── `DEPLOYMENT_PATHS` est la LISTE DES PAGES DU PROJET ──────────────────────
+// Ce n'est pas seulement le périmètre de Lighthouse : la table route → carte OG
+// (scripts/check-og-images.js, `ROUTES`) en DÉRIVE, elle ne la recopie plus. Deux
+// listes coexistaient — les pages auditées et les pages à carte — et rien ne les
+// empêchait de diverger : /forgot-password a été auditée pour son CLS pendant
+// que sa carte OG n'était vérifiée par personne, et sept pages pré-rendues
+// pouvaient l'être sans jamais être mesurées. Désormais :
+//   • une page auditée sans carte déclarée reçoit la carte GÉNÉRIQUE (définie),
+//     donc elle est vérifiée au lieu d'être oubliée ;
+//   • une page PRÉ-RENDUE absente d'ici fait ÉCHOUER le build (vite.config.js),
+//     donc on ne peut plus écrire une coquille que rien ne surveille ;
+//   • une carte dédiée absente d'ici n'existe plus : c'est la même liste.
+// Les 4 pages ajoutées le 18/09/2026 (/login, /payment, /how-it-works, /support)
+// sont exactement celles qui étaient pré-rendues hors du périmètre : /login
+// portait même une carte DÉDIÉE (og-login.png) que personne ne vérifiait.
+// /payment est protégée — le Bearer du job CI la rend comme un utilisateur
+// connecté, ce que sa coquille pré-rendue décrit déjà.
 const LOCAL_FALLBACK_PATHS = ['/'];
 const DEPLOYMENT_PATHS = [
   '/',
+  '/jobs',
+  '/login',
   '/register',
   '/forgot-password',
+  '/payment',
+  '/how-it-works',
+  '/support',
   '/dashboard',
-  '/jobs',
   '/profile',
 ];
 // Le repli « build local » n'est pas seulement l'ABSENCE d'URL : depuis le
