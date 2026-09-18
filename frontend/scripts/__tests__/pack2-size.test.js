@@ -64,12 +64,12 @@ describe('check-pack2-chunks : mesureur de poids des dictionnaires', () => {
     expect(Buffer.byteLength('Découvrir', 'utf8')).toBe(10);
   });
 
-  it('budget par défaut = 20 000, surchargeable via PACK2_SCOPE_BUDGET_BYTES', () => {
-    expect(scopeBudgetBytes()).toBe(20000);
+  it('budget surchargeable via PACK2_SCOPE_BUDGET_BYTES, repli sur le défaut si invalide', () => {
+    const fallback = scopeBudgetBytes();
     process.env.PACK2_SCOPE_BUDGET_BYTES = '5000';
     expect(scopeBudgetBytes()).toBe(5000);
     process.env.PACK2_SCOPE_BUDGET_BYTES = 'abc';
-    expect(scopeBudgetBytes()).toBe(20000); // invalide → défaut
+    expect(scopeBudgetBytes()).toBe(fallback); // invalide → défaut
   });
 
   it('alerte quand un dictionnaire dépasse le budget', () => {

@@ -269,7 +269,10 @@ class TestCheckDeployedFormats:
         check.errors, check.checked = [], []
         check.check_deployed_formats(self.PUBLIC_OK, self.SECRETS_OK)
         assert not check.errors, check.errors
-        assert len(check.checked) == 7
+        # Tout ce qui a été donné doit avoir été contrôlé : la comparaison porte
+        # sur les fixtures, jamais sur un compte figé qui exigerait une retouche
+        # du test à chaque clé ajoutée.
+        assert len(check.checked) == len(self.PUBLIC_OK) + len(self.SECRETS_OK)
 
     def test_public_url_invalide_detectee(self, check):
         check.errors, check.checked = [], []

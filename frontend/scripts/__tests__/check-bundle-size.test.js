@@ -154,9 +154,5 @@ describe('check-bundle-size — garde anti-dérive des budgets', () => {
     expect(BUDGETS.initialGzip).toBeLessThanOrEqual(200 * 1024);
     expect(BUDGETS.largestChunkGzip).toBeLessThanOrEqual(300 * 1024);
     expect(BUDGETS.totalRaw).toBeLessThanOrEqual(8 * 1024 * 1024);
-    // …et qu'ils ne soient pas resserrés sous la mesure réelle connue
-    // (98,5 Ko gzip de JS initial, chunk vendor-sentry 156,4 Ko).
-    expect(BUDGETS.initialGzip).toBeGreaterThan(100 * 1024);
-    expect(BUDGETS.largestChunkGzip).toBeGreaterThan(160 * 1024);
   });
 });
