@@ -968,7 +968,70 @@ d'annoncer autre chose. `npx vitest run` : **48 fichiers / 630 tests** ;
 avant ; le retour à la ligne peut séparer une séquence de graphèmes (emoji composé),
 des deux côtés IDENTIQUEMENT puisque c'est le même texte ; et la CTA de la carte
 (`accent`) reste une chaîne propre au visuel — ce n'est ni un titre ni une
-description, donc rien à confronter à la page.
+description, donc rien à confronter à la page. Les REFUS du générateur qui rendent
+cette égalité tenable sont verrouillés par des tests depuis F17.
+
+### F17 — Les refus du générateur de cartes n'étaient prouvés par AUCUN test — **fermé le 19/09/2026**
+
+Ce qui tient F16, ce sont les refus de `frontend/scripts/gen-og-images.py` : deux
+cartes pour une même route, carte incomplète, route qui n'est pas un chemin absolu,
+dossier sans aucune carte, clé i18n absente ou vide, texte que la carte ne peut pas
+porter (mot plus large que la colonne, plus de lignes que la mise en page n'en
+réserve), bloc plus haut que la carte. Sans eux, une carte pourrait annoncer autre
+chose que sa page en restant « conforme » au manifeste.
+
+Or **aucun test du dépôt ne les exerçait**. Deux fichiers mentionnaient bien le
+générateur — `scripts/__tests__/check-og-assets.test.js` et
+`scripts/__tests__/check-og-images.test.js` — mais l'un comme l'autre n'en lisaient
+que le NOM (l'égalité générateur ↔ manifeste) : neutraliser un de ces refus ne
+faisait rougir personne. C'était le seul faux vert que F16 pouvait encore produire.
+
+**Correctif — `backend/tests/test_gen_og_images.py`** (24 tests). Le module est
+chargé par son CHEMIN (comme `test_dmarc_policy.py` charge
+`backend/scripts/dmarc_policy.py`) et son `CARDS_DIR` est redirigé vers un dossier
+temporaire : aucun fichier du dépôt n'est écrit. Les refus sont tous vérifiables
+**sans police de référence et sans image produite** — la CI n'a ni Arial ni besoin
+des PNG, alors que ce sont ces refus qui décident de ce que les cartes disent. Le
+cas « texte trop large » s'éprouve avec des textes absurdes (80 « A » pour une
+colonne de 200 px, 400 mots pour 3 lignes) : sur un runner sans Arial, la police de
+repli mesure autrement mais pas assez pour les faire tenir, donc le verdict ne
+dépend pas de la machine. Deux tests ne vérifient pas un refus mais l'invariant qui
+rend F16 possible : les lignes repliées, rejointes par une espace, redonnent le
+texte publié par la page — c'est ce qui autorise `check-og-assets.js` à comparer
+les lignes du manifeste à `fr.json`.
+
+**Preuves — huit mutations, un refus neutralisé par mutation** (chaque ligne `if … :`
+remplacée par un `if False:` de même indentation, sur le fichier réel, restauré à
+l'empreinte SHA-256 près) :
+
+| Refus neutralisé | Rouge |
+|---|---|
+| deux cartes pour la même route | **2** — le refus nommé, et « rien n'est écrit quand la donnée est refusée » |
+| champ de carte manquant | **6** — les 5 champs, plus le champ blanc |
+| route pas un chemin absolu | **1** |
+| clé i18n absente | **6** — les 5 formes de clé, plus la description |
+| plus de lignes que réservé | **1** |
+| mot plus large que la colonne | **1** |
+| bloc plus haut que la carte wide | **1** |
+| bloc plus haut que la carte carrée | **1** |
+
+`frontend/scripts/gen-og-images.py` restauré à l'empreinte
+`99f301db42f26f7517ed7cb373d8551be45418464128215b2e184b5d850ae355` — identique
+avant et après la passe. Un détail de méthode, parce qu'il a failli me tromper : la
+**première** forme de mutation (`if False and <condition>`) laissait survivre la
+seconde moitié d'une condition `… or …` (priorité des opérateurs), donc la branche
+« clé vide » passait sans rien prouver — c'est en changeant de forme, pas en
+relisant le tableau, que le sixième rouge est apparu.
+
+**Limites assumées** : le refus tombe à la LECTURE des données, donc une clé i18n
+absente sur la 2ᵉ carte laisse la 1ʳᵉ carte déjà écrite dans `public/` — le verdict
+reste non-nul et le manifeste n'est PAS réécrit (`check-og-assets.js` rougit alors
+sur l'écart PNG ↔ manifeste), mais la sortie n'est pas atomique ; un dossier
+`og-cards/` **absent** échoue par une trace `FileNotFoundError` au lieu d'une phrase
+nominative — le verdict y est encore non-nul, donc rien n'est silencieux, mais le
+message n'est pas celui de la convention du générateur ; et le RENDU (polices
+réellement retenues, octets des PNG) reste prouvé par `check-og-reproducible.js` et
+`check-og-assets.js`, pas par ces tests.
 
 ## 4. Gardes jamais prouvés
 
@@ -990,6 +1053,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
+| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (24 tests : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **sans police de référence ni image produite** —, l'invariant lignes repliées ↔ texte publié, et « rien n'est écrit quand la donnée est refusée ») + **huit** mutations rejouées le 19/09/2026 sur le fichier réel, chacune neutralisant UN refus par un `if False:` (2, 6, 1, 6, 1, 1, 1 et 1 tests rouges), restauré à l'empreinte identique (§3 F17) |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de
