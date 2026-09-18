@@ -30,7 +30,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Workflow lint (actionlint + shellcheck)** | YAML/expressions de `ci.yml` invalides ; shellcheck sur `.github/scripts/*.sh` et `backend/scripts/*.sh` (les deux globs résolvent : `resolve-vercel-url.sh`, `loadtest_real_flow.sh`). | Non. Seul `rhysd/actionlint` est **épinglé** (`v1.7.12`). |
 | **Fly env doc-prod (drift + secrets)** | Formats des références du dépôt (`--refs-only`, sans réseau) ; drift `fly.toml` ↔ runtime ; secret obligatoire manquant ; doublon `[env]`↔secret ; secret orphelin ; clé `.env.example` absente de Fly. **Token absent → `exit 2` → job rouge** (échec bruyant, pas de saut). | Partiellement : les formats des **secrets déployés** (via `flyctl ssh`) et le snapshot de digests sont silencieusement inopérants (§3, F4). |
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict. | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
-| **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build`, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
+| **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
 | **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles mais encore larges (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
@@ -665,6 +665,44 @@ une autre fiche fait échouer le contrat (`exit 1`, écart nommé), restauration
 vérifiée par `cmp` ; les mutations pures (chemin applicatif changé, `canonical`
 absent, `og:url` absente) sont dans `scripts/__tests__/check-job-og-contract.test.js`.
 
+### F12 — « Une page de route annonce ses métadonnées » n'était refusé qu'APRÈS le build — **fermé le 18/09/2026**
+
+Les six règles de `scripts/check-page-meta.js` étaient jouées par la CI **après**
+`vite build`. C'est leur place pour ce qui compare des artefacts (D, E, F : les
+coquilles écrites), mais les trois premières ne lisent que les sources —
+`src/App.js`, la table `src/config/page-meta.js` et les pages. Rien ne justifiait
+donc de les découvrir si tard, et deux conséquences se payaient :
+
+- le bundle était **produit** pour une page qui n'annonce rien (`vite build` en
+  0), et c'est ce bundle qui partait en pré-déploiement Vercel dès la poussée de
+  la branche — la CI rougissait en parallèle, pas avant ;
+- sur un poste, l'oubli ne se voyait qu'en lançant les gardes à la main.
+
+Le build les joue maintenant lui-même : `assertPagesAnnounceTheirMeta()` est
+appelée par le `buildStart` du plugin `require-page-meta` (`vite.config.js`,
+`apply: 'build'`), donc `npm run build` échoue **avant d'écrire le premier octet**.
+`apply: 'build'` est vérifié, pas supposé : le plugin est ABSENT de la résolution
+en mode `serve` et présent en mode `build` — l'itération n'est pas arrêtée par un
+garde de publication. La CI continue de tout rejouer, coquilles comprises ; les
+règles A/B/C sont extraites dans une seule fonction, appelée par les deux chemins,
+donc elles ne peuvent pas diverger.
+
+**Preuves** : `src/pages/Support.js` privé de son `usePageMeta()` → `npm run build`
+en **1** :
+
+```
+error during build:
+[require-page-meta] métadonnées de page : 1 problème(s), le build refuse de produire un bundle …
+  - la page src/pages/Support.js n’appelle pas usePageMeta() : au runtime la route « /support » annonce AUCUN texte …
+✓ 0 modules transformed.
+```
+
+restauré à l'octet (`cmp`), le build repasse en 0. Côté tests,
+`scripts/__tests__/check-page-meta.test.js` (33 tests) prouve le refus sur les cas
+réels — page qui n'annonce rien, page qui déclare son texte elle-même, plusieurs
+violations nommées d'un coup — et qu'**aucun artefact n'est requis** : l'arbre de
+test est joué sans `build/`, exactement ce que la CI ne pouvait pas faire.
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -679,7 +717,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide), et l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
-| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète) |
+| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (33 tests : les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète, page privée de son `usePageMeta()` → `npm run build` en **1**, §3 F12) |
 | `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |

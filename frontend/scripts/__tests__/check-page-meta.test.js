@@ -20,7 +20,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { runPageMetaCheck } from '../check-page-meta';
+import { assertPagesAnnounceTheirMeta, runPageMetaCheck } from '../check-page-meta';
 import { PAGE_META } from '../../src/config/page-meta';
 import { GENERIC_CARD, dedicatedCardsFrom } from '../../src/config/og-cards';
 
@@ -147,6 +147,65 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+describe('check-page-meta — le BUILD refuse (règles A/B/C, aucun artefact requis)', () => {
+  // Ces règles sont jouées par `buildStart` du plugin require-page-meta
+  // (vite.config.js) : elles ne lisent que les sources, donc le build peut les
+  // trancher avant d'écrire quoi que ce soit. Les cas ci-dessous montrent qu'elles
+  // SAVENT refuser, et qu'elles n'ont besoin d'aucune coquille pour cela.
+  it('accepte une arborescence saine', () => {
+    cleanTree();
+
+    expect(() => assertPagesAnnounceTheirMeta({ root })).not.toThrow();
+  });
+
+  it('refuse une page de route qui n’annonce AUCUN texte', () => {
+    cleanTree();
+    write('src/pages/Register.js', 'export default function Register() { return null; }\n');
+
+    expect(() => assertPagesAnnounceTheirMeta({ root })).toThrow(
+      /src\/pages\/Register\.js n’appelle pas usePageMeta\(\)/
+    );
+  });
+
+  it('refuse une page qui déclare son texte elle-même', () => {
+    cleanTree();
+    write('src/pages/Login.js', "import { usePageTitle } from '../utils/seo';\nusePageTitle('Connexion — Kojo');\n");
+
+    expect(() => assertPagesAnnounceTheirMeta({ root })).toThrow(/utilise usePageTitle\(\)/);
+  });
+
+  it('n’a besoin d’AUCUN artefact de build : sans build/, il tranche quand même', () => {
+    // C'est là toute la différence avec la CI, qui ne voyait ces règles qu'une
+    // fois le build terminé (et donc un pré-déploiement parti).
+    cleanTree();
+    fs.rmSync(path.join(root, 'build'), { recursive: true, force: true });
+
+    expect(() => assertPagesAnnounceTheirMeta({ root })).not.toThrow();
+
+    write('src/pages/Support.js', 'export default function Support() { return null; }\n');
+    expect(() => assertPagesAnnounceTheirMeta({ root })).toThrow(
+      /src\/pages\/Support\.js n’appelle pas usePageMeta\(\)/
+    );
+  });
+
+  it('nomme TOUTES les violations en une fois', () => {
+    cleanTree();
+    write('src/pages/Register.js', 'export default function Register() { return null; }\n');
+    write('src/pages/Payment.js', 'export default function Payment() { return null; }\n');
+
+    let message = '';
+    try {
+      assertPagesAnnounceTheirMeta({ root });
+    } catch (error) {
+      message = error.message;
+    }
+
+    expect(message).toMatch(/métadonnées de page : 2 problème\(s\)/);
+    expect(message).toMatch(/Register\.js n’appelle pas/);
+    expect(message).toMatch(/Payment\.js n’appelle pas/);
+  });
 });
 
 describe('check-page-meta — le cas sain', () => {

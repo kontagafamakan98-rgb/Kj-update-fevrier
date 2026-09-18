@@ -39,6 +39,14 @@
  *      carrée aussi — sans quoi la page retomberait en silence sur la carte générique,
  *      c'est-à-dire exactement l'oubli que la déduction doit rendre impossible.
  *
+ * ── Qui joue quoi, et quand ───────────────────────────────────────────────
+ * A, B et C ne lisent QUE les sources (App.js, la table, les pages) : le BUILD
+ * les joue lui-même (`assertPagesAnnounceTheirMeta`, appelée par vite.config.js),
+ * donc `npm run build` échoue AVANT d'avoir écrit le premier octet. Sans cela, un
+ * pré-déploiement dont une page n'annonce rien pouvait partir, la CI ne le voyant
+ * qu'APRÈS le build. D, E et F comparent les coquilles écrites : elles n'ont de
+ * sens qu'ici, une fois le build terminé.
+ *
  * Quelles pages ont un visuel dédié n'est PAS une liste de ce fichier, ni du
  * code : la règle est le NOM du fichier (`public/og-<page>.png` + sa variante
  * carrée), et la liste des cartes présentes est le manifeste du générateur —
@@ -65,7 +73,8 @@
  * (backend/kojo_job_og.py) à ce que l'application annonce (src/utils/jobSeo.js) —
  * et scripts/check-og-images.js vérifie en plus le déploiement réel en HTTP.
  *
- * Usage : node scripts/check-page-meta.js
+ * Usage : node scripts/check-page-meta.js (le build, lui, n'en joue que A/B/C :
+ * voir `assertPagesAnnounceTheirMeta`)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -102,6 +111,9 @@ const walk = (dir) => {
 
 const lineOf = (source, index) => source.slice(0, index).split('\n').length;
 
+/** Chemin d'un fichier relatif à `root`, en séparateurs POSIX (messages lisibles). */
+const relativeOf = (root, file) => path.relative(root, file).split(path.sep).join('/');
+
 /**
  * Table route → page, LUE dans src/App.js (jamais recopiée : deux listes qui se
  * comparent finissent par diverger). Un fichier peut servir plusieurs routes.
@@ -135,48 +147,26 @@ const readRouting = (appSource) => {
 };
 
 /**
- * Exécute le garde.
+ * Les règles qui ne lisent QUE les sources :
  *
- * @param {object} [options]
- * @param {string} [options.root] Racine du frontend (injectable pour les tests).
- * @param {object} [options.table] Table route → clés i18n (défaut : PAGE_META,
- *   injectable pour éprouver le cas d'une table vide).
- * @param {boolean} [options.quiet] Tait la sortie de progression.
- * @returns {{ok: boolean, errors: string[], checked: string[], pages: string[],
- *   notices: string[]}}
+ *   A. aucune déclaration hors table (carte ou clé i18n écrite en dur dans src/) ;
+ *   B. une page qui sert une route de la table passe par usePageMeta(), pas par
+ *      les hooks bas niveau ;
+ *   C. chaque route de la table a une page qui l'annonce.
+ *
+ * Extraites du garde parce qu'elles ne dépendent d'AUCUN artefact de build : rien
+ * ne justifiait de les découvrir après le build, donc `assertPagesAnnounceTheirMeta`
+ * les joue DANS le build (vite.config.js) et `runPageMetaCheck` les rejoue en CI
+ * avec les règles D/E/F, qui ont besoin des coquilles écrites.
+ *
+ * @returns {{errors: string[], pages: string[]}}
  */
-export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = PAGE_META } = {}) {
+const checkPageSources = ({ root, table }) => {
   const errors = [];
-  const checked = [];
   const pages = [];
-  const notices = [];
-  const log = (...args) => {
-    if (!quiet) console.log(...args);
-  };
-
-  // Les cartes réellement PRÉSENTES (manifeste du générateur) : c'est d'elles que
-  // dérive « cette page a-t-elle un visuel dédié », pour le garde comme pour le
-  // bundle. Un manifeste illisible viderait la comparaison de son sens.
-  let dedicatedCards = {};
-  let incompleteCards = [];
-  try {
-    const manifest = JSON.parse(
-      fs.readFileSync(path.join(root, 'scripts', 'og-assets.manifest.json'), 'utf8')
-    );
-    ({ cards: dedicatedCards, incomplete: incompleteCards } = dedicatedCardsFrom(
-      (manifest.assets || []).map((asset) => asset.file)
-    ));
-  } catch (error) {
-    errors.push(
-      `scripts/og-assets.manifest.json illisible (${error.message}) : les cartes attendues ne ` +
-        'peuvent pas être déduites — relancer le générateur (scripts/gen-og-images.py)'
-    );
-  }
-
-  const relativeOf = (file) => path.relative(root, file).split(path.sep).join('/');
   const tableFiles = new Set(TABLE_FILES);
 
-  // ── Le périmètre : sans src/, ce garde ne lirait rien ─────────────────────
+  // ── Le périmètre : sans src/, ces règles ne liraient rien ─────────────────
   const srcDir = path.join(root, 'src');
   if (!fs.existsSync(srcDir)) {
     errors.push(
@@ -213,7 +203,7 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
   ];
 
   for (const file of fs.existsSync(srcDir) ? walk(srcDir) : []) {
-    const relative = relativeOf(file);
+    const relative = relativeOf(root, file);
     const source = fs.readFileSync(file, 'utf8');
 
     if (!tableFiles.has(relative)) {
@@ -281,6 +271,78 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
     pages.push(`  ✓ ${route} → ${page}`);
   }
 
+  return { errors, pages };
+};
+
+/**
+ * Lève si une page de route PUBLIQUE n'annonce pas ses métadonnées.
+ *
+ * Appelée par le BUILD (`buildStart` du plugin require-page-meta dans
+ * vite.config.js) : les règles A/B/C ne lisent que les sources, donc elles se
+ * tranchent AVANT d'écrire le premier octet — là où la CI ne pouvait les voir
+ * qu'APRÈS le build, c'est-à-dire après qu'un pré-déploiement à une page muette
+ * aurait pu partir.
+ *
+ * @param {object} [options]
+ * @param {string} [options.root] Racine du frontend (injectable pour les tests).
+ * @param {object} [options.table] Table route → clés i18n (défaut : PAGE_META).
+ * @throws {Error} Toutes les violations, nommées, en une fois.
+ */
+export function assertPagesAnnounceTheirMeta({ root = FRONTEND_DIR, table = PAGE_META } = {}) {
+  const { errors } = checkPageSources({ root, table });
+  if (errors.length === 0) return;
+  throw new Error(
+    `métadonnées de page : ${errors.length} problème(s), le build refuse de produire un bundle ` +
+      'dans cet état (une page de route publique annonce ses métadonnées via usePageMeta(), et ' +
+      'les tables de src/config/ sont la seule déclaration) :\n  - ' +
+      errors.join('\n  - ')
+  );
+}
+
+/**
+ * Exécute le garde complet — les règles A/B/C (sources) puis D/E/F (coquilles).
+ *
+ * @param {object} [options]
+ * @param {string} [options.root] Racine du frontend (injectable pour les tests).
+ * @param {object} [options.table] Table route → clés i18n (défaut : PAGE_META,
+ *   injectable pour éprouver le cas d'une table vide).
+ * @param {boolean} [options.quiet] Tait la sortie de progression.
+ * @returns {{ok: boolean, errors: string[], checked: string[], pages: string[],
+ *   notices: string[]}}
+ */
+export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = PAGE_META } = {}) {
+  const errors = [];
+  const checked = [];
+  const pages = [];
+  const notices = [];
+  const log = (...args) => {
+    if (!quiet) console.log(...args);
+  };
+
+  // Les cartes réellement PRÉSENTES (manifeste du générateur) : c'est d'elles que
+  // dérive « cette page a-t-elle un visuel dédié », pour le garde comme pour le
+  // bundle. Un manifeste illisible viderait la comparaison de son sens.
+  let dedicatedCards = {};
+  let incompleteCards = [];
+  try {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(root, 'scripts', 'og-assets.manifest.json'), 'utf8')
+    );
+    ({ cards: dedicatedCards, incomplete: incompleteCards } = dedicatedCardsFrom(
+      (manifest.assets || []).map((asset) => asset.file)
+    ));
+  } catch (error) {
+    errors.push(
+      `scripts/og-assets.manifest.json illisible (${error.message}) : les cartes attendues ne ` +
+        'peuvent pas être déduites — relancer le générateur (scripts/gen-og-images.py)'
+    );
+  }
+
+  // ── Règles A, B et C : les sources — les MÊMES que joue le build ──────────
+  const source = checkPageSources({ root, table });
+  errors.push(...source.errors);
+  pages.push(...source.pages);
+
   // ── Règle D : les coquilles du build annoncent la table ───────────────────
   let fr = null;
   try {
@@ -312,7 +374,7 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
   const buildDir = path.join(root, 'build');
   if (!fs.existsSync(buildDir)) {
     errors.push(
-      `${relativeOf(buildDir) || 'build'}/ absent : aucune coquille pré-rendue à comparer. ` +
+      `${relativeOf(root, buildDir) || 'build'}/ absent : aucune coquille pré-rendue à comparer. ` +
         'Lancer `npm run build` avant ce garde (sinon il serait vert sans avoir rien lu).'
     );
   } else {
