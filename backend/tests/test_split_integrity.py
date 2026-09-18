@@ -10,7 +10,9 @@ Ces tests couvrent des chemins que la suite fonctionnelle ne déclenche pas
 Note : en mode TEST_MONGO_URL (vrai MongoDB), ces tests s'exécutent aussi ;
 ils n'ont pas besoin de données.
 """
-import os
+import re
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -113,22 +115,29 @@ def test_paydunya_disburse_base_url_defined():
     assert "disburse" in PAYDUNYA_DISBURSE_BASE_URL
 
 
-def test_shared_helpers_importable():
-    """kojo_shared dépend de json (push web) et de timedelta (expiration VAPID)."""
-    from kojo_shared import _send_payment_pending_to_worker, send_web_push_to_user, store_notification
-
-    assert callable(_send_payment_pending_to_worker)
-    assert callable(send_web_push_to_user)
-    assert callable(store_notification)
+# `test_shared_helpers_importable` est SUPPRIMÉ : il n'affirmait que l'existence
+# de trois exports de kojo_shared. L'import du module est déjà prouvé, nom par
+# nom, par tests/test_import_health.py (qui échoue sur un `NameError`/`ImportError`
+# à l'import), et un garde refuse désormais ce type d'assertion :
+# .github/scripts/check-test-existence-assertions.py.
 
 
-def test_no_undefined_names_in_split_modules():
-    """Garde-fou : aucun nom non défini dans les modules découpés.
+# ── Garde pyflakes : aucun nom non défini dans les modules découpés ──────────
+# Les modules surveillés sont DÉRIVÉS du dossier (`kojo_*.py` + `server.py`). La
+# liste était recopiée à la main et en omettait quatre, dont `server.py` — le
+# fichier dont le `NameError` a atteint la production le 2026-08-27 — et
+# `kojo_routers_public.py`, qui sert les fiches mission. Un module ajouté au
+# backend entre désormais dans le périmètre sans que personne n'y pense.
+BACKEND_DIR = Path(__file__).resolve().parent.parent
 
-    Utilise pyflakes s'il est installé (déclaré dans les outils de dev) ;
-    sinon le test est sauté (les autres tests couvrent déjà les chemins clés).
-    """
-    pyflakes = pytest.importorskip("pyflakes.api", reason="pyflakes non installé")
+
+def split_modules(root=BACKEND_DIR):
+    """Modules surveillés : tous les `kojo_*.py` du backend, plus `server.py`."""
+    return sorted(path.name for path in Path(root).glob("kojo_*.py")) + ["server.py"]
+
+
+def _pyflakes_reporter():
+    """Rapporteur pyflakes qui COLLECTE les messages au lieu de les imprimer."""
     from pyflakes import reporter as pyflakes_reporter
 
     import io as _io
@@ -144,22 +153,115 @@ def test_no_undefined_names_in_split_modules():
         def syntaxError(self, filename, msg, lineno, column, text):
             pass
 
-    module_names = [
-        "kojo_core", "kojo_email", "kojo_geo_data", "kojo_models", "kojo_payments",
-        "kojo_routers_auth", "kojo_routers_geo", "kojo_routers_jobs",
-        "kojo_routers_messages", "kojo_routers_notifications",
-        "kojo_routers_owner", "kojo_routers_payments", "kojo_routers_support",
-        "kojo_routers_users", "kojo_scheduler", "kojo_settings", "kojo_shared",
-    ]
-    import kojo_shared  # noqa: F401  (importe pywebpush si dispo)
+    return _Reporter()
 
-    rep = _Reporter()
-    import pyflakes.api as pf_api
 
-    for name in module_names:
-        path = os.path.join(os.path.dirname(__file__), "..", f"{name}.py")
-        pf_api.checkPath(os.path.abspath(path), rep)
+def undefined_names(paths):
+    """Lignes « undefined name » que pyflakes signale pour ces fichiers.
 
-    output = rep.buffer.getvalue()
-    undefined = [ln for ln in output.splitlines() if "undefined name" in ln]
-    assert not undefined, f"Noms non définis détectés dans les modules découpés:\n" + "\n".join(undefined)
+    pyflakes est requis (outil de dev, installé en CI) ; sans lui le test est
+    SAUTÉ — un vert à connaître, pas un silence : le job méta-test
+    `audit-regression-test` prouve par ailleurs que pyflakes lui-même sait
+    échouer sur un import retiré.
+    """
+    pyflakes_api = pytest.importorskip("pyflakes.api", reason="pyflakes non installé")
+    reporter = _pyflakes_reporter()
+    for path in paths:
+        pyflakes_api.checkPath(str(path), reporter)
+    return [line for line in reporter.buffer.getvalue().splitlines() if "undefined name" in line]
+
+
+def _imported_name(line):
+    """Nom lié par une ligne d'import, ou None (alias compris)."""
+    aliased = re.match(r"^\s*import\s+([\w.]+)\s+as\s+(\w+)", line)
+    if aliased:
+        return aliased.group(2)
+    plain = re.match(r"^\s*import\s+([\w.]+)", line)
+    if plain:
+        return plain.group(1).split(".")[0]
+    from_import = re.match(r"^\s*from\s+[\w.]+\s+import\s+([A-Za-z_]\w*)\s*$", line)
+    return from_import.group(1) if from_import else None
+
+
+def _remove_first_used_import(source):
+    """Retire le premier import dont le nom est UTILISÉ ailleurs dans le fichier.
+
+    Retourne (source mutée, nom retiré) ou (None, None). L'usage est vérifié
+    AVANT de retirer quoi que ce soit : supprimer un import inutilisé ne
+    déclencherait aucun message, et le test échouerait pour une mauvaise raison.
+    """
+    for line in source.splitlines():
+        candidate = _imported_name(line)
+        if not candidate:
+            continue
+        reste = source.replace(line, "", 1)
+        if re.search(rf"\b{re.escape(candidate)}\b", reste):
+            return reste, candidate
+    return None, None
+
+
+def test_le_perimetre_des_modules_est_derive_et_complet():
+    """Non-vacuité : la dérivation voit bien les modules, y compris les oubliés."""
+    names = split_modules()
+    assert len(names) >= 20, names
+    for attendu in ("server.py", "kojo_routers_public.py", "kojo_env_validators.py"):
+        assert attendu in names, f"{attendu} est hors du périmètre pyflakes : {names}"
+    # Le step pyflakes de la CI doit viser le MÊME ensemble : deux périmètres qui
+    # divergent en silence, c'est précisément ce qui a laissé quatre modules hors
+    # garde (dont `server.py`).
+    workflow = (BACKEND_DIR.parent / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "python -m pyflakes kojo_*.py server.py" in workflow, (
+        "le step pyflakes de la CI ne vise plus kojo_*.py + server.py : le garde et la CI "
+        "surveilleraient deux ensembles différents"
+    )
+
+
+def test_no_undefined_names_in_split_modules():
+    """Garde-fou : aucun nom non défini dans les modules découpés.
+
+    Aucun module n'a besoin d'être IMPORTÉ ici : pyflakes ne fait qu'analyser des
+    fichiers. Qu'un module échoue à s'importer est la question d'un autre garde,
+    plus fort que celui-ci — tests/test_import_health.py.
+    """
+    undefined = undefined_names([BACKEND_DIR / name for name in split_modules()])
+    assert not undefined, "Noms non définis détectés dans les modules découpés:\n" + "\n".join(undefined)
+
+
+def test_le_garde_echoue_quand_on_retire_un_import(tmp_path):
+    """Mutation, sur une COPIE des modules réels : retirer un import utilisé rougit.
+
+    Sans ce test, « ce garde échoue quand un import manque » restait une
+    supposition : la suite ne l'exerçait que sur des modules sains, donc un
+    garde devenu aveugle (mauvaise liste de fichiers, filtre trop large) aurait
+    gardé sa réputation sans preuve.
+    """
+    pytest.importorskip("pyflakes.api", reason="pyflakes non installé")
+
+    copies = []
+    for name in split_modules():
+        target = tmp_path / name
+        shutil.copyfile(BACKEND_DIR / name, target)
+        copies.append(target)
+
+    # Contrôle : la copie INTACTE est propre — c'est donc bien la mutation, et
+    # non la copie ou le chemin, qui déclenche le message.
+    assert undefined_names(copies) == [], "la copie intacte n'est pas propre : le reste ne prouve rien"
+
+    mutated, removed = None, None
+    for target in copies:
+        mutated_source, name = _remove_first_used_import(target.read_text(encoding="utf-8"))
+        if mutated_source is None:
+            continue
+        target.write_text(mutated_source, encoding="utf-8")
+        mutated, removed = target, name
+        break
+    assert mutated is not None, (
+        "aucun import utilisé trouvé dans les modules copiés : la mutation ne prouve rien"
+    )
+
+    report = "\n".join(undefined_names(copies))
+    assert report, f"retirer l'import `{removed}` de {mutated.name} n'a été signalé par personne"
+    assert mutated.name in report, report
+    assert removed in report, report

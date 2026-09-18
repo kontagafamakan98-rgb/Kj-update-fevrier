@@ -37,7 +37,6 @@ _STDLIB_MODULES = {
 
 
 def _module_source() -> str:
-    assert VALIDATORS.exists(), f"{VALIDATORS} absent — normalement commité"
     return VALIDATORS.read_text(encoding="utf-8")
 
 

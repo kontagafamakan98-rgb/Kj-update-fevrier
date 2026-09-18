@@ -4,12 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import {
-  MANIFEST_NAME,
-  OG_READ_ONLY_SCRIPTS,
-  REFERENCE_FONTS,
-  runOgAssetsCheck,
-} from '../check-og-assets';
+import { MANIFEST_NAME, REFERENCE_FONTS, runOgAssetsCheck } from '../check-og-assets';
 
 // Tests du garde-fou « cartes Open Graph » (scripts/check-og-assets.js) :
 //   - un seul générateur OG toléré dans scripts/, détecté par le NOM (jeton
@@ -285,13 +280,6 @@ describe('check-og-assets — dépôt réel', () => {
     expect(files).toContain('og-login.png');
     expect(files).toContain('og-image-1200x630.png');
     expect(result.assets.every((asset) => asset.width > 0 && asset.height > 0)).toBe(true);
-  });
-
-  it('la liste des scripts OG en lecture seule ne pourrit pas', () => {
-    for (const name of OG_READ_ONLY_SCRIPTS) {
-      expect(fs.existsSync(path.join(REPO_ROOT, 'scripts', name)), `${name} introuvable`).toBe(true);
-    }
-    expect(OG_READ_ONLY_SCRIPTS).toContain('check-og-assets.js');
   });
 
   it('le manifeste versionné décrit les cartes du dépôt, avec la police de référence', () => {

@@ -27,7 +27,6 @@ SCRIPT = BACKEND_DIR.parent / ".github" / "scripts" / "check-fly-env-drift.py"
 
 def _load_check():
     """Charge check-fly-env-drift.py en pointant ses chemins vers le repo."""
-    assert SCRIPT.exists(), f"{SCRIPT} absent — normalement commité"
     spec = importlib.util.spec_from_file_location("check_fly_env_drift", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     mod.REPO_ROOT = BACKEND_DIR.parent

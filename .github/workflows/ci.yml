@@ -171,6 +171,16 @@ jobs:
       - name: Check action pins (no branch refs)
         run: python3 .github/scripts/check-workflow-pins.py
 
+      # Assertions d'existence sur un export (`callable(...)`, `is not None`
+      # comme condition entière, `.toBeDefined()`) : elles restent vertes même
+      # quand l'export ne fait plus rien, et elles reviennent au prochain ajout
+      # de test. Ce garde empêche le nettoyage du 18/09/2026 de se reperdre —
+      # voir .github/scripts/check-test-existence-assertions.py, dont les cas
+      # acceptés/refusés sont verrouillés par
+      # backend/tests/test_existence_assertion_guard.py.
+      - name: Check test assertions describe behaviour (no export existence)
+        run: python3 .github/scripts/check-test-existence-assertions.py
+
       # shellcheck (pré-installé sur ubuntu-latest) : analyse statique des
       # scripts shell du dépôt. Échoue sur les erreurs (les warnings restent
       # informatifs — comportement par défaut de shellcheck).

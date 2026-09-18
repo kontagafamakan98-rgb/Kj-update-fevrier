@@ -7,6 +7,7 @@ escalade quand la re-vérification est indisponible.
 """
 import uuid
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -210,12 +211,21 @@ class TestPayoutSweeper:
         assert summary["alerted"] == 0
         alert_mock.assert_not_called()
 
-    async def test_loop_is_importable_and_wired(self, client: AsyncClient):
-        """La boucle de fond est importable (câblage server.py) et la fonction
-        de sweep est appelable sans erreur."""
-        import kojo_scheduler
-        assert callable(kojo_scheduler.payout_stuck_sweeper_loop)
-        assert callable(kojo_scheduler.payout_stuck_sweep_once)
+    async def test_la_boucle_est_demarree_par_server(self, client: AsyncClient):
+        """La boucle de fond est réellement DÉMARRÉE, et un sweep à vide est neutre.
+
+        L'existence des deux fonctions n'est plus affirmée ici : l'import du
+        module la prouve déjà (tests/test_import_health.py), et `callable(...)`
+        serait resté vert même si plus personne ne DÉMARRAIT la boucle — le
+        sweep ne tournerait alors jamais en production.
+        """
+        server_source = (Path(__file__).resolve().parent.parent / "server.py").read_text(
+            encoding="utf-8"
+        )
+        assert "asyncio.create_task(payout_stuck_sweeper_loop())" in server_source, (
+            "la boucle de décaissements bloqués n'est plus démarrée par server.py : "
+            "le sweep ne tournerait jamais en production"
+        )
         # Un sweep à vide ne plante pas (aucun paiement en attente).
         summary = await self._run_sweep()
         assert summary == {"rechecked": 0, "resolved": 0, "stuck": 0, "alerted": 0}

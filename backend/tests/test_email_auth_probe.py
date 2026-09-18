@@ -21,7 +21,6 @@ SCRIPT = REPO_ROOT / ".github" / "scripts" / "check-email-auth.py"
 
 
 def _load_probe():
-    assert SCRIPT.exists(), f"{SCRIPT} absent — normalement commité"
     spec = importlib.util.spec_from_file_location("check_email_auth", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

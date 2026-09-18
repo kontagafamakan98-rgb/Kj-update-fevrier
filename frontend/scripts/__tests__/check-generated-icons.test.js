@@ -296,8 +296,9 @@ describe('inventaire et structure', () => {
     // Le garde s'inspecte lui-même : il est dans ICON_READ_ONLY_SCRIPTS, sans
     // quoi son propre nom d'icône déclencherait la détection de second générateur.
     expect(ICON_READ_ONLY_SCRIPTS).toContain('check-generated-icons.js');
+    // Le fichier est LU juste après : s'il disparaissait, la lecture échouerait
+    // ici même — inutile d'ajouter une assertion d'existence avant.
     const itself = path.resolve(__dirname, '..', 'check-generated-icons.js');
-    expect(fs.existsSync(itself)).toBe(true);
     // Il ne doit écrire AUCUNE image, sinon il se dénoncerait lui-même.
     const source = fs.readFileSync(itself, 'utf8');
     expect(source).not.toMatch(/\.save\(|Image\.new\(|sharp\(/);
