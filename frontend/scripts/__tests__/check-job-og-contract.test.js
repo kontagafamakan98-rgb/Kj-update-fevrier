@@ -5,15 +5,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  CONTRACT_JOBS,
   FIXTURE_JOB,
   compareJobOg,
   decodeEntities,
   findPython,
+  hasLoneSurrogate,
   htmlTitle,
   renderPrerenderedPage,
   runJobOgContractCheck,
 } from '../check-job-og-contract';
-import { jobSeo } from '../../src/utils/jobSeo';
+import { DESCRIPTION_LIMIT, jobSeo } from '../../src/utils/jobSeo';
 
 // Tests du garde « contrat app ↔ pré-rendu de /jobs/:id » (hors ligne) :
 //   - le HTML comparé est celui du MODULE DE PRODUCTION (backend/kojo_job_og.py),
@@ -35,6 +37,23 @@ const hasPrerender = Boolean(prerender && !prerender.error && prerender.html);
 // Le HTML de référence : celui que le backend produit RÉELLEMENT pour la mission
 // de référence. Tout le reste du fichier le mute, jamais ne le réécrit.
 const realHtml = hasPrerender ? prerender.html : '';
+
+/**
+ * Chaque mission du JEU de référence, avec le HTML de PRODUCTION qui lui
+ * correspond et ce que l'application annonce. Le jeu est éprouvé cas par cas :
+ * une seule mission ne dirait rien d'un pré-rendu qui n'a jamais traversé de
+ * caractère astral.
+ */
+const referenceCases = hasPrerender
+  ? CONTRACT_JOBS.map((job) => ({
+      job,
+      app: jobSeo(job),
+      html: renderPrerenderedPage({ python, job, base: BASE, root: REPO_ROOT }).html,
+    }))
+  : [];
+
+// Le détecteur de demi-caractère vient du GARDE (hasLoneSurrogate), pas d'une
+// copie locale : il sert aussi à nommer la cause dans ses messages d'échec.
 
 describe('check-job-og-contract — le pré-rendu de production est exécuté', () => {
   it('le module backend est importable sans aucune dépendance installée', () => {
@@ -102,10 +121,12 @@ describe.skipIf(!hasPrerender)('check-job-og-contract — ce qui doit échouer',
   });
 
   it('détecte une description coupée à un autre endroit', () => {
-    // La coupe à 150 caractères + « … » est une règle des DEUX côtés : une
+    // La coupe à 150 points de code + « … » est une règle des DEUX côtés : une
     // différence d'un seul caractère doit être visible, pas arrondie.
     const errors = compareJobOg({ app: { ...app, description: `${app.description}x` }, html: realHtml, base: BASE });
-    expect(errors.join('\n')).toMatch(/description : le pré-rendu annonce 151 caractères, l'application 152/);
+    expect(errors.join('\n')).toMatch(
+      /description : le pré-rendu annonce 151 points de code, l'application 152/
+    );
   });
 
   it('décode les entités du HTML : un texte échappé est un texte CONFORME', () => {
@@ -119,6 +140,75 @@ describe.skipIf(!hasPrerender)('check-job-og-contract — ce qui doit échouer',
   it('refuse une mission sans annonce côté application (comparaison non vide)', () => {
     const errors = compareJobOg({ app: jobSeo({ id: FIXTURE_JOB.id }), html: realHtml, base: BASE });
     expect(errors.join('\n')).toMatch(/aucun titre pour cette mission/i);
+  });
+});
+
+describe.skipIf(!hasPrerender)('check-job-og-contract — le jeu de référence (frontière des 150)', () => {
+  it('chaque mission du jeu tient le contrat des DEUX côtés', () => {
+    expect(referenceCases).toHaveLength(CONTRACT_JOBS.length);
+    for (const { job, app: announce, html } of referenceCases) {
+      expect(compareJobOg({ app: announce, html, base: BASE }), job.label).toEqual([]);
+    }
+  });
+
+  it('place bien la frontière sur ce qu’il annonce', () => {
+    // Sans ce contrôle, un jeu qui n'atteint jamais la frontière passerait pour
+    // une couverture alors qu'il ne prouverait rien : chaque mission déclare ce
+    // qu'elle couvre, et ce test le vérifie sur le texte lui-même.
+    const at = (job) => Array.from(job.description)[DESCRIPTION_LIMIT - 1];
+    const byLabel = Object.fromEntries(CONTRACT_JOBS.map((job) => [job.label, job]));
+
+    expect(at(byLabel['accents à la frontière'])).toBe('è');
+    expect(at(byLabel['emoji BMP à la frontière'])).toBe('☕');
+    expect(at(byLabel['astral à la frontière'])).toBe('😀');
+    // Le cas « avant la frontière » place son astral ailleurs : au 100e point.
+    expect(Array.from(byLabel['astral avant la frontière'].description)[99]).toBe('🚚');
+    for (const job of CONTRACT_JOBS) {
+      expect(Array.from(job.description).length, job.label).toBeGreaterThan(DESCRIPTION_LIMIT);
+      expect(job.covers, job.label).toBeTruthy();
+    }
+  });
+
+  it('coupe en POINTS DE CODE : aucun demi-caractère publié', () => {
+    // Le détecteur lui-même d'abord : sans cela, un détecteur qui répondrait
+    // toujours « non » ferait passer l'assertion suivante pour une preuve.
+    expect(hasLoneSurrogate('\ud83d')).toBe(true);
+    expect(hasLoneSurrogate('a\udc00b')).toBe(true);
+    expect(hasLoneSurrogate('😀')).toBe(false);
+    expect(hasLoneSurrogate('Réfection à Ouagadougou')).toBe(false);
+
+    const case_ = referenceCases.find(({ job }) => job.label === 'astral à la frontière');
+
+    expect(case_.app.description).toContain('😀');
+    expect(hasLoneSurrogate(case_.app.description)).toBe(false);
+    // 150 points de code + le « … » de la coupe.
+    expect(Array.from(case_.app.description)).toHaveLength(DESCRIPTION_LIMIT + 1);
+    expect(case_.app.description.endsWith('…')).toBe(true);
+  });
+
+  it('détecte la règle d’AVANT (unités UTF-16), qui coupait la paire en deux', () => {
+    for (const { job, html, app: announce } of referenceCases) {
+      // Ce que `slice(0, 150)` + `length` produisaient avant le correctif.
+      const utf16 = `${job.description.slice(0, DESCRIPTION_LIMIT)}${
+        job.description.length > DESCRIPTION_LIMIT ? '…' : ''
+      }`;
+      const hasAstral = /[\u{10000}-\u{10FFFF}]/u.test(job.description);
+
+      // Les textes du plan de base (accents compris) ne divergent PAS : c'est
+      // exactement pourquoi la règle d'avant passait inaperçue.
+      expect(utf16 !== announce.description, job.label).toBe(hasAstral);
+      if (!hasAstral) continue;
+
+      const errors = compareJobOg({ app: { ...announce, description: utf16 }, html, base: BASE });
+      expect(errors.join('\n'), job.label).toMatch(
+        /description : le pré-rendu annonce \d+ points de code, l'application \d+/
+      );
+      // Quand la coupe est tombée DANS la paire, le message nomme la cause —
+      // c'est le cas où les deux textes ont la même longueur en points de code.
+      if (hasLoneSurrogate(utf16)) {
+        expect(errors.join('\n'), job.label).toMatch(/DEMI-CARACTÈRE/);
+      }
+    }
   });
 });
 

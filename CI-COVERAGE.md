@@ -597,9 +597,9 @@ base. Deux trous, pas un :
   runtime. Un titre renommé d'un seul côté passait : l'onglet du navigateur et la
   carte de partage ne disaient plus la même chose, tous les voyants verts.
 
-**Le contrat est maintenant vérifié hors ligne, sur une mission de référence**
-(`scripts/check-job-og-contract.js`, step « Check job OG contract » du job
-frontend). Il exécute les deux implémentations :
+**Le contrat est maintenant vérifié hors ligne, sur un jeu de missions de
+référence** (`scripts/check-job-og-contract.js`, step « Check job OG contract » du
+job frontend — cinq missions depuis F15). Il exécute les deux implémentations :
 
 ```
 pré-rendu    python -c "import kojo_job_og" …… → le HTML réel du backend
@@ -611,7 +611,8 @@ application  src/utils/jobSeo.js              → le titre, la description et la
 ```
 
 Puis l'égalité est exigée sur le titre (`<title>`, `og:title`, `twitter:title`),
-la description (les quatre balises, coupe à 150 caractères + « … » comprise), la
+la description (les quatre balises, coupe à 150 **points de code** + « … » comprise
+— l'unité elle-même était fausse d'un côté, cf. F15), la
 carte (`og:image` wide **et** carrée, `twitter:image`) — la carrée étant dérivée
 de la carte de l'APPLICATION, pour qu'un renommage d'un seul côté fasse échouer
 les deux assertions — et l'URL de la page, `canonical` et `og:url` (F11).
@@ -629,9 +630,10 @@ Deux points de méthode que l'exécution a imposés :
 
 **Preuves** : le dépôt est vert (`runJobOgContractCheck` → 0 erreur, mission
 réelle) ; les mutations sont exercées par `scripts/__tests__/check-job-og-contract.test.js`
-(11 tests) sur le HTML du **module de production** — titre renommé d'un côté,
+(15 tests) sur le HTML du **module de production** — titre renommé d'un côté,
 carte renommée, variante carrée retirée, description coupée d'un caractère de
-plus, canonical divergent ou absent, mission sans annonce côté application —, et
+plus, canonical divergent ou absent, mission sans annonce côté application, règle
+de coupe par unités UTF-16 (F15) —, et
 un interpréteur absent est une
 **erreur en CI** (::notice hors CI, un poste sans Python ne devant pas voir rouge
 pour cette seule raison).
@@ -822,6 +824,67 @@ traduction vide, d'une langue publiée sans dictionnaire, d'un dictionnaire non
 chargé, d'une liste illisible — plus le cas qui prouve la **dérivation** (une
 langue ajoutée à `LanguageContext.js` est vérifiée sans que le garde change).
 
+### F15 — La coupe à 150 comptait deux unités différentes selon le langage — **fermé le 18/09/2026**
+
+Le contrat de F10 comparait la description **déjà coupée** des deux côtés, mais sur
+une seule mission dont le texte restait dans le **plan multilingue de base** — les
+accents compris. Or les deux moitiés comptent dans des unités différentes :
+
+```
+src/utils/jobSeo.js      description.slice(0, 150) + description.length   → UNITÉS UTF-16
+backend/kojo_job_og.py   raw_desc[:150]            + len(raw_desc)        → POINTS DE CODE
+```
+
+Les deux comptes coïncident **exactement** tant qu'aucun caractère n'est hors BMP,
+ce qui rendait la divergence invisible : accents, apostrophes typographiques et
+emoji du plan de base passaient. Avec un caractère **astral** (emoji, deux unités
+UTF-16) la frontière se décale d'un caractère d'un côté — et si le 150e point de
+code EST un astral, `slice` coupe au MILIEU de la paire de surrogates :
+l'application publiait un **demi-caractère** dans `<meta name="description">`,
+`og:description` et `twitter:description`, quand le pré-rendu publiait l'emoji
+entier. La même fiche annonçait donc deux descriptions selon le canal — l'onglet et
+la carte de partage — avec un « … » qui ne tombait pas au même endroit.
+
+**Correctif** : l'application coupe par POINTS DE CODE (`Array.from`), l'unité de
+Python, et la borne vit dans une seule constante exportée (`DESCRIPTION_LIMIT`),
+que le garde importe au lieu de la recopier.
+
+**Le jeu de référence** remplace l'unique mission : `CONTRACT_JOBS` en porte cinq,
+chacune déclarant ce qu'elle couvre, et le garde exige l'égalité des deux côtés
+pour CHACUNE :
+
+| Mission | Ce qu'elle place à la frontière des 150 |
+|---|---|
+| apostrophe et « & » | texte échappé dans le HTML, description longue |
+| accents à la frontière | le 150e point de code est le « è » de « gouttières » |
+| emoji BMP à la frontière | un emoji du plan de base (1 unité UTF-16) : les comptes coïncident encore |
+| astral à la frontière | la paire de surrogates tombe pile sur la coupe |
+| astral avant la frontière | le décompte UTF-16 décale la frontière d'un caractère |
+
+**Preuves** — la règle d'avant remise en place dans `src/utils/jobSeo.js` (mutation
+sur le fichier réel, restaurée à l'empreinte SHA-1 identique) :
+
+```
+node scripts/check-job-og-contract.js   → exit 1, 6 problèmes nommés
+  [astral à la frontière] description : … 151 points de code, l'application 151 —
+    « … et goutti😀… » ≠ « … et goutti…. »        ← la moitié du caractère publiée
+  [astral avant la frontière] description : … 151 points de code, l'application 150
+npx vitest run scripts/__tests__/check-job-og-contract.test.js → 4 échecs / 15
+  restauré → garde exit 0 (5 missions), 15 tests verts
+```
+
+Le message nomme la cause quand elle est là (« DEMI-CARACTÈRE : la coupe s'est faite
+sur une unité UTF-16, au milieu d'un caractère astral ») : un « » affiché ne dit pas
+d'où il vient. Les tests passent de 11 à **15**, dont deux qui empêchent le jeu de
+devenir décoratif — la frontière de chaque mission est vérifiée sur le texte lui-même,
+et le détecteur de demi-caractère est éprouvé avant qu'on s'en serve.
+
+**Limite assumée** : la coupe reste en points de code, donc elle peut séparer une
+séquence de graphèmes (emoji composé, accent combinant) — mais des deux côtés
+IDENTIQUEMENT, puisque les deux langages comptent pareil. Couper par graphèmes
+demanderait une bibliothèque côté Python, que ce module ne peut pas importer : sa
+frontière est d'être sans dépendance (cf. F10).
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -833,7 +896,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
-| `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide), et l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
+| `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide) ; le **jeu de référence** (5 missions, frontière des 150 sur un accent, un emoji BMP, un astral et avant un astral) est comparé mission par mission, et la règle de coupe d'AVANT (unités UTF-16) est détectée — mutation rejouée le 18/09/2026 sur le fichier réel : garde en **1** (6 problèmes) et 4 tests rouges, restauré à l'empreinte identique (§3 F15) ; l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (41 tests : les 7 règles savent échouer — dont un build PÉRIMÉ, une table vide, une carte large sans variante carrée, une clé de page absente d'une seule langue, une langue publiée sans dictionnaire et un dictionnaire que personne ne charge —, leurs exemptions, dépôt réel vert) **et** le plugin de build lui-même, `requirePageMeta` : monté sur une arborescence dont la page est muette (`buildStart` doit lever) + `scripts/__tests__/check-page-meta-build-wiring.test.js` (2 tests, environnement Node : le `vite.config.js` RÉEL installe le plugin en `apply: 'build'`, et la config ne le réécrit pas) — mutations automatisées le 18/09/2026 sur les trois maillons (plugin retiré, `apply: 'serve'`, `buildStart` sans appel → la suite rougit) + mutations rejouées à la main : carte dédiée ajoutée, carte incomplète, page privée de son `usePageMeta()` (§3 F12), et deux mutations de dictionnaire (§3 F14) → `npm run build` en **1** à chaque fois, tout restauré à l'octet |
