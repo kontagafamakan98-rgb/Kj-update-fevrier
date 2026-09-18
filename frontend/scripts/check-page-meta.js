@@ -33,11 +33,15 @@
  *      dans src/i18n/fr.json (la langue des coquilles — <html lang="fr">).
  *   E. le périmètre n'est jamais vide : zéro coquille comparée est une ERREUR,
  *      jamais un vert (c'est le seul faux vert que ce garde peut produire).
- *   F. les cartes DÉDIÉES présentes dans public/ sont utilisées, et complètes :
- *      une carte ajoutée pour une page qui n'est pas pré-rendue (donc annoncée
- *      par aucune coquille) est une erreur, et une carte large SANS sa variante
- *      carrée aussi — sans quoi la page retomberait en silence sur la carte générique,
- *      c'est-à-dire exactement l'oubli que la déduction doit rendre impossible.
+ *   F. (RETIRÉE : la couverture a suivi la donnée) une carte ne se déclare plus
+ *      par le NOM de son fichier (`og-<page>.png`) mais par un fichier de données
+ *      qui nomme la route qu'elle sert, les clés de texte de cette page et ses
+ *      DEUX sorties. « Une carte large sans variante carrée » n'est donc plus un
+ *      état atteignable (le champ `square` est obligatoire, et check-og-assets.js
+ *      vérifie le PNG), et « une carte pour une page non pré-rendue » non plus :
+ *      la route de la carte ENTRE dans la table par construction, donc la règle C
+ *      la tient déjà à une page réelle de src/App.js — et un fichier de carte peut
+ *      désormais le dire (scripts/check-og-images.js refuse une route inconnue).
  *   G. chaque clé de texte de page déclarée dans src/config/page-meta.js existe,
  *      NON VIDE, dans CHAQUE langue publiée. Les langues publiées sont lues dans
  *      src/contexts/LanguageContext.js (`const LANGUAGES = [...]`) : une clé
@@ -46,23 +50,30 @@
  *      dictionnaire présent dans src/i18n/ qu'aucune langue publiée ne charge est
  *      une erreur aussi : sinon une langue ajoutée sans être branchée passerait
  *      pour vérifiée.
+ *   H. une route déclare ses textes UNE fois : les routes servies par une carte
+ *      OG les déclarent dans le fichier de données de cette carte (parce que la
+ *      carte les DESSINE), les autres dans src/config/page-meta.js. Une route
+ *      présente des DEUX côtés est une erreur : la carte l'emporterait en
+ *      silence, donc corriger la déclaration écrite à la main ne changerait rien.
  *
  * ── Qui joue quoi, et quand ───────────────────────────────────────────────
- * A, B, C et G ne lisent QUE les sources (App.js, la table, les pages, les
- * dictionnaires) : le BUILD les joue lui-même (`assertPagesAnnounceTheirMeta`,
- * appelée par vite.config.js), donc `npm run build` échoue AVANT d'avoir écrit le
- * premier octet. Sans cela, un pré-déploiement dont une page n'annonce rien — ou
- * dont une traduction de page manque — pouvait partir, la CI ne le voyant
- * qu'APRÈS le build. D, E et F comparent les coquilles écrites : elles n'ont de
- * sens qu'ici, une fois le build terminé.
+ * A, B, C, G et H ne lisent QUE les tables et les sources (App.js, page-meta.js,
+ * les pages, les dictionnaires, et la table venue des cartes) : le BUILD les joue
+ * lui-même (`assertPagesAnnounceTheirMeta`, appelée par vite.config.js), donc
+ * `npm run build` échoue AVANT d'avoir écrit le premier octet. Sans cela, un
+ * pré-déploiement dont une page n'annonce rien — ou dont une traduction de page
+ * manque — pouvait partir, la CI ne le voyant qu'APRÈS le build. D et E comparent
+ * les coquilles écrites : elles n'ont de sens qu'ici, une fois le build terminé.
  *
- * Quelles pages ont un visuel dédié n'est PAS une liste de ce fichier, ni du
- * code : la règle est le NOM du fichier (`public/og-<page>.png` + sa variante
- * carrée), et la liste des cartes présentes est le manifeste du générateur —
- * celui que check-og-assets.js confronte aux PNG versionnés. Le garde lit ce
- * manifeste par `fs`, le bundle l'inline par import : un seul fait, deux
- * chargeurs (comme src/i18n/fr.json), donc ajouter une carte ne peut plus être
- * oublié dans le code — relancer le générateur suffit.
+ * Quelles routes ont une carte n'est PAS une liste de ce fichier, ni du code :
+ * chaque carte déclare sa route dans son fichier de données (scripts/og-cards/),
+ * le générateur la recopie dans le manifeste, et src/config/og-cards.js en dérive
+ * la carte servie à chaque route ET les textes de cette route. Ajouter une carte
+ * est donc un ajout de données — relancer le générateur suffit, et la route entre
+ * dans la table des textes du même geste (règle C : elle doit servir une page).
+ * Le manifeste n'est plus lu ici par `fs` : le garde importe la table, comme le
+ * bundle, pour qu'un fait n'ait qu'un chargeur (check-og-assets.js, lui, lit le
+ * manifeste : c'est son sujet, et il en confronte les octets aux PNG versionnés).
  *
  * ── Limite assumée ────────────────────────────────────────────────────────
  * Les règles A, B et G lisent les SOURCES (expressions régulières), elles ne les
@@ -90,8 +101,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { GENERIC_CARD, dedicatedCardsFrom } from '../src/config/og-cards.js';
-import { PAGE_META, pageMetaKeys } from '../src/config/page-meta.js';
+import { CARDS_BY_ROUTE, CARD_PAGE_META, GENERIC_CARD } from '../src/config/og-cards.js';
+import { DECLARED_PAGE_META, PAGE_META, pageMetaKeys } from '../src/config/page-meta.js';
 import { SITE_ORIGIN, metaContent, metaContents, shellFileFor } from './site-meta.js';
 import { ROUTES as AUDITED_ROUTES } from './check-og-images.js';
 
@@ -269,16 +280,24 @@ const checkPageTexts = ({ root, table }) => {
  *   B. une page qui sert une route de la table passe par usePageMeta(), pas par
  *      les hooks bas niveau ;
  *   C. chaque route de la table a une page qui l'annonce ;
- *   G. chaque clé de page existe, non vide, dans chaque langue publiée.
+ *   G. chaque clé de page existe, non vide, dans chaque langue publiée ;
+ *   H. une route ne déclare pas ses textes des deux côtés (carte ET table
+ *      écrite à la main).
  *
  * Extraites du garde parce qu'elles ne dépendent d'AUCUN artefact de build : rien
  * ne justifiait de les découvrir après le build, donc `assertPagesAnnounceTheirMeta`
  * les joue DANS le build (vite.config.js) et `runPageMetaCheck` les rejoue en CI
- * avec les règles D/E/F, qui ont besoin des coquilles écrites.
+ * avec les règles D/E, qui ont besoin des coquilles écrites.
  *
+ * @param {object} options
+ * @param {string} options.root Racine du frontend.
+ * @param {object} options.table Table route → clés i18n (PAGE_META).
+ * @param {object} [options.declaredMeta] Les routes déclarées à la MAIN
+ *   (défaut : DECLARED_PAGE_META) — injectable pour éprouver la règle H sans
+ *   mutiler le dépôt, comme `table` l'est pour une table vide.
  * @returns {{errors: string[], pages: string[], fr: object|null, languages: string[]}}
  */
-const checkPageSources = ({ root, table }) => {
+const checkPageSources = ({ root, table, declaredMeta = DECLARED_PAGE_META }) => {
   const errors = [];
   const pages = [];
   const tableFiles = new Set(TABLE_FILES);
@@ -286,6 +305,23 @@ const checkPageSources = ({ root, table }) => {
   // ── Règle G : les textes de page existent dans chaque langue publiée ──────
   const texts = checkPageTexts({ root, table });
   errors.push(...texts.errors);
+
+  // ── Règle H : une route, une déclaration ─────────────────────────────────
+  // La carte DESSINE le titre et la description de sa page, donc ses textes sont
+  // déclarés dans son fichier de données. Une route déclarée AUSSI dans la table
+  // écrite à la main verrait la carte l'emporter en silence : corriger la
+  // déclaration manuelle ne changerait rien, et personne ne le saurait.
+  for (const route of Object.keys(declaredMeta).filter((route) =>
+    Object.hasOwn(CARD_PAGE_META, route)
+  )) {
+    errors.push(
+      `la route « ${route} » déclare ses textes DEUX fois : dans le fichier de données de sa ` +
+        'carte OG (scripts/og-cards/, qui les fait DESSINER sur le visuel) et dans la table ' +
+        'écrite à la main (src/config/page-meta.js) — la carte l’emporte, donc corriger l’une ' +
+        'des deux déclarations ne changerait RIEN. Retirer la ligne de src/config/page-meta.js ' +
+        '(la carte est la déclaration de cette route) ou retirer la route du fichier de carte.'
+    );
+  }
 
   // ── Le périmètre : sans src/, ces règles ne liraient rien ─────────────────
   const srcDir = path.join(root, 'src');
@@ -410,8 +446,12 @@ const checkPageSources = ({ root, table }) => {
  * @param {object} [options.table] Table route → clés i18n (défaut : PAGE_META).
  * @throws {Error} Toutes les violations, nommées, en une fois.
  */
-export function assertPagesAnnounceTheirMeta({ root = FRONTEND_DIR, table = PAGE_META } = {}) {
-  const { errors } = checkPageSources({ root, table });
+export function assertPagesAnnounceTheirMeta({
+  root = FRONTEND_DIR,
+  table = PAGE_META,
+  declaredMeta = DECLARED_PAGE_META,
+} = {}) {
+  const { errors } = checkPageSources({ root, table, declaredMeta });
   if (errors.length === 0) return;
   throw new Error(
     `métadonnées de page : ${errors.length} problème(s), le build refuse de produire un bundle ` +
@@ -465,7 +505,12 @@ export const requirePageMeta = ({ root = FRONTEND_DIR } = {}) => ({
  * @returns {{ok: boolean, errors: string[], checked: string[], pages: string[],
  *   notices: string[]}}
  */
-export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = PAGE_META } = {}) {
+export function runPageMetaCheck({
+  root = FRONTEND_DIR,
+  quiet = false,
+  table = PAGE_META,
+  declaredMeta = DECLARED_PAGE_META,
+} = {}) {
   const errors = [];
   const checked = [];
   const pages = [];
@@ -474,27 +519,12 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
     if (!quiet) console.log(...args);
   };
 
-  // Les cartes réellement PRÉSENTES (manifeste du générateur) : c'est d'elles que
-  // dérive « cette page a-t-elle un visuel dédié », pour le garde comme pour le
-  // bundle. Un manifeste illisible viderait la comparaison de son sens.
-  let dedicatedCards = {};
-  let incompleteCards = [];
-  try {
-    const manifest = JSON.parse(
-      fs.readFileSync(path.join(root, 'scripts', 'og-assets.manifest.json'), 'utf8')
-    );
-    ({ cards: dedicatedCards, incomplete: incompleteCards } = dedicatedCardsFrom(
-      (manifest.assets || []).map((asset) => asset.file)
-    ));
-  } catch (error) {
-    errors.push(
-      `scripts/og-assets.manifest.json illisible (${error.message}) : les cartes attendues ne ` +
-        'peuvent pas être déduites — relancer le générateur (scripts/gen-og-images.py)'
-    );
-  }
-
-  // ── Règles A, B et C : les sources — les MÊMES que joue le build ──────────
-  const source = checkPageSources({ root, table });
+  // ── Règles A, B, C, G et H : les tables et les sources — les MÊMES que joue
+  // le build. Les cartes ne sont plus relues ici depuis le manifeste :
+  // src/config/og-cards.js en dérive la table servie à chaque route, que ce
+  // garde importe comme le bundle (check-og-assets.js, lui, lit le manifeste :
+  // c'est son sujet, et il en confronte les octets aux PNG versionnés).
+  const source = checkPageSources({ root, table, declaredMeta });
   errors.push(...source.errors);
   pages.push(...source.pages);
 
@@ -557,7 +587,7 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
       // Carte OG (wide + variante carrée) : la coquille doit annoncer celles
       // DÉDUITES des cartes présentes, sinon le partage d'un lien montrerait une
       // autre image qu'un crawler ayant exécuté le JavaScript.
-      const card = dedicatedCards[route] || GENERIC_CARD;
+      const card = CARDS_BY_ROUTE[route] || GENERIC_CARD;
       const images = metaContents(html, 'og:image');
       const wide = images[0] || '';
       const square = images.find((url) => url.includes('square')) || '';
@@ -587,24 +617,6 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
     }
   }
 
-  // ── Règle F : les cartes dédiées présentes sont complètes ET utilisées ─────
-  for (const file of incompleteCards) {
-    errors.push(
-      `public${file} n’a pas sa variante carrée (og-…-square.png) : la page servie par cette ` +
-        'carte retomberait EN SILENCE sur la carte générique. Le nom du fichier EST la ' +
-        'déclaration d’un visuel dédié — générer les deux formats d’un coup'
-    );
-  }
-  for (const route of Object.keys(dedicatedCards)) {
-    if (Object.hasOwn(table, route)) continue;
-    errors.push(
-      `la carte dédiée « ${dedicatedCards[route].image} » sert la route « ${route} », qui n’est ` +
-        'pas pré-rendue (src/config/page-meta.js) : aucune coquille ne l’annonce, donc aucun ' +
-        'crawler ne la voit. Ajouter la route à la table des textes (elle a alors sa coquille), ' +
-        'ou retirer le visuel'
-    );
-  }
-
   // Ce qui n'est PAS comparable, dit explicitement : les pages auditées sans texte
   // par route sont servies par le gabarit nu (titre neutre voulu).
   if (table === PAGE_META) {
@@ -620,8 +632,8 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
   log(`Métadonnées de page : app et coquilles pré-rendues (${checked.length} route(s)) :`);
   log(checked.join('\n'));
   log(
-    'Cartes dédiées déduites des fichiers présents : ' +
-      (Object.entries(dedicatedCards)
+    'Cartes déclarées par les fichiers de données (scripts/og-cards/) : ' +
+      (Object.entries(CARDS_BY_ROUTE)
         .map(([route, card]) => `${route} → ${card.image}`)
         .join(', ') || '(aucune) — toutes les pages reçoivent la carte générique')
   );

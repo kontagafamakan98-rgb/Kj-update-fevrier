@@ -1,7 +1,8 @@
 {
+  "route": "/login",
+  "title": "loginMetaTitle",
+  "description": "loginMetaDescription",
+  "accent": "Se connecter ou créer un compte →",
   "wide": "og-login.png",
-  "square": "og-login-square.png",
-  "tagline": ["Accédez à votre compte"],
-  "sub": ["Clients & travailleurs · Suivez vos missions en un clic"],
-  "accent": "Se connecter ou créer un compte →"
+  "square": "og-login-square.png"
 }

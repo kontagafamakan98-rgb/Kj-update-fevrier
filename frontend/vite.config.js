@@ -871,10 +871,11 @@ export default defineConfig(({ mode }) => {
 
           // ── Coquilles par route : la liste EST la table des textes ────────
           // Une route pré-rendue est une route qui publie un titre et une
-          // description (src/config/page-meta.js). La carte OG, elle, DÉRIVE des
-          // pages du projet (DEPLOYMENT_PATHS de lighthouserc.cjs) : une route
-          // de la table sans carte fait échouer le build plutôt que de publier
-          // une coquille sans og:image que rien ne surveillerait.
+          // description (src/config/page-meta.js). La carte de chaque page vient
+          // des cartes DÉCLARÉES (scripts/og-cards/ → manifeste →
+          // src/config/og-cards.js) : celle de sa route, sinon celle de la
+          // racine — et une route du projet sans carte fait échouer le build
+          // plutôt que de publier une coquille sans og:image.
           // ── Le texte d'une route, écrit par UNE fonction ───────────────────
           // Titre, `name="title"`, description, og:* et twitter:* viennent tous
           // de src/config/page-meta.js, résolu dans src/i18n/fr.json — T() casse

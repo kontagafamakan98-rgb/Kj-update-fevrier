@@ -50,7 +50,7 @@ import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } f
 // (et le build qui l'importe) n'en garde AUCUNE copie, donc la coquille
 // pré-rendue et la page au runtime ne peuvent pas annoncer deux cartes
 // différentes. Ici on ne fait que DÉRIVER la table des pages du projet.
-import { DEDICATED_CARDS, ogCardFor } from '../src/config/og-cards.js';
+import { CARDS_BY_ROUTE, ogCardFor } from '../src/config/og-cards.js';
 import { normalizeRoute } from '../src/config/route-path.js';
 
 /**
@@ -64,33 +64,35 @@ import { normalizeRoute } from '../src/config/route-path.js';
  * calculée une fois au chargement depuis la config réelle.
  *
  * ── Ce qui ÉCHOUE ici, et pas seulement dans un test ───────────────────────
- * Une carte dédiée se déclare par son SEUL nom de fichier (`public/og-x.png`) :
- * personne n'écrit `/x` nulle part. Si `/x` n'est pas une page du projet, la carte
- * ne servirait aucune page et la dérivation la perdrait EN SILENCE — un PNG livré,
- * jamais annoncé par le build, jamais vérifié (le slug mal orthographié est le cas
- * réaliste : il produit une carte morte que rien ne signale). Le refus est donc
- * dans la fonction, pas dans un test : elle s'exécute au CHARGEMENT de ce module,
- * que `vite.config.js` importe pour écrire les coquilles — `vite build` échoue —
- * comme check-prerender-shells.js et check-page-meta.js, qui dérivent la table.
+ * Une carte DÉCLARE la route qu'elle sert dans son fichier de données
+ * (scripts/og-cards/) : si cette route n'est aucune page du projet, la carte ne
+ * servirait personne et la dérivation la perdrait EN SILENCE — un PNG livré,
+ * jamais annoncé par le build, jamais vérifié (le chemin mal orthographié est le
+ * cas réaliste : `/job` pour `/jobs` produit une carte morte que rien ne
+ * signale). Le refus est donc dans la fonction, pas dans un test : elle s'exécute
+ * au CHARGEMENT de ce module, que `vite.config.js` importe pour écrire les
+ * coquilles — `vite build` échoue — comme check-prerender-shells.js et
+ * check-page-meta.js, qui dérivent la table.
  *
  * `paths === null` (config illisible) n'est pas jugé ici : il n'y a alors aucune
  * liste à confronter, et runOgImageCheck en fait une erreur explicite (plus bas).
  *
  * @param {string[]|null} paths Chemins à couvrir (null = config illisible).
- * @throws {Error} Une carte dédiée désigne une page absente de `paths`.
+ * @throws {Error} Une carte déclare une route absente de `paths`.
  */
 export function deriveRoutes(paths) {
   if (paths) {
     const pages = new Set(paths.map(normalizeRoute));
-    const orphans = Object.keys(DEDICATED_CARDS).filter((route) => !pages.has(route));
+    const orphans = Object.keys(CARDS_BY_ROUTE).filter((route) => !pages.has(route));
     if (orphans.length) {
       throw new Error(
-        `carte(s) dédiée(s) pour une page absente des pages du projet (lighthouserc.cjs, ` +
+        `carte(s) pour une route absente des pages du projet (lighthouserc.cjs, ` +
           `DEPLOYMENT_PATHS) : ${orphans
-            .map((route) => `${DEDICATED_CARDS[route].image} → ${route}`)
-            .join(', ')} — une carte se déclare par son nom de fichier, mais elle ne peut ` +
-          `servir qu'une page qui existe. Corriger le slug de la carte dans son ` +
-          `fichier de données (scripts/og-cards/) ou déclarer la page dans les pages du projet.`
+            .map((route) => `${CARDS_BY_ROUTE[route].image} → ${route}`)
+            .join(', ')} — chaque carte déclare la route qu'elle sert dans son ` +
+          `fichier de données (scripts/og-cards/), et elle ne peut servir qu'une ` +
+          `page qui existe. Corriger la route dans ce fichier, ou déclarer la page ` +
+          `dans les pages du projet.`
       );
     }
   }

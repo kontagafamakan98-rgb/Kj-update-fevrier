@@ -1,90 +1,90 @@
 // Import AVEC attribut : ce module est chargé par Node (vite.config.js et les
 // gardes de scripts/) autant que par le bundle — Node n'exécute plus un import
 // JSON sans `with { type: 'json' }`, et Vite/vitest acceptent la même écriture.
-// Le fichier est lu, pas recopié : voir dedicatedCardsFrom, plus bas.
+// Le fichier est lu, pas recopié : voir cardsFromManifest, plus bas.
 import manifest from '../../scripts/og-assets.manifest.json' with { type: 'json' };
 
 import { normalizeRoute } from './route-path.js';
 
-// Carte GÉNÉRIQUE : l'accueil et toute page sans visuel dédié.
-//
-// `image` = carte wide (1200x630) ; `imageSquare` = variante CARRÉE 1200x1200,
-// exigée par les réseaux qui recadrent en 1:1. Ces deux fichiers sont les SEULS
-// exclus par leur nom de la convention ci-dessous (ils ne nomment aucune page).
-export const GENERIC_CARD = {
-  image: '/og-image-1200x630.png',
-  imageSquare: '/og-square-1200x1200.png',
-};
-
-const GENERIC_FILES = new Set([GENERIC_CARD.image, GENERIC_CARD.imageSquare]);
-
-/** Nom de fichier de carte dédiée : `og-<page>.png` (déclaré par scripts/og-cards/, lu par gen-og-images.py). */
-const DEDICATED_FILE = /^\/og-([a-z0-9-]+)\.png$/;
+// Route de la carte GÉNÉRIQUE : celle de la racine. Elle sert aussi toute page
+// sans visuel dédié (/register, /payment…), et c'est le fichier de données
+// (`scripts/og-cards/generique.json`) qui la déclare comme les autres — sa paire
+// de fichiers n'est donc écrite nulle part ailleurs.
+const ROOT_ROUTE = '/';
 
 /**
- * Quelles pages ont un VISUEL DÉDIÉ — déduit des cartes PRÉSENTES, plus d'aucune
- * liste écrite à la main.
+ * Table route → carte, lue dans le MANIFESTE du générateur.
  *
- * ── La règle ───────────────────────────────────────────────────────────────
- * Un visuel dédié à la page `/x` existe quand `public/` contient `og-x.png` ET sa
- * variante carrée `og-x-square.png`. Le nom du fichier EST la déclaration : il n'y
- * a rien à ajouter au code pour qu'une page change de carte.
+ * ── Ce qui a changé, et pourquoi ───────────────────────────────────────────
+ * La route d'une carte était DÉDUITE du nom de son fichier PNG (`og-<page>.png`),
+ * ce qui obligeait la carte générique à vivre hors de la table (ses fichiers ne
+ * nomment aucune page) et faisait porter à un nom de fichier une information qui
+ * appartient à la donnée. Chaque carte déclare maintenant sa ROUTE, ses textes et
+ * ses sorties dans `scripts/og-cards/*.json` ; le générateur recopie cette route
+ * ici, et ce module la sert au build comme au runtime. Renommer un PNG ne change
+ * donc plus la page qu'une carte sert — et une carte ne peut plus être servie à
+ * une page qui n'est pas la sienne.
  *
- * ── Pourquoi ce n'est pas une liste déguisée ───────────────────────────────
- * Deux listes vivaient ici et dans le générateur, et elles pouvaient diverger en
- * silence : `DEDICATED_CARDS` était recopiée à la main, donc une carte ajoutée
- * dans `public/` restait annoncée par personne (le commit de la carte seule
- * passait pour un succès). La déduction lit maintenant le MANIFESTE
- * (scripts/og-assets.manifest.json) — le même fichier que le générateur écrit et
- * que `check-og-assets.js` confronte aux PNG versionnés par empreinte SHA-256.
- * Un seul fait, deux chargeurs : l'import (bundle, vitest) et `fs` (scripts
- * Node), comme src/i18n/fr.json. Ajouter une carte = relancer le générateur.
- *
- * @param {string[]} files Noms de fichiers livrés dans public/ (chemin du manifeste).
- * @returns {{cards: Object<string, {image: string, imageSquare: string}>,
- *   incomplete: string[]}} `cards` = pages servies par un visuel dédié ;
- *   `incomplete` = cartes larges SANS variante carrée : elles ne peuvent pas être
- *   servies (les réseaux 1:1 liraient une image absente) — la page reçoit la
- *   carte générique, et scripts/check-page-meta.js refuse cet état.
+ * @param {Array<object>} cards Entrées `cards` du manifeste (une par carte).
+ * @returns {Object<string, {image: string, imageSquare: string}>} Carte servie,
+ *   par route normalisée.
  */
-export const dedicatedCardsFrom = (files) => {
-  const present = new Set((files || []).map((file) => `/${String(file).replace(/^\/+/, '')}`));
-  const cards = {};
-  const incomplete = [];
-  for (const file of present) {
-    if (GENERIC_FILES.has(file)) continue;
-    const match = DEDICATED_FILE.exec(file);
-    if (!match) continue;
-    const slug = match[1];
-    // `og-jobs-square.png` est la variante carrée de la carte de /jobs : ce n'est
-    // pas la carte d'une page « jobs-square ».
-    if (slug.endsWith('-square')) continue;
-    const imageSquare = `/og-${slug}-square.png`;
-    if (!present.has(imageSquare)) {
-      incomplete.push(file);
-      continue;
-    }
-    cards[`/${slug}`] = { image: file, imageSquare };
-  }
-  return { cards, incomplete };
-};
-
-// La table servie par le build ET par le runtime : ni l'un ni l'autre ne connaît
-// la liste des pages, seulement le nom des fichiers présents.
-//
-// Exportée pour le seul contrôle que ce module NE PEUT PAS faire : une carte
-// dédiée qui ne désigne aucune page du projet. La liste des pages vit dans
-// lighthouserc.cjs, donc le refus est du côté qui les confronte
-// (scripts/check-og-images.js, deriveRoutes — appelé au chargement du build).
-export const DEDICATED_CARDS = dedicatedCardsFrom(
-  (manifest.assets || []).map((asset) => asset.file)
-).cards;
+export const cardsFromManifest = (cards) =>
+  Object.fromEntries(
+    (cards || [])
+      .filter((card) => card && typeof card.route === 'string' && card.wide && card.square)
+      .map((card) => [
+        normalizeRoute(card.route),
+        { image: `/${card.wide}`, imageSquare: `/${card.square}` },
+      ])
+  );
 
 /**
- * Carte de la route donnée (générique si elle n'a pas de visuel dédié).
+ * Les textes de page qu'une carte déclare : route → clés i18n.
+ *
+ * La carte DESSINE le titre et la description de sa page (voir
+ * scripts/gen-og-images.py), donc c'est son fichier de données qui les déclare —
+ * une seule fois. src/config/page-meta.js lit cette table pour les routes servies
+ * par une carte et refuse qu'une même route soit déclarée des deux côtés : les
+ * deux surfaces ne peuvent donc pas annoncer deux textes.
+ *
+ * @param {Array<object>} cards Entrées `cards` du manifeste.
+ * @returns {Object<string, {title: string, description: string}>}
+ */
+export const cardPageMetaFrom = (cards) =>
+  Object.fromEntries(
+    (cards || [])
+      .filter(
+        (card) =>
+          card &&
+          typeof card.route === 'string' &&
+          typeof card.title === 'string' &&
+          typeof card.description === 'string'
+      )
+      .map((card) => [
+        normalizeRoute(card.route),
+        { title: card.title, description: card.description },
+      ])
+  );
+
+// Les cartes servies par le build ET par le runtime : la clé est la route
+// DÉCLARÉE par le fichier de données, jamais le nom d'un PNG.
+export const CARDS_BY_ROUTE = cardsFromManifest(manifest.cards);
+
+// Les textes de page déclarés par les cartes (src/config/page-meta.js les
+// fusionne avec ceux des routes qui n'ont pas de visuel).
+export const CARD_PAGE_META = cardPageMetaFrom(manifest.cards);
+
+// La carte générique : celle de la racine, servie à toute page sans visuel dédié.
+// `check-og-assets.js` refuse un manifeste où aucune carte ne sert la racine —
+// sans elle, ces pages n'auraient plus de carte du tout.
+export const GENERIC_CARD = CARDS_BY_ROUTE[ROOT_ROUTE];
+
+/**
+ * Carte de la route donnée (générique si elle n'a pas de carte déclarée).
  *
  * @param {string} [route] Chemin de la route (« /jobs »). Par défaut : la route
  *   courante du navigateur — un appelant qui ne passe rien ne peut donc pas
  *   annoncer la carte d'une AUTRE route.
  */
-export const ogCardFor = (route) => DEDICATED_CARDS[normalizeRoute(route)] || GENERIC_CARD;
+export const ogCardFor = (route) => CARDS_BY_ROUTE[normalizeRoute(route)] || GENERIC_CARD;

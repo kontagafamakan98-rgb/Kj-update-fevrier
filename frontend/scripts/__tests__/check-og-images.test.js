@@ -5,7 +5,7 @@ import path from 'path';
 import { runOgImageCheck, ROUTES, deriveRoutes, lighthouseAuditedPaths } from '../check-og-images';
 // La table des cartes appartient à src/config/og-cards.js : les scripts la
 // LISENT, ils ne la possèdent pas (c'est elle que les pages utilisent aussi).
-import { GENERIC_CARD, dedicatedCardsFrom } from '../../src/config/og-cards';
+import { CARDS_BY_ROUTE, GENERIC_CARD } from '../../src/config/og-cards';
 import manifest from '../../scripts/og-assets.manifest.json';
 
 // Tests du garde-fou « og:image par route » (scripts/check-og-images.js).
@@ -334,31 +334,35 @@ describe('check-og-images — la table route → carte DÉRIVE des pages du proj
     expect(ROUTES.map((route) => route.path)).toEqual(audited);
   });
 
-  it("REFUSE une carte dédiée qui ne désigne aucune page du projet (échec de la dérivation)", () => {
-    // Une carte se déclare par son nom de fichier, sans que `/x` soit écrit
-    // nulle part : une carte pour une page hors liste serait donc perdue EN
-    // SILENCE (livrée dans public/, annoncée par personne). Avant, seule une
-    // assertion de ce fichier le signalait ; le refus est maintenant dans la
+  it("REFUSE une carte dont la route n’est aucune page du projet (échec de la dérivation)", () => {
+    // Une carte DÉCLARE la route qu'elle sert (scripts/og-cards/) : une route mal
+    // orthographiée (`/job` pour `/jobs`) produirait sinon une carte morte —
+    // livrée dans public/, servie à personne, annoncée par personne. Avant, seule
+    // une assertion de ce fichier le signalait ; le refus est maintenant dans la
     // dérivation, donc `vite build` échoue aussi (vite.config.js importe ROUTES).
-    // La carte fautive est DÉDUITE du manifeste réel : rien n'est recopié.
-    const real = Object.keys(
-      dedicatedCardsFrom((manifest.assets || []).map((asset) => asset.file)).cards
-    );
+    // La carte fautive est DÉDUITE de la table réelle : rien n'est recopié.
+    const real = Object.keys(CARDS_BY_ROUTE);
     expect(real.length).toBeGreaterThan(0); // sinon le refus ne porterait sur rien
 
     const audited = lighthouseAuditedPaths();
     const amputee = audited.filter((route) => route !== real[0]);
-    expect(() => deriveRoutes(amputee)).toThrow(new RegExp(`${real[0]} \u2014 une carte`));
+    expect(() => deriveRoutes(amputee)).toThrow(
+      new RegExp(`${real[0]} \u2014 chaque carte déclare la route`)
+    );
 
     // Non-vacuité en miroir : la liste RÉELLE des pages passe la dérivation.
     expect(() => deriveRoutes(audited)).not.toThrow();
   });
 
-  it('donne la carte dédiée aux pages qui en ont une, la générique à toutes les autres', () => {
-    expect(deriveRoutes(['/jobs', '/register', '/login'])).toEqual([
+  it('sert à chaque page la carte de SA route, et celle de la racine aux autres', () => {
+    // La liste doit contenir toutes les routes à carte (la dérivation refuse une
+    // liste qui en omettrait une) : « / » porte la carte générique — celle que
+    // reçoit aussi /register, qui n'a pas de visuel à lui.
+    expect(deriveRoutes(['/jobs', '/register', '/login', '/'])).toEqual([
       { path: '/jobs', image: '/og-jobs.png', imageSquare: '/og-jobs-square.png' },
       { path: '/register', ...GENERIC_CARD },
       { path: '/login', image: '/og-login.png', imageSquare: '/og-login-square.png' },
+      { path: '/', ...GENERIC_CARD },
     ]);
   });
 
