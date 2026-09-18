@@ -5,7 +5,8 @@
  * Ce que ces tests doivent prouver, dans l'ordre d'importance :
  *   • les règles SAVENT échouer — carte écrite en dur, clé i18n écrite en dur,
  *     page qui déclare son texte elle-même, page qui n'annonce RIEN, coquille
- *     qui annonce un autre texte que la table (build périmé) ;
+ *     qui annonce un autre texte que la table (build périmé), clé de page absente
+ *     d'une des langues publiées ;
  *   • elles ne se déclenchent PAS là où elles n'ont rien à faire — un
  *     commentaire a le droit de nommer une carte, les tables ont le droit
  *     d'écrire leurs clés, et la fiche /jobs/:id garde son texte de DONNÉE ;
@@ -13,14 +14,19 @@
  *     c'est le seul faux vert que ce garde pourrait produire.
  *
  * Les cas tournent sur une arborescence temporaire construite depuis la table
- * RÉELLE (src/config/page-meta.js + src/i18n/fr.json) : le dépôt n'est jamais
- * modifié, et une table vide ne pourrait pas faire passer ces tests.
+ * RÉELLE (src/config/page-meta.js) et les dictionnaires RÉELS des langues que
+ * src/contexts/LanguageContext.js publie : le dépôt n'est jamais modifié, et une
+ * table vide ne pourrait pas faire passer ces tests.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { assertPagesAnnounceTheirMeta, runPageMetaCheck } from '../check-page-meta';
+import {
+  assertPagesAnnounceTheirMeta,
+  readPublishedLanguages,
+  runPageMetaCheck,
+} from '../check-page-meta';
 import { PAGE_META } from '../../src/config/page-meta';
 import { GENERIC_CARD, dedicatedCardsFrom } from '../../src/config/og-cards';
 import { shellFileFor } from '../site-meta';
@@ -28,7 +34,18 @@ import { shellFileFor } from '../site-meta';
 const FRONTEND = path.resolve(__dirname, '..', '..');
 const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
 
-const FR = JSON.parse(fs.readFileSync(path.join(FRONTEND, 'src', 'i18n', 'fr.json'), 'utf8'));
+// Les langues publiées sont LISES dans src/contexts/LanguageContext.js : la
+// fixture n'en recopie pas la liste, elle écrit les dictionnaires des mêmes
+// langues. Une liste recopiée ici pourrait passer au vert en testant des langues
+// que l'application ne charge pas.
+const LANGUAGE_NAMES = readPublishedLanguages(FRONTEND);
+const REAL_DICTS = Object.fromEntries(
+  LANGUAGE_NAMES.map((language) => [
+    language,
+    JSON.parse(fs.readFileSync(path.join(FRONTEND, 'src', 'i18n', `${language}.json`), 'utf8')),
+  ])
+);
+const FR = REAL_DICTS.fr;
 // Le manifeste du générateur : la fixture part du VRAI (les cartes réellement
 // présentes dans public/) et n'y ajoute que ce que le cas veut éprouver.
 const REAL_MANIFEST = JSON.parse(
@@ -106,9 +123,19 @@ const write = (relative, content) => {
   return full;
 };
 
-/** Arborescence saine : table réelle, App.js, pages, dictionnaire, coquilles. */
+const writeDict = (language, dictionary) =>
+  write(`src/i18n/${language}.json`, `${JSON.stringify(dictionary)}\n`);
+
+/**
+ * Arborescence saine : table réelle, App.js, pages, dictionnaires des langues
+ * publiées, coquilles.
+ */
 const cleanTree = (extraCards = []) => {
-  write('src/i18n/fr.json', `${JSON.stringify(FR)}\n`);
+  write(
+    'src/contexts/LanguageContext.js',
+    `const LANGUAGES = [${LANGUAGE_NAMES.map((language) => `'${language}'`).join(', ')}];\n`
+  );
+  for (const [language, dictionary] of Object.entries(REAL_DICTS)) writeDict(language, dictionary);
   writeManifest(extraCards);
   const lazyLines = [];
   const routeLines = [];
@@ -384,16 +411,88 @@ describe('check-page-meta — règle D (la coquille annonce la table)', () => {
     expect(result.errors.join('\n')).toMatch(/payment\.html absent/);
   });
 
-  it('échoue quand la clé i18n déclarée par la table n’existe pas', () => {
+});
+
+describe('check-page-meta — règle G (chaque texte de page existe dans chaque langue publiée)', () => {
+  it('le BUILD refuse une clé de page absente du dictionnaire FRANÇAIS', () => {
+    // Le cas que portait la règle D, qui ne lisait que fr : c'est la règle G qui
+    // le porte désormais, pour le français comme pour les autres langues.
     cleanTree();
-    const fr = JSON.parse(fs.readFileSync(path.join(root, 'src', 'i18n', 'fr.json'), 'utf8'));
+    const fr = { ...FR };
     delete fr.supportMetaTitle;
-    write('src/i18n/fr.json', `${JSON.stringify(fr, null, 2)}\n`);
+    writeDict('fr', fr);
+
+    expect(() => assertPagesAnnounceTheirMeta({ root })).toThrow(
+      /src\/i18n\/fr\.json : la clé « supportMetaTitle » \(titre de la route « \/support »\) est absente/
+    );
+  });
+
+  it('le BUILD refuse une clé de page absente d’une SEULE des langues', () => {
+    cleanTree();
+    const wo = { ...REAL_DICTS.wo };
+    delete wo.supportMetaDescription;
+    writeDict('wo', wo);
+
+    expect(() => assertPagesAnnounceTheirMeta({ root })).toThrow(
+      /src\/i18n\/wo\.json : la clé « supportMetaDescription » \(description de la route « \/support »\) est absente/
+    );
+  });
+
+  it('le BUILD refuse une traduction VIDE (clé présente, texte absent)', () => {
+    cleanTree();
+    writeDict('mos', { ...REAL_DICTS.mos, jobsMetaTitle: '   ' });
+
+    expect(() => assertPagesAnnounceTheirMeta({ root })).toThrow(
+      /src\/i18n\/mos\.json : la clé « jobsMetaTitle » \(titre de la route « \/jobs »\) est vide/
+    );
+  });
+
+  it('suit la liste de LanguageContext.js : une langue ajoutée LÀ est vérifiée', () => {
+    cleanTree();
+    write(
+      'src/contexts/LanguageContext.js',
+      `const LANGUAGES = [${LANGUAGE_NAMES.map((l) => `'${l}'`).join(', ')}, 'xx'];\n`
+    );
+    const xx = { ...FR };
+    delete xx.homeMetaTitle;
+    writeDict('xx', xx);
 
     const result = run();
 
     expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toMatch(/la clé « supportMetaTitle »,.*absente ou vide/);
+    expect(result.errors.join('\n')).toMatch(/src\/i18n\/xx\.json : la clé « homeMetaTitle »/);
+  });
+
+  it('échoue quand une langue publiée n’a pas de dictionnaire', () => {
+    cleanTree();
+    fs.rmSync(path.join(root, 'src', 'i18n', 'en.json'));
+
+    const result = run();
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/src\/i18n\/en\.json illisible .*« en » est publiée/);
+  });
+
+  it('échoue quand un dictionnaire n’est chargé par aucune langue publiée', () => {
+    cleanTree();
+    writeDict('de', FR);
+
+    const result = run();
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /src\/i18n\/de\.json existe mais aucune langue publiée ne le charge/
+    );
+  });
+
+  it('échoue quand la liste des langues est illisible — jamais un vert par vacuité', () => {
+    cleanTree();
+    write('src/contexts/LanguageContext.js', "export const OTHER = ['fr'];\n");
+
+    const result = run();
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/LanguageContext\.js ne déclare aucune « const LANGUAGES/);
   });
 });
 
