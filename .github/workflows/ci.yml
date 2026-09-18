@@ -165,11 +165,19 @@ jobs:
       # d'infrastructure sans rapport avec le code. Voir
       # .github/scripts/check-workflow-pins.py.
       #
+      # Le garde prend UN chemin : il est donc appelé sur TOUS les fichiers de
+      # .github/workflows/. Tant qu'il ne voyait que ci.yml, ajouter un second
+      # workflow ouvrait un trou invisible — précisément le défaut qu'il existe
+      # pour empêcher (le 18/09/2026, seo-vercel-env.yml est né sans garde).
+      #
       # `python3` (et non `python`) : ce job n'installe pas Python via
       # setup-python, seule la commande `python3` de l'image du runner est
       # garantie — le script est en stdlib pure, aucun paquet à installer.
       - name: Check action pins (no branch refs)
-        run: python3 .github/scripts/check-workflow-pins.py
+        run: |
+          for workflow in .github/workflows/*.yml; do
+            python3 .github/scripts/check-workflow-pins.py "$workflow"
+          done
 
       # Assertions d'existence sur un export (`callable(...)`, `is not None`
       # comme condition entière, `.toBeDefined()`) : elles restent vertes même

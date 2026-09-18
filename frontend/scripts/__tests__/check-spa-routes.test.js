@@ -499,7 +499,10 @@ describe('check-spa-routes — séparation des gabarits', () => {
     const project = makeProject({ extraBuildHtml: ['produits'] });
     const errors = run(project).errors.join('\n');
     expect(errors).toContain('produits');
-    expect(errors).toContain('PRERENDERED_ROUTES');
+    // Le message doit nommer L'ENDROIT où une page se déclare : la table des
+    // textes de route. Avant, il renvoyait vers la liste recopiée du garde —
+    // c'est-à-dire vers la seconde déclaration qu'on vient de supprimer.
+    expect(errors).toContain('src/config/page-meta.js');
   });
 });
 

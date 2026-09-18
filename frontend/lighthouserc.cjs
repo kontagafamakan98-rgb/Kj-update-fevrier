@@ -82,7 +82,10 @@ const localBase = 'http://localhost:4173';
 //     donc elle est vérifiée au lieu d'être oubliée ;
 //   • une page PRÉ-RENDUE absente d'ici fait ÉCHOUER le build (vite.config.js),
 //     donc on ne peut plus écrire une coquille que rien ne surveille ;
-//   • une carte dédiée absente d'ici n'existe plus : c'est la même liste.
+//   • une carte dédiée dont la page est absente d'ici fait ÉCHOUER la
+//     dérivation, donc `vite build` (scripts/check-og-images.js, deriveRoutes) :
+//     une carte se déclare par son nom de fichier, donc ce slug ne serait servi
+//     à aucune page et disparaîtrait de la table sans que rien ne le signale.
 // Les 4 pages ajoutées le 18/09/2026 (/login, /payment, /how-it-works, /support)
 // sont exactement celles qui étaient pré-rendues hors du périmètre : /login
 // portait même une carte DÉDIÉE (og-login.png) que personne ne vérifiait.

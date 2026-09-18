@@ -15,7 +15,9 @@
  *    complémentaire : la CONFIGURATION qui achemine la requête.
  * 2. Les pages pré-rendues (`/jobs`, `/login`, …) doivent être servies par
  *    leur `.html` — `check-prerender-shells.js` vérifie le fichier, ce garde
- *    vérifie qu'il est atteignable ET non masqué par une règle plus large.
+ *    vérifie qu'il est atteignable ET non masqué par une règle plus large. La
+ *    liste de ces pages DÉRIVE de src/config/page-meta.js (voir
+ *    PRERENDERED_ROUTES) : elle n'est plus déclarée une seconde fois ici.
  * 3. AUCUN catch-all `/(.*)` → `/index.html` : c'est lui qui faisait répondre
  *    **200** à toute URL inconnue (« soft 404 »). Chaque route SPA est donc
  *    déclarée nommément, et le reste tombe sur la page 404 de Vercel (statut
@@ -44,6 +46,9 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+// La liste des pages pré-rendues se LIT ici, elle ne se recopie pas : c'est la
+// table des textes de route dont le BUILD écrit les coquilles (vite.config.js).
+import { PAGE_META } from '../src/config/page-meta.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(__dirname, '..');
@@ -63,18 +68,21 @@ export const SPA_INDEX = '/index.html';
 export const APP_HTML = '/app.html';
 // Pages réellement pré-rendues dans le build : chacune a son propre fichier.
 // Toute autre route de production doit être servie par APP_HTML.
-export const PRERENDERED_ROUTES = [
-  'jobs',
-  'login',
-  'register',
-  'forgot-password',
-  'payment',
-  // Pages PUBLIQUES de contenu : elles ont leur propre shell depuis qu'elles ne
-  // doivent plus être servies par le gabarit nu (titre « Kojo », aucun h1). Le
-  // gabarit app.html ne concerne plus que les écrans connectés (noindex).
-  'how-it-works',
-  'support',
-];
+//
+// ── DÉRIVÉE, et non recopiée ─────────────────────────────────────────────────
+// Cette liste était écrite à la main ici — une SECONDE déclaration des mêmes
+// pages que celle du build. Rien ne les reliait : ajouter une route pré-rendue
+// sans l'ajouter ici la faisait servir par app.html (le gabarit nu, titre
+// « Kojo », aucun h1) sans qu'aucun test ne le voie, et l'inverse laissait le
+// garde exiger un routage pour une page qui n'existe pas.
+//
+// La source unique est src/config/page-meta.js : ses clés SONT les routes qui
+// publient un titre et une description, et c'est exactement ce que
+// vite.config.js pré-rend (`<route>.html`), la racine mise à part (index.html).
+// Déclarer une page se fait donc à UN endroit, et le garde suit.
+export const PRERENDERED_ROUTES = Object.keys(PAGE_META)
+  .filter((route) => route !== '/')
+  .map((route) => route.slice(1));
 // Routes non indexables : elles n'existent que pour un utilisateur connecté (ou
 // pour le support) et n'ont aucun contenu à montrer à un moteur.
 export const PRIVATE_ROUTES = [
@@ -514,9 +522,9 @@ export function runSpaRoutesCheck(options = {}) {
       if (['index', '404', 'app'].includes(route)) continue;
       if (!PRERENDERED_ROUTES.includes(route)) {
         errors.push(
-          `build/${file} est pré-rendu mais absent de PRERENDERED_ROUTES : le routage ne le sert ` +
-            `pas (ou le sert au mauvais endroit) — déclarez « ${route} » dans le garde et dans ` +
-            'frontend/vercel.json'
+          `build/${file} est pré-rendu mais AUCUNE route ne le déclare : le routage ne le sert ` +
+            'pas (ou le sert au mauvais endroit) — c\'est src/config/page-meta.js qui déclare une ' +
+            'page (elle aura alors sa coquille), et frontend/vercel.json qui la route.'
         );
       }
     }

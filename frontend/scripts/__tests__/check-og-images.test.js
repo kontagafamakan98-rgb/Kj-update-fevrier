@@ -332,16 +332,26 @@ describe('check-og-images — la table route → carte DÉRIVE des pages du proj
       expect.arrayContaining(['/forgot-password', '/register', '/jobs'])
     );
     expect(ROUTES.map((route) => route.path)).toEqual(audited);
-    // Une carte dédiée pour une page hors liste serait silencieusement perdue
-    // (personne ne la vérifierait) : c'est le seul écart qui survit à la
-    // dérivation, donc il est verrouillé.
-    // Les cartes dédiées sont DÉDUITES des fichiers présents : le test lit la
-    // même donnée que le build (manifeste du générateur), sans liste de pages.
-    const dedicated = Object.keys(
+  });
+
+  it("REFUSE une carte dédiée qui ne désigne aucune page du projet (échec de la dérivation)", () => {
+    // Une carte se déclare par son nom de fichier, sans que `/x` soit écrit
+    // nulle part : une carte pour une page hors liste serait donc perdue EN
+    // SILENCE (livrée dans public/, annoncée par personne). Avant, seule une
+    // assertion de ce fichier le signalait ; le refus est maintenant dans la
+    // dérivation, donc `vite build` échoue aussi (vite.config.js importe ROUTES).
+    // La carte fautive est DÉDUITE du manifeste réel : rien n'est recopié.
+    const real = Object.keys(
       dedicatedCardsFrom((manifest.assets || []).map((asset) => asset.file)).cards
     );
-    const orphans = dedicated.filter((p) => !audited.includes(p));
-    expect(orphans).toEqual([]);
+    expect(real.length).toBeGreaterThan(0); // sinon le refus ne porterait sur rien
+
+    const audited = lighthouseAuditedPaths();
+    const amputee = audited.filter((route) => route !== real[0]);
+    expect(() => deriveRoutes(amputee)).toThrow(new RegExp(`${real[0]} \u2014 une carte`));
+
+    // Non-vacuité en miroir : la liste RÉELLE des pages passe la dérivation.
+    expect(() => deriveRoutes(audited)).not.toThrow();
   });
 
   it('donne la carte dédiée aux pages qui en ont une, la générique à toutes les autres', () => {
@@ -363,7 +373,12 @@ describe('check-og-images — la table route → carte DÉRIVE des pages du proj
         square: `${ORIGIN}${GENERIC_CARD.imageSquare}`,
       }),
     };
-    const { result, calls } = await run(map, { routes: deriveRoutes(['/', '/nouvelle-page']) });
+    // La liste doit être celle des pages du projet PLUS la page inconnue : une
+    // liste partielle est désormais REFUSÉE par la dérivation (elle perdrait les
+    // cartes dédiées des pages qu'elle omet).
+    const { result, calls } = await run(map, {
+      routes: deriveRoutes([...lighthouseAuditedPaths(), '/nouvelle-page']),
+    });
 
     expect(result.ok).toBe(true);
     expect(calls).toContain(`${ORIGIN}/nouvelle-page`);

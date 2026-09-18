@@ -476,7 +476,28 @@ inventer. En revanche `frontend/scripts/setup-seo-env.js` fait en une fois les
 trois gestes qu'on oublie dans l'ordre — pose des deux variables (`production` ET
 `preview`, en `upsert`, donc rejouable), redéploiement de production, puis
 relecture du HTML servi par la sonde ci-dessus, avec **échec** si les deux balises
-n'y sont pas :
+n'y sont pas. Il tourne **depuis la CI**, sans jeton local : le workflow
+`.github/workflows/seo-vercel-env.yml` est **manuel** (`workflow_dispatch`) et lit
+les valeurs dans des **secrets de dépôt** :
+
+| Secret | Contenu |
+|---|---|
+| `VERCEL_TOKEN` | jeton Vercel ayant accès au projet (`Settings → Tokens`) |
+| `KOJO_GA_MEASUREMENT_ID` | identifiant de flux GA4, de la forme `G-…` |
+| `KOJO_GSC_VERIFICATION` | contenu de la balise `google-site-verification` |
+
+Bouton « Run workflow » sur **SEO Vercel env (manual)** : le job pose les deux
+variables (`production` ET `preview`, en `upsert`), redéploie la production,
+attend `READY`, relit le HTML servi et **échoue** si les deux balises n'y sont
+pas. Trois raisons à cette forme : aucun push ni PR ne peut déclencher une
+écriture sur la production Vercel (fichier `dispatch`-only, séparé de `ci.yml`,
+dont le bouton déploie le backend Fly), et les VALEURS ne sont jamais des entrées
+de dispatch — une entrée est publiée dans les logs du run, un secret ne l'est
+pas. Un secret absent fait échouer le job **avant toute écriture** (« Il manque
+une valeur — rien n'a été écrit », code 2) : une variable vide posée sur Vercel
+remplacerait la configuration en place par du vide.
+
+Le même script reste lançable à la main, pour un diagnostic :
 
 ```bash
 KOJO_GA_MEASUREMENT_ID=G-… KOJO_GSC_VERIFICATION=… VERCEL_TOKEN=vcp_… \
@@ -531,6 +552,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète) |
+| `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
 
@@ -585,6 +607,19 @@ touché. Deux listes vivaient auparavant ici et dans le générateur : une carte
 ajoutée dans `public/` restait annoncée par personne, et le commit de la carte
 seule passait pour un succès.
 
+Le revers de cette déduction est traité au même endroit : une carte dédiée dont le
+slug ne correspond à AUCUNE page du projet (`lighthouserc.cjs`, `DEPLOYMENT_PATHS`)
+fait ÉCHOUER la dérivation elle-même, donc `vite build` — pas seulement un test.
+C'est un PNG livré que le build perdrait en silence (le slug mal orthographié est
+le cas réaliste) ; le seul indice serait « la page reçoit la carte générique », ce
+qui est le comportement normal de toutes les autres pages. Prouvé le 18/09/2026 en
+ajoutant `og-produits.png` + sa variante au manifeste seul : `npm run build` est
+sorti en 1 avec le slug nommé, et les trois gardes qui dérivent la table
+(`check-og-images`, `check-prerender-shells`, `check-page-meta`) ont refusé de
+tourner sur cet état avant d'avoir rien vérifié. Limite assumée : `paths === null`
+(config illisible) n'est pas jugé là — il n'y a alors aucune liste à confronter, et
+c'est `runOgImageCheck` qui en fait une erreur explicite.
+
 `scripts/check-page-meta.js` (job frontend, après
 le build) impose six règles, chacune capable d'échouer :
 
@@ -600,10 +635,12 @@ le build) impose six règles, chacune capable d'échouer :
    `fr.json`, la langue des coquilles) ;
 5. zéro coquille comparée est une ERREUR — jamais un vert quand rien n'a été lu ;
 6. une carte dédiée PRÉSENTE est complète et utilisée : une carte large sans sa
-   variante carrée, ou une carte pour une page qui n'est pas pré-rendue (donc
-   annoncée par aucune coquille), est une erreur — sinon la page retomberait sans
-   bruit sur la carte générique, c'est-à-dire exactement l'oubli que la déduction
-   doit rendre impossible.
+   variante carrée, ou une carte pour une page du projet **qui n'est pas
+   pré-rendue** (`/dashboard` : auditée, mais servie par le gabarit nu — le cas
+   « absente des pages du projet » n'arrive jamais jusqu'ici, il arrête la
+   dérivation), est une erreur — sinon la page retomberait sans bruit sur la carte
+   générique, c'est-à-dire exactement l'oubli que la déduction doit rendre
+   impossible.
 
 Les routes servies par le gabarit nu (`/dashboard`, `/profile` — noindex) sont
 NOMMÉES en notice plutôt que passées sous silence, et les fiches `/jobs/:id`,
@@ -680,8 +717,11 @@ chaque PR vers `main` (sauf mention contraire).
   par le bon gabarit** — sa page pré-rendue si elle en a une, `app.html` sinon,
   et jamais `index.html` (qui porte le contenu de l'accueil) ; `app.html` doit
   rester nu (pas de `<h1>`, pas de canonical, pas de JSON-LD, `#root` vide) et
-  toute page `.html` émise par le build doit être déclarée dans
-  `PRERENDERED_ROUTES`. Enfin, les routes privées (`/dashboard`, `/profile`,
+  toute page `.html` émise par le build doit correspondre à une route de la table
+  des textes (`src/config/page-meta.js`) — c'est LÀ qu'une page se déclare, et la
+  liste des pages pré-rendues du garde en **DÉRIVE** au lieu d'être recopiée :
+  une route ajoutée à la table change le gabarit attendu sans qu'aucune autre
+  liste soit à mettre à jour. Enfin, les routes privées (`/dashboard`, `/profile`,
   `/messages`, `/create-job`, `/support-admin`…) portent `X-Robots-Tag:
   noindex` : un tableau de bord indexé est une page vide dans les résultats.
 - Page d'accueil pré-rendue (`check-home-shell.js`) : un h1 unique reprenant
