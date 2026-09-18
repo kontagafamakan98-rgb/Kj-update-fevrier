@@ -268,6 +268,13 @@ BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME', 'KOJO').strip() or 'KOJO
 
 PASSWORD_RESET_FROM_EMAIL = os.environ.get('PASSWORD_RESET_FROM_EMAIL', BREVO_SENDER_EMAIL).strip() or BREVO_SENDER_EMAIL
 
+# Boîte qui reçoit les RÉPONSES des utilisateurs. L'expéditeur transactionnel
+# est une adresse DU DOMAINE (noreply@…), qui n'a pas de boîte : sans Reply-To,
+# une réponse à un reçu de paiement rebondit. Défaut = adresse de contact
+# RÉELLE, même règle que VAPID_CLAIMS_EMAIL (un placeholder passerait le
+# contrôle de format tout en étant inutilisable). Vide = aucun Reply-To.
+BREVO_REPLY_TO_EMAIL = os.environ.get('BREVO_REPLY_TO_EMAIL', 'kojoapp98@gmail.com').strip()
+
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
 GMAIL_DEPRECATED_NOTICE = 'Gmail OAuth disabled in favor of Brevo'

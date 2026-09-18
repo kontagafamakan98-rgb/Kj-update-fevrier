@@ -81,6 +81,10 @@ cd frontend && npm test
   job `backend-tests` passe et que le push touche `backend/**`**.
 - **Secret** : `FLY_API_TOKEN` (jeton deploy, généré par
   `flyctl tokens create deploy -n "GitHub Actions"`) dans les secrets GitHub.
+- **Sonde email** : `KOJO_PROBE_IMAP_USER` + `KOJO_PROBE_IMAP_PASSWORD` (mot de
+  passe d'application Gmail) vérifient sur `main` que les emails transactionnels
+  passent SPF, DKIM et DMARC — verdicts lus sur un message réellement reçu, pas
+  supposés depuis le DNS (`backend/DEPLOY_FLYIO.md`).
 - Guide pas à pas complet : `backend/DEPLOY_FLYIO.md`.
 
 | Variable | Obligatoire ? | Notes |

@@ -30,6 +30,7 @@ from kojo_core import (
     RateLimitMiddleware,
     WestAfricaSecurityMiddleware,
     _rate_limit_cleanup_loop,
+    build_allowed_origins,
     build_trusted_hosts,
     client,
     cloudinary_health_probe,
@@ -393,18 +394,16 @@ app.include_router(api_router)
 # ---------------------------------------------------------------------------
 # CORS Configuration optimized for West Africa
 # ---------------------------------------------------------------------------
-WEST_AFRICA_ORIGINS = [
-    "http://localhost:3000",
-    "https://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
-# Get additional origins from environment
-env_origins = [origin.strip() for origin in os.environ.get('CORS_ORIGINS', '').split(',') if origin.strip()]
-allowed_origins = WEST_AFRICA_ORIGINS + env_origins
-
 # Support public Vercel deployments and common development/private network origins.
 # Exact origins from CORS_ORIGINS remain supported via allow_origins.
+
+# La liste des origines EXACTES est construite par kojo_core.build_allowed_origins() :
+# origines de dev + FRONTEND_APP_URL + CORS_ORIGINS. L'adresse canonique du
+# frontend ne dépend donc plus de quelqu'un qui l'aurait recopiée dans
+# CORS_ORIGINS — c'est précisément ce qui a cassé le 18/09/2026 (domaine propre
+# kojoforafrica.cc.cd hors du motif Vercel : aucune origine exacte ne matchait
+# plus, donc tout préflight répondait 400 « Disallowed CORS origin »).
+allowed_origins = build_allowed_origins()
 TRUSTED_HOSTS = build_trusted_hosts()
 # Activé par défaut désormais: build_trusted_hosts() couvre déjà localhost,
 # *.onrender.com, *.vercel.app et toute origine dérivée de FRONTEND_APP_URL /
