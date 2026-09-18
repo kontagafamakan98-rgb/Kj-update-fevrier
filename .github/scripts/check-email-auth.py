@@ -23,6 +23,15 @@ existent :
     annoncé `BbH7…`, `bh` recalculé `uaXR…`, signature invalide). L'octet
     signé n'existe plus qu'à la réception.
 
+── L'alignement, que les verdicts ne disent pas ───────────────────────────
+Un `spf=pass` posé sur le domaine d'un TIERS ne fait pas passer DMARC : seul
+l'alignement de l'enveloppe (`Return-Path` / `smtp.mailfrom`) avec le domaine du
+`From:` compte. La sonde lit donc, sur le même message, les trois domaines qui
+décident (From, enveloppe SPF, `d=` de la signature DKIM) et publie la phrase
+d'alignement à côté des verdicts. Quand l'alignement SPF est déclaré EXIGÉ
+(`KOJO_REQUIRE_SPF_ALIGNMENT=1`), son absence fait échouer la sonde : c'est ce
+qui verrouille le gain une fois les deux jambes en place.
+
 ── Ce que la sonde refuse de faire ────────────────────────────────────────
 Sans identifiants, elle ANNULE en le disant (`::notice`, code 0) plutôt que de
 sortir verte : un run qui n'a rien vérifié doit se lire comme tel. Identifiants
@@ -112,6 +121,108 @@ def evaluate(verdicts: dict[str, str], expected: str = EXPECTED) -> list[str]:
         elif verdict != expected:
             problems.append(f"{mechanism}={verdict} (attendu {expected})")
     return problems
+
+
+# ── Alignement DMARC : ce que les verdicts NE disent PAS ─────────────────────
+# `spf=pass` peut être vrai sur le domaine d'un TIERS : DMARC n'utilise ce
+# verdict que si l'hôte de l'enveloppe (`Return-Path`, `smtp.mailfrom`) s'aligne
+# sur le domaine du `From:`. Sans alignement SPF, `dmarc=pass` ne repose que sur
+# DKIM — une seule jambe, celle qu'une rotation de clé mal menée, une signature
+# perdue ou un réglage cassé emporte.
+#
+# Mesuré le 18/09/2026 sur un message réellement livré :
+#   Return-Path: <bounces-470616010-…@gw.d.sender-sib.com>   (domaine de Brevo)
+#   From:        noreply@kojoforafrica.cc.cd
+#   DKIM-Signature: … d=kojoforafrica.cc.cd; s=brevo2
+# → spf=pass NON aligné, dkim=pass aligné : DMARC tient sur DKIM seul.
+ADDRESS_DOMAIN_RE = re.compile(r"[^<>@\s,;]+@([A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?)")
+DKIM_DOMAIN_RE = re.compile(r"\b[dD]\s*=\s*([A-Za-z0-9][A-Za-z0-9.-]*)")
+ALIGNMENT_TRUTHY = {"1", "true", "yes", "oui", "on"}
+
+
+def spf_alignment_required(env: dict[str, str]) -> bool:
+    """L'alignement SPF est-il EXIGÉ pour ce run ?
+
+    Par défaut non : tant que Brevo n'a pas mis le sous-domaine brandé en place,
+    exiger l'alignement ferait rougir la CI pour un état d'exploitation connu.
+    La variable est là pour VERROUILLER le gain une fois obtenu, sans toucher au
+    code (`KOJO_REQUIRE_SPF_ALIGNMENT=1`).
+    """
+    return str(env.get("KOJO_REQUIRE_SPF_ALIGNMENT", "")).strip().lower() in ALIGNMENT_TRUTHY
+
+
+def header_domain(value) -> str:
+    """Domaine d'un en-tête d'adresse (`From`, `Return-Path`), en minuscules."""
+    match = ADDRESS_DOMAIN_RE.search(str(value or ""))
+    return match.group(1).lower().rstrip(".") if match else ""
+
+
+def is_aligned(host: str, from_domain: str) -> bool:
+    """L'hôte appartient-il au domaine du `From:` ?
+
+    Alignement « relaxé » restreint aux frontières de libellés : égal, ou
+    sous-domaine de l'un ou de l'autre. Plus STRICT que le PSL qu'utilisent les
+    récepteurs (il n'y a pas de table des suffixes publics ici) : on ne revendique
+    l'alignement que si l'hôte est vraiment notre domaine — un faux « aligné »
+    ferait exactement ce que cette mesure existe pour empêcher.
+    """
+    left, right = str(host or "").lower().rstrip("."), str(from_domain or "").lower().rstrip(".")
+    if not left or not right:
+        return False
+    return left == right or left.endswith("." + right) or right.endswith("." + left)
+
+
+def alignment_facts(raw_headers) -> dict:
+    """Les trois domaines qui décident de l'alignement, lus sur le message reçu."""
+    if isinstance(raw_headers, str):
+        raw_headers = raw_headers.encode("utf-8", "replace")
+    message = message_from_bytes(raw_headers)
+    dkim = DKIM_DOMAIN_RE.search(str(message.get("DKIM-Signature", "")))
+    return {
+        "from": header_domain(message.get("From", "")),
+        "envelope": header_domain(message.get("Return-Path", "")),
+        "dkim": dkim.group(1).lower().rstrip(".") if dkim else "",
+    }
+
+
+def alignment_notice(facts: dict, verdicts: dict) -> str:
+    """La phrase d'alignement, publiée à côté des verdicts.
+
+    Elle nomme les domaines COMPARÉS : « spf=pass NON aligné — enveloppe
+    gw.d.sender-sib.com ≠ kojoforafrica.cc.cd : ce verdict ne compte pas pour
+    DMARC » se lit et se corrige ; « spf=pass » seul rassure à tort.
+    """
+    from_domain = facts.get("from") or "(From absente)"
+    if is_aligned(facts.get("envelope", ""), facts.get("from", "")):
+        spf = f"spf={verdicts.get('spf', 'absent')} aligné (enveloppe {facts['envelope']})"
+    else:
+        spf = (
+            f"spf={verdicts.get('spf', 'absent')} NON aligné — enveloppe "
+            f"{facts.get('envelope') or '(absente)'} ≠ {from_domain} : ce verdict "
+            "ne compte pas pour DMARC"
+        )
+    if is_aligned(facts.get("dkim", ""), facts.get("from", "")):
+        dkim = f"dkim={verdicts.get('dkim', 'absent')} aligné (d={facts['dkim']})"
+    else:
+        dkim = f"dkim={verdicts.get('dkim', 'absent')} NON aligné — d={facts.get('dkim') or '(absent)'} ≠ {from_domain}"
+    return f"{spf} | {dkim}"
+
+
+def alignment_problems(facts: dict, verdicts: dict, required: bool) -> list[str]:
+    """Manquements d'alignement — seulement quand l'exigence est déclarée.
+
+    Un `spf=fail` n'est pas listé ici : `evaluate()` le signale déjà, et deux
+    erreurs pour un même fait brouilleraient la lecture du journal.
+    """
+    if not required or verdicts.get("spf") != EXPECTED:
+        return []
+    if is_aligned(facts.get("envelope", ""), facts.get("from", "")):
+        return []
+    return [
+        f"SPF non aligné : enveloppe {facts.get('envelope') or '(absente)'} ≠ domaine du From "
+        f"{facts.get('from') or '(absent)'} — DMARC ne reposerait que sur DKIM, et "
+        "KOJO_REQUIRE_SPF_ALIGNMENT=1 exige les deux jambes"
+    ]
 
 
 def credentials(env: dict[str, str]):
@@ -260,12 +371,26 @@ def main(argv=None) -> int:
     verdicts, transcript = authentication_verdicts(headers)
     print(f"Authentication-Results lu : {transcript or '(absent)'}")
 
+    # L'alignement se lit sur le MÊME message : verdicts et enveloppe/signature
+    # sont deux lectures des en-têtes reçus, jamais deux sources.
+    facts = alignment_facts(headers)
+    print(
+        f"Domaines — From {facts['from'] or '(absent)'} | enveloppe SPF "
+        f"{facts['envelope'] or '(absente)'} | DKIM d={facts['dkim'] or '(absent)'}"
+    )
+    print(f"::notice title=Alignement DMARC::{alignment_notice(facts, verdicts)}")
+
     problems = evaluate(verdicts)
     if problems:
         print("::error title=Authentification email en échec::" + " | ".join(problems))
         for problem in problems:
             print(f"  ❌ {problem}")
         print("  (le message est bien arrivé : le problème est la façon dont il est signé, pas la livraison)")
+        return 1
+
+    missing_alignment = alignment_problems(facts, verdicts, spf_alignment_required(os.environ))
+    if missing_alignment:
+        print("::error title=Alignement SPF exigé mais absent::" + " | ".join(missing_alignment))
         return 1
 
     print(f"::notice title=Email authentifié::spf={verdicts['spf']} dkim={verdicts['dkim']} dmarc={verdicts['dmarc']}")

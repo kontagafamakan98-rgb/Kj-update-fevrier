@@ -189,6 +189,47 @@ fly secrets set \
   le récepteur réécrit le corps, donc le `bh` signé ne correspond plus à celui
   qu'on recalcule. L'octet signé n'existe qu'à la réception.
 
+  🧭 **Alignement SPF : DMARC ne tient aujourd'hui que sur DKIM.** Un `spf=pass`
+  posé sur le domaine d'un TIERS ne compte pas pour DMARC : seul l'alignement de
+  l'enveloppe (`Return-Path` / `smtp.mailfrom`) avec le domaine du `From:` est
+  retenu. Mesuré le 18/09/2026 sur un message réellement livré :
+
+  ```
+  Return-Path:     <bounces-470616010-2104611724@gw.d.sender-sib.com>   ← Brevo
+  From:            "KOJO" <noreply@kojoforafrica.cc.cd>
+  DKIM-Signature:  … d=kojoforafrica.cc.cd; s=brevo2                    ← aligné
+  ```
+
+  → `spf=pass` **non aligné**, `dkim=pass` aligné : une seule jambe porte la
+  politique `p=quarantine`. La sonde publie désormais cette phrase d'alignement
+  à chaque run de `main` (`::notice title=Alignement DMARC::…`, enveloppe et
+  `d=` comparés au domaine du `From:`, jamais supposés).
+
+  Ce qui manque n'est pas dans le DNS mais chez Brevo : leur FAQ est explicite —
+  *sans sous-domaine brandé, SPF passe via l'infrastructure de Brevo, pas votre
+  domaine* ; le sous-domaine brandé « déplace l'alignement SPF sur votre domaine
+  d'envoi » et permet de tenir une politique DMARC stricte sur **deux signaux
+  indépendants**. Il est disponible sur IP partagée (obligatoire seulement en IP
+  dédiée) et se configure dans Settings → Senders, Domains, IPs → Domains →
+  *Add a domain* → **branded subdomain** (préfixe libre, p. ex. `mail`, d'où
+  `mail.kojoforafrica.cc.cd`). Brevo génère alors un **CNAME « branded record »**
+  (en-tête de retour et SPF hébergés chez eux) **dont la valeur est propre au
+  compte** : elle ne se devine pas, elle se lit dans ce flux (ou via l'API).
+
+  Dès que ces valeurs sont connues, l'ajout à la zone DNSHE est un appel de
+  plus (`dns_records/create`, même client que `dmarc_policy.py`) : aucun
+  redéploiement n'est nécessaire, la vérification se fait sur un message.
+
+  ✅ **Verrouiller le gain une fois les deux jambes en place** :
+  `gh variable set KOJO_REQUIRE_SPF_ALIGNMENT --body 1`. La sonde l'exige alors
+  et rougit si DMARC ne repose plus que sur DKIM — sans toucher au code.
+
+  À noter : les deux CNAME `brevo1`/`brevo2` existent pour que Brevo fasse
+  TOURNER la clé sans republier d'enregistrement. Une rotation est donc déjà
+  absorbée ; ce que l'alignement SPF protège, c'est la perte de DKIM (clé
+  révoquée, signature retirée, réglage cassé) — le jour où elle survient, la
+  politique DMARC ne tombe pas avec elle.
+
   Deux secrets GitHub l'activent — **et seulement GitHub** : les ajouter à
   `.env.example` les rendrait obligatoires sur Fly (`check-fly-env-drift.py`
   exige que toute clé de `.env.example` soit déployée) :

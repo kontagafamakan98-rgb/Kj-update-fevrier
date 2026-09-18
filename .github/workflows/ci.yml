@@ -242,6 +242,13 @@ jobs:
         env:
           KOJO_PROBE_IMAP_USER: ${{ secrets.KOJO_PROBE_IMAP_USER }}
           KOJO_PROBE_IMAP_PASSWORD: ${{ secrets.KOJO_PROBE_IMAP_PASSWORD }}
+          # Alignement SPF exigé ? La sonde publie TOUJOURS la phrase
+          # d'alignement (enveloppe SPF et `d=` comparés au domaine du From) ;
+          # passer cette variable de dépôt à 1 fait ÉCHOUER le job si DMARC ne
+          # repose que sur DKIM. À poser quand le sous-domaine brandé de Brevo
+          # est en place : le gain est alors verrouillé sans toucher au code.
+          #   gh variable set KOJO_REQUIRE_SPF_ALIGNMENT --body 1
+          KOJO_REQUIRE_SPF_ALIGNMENT: ${{ vars.KOJO_REQUIRE_SPF_ALIGNMENT }}
 
   # ─── Backend : tests Python (FakeDB + vrai MongoDB) ──────────────────────
   backend-tests:
