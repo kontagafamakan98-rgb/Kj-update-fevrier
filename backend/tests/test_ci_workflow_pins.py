@@ -158,3 +158,29 @@ class TestWorkflowReel:
             "le garde doit être exécuté par le job workflow-lint — sinon il serait "
             "vert sans jamais tourner"
         )
+
+    def test_tous_les_workflows_sont_couverts_pas_seulement_ci_yml(self, check):
+        """Un second fichier de workflow ne doit pas échapper au garde.
+
+        Le garde prend UN chemin : tant que la CI ne l'appelait que sur
+        `ci.yml`, ajouter un workflow (ici `seo-vercel-env.yml`) ouvrait un trou
+        invisible, alors qu'une action non résoluble fait échouer le job AVANT
+        ses étapes — le défaut du 2026-08-27.
+        """
+        workflows = sorted(WORKFLOW.parent.glob("*.yml"))
+        assert len(workflows) >= 2, (
+            "les deux workflows du 18/09/2026 (ci.yml, seo-vercel-env.yml) : "
+            f"trouvés {[path.name for path in workflows]}"
+        )
+        contenu_ci = WORKFLOW.read_text(encoding="utf-8")
+        assert ".github/workflows/*.yml" in contenu_ci, (
+            "la CI doit appeler le garde sur TOUS les workflows, sinon un fichier "
+            "ajouté plus tard ne serait vérifié par personne"
+        )
+        for path in workflows:
+            errors, conforming = check.check_workflow(path)
+            assert errors == [], f"{path.name} : " + "\n".join(errors)
+            assert conforming, (
+                f"{path.name} : aucune référence `uses:` vue — le garde sortirait 1 "
+                "au lieu de prouver quelque chose"
+            )

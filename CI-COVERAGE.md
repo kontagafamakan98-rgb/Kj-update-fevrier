@@ -476,7 +476,28 @@ inventer. En revanche `frontend/scripts/setup-seo-env.js` fait en une fois les
 trois gestes qu'on oublie dans l'ordre — pose des deux variables (`production` ET
 `preview`, en `upsert`, donc rejouable), redéploiement de production, puis
 relecture du HTML servi par la sonde ci-dessus, avec **échec** si les deux balises
-n'y sont pas :
+n'y sont pas. Il tourne **depuis la CI**, sans jeton local : le workflow
+`.github/workflows/seo-vercel-env.yml` est **manuel** (`workflow_dispatch`) et lit
+les valeurs dans des **secrets de dépôt** :
+
+| Secret | Contenu |
+|---|---|
+| `VERCEL_TOKEN` | jeton Vercel ayant accès au projet (`Settings → Tokens`) |
+| `KOJO_GA_MEASUREMENT_ID` | identifiant de flux GA4, de la forme `G-…` |
+| `KOJO_GSC_VERIFICATION` | contenu de la balise `google-site-verification` |
+
+Bouton « Run workflow » sur **SEO Vercel env (manual)** : le job pose les deux
+variables (`production` ET `preview`, en `upsert`), redéploie la production,
+attend `READY`, relit le HTML servi et **échoue** si les deux balises n'y sont
+pas. Trois raisons à cette forme : aucun push ni PR ne peut déclencher une
+écriture sur la production Vercel (fichier `dispatch`-only, séparé de `ci.yml`,
+dont le bouton déploie le backend Fly), et les VALEURS ne sont jamais des entrées
+de dispatch — une entrée est publiée dans les logs du run, un secret ne l'est
+pas. Un secret absent fait échouer le job **avant toute écriture** (« Il manque
+une valeur — rien n'a été écrit », code 2) : une variable vide posée sur Vercel
+remplacerait la configuration en place par du vide.
+
+Le même script reste lançable à la main, pour un diagnostic :
 
 ```bash
 KOJO_GA_MEASUREMENT_ID=G-… KOJO_GSC_VERIFICATION=… VERCEL_TOKEN=vcp_… \

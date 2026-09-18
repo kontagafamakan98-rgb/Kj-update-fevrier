@@ -1,0 +1,58 @@
+name: SEO Vercel env (manual)
+
+# ─── Pourquoi un workflow SÉPARÉ, et dispatch-only ───────────────────────────
+# Les deux valeurs SEO — identifiant de flux GA4 et jeton Search Console — ne
+# vivent que dans Vercel → Settings → Environment Variables : les `VITE_*` sont
+# INLINÉES au build, donc les poser ne suffit pas, il faut redéployer puis relire
+# le HTML servi. Trois gestes qu'un poste faisait avec un jeton local — et qu'il
+# n'a plus à faire.
+#
+# Ce fichier est `workflow_dispatch` UNIQUEMENT, à dessein : aucun push ni PR ne
+# peut déclencher une écriture dans un projet de production. Il est séparé de
+# `ci.yml` pour la même raison : le bouton « Run workflow » de la CI déploie le
+# backend Fly, celui-ci configure le SEO — deux actions de production ne doivent
+# pas partir du même clic.
+#
+# Les deux VALEURS viennent des SECRETS du dépôt, jamais d'une entrée de
+# dispatch : une entrée `workflow_dispatch` est publiée dans les logs du run, un
+# secret ne l'est pas. Le script refuse de partir si une valeur manque ou si
+# l'identifiant GA4 n'a pas la forme `G-…` — une variable vide posée sur Vercel
+# remplacerait la configuration en place par du vide.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup-seo-env:
+    name: Poser GA4 + Search Console sur Vercel, redéployer, vérifier
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # Aucune dépendance à installer : le script n'utilise que des modules
+      # `node:` et `fetch`. Il pose les deux variables sur `production` ET
+      # `preview` (en `upsert`, donc rejouable), redéploie la production à partir
+      # du dernier déploiement, attend `READY`, puis relit le HTML servi avec la
+      # MÊME sonde que la CI (`scripts/check-seo-production.js`) — et ÉCHOUE si
+      # les deux balises n'y sont pas. Un déploiement `READY` ne prouve pas que
+      # la balise est là.
+      #
+      # `VERCEL_TEAM_ID` et `VERCEL_PROJECT_NAME` sont optionnels : le script
+      # retombe sur le projet `kj-update-fevrier` et sur le compte du jeton.
+      - name: Poser les variables, redéployer, relire le HTML servi
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          KOJO_GA_MEASUREMENT_ID: ${{ secrets.KOJO_GA_MEASUREMENT_ID }}
+          KOJO_GSC_VERIFICATION: ${{ secrets.KOJO_GSC_VERIFICATION }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME }}
+        run: node scripts/setup-seo-env.js
