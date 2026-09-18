@@ -19,9 +19,10 @@
  *      OG). Il faut les DEUX signaux : un checker qui ne fait que LIRE les
  *      cartes n'écrit pas d'image, donc il n'a jamais besoin d'exception ;
  *   2. lit les DÉCLARATIONS DANS les données (un fichier par carte sous
- *      scripts/og-cards/, qui nomme ses sorties) et les DIMENSIONS DANS le
- *      générateur lui-même (formats wide/carré, taille du favicon) : aucune
- *      constante n'est dupliquée ici, donc le check ne peut pas diverger ;
+ *      scripts/og-cards/, qui nomme la route qu'elle sert, les clés de texte de
+ *      cette page et ses deux sorties) et les DIMENSIONS DANS le générateur
+ *      lui-même (formats wide/carré, taille du favicon) : aucune constante n'est
+ *      dupliquée ici, donc le check ne peut pas diverger ;
  *   3. vérifie que chaque PNG attendu existe, est un VRAI PNG (signature +
  *      chunk IHDR) et porte EXACTEMENT les dimensions déclarées ;
  *   4. refuse tout og-*.png ORPHELIN dans public/ (présent mais absent du
@@ -32,7 +33,14 @@
  *      qui rend la divergence — carte retouchée à la main, texte changé sans
  *      régénération, cartes refaites ailleurs avec une AUTRE police —
  *      détectable sur n'importe quel runner, sans dépendre des polices
- *      installées.
+ *      installées ;
+ *   6. recompose le TEXTE que chaque carte dessine (les lignes consignées dans
+ *      le manifeste) et exige qu'il soit EXACTEMENT le titre et la description
+ *      de sa page, lus dans src/i18n/fr.json. C'est cette égalité qui rend
+ *      impossible qu'un visuel de partage et la page qu'il annonce disent deux
+ *      textes différents : renommer un titre sans régénérer les cartes fait
+ *      échouer ce check, au lieu de laisser un PNG périmé derrière un manifeste
+ *      « frais ».
  *
  * Usage : cd frontend && node scripts/check-og-assets.js
  */
@@ -58,6 +66,16 @@ export const CARDS_DIR_NAME = 'og-cards';
 // l'arrivée : le manifeste consigne la police retenue et ce garde refuse le
 // changement tant qu'il n'est pas assumé ici, en connaissance de cause.
 export const REFERENCE_FONTS = { regular: 'arial.ttf', bold: 'arialbd.ttf' };
+
+// Ce qu'une carte DOIT déclarer : sa route, les clés i18n du titre et de la
+// description de cette page, et ses deux sorties. Le générateur refuse les mêmes
+// champs — une carte incomplète n'est pas une carte, et la laisser passer
+// reviendrait à dessiner un visuel qui n'annonce rien de vérifiable.
+export const REQUIRED_CARD_KEYS = ['route', 'title', 'description', 'wide', 'square'];
+
+// Le dictionnaire dont les cartes dessinent le texte : fr.json, la langue des
+// coquilles pré-rendues, donc le texte qu'un crawler sans JavaScript lit.
+export const DICTIONARY_PATH = 'src/i18n/fr.json';
 
 /**
  * Étage 1 — le NOM. Un générateur doit le dire : un jeton « og » ET un verbe
@@ -140,15 +158,32 @@ export const readDeclaredCards = (cardsDir) => {
       errors.push(`${CARDS_DIR_NAME}/${name} illisible (JSON invalide) : ${error.message}`);
       continue;
     }
-    const missing = ['wide', 'square'].filter((key) => typeof data[key] !== 'string');
+    const missing = REQUIRED_CARD_KEYS.filter(
+      (key) => typeof data[key] !== 'string' || !data[key].trim()
+    );
     if (missing.length > 0) {
       errors.push(
-        `${CARDS_DIR_NAME}/${name} ne nomme pas ${missing.join(' ni ')} : une carte ` +
-          `nomme ses DEUX sorties (wide et square)`
+        `${CARDS_DIR_NAME}/${name} ne déclare pas ${missing.join(' ni ')} : une carte nomme ` +
+          `la route qu'elle sert, les clés i18n du titre et de la description de cette page, ` +
+          `et ses DEUX sorties (wide et square)`
       );
       continue;
     }
-    cards.push({ name, wide: data.wide, square: data.square });
+    if (!data.route.startsWith('/')) {
+      errors.push(
+        `${CARDS_DIR_NAME}/${name} : la route « ${data.route} » n'est pas un chemin absolu ` +
+          `(« /jobs ») — c'est la page que cette carte sert`
+      );
+      continue;
+    }
+    cards.push({
+      name,
+      route: data.route,
+      title: data.title,
+      description: data.description,
+      wide: data.wide,
+      square: data.square,
+    });
   }
   if (cards.length === 0 && errors.length === 0) {
     errors.push(`${CARDS_DIR_NAME}/ ne contient aucun fichier *.json : aucune carte à vérifier`);
@@ -166,6 +201,105 @@ export const readDeclaredCards = (cardsDir) => {
  * laisserait des PNG périmés derrière un manifeste « frais », et la CI dirait
  * vert sur des cartes que plus personne ne peut reproduire.
  */
+/**
+ * La règle de fond : le texte qu'une carte DESSINE est celui de sa page.
+ *
+ * Le générateur consigne dans le manifeste les LIGNES réellement dessinées (par
+ * format et par champ) ; ici elles sont recomposées (jointes par une espace —
+ * le retour à la ligne ne coupe jamais un mot) et comparées au dictionnaire.
+ * L'égalité est le seul contrôle possible sans exécuter Pillow, et c'est le bon :
+ * elle attrape exactement les deux divergences réelles — un texte de page
+ * renommé sans régénérer les cartes, et un manifeste retouché à la main pour y
+ * faire dire autre chose que ce que la page publie.
+ *
+ * `cards` (les fichiers de données) dit ce qui a été DESSINÉ ; le manifeste dit ce
+ * qui est VRAI dans les PNG versionnés. Les deux doivent dire la même chose, sinon
+ * les empreintes (cards_sha256) et cette égalité désignent le même coupable : une
+ * carte à régénérer.
+ *
+ * @param {object} options
+ * @param {Array<object>} options.cards Cartes déclarées (readDeclaredCards).
+ * @param {object} options.manifest Manifeste lu sur le disque.
+ * @param {object} options.dictionary Dictionnaire français (src/i18n/fr.json).
+ * @returns {string[]} Une erreur par divergence, nommée.
+ */
+export const checkCardTexts = ({ cards = [], manifest, dictionary }) => {
+  const errors = [];
+  const entries = Array.isArray(manifest?.cards) ? manifest.cards : [];
+  if (entries.length === 0) {
+    errors.push(
+      `${MANIFEST_NAME} ne décrit aucune carte (clé « cards » absente ou vide) : le texte que ` +
+        `les cartes dessinent n'est pas vérifiable — relance scripts/${GENERATOR_NAME}`
+    );
+    return errors;
+  }
+  const byRoute = new Map(
+    entries.filter((entry) => entry && typeof entry.route === 'string').map((entry) => [entry.route, entry])
+  );
+
+  for (const card of cards) {
+    const entry = byRoute.get(card.route);
+    if (!entry) {
+      errors.push(
+        `${MANIFEST_NAME} ne décrit pas la carte de la route « ${card.route} » ` +
+          `(${CARDS_DIR_NAME}/${card.name}) : manifeste périmé — relance scripts/${GENERATOR_NAME}`
+      );
+      continue;
+    }
+    for (const key of ['title', 'description', 'wide', 'square']) {
+      if (entry[key] !== card[key]) {
+        errors.push(
+          `${MANIFEST_NAME} : la carte « ${card.route} » y annonce ${key} = « ${entry[key]} », mais ` +
+            `${CARDS_DIR_NAME}/${card.name} déclare « ${card[key]} » — manifeste périmé ou retouché ` +
+            `à la main, relance scripts/${GENERATOR_NAME}`
+        );
+      }
+    }
+    for (const [kind, field] of [
+      ['wide', 'title'],
+      ['wide', 'description'],
+      ['square', 'title'],
+      ['square', 'description'],
+    ]) {
+      const key = card[field];
+      const published = typeof dictionary?.[key] === 'string' ? dictionary[key] : null;
+      if (published === null) {
+        errors.push(
+          `${DICTIONARY_PATH} : la clé « ${key} » (${field} de la route « ${card.route} ») est ` +
+            'absente ou vide — la carte de cette page dessinerait un texte que la page ne publie pas'
+        );
+        continue;
+      }
+      const drawn = entry.lines?.[kind]?.[field];
+      if (!Array.isArray(drawn) || drawn.length === 0) {
+        errors.push(
+          `${MANIFEST_NAME} : la carte ${kind} de « ${card.route} » ne consigne pas les lignes ` +
+            `dessinées pour son ${field} — relance scripts/${GENERATOR_NAME}`
+        );
+        continue;
+      }
+      if (drawn.join(' ') !== published) {
+        errors.push(
+          `la carte ${kind} de « ${card.route} » dessine « ${drawn.join(' ')} », alors que ` +
+            `${DICTIONARY_PATH} publie « ${published} » pour ${key} : le texte de la page a ` +
+            `changé, donc la carte de partage annoncerait autre chose que sa page — relance ` +
+            `scripts/${GENERATOR_NAME} et committe les PNG`
+        );
+      }
+    }
+  }
+
+  // La carte de la RACINE sert toute page sans visuel dédié (src/config/og-cards.js) :
+  // sans elle, ces pages n'annonceraient plus aucune carte.
+  if (!byRoute.has('/')) {
+    errors.push(
+      `aucune carte ne sert la route « / » (${CARDS_DIR_NAME}/) : c'est la carte servie à ` +
+        "toute page sans visuel dédié — sans elle, ces pages n'ont plus de carte du tout"
+    );
+  }
+  return errors;
+};
+
 const cardsFingerprint = (cardsDir) => {
   const names = existsSync(cardsDir)
     ? readdirSync(cardsDir).filter((name) => name.endsWith('.json')).sort()
@@ -206,6 +340,11 @@ export const runOgAssetsCheck = (opts = {}) => {
 
   const errors = [];
   const fail = (message) => errors.push(message);
+
+  // Les cartes DÉCLARÉES (un fichier de données par carte) : lues UNE fois, elles
+  // servent aux dimensions attendues (section 2) puis au texte que la carte
+  // dessine (section 6).
+  const declared = readDeclaredCards(path.join(scriptsDir, CARDS_DIR_NAME));
 
   // ── 1. Un seul générateur OG ──────────────────────────────────────────────
   // Toute variante de nom (gen_og_image.py, gen-og-cards.py, …) est détectée :
@@ -277,7 +416,6 @@ export const runOgAssetsCheck = (opts = {}) => {
 
     // La LISTE des cartes vient des données, les DIMENSIONS du code : chacune des
     // deux sources est lue là où elle fait autorité, et aucune n'est recopiée ici.
-    const declared = readDeclaredCards(path.join(scriptsDir, CARDS_DIR_NAME));
     for (const message of declared.errors) fail(message);
     for (const card of declared.cards) {
       if (wide) {
@@ -377,6 +515,30 @@ export const runOgAssetsCheck = (opts = {}) => {
             `génération : relance scripts/${GENERATOR_NAME} et committe le manifeste ` +
             `(et les PNG s'ils bougent)`
         );
+      }
+
+      // 5a-ter. Le texte DESSINÉ est celui de la page.
+      //
+      // C'est l'égalité qui rend impossible qu'une carte et sa page annoncent deux
+      // textes : la carte dessine le titre et la description de la route qu'elle
+      // sert, le garde recompose les lignes consignées et les compare au
+      // dictionnaire. Un titre renommé sans régénérer les cartes tombe ici (et
+      // non dans une impression visuelle, que personne ne joue).
+      const dictionaryPath = path.join(root, DICTIONARY_PATH);
+      let dictionary = null;
+      try {
+        dictionary = JSON.parse(readFileSync(dictionaryPath, 'utf8'));
+      } catch (error) {
+        fail(
+          `${DICTIONARY_PATH} illisible (${error.message}) : le texte que les cartes dessinent ne ` +
+            'peut pas être confronté à celui que les pages publient — or c’est la seule vérification ' +
+            'qui empêche les deux de diverger'
+        );
+      }
+      if (dictionary) {
+        for (const message of checkCardTexts({ cards: declared.cards, manifest, dictionary })) {
+          fail(message);
+        }
       }
 
       // 5b. Les cartes n'ont pas été refaites avec une autre police.

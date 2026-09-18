@@ -1,51 +1,51 @@
 {
   "assets": [
     {
-      "bytes": 32491,
+      "bytes": 41409,
       "file": "og-image-1200x630.png",
       "format": "wide",
       "height": 630,
-      "sha256": "217c2daad556e68f9d1864277ebc15f0d81353f02be6efc6ab9ffc44724292fb",
+      "sha256": "070d26dc5b203adaa9c4bf5855c0b8c4518f405b33c17a6b91850419867bc4b7",
       "width": 1200
     },
     {
-      "bytes": 37245,
+      "bytes": 48741,
       "file": "og-square-1200x1200.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "a7b186c31041df3cd05f79fe3263213712c097854cc7c8412c731cdfdbfd8ab5",
+      "sha256": "028e23aa64f031a3aec51387bf56e26c2eb12f8c34d02775a773d9354724cbfb",
       "width": 1200
     },
     {
-      "bytes": 40013,
+      "bytes": 34739,
       "file": "og-jobs.png",
       "format": "wide",
       "height": 630,
-      "sha256": "c1a8a0bcc49973b20b7cf4f3930ed7982c3932e93b19ec23557066aa1efd4693",
+      "sha256": "3dc1f378c4796a7139c3de9f1d5e7ded1a0c30133a1dea28ee0ed55c7e2df9a4",
       "width": 1200
     },
     {
-      "bytes": 43523,
+      "bytes": 40092,
       "file": "og-jobs-square.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "2889793e4877b7d1b09e9e37e4acf9019e49a17181fda5528708eebb3bd89916",
+      "sha256": "f40f64d2dbe131a1e3e6684c84553cc630299f7957a34e60a41cf900ecce661e",
       "width": 1200
     },
     {
-      "bytes": 35853,
+      "bytes": 30398,
       "file": "og-login.png",
       "format": "wide",
       "height": 630,
-      "sha256": "da1332cb5a1f587a84dcf439d8328509790989b1f84f79ed0bb1e9eb3f3f588c",
+      "sha256": "ff3b2dafa9b813ae45fe1e942c0247734f1274985d181d0df3bdcf789a5d3a4a",
       "width": 1200
     },
     {
-      "bytes": 39366,
+      "bytes": 35429,
       "file": "og-login-square.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "f8b7e12d4ccc97d5340cf675f09c5e5b517d1af0aac240045e6b214f749877d0",
+      "sha256": "6d3a6d485888ad251e8ba8f651c3b547b462e8d1c15379c62bd519874bf54ebd",
       "width": 1200
     },
     {
@@ -57,11 +57,98 @@
       "width": 512
     }
   ],
-  "cards_sha256": "b6c4c39f94b978315af0d97f72a8d0e2fe94fe3c5347ce85940d7bd58975ac3e",
+  "cards": [
+    {
+      "description": "homeMetaDescription",
+      "lines": {
+        "square": {
+          "description": [
+            "Trouvez un plombier, électricien ou mécanicien vérifié au Mali, au",
+            "Sénégal, au Burkina Faso et en Côte d'Ivoire. Publiez une mission en",
+            "toute sécurité."
+          ],
+          "title": [
+            "Kojo — Services et travailleurs en",
+            "Afrique de l'Ouest"
+          ]
+        },
+        "wide": {
+          "description": [
+            "Trouvez un plombier, électricien ou mécanicien vérifié au Mali,",
+            "au Sénégal, au Burkina Faso et en Côte d'Ivoire. Publiez une",
+            "mission en toute sécurité."
+          ],
+          "title": [
+            "Kojo — Services et travailleurs",
+            "en Afrique de l'Ouest"
+          ]
+        }
+      },
+      "route": "/",
+      "square": "og-square-1200x1200.png",
+      "title": "homeMetaTitle",
+      "wide": "og-image-1200x630.png"
+    },
+    {
+      "description": "jobsMetaDescription",
+      "lines": {
+        "square": {
+          "description": [
+            "Trouvez un travailleur qualifié près de chez vous : emplois, missions",
+            "et talents disponibles dans toute l'Afrique de l'Ouest."
+          ],
+          "title": [
+            "Emplois disponibles — Kojo"
+          ]
+        },
+        "wide": {
+          "description": [
+            "Trouvez un travailleur qualifié près de chez vous : emplois,",
+            "missions et talents disponibles dans toute l'Afrique de l'Ouest."
+          ],
+          "title": [
+            "Emplois disponibles — Kojo"
+          ]
+        }
+      },
+      "route": "/jobs",
+      "square": "og-jobs-square.png",
+      "title": "jobsMetaTitle",
+      "wide": "og-jobs.png"
+    },
+    {
+      "description": "loginMetaDescription",
+      "lines": {
+        "square": {
+          "description": [
+            "Accédez à votre compte client ou travailleur Kojo et suivez vos",
+            "missions en un clic."
+          ],
+          "title": [
+            "Connexion — Kojo"
+          ]
+        },
+        "wide": {
+          "description": [
+            "Accédez à votre compte client ou travailleur Kojo et suivez vos",
+            "missions en un clic."
+          ],
+          "title": [
+            "Connexion — Kojo"
+          ]
+        }
+      },
+      "route": "/login",
+      "square": "og-login-square.png",
+      "title": "loginMetaTitle",
+      "wide": "og-login.png"
+    }
+  ],
+  "cards_sha256": "25580004c68f853c770be5b2beec0ad99c857a115a49b9c7a0ee089158ebfdad",
   "fonts": {
     "bold": "arialbd.ttf",
     "regular": "arial.ttf"
   },
   "generator": "gen-og-images.py",
-  "generator_sha256": "951dabfb52fcb22529132e827ba81e115ed00c12bc201d6166f38a080639931e"
+  "generator_sha256": "99f301db42f26f7517ed7cb373d8551be45418464128215b2e184b5d850ae355"
 }

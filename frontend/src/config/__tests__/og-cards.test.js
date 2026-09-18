@@ -1,93 +1,140 @@
 /**
- * La table des cartes dédiées est-elle bien DÉDUITE des fichiers présents ?
+ * La table des cartes vient-elle de ce que les fichiers de données DÉCLARENT —
+ * la route servie, les textes de la page — et non plus du nom des PNG ?
  *
- * C'est la propriété qui remplace la liste écrite à la main : le nom du fichier
- * (`og-<page>.png` + sa variante carrée) EST la déclaration. Deux erreurs
+ * C'est la propriété qui remplace la convention de nom : `og-jobs.png` ne dit
+ * plus quelle page il sert (la carte générique, elle, n'a jamais suivi de
+ * convention), et la carte DESSINE le titre et la description de sa page, donc
+ * c'est le même fichier de données qui déclare les deux. Deux erreurs
  * silencieuses sont possibles et doivent être nommées : une carte servie à une
- * page qui n'existe pas (clé fantôme), et une carte large sans sa variante carrée
- * (la page retomberait sans bruit sur la carte générique).
+ * route que personne n'a déclarée, et des textes de page déclarés à deux endroits
+ * — d'où le dernier bloc, qui confronte les deux tables au MÊME fichier de
+ * données, lu sur le disque.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import manifest from '../../../scripts/og-assets.manifest.json';
-import { GENERIC_CARD, dedicatedCardsFrom, ogCardFor } from '../og-cards';
+import {
+  CARDS_BY_ROUTE,
+  CARD_PAGE_META,
+  GENERIC_CARD,
+  cardPageMetaFrom,
+  cardsFromManifest,
+  ogCardFor,
+} from '../og-cards';
+import { PAGE_META } from '../page-meta';
 
-describe('dedicatedCardsFrom — le nom du fichier est la déclaration', () => {
-  it('associe og-<page>.png à la page /<page>, variante carrée comprise', () => {
-    const { cards, incomplete } = dedicatedCardsFrom(['og-jobs.png', 'og-jobs-square.png']);
+describe('cardsFromManifest — la route déclarée décide de la carte', () => {
+  it('sert la carte déclarée à la route déclarée', () => {
+    const cards = cardsFromManifest([
+      { route: '/jobs', wide: 'og-jobs.png', square: 'og-jobs-square.png' },
+    ]);
 
     expect(cards).toEqual({
       '/jobs': { image: '/og-jobs.png', imageSquare: '/og-jobs-square.png' },
     });
-    expect(incomplete).toEqual([]);
   });
 
-  it('n’invente aucune page à partir des deux fichiers GÉNÉRIQUES', () => {
-    const { cards } = dedicatedCardsFrom([GENERIC_CARD.image.slice(1), GENERIC_CARD.imageSquare.slice(1)]);
-
-    expect(cards).toEqual({});
-  });
-
-  it('ne prend pas une variante carrée pour la carte d’une page « -square »', () => {
-    const { cards } = dedicatedCardsFrom(['og-jobs-square.png']);
-
-    expect(cards).toEqual({});
-    expect(Object.keys(cards)).not.toContain('/jobs-square');
-  });
-
-  it('signale une carte large sans variante carrée, et ne la sert pas', () => {
-    const { cards, incomplete } = dedicatedCardsFrom(['og-support.png']);
-
-    expect(incomplete).toEqual(['/og-support.png']);
-    expect(cards).toEqual({});
-  });
-
-  it('ignore les fichiers qui ne sont pas des cartes de page', () => {
-    const { cards, incomplete } = dedicatedCardsFrom([
-      'icons/icon-dark.png',
-      'favicon.ico',
-      'og-assets.manifest.json',
+  it('n’invente aucune route à partir du NOM des fichiers', () => {
+    // `og-image-1200x630.png` ne nomme aucune page : c'est la carte de la racine,
+    // et seule sa déclaration le dit.
+    const cards = cardsFromManifest([
+      { route: '/', wide: 'og-image-1200x630.png', square: 'og-square-1200x1200.png' },
     ]);
 
-    expect(cards).toEqual({});
-    expect(incomplete).toEqual([]);
+    expect(cards).toEqual({
+      '/': { image: '/og-image-1200x630.png', imageSquare: '/og-square-1200x1200.png' },
+    });
+    expect(Object.keys(cards)).toEqual(['/']);
+  });
+
+  it('normalise la route déclarée (« /jobs/ » est la même page que « /jobs »)', () => {
+    const cards = cardsFromManifest([{ route: '/jobs/', wide: 'a.png', square: 'b.png' }]);
+
+    expect(cards['/jobs']).toEqual({ image: '/a.png', imageSquare: '/b.png' });
+    expect(cards['/jobs/']).toBeUndefined();
+  });
+
+  it('ignore une entrée incomplète plutôt que d’inventer une carte', () => {
+    for (const card of [
+      null,
+      {},
+      { route: '/x' },
+      { route: '/x', wide: 'a.png' },
+      { wide: 'a.png', square: 'b.png' },
+    ]) {
+      expect(cardsFromManifest([card]), JSON.stringify(card)).toEqual({});
+    }
   });
 
   it('est vide — sans planter — pour une liste vide ou absente', () => {
-    for (const files of [[], undefined, null]) {
-      const { cards, incomplete } = dedicatedCardsFrom(files);
-      expect(cards).toEqual({});
-      expect(incomplete).toEqual([]);
+    for (const cards of [[], undefined, null]) expect(cardsFromManifest(cards)).toEqual({});
+  });
+});
+
+describe('cardPageMetaFrom — les textes de page que les cartes déclarent', () => {
+  it('rend les clés i18n déclarées, par route', () => {
+    expect(cardPageMetaFrom([{ route: '/jobs', title: 'a', description: 'b' }])).toEqual({
+      '/jobs': { title: 'a', description: 'b' },
+    });
+  });
+
+  it('ignore une carte qui ne déclare pas ses deux clés', () => {
+    for (const card of [
+      { route: '/jobs', wide: 'a.png', square: 'b.png' },
+      { route: '/jobs', title: 'a' },
+      { route: '/jobs', description: 'b' },
+    ]) {
+      expect(cardPageMetaFrom([card])).toEqual({});
     }
   });
 });
 
-// L'attente est DÉDUITE des cartes réellement présentes, jamais recopiée :
-// nommer /jobs et /login ici serait la dernière liste écrite à la main — celle
-// qu'une carte ajoutée ne met pas à jour, et qui laisse passer pour une preuve
-// une déduction capable de renvoyer une table vide.
-const REAL_FILES = (manifest.assets || []).map((asset) => asset.file);
-const { cards: REAL_CARDS } = dedicatedCardsFrom(REAL_FILES);
+// Les cartes du dépôt, lues dans leurs FICHIERS DE DONNÉES — jamais dans le
+// manifeste que ce module lit lui-même : le fichier de données fait autorité, et
+// c'est lui qui est confronté aux deux tables servies à l'app et au build.
+const CARDS_DIR = path.resolve(__dirname, '..', '..', '..', 'scripts', 'og-cards');
+const DECLARED = readdirSync(CARDS_DIR)
+  .filter((name) => name.endsWith('.json'))
+  .sort()
+  .map((name) => ({ name, card: JSON.parse(readFileSync(path.join(CARDS_DIR, name), 'utf8')) }));
 
-describe('ogCardFor — la route décide, la carte suit', () => {
-  it('sert à SA page chaque carte réellement présente dans public/', () => {
-    // Une table vide ne prouve rien : sans ce plancher, une déduction débranchée
-    // ferait passer la boucle ci-dessous pour une vérification.
-    expect(Object.keys(REAL_CARDS).length).toBeGreaterThan(0);
-    for (const [route, card] of Object.entries(REAL_CARDS)) {
-      for (const file of [card.image, card.imageSquare]) {
+describe('dépôt réel — une carte, une page, une déclaration', () => {
+  it('chaque carte déclarée est servie à SA route, et ses PNG existent', () => {
+    // Un dépôt sans carte ferait passer les boucles suivantes pour des preuves.
+    expect(DECLARED.length).toBeGreaterThan(0);
+    for (const { name, card } of DECLARED) {
+      const served = CARDS_BY_ROUTE[card.route];
+      expect(served, `${name} → ${card.route}`).toEqual({
+        image: `/${card.wide}`,
+        imageSquare: `/${card.square}`,
+      });
+      for (const file of [card.wide, card.square]) {
         expect(existsSync(path.join('public', file)), `${file} absent de public/`).toBe(true);
       }
+    }
+  });
+
+  it('les textes de la route viennent de SON fichier de carte, des deux côtés', () => {
+    for (const { name, card } of DECLARED) {
+      const keys = { title: card.title, description: card.description };
+      // La table servie au bundle ET celle que lit le build : une seule
+      // déclaration, donc rien à comparer qui puisse diverger.
+      expect(CARD_PAGE_META[card.route], name).toEqual(keys);
+      expect(PAGE_META[card.route], name).toEqual(keys);
+    }
+  });
+
+  it('la carte générique est celle de la racine, servie à toute page sans carte', () => {
+    expect(Object.keys(CARDS_BY_ROUTE).length).toBeGreaterThan(0);
+    expect(GENERIC_CARD).toEqual(CARDS_BY_ROUTE['/']);
+
+    for (const [route, card] of Object.entries(CARDS_BY_ROUTE)) {
       expect(ogCardFor(route)).toEqual(card);
       expect(ogCardFor(`${route}/`)).toEqual(card);
       expect(ogCardFor(`${route}?ref=x`)).toEqual(card);
     }
-  });
-
-  it('sert la carte générique à une page sans visuel dédié', () => {
-    const unknown = `${Object.keys(REAL_CARDS)[0]}-inexistant`;
-    expect(ogCardFor(unknown)).toEqual(GENERIC_CARD);
+    expect(ogCardFor('/une-page-sans-visuel')).toEqual(GENERIC_CARD);
     expect(ogCardFor(undefined)).toEqual(GENERIC_CARD);
   });
 });

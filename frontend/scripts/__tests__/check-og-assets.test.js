@@ -56,11 +56,48 @@ def main():
 `;
 
 // Un fichier de données par carte : ce que le check lit pour savoir QUELS PNG
-// doivent exister. Le générateur les découvre par le même chemin (dossier trié).
+// doivent exister ET quel texte chaque carte dessine. Le générateur les découvre
+// par le même chemin (dossier trié).
 const CARD_FIXTURES = {
-  'home.json': { wide: 'og-home.png', square: 'og-home-square.png' },
-  'jobs.json': { wide: 'og-jobs.png', square: 'og-jobs-square.png' },
+  'home.json': {
+    route: '/',
+    title: 'homeMetaTitle',
+    description: 'homeMetaDescription',
+    wide: 'og-home.png',
+    square: 'og-home-square.png',
+  },
+  'jobs.json': {
+    route: '/jobs',
+    title: 'jobsMetaTitle',
+    description: 'jobsMetaDescription',
+    wide: 'og-jobs.png',
+    square: 'og-jobs-square.png',
+  },
 };
+
+// Le dictionnaire des pages (src/i18n/fr.json) : c'est de LUI que les cartes
+// tirent le texte qu'elles dessinent. Une carte dont les lignes ne recomposent
+// pas ces textes annonce autre chose que sa page.
+const DICT_FIXTURE = {
+  homeMetaTitle: 'Accueil — Kojo',
+  homeMetaDescription: 'Trouvez un professionnel vérifié près de chez vous.',
+  jobsMetaTitle: 'Emplois disponibles — Kojo',
+  jobsMetaDescription: 'Trouvez un travailleur qualifié près de chez vous.',
+};
+
+// Les lignes qu'une carte consigne avoir dessinées, pour un texte donné. La
+// fixture les écrit en UNE ligne par champ : le check ne compare que la
+// recomposition, pas la découpe (c'est le générateur qui la mesure).
+const cardLines = (card, dictionary) => ({
+  wide: {
+    title: [dictionary[card.title]],
+    description: [dictionary[card.description]],
+  },
+  square: {
+    title: [dictionary[card.title]],
+    description: [dictionary[card.description]],
+  },
+});
 
 // Le contenu d'une carte, sérialisé comme le ferait un auteur de données (JSON
 // indenté, saut de ligne final) : la fixture ne teste pas la mise en forme, le
@@ -136,6 +173,7 @@ const makeFixture = ({
   cardsCrlf = false,
   assets = {},
   manifest = undefined,
+  dictionary = DICT_FIXTURE,
 } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'og-assets-'));
   tempDirs.push(root);
@@ -160,6 +198,17 @@ const makeFixture = ({
     }
   }
 
+  // Le dictionnaire des pages : écrit ICI parce que le générateur le lit au même
+  // chemin (src/i18n/fr.json, la langue des coquilles). `null` = fichier absent,
+  // pour éprouver le cas où la comparaison n'a rien à lire.
+  if (dictionary) {
+    fs.mkdirSync(path.join(root, 'src', 'i18n'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'src', 'i18n', 'fr.json'),
+      `${JSON.stringify(dictionary, null, 2)}\n`
+    );
+  }
+
   const written = [];
   for (const [rel, buffer] of Object.entries({ ...DEFAULT_ASSETS, ...assets })) {
     if (!buffer) continue; // valeur `null` → fichier volontairement absent
@@ -176,6 +225,16 @@ const makeFixture = ({
       : null,
     cards_sha256: cards ? cardsFingerprint(cardsDir) : null,
     fonts: { ...REFERENCE_FONTS },
+    cards: cards
+      ? Object.values(cards).map((card) => ({
+          route: card.route,
+          title: card.title,
+          description: card.description,
+          wide: card.wide,
+          square: card.square,
+          lines: cardLines(card, dictionary || {}),
+        }))
+      : [],
     assets: written.map(([rel, buffer]) => ({
       file: rel,
       ...dimsOf(buffer),
@@ -231,7 +290,13 @@ describe('check-og-assets — les cartes se déclarent en données', () => {
       root: makeFixture({
         cards: {
           ...CARD_FIXTURES,
-          'support.json': { wide: 'og-support.png', square: 'og-support-square.png' },
+          'support.json': {
+            route: '/support',
+            title: 'homeMetaTitle',
+            description: 'homeMetaDescription',
+            wide: 'og-support.png',
+            square: 'og-support-square.png',
+          },
         },
         assets: {
           'og-support.png': fakePng(1200, 630),
@@ -245,11 +310,37 @@ describe('check-og-assets — les cartes se déclarent en données', () => {
 
   it('refuse une carte qui ne nomme pas ses DEUX sorties', () => {
     const result = run({
-      root: makeFixture({ cards: { 'support.json': { wide: 'og-support.png' } } }),
+      root: makeFixture({
+        cards: {
+          'support.json': {
+            route: '/support',
+            title: 'homeMetaTitle',
+            description: 'homeMetaDescription',
+            wide: 'og-support.png',
+          },
+        },
+        assets: { 'og-support.png': fakePng(1200, 630) },
+      }),
     });
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(
-      new RegExp(`${CARDS_DIR_NAME}/support\\.json ne nomme pas square`)
+      new RegExp(`${CARDS_DIR_NAME}/support\\.json ne déclare pas square`)
+    );
+  });
+
+  it('refuse une route qui n’est pas un chemin absolu', () => {
+    // La route est la clé de la table (celle qui décide la carte servie à chaque
+    // page) : « jobs » sans barre oblique n'y désignerait rien.
+    const result = run({
+      root: makeFixture({
+        cards: {
+          'jobs.json': { ...CARD_FIXTURES['jobs.json'], route: 'jobs' },
+        },
+      }),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      new RegExp(`${CARDS_DIR_NAME}/jobs\\.json : la route « jobs » n'est pas un chemin absolu`)
     );
   });
 
@@ -408,15 +499,15 @@ describe('check-og-assets — manifeste de reproductibilité', () => {
     expect(result.errors.join('\n')).toMatch(/a changé depuis la dernière génération/);
   });
 
-  it("détecte un TEXTE de carte changé sans régénération (l'empreinte du générateur ne le voit plus)", () => {
-    // C'est le risque propre à cette passe : le contenu des cartes a quitté le
+  it("détecte une carte MODIFIÉE sans régénération (l'empreinte du générateur ne la voit plus)", () => {
+    // C'est le risque propre aux cartes en données : leur contenu a quitté le
     // générateur, donc son empreinte ne peut plus le couvrir. Sans empreinte des
-    // données, une accroche retouchée laisserait des PNG périmés derrière un
-    // manifeste « frais », et la CI dirait vert.
+    // données, une route ou une clé retouchée laisserait des PNG périmés derrière
+    // un manifeste « frais », et la CI dirait vert.
     const root = makeFixture();
     const cardPath = path.join(root, 'scripts', CARDS_DIR_NAME, 'jobs.json');
     const card = JSON.parse(fs.readFileSync(cardPath, 'utf8'));
-    card.tagline = ['Emplois près de chez vous'];
+    card.route = '/emplois';
     fs.writeFileSync(cardPath, cardJson(card));
     const result = run({ root });
     expect(result.ok).toBe(false);
@@ -501,5 +592,116 @@ describe('check-og-assets — manifeste de reproductibilité', () => {
     expect(result.errors.join('\n')).toMatch(
       /décrit og-abandonnee\.png, que gen-og-images\.py ne déclare plus/
     );
+  });
+});
+
+// La propriété de fond de cette passe : le texte que la carte DESSINE est celui
+// de sa page. Rien dans une image ne se relit — c'est donc le manifeste, écrit par
+// le générateur à partir des lignes qu'il a réellement dessinées, que le garde
+// recompose et confronte au dictionnaire.
+describe('check-og-assets — la carte dessine le texte de sa page', () => {
+  it('cas nominal : les lignes consignées recomposent le dictionnaire → ok', () => {
+    const result = run({ root: makeFixture() });
+
+    expect(result.errors).toEqual([]);
+  });
+
+  it('détecte un TITRE de page renommé sans régénérer les cartes', () => {
+    // Le scénario réel : quelqu'un renomme jobsMetaTitle, le build repart avec le
+    // nouveau titre, et les PNG de partage — versionnés — dessinent encore
+    // l'ancien. Sans cette égalité, personne ne le voyait : le manifeste était
+    // « frais » (la carte n'a pas bougé) et la CI disait vert.
+    const root = makeFixture();
+    fs.writeFileSync(
+      path.join(root, 'src', 'i18n', 'fr.json'),
+      `${JSON.stringify({ ...DICT_FIXTURE, jobsMetaTitle: 'Offres et missions — Kojo' }, null, 2)}\n`
+    );
+
+    const result = run({ root });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /la carte wide de « \/jobs » dessine « Emplois disponibles — Kojo », alors que src\/i18n\/fr\.json publie « Offres et missions — Kojo » pour jobsMetaTitle/
+    );
+    // Le remède est dans le message : c'est le générateur qu'il faut relancer.
+    expect(result.errors.join('\n')).toMatch(/relance scripts\/gen-og-images\.py/);
+  });
+
+  it('détecte un manifeste retouché à la main (lignes qui ne sont plus celles du dictionnaire)', () => {
+    // L'autre moitié : les empreintes prouvent que les PNG sont ceux du
+    // générateur, pas que le manifeste dit vrai. Un « cards » réécrit à la main
+    // ferait annoncer au garde un texte que la carte ne dessine pas.
+    const root = makeFixture({
+      manifest: {
+        cards: [
+          {
+            route: '/jobs',
+            title: 'jobsMetaTitle',
+            description: 'jobsMetaDescription',
+            wide: 'og-jobs.png',
+            square: 'og-jobs-square.png',
+            lines: {
+              wide: { title: ['Emplois près de chez vous'], description: ['Trouvez.'] },
+              square: { title: ['Emplois près de chez vous'], description: ['Trouvez.'] },
+            },
+          },
+        ],
+      },
+    });
+
+    const result = run({ root });
+
+    expect(result.ok).toBe(false);
+    const messages = result.errors.join('\n');
+    expect(messages).toMatch(/la carte wide de « \/jobs » dessine « Emplois près de chez vous »/);
+    // Les autres cartes du dépôt n'ont plus d'entrée : le manifeste est périmé.
+    expect(messages).toMatch(/ne décrit pas la carte de la route « \/ »/);
+  });
+
+  it('exige que la carte du manifeste corresponde à ce que le fichier de carte déclare', () => {
+    const root = makeFixture({
+      manifest: { cards: [] },
+    });
+
+    const result = run({ root });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/ne décrit aucune carte \(clé « cards » absente ou vide\)/);
+  });
+
+  it('exige une carte pour la RACINE (celle que reçoit toute page sans visuel)', () => {
+    // Sans elle, une page comme /register n'aurait plus AUCUNE carte à annoncer.
+    const root = makeFixture({
+      cards: { 'jobs.json': CARD_FIXTURES['jobs.json'] },
+      assets: { 'og-home.png': null, 'og-home-square.png': null },
+    });
+
+    const result = run({ root });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/aucune carte ne sert la route « \/ »/);
+  });
+
+  it('refuse une carte incomplète, en la nommant plutôt qu’en la sautant', () => {
+    // Une carte sans route ni clés de texte n'annonce rien de vérifiable : la
+    // sauter en silence la ferait sortir du périmètre sans que rien ne le dise.
+    const root = makeFixture({
+      cards: { 'broken.json': { wide: 'og-home.png', square: 'og-home-square.png' } },
+      assets: { 'og-jobs.png': null, 'og-jobs-square.png': null },
+    });
+
+    const result = run({ root });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /broken\.json ne déclare pas route ni title ni description/
+    );
+  });
+
+  it('échoue quand le dictionnaire des pages est illisible (rien à confronter)', () => {
+    const result = run({ root: makeFixture({ dictionary: null }) });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/src\/i18n\/fr\.json illisible/);
   });
 });

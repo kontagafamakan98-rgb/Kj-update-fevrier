@@ -1,5 +1,6 @@
 // Extension explicite : ce fichier est importé AUSSI par Node (vite.config.js et
 // les gardes de scripts/), et Node n'exécute pas un import relatif sans extension.
+import { CARD_PAGE_META } from './og-cards.js';
 import { normalizeRoute } from './route-path.js';
 
 // Table UNIQUE du titre et de la description publiés par route.
@@ -28,10 +29,17 @@ import { normalizeRoute } from './route-path.js';
 // Une route qui n'a pas de coquille pré-rendue et n'annonce donc rien dans le
 // HTML servi (/messages, /profile — servies par app.html, noindex) garde sa
 // propre clé dans sa page : rien ne peut diverger là où il n'y a qu'un canal.
-export const PAGE_META = {
-  '/': { title: 'homeMetaTitle', description: 'homeMetaDescription' },
-  '/jobs': { title: 'jobsMetaTitle', description: 'jobsMetaDescription' },
-  '/login': { title: 'loginMetaTitle', description: 'loginMetaDescription' },
+//
+// ── Deux endroits pour déclarer, et jamais les deux pour une même route ─────
+// Une route qui a une carte OG déclare ses textes dans le FICHIER DE DONNÉES de
+// cette carte (scripts/og-cards/), parce que la carte les DESSINE : le visuel que
+// reçoit un réseau social et le texte que lit un moteur de recherche sortent donc
+// de la même clé, et une carte ne peut plus annoncer autre chose que sa page.
+// Les autres — les routes sans visuel dédié — déclarent ici, et seulement ici.
+// `check-page-meta.js` refuse une route présente des deux côtés : deux
+// déclarations pour une URL, c'est la garantie qu'en corriger une seule ne change
+// rien.
+export const DECLARED_PAGE_META = {
   '/register': { title: 'registerMetaTitle', description: 'registerMetaDescription' },
   '/forgot-password': {
     title: 'forgotPasswordMetaTitle',
@@ -49,6 +57,15 @@ export const PAGE_META = {
   },
   '/support': { title: 'supportMetaTitle', description: 'supportMetaDescription' },
 };
+
+/**
+ * Toutes les routes qui publient un titre et une description — celles sans carte
+ * déclarées ci-dessus, celles à carte déclarées par leur fichier de données.
+ *
+ * La carte l'emporte si les deux déclarent la même route : cet état est refusé
+ * par le garde, et un état refusé n'a pas à décider d'un gagnant en silence.
+ */
+export const PAGE_META = { ...DECLARED_PAGE_META, ...CARD_PAGE_META };
 
 /**
  * Clés i18n du titre et de la description d'une route.

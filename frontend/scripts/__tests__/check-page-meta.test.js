@@ -5,8 +5,9 @@
  * Ce que ces tests doivent prouver, dans l'ordre d'importance :
  *   • les règles SAVENT échouer — carte écrite en dur, clé i18n écrite en dur,
  *     page qui déclare son texte elle-même, page qui n'annonce RIEN, coquille
- *     qui annonce un autre texte que la table (build périmé), clé de page absente
- *     d'une des langues publiées ;
+ *     qui annonce un autre texte que la table (build périmé) ou une autre carte,
+ *     clé de page absente d'une des langues publiées, route déclarée à la fois
+ *     par une carte OG et par la table écrite à la main ;
  *   • elles ne se déclenchent PAS là où elles n'ont rien à faire — un
  *     commentaire a le droit de nommer une carte, les tables ont le droit
  *     d'écrire leurs clés, et la fiche /jobs/:id garde son texte de DONNÉE ;
@@ -28,8 +29,8 @@ import {
   requirePageMeta,
   runPageMetaCheck,
 } from '../check-page-meta';
-import { PAGE_META } from '../../src/config/page-meta';
-import { GENERIC_CARD, dedicatedCardsFrom } from '../../src/config/og-cards';
+import { DECLARED_PAGE_META, PAGE_META } from '../../src/config/page-meta';
+import { CARDS_BY_ROUTE, CARD_PAGE_META, GENERIC_CARD } from '../../src/config/og-cards';
 import { shellFileFor } from '../site-meta';
 
 const FRONTEND = path.resolve(__dirname, '..', '..');
@@ -47,11 +48,6 @@ const REAL_DICTS = Object.fromEntries(
   ])
 );
 const FR = REAL_DICTS.fr;
-// Le manifeste du générateur : la fixture part du VRAI (les cartes réellement
-// présentes dans public/) et n'y ajoute que ce que le cas veut éprouver.
-const REAL_MANIFEST = JSON.parse(
-  fs.readFileSync(path.join(FRONTEND, 'scripts', 'og-assets.manifest.json'), 'utf8')
-);
 
 // Page React qui sert chaque route de la table (nom de fichier → nom de
 // composant, comme App.js le déclare).
@@ -70,30 +66,16 @@ const PAGE_NAMES = {
 // (scripts/site-meta.js) : la fixture ne la redéclare pas, elle l'importe.
 const shellFilePath = (route) => `build/${shellFileFor(route)}`;
 
-// Cartes déduites du manifeste de la FIXTURE (dédiées + générique).
-let fixtureCards = {};
+// La fixture n'écrit AUCUN manifeste : les cartes ne se déduisent plus des
+// fichiers déduits dans public/, elles sont déclarées par les fichiers de données
+// et servies par src/config/og-cards.js — le même module pour le build, le runtime
+// et ce garde (check-og-assets.js, lui, lit le manifeste : c'est son sujet).
 
-/**
- * Écrit le manifeste de la fixture (le vrai, plus les cartes du cas).
- *
- * @param {string[]} [extraFiles] Cartes ajoutées (présentes dans public/).
- * @param {Array} [baseAssets] Cartes de départ (défaut : les vraies).
- */
-const writeManifest = (extraFiles = [], baseAssets = REAL_MANIFEST.assets) => {
-  const manifest = {
-    ...REAL_MANIFEST,
-    assets: [...baseAssets, ...extraFiles.map((file) => ({ file }))],
-  };
-  write('scripts/og-assets.manifest.json', `${JSON.stringify(manifest, null, 2)}\n`);
-  fixtureCards = dedicatedCardsFrom(manifest.assets.map((asset) => asset.file)).cards;
-  return fixtureCards;
-};
-
-// Coquille CONFORME, écrite depuis la table réelle et les cartes déduites :
+// Coquille CONFORME, écrite depuis la table réelle et les cartes déclarées :
 // c'est ce que le build produit, et donc ce que le cas sain doit accepter.
 const shellFor = (route) => {
   const keys = PAGE_META[route];
-  const card = fixtureCards[route] || GENERIC_CARD;
+  const card = CARDS_BY_ROUTE[route] || GENERIC_CARD;
   const title = FR[keys.title];
   const description = FR[keys.description];
   const image = `${SITE_ORIGIN}${card.image}`;
@@ -131,13 +113,12 @@ const writeDict = (language, dictionary) =>
  * Arborescence saine : table réelle, App.js, pages, dictionnaires des langues
  * publiées, coquilles.
  */
-const cleanTree = (extraCards = []) => {
+const cleanTree = () => {
   write(
     'src/contexts/LanguageContext.js',
     `const LANGUAGES = [${LANGUAGE_NAMES.map((language) => `'${language}'`).join(', ')}];\n`
   );
   for (const [language, dictionary] of Object.entries(REAL_DICTS)) writeDict(language, dictionary);
-  writeManifest(extraCards);
   const lazyLines = [];
   const routeLines = [];
   for (const route of Object.keys(PAGE_META)) {
@@ -555,10 +536,8 @@ describe('check-page-meta — non-vacuité', () => {
   it('échoue quand la table est vide (aucune route à comparer)', () => {
     // La clause de non-vacuité doit pouvoir échouer : une table vide (ou une
     // dérivation cassée qui la viderait) produirait sinon un vert qui ne porte
-    // sur rien. Ici le manifeste ne contient que la carte générique, donc
-    // l'absence de route comparée est bien le SEUL défaut.
+    // sur rien. Aucune route comparée n'est alors le SEUL défaut.
     cleanTree();
-    writeManifest([], []);
 
     const result = run({ table: {} });
 
@@ -616,68 +595,51 @@ describe('check-page-meta — le runtime suit la table, route par route', () => 
   });
 });
 
-describe('check-page-meta — règle F (les cartes dédiées présentes sont utilisées)', () => {
-  it('reprend une carte dédiée ajoutée dans public/, SANS toucher au code', () => {
-    // Le but de la déduction : déposer public/og-support.png (+ sa variante
-    // carrée) et relancer le build suffit à donner sa carte à /support — plus
-    // aucune liste de code à mettre à jour, donc plus rien à oublier.
-    cleanTree(['og-support.png', 'og-support-square.png']);
-
-    const result = run();
-
-    expect(result.errors).toEqual([]);
-    const shell = fs.readFileSync(path.join(root, 'build', 'support.html'), 'utf8');
-    expect(shell).toContain(`${SITE_ORIGIN}/og-support.png`);
-    expect(shell).toContain(`${SITE_ORIGIN}/og-support-square.png`);
-  });
-
-  it('échoue quand la carte ajoutée n’est régénérée dans aucune coquille', () => {
-    // La moitié de l’oubli : la carte existe, l’app la connaît, mais le build
-    // (donc le HTML servi) annonce encore la carte générique.
+// L'ancienne règle F (« les cartes dédiées présentes sont complètes ET
+// utilisées ») a disparu avec la convention de nom qu'elle surveillait : un
+// fichier de carte déclare sa route et ses DEUX sorties (le générateur et
+// check-og-assets.js refusent un champ manquant), et sa route entre dans la table
+// des textes par construction — donc la règle C la tient à une page réelle. Ce qui
+// restait à prouver côté carte, c'est le contrat avec le BUILD
+// (og:image annoncée par la coquille) et la règle H, ci-dessous.
+describe('check-page-meta — la carte annoncée, et une seule déclaration par route', () => {
+  it('échoue quand une coquille annonce une autre carte que la table', () => {
+    // Le cas « build périmé », côté image : la coquille a été écrite avant que la
+    // route change de carte, donc elle en annonce une que la table ne dit plus.
     cleanTree();
-    writeManifest(['og-support.png', 'og-support-square.png']);
+    const shellPath = path.join(root, shellFilePath('/support'));
+    const stale = fs
+      .readFileSync(shellPath, 'utf8')
+      .replaceAll(`${SITE_ORIGIN}/og-image-1200x630.png`, `${SITE_ORIGIN}/og-support.png`);
+    fs.writeFileSync(shellPath, stale, 'utf8');
 
     const result = run();
 
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(
-      /support\.html : og:image annonce « https:\/\/[^»]*og-image-1200x630\.png », la table dit « [^»]*og-support\.png »/
+      /support\.html : og:image annonce « https:\/\/[^»]*og-support\.png », la table dit « [^»]*og-image-1200x630\.png »/
     );
   });
 
-  it('échoue quand une carte dédiée ne sert aucune page pré-rendue', () => {
-    cleanTree(['og-dashboard.png', 'og-dashboard-square.png']);
-
-    const result = run();
-
-    expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toMatch(
-      /la carte dédiée « \/og-dashboard\.png » sert la route « \/dashboard », qui n’est pas pré-rendue/
-    );
-  });
-
-  it('échoue quand une carte dédiée n’a pas sa variante carrée', () => {
-    // Sans la variante 1:1, la page retomberait EN SILENCE sur la carte
-    // générique : c’est exactement l’oubli que la déduction doit rendre visible.
-    cleanTree(['og-support.png']);
-
-    const result = run();
-
-    expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toMatch(/public\/og-support\.png n’a pas sa variante carrée/);
-    // Et la coquille reste sur la carte générique : pas de og:image cassé.
-    const shell = fs.readFileSync(path.join(root, 'build', 'support.html'), 'utf8');
-    expect(shell).toContain(`${SITE_ORIGIN}${GENERIC_CARD.image}`);
-  });
-
-  it('échoue quand le manifeste des cartes est illisible', () => {
+  it('refuse une route déclarée À LA FOIS par une carte et par la table écrite à la main', () => {
+    // La carte DESSINE le titre et la description de sa page : les déclarer aussi
+    // dans src/config/page-meta.js ferait gagner la carte EN SILENCE, donc
+    // corriger la ligne manuelle ne changerait rien. Le cas est injecté — la table
+    // écrite à la main est un paramètre, comme `table` l'est pour une table vide :
+    // le dépôt réel n'a pas ce défaut, et c'est ce que le cas suivant vérifie.
     cleanTree();
-    fs.rmSync(path.join(root, 'scripts', 'og-assets.manifest.json'));
 
-    const result = run();
+    const result = run({ declaredMeta: { '/jobs': { title: 'x', description: 'y' } } });
 
     expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toMatch(/og-assets\.manifest\.json illisible/);
+    expect(result.errors.join('\n')).toMatch(/la route « \/jobs » déclare ses textes DEUX fois/);
+  });
+
+  it('n’a rien à redire sur les deux tables du DÉPÔT (aucune route à carte déclarée deux fois)', () => {
+    const overlap = Object.keys(DECLARED_PAGE_META).filter((route) =>
+      Object.hasOwn(CARD_PAGE_META, route)
+    );
+    expect(overlap).toEqual([]);
   });
 });
 
