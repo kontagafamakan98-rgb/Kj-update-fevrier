@@ -222,6 +222,27 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
+      # ── Sonde email RÉELLE : SPF / DKIM / DMARC lus sur un message reçu ────
+      # Le domaine est authentifié (SPF, deux CNAME DKIM chez Brevo, DMARC) et
+      # Brevo répond `dkimError: false` — rien de tout cela ne dit qu'un email
+      # LIVRÉ passe les trois. La sonde envoie un OTP via l'API de production
+      # vers un alias Gmail dédié puis lit l'`Authentication-Results` que Gmail
+      # pose à la RÉCEPTION, seul endroit où les verdicts existent : une boîte
+      # jetable ne les enregistre pas, et les recalculer sur la copie reçue est
+      # impossible (le récepteur réécrit le corps, le `bh` signé ne correspond
+      # plus). Échec bruyant si un verdict n'est pas `pass`.
+      #
+      # main uniquement : un run de PR enverrait un vrai email de production et
+      # lirait la boîte de test pour rien. Sans les secrets, la sonde publie une
+      # `::notice` et s'arrête en 0 — elle dit qu'elle n'a PAS vérifié au lieu
+      # de sortir verte.
+      - name: Sonde email authentifié (SPF/DKIM/DMARC lus dans Gmail, main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python .github/scripts/check-email-auth.py
+        env:
+          KOJO_PROBE_IMAP_USER: ${{ secrets.KOJO_PROBE_IMAP_USER }}
+          KOJO_PROBE_IMAP_PASSWORD: ${{ secrets.KOJO_PROBE_IMAP_PASSWORD }}
+
   # ─── Backend : tests Python (FakeDB + vrai MongoDB) ──────────────────────
   backend-tests:
     name: Backend tests (Python + MongoDB)

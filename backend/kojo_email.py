@@ -20,6 +20,7 @@ from kojo_core import db
 from kojo_settings import (
     BREVO_API_KEY,
     BREVO_API_URL,
+    BREVO_REPLY_TO_EMAIL,
     BREVO_SENDER_EMAIL,
     BREVO_SENDER_NAME,
     EMAIL_OTP_EXPIRY_MINUTES,
@@ -246,6 +247,12 @@ def send_email_via_brevo_api(to_email: str, subject: str, text_body: str, html_b
         'htmlContent': html_body or f'<pre>{text_body}</pre>',
         'textContent': text_body,
     }
+
+    # Réponses : l'expéditeur du domaine n'a pas de boîte. Le garde `if` évite
+    # un replyTo à valeur vide, que Brevo rejetterait (400) — donc une panne
+    # d'envoi provoquée par une variable effacée.
+    if BREVO_REPLY_TO_EMAIL:
+        payload['replyTo'] = {'email': BREVO_REPLY_TO_EMAIL, 'name': BREVO_SENDER_NAME}
 
     try:
         brevo_response = requests.post(
