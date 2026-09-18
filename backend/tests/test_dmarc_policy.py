@@ -22,7 +22,6 @@ DNS_NAME = b"\x06_dmarc\x0dkojoforafrica\x02cc\x02cd\x00"
 
 
 def _load_policy():
-    assert SCRIPT.exists(), f"{SCRIPT} absent — normalement commité"
     spec = importlib.util.spec_from_file_location("dmarc_policy", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

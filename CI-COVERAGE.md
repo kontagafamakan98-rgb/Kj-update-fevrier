@@ -280,6 +280,23 @@ Le `| grep` **réduit pyflakes à une seule catégorie** (nom non défini). Un i
 inutilisé, une variable masquée ou une redéfinition ne font pas échouer le job —
 « pyflakes ✓ » signifie « aucun nom non défini », pas « pyflakes propre ».
 
+Ce step et le garde de `backend/tests/test_split_integrity.py` (pyflakes, même
+catégorie) portaient deux périmètres qui ne coïncidaient pas : la liste du test
+était recopiée à la main et en omettait **quatre** — `server.py`, le fichier dont
+le `NameError` a atteint la production le 2026-08-27, et `kojo_routers_public.py`,
+`kojo_routers_reviews.py`, `kojo_env_validators.py`. Le test DÉRIVE désormais son
+périmètre (`kojo_*.py` + `server.py`, 21 modules) : il voit exactement ce que le
+step voit, et un module ajouté entre dans le garde sans qu'on y pense. Sa capacité
+à échouer, jusqu'ici supposée (la suite ne l'exerçait que sur des modules sains),
+est démontrée par mutation sur une **copie** des modules réels :
+`test_le_garde_echoue_quand_on_retire_un_import` copie les 21 modules, vérifie que
+la copie intacte est propre, retire le premier import RÉELLEMENT UTILISÉ (l'usage
+est vérifié avant le retrait, sinon la mutation ne prouverait rien) et exige le
+message. Rejoué à la main le 18/09/2026 : retirer `import asyncio` de
+`kojo_core.py` produit `undefined name 'asyncio'` (l. 433 et 437), et retirer
+`from urllib.parse import urlparse` reproduit l'incident à l'identique —
+`undefined name 'urlparse'` (l. 476).
+
 ### F8 — Aucun job ne vérifie le résultat du déploiement
 
 `deploy-fly` s'arrête au succès de `flyctl deploy`. Rien ne sonde ensuite
@@ -512,6 +529,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
+| `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
 
@@ -522,6 +540,38 @@ devenait aveugle (mauvaise condition, chemin d'artefact modifié par une montée
 version de Vite), la CI resterait verte sans que personne ne le voie — c'est le
 seul garde dans ce cas, et c'est la première chose à corriger si l'on veut que
 « les gardes sont testés » soit une affirmation vraie sans exception.
+
+À côté de ces gardes, un test d'IMPORT-SANTÉ remplace les assertions
+d'existence qui s'étaient dispersées (« ce fichier est-il sur le disque ? ») :
+`backend/tests/test_import_health.py` importe tous les modules backend et les
+scripts de `.github/scripts/`, `frontend/scripts/__tests__/import-health.test.js`
+importe tout module que le frontend importe — les points d'entrée qui
+s'exécutent à l'import (`process.exit`, rendu dans `#root`, pipeline esbuild)
+sont écartés par la règle elle-même, et le journal dit combien de modules sont
+couverts. Les deux portent leur preuve de non-vacuité (un module cassé, ou un
+module disparu, fait rougir le garde en nommant la cause), vérifiée par mutation
+le 18/09/2026 — frontend : `src/App.js` et `src/services/api.js` ; backend :
+`.github/scripts/check-exec-bits.py`.
+
+Le seul garde d'existence qui gardait autre chose qu'un module — la liste
+d'exceptions `OG_READ_ONLY_SCRIPTS` de `check-og-assets.js` — a été SUPPRIMÉ
+plutôt que testé : **mesuré**, aucun de ses trois membres ne déclenche les deux
+étages du détecteur (le contenu exige d'ÉCRIRE une image ET de viser une carte
+OG, ce qu'un checker ne fait jamais). La liste n'avait donc aucun effet, et le
+test qui l'accompagnait ne vérifiait que l'existence de ses entrées.
+
+Pour que le nettoyage ne se reperde pas, `.github/scripts/check-test-existence-assertions.py`
+(job `workflow-lint`) refuse une assertion qui ne porte QUE sur l'existence d'un
+export : `callable(...)`, `<chemin> is not None` ou `<chemin>` comme condition
+entière, `expect(<chemin>).toBeDefined()`. La règle est ÉTROITE à dessein — le
+sujet doit être un nom IMPORTÉ par le fichier de test — donc
+`assert payload["job_id"] is not None` et `expect(country.nameFrench).toBeDefined()`
+restent permis : ils portent sur une VALEUR produite par le test. Les cinq
+assertions restantes ont été remplacées au même moment :
+`test_shared_helpers_importable` (trois `callable(...)`) supprimé au profit du
+test d'import-santé, et le câblage du sweeper de décaissements vérifié par ce que
+`server.py` DÉMARRE réellement (`asyncio.create_task(...)`) au lieu de l'existence
+de la fonction.
 
 ## 5. Ce qui est réellement vérifié à chaque push
 

@@ -36,7 +36,6 @@ GRADLEW = "frontend/android/gradlew"
 
 def _load_check():
     """Charge check-exec-bits.py comme module importable (script stdlib)."""
-    assert SCRIPT.exists(), f"{SCRIPT} absent — normalement commité"
     spec = importlib.util.spec_from_file_location("check_exec_bits", SCRIPT)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

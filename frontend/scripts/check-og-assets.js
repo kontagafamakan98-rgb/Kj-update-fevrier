@@ -16,8 +16,8 @@
  *      La détection se fait à deux étages : par le NOM (jeton « og » + verbe
  *      de production, quelle que soit l'extension de script) et, pour un nom
  *      anodin, par le CONTENU (le fichier écrit une image ET vise une carte
- *      OG). Les scripts OG qui ne font que LIRE les cartes — les checkers —
- *      sont déclarés explicitement dans OG_READ_ONLY_SCRIPTS ;
+ *      OG). Il faut les DEUX signaux : un checker qui ne fait que LIRE les
+ *      cartes n'écrit pas d'image, donc il n'a jamais besoin d'exception ;
  *   2. lit le MANIFESTE DANS le générateur lui-même (dimensions des formats
  *      wide/carré, pages couvertes, taille du favicon) : aucune constante
  *      n'est dupliquée ici, donc le check ne peut pas diverger du script ;
@@ -42,16 +42,6 @@ import { pathToFileURL } from 'node:url';
 export const GENERATOR_NAME = 'gen-og-images.py';
 
 // Scripts OG qui NE génèrent RIEN : ils LISENT les cartes pour les vérifier.
-// La liste est volontairement explicite, pour que la règle reste lisible :
-// tout script OG qui n'y figure pas est suspect d'être une seconde source de
-// vérité. Elle est verrouillée par un test de non-rot (chaque entrée doit
-// exister sur le disque, sinon la liste se remplirait de fantômes).
-export const OG_READ_ONLY_SCRIPTS = [
-  'check-og-assets.js',
-  'check-og-images.js',
-  'check-og-job-200.js',
-];
-
 const SCRIPT_EXTENSIONS = ['.py', '.js', '.mjs', '.cjs', '.ts', '.sh'];
 
 export const MANIFEST_NAME = 'og-assets.manifest.json';
@@ -85,8 +75,8 @@ export const nameLooksLikeOgGenerator = (name) => {
  * Étage 2 — le CONTENU, pour les noms qui ne disent rien (« cards.py »). Il
  * faut les DEUX signaux : écrire une image (API d'écriture) ET viser une carte
  * OG. Exiger les deux évite de confondre un lecteur qui mentionne forcément
- * « og-*.png » avec un producteur ; les checkers connus sont de toute façon
- * hors périmètre via OG_READ_ONLY_SCRIPTS.
+ * « og-*.png » avec un producteur : un lecteur qui ne fait que vérifier les
+ * cartes échoue sur la première.
  */
 const WRITES_IMAGE = /\.save\(|writeFileSync\(|writeFile\(|createWriteStream\(|\.toBuffer\(|\.toFile\(|Image\.new\(|sharp\(/;
 const MENTIONS_OG_ASSET = /og-[a-z0-9-]*\.png|public\/og/i;
@@ -175,7 +165,6 @@ export const runOgAssetsCheck = (opts = {}) => {
 
   for (const name of scriptFiles) {
     if (name === GENERATOR_NAME) continue;
-    if (OG_READ_ONLY_SCRIPTS.includes(name)) continue;
 
     let source = '';
     try {
@@ -185,21 +174,19 @@ export const runOgAssetsCheck = (opts = {}) => {
     }
 
     if (nameLooksLikeOgGenerator(name)) {
-      fail(
-        `second générateur OG détecté (${name}) : son nom annonce un ` +
+      fail(          `second générateur OG détecté (${name}) : son nom annonce un ` +
           `générateur, or une seule source de vérité est autorisée, ` +
-          `scripts/${GENERATOR_NAME} — s'il ne fait que LIRE les cartes, ` +
-          `déclare-le dans OG_READ_ONLY_SCRIPTS`
+          `scripts/${GENERATOR_NAME} — un checker qui se contente de LIRE les ` +
+          `cartes n'est pas concerné (il n'écrit aucune image)`
       );
       continue;
     }
 
     if (contentLooksLikeOgGenerator(source)) {
-      fail(
-        `second générateur OG détecté (${name}) : ce fichier écrit une carte ` +
+      fail(          `second générateur OG détecté (${name}) : ce fichier écrit une carte ` +
           `OG, or une seule source de vérité est autorisée, ` +
-          `scripts/${GENERATOR_NAME} — s'il ne fait que LIRE les cartes, ` +
-          `déclare-le dans OG_READ_ONLY_SCRIPTS`
+          `scripts/${GENERATOR_NAME} — un checker qui se contente de LIRE les ` +
+          `cartes n'est pas concerné (il n'écrit aucune image)`
       );
     }
   }
