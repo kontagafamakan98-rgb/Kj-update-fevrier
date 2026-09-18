@@ -278,3 +278,77 @@ class TestSessionsNeuveAChaqueEssai:
             probe.time.monotonic = original
 
         assert len(sessions) >= 2, "plusieurs sessions avant d'abandonner"
+
+
+# ── Alignement DMARC ────────────────────────────────────────────────────────
+# En-têtes d'un message RÉELLEMENT livré le 18/09/2026 : l'enveloppe est le
+# domaine de rebond de Brevo, la signature porte le nôtre. C'est l'état mesuré,
+# pas une hypothèse — et c'est pour ça que la phrase d'alignement existe.
+LIVRE_AVANT = (
+    b"Return-Path: <bounces-470616010-2104611724@gw.d.sender-sib.com>\r\n"
+    b"DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=kojoforafrica.cc.cd;\r\n"
+    b" q=dns/txt; s=brevo2; bh=WG3xHfKWanjvy9UEZH6MjGSMOp1cVuB7adV9zcRMJuU=;\r\n"
+    b"From: \"KOJO\" <noreply@kojoforafrica.cc.cd>\r\n"
+    b"To: <kojo-probe@test.dev>\r\n"
+)
+
+
+def with_envelope(host, from_domain="kojoforafrica.cc.cd", dkim="kojoforafrica.cc.cd"):
+    """Mêmes en-têtes, enveloppe et `d=` remplacés — l'état APRÈS le changement."""
+    return (
+        f"Return-Path: <bounces@{host}>\r\n"
+        f"DKIM-Signature: v=1; d={dkim}; s=brevo2;\r\n"
+        f"From: \"KOJO\" <noreply@{from_domain}>\r\n"
+    ).encode()
+
+
+class TestAlignementDmarc:
+    """`spf=pass` sur le domaine d'un tiers ne vaut RIEN pour DMARC."""
+
+    def test_lit_les_trois_domaines_du_message_recu(self, probe):
+        facts = probe.alignment_facts(LIVRE_AVANT)
+
+        assert facts == {
+            "from": "kojoforafrica.cc.cd",
+            "envelope": "gw.d.sender-sib.com",
+            "dkim": "kojoforafrica.cc.cd",
+        }
+
+    def test_un_spf_pass_non_aligne_est_dit_non_aligne(self, probe):
+        verdicts = {"spf": "pass", "dkim": "pass", "dmarc": "pass"}
+        notice = probe.alignment_notice(probe.alignment_facts(LIVRE_AVANT), verdicts)
+
+        # Le fait mesuré : DMARC tient sur DKIM seul.
+        assert "spf=pass NON aligné" in notice
+        assert "gw.d.sender-sib.com" in notice and "kojoforafrica.cc.cd" in notice
+        assert "dkim=pass aligné (d=kojoforafrica.cc.cd)" in notice
+
+    def test_accepte_l_enveloppe_sur_un_sous_domaine_du_domaine(self, probe):
+        """Ce que produira le sous-domaine brandé de Brevo (`mail.…`)."""
+        facts = probe.alignment_facts(with_envelope("mail.kojoforafrica.cc.cd"))
+
+        assert probe.is_aligned(facts["envelope"], facts["from"])
+        assert "spf=pass aligné" in probe.alignment_notice(facts, {"spf": "pass", "dkim": "pass"})
+        assert probe.alignment_problems(facts, {"spf": "pass"}, required=True) == []
+
+    def test_refuse_un_domaine_qui_ressemble_au_notre(self, probe):
+        """Un suffixe de chaîne ne doit pas passer pour un sous-domaine."""
+        facts = probe.alignment_facts(with_envelope("kojoforafrica.cc.cd.attaquant.test"))
+
+        assert not probe.is_aligned(facts["envelope"], facts["from"])
+        assert probe.alignment_problems(facts, {"spf": "pass"}, required=True)
+
+    def test_n_exige_rien_tant_que_l_exigence_n_est_pas_declaree(self, probe):
+        facts = probe.alignment_facts(LIVRE_AVANT)
+
+        assert probe.alignment_problems(facts, {"spf": "pass"}, required=False) == []
+        assert probe.spf_alignment_required({"KOJO_REQUIRE_SPF_ALIGNMENT": "1"}) is True
+        assert probe.spf_alignment_required({"KOJO_REQUIRE_SPF_ALIGNMENT": ""}) is False
+        assert probe.spf_alignment_required({}) is False
+
+    def test_un_spf_en_echec_ne_double_pas_l_erreur(self, probe):
+        """`evaluate()` signale déjà un spf=fail : deux erreurs pour un fait
+        brouilleraient la lecture du journal."""
+        facts = probe.alignment_facts(LIVRE_AVANT)
+
+        assert probe.alignment_problems(facts, {"spf": "fail"}, required=True) == []

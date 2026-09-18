@@ -432,8 +432,17 @@ cibles `production,preview`, type standard et donc relisible) puis la production
 redéployée. Vérifié sur le HTML servi : `"sameAs"` contient les trois URLs (donc
 visible d'un crawler sans JavaScript) et le bundle porte les trois mêmes URLs
 (liens du footer, rendus par React). La sonde est passée de `0/4` à `1/4`, avec
-la ligne « Liens sociaux : PRÉSENT — 3 profil(s) ». C'est la démonstration que la
-chaîne variable → build → HTML servi → vérification fonctionne de bout en bout.
+la ligne « Liens sociaux : PRÉSENT — 3 profil(s) dans le `sameAs`, 3 lien(s) dans
+le HTML servi ». C'est la démonstration que la chaîne variable → build → HTML
+servi → vérification fonctionne de bout en bout.
+
+Le **bloc « Suivez-nous » du corps de page** (section contact du shell pré-rendu)
+complète ces liens : un audit « Social Media Links » lit le corps de page, et un
+`sameAs` en JSON-LD ne lui suffit pas. Il est alimenté par le **même tableau** que
+le footer React (`src/config/social-networks.json` + `VITE_SOCIAL_*`) — impossible
+de publier deux jeux de profils. La sonde dit désormais les deux mesures et nomme
+le faux vert : `AUCUN lien social dans le HTML brut` quand le `sameAs` est rempli
+mais qu'aucune ancre ne suit dans le HTML servi.
 `VITE_SOCIAL_TIKTOK`, `LINKEDIN` et `YOUTUBE` restent volontairement vides :
 `contact.js` n'affiche aucun profil inventé.
 
@@ -444,8 +453,20 @@ Vercel → Project Settings → Environment Variables, et exigent un redéploiem
 mesuré : `VITE_GOOGLE_CLIENT_ID`, déclarée `type=sensitive`, apparaît en clair
 dans `/assets/index-*.js` de la production, la valeur n'étant « décryptable que
 pendant les déploiements » (doc Vercel) ; ce que ça coûte, c'est de ne plus
-pouvoir la RELIRE pour vérifier. Aucune commande du dépôt ne peut les créer :
-elles viennent d'un compte Google (une propriété GA4, un jeton Search Console).
+pouvoir la RELIRE pour vérifier. Les VALEURS, elles, viennent d'un compte Google
+(une propriété GA4, un jeton Search Console) : aucune commande ne peut les
+inventer. En revanche `frontend/scripts/setup-seo-env.js` fait en une fois les
+trois gestes qu'on oublie dans l'ordre — pose des deux variables (`production` ET
+`preview`, en `upsert`, donc rejouable), redéploiement de production, puis
+relecture du HTML servi par la sonde ci-dessus, avec **échec** si les deux balises
+n'y sont pas :
+
+```bash
+KOJO_GA_MEASUREMENT_ID=G-… KOJO_GSC_VERIFICATION=… VERCEL_TOKEN=vcp_… \
+  node frontend/scripts/setup-seo-env.js
+# … --dry-run : lectures seules (projet, variables déjà posées, charges utiles)
+```
+
 Tant qu'elles manquent, l'audit restera rouge sur l'analytics et la vérification
 Search Console, quel que soit l'état du code.
 
@@ -585,10 +606,13 @@ chaque PR vers `main` (sauf mention contraire).
   Quand une référence manque, la colonne est omise et la raison est écrite —
   aucun écart n'est calculé contre une mesure douteuse.
 - Les quatre intégrations SEO/analytics configurées par variables
-  d'environnement (GA4, Search Console, Plausible, `sameAs` des réseaux
-  sociaux) sont sondées sur le **HTML de production**, sur `main` uniquement
+  d'environnement (GA4, Search Console, Plausible, profils sociaux) sont sondées
+  sur le **HTML de production**, sur `main` uniquement
   (`scripts/check-seo-production.js`) : une annotation `::notice` par
-  intégration, avec la variable à poser quand elle manque. La même sonde confronte
+  intégration, avec la variable à poser quand elle manque. Pour les réseaux
+  sociaux, elle lit le `sameAs` **et** les liens réellement présents dans le HTML
+  servi : un profil déclaré que seul le JSON-LD porte n'est pas dit « présent »
+  sans réserve. La même sonde confronte
   le `canonical` servi et l'hôte du `/sitemap.xml` à l'origine attendue, donc une
   migration de domaine à moitié faite est nommée dans le journal. Aucun échec,
   jamais — une configuration incomplète est un fait d'exploitation, pas une
@@ -597,7 +621,15 @@ chaque PR vers `main` (sauf mention contraire).
   vérifiée sur un message RÉELLEMENT reçu, sur `main` uniquement
   (`.github/scripts/check-email-auth.py`, job `fly-env-drift`) : un OTP part par
   l'API de production vers un alias Gmail dédié, et la sonde lit
-  l'`Authentication-Results` que Gmail pose à la réception. Une boîte jetable ne
+  l'`Authentication-Results` que Gmail pose à la réception. Elle publie en plus
+  la phrase d'**alignement** — enveloppe SPF (`Return-Path`) et `d=` de la
+  signature comparés au domaine du `From:`, jamais supposés. C'est le point que
+  les verdicts seuls cachent : un `spf=pass` posé sur le domaine de Brevo ne
+  compte pas pour DMARC. Mesuré le 18/09/2026 sur un message livré : enveloppe
+  `gw.d.sender-sib.com` ≠ `kojoforafrica.cc.cd`, donc DMARC passe par DKIM seul.
+  La variable de dépôt `KOJO_REQUIRE_SPF_ALIGNMENT=1` transforme cette exigence
+  en échec — à poser quand le sous-domaine brandé de Brevo est en place (cf.
+  `backend/DEPLOY_FLYIO.md`), le gain est alors verrouillé sans toucher au code. Une boîte jetable ne
   convient pas — elle n'écrit aucun verdict (mesuré sur mail.tm), et recalculer
   DKIM sur la copie reçue est impossible puisque le récepteur réécrit le corps.
   Sans les secrets `KOJO_PROBE_IMAP_*`, la sonde publie une `::notice` et sort

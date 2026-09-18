@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { INTEGRATIONS, analyzeSeoServedHtml, runSeoProductionReport } from '../check-seo-production.js';
+import { INTEGRATIONS, analyzeSeoServedHtml, noticeFor, runSeoProductionReport } from '../check-seo-production.js';
 import { SITE_ORIGIN } from '../site-meta.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -26,7 +26,7 @@ const CONFIGURED_HTML = `<!doctype html><html><head>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ABC1234567"></script>
 <meta content="jeton-gsc-abc123" name="google-site-verification">
 <script type="application/ld+json">{"@type":"LocalBusiness","sameAs":["https://www.facebook.com/kojo","http://insecure.test"]}</script>
-</head><body><div id="root"></div></body></html>`;
+</head><body><div id="root"><a href="https://www.facebook.com/kojo" rel="me noreferrer">Facebook</a></div></body></html>`;
 
 // HTML « non configuré » : l'état de la production tant que Vercel n'a rien.
 const UNCONFIGURED_HTML = `<!doctype html><html><head>
@@ -60,11 +60,24 @@ describe('analyse du HTML servi', () => {
     expect(analysis.gsc).toEqual({ present: true, value: 'jeton-gsc-abc123' });
     expect(analysis.plausible.present).toBe(true);
     // Le http:// du sameAs est écarté : un lien mixte n'a rien à y faire.
+    // `anchors` compte les liens du HTML SERVI vers un hôte déclaré : un
+    // `sameAs` rempli sans lien visible pour un crawler sans JavaScript.
     expect(analysis.social).toEqual({
       present: true,
       value: 'https://www.facebook.com/kojo',
       count: 1,
+      anchors: 1,
     });
+  });
+
+  it('un sameAs déclaré sans lien dans le corps est dit invisible, pas présent', () => {
+    // Le cas que ce décompte existe pour nommer : la configuration est là, le
+    // crawler ne voit rien.
+    const withoutLinks = CONFIGURED_HTML.replace(/<a href="[^"]+"[^>]*>[^<]*<\/a>/, '');
+    expect(analyzeSeoServedHtml(withoutLinks).social.anchors).toBe(0);
+    expect(noticeFor(INTEGRATIONS[3], analyzeSeoServedHtml(withoutLinks).social)).toContain(
+      'AUCUN lien social dans le HTML brut',
+    );
   });
 
   it('ne voit rien dans le HTML non configuré', () => {
