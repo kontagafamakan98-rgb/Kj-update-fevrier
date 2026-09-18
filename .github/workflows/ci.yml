@@ -316,6 +316,22 @@ jobs:
         working-directory: backend
         run: python scripts/audit_docstrings.py --fail-on-warning
 
+      # ── Santé d'import : le VERDICT est publié en annotation de PR ──────────
+      # Un fichier présent peut porter un `NameError` que personne ne voit (le
+      # 2026-08-27, il a atteint la production alors que toutes les assertions
+      # d'existence étaient vertes). Le verdict — périmètre, modules importés, ce
+      # qui n'est PAS couvert, et un `::error` par module cassé — est produit par
+      # backend/tests/test_import_health.py, comme la sonde SEO publie les siens.
+      #
+      # Ce fichier tourne aussi dans la suite complète, mais pytest CAPTURE le
+      # `print` des tests : ses annotations n'y seraient lues par personne, ni en
+      # vert ni en rouge. `--capture=tee-sys` recopie la sortie capturée dans le
+      # journal du job, que GitHub transforme en annotations. Deux secondes, et
+      # sans MongoDB (importer n'est pas se connecter).
+      - name: Santé d'import — verdict publié en annotation
+        working-directory: backend
+        run: python -m pytest tests/test_import_health.py -q --tb=short --capture=tee-sys
+
       - name: Run tests against real MongoDB
         working-directory: backend
         env:
