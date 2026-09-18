@@ -658,14 +658,30 @@ Quelles pages ont un VISUEL DÉDIÉ n'est plus une liste écrite à la main : el
 DÉDUIT des cartes présentes. `public/og-<page>.png` + sa variante carrée
 `og-<page>-square.png` — le nom du fichier EST la déclaration, lu par le build, par
 le runtime et par le garde (manifeste du générateur, le même fichier que
-`check-og-assets.js` confronte aux PNG par empreinte SHA-256). Ajouter une carte
-n'ajoute donc **aucune ligne de code** : mesuré le 18/09/2026 en déposant
-`og-support.png` + `og-support-square.png` comme le ferait `gen-og-images.py`, le
-build a publié la nouvelle carte dans `support.html` et le garde l'a nommée
-(`/support → /og-support.png`) sans qu'aucun fichier `.js` ou `.jsx` ne soit
-touché. Deux listes vivaient auparavant ici et dans le générateur : une carte
-ajoutée dans `public/` restait annoncée par personne, et le commit de la carte
-seule passait pour un succès.
+`check-og-assets.js` confronte aux PNG par empreinte SHA-256). Deux listes vivaient
+auparavant ici et dans le générateur : une carte ajoutée dans `public/` restait
+annoncée par personne, et le commit de la carte seule passait pour un succès.
+
+Le GESTE d'ajout est purement déclaratif depuis le 18/09/2026 : **un fichier de
+données par carte** (`scripts/og-cards/<carte>.json` — le contenu, et les DEUX
+sorties qu'il produit), puis le générateur, qui découvre le dossier. Le slug d'une
+carte, son accroche et ses lignes ne sont plus dans `gen-og-images.py` : aucun
+`.py` ni `.js` ne bouge pour ajouter une carte. Mesuré en sortant le contenu des
+trois cartes existantes du générateur : les **7 PNG sont restés identiques OCTET
+POUR OCTET** (`git status public/` vide) — le contenu a changé de place, pas les
+images. Et l'ajout lui-même est couvert par un test qui ne dépose qu'un fichier
+JSON : `og-support.png` entre dans le périmètre du garde sans qu'aucune ligne de
+code ne soit touchée.
+
+Sortir le texte du générateur lui retire la protection de son empreinte (elle ne
+couvre que du code) : le manifeste porte donc une seconde empreinte,
+`cards_sha256`, recette identique octet pour octet des deux côtés (nom de fichier +
+LF + contenu normalisé en LF, fichiers triés). Sans elle, changer une accroche sans
+relancer le script laisserait des PNG périmés derrière un manifeste « frais ». Deux
+tests la tiennent : un texte modifié seul fait rougir, un fichier en CRLF reste vert
+(`check-og-assets.test.js`), et l'accord Python ↔ JavaScript est prouvé sur le
+dépôt réel — le manifeste versionné est écrit par Python, l'empreinte recalculée en
+JavaScript doit lui être égale.
 
 Le revers de cette déduction est traité au même endroit : une carte dédiée dont le
 slug ne correspond à AUCUNE page du projet (`lighthouserc.cjs`, `DEPLOYMENT_PATHS`)

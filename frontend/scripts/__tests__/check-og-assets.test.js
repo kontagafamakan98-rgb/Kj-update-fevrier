@@ -4,20 +4,27 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { MANIFEST_NAME, REFERENCE_FONTS, runOgAssetsCheck } from '../check-og-assets';
+import {
+  CARDS_DIR_NAME,
+  MANIFEST_NAME,
+  REFERENCE_FONTS,
+  runOgAssetsCheck,
+} from '../check-og-assets';
 
 // Tests du garde-fou « cartes Open Graph » (scripts/check-og-assets.js) :
 //   - un seul générateur OG toléré dans scripts/, détecté par le NOM (jeton
 //     « og » + verbe de production, quelle que soit l'extension) ET, pour un
 //     nom anodin, par le CONTENU (écrit une image + vise une carte OG) ;
 //   - aucun faux positif sur un script qui ne fait que LIRE les cartes ;
-//   - le manifeste est lu DANS le générateur (aucune constante dupliquée) ;
+//   - la LISTE des cartes est lue dans les DONNÉES (un fichier par carte), les
+//     DIMENSIONS dans le générateur : aucune des deux n'est recopiée ici ;
 //   - chaque PNG déclaré doit exister, être un vrai PNG et respecter ses
 //     dimensions (signature + IHDR) ;
 //   - aucun og-*.png orphelin dans public/ ;
 //   - le MANIFESTE de reproductibilité (empreintes SHA-256 des cartes,
-//     empreinte du générateur, polices retenues) est confronté aux fichiers
-//     commités : carte retouchée, générateur modifié sans régénération,
+//     empreinte du générateur, empreinte du CONTENU des cartes, polices
+//     retenues) est confronté aux fichiers commités : carte retouchée, texte
+//     ou générateur modifié sans régénération,
 //     cartes refaites avec une autre police ;
 //   - le check est vert sur le dépôt réel.
 //
@@ -35,30 +42,51 @@ afterEach(() => {
   }
 });
 
-// Générateur minimal reproduisant la structure attendue par le check :
-// constantes de formats, VARIANTS / SQUARE_VARIANTS, favicon sombre.
+// Générateur minimal reproduisant ce que le check y lit : les constantes de
+// FORMATS et la taille du favicon sombre. Le contenu des cartes n'est plus ici —
+// il vit dans les fichiers de données (CARD_FIXTURES, plus bas).
 const GENERATOR_FIXTURE = `W, H = 1200, 630
 SQUARE = 1200
 OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
-
-VARIANTS = {
-    "og-home.png": {
-        "tagline_lines": ["Accueil"],
-    },
-    "og-jobs.png": {
-        "tagline_lines": ["Emplois"],
-    },
-}
-
-SQUARE_VARIANTS = {
-    "og-home-square.png": "og-home.png",
-}
 
 
 def main():
     favicon = make_dark_favicon(512)
     out = os.path.join(OUT_DIR, 'icons', 'icon-dark.png')
 `;
+
+// Un fichier de données par carte : ce que le check lit pour savoir QUELS PNG
+// doivent exister. Le générateur les découvre par le même chemin (dossier trié).
+const CARD_FIXTURES = {
+  'home.json': { wide: 'og-home.png', square: 'og-home-square.png' },
+  'jobs.json': { wide: 'og-jobs.png', square: 'og-jobs-square.png' },
+};
+
+// Le contenu d'une carte, sérialisé comme le ferait un auteur de données (JSON
+// indenté, saut de ligne final) : la fixture ne teste pas la mise en forme, le
+// générateur l'ignore.
+const cardJson = (card, { crlf = false } = {}) => {
+  const text = JSON.stringify(card, null, 2) + '\n';
+  return crlf ? text.replace(/\n/g, '\r\n') : text;
+};
+
+// Empreinte du CONTENU des cartes, à la recette du générateur (nom + LF + octets
+// normalisés en LF, fichiers triés). L'accord entre langages n'est PAS prouvé
+// ici : il l'est par le manifeste versionné, écrit par Python et recalculé en
+// JavaScript par le cas « dépôt réel ».
+const cardsFingerprint = (cardsDir) => {
+  const digest = crypto.createHash('sha256');
+  for (const name of fs.readdirSync(cardsDir).filter((file) => file.endsWith('.json')).sort()) {
+    const data = fs
+      .readFileSync(path.join(cardsDir, name))
+      .toString('latin1')
+      .replace(/\r\n/g, '\n');
+    digest.update(Buffer.from(name, 'utf8'));
+    digest.update('\n');
+    digest.update(Buffer.from(data, 'latin1'));
+  }
+  return digest.digest('hex');
+};
 
 // PNG minimal mais VALIDE pour le check : signature + chunk IHDR portant les
 // dimensions. Le check ne décode pas l'image, il ne lit que ces 33 octets.
@@ -93,6 +121,7 @@ const DEFAULT_ASSETS = {
   'og-home.png': fakePng(1200, 630),
   'og-jobs.png': fakePng(1200, 630),
   'og-home-square.png': fakePng(1200, 1200),
+  'og-jobs-square.png': fakePng(1200, 1200),
   'icons/icon-dark.png': fakePng(512, 512),
 };
 
@@ -103,6 +132,8 @@ const DEFAULT_ASSETS = {
 const makeFixture = ({
   generator = GENERATOR_FIXTURE,
   extraScripts = [],
+  cards = CARD_FIXTURES,
+  cardsCrlf = false,
   assets = {},
   manifest = undefined,
 } = {}) => {
@@ -121,6 +152,14 @@ const makeFixture = ({
     fs.writeFileSync(path.join(scriptsDir, name), content);
   }
 
+  const cardsDir = path.join(scriptsDir, CARDS_DIR_NAME);
+  if (cards) {
+    fs.mkdirSync(cardsDir, { recursive: true });
+    for (const [name, card] of Object.entries(cards)) {
+      fs.writeFileSync(path.join(cardsDir, name), cardJson(card, { crlf: cardsCrlf }));
+    }
+  }
+
   const written = [];
   for (const [rel, buffer] of Object.entries({ ...DEFAULT_ASSETS, ...assets })) {
     if (!buffer) continue; // valeur `null` → fichier volontairement absent
@@ -135,6 +174,7 @@ const makeFixture = ({
     generator_sha256: generator
       ? crypto.createHash('sha256').update(Buffer.from(generator)).digest('hex')
       : null,
+    cards_sha256: cards ? cardsFingerprint(cardsDir) : null,
     fonts: { ...REFERENCE_FONTS },
     assets: written.map(([rel, buffer]) => ({
       file: rel,
@@ -170,17 +210,57 @@ const writeManifest = (root, manifest) =>
 
 const run = (options) => runOgAssetsCheck({ ...options, quiet: true });
 
-describe('check-og-assets — manifeste lu dans le générateur', () => {
+describe('check-og-assets — les cartes se déclarent en données', () => {
   it('cas nominal : générateur unique et PNG conformes → ok', () => {
     const result = run({ root: makeFixture() });
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
     expect(result.assets.map((asset) => asset.file)).toEqual([
       'og-home.png',
-      'og-jobs.png',
       'og-home-square.png',
+      'og-jobs.png',
+      'og-jobs-square.png',
       'icons/icon-dark.png',
     ]);
+  });
+
+  it('suit les données : une carte AJOUTÉE (fichier seul) entre dans le périmètre', () => {
+    // Le geste attendu pour une carte dédiée de plus : un fichier JSON, sans
+    // toucher une ligne de code. Le garde doit la voir du seul fait du fichier.
+    const result = run({
+      root: makeFixture({
+        cards: {
+          ...CARD_FIXTURES,
+          'support.json': { wide: 'og-support.png', square: 'og-support-square.png' },
+        },
+        assets: {
+          'og-support.png': fakePng(1200, 630),
+          'og-support-square.png': fakePng(1200, 1200),
+        },
+      }),
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.assets.map((asset) => asset.file)).toContain('og-support.png');
+  });
+
+  it('refuse une carte qui ne nomme pas ses DEUX sorties', () => {
+    const result = run({
+      root: makeFixture({ cards: { 'support.json': { wide: 'og-support.png' } } }),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      new RegExp(`${CARDS_DIR_NAME}/support\\.json ne nomme pas square`)
+    );
+  });
+
+  it('refuse un dossier de cartes absent ou sans aucune carte', () => {
+    const absent = run({ root: makeFixture({ cards: null }) });
+    expect(absent.ok).toBe(false);
+    expect(absent.errors.join('\n')).toMatch(new RegExp(`${CARDS_DIR_NAME}/ absent`));
+
+    const vide = run({ root: makeFixture({ cards: {} }) });
+    expect(vide.ok).toBe(false);
+    expect(vide.errors.join('\n')).toMatch(/ne contient aucun fichier \*\.json/);
   });
 
   it('détecte un SECOND générateur OG (deux sources de vérité)', () => {
@@ -287,6 +367,11 @@ describe('check-og-assets — dépôt réel', () => {
     expect(manifest.generator).toBe('gen-og-images.py');
     expect(manifest.fonts).toEqual(REFERENCE_FONTS);
     expect(manifest.assets).toHaveLength(7);
+    // Le manifeste est écrit par Python, l'empreinte recalculée en JavaScript :
+    // ce cas est la preuve que les deux recettes donnent le MÊME octet.
+    expect(manifest.cards_sha256).toBe(
+      cardsFingerprint(path.join(REPO_ROOT, 'scripts', CARDS_DIR_NAME))
+    );
   });
 });
 
@@ -321,6 +406,32 @@ describe('check-og-assets — manifeste de reproductibilité', () => {
     const result = run({ root });
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/a changé depuis la dernière génération/);
+  });
+
+  it("détecte un TEXTE de carte changé sans régénération (l'empreinte du générateur ne le voit plus)", () => {
+    // C'est le risque propre à cette passe : le contenu des cartes a quitté le
+    // générateur, donc son empreinte ne peut plus le couvrir. Sans empreinte des
+    // données, une accroche retouchée laisserait des PNG périmés derrière un
+    // manifeste « frais », et la CI dirait vert.
+    const root = makeFixture();
+    const cardPath = path.join(root, 'scripts', CARDS_DIR_NAME, 'jobs.json');
+    const card = JSON.parse(fs.readFileSync(cardPath, 'utf8'));
+    card.tagline = ['Emplois près de chez vous'];
+    fs.writeFileSync(cardPath, cardJson(card));
+    const result = run({ root });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      new RegExp(`le contenu des cartes \\(${CARDS_DIR_NAME}/\\) a changé`)
+    );
+  });
+
+  it("tolère une carte en CRLF : le fin de ligne n'est pas une propriété du contenu", () => {
+    // Même leçon que pour le générateur : un poste Windows matérialise le JSON en
+    // CRLF, la CI Linux le lit en LF. Le manifeste est écrit une fois, la
+    // normalisation doit valoir dans les deux sens, sinon le rouge tombe sur une
+    // donnée identique.
+    const root = makeFixture({ cardsCrlf: true });
+    expect(run({ root }).ok).toBe(true);
   });
 
   // Empreinte du contenu NORMALISÉ en LF, comme l'écrit le générateur Python

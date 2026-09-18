@@ -32,7 +32,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENERATOR_NAME, MANIFEST_NAME } from './check-og-assets.js';
+import { CARDS_DIR_NAME, GENERATOR_NAME, MANIFEST_NAME } from './check-og-assets.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const COMMITTED_MANIFEST = path.join(FRONTEND_DIR, 'scripts', MANIFEST_NAME);
@@ -137,6 +137,12 @@ const run = () => {
       errors.push(
         `scripts/${GENERATOR_NAME} : empreinte régénérée ≠ manifeste versionné ` +
           `(le manifeste doit être régénéré et commité)`
+      );
+    }
+    if (regenerated.cards_sha256 !== committed.cards_sha256) {
+      errors.push(
+        `contenu des cartes (${CARDS_DIR_NAME}/) : empreinte régénérée ≠ manifeste ` +
+          `versionné (le manifeste doit être régénéré et commité)`
       );
     }
 

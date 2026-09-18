@@ -18,7 +18,7 @@ export const GENERIC_CARD = {
 
 const GENERIC_FILES = new Set([GENERIC_CARD.image, GENERIC_CARD.imageSquare]);
 
-/** Nom de fichier de carte dédiée : `og-<page>.png` (voir gen-og-images.py). */
+/** Nom de fichier de carte dédiée : `og-<page>.png` (déclaré par scripts/og-cards/, lu par gen-og-images.py). */
 const DEDICATED_FILE = /^\/og-([a-z0-9-]+)\.png$/;
 
 /**
