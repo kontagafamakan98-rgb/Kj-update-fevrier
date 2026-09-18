@@ -14,7 +14,7 @@
  * AUCUN texte au runtime — après une navigation interne, l'onglet gardait le
  * titre de la page précédente.
  *
- * ── Six règles, chacune capable d'échouer ───────────────────────────────────
+ * ── Sept règles, chacune capable d'échouer ──────────────────────────────────
  *   A. aucune déclaration hors table : un chemin de carte (/og-*.png) ou une clé
  *      i18n de src/config/page-meta.js écrit en dur dans src/ est une erreur —
  *      la seule déclaration vit dans les tables, que le build ET le runtime
@@ -38,12 +38,21 @@
  *      par aucune coquille) est une erreur, et une carte large SANS sa variante
  *      carrée aussi — sans quoi la page retomberait en silence sur la carte générique,
  *      c'est-à-dire exactement l'oubli que la déduction doit rendre impossible.
+ *   G. chaque clé de texte de page déclarée dans src/config/page-meta.js existe,
+ *      NON VIDE, dans CHAQUE langue publiée. Les langues publiées sont lues dans
+ *      src/contexts/LanguageContext.js (`const LANGUAGES = [...]`) : une clé
+ *      absente d'une seule d'entre elles publie le texte français de repli pour
+ *      les utilisateurs de cette langue, ce que rien d'autre ne signalait. Un
+ *      dictionnaire présent dans src/i18n/ qu'aucune langue publiée ne charge est
+ *      une erreur aussi : sinon une langue ajoutée sans être branchée passerait
+ *      pour vérifiée.
  *
  * ── Qui joue quoi, et quand ───────────────────────────────────────────────
- * A, B et C ne lisent QUE les sources (App.js, la table, les pages) : le BUILD
- * les joue lui-même (`assertPagesAnnounceTheirMeta`, appelée par vite.config.js),
- * donc `npm run build` échoue AVANT d'avoir écrit le premier octet. Sans cela, un
- * pré-déploiement dont une page n'annonce rien pouvait partir, la CI ne le voyant
+ * A, B, C et G ne lisent QUE les sources (App.js, la table, les pages, les
+ * dictionnaires) : le BUILD les joue lui-même (`assertPagesAnnounceTheirMeta`,
+ * appelée par vite.config.js), donc `npm run build` échoue AVANT d'avoir écrit le
+ * premier octet. Sans cela, un pré-déploiement dont une page n'annonce rien — ou
+ * dont une traduction de page manque — pouvait partir, la CI ne le voyant
  * qu'APRÈS le build. D, E et F comparent les coquilles écrites : elles n'ont de
  * sens qu'ici, une fois le build terminé.
  *
@@ -56,9 +65,11 @@
  * oublié dans le code — relancer le générateur suffit.
  *
  * ── Limite assumée ────────────────────────────────────────────────────────
- * Les règles A et B lisent les SOURCES (expressions régulières), elles ne les
+ * Les règles A, B et G lisent les SOURCES (expressions régulières), elles ne les
  * exécutent pas : une déclaration construite dynamiquement (`t('jobs' +
- * 'MetaTitle')`, un chemin de carte assemblé) leur échappe. La règle D, elle,
+ * 'MetaTitle')`, un chemin de carte assemblé) leur échappe. Pour G, une liste de
+ * langues construite autrement qu'en littéral se lit comme VIDE, donc comme une
+ * erreur — jamais comme un vert. La règle D, elle,
  * ne dépend d'aucun motif — elle compare le HTML écrit à ce que la table dit —
  * donc une telle déclaration resterait démasquée dès que le texte publié ne
  * serait plus celui de la table.
@@ -73,7 +84,7 @@
  * (backend/kojo_job_og.py) à ce que l'application annonce (src/utils/jobSeo.js) —
  * et scripts/check-og-images.js vérifie en plus le déploiement réel en HTTP.
  *
- * Usage : node scripts/check-page-meta.js (le build, lui, n'en joue que A/B/C :
+ * Usage : node scripts/check-page-meta.js (le build, lui, n'en joue que A/B/C/G :
  * voir `assertPagesAnnounceTheirMeta`)
  */
 import fs from 'node:fs';
@@ -146,25 +157,135 @@ const readRouting = (appSource) => {
   return { pageByRoute, routesByPage };
 };
 
+// La seule liste qui décide ce qu'un utilisateur peut CHOISIR comme langue. Elle
+// est LUE ici, jamais recopiée : une langue ajoutée là doit voir ses clés
+// vérifiées sans que ce fichier bouge.
+const LANGUAGES_DECL = /const\s+LANGUAGES\s*=\s*\[([^\]]*)\]/;
+
+/**
+ * Langues publiées, lues dans src/contexts/LanguageContext.js.
+ *
+ * Exportée parce que les FIXTURES s'en servent : elles écrivent les dictionnaires
+ * des langues réellement publiées au lieu de recopier la liste, qui divergerait.
+ *
+ * @param {string} root Racine du frontend.
+ * @param {string[]} [errors] Collecteur : une liste illisible est une ERREUR, pas
+ *   un périmètre vide (sinon la règle G serait verte sans avoir rien vérifié).
+ * @returns {string[]} Codes de langue, dans l'ordre déclaré.
+ */
+export const readPublishedLanguages = (root, errors = []) => {
+  const relative = 'src/contexts/LanguageContext.js';
+  const full = path.join(root, relative);
+  const source = fs.existsSync(full) ? fs.readFileSync(full, 'utf8') : null;
+  const match = source === null ? null : source.match(LANGUAGES_DECL);
+  const languages = match
+    ? [...match[1].matchAll(/['"]([A-Za-z][A-Za-z-]*)['"]/g)].map((m) => m[1])
+    : [];
+  if (languages.length === 0) {
+    errors.push(
+      source === null
+        ? `${relative} introuvable : les langues publiées sont illisibles, donc « chaque clé de ` +
+            'page existe dans chaque langue » ne porterait sur aucune langue'
+        : `${relative} ne déclare aucune « const LANGUAGES = [...] » : les langues publiées sont ` +
+            'illisibles, donc « chaque clé de page existe dans chaque langue » ne porterait sur rien'
+    );
+  }
+  return languages;
+};
+
+/**
+ * Règle G — chaque clé de texte de page (src/config/page-meta.js) existe, NON
+ * VIDE, dans chaque langue publiée.
+ *
+ * Le français ne suffisait pas : la règle D ne le lisait que pour les coquilles, et
+ * i18nParity.test.js ne compare les dictionnaires qu'entre EUX — une clé de page
+ * absente des cinq ne serait signalée nulle part, et un utilisateur en bambara ou
+ * en mossi lirait le français sans que rien ne le dise.
+ *
+ * @param {object} options
+ * @param {string} options.root Racine du frontend.
+ * @param {object} options.table Table route → clés i18n.
+ * @returns {{errors: string[], fr: object|null, languages: string[]}} `fr` est le
+ *   dictionnaire français : la règle D n'a pas à le relire, donc une seule lecture
+ *   décide de ce qui est résolvable.
+ */
+const checkPageTexts = ({ root, table }) => {
+  const errors = [];
+  const languages = readPublishedLanguages(root, errors);
+
+  const dictionaries = new Map();
+  for (const language of languages) {
+    const relative = `src/i18n/${language}.json`;
+    try {
+      dictionaries.set(language, JSON.parse(fs.readFileSync(path.join(root, relative), 'utf8')));
+    } catch (error) {
+      errors.push(
+        `${relative} illisible (${error.message}) alors que la langue « ${language} » est publiée ` +
+          '(src/contexts/LanguageContext.js) : ses clés ne peuvent pas être vérifiées — les textes ' +
+          'de page y seraient le français de repli'
+      );
+    }
+  }
+
+  // L'autre moitié de la divergence : un dictionnaire que personne ne charge.
+  const dictDir = path.join(root, 'src', 'i18n');
+  for (const name of fs.existsSync(dictDir) ? fs.readdirSync(dictDir) : []) {
+    if (!name.endsWith('.json')) continue;
+    const language = name.slice(0, -'.json'.length);
+    if (languages.includes(language)) continue;
+    errors.push(
+      `src/i18n/${name} existe mais aucune langue publiée ne le charge ` +
+        '(src/contexts/LanguageContext.js) : ses clés ne seraient jamais affichées — l’ajouter à ' +
+        'LANGUAGES, ou retirer le fichier'
+    );
+  }
+
+  for (const [route, keys] of Object.entries(table)) {
+    for (const [label, key] of [
+      ['titre', keys.title],
+      ['description', keys.description],
+    ]) {
+      if (!key) continue;
+      for (const [language, dictionary] of dictionaries) {
+        const value = dictionary[key];
+        if (typeof value === 'string' && value.trim()) continue;
+        errors.push(
+          `src/i18n/${language}.json : la clé « ${key} » (${label} de la route « ${route} ») est ` +
+            `${value === undefined ? 'absente' : 'vide'} — l’app publierait pour cette langue le ` +
+            'texte français de repli, alors que cette route annonce ses textes dans ' +
+            'src/config/page-meta.js'
+        );
+      }
+    }
+  }
+
+  return { errors, fr: dictionaries.get('fr') || null, languages };
+};
+
 /**
  * Les règles qui ne lisent QUE les sources :
  *
  *   A. aucune déclaration hors table (carte ou clé i18n écrite en dur dans src/) ;
  *   B. une page qui sert une route de la table passe par usePageMeta(), pas par
  *      les hooks bas niveau ;
- *   C. chaque route de la table a une page qui l'annonce.
+ *   C. chaque route de la table a une page qui l'annonce ;
+ *   G. chaque clé de page existe, non vide, dans chaque langue publiée.
  *
  * Extraites du garde parce qu'elles ne dépendent d'AUCUN artefact de build : rien
  * ne justifiait de les découvrir après le build, donc `assertPagesAnnounceTheirMeta`
  * les joue DANS le build (vite.config.js) et `runPageMetaCheck` les rejoue en CI
  * avec les règles D/E/F, qui ont besoin des coquilles écrites.
  *
- * @returns {{errors: string[], pages: string[]}}
+ * @returns {{errors: string[], pages: string[], fr: object|null, languages: string[]}}
  */
 const checkPageSources = ({ root, table }) => {
   const errors = [];
   const pages = [];
   const tableFiles = new Set(TABLE_FILES);
+
+  // ── Règle G : les textes de page existent dans chaque langue publiée ──────
+  const texts = checkPageTexts({ root, table });
+  errors.push(...texts.errors);
 
   // ── Le périmètre : sans src/, ces règles ne liraient rien ─────────────────
   const srcDir = path.join(root, 'src');
@@ -271,17 +392,18 @@ const checkPageSources = ({ root, table }) => {
     pages.push(`  ✓ ${route} → ${page}`);
   }
 
-  return { errors, pages };
+  return { errors, pages, fr: texts.fr, languages: texts.languages };
 };
 
 /**
- * Lève si une page de route PUBLIQUE n'annonce pas ses métadonnées.
+ * Lève si une page de route PUBLIQUE n'annonce pas ses métadonnées, ou si un
+ * texte qu'elle annonce manque dans une langue publiée.
  *
  * Appelée par le BUILD (`buildStart` du plugin require-page-meta dans
- * vite.config.js) : les règles A/B/C ne lisent que les sources, donc elles se
- * tranchent AVANT d'écrire le premier octet — là où la CI ne pouvait les voir
- * qu'APRÈS le build, c'est-à-dire après qu'un pré-déploiement à une page muette
- * aurait pu partir.
+ * vite.config.js) : les règles A/B/C/G ne lisent que les sources, donc
+ * elles se tranchent AVANT d'écrire le premier octet — là où la CI ne pouvait les
+ * voir qu'APRÈS le build, c'est-à-dire après qu'un pré-déploiement à une page
+ * muette (ou à une traduction manquante) aurait pu partir.
  *
  * @param {object} [options]
  * @param {string} [options.root] Racine du frontend (injectable pour les tests).
@@ -293,14 +415,15 @@ export function assertPagesAnnounceTheirMeta({ root = FRONTEND_DIR, table = PAGE
   if (errors.length === 0) return;
   throw new Error(
     `métadonnées de page : ${errors.length} problème(s), le build refuse de produire un bundle ` +
-      'dans cet état (une page de route publique annonce ses métadonnées via usePageMeta(), et ' +
-      'les tables de src/config/ sont la seule déclaration) :\n  - ' +
+      'dans cet état (une page de route publique annonce ses métadonnées via usePageMeta(), les ' +
+      'tables de src/config/ sont la seule déclaration, et chaque clé de texte existe dans chaque ' +
+      'langue publiée) :\n  - ' +
       errors.join('\n  - ')
   );
 }
 
 /**
- * Exécute le garde complet — les règles A/B/C (sources) puis D/E/F (coquilles).
+ * Exécute le garde complet — les règles A/B/C/G (sources) puis D/E/F (coquilles).
  *
  * @param {object} [options]
  * @param {string} [options.root] Racine du frontend (injectable pour les tests).
@@ -344,32 +467,11 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
   pages.push(...source.pages);
 
   // ── Règle D : les coquilles du build annoncent la table ───────────────────
-  let fr = null;
-  try {
-    fr = JSON.parse(fs.readFileSync(path.join(root, 'src', 'i18n', 'fr.json'), 'utf8'));
-  } catch (_err) {
-    errors.push(
-      'src/i18n/fr.json illisible : les textes attendus ne peuvent pas être résolus — la ' +
-        'comparaison porterait sur du vide'
-    );
-  }
-
-  const resolved = new Map();
-  const textOf = (key) => {
-    if (resolved.has(key)) return resolved.get(key);
-    const value = fr ? fr[key] : null;
-    let text = '';
-    if (typeof value !== 'string' || !value.trim()) {
-      errors.push(
-        `src/i18n/fr.json : la clé « ${key} », déclarée dans src/config/page-meta.js, est absente ` +
-          'ou vide — la coquille et la page publieraient un texte vide'
-      );
-    } else {
-      text = value;
-    }
-    resolved.set(key, text);
-    return text;
-  };
+  // Le dictionnaire français vient de la règle G, déjà jouée ci-dessus : une clé
+  // absente ou vide y est signalée UNE fois, avec sa route et sa langue. Ce
+  // résolveur ne fait donc que rendre le texte à comparer.
+  const fr = source.fr;
+  const textOf = (key) => (fr && typeof fr[key] === 'string' ? fr[key] : '');
 
   const buildDir = path.join(root, 'build');
   if (!fs.existsSync(buildDir)) {
@@ -491,6 +593,10 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
         .map(([route, card]) => `${route} → ${card.image}`)
         .join(', ') || '(aucune) — toutes les pages reçoivent la carte générique')
   );
+  log(
+    'Textes de page vérifiés dans chaque langue publiée : ' +
+      (source.languages.join(', ') || '(aucune langue lue)')
+  );
   if (pages.length) log(`Pages de route annonçant la table (${pages.length}) :\n${pages.join('\n')}`);
   for (const notice of notices) log(`  ⚠️ ${notice}`);
 
@@ -502,7 +608,7 @@ export function runPageMetaCheck({ root = FRONTEND_DIR, quiet = false, table = P
     );
   }
 
-  return { ok: errors.length === 0, errors, checked, pages, notices };
+  return { ok: errors.length === 0, errors, checked, pages, notices, languages: source.languages };
 }
 
 const isDirectRun =
@@ -520,7 +626,8 @@ if (isDirectRun) {
   }
   console.log(
     `\n✅ Titre, description et carte cohérents : ${result.checked.length} coquille(s) ` +
-      `pré-rendue(s) annoncent la table src/config/page-meta.js, et ${result.pages.length} page(s) ` +
-      'de route annoncent la leur via usePageMeta().'
+      `pré-rendue(s) annoncent la table src/config/page-meta.js, ${result.pages.length} page(s) ` +
+      `de route annoncent la leur via usePageMeta(), et leurs textes existent dans les ` +
+      `${result.languages.length} langues publiées (${result.languages.join(', ')}).`
   );
 }

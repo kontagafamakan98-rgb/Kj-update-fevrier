@@ -698,8 +698,8 @@ error during build:
 ```
 
 restauré à l'octet (`cmp`), le build repasse en 0. Côté tests,
-`scripts/__tests__/check-page-meta.test.js` (33 tests) prouve le refus sur les cas
-réels — page qui n'annonce rien, page qui déclare son texte elle-même, plusieurs
+`scripts/__tests__/check-page-meta.test.js` prouve le refus sur les cas réels —
+page qui n'annonce rien, page qui déclare son texte elle-même, plusieurs
 violations nommées d'un coup — et qu'**aucun artefact n'est requis** : l'arbre de
 test est joué sans `build/`, exactement ce que la CI ne pouvait pas faire.
 
@@ -750,6 +750,56 @@ route : un motif qui la capture (`/dashboard/(.*)` pour `/dashboard/:onglet`)
 suffit, mais `/(.*)` ne compte pas — il couvre la racine, donc tout le site, et
 désindexerait les pages publiques au lieu de protéger celle-là.
 
+### F14 — Une traduction de page manquante restait invisible au build — **fermé le 18/09/2026**
+
+`src/config/page-meta.js` déclare, par route, un titre et une description en clés
+i18n, et cinq dictionnaires les publient (`fr/en/wo/bm/mos`). Rien ne vérifiait
+qu'une de ces clés existe dans les cinq **au moment du build** :
+
+- la règle D de `check-page-meta.js` ne lisait que `src/i18n/fr.json` ;
+- `i18nParity.test.js` compare les dictionnaires **entre eux**, et
+  `i18nCoverage.test.js` les clés appelées par le code — ni l'un ni l'autre ne
+  connaît la table des pages ;
+- surtout, ces deux tests importent les cinq fichiers **par leur nom** : une
+  sixième langue ajoutée à `LanguageContext.js` et à `src/i18n/` n'entre dans le
+  périmètre d'aucun test du dépôt.
+
+Conséquence : le bundle (et le pré-déploiement Vercel qui le suit) partait avec,
+pour les utilisateurs d'une langue, le texte français de repli — sans qu'aucun
+artefact ne le dise. La règle **G** ferme les trois cas, dans la fonction que le
+BUILD joue déjà (`buildStart` du plugin `require-page-meta`, §3 F12) :
+
+- chaque clé de page existe, **non vide**, dans chaque langue publiée ;
+- la liste des langues est **lue** dans `src/contexts/LanguageContext.js` — jamais
+  recopiée, donc une langue ajoutée là est vérifiée sans que ce fichier bouge ;
+- une langue publiée sans dictionnaire lisible est une erreur, et un dictionnaire
+  que personne ne charge aussi (sinon une langue branchée nulle part passerait
+  pour vérifiée) ;
+- une liste de langues illisible est une ERREUR, pas un périmètre vide.
+
+**Preuves** — deux mutations sur le dépôt réel, chacune restaurée à l'octet
+(`git diff --exit-code` sur le fichier, vide) :
+
+```
+wo.json : supportMetaDescription retirée
+  → npm run build en 1 (41 ms, « ✓ 0 modules transformed » : rien n'a été écrit)
+    [require-page-meta] src/i18n/wo.json : la clé « supportMetaDescription » (description de la
+    route « /support ») est absente — l'app publierait pour cette langue le texte français de repli…
+
+bm.json : loginMetaTitle mise à la chaîne vide
+  → npm run build en 1 : « … (titre de la route « /login ») est vide … »
+
+restaurés → npm run build en 0
+```
+
+Côté garde CI, `node scripts/check-page-meta.js` rend désormais les langues
+vérifiées dans son verdict (`… et leurs textes existent dans les 5 langues
+publiées (fr, en, wo, bm, mos)`), et les tests passent de 33 à **39** : refus
+d'une clé absente du français, d'une clé absente d'une SEULE langue, d'une
+traduction vide, d'une langue publiée sans dictionnaire, d'un dictionnaire non
+chargé, d'une liste illisible — plus le cas qui prouve la **dérivation** (une
+langue ajoutée à `LanguageContext.js` est vérifiée sans que le garde change).
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -764,7 +814,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide), et l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
-| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (33 tests : les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète, page privée de son `usePageMeta()` → `npm run build` en **1**, §3 F12) |
+| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (39 tests : les 7 règles savent échouer — dont un build PÉRIMÉ, une table vide, une carte large sans variante carrée, une clé de page absente d'une seule langue, une langue publiée sans dictionnaire et un dictionnaire que personne ne charge —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 : carte dédiée ajoutée, carte incomplète, page privée de son `usePageMeta()` (§3 F12), et deux mutations de dictionnaire (§3 F14) → `npm run build` en **1** à chaque fois, tout restauré à l'octet |
 | `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
@@ -868,7 +918,7 @@ tourner sur cet état avant d'avoir rien vérifié. Limite assumée : `paths ===
 c'est `runOgImageCheck` qui en fait une erreur explicite.
 
 `scripts/check-page-meta.js` (job frontend, après
-le build) impose six règles, chacune capable d'échouer :
+le build) impose sept règles, chacune capable d'échouer :
 
 1. aucune déclaration hors table — ni chemin de carte ni clé i18n de
    `page-meta.js` écrit en dur dans `src/` ;
@@ -887,7 +937,16 @@ le build) impose six règles, chacune capable d'échouer :
    « absente des pages du projet » n'arrive jamais jusqu'ici, il arrête la
    dérivation), est une erreur — sinon la page retomberait sans bruit sur la carte
    générique, c'est-à-dire exactement l'oubli que la déduction doit rendre
-   impossible.
+   impossible ;
+7. chaque clé de texte de page existe, non vide, dans **chaque langue publiée** —
+   la liste de ces langues est LUE dans `src/contexts/LanguageContext.js`, jamais
+   recopiée, une langue publiée sans dictionnaire lisible est une erreur comme un
+   dictionnaire que personne ne charge, et une liste illisible est refusée plutôt
+   que lue comme vide (§3 F14).
+
+Les règles 1, 2, 3 et 7 ne lisent que les sources : le BUILD les joue déjà
+(`buildStart` du plugin `require-page-meta`), la CI les rejoue avec les règles 4,
+5 et 6, qui ont besoin des coquilles écrites.
 
 Les routes servies par le gabarit nu (`/dashboard`, `/profile` — noindex) sont
 NOMMÉES en notice plutôt que passées sous silence. Les fiches `/jobs/:id`, dont le
