@@ -45,22 +45,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } from './site-meta.js';
-
-// ── Ce qui reste ici : QUELLES pages ont un visuel dédié ────────────────────
-// La liste des routes n'est plus recopiée : `ROUTES` (plus bas) DÉRIVE des
-// pages du projet lues dans lighthouserc.cjs. Une page auditée sans carte
-// dédiée reçoit la carte générique — donc elle est vérifiée, jamais oubliée.
-// `image` = carte wide attendue ; `imageSquare` = variante CARRÉE 1200x1200
-// (réseaux qui recadrent en 1:1).
-export const GENERIC_CARD = {
-  image: '/og-image-1200x630.png',
-  imageSquare: '/og-square-1200x1200.png',
-};
-
-export const DEDICATED_CARDS = {
-  '/jobs': { image: '/og-jobs.png', imageSquare: '/og-jobs-square.png' },
-  '/login': { image: '/og-login.png', imageSquare: '/og-login-square.png' },
-};
+// Les cartes par route sont la propriété de src/config/og-cards.js : ce module
+// (et le build qui l'importe) n'en garde AUCUNE copie, donc la coquille
+// pré-rendue et la page au runtime ne peuvent pas annoncer deux cartes
+// différentes. Ici on ne fait que DÉRIVER la table des pages du projet.
+import { ogCardFor } from '../src/config/og-cards.js';
 
 /**
  * Table route → carte, à partir des routes à couvrir.
@@ -75,10 +64,7 @@ export const DEDICATED_CARDS = {
  * @param {string[]|null} paths Chemins à couvrir (null = config illisible).
  */
 export function deriveRoutes(paths) {
-  return (paths || []).map((routePath) => ({
-    path: routePath,
-    ...(DEDICATED_CARDS[routePath] || GENERIC_CARD),
-  }));
+  return (paths || []).map((routePath) => ({ path: routePath, ...ogCardFor(routePath) }));
 }
 
 // Résolu au niveau module, comme check-home-shell.js : sous vitest,

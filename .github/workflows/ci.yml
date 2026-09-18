@@ -362,6 +362,14 @@ jobs:
         working-directory: frontend
         run: node scripts/check-prerender-shells.js
 
+      # Les DEUX canaux qui publient og:image — la coquille pré-rendue (build) et
+      # les pages au runtime — doivent annoncer la même carte, lue dans la table
+      # unique src/config/og-cards.js. Avant ce garde, chacun la déclarait de son
+      # côté (ex. /login) : changer l'image d'un seul côté ne cassait rien.
+      - name: Check OG cards agree (runtime pages ↔ prerendered shells)
+        working-directory: frontend
+        run: node scripts/check-og-runtime-cards.js
+
       # Régression « chunk partagé pack2PageI18n » : le découpage par scope
       # (un dictionnaire par page lazy) ne doit pas réapparaître comme chunk
       # commun portant ≥ 3 dictionnaires (l'ancien monolithe ~60 kB chargé
