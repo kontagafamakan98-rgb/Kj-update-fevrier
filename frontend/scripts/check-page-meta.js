@@ -84,7 +84,7 @@
  * (backend/kojo_job_og.py) à ce que l'application annonce (src/utils/jobSeo.js) —
  * et scripts/check-og-images.js vérifie en plus le déploiement réel en HTTP.
  *
- * Usage : node scripts/check-page-meta.js (le build, lui, n'en joue que A/B/C/G :
+ * Usage : node scripts/check-page-meta.js (le build, lui, n'en joue que A/B/C :
  * voir `assertPagesAnnounceTheirMeta`)
  */
 import fs from 'node:fs';
@@ -399,8 +399,8 @@ const checkPageSources = ({ root, table }) => {
  * Lève si une page de route PUBLIQUE n'annonce pas ses métadonnées, ou si un
  * texte qu'elle annonce manque dans une langue publiée.
  *
- * Appelée par le BUILD (`buildStart` du plugin require-page-meta dans
- * vite.config.js) : les règles A/B/C/G ne lisent que les sources, donc
+ * Appelée par le BUILD (`buildStart` du plugin require-page-meta ci-dessous, que
+ * vite.config.js installe) : les règles A/B/C/G ne lisent que les sources, donc
  * elles se tranchent AVANT d'écrire le premier octet — là où la CI ne pouvait les
  * voir qu'APRÈS le build, c'est-à-dire après qu'un pré-déploiement à une page
  * muette (ou à une traduction manquante) aurait pu partir.
@@ -421,6 +421,38 @@ export function assertPagesAnnounceTheirMeta({ root = FRONTEND_DIR, table = PAGE
       errors.join('\n  - ')
   );
 }
+
+/**
+ * Le plugin Vite qui fait porter ces règles par le BUILD.
+ *
+ * `buildStart` s'exécute avant que Rollup ne transforme le premier module, donc
+ * `npm run build` refuse de produire un bundle dans cet état — au lieu de le
+ * laisser partir et de le voir rouge en CI une fois le build terminé. Les règles
+ * jouées ici (A/B/C/G) ne lisent que les sources — App.js, la table
+ * src/config/page-meta.js, les pages et les dictionnaires de src/i18n/ — donc le
+ * build peut les trancher avant d'écrire le premier octet.
+ *
+ * `apply: 'build'` : le serveur de dev reste utilisable, on n'est pas arrêté à
+ * l'itération par un garde de publication (la CI, elle, rejoue tout, coquilles
+ * comprises). C'est VÉRIFIÉ par un test, pas supposé : il lit le plugin que
+ * vite.config.js installe réellement.
+ *
+ * Il vit ici — et non dans vite.config.js — pour que sa capacité de refus soit
+ * EXERÇABLE : un test le monte sur une arborescence dont une page n'annonce rien,
+ * ou dont une traduction manque, et exige qu'il lève. Sans cela, « le build
+ * refuse » ne tenait qu'à une mutation faite à la main.
+ *
+ * @param {object} [options]
+ * @param {string} [options.root] Racine du frontend (injectable pour les tests).
+ * @returns {{name: string, apply: string, buildStart: () => void}}
+ */
+export const requirePageMeta = ({ root = FRONTEND_DIR } = {}) => ({
+  name: 'require-page-meta',
+  apply: 'build',
+  buildStart() {
+    assertPagesAnnounceTheirMeta({ root });
+  },
+});
 
 /**
  * Exécute le garde complet — les règles A/B/C/G (sources) puis D/E/F (coquilles).

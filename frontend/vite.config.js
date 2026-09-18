@@ -22,9 +22,10 @@ import { API_ORIGIN, SITE_ORIGIN, shellFileFor } from './scripts/site-meta.js'
 
 // « Une page de route publique annonce-t-elle ses métadonnées, dans chaque langue
 // publiée ? » : les règles qui ne lisent QUE les sources sont jouées ICI, par le
-// build (voir le plugin require-page-meta plus bas) — la CI les rejoue après le
-// build, mais un oubli partait alors en pré-déploiement avant d'être rattrapé.
-import { assertPagesAnnounceTheirMeta } from './scripts/check-page-meta.js'
+// build — la CI les rejoue après le build, mais un oubli partait alors en
+// pré-déploiement avant d'être rattrapé. Le plugin est défini par le garde
+// lui-même (scripts/check-page-meta.js) : UNE définition, exerçable par un test.
+import { requirePageMeta } from './scripts/check-page-meta.js'
 
 const OG_CARDS = Object.fromEntries(
   OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
@@ -56,24 +57,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
-      {
-        // Une page de route PUBLIQUE qui n'annonce pas ses métadonnées — ou qui
-        // en annonce une dont la traduction manque dans une langue publiée — fait
-        // ÉCHOUER le build : `npm run build` refuse de produire un bundle dans
-        // cet état, au lieu de le laisser partir et de le voir rouge en CI une
-        // fois le build terminé. Les règles jouées ici (A/B/C/G de
-        // scripts/check-page-meta.js) ne lisent que les sources — App.js, la
-        // table src/config/page-meta.js, les pages et les dictionnaires de
-        // src/i18n/ — donc le build peut les trancher avant d'écrire le premier
-        // octet. `apply: 'build'` : le
-        // serveur de dev reste utilisable, on n'est pas arrêté à l'itération par
-        // un garde de publication (la CI, elle, rejoue tout, coquilles comprises).
-        name: 'require-page-meta',
-        apply: 'build',
-        buildStart() {
-          assertPagesAnnounceTheirMeta()
-        },
-      },
+      // Une page de route PUBLIQUE qui n'annonce pas ses métadonnées — ou qui en
+      // annonce une dont la traduction manque dans une langue publiée — fait
+      // ÉCHOUER le build. Le plugin est défini par le garde lui-même
+      // (requirePageMeta dans scripts/check-page-meta.js), donc sa capacité de
+      // refus est exerçable par un test au lieu d'être écrite ici, hors de portée.
+      requirePageMeta(),
       react(),
       {
         name: 'treat-js-files-as-jsx',

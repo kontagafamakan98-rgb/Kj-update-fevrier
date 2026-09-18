@@ -25,6 +25,7 @@ import path from 'path';
 import {
   assertPagesAnnounceTheirMeta,
   readPublishedLanguages,
+  requirePageMeta,
   runPageMetaCheck,
 } from '../check-page-meta';
 import { PAGE_META } from '../../src/config/page-meta';
@@ -235,6 +236,38 @@ describe('check-page-meta — le BUILD refuse (règles A/B/C, aucun artefact req
     expect(message).toMatch(/métadonnées de page : 2 problème\(s\)/);
     expect(message).toMatch(/Register\.js n’appelle pas/);
     expect(message).toMatch(/Payment\.js n’appelle pas/);
+  });
+});
+
+describe('check-page-meta — la CAPACITÉ du plugin de build (le branchement est testé à part)', () => {
+  // Le plugin que vite.config.js installe, monté sur une arborescence où la
+  // violation existe : le refus du build est exercé à chaque `npx vitest run`,
+  // au lieu de la mutation faite à la main (muter une page, `npm run build`,
+  // restaurer). Le BRANCHEMENT lui-même — vite.config.js installe bien ce plugin
+  // en mode build — appartient à scripts/__tests__/check-page-meta-build-wiring.test.js,
+  // qui doit tourner en environnement Node (il importe la config, donc esbuild).
+
+  it('monté sur une page qui n’annonce RIEN, il refuse', () => {
+    cleanTree();
+    const plugin = requirePageMeta({ root });
+
+    expect(() => plugin.buildStart()).not.toThrow();
+
+    write('src/pages/Register.js', 'export default function Register() { return null; }\n');
+
+    expect(() => plugin.buildStart()).toThrow(/Register\.js n’appelle pas usePageMeta\(\)/);
+  });
+
+  it('monté sur une traduction de page absente, il refuse', () => {
+    cleanTree();
+    const plugin = requirePageMeta({ root });
+    const wo = { ...REAL_DICTS.wo };
+    delete wo.supportMetaDescription;
+    writeDict('wo', wo);
+
+    expect(() => plugin.buildStart()).toThrow(
+      /src\/i18n\/wo\.json : la clé « supportMetaDescription »/
+    );
   });
 });
 

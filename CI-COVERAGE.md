@@ -703,6 +703,27 @@ page qui n'annonce rien, page qui déclare son texte elle-même, plusieurs
 violations nommées d'un coup — et qu'**aucun artefact n'est requis** : l'arbre de
 test est joué sans `build/`, exactement ce que la CI ne pouvait pas faire.
 
+**Ce refus n'est plus prouvé à la main** (18/09/2026). Il tenait à une mutation
+faite une fois — muter une page, lancer le build, lire l'échec, restaurer — qui ne
+survit à aucun commit : retirer `requirePageMeta()` du tableau `plugins` de
+`vite.config.js`, ou le passer en `apply: 'serve'`, rendait le refus inopérant sans
+qu'aucun test ne rougisse. Le plugin est donc extrait du `vite.config.js` dans le
+garde lui-même (`requirePageMeta` — **une seule définition**), et deux fichiers le
+portent :
+
+- `scripts/__tests__/check-page-meta.test.js` exige que
+  `requirePageMeta({ root }).buildStart()` **lève** sur une arborescence dont la
+  page n'annonce rien, et sur une dont la traduction de page manque ;
+- `scripts/__tests__/check-page-meta-build-wiring.test.js` (2 tests, environnement
+  **Node** — il importe la vraie config, donc esbuild) exige que le
+  `vite.config.js` RÉEL installe ce plugin, en `apply: 'build'`, et refuse une
+  copie locale du plugin dans la config.
+
+Trois mutations, chacune restaurée à l'empreinte SHA-1 identique : plugin retiré
+du tableau `plugins` → le fichier de branchement rougit ; `apply: 'serve'` dans le
+CODE → idem ; `buildStart` qui n'appelle plus la règle → le fichier de capacité
+rougit. Supprimer le refus ne peut plus laisser la CI verte.
+
 ### F13 — Une route ni publique ni privée passait en silence — **fermé le 18/09/2026**
 
 `check-spa-routes.js` tenait sa liste de routes privées **écrite à la main**
@@ -794,7 +815,8 @@ restaurés → npm run build en 0
 
 Côté garde CI, `node scripts/check-page-meta.js` rend désormais les langues
 vérifiées dans son verdict (`… et leurs textes existent dans les 5 langues
-publiées (fr, en, wo, bm, mos)`), et les tests passent de 33 à **39** : refus
+publiées (fr, en, wo, bm, mos)`), et les tests passent de 33 à **41** (+2 dans le
+fichier de branchement, §3 F12) : refus
 d'une clé absente du français, d'une clé absente d'une SEULE langue, d'une
 traduction vide, d'une langue publiée sans dictionnaire, d'un dictionnaire non
 chargé, d'une liste illisible — plus le cas qui prouve la **dérivation** (une
@@ -814,7 +836,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide), et l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
-| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (39 tests : les 7 règles savent échouer — dont un build PÉRIMÉ, une table vide, une carte large sans variante carrée, une clé de page absente d'une seule langue, une langue publiée sans dictionnaire et un dictionnaire que personne ne charge —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 : carte dédiée ajoutée, carte incomplète, page privée de son `usePageMeta()` (§3 F12), et deux mutations de dictionnaire (§3 F14) → `npm run build` en **1** à chaque fois, tout restauré à l'octet |
+| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (41 tests : les 7 règles savent échouer — dont un build PÉRIMÉ, une table vide, une carte large sans variante carrée, une clé de page absente d'une seule langue, une langue publiée sans dictionnaire et un dictionnaire que personne ne charge —, leurs exemptions, dépôt réel vert) **et** le plugin de build lui-même, `requirePageMeta` : monté sur une arborescence dont la page est muette (`buildStart` doit lever) + `scripts/__tests__/check-page-meta-build-wiring.test.js` (2 tests, environnement Node : le `vite.config.js` RÉEL installe le plugin en `apply: 'build'`, et la config ne le réécrit pas) — mutations automatisées le 18/09/2026 sur les trois maillons (plugin retiré, `apply: 'serve'`, `buildStart` sans appel → la suite rougit) + mutations rejouées à la main : carte dédiée ajoutée, carte incomplète, page privée de son `usePageMeta()` (§3 F12), et deux mutations de dictionnaire (§3 F14) → `npm run build` en **1** à chaque fois, tout restauré à l'octet |
 | `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
