@@ -16,7 +16,7 @@ import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import CountrySelector from '../components/CountrySelector';
 import JobsMap from '../components/JobsMap';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
-import { usePageTitle, usePageOpenGraph, ogImageUrl } from '../utils/seo';
+import { usePageTitle, usePageOpenGraph, ogCardUrl } from '../utils/seo';
 import { makePublicJobsPrefetch } from '../utils/publicJobsPrefetch';
 
 function JobCard({ job, user, userType, appliedJobIds, t }) {
@@ -132,15 +132,17 @@ export default function Jobs() {
   const [searchParams] = useSearchParams();
   const locale = getLocaleForLanguage(currentLanguage);
   usePageTitle(t('jobsMetaTitle'));
-  // OG dynamique par route : le partage d'un lien /jobs affiche une carte
-  // dédiée (og-jobs.png) avec le titre/description de la page emplois, au
-  // lieu de l'image générique de l'accueil.
+  // OG dynamique par route : le partage d'un lien /jobs affiche la carte de la
+  // route, lue dans la table UNIQUE (src/config/og-cards.js) — celle que le
+  // build écrit dans la coquille pré-rendue. Aucun chemin de carte n'est écrit
+  // ici : `ogCardUrl()` suit la route courante, donc cette page ne peut pas
+  // annoncer une autre carte que celle du HTML servi.
   usePageOpenGraph({
     title: t('jobsMetaTitle'),
     description:
       t('jobsMetaDescription') ||
       'Trouvez un travailleur qualifié près de chez vous : emplois, missions et talents disponibles dans toute l’Afrique de l’Ouest.',
-    image: ogImageUrl('/og-jobs.png'),
+    image: ogCardUrl(),
   });
 
   // Onglet par défaut selon le type d'utilisateur : client connecté → « Mes

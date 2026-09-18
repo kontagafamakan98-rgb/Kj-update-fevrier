@@ -530,6 +530,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
+| `check-og-runtime-cards.js` | `scripts/__tests__/check-og-runtime-cards.test.js` (les 3 règles savent échouer, leurs exemptions, périmètre vide refusé) + mutation rejouée à la main le 18/09/2026 |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
 
@@ -552,6 +553,24 @@ couverts. Les deux portent leur preuve de non-vacuité (un module cassé, ou un
 module disparu, fait rougir le garde en nommant la cause), vérifiée par mutation
 le 18/09/2026 — frontend : `src/App.js` et `src/services/api.js` ; backend :
 `.github/scripts/check-exec-bits.py`.
+
+Deux canaux publient `og:image` pour la même URL : le HTML **pré-rendu** (écrit par
+`vite.config.js`, vérifié en HTTP par `check-og-images.js`) et le **runtime** (les
+pages, après montage, via `src/utils/seo.js`). Chacun déclarait sa carte de son
+côté — `/login` un chemin dans `src/pages/Login.js`, un autre dans la table des
+coquilles — sans qu'aucun test ne relie les deux : changer l'image d'un seul côté
+ne cassait rien, et un crawler (HTML pré-rendu) aurait annoncé une autre carte
+qu'un navigateur (page exécutée). La table unique vit maintenant dans
+`src/config/og-cards.js` — sans dépendance, donc lisible par le build ET par le
+bundle (même arrangement que `src/config/contact.js`) — et
+`scripts/check-og-runtime-cards.js` (job frontend, après le build) l'impose :
+aucun chemin de carte écrit en dur dans `src/` (hors de la table), dans
+`src/pages/` la carte se déduit de l'URL courante (`ogCardUrl()` sans argument,
+donc une page ne peut pas annoncer la carte d'une autre route), et chaque
+coquille de `build/` annonce EXACTEMENT la carte de la table (wide + carrée). Les
+routes sans coquille (`/dashboard`, `/profile`, servies par `app.html`) sont
+NOMMÉES en notice plutôt que passées sous silence, et l'absence de build ou de
+coquille est une erreur — un vert n'est pas permis quand rien n'a été lu.
 
 Le seul garde d'existence qui gardait autre chose qu'un module — la liste
 d'exceptions `OG_READ_ONLY_SCRIPTS` de `check-og-assets.js` — a été SUPPRIMÉ

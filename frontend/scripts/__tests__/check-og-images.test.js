@@ -2,14 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import {
-  runOgImageCheck,
-  ROUTES,
-  GENERIC_CARD,
-  DEDICATED_CARDS,
-  deriveRoutes,
-  lighthouseAuditedPaths,
-} from '../check-og-images';
+import { runOgImageCheck, ROUTES, deriveRoutes, lighthouseAuditedPaths } from '../check-og-images';
+// La table des cartes appartient à src/config/og-cards.js : les scripts la
+// LISENT, ils ne la possèdent pas (c'est elle que les pages utilisent aussi).
+import { GENERIC_CARD, DEDICATED_CARDS } from '../../src/config/og-cards';
 
 // Tests du garde-fou « og:image par route » (scripts/check-og-images.js).
 //

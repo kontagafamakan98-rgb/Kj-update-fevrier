@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { ogCardFor } from '../config/og-cards';
 
 // SEO par route (SPA) : met à jour document.title, la meta description ET le
 // <link rel="canonical"> quand le composant monte.
@@ -78,6 +79,12 @@ export const ogImageUrl = (path) => {
   }
   return path;
 };
+
+// Carte OG d'une route, lue dans la table UNIQUE (src/config/og-cards.js) — la
+// même que celle des coquilles pré-rendues. Sans argument, elle suit la route
+// COURANTE : une page ne peut donc pas annoncer la carte d'une autre route, et
+// changer une carte se fait à un seul endroit (le shell et le runtime suivent).
+export const ogCardUrl = (route) => ogImageUrl(ogCardFor(route).image);
 
 const DEFAULT_OG_IMAGE =
   typeof window !== 'undefined' && window.location.origin
