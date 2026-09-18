@@ -48,6 +48,35 @@ const LOOPBACK = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?
 const PROBE_HEADERS = { 'user-agent': 'kojo-seo-production-probe/1.0' };
 
 /**
+ * Liens sociaux RÉELLEMENT posés dans le HTML servi, restreints aux hôtes que
+ * le `sameAs` déclare.
+ *
+ * `sameAs` prouve que les profils sont déclarés au build ; il ne prouve pas
+ * qu'un crawler sans JavaScript les voit. Un `sameAs` rempli avec zéro lien
+ * dans le corps de page est exactement le faux vert que ce décompte nomme.
+ */
+export function socialAnchorsFrom(html, declared) {
+  const hosts = new Set();
+  for (const url of declared) {
+    try {
+      hosts.add(new URL(url).host);
+    } catch (_error) {
+      /* URL déjà écartée du sameAs */
+    }
+  }
+  const hrefs = [...String(html).matchAll(/<a\b[^>]*\shref="(https?:\/\/[^"]+)"/gi)].map(
+    (match) => match[1]
+  );
+  return [...new Set(hrefs.filter((href) => {
+    try {
+      return hosts.has(new URL(href).host);
+    } catch (_error) {
+      return false;
+    }
+  }))];
+}
+
+/**
  * Ce que le HTML servi contient réellement.
  *
  * `plausible.io` n'apparaît que dans la CSP quand Plausible est activé : son
@@ -69,12 +98,17 @@ export function analyzeSeoServedHtml(html = '') {
     ga4: { present: Boolean(ga), value: ga ? ga[1] : '' },
     gsc: { present: Boolean(gsc), value: gsc },
     plausible: { present: source.includes('plausible.io'), value: '' },
-    social: { present: social.length > 0, value: social.join(', '), count: social.length },
+    social: {
+      present: social.length > 0,
+      value: social.join(', '),
+      count: social.length,
+      anchors: socialAnchorsFrom(source, social).length,
+    },
   };
 }
 
 /** Une ligne par intégration : ce qui est présent, ou la variable à poser. */
-function noticeFor({ key, label, env }, state) {
+export function noticeFor({ key, label, env }, state) {
   if (!state.present) {
     return `${label} : ABSENT — poser ${env} dans Vercel → Settings → Environment Variables, puis REDÉPLOYER (les VITE_* sont inlinées au build).`;
   }
@@ -84,7 +118,10 @@ function noticeFor({ key, label, env }, state) {
       : key === 'gsc'
         ? `jeton ${String(state.value).slice(0, 8)}…`
         : key === 'social'
-          ? `${state.count} profil(s) dans le sameAs`
+          ? `${state.count} profil(s) dans le sameAs, ${state.anchors} lien(s) dans le HTML servi` +
+            (state.anchors === 0
+              ? " — AUCUN lien social dans le HTML brut : un crawler sans JavaScript ne peut pas les voir (bloc social du shell pré-rendu et footer)"
+              : '')
           : 'CSP script-src ouverte (script injecté par le bundle)';
   return `${label} : PRÉSENT — ${detail}`;
 }

@@ -387,6 +387,26 @@ export default defineConfig(({ mode }) => {
             `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
             `</a>`,
             `</div>`,
+            // Bloc social : les MÊMES profils que le footer React et que le
+            // `sameAs` du LocalBusiness — une seule source,
+            // src/config/social-networks.json + VITE_SOCIAL_* (le tableau
+            // `socialLinks` est celui du footer juste en dessous). Il est ici,
+            // dans le corps de page, et pas seulement au pied de page : c'est
+            // le corps qu'un audit « liens sociaux » lit, et un crawler sans
+            // JavaScript n'a pas d'autre moyen de voir ces liens.
+            ...(socialLinks.length
+              ? [
+                  `<div class="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">`,
+                  `<h3 class="text-lg font-semibold text-gray-900 mb-3">Suivez-nous</h3>`,
+                  `<div class="flex flex-wrap items-center justify-center gap-4 text-sm text-orange-700">`,
+                  ...socialLinks.map(
+                    (social) =>
+                      `<a href="${esc(social.url)}" target="_blank" rel="me noreferrer" class="font-medium hover:text-orange-800 underline underline-offset-2">${esc(social.label)}</a>`
+                  ),
+                  `</div>`,
+                  `</div>`,
+                ]
+              : []),
             // Carte intégrée (SEO local). loading=lazy : l'iframe ne concurrence
             // pas le LCP, et pour un utilisateur avec JavaScript elle est
             // remplacée par React avant même de se charger.
