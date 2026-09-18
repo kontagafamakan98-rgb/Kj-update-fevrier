@@ -75,10 +75,12 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { runOgImageCheck, baseServesJobOgRoute } from './check-og-images.js';
-import { SITE_ORIGIN, declaresNoIndex } from './site-meta.js';
+import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex } from './site-meta.js';
 
 export const DEFAULT_BASE = SITE_ORIGIN;
-export const DEFAULT_BACKEND = 'https://api.kojoforafrica.cc.cd';
+// Origine de l'API : propriété de scripts/site-meta.js (voir DEFAULT_BACKEND
+// dans check-og-images.js — c'est la MÊME valeur, donc un seul propriétaire).
+export const DEFAULT_BACKEND = API_ORIGIN;
 // Étiquette du verrou post-suppression (contrôlé après le DELETE).
 export const POST_DELETE_LABEL = '/jobs/:id (après suppression)';
 // Préfixe repérable pour un humain qui tomberait sur une mission laissée en

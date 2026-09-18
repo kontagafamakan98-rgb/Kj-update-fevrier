@@ -9,6 +9,11 @@ import fs from 'node:fs'
 // fait échouer le build, plutôt que de publier un og:image troué.
 import { ROUTES as OG_CARD_ROUTES } from './scripts/check-og-images.js'
 
+// Identité publique du site : origine canonique ET origine de l'API, possédées
+// par scripts/site-meta.js. Le build n'en garde aucune copie — leur PAIRE est ce
+// que le backend doit autoriser en CORS (scripts/check-cors-preflight.js).
+import { API_ORIGIN, SITE_ORIGIN } from './scripts/site-meta.js'
+
 const OG_CARDS = Object.fromEntries(
   OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
 )
@@ -30,9 +35,9 @@ export default defineConfig(({ mode }) => {
   // comme repli pour le mode direct (mobile Capacitor, debug, ou si le
   // proxy est désactivé via VITE_USE_SAME_ORIGIN_API=false).
   const rawApiUrl = (env.VITE_API_URL || env.VITE_API_BASE_URL || env.VITE_BACKEND_URL || '').trim()
-  let apiOrigin = 'https://api.kojoforafrica.cc.cd'
+  let apiOrigin = API_ORIGIN
   try {
-    apiOrigin = new URL(rawApiUrl || 'https://api.kojoforafrica.cc.cd/api').origin
+    apiOrigin = new URL(rawApiUrl || `${API_ORIGIN}/api`).origin
   } catch (_error) {
     // URL invalide : on garde l'origin par défaut
   }
@@ -117,7 +122,7 @@ export default defineConfig(({ mode }) => {
           const html = fs.readFileSync(indexPath, 'utf8')
 
           // Origin du site (doit matcher og:url statique d'index.html).
-          const origin = 'https://kojoforafrica.cc.cd'
+          const origin = SITE_ORIGIN
 
           // Shell statique injecté dans <div id="root"> : réplique EXACTEMENT
           // le premier rendu de la page (placeholder navbar h-16 + header h1)
