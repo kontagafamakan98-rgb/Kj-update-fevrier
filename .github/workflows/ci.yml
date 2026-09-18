@@ -553,16 +553,21 @@ jobs:
           path: frontend/.bundle-size
           key: bundle-size-baseline-${{ github.sha }}
 
-  # ─── Performance : budgets Lighthouse CI (6 pages : accueil, auth, protégées) ─
+  # ─── Performance : budgets Lighthouse CI (10 pages : publiques, protégées) ──
   # Audite le DÉPLOIEMENT VERCEL RÉEL en condition mobile simulée (Slow 4G
   # + CPU 4x) et BLOQUE la PR si un budget est dépassé.
   #
-  # URLs auditées (multi-URL, cf. frontend/lighthouserc.cjs) :
+  # URLs auditées (multi-URL, cf. frontend/lighthouserc.cjs, dont les
+  # DEPLOYMENT_PATHS sont la LISTE DES PAGES DU PROJET : la table route → carte
+  # OG des gardes en DÉRIVE, aucun second exemplaire à tenir à jour) :
   #   • /          — accueil (publique)
   #   • /register, /forgot-password — pages d'authentification PUBLIQUES, dont
   #     le CLS a été corrigé par les PR #19 (wrapper Register en min-h-full) et
   #     #20 (ForgotPasswordSkeleton calibré) : les auditer est ce qui empêche la
   #     correction de régresser sans que personne ne le voie.
+  #   • /login, /how-it-works, /support, /payment — pages pré-rendues qui
+  #     n'étaient mesurées nulle part (ajoutées le 18/09/2026) ; /payment est
+  #     protégée, les trois autres sont publiques.
   #   • /dashboard, /jobs, /profile — pages PROTÉGÉES, authentifiées via un
   #     token Bearer obtenu en se connectant avec le COMPTE CLIENT DÉDIÉ CI
   #     (secrets LHCI_CI_EMAIL / LHCI_CI_PASSWORD). Ce compte est distinct des
