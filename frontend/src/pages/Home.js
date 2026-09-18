@@ -4,14 +4,14 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
 import FlagIcon from '../components/FlagIcon';
-import { usePageTitle } from '../utils/seo';
+import { usePageMeta } from '../utils/seo';
 import { publicAPI } from '../services/apiEndpoints';
 import { safeLog } from '../utils/env';
 
 export default function Home() {
   const { t } = useLanguage();
   const { user } = useAuth();
-  usePageTitle(t('homeMetaTitle'));
+  usePageMeta();
 
   // Chiffres réels depuis /public/stats (repli sur des valeurs génériques
   // si l'appel échoue, pour ne jamais bloquer l'affichage de la landing).

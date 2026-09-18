@@ -1,13 +1,11 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
-import { usePageTitle } from '../utils/seo';
+import { usePageMeta } from '../utils/seo';
 
 export default function HowItWorks() {
   const { t } = useLanguage();
-  usePageTitle(t('howItWorksTitle') + ' — Kojo', {
-    description: t('howItWorksHero'),
-  });
+  usePageMeta();
 
   const STEPS = [
     { icon: '📝', title: t('howStep1Title'), description: t('howStep1Desc') },

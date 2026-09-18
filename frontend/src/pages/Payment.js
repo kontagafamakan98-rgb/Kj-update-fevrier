@@ -8,6 +8,7 @@ import { safeLog } from '../utils/env';
 // ici) pour que le fallback Suspense de /payment (PaymentSkeleton) et l'état
 // de chargement des données partagent EXACTEMENT les mêmes hauteurs.
 import { PaymentContentSkeleton } from '../components/SkeletonLoader';
+import { usePageMeta } from '../utils/seo';
 
 const COPY = {
   fr: {
@@ -219,6 +220,7 @@ const Payment = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
+  usePageMeta();
 
   // Contexte optionnel transmis depuis la page d'un job (juste apres
   // l'acceptation d'un travailleur) : job_id, worker_id, et le montant

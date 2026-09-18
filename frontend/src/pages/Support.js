@@ -4,7 +4,7 @@ import { Phone, Mail, MapPin, MessageCircle, Bot, Send, CheckCircle, ArrowLeft }
 import { supportAPI } from '../services/apiEndpoints';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { usePageTitle } from '../utils/seo';
+import { usePageMeta } from '../utils/seo';
 // Contact (N.A.P.) partagé avec le footer et le shell statique de l'accueil :
 // une seule source (src/config/contact.json) pour ne jamais publier deux
 // adresses ou deux numéros différents selon le canal.
@@ -612,13 +612,7 @@ function TicketTracker({ copy }) {
 const Support = () => {
   const { currentLanguage, t } = useLanguage();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
-  // SEO de la route : /support est une page PUBLIQUE servie par son PROPRE
-  // shell pré-rendu (support.html, plugin prerender-route-meta) depuis que le
-  // gabarit nu app.html ne concerne plus que les écrans connectés. Le titre et
-  // la description posés ici doivent donc rester les MÊMES que les méta
-  // statiques (src/i18n : support / supportHelp) ; un crawler qui exécute le
-  // JavaScript et un crawler qui ne l'exécute pas lisent alors la même chose.
-  usePageTitle(`${t('support')} — Kojo`, { description: t('supportHelp') });
+  usePageMeta();
   const [mode, setMode] = useState(null); // null | 'robot' | 'direct'
 
   return (

@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
 import { authAPI } from '../services/api';
 import { safeLog } from '../utils/env';
+import { usePageMeta } from '../utils/seo';
 
 const COPY = {
   fr: {
@@ -201,6 +202,7 @@ const COPY = {
 
 const ForgotPassword = () => {
   const { currentLanguage, t } = useLanguage();
+  usePageMeta();
   const toast = useToast();
   const navigate = useNavigate();
   const copy = COPY[currentLanguage] || COPY.fr;

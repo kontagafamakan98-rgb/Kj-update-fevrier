@@ -19,9 +19,14 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-vi.mock('../../contexts/LanguageContext', () => ({
-  useLanguage: () => ({ currentLanguage: 'fr' }),
-}));
+// `t` n'est pas optionnel : la page annonce les métadonnées de sa route via
+// usePageMeta(), qui résout les clés i18n de src/config/page-meta.js. Un mock
+// réduit à currentLanguage ferait planter la page (t is not a function) — donc
+// on lui donne le vrai dictionnaire français, comme le fournisseur réel.
+vi.mock('../../contexts/LanguageContext', async () => {
+  const { default: fr } = await vi.importActual('../../i18n/fr.json');
+  return { useLanguage: () => ({ currentLanguage: 'fr', t: (key) => fr[key] || key }) };
+});
 
 // OBJET STABLE : retourner un nouvel objet user à chaque appel re-renderait
 // Payment (useEffect [user]) en boucle infinie (loadBase → setState → rerender

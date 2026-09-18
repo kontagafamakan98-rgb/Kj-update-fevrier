@@ -15,6 +15,7 @@ import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
 import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
 import { authAPI } from '../services/api';
+import { usePageMeta } from '../utils/seo';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -22,6 +23,7 @@ export default function Register() {
   // (?ref=CODE) ouvre le formulaire directement en mode travailleur.
   const initialUserType = searchParams.get('type') || (searchParams.get('ref') ? 'worker' : 'client');
   const { t, currentLanguage } = useLanguage();
+  usePageMeta();
   const defaultLanguage = currentLanguage || 'fr';
   
   const initialReferralCode = (searchParams.get('ref') || '').trim();

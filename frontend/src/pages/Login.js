@@ -8,7 +8,7 @@ import LoadingButton from '../components/LoadingButton';
 import GoogleButton from '../components/GoogleButton';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
-import { usePageTitle, usePageOpenGraph, ogCardUrl } from '../utils/seo';
+import { usePageMeta } from '../utils/seo';
 
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
@@ -40,15 +40,7 @@ export default function Login() {
   };
   const forgotPasswordLabel = forgotPasswordLabelMap[currentLanguage] || forgotPasswordLabelMap.fr;
 
-  // SEO / OG par route : titre et description propres à la page, et carte de
-  // partage lue dans la table UNIQUE (src/config/og-cards.js) — la même que la
-  // coquille pré-rendue par le build. Aucun chemin de carte écrit ici.
-  usePageTitle(t('loginMetaTitle'));
-  usePageOpenGraph({
-    title: t('loginMetaTitle'),
-    description: t('loginMetaDescription'),
-    image: ogCardUrl(),
-  });
+  usePageMeta();
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
   const pageT = makeScopedTranslator(currentLanguage, t);
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
