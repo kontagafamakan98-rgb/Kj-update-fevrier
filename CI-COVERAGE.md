@@ -582,6 +582,59 @@ VITE_SOCIAL_FACEBOOK=https://facebook.com/kojo-test npx vite build
 grep -c googletagmanager build/index.html   # 2 (balise + CSP relâchée)
 ```
 
+### F10 — Le contrat `/jobs/:id` n'était vérifié qu'en HTTP, et jamais contre l'application — **fermé le 18/09/2026**
+
+Une fiche mission n'a pas de coquille pré-rendue à comparer : son HTML est produit
+par le backend **à la requête**. Son titre et sa carte n'étaient donc vérifiés
+qu'en HTTP (`check-og-images.js`, qui l'écrivait lui-même : « leur carte est
+vérifiée en HTTP »), contre un serveur debout et une mission réellement créée en
+base. Deux trous, pas un :
+
+- **jamais hors ligne** — donc jamais sur les runs dont la cible est protégée, et
+  jamais avant un déploiement ;
+- **jamais contre l'APPLICATION** — le garde HTTP lisait le HTML du backend, et
+  rien ne comparait ce dernier à ce que `src/pages/JobDetails.js` annonce au
+  runtime. Un titre renommé d'un seul côté passait : l'onglet du navigateur et la
+  carte de partage ne disaient plus la même chose, tous les voyants verts.
+
+**Le contrat est maintenant vérifié hors ligne, sur une mission de référence**
+(`scripts/check-job-og-contract.js`, step « Check job OG contract » du job
+frontend). Il exécute les deux implémentations :
+
+```
+pré-rendu    python -c "import kojo_job_og" …… → le HTML réel du backend
+             (backend/kojo_job_og.py : module SANS dépendance — ni FastAPI, ni
+             MongoDB, ni kojo_settings — donc importable avec le python3 du
+             runner ; c'est ce qui fixe sa frontière)
+application  src/utils/jobSeo.js              → le titre, la description et la
+             carte de la MÊME mission (la fonction que JobDetails utilise)
+```
+
+Puis l'égalité est exigée sur le titre (`<title>`, `og:title`, `twitter:title`),
+la description (les quatre balises, coupe à 150 caractères + « … » comprise) et la
+carte (`og:image` wide **et** carrée, `twitter:image`) — la carrée étant dérivée
+de la carte de l'APPLICATION, pour qu'un renommage d'un seul côté fasse échouer
+les deux assertions.
+
+Deux points de méthode que l'exécution a imposés :
+
+- **Python écrit dans l'encodage de la locale** (cp1252 sous Windows), pas en
+  UTF-8 : sans `PYTHONIOENCODING=utf-8`, le tiret cadratin et le « … » du
+  pré-rendu revenaient en caractères de remplacement et le garde accusait le
+  backend d'un écart de texte qui n'existait pas. Constaté au premier essai.
+- **les entités HTML sont décodées** avant comparaison (`&amp;`, `&apos;`…, les
+  cinq qu'écrit `escape_xml`) : comparer la valeur brute ferait échouer le garde
+  sur du texte correct, et pousserait à retirer l'échappement du HTML pour faire
+  passer le test.
+
+**Preuves** : le dépôt est vert (`runJobOgContractCheck` → 0 erreur, mission
+réelle) ; les mutations sont exercées par `scripts/__tests__/check-job-og-contract.test.js`
+(10 tests) sur le HTML du **module de production** — titre renommé d'un côté,
+carte renommée, variante carrée retirée, description coupée d'un caractère de
+plus, mission sans annonce côté application —, et un interpréteur absent est une
+**erreur en CI** (::notice hors CI, un poste sans Python ne devant pas voir rouge
+pour cette seule raison).
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -593,6 +646,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
+| `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 5 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, annonce applicative vide), et l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (les 6 règles savent échouer — dont un build PÉRIMÉ, une table vide et une carte large sans variante carrée —, leurs exemptions, dépôt réel vert) + mutations rejouées à la main le 18/09/2026 (carte dédiée ajoutée, carte incomplète) |
@@ -719,9 +773,11 @@ le build) impose six règles, chacune capable d'échouer :
    impossible.
 
 Les routes servies par le gabarit nu (`/dashboard`, `/profile` — noindex) sont
-NOMMÉES en notice plutôt que passées sous silence, et les fiches `/jobs/:id`,
-dont le texte vient de la MISSION (il n'existe pas avant la requête), gardent leur
-carte dynamique, vérifiée en HTTP contre le déploiement.
+NOMMÉES en notice plutôt que passées sous silence. Les fiches `/jobs/:id`, dont le
+texte vient de la MISSION (il n'existe pas avant la requête), n'ont pas de table à
+confronter : elles ont leur propre garde, hors ligne et sur une mission de
+référence — `scripts/check-job-og-contract.js`, décrit plus bas — que
+`scripts/check-og-images.js` complète en HTTP contre le déploiement réel.
 
 Le seul garde d'existence qui gardait autre chose qu'un module — la liste
 d'exceptions `OG_READ_ONLY_SCRIPTS` de `check-og-assets.js` — a été SUPPRIMÉ

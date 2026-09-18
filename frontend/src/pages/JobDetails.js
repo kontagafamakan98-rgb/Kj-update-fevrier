@@ -15,6 +15,7 @@ import JobReviews from '../components/JobReviews';
 import { JobDetailsSkeleton } from '../components/SkeletonLoader';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
 import { usePageTitle, usePageOpenGraph, ogImageUrl } from '../utils/seo';
+import { jobSeo } from '../utils/jobSeo';
 import {
   extractProposalId,
   extractProposalMessage,
@@ -160,18 +161,24 @@ export default function JobDetails() {
   const pageT = makeScopedTranslator(currentLanguage, t);
   const toast = useToast();
   const navigate = useNavigate();
-  usePageTitle(job?.title ? `${job.title} — Kojo` : t('jobDetailsTitleFallback'));
+  // Le titre, la description et la carte d'une mission se décident dans
+  // src/utils/jobSeo.js — la même paire que le pré-rendu backend, comparée hors
+  // ligne par scripts/check-job-og-contract.js. `job || { id }` : avant le
+  // chargement, seule la carte est connue (l'identifiant EST dans l'URL), donc
+  // elle est annoncée dès le premier rendu.
+  const seo = jobSeo(job || { id });
+  usePageTitle(seo.title || t('jobDetailsTitleFallback'));
   // OG dynamique : un lien /jobs/:id partagé (WhatsApp, Facebook) montre le
   // titre et la description réels de la mission au lieu du texte générique.
   usePageOpenGraph({
-    title: job?.title ? `${job.title} — Kojo` : 'Kojo — Services en Afrique de l\'Ouest',
-    description: job?.description
-      ? `${job.description.slice(0, 150)}${job.description.length > 150 ? '…' : ''}`
-      : 'Trouvez des services et travailleurs en Afrique de l\'Ouest : plomberie, électricité, mécanique, construction.',
+    title: seo.title || 'Kojo — Services en Afrique de l\'Ouest',
+    description:
+      seo.description ||
+      'Trouvez des services et travailleurs en Afrique de l\'Ouest : plomberie, électricité, mécanique, construction.',
     // Carte OG DYNAMIQUE générée par le backend (Pillow) : PNG 1200x630 avec
     // le TITRE RÉEL de la mission. Le rewrite Vercel /api/* → Fly achemine
     // l'appel ; le crawler récupère une vraie image (pas une data: URL).
-    image: id ? ogImageUrl(`/api/og/jobs/${id}.png`) : undefined,
+    image: seo.card ? ogImageUrl(seo.card) : undefined,
   });
 
   useEffect(() => {
