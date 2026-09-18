@@ -20,6 +20,22 @@
 export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
 
 /**
+ * Origine de l'API que ce site appelle en direct depuis le navigateur.
+ *
+ * Elle vit ici, avec `SITE_ORIGIN`, parce que les deux forment UNE paire : le
+ * backend n'accepte que les origines qu'il déclare (`allowed_origins`, dérivé
+ * de `FRONTEND_APP_URL` + `CORS_ORIGINS`), donc publier le site sur une nouvelle
+ * origine sans que le backend la connaisse casse le site sans une ligne de
+ * journal serveur — le préflight est refusé par Starlette AVANT les routes.
+ * Constaté le 18/09/2026, et c'est ce que rejoue `check-cors-preflight.js`.
+ *
+ * Elle était recopiée dans `check-og-images.js`, `check-og-job-200.js`
+ * (`DEFAULT_BACKEND`) et deux fois dans `vite.config.js` : quatre copies du même
+ * fait, dont aucune n'était comparée à l'origine du site.
+ */
+export const API_ORIGIN = 'https://api.kojoforafrica.cc.cd';
+
+/**
  * Attributs d'une balise, quel que soit leur ordre et le type de citation.
  *
  * ⚠️ La citation qui FERME doit être la même que celle qui ouvre : un motif du

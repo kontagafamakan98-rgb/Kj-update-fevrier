@@ -659,6 +659,34 @@ jobs:
         working-directory: frontend
         run: node scripts/check-seo-production.js
 
+      # ── Garde CORS de la PRODUCTION — main uniquement, BLOQUANTE ───────────
+      # Le 18/09/2026, la bascule du frontend sur `kojoforafrica.cc.cd` a cassé
+      # le site SANS une ligne de journal serveur : `allow_origins` était
+      # construit sans `FRONTEND_APP_URL`, le motif Vercel (`allow_origin_regex`)
+      # couvrait la production tant que le site vivait sous `*.vercel.app`, et
+      # après la bascule Starlette refusait le préflight en 400 — AVANT les
+      # routes, donc aucune trace applicative. Seules les consoles des visiteurs
+      # le disaient.
+      #
+      # La sonde rejoue la paire que le navigateur exige (origine canonique du
+      # site ↔ API inlinée par le build), préflight + GET crédité, et ÉCHOUE si
+      # l'origine n'est pas autorisée — un `::notice` serait passé inaperçu,
+      # c'est précisément ce qui s'est produit. Elle échoue aussi quand l'API
+      # reste injoignable : une vérification qui n'a pas pu s'exécuter doit se
+      # voir. Les réessais internes (6 × 15 s) absorbent la fenêtre du
+      # déploiement Fly, qui tourne dans ce même run et peut encore servir une
+      # instance ancienne — celle qui refuse la nouvelle origine.
+      #
+      # ⚠️ main uniquement, et c'est structurel : la sonde mesure la paire
+      # DÉPLOYÉE. Sur une PR de migration de domaine, la production porte encore
+      # l'ancienne configuration — un rouge y serait un faux positif au moment
+      # même où il faut fusionner. L'ordre qui évite la panne reste : backend
+      # (`FRONTEND_APP_URL` / `CORS_ORIGINS`) d'abord, frontend ensuite.
+      - name: Garde CORS de la production (préflight réel, main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: frontend
+        run: node scripts/check-cors-preflight.js
+
       # ── Repli local « forme production » (aucune preview Vercel exploitable) ─
       # Preview PROTÉGÉE par Deployment Protection (détectée par
       # resolve-vercel-url.sh) ou commentaire Vercel absent : on rejoue en local

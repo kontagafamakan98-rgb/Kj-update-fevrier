@@ -398,10 +398,12 @@ Vercel), et `kj-update-fevrier.vercel.app` **redirige** vers le domaine : une
 seule adresse canonique, pour le crawl comme pour les partages.
 
 Le domaine n'existe qu'à une seule place par surface — `index.html` (canonical,
-OG, Twitter, JSON-LD), `vite.config.js` (origine du pré-rendu par route), les
-gardes `check-prerender-shells.js` / `check-og-images.js` /
-`check-seo-production.js` (qui échouent si le build repart sur l'ancienne
-adresse, tous lisant `SITE_ORIGIN` de `scripts/site-meta.js`), `resolve-vercel-url.sh` (base Lighthouse de `main`), et côté backend
+OG, Twitter, JSON-LD), les gardes `check-prerender-shells.js` /
+`check-og-images.js` / `check-seo-production.js` / `check-cors-preflight.js` et
+le pré-rendu par route de `vite.config.js` (qui échouent ou sondent faux si le
+build repart sur l'ancienne adresse, tous lisant `SITE_ORIGIN` de
+`scripts/site-meta.js` — l'API qu'il appelle se lit dans le même module, sous
+`API_ORIGIN`), `resolve-vercel-url.sh` (base Lighthouse de `main`), et côté backend
 `DEFAULT_SITE_BASE` — le repli de `_site_base()`, qui construit le sitemap et
 `robots.txt` — déjà pointé sur le domaine.
 
@@ -487,7 +489,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | Garde | Prouvé qu'il peut échouer par |
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
-| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`) | tests Vitest dédiés |
+| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-assets.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | **`check-prerender-shells.js`** | **rien** |
@@ -601,6 +603,20 @@ chaque PR vers `main` (sauf mention contraire).
   Sans les secrets `KOJO_PROBE_IMAP_*`, la sonde publie une `::notice` et sort
   en 0 (elle dit qu'elle n'a PAS vérifié) ; avec eux, un verdict non `pass`
   fait rougir le job.
+- La **paire CORS** que le navigateur exige — origine canonique du site
+  (`SITE_ORIGIN`) ↔ API inlinée par le build (`API_ORIGIN`), toutes deux lues
+  dans `scripts/site-meta.js` — est MESURÉE sur la production, sur `main`
+  uniquement (`scripts/check-cors-preflight.js`, job `lighthouse-ci`) :
+  préflight `OPTIONS` réel puis `GET` crédité, avec l'en-tête que le client
+  envoie. Contrairement à la sonde SEO ci-dessus, l'échec est **bruyant** :
+  cette paire est un invariant, pas une configuration facultative. Le 18/09/2026
+  la bascule du frontend sur `kojoforafrica.cc.cd` l'a cassée sans aucun journal
+  serveur (Starlette refuse le préflight AVANT les routes) — les seuls témoins
+  étaient les consoles des visiteurs. Un préflight non autorisé, un
+  `allow-origin: *` sur une requête créditée ou un préflight sans
+  `allow-credentials: true` font donc rougir le job ; une API injoignable aussi,
+  avec un diagnostic distinct (« impossible de conclure » vs « origine NON
+  autorisée »).
 
 **Références et configuration**
 - Formats des variables critiques dans `fly.toml [env]`, `.env.example` et
@@ -629,7 +645,7 @@ chaque PR vers `main` (sauf mention contraire).
 | Gmail IMAP (`imap.gmail.com`) + API de production | `fly-env-drift`, sonde email (main only) | Rouge si la boîte est injoignable ou si un verdict n'est pas `pass` (volontaire : une vérification qui ne peut pas s'exécuter doit se voir). **Sans** les secrets `KOJO_PROBE_IMAP_*`, la sonde s'annule en publiant une `::notice` — elle ne sort jamais verte sans avoir rien lu |
 | API GitHub (commentaires de PR) | `resolve-vercel-url.sh` | **Bascule silencieuse en F2** (repli build local), borné par `--max-time 20 --retry 2` |
 | Vercel (preview + Deployment Protection) | idem | **F2** également : preview protégée ⇒ repli local |
-| Backend de production (`api.kojoforafrica.cc.cd`) | `ci-auth`, `check-og-images`, `check-og-job-200` | Rouge (le login du compte CI échoue) |
+| Backend de production (`api.kojoforafrica.cc.cd`) | `ci-auth`, `check-og-images`, `check-og-job-200`, `check-cors-preflight` (main only) | Rouge (le login du compte CI échoue ; pour la garde CORS : origine refusée, ou API injoignable après 6 tentatives espacées de 15 s) |
 | Vercel production | `check-og-images`, `check-og-job-200` | Rouge |
 | Android SDK / Gradle / AGP | `mobile-build` | Rouge, téléchargements longs |
 | API de commentaires GitHub | `bundle-size-report` | Rouge sur **ce job seulement** — il n'est pas requis, donc aucune fusion n'est bloquée ; les mesures restent dans le résumé du run |
@@ -674,6 +690,13 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    nul n'est pas détecté — le
    HTML est servi en `must-revalidate`, donc l'edge revalide, mais la sonde ne
    le PROUVE pas (mesuré : `HIT` + `Age: 1` avec et sans `cache-control`).
+9. **La garde CORS ne tourne que sur `main`** : elle mesure la paire
+   DÉPLOYÉE (origine du site ↔ API), donc une PR de migration de domaine n'est
+   pas arrêtée avant fusion — la bascule peut casser la production, et c'est le
+   run de `main` qui le dit ensuite (en rouge, pas en `::notice`). L'ordre qui
+   évite la panne reste : backend (`FRONTEND_APP_URL` / `CORS_ORIGINS`) d'abord,
+   frontend ensuite. Les réessais de la sonde (6 × 15 s) absorbent la fenêtre du
+   déploiement Fly, qui tourne dans le même run.
 
 ## 8. Tenir ce document à jour
 

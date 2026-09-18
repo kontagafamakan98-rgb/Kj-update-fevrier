@@ -42,7 +42,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } from './site-meta.js';
+import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, metaContent, metaContents } from './site-meta.js';
 
 // ── SOURCE UNIQUE de la correspondance route → carte OG ────────────────────
 // `vite.config.js` importe ce tableau et n'en garde AUCUNE copie : il écrit les
@@ -117,7 +117,9 @@ export function lighthouseAuditedPaths(configPath = LIGHTHOUSERC_PATH) {
 }
 
 export const DEFAULT_BASE = 'http://localhost:4173';
-export const DEFAULT_BACKEND = 'https://api.kojoforafrica.cc.cd';
+// Origine de l'API : propriété de scripts/site-meta.js (avec SITE_ORIGIN, car
+// c'est leur PAIRE que le backend doit autoriser en CORS).
+export const DEFAULT_BACKEND = API_ORIGIN;
 
 // Identifiant qui ne peut pas exister : sert de SONDE DE CAPACITÉ.
 export const PROBE_JOB_ID = '00000000-0000-4000-8000-000000000000';
