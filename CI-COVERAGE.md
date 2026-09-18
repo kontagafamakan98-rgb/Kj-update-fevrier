@@ -570,11 +570,27 @@ d'existence qui s'étaient dispersées (« ce fichier est-il sur le disque ? »)
 scripts de `.github/scripts/`, `frontend/scripts/__tests__/import-health.test.js`
 importe tout module que le frontend importe — les points d'entrée qui
 s'exécutent à l'import (`process.exit`, rendu dans `#root`, pipeline esbuild)
-sont écartés par la règle elle-même, et le journal dit combien de modules sont
-couverts. Les deux portent leur preuve de non-vacuité (un module cassé, ou un
-module disparu, fait rougir le garde en nommant la cause), vérifiée par mutation
-le 18/09/2026 — frontend : `src/App.js` et `src/services/api.js` ; backend :
-`.github/scripts/check-exec-bits.py`.
+sont écartés par la règle elle-même. Les deux portent leur preuve de non-vacuité
+(un module cassé, ou un module disparu, fait rougir le garde en nommant la cause),
+vérifiée par mutation le 18/09/2026 — frontend : `src/App.js` et
+`src/services/api.js` ; backend : `.github/scripts/check-exec-bits.py`.
+
+Depuis le 18/09/2026, les deux **publient leur verdict en annotation de PR**, comme
+la sonde SEO : un `::notice` pour le périmètre et le nombre de modules importés, un
+second pour ce qui n'a **PAS** été couvert (fichiers de tests et `node_modules`
+/ site-packages écartés, et la liste des fichiers que RIEN n'importe — 27 des 141
+fichiers du périmètre frontend), et un `::error` **par module cassé**. Les
+annotations sont émises AVANT l'assertion, donc un garde rouge nomme le module et
+l'erreur réelle dans l'onglet Checks, pas seulement dans le journal brut.
+
+Côté frontend, les lignes sortent d'elles-mêmes : le rédacteur de vitest affiche
+le `console.log` d'un test qui passe. Côté backend, pytest **capture** le `print`
+des tests — sans quoi les annotations n'existeraient ni en vert ni en rouge — donc
+le job `backend-tests` a un pas dédié
+(`pytest tests/test_import_health.py --capture=tee-sys`) qui recopie la sortie
+capturée dans le journal du job, celui que GitHub lit. Il ne demande ni MongoDB ni
+secret, et dure deux secondes ; le fichier continue de tourner dans la suite
+complète, où il garde son rôle de test.
 
 Deux canaux publient les métadonnées d'une page — `og:image`, `<title>`, `meta
 description` — : le HTML **pré-rendu** (écrit par `vite.config.js`, vérifié en HTTP

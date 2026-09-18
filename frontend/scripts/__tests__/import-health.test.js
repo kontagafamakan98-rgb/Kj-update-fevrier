@@ -34,6 +34,13 @@
  *
  * Le pendant backend vit dans backend/tests/test_import_health.py : les deux
  * moitiés du dépôt ont le même garde, et la même preuve de non-vacuité.
+ *
+ * ── Verdict en annotation de PR ─────────────────────────────────────────────
+ * Le verdict est publié dans le journal du run sous forme d'annotations GitHub
+ * (`::notice` pour le périmètre et ce qui n'est PAS couvert, un `::error` par
+ * module cassé), comme le fait déjà la sonde SEO (scripts/check-seo-production.js).
+ * Elles sont émises AVANT l'assertion : un garde rouge nomme donc le module et
+ * l'erreur réelle dans l'annotation, pas seulement dans le journal du job.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -46,13 +53,16 @@ const MODULE_EXTENSIONS = ['.js', '.jsx', '.cjs', '.mjs'];
 
 const relative = (file) => path.relative(FRONTEND, file).split(path.sep).join('/');
 
-const walk = (dir) => {
+// `includeTests` : le périmètre à IMPORTÉ exclut les fichiers de tests, mais le
+// verdict les COMPTE (ce qu'il n'a pas couvert doit être nommé, pas tu).
+const walk = (dir, { includeTests = false } = {}) => {
   const found = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
-      found.push(...walk(full));
+      if (entry.name === 'node_modules') continue;
+      if (entry.name === '__tests__' && !includeTests) continue;
+      found.push(...walk(full, { includeTests }));
     } else if (MODULE_EXTENSIONS.includes(path.extname(entry.name))) {
       found.push(full);
     }
@@ -116,6 +126,46 @@ const importFailures = async (files = importedModules()) => {
   return failures;
 };
 
+/** Fichiers de tests du périmètre : exclus de l'import, comptés pour le verdict. */
+const testModuleFiles = () =>
+  SOURCE_DIRS.flatMap((dir) => walk(path.join(FRONTEND, dir), { includeTests: true })).filter(
+    (file) => /\.test\.(js|jsx)$/.test(path.basename(file))
+  );
+
+/**
+ * Annotations GitHub du verdict : une ligne par fait.
+ *
+ * Fonction PURE — ce qui est publié ne doit dépendre que de ses arguments — pour
+ * être éprouvable sans capturer stdout.
+ */
+const annotationLines = ({ files, imported, notImported, testFiles, failures = [] }) => [
+  // `imported - failures.length` : un module cassé n'est PAS importé, donc le
+  // verdict ne peut pas continuer à annoncer le périmètre complet.
+  `::notice title=Santé d'import (frontend)::${imported - failures.length} module(s) importé(s) ` +
+    `sur ${files} fichier(s) du périmètre (src/, scripts/, configuration racine)`,
+  `::notice title=Import non couvert (frontend)::${notImported.length} fichier(s) que RIEN ` +
+    "n'importe (gardes lancés en script, configs lues par un outil, entrées du bundle) : " +
+    `${notImported.join(', ') || 'aucun'} ; ${testFiles} fichier(s) de tests et ` +
+    'node_modules exclus',
+  ...failures.map(
+    ([file, message]) => `::error title=Module qui ne s'importe plus::${file} — ${message}`
+  ),
+];
+
+/** Le verdict complet, calculé depuis le disque (périmètre, imports, exclusions). */
+const verdictAnnotations = (failures = []) => {
+  const files = moduleFiles();
+  const imported = importedModules();
+  const importedSet = new Set(imported);
+  return annotationLines({
+    files: files.length,
+    imported: imported.length,
+    notImported: files.filter((file) => !importedSet.has(file)).map(relative),
+    testFiles: testModuleFiles().length,
+    failures,
+  });
+};
+
 const assertImportsHealthy = (failures) => {
   if (failures.length) {
     const report = failures.map(([file, message]) => `  • ${file}\n    ${message}`).join('\n');
@@ -146,14 +196,55 @@ describe("santé d'import des modules frontend", () => {
   });
 
   it('tous les modules importés s\u2019importent', async () => {
-    const importable = importedModules();
-    // Ce que le run couvre, écrit dans le journal : un vert doit dire sur QUOI
-    // il porte, pas seulement qu'il n'a rien trouvé.
-    console.log(
-      `santé d'import : ${importable.length} module(s) importé(s) sur ` +
-        `${moduleFiles().length} fichier(s) du périmètre (le reste : points d'entrée)`
+    // Le verdict est publié AVANT l'assertion : un module cassé est nommé dans
+    // une annotation `::error` de la PR, pas seulement dans le journal du job.
+    // Un vert doit dire sur QUOI il porte — et sur quoi il ne porte PAS.
+    const failures = await importFailures();
+    // La ligne vide est NÉCESSAIRE : le rédacteur de vitest écrit son en-tête
+    // (`stdout | … > nom du test`) sans saut de ligne quand le test échoue, donc
+    // la première annotation serait collée derrière — et GitHub ne lit une
+    // annotation que si elle commence la ligne.
+    console.log('');
+    for (const ligne of verdictAnnotations(failures)) console.log(ligne);
+    assertImportsHealthy(failures);
+  });
+
+  it('le verdict nomme le périmètre et ce qu\u2019il n\u2019a PAS couvert', () => {
+    // Sans cela, le verdict pourrait annoncer « tout va bien » en important
+    // trois modules : c'est le seul faux vert possible d'un verdict. Les
+    // compteurs sont donc confrontés au disque, pas à des littéraux.
+    const lignes = verdictAnnotations([]);
+    const fichiers = moduleFiles().length;
+
+    expect(lignes[0]).toMatch(
+      /^::notice title=Santé d'import \(frontend\)::\d+ module\(s\) importé\(s\) sur \d+/
     );
-    assertImportsHealthy(await importFailures(importable));
+    expect(lignes[0]).toContain(`sur ${fichiers} fichier(s)`);
+    expect(fichiers).toBeGreaterThan(100);
+    expect(lignes[0]).not.toContain('sur 0 ');
+    expect(lignes[1]).toMatch(/^::notice title=Import non couvert \(frontend\)::\d+ fichier\(s\)/);
+    for (const exclu of ['fichier(s) de tests', 'node_modules']) {
+      expect(lignes[1]).toContain(exclu);
+    }
+    expect(testModuleFiles().length).toBeGreaterThan(10);
+  });
+
+  it('un module cassé devient une annotation ::error, et le compte baisse', () => {
+    // Non-vacuité du verdict : un dépôt sain ne contient pas de module cassé,
+    // donc sans ce cas rien ne prouverait que le verdict sait ROUGIR ni qu'il
+    // arrête d'annoncer un périmètre complet dès qu'un module manque.
+    const base = { files: 10, imported: 9, notImported: [], testFiles: 2 };
+    const avecFaute = annotationLines({
+      ...base,
+      failures: [['src/fantome.js', 'TypeError: x is not a function']],
+    });
+
+    expect(annotationLines(base)[0]).toContain('9 module(s) importé(s) sur 10');
+    expect(avecFaute[0]).toContain('8 module(s) importé(s) sur 10');
+    expect(avecFaute).toHaveLength(3);
+    expect(avecFaute[2]).toBe(
+      "::error title=Module qui ne s'importe plus::src/fantome.js — TypeError: x is not a function"
+    );
   });
 
   it('échoue quand un module ne s\u2019importe plus, en nommant l\u2019erreur réelle', async () => {
