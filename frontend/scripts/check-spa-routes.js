@@ -29,7 +29,10 @@
  *    du contenu dupliqué, et un canonical statique "/" sur toutes ces routes.
  * 5. Les routes PRIVÉES (dashboard, profil, messages, admin…) ne doivent pas
  *    être indexables : `X-Robots-Tag: noindex` dans vercel.json. Un tableau de
- *    bord indexé par un moteur, c'est une page vide dans les résultats.
+ *    bord indexé par un moteur, c'est une page vide dans les résultats. Ce
+ *    qu'est une route privée DÉRIVE du routage réel (voir privateRoutesOf) :
+ *    ajouter une page oblige à choisir — ses textes dans
+ *    src/config/page-meta.js (publique), ou son noindex (privée).
  *
  * ── Les pièges vérifiés ──────────────────────────────────────────────────────
  *   • une route React absente de vercel.json → 404 en production (l'app ne la
@@ -49,6 +52,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // La liste des pages pré-rendues se LIT ici, elle ne se recopie pas : c'est la
 // table des textes de route dont le BUILD écrit les coquilles (vite.config.js).
 import { PAGE_META } from '../src/config/page-meta.js';
+import { shellFileFor } from './site-meta.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(__dirname, '..');
@@ -83,19 +87,35 @@ export const APP_HTML = '/app.html';
 export const PRERENDERED_ROUTES = Object.keys(PAGE_META)
   .filter((route) => route !== '/')
   .map((route) => route.slice(1));
-// Routes non indexables : elles n'existent que pour un utilisateur connecté (ou
-// pour le support) et n'ont aucun contenu à montrer à un moteur.
-export const PRIVATE_ROUTES = [
-  '/dashboard',
-  '/messages',
-  '/profile',
-  '/create-job',
-  '/photo-debug',
-  '/email-verification',
-  '/payment-verification',
-  '/commission-dashboard',
-  '/support-admin',
-];
+// ── Les routes privées DÉRIVENT du routage, elles ne se déclarent pas ────────
+// Une route de production n'a que deux états, et c'est le routage réel qui les
+// sépare :
+//   • PUBLIQUE — ses textes sont déclarés dans src/config/page-meta.js (le build
+//     lui écrit sa coquille `<route>.html`), ou elle est servie par un rewrite
+//     vers le BACKEND, qui la pré-rend (la fiche /jobs/:id) ;
+//   • PRIVÉE   — tout le reste : servie par le gabarit nu app.html, donc tenue
+//     au noindex.
+//
+// Cette liste était écrite à la main ici. Une page ajoutée à App.js et oubliée
+// dans cette liste n'appartenait à AUCUN des deux ensembles : servie par
+// app.html (dont la coquille dit `robots: index, follow`), sans X-Robots-Tag,
+// indexable sous le titre neutre du gabarit — et aucun garde ne le voyait
+// (mesuré : une route /nouvelle-page passait en silence). Dérivée du routage,
+// cette page tombe maintenant dans le second ensemble et le garde RÉCLAME son
+// noindex : l'auteur doit choisir.
+//
+// @param {string[]} routes Routes de production extraites de App.js.
+// @param {Array<{source?: string, destination?: string}>} rewrites Table de
+//        routage de vercel.json (une destination hors build = pré-rendue par le
+//        serveur).
+export function privateRoutesOf(routes, rewrites = []) {
+  const servedByServer = (route) =>
+    rewrites.some((rule) => {
+      if (!rule || /\.html$/.test(String(rule.destination || ''))) return false;
+      return rule.source === route || matchesPattern(route, String(rule.source || ''));
+    });
+  return routes.filter((route) => !Object.hasOwn(PAGE_META, route) && !servedByServer(route));
+}
 export const APP_JS = 'src/App.js';
 // Routes volontairement NON routées : elles n'existent qu'en développement
 // (bloc `import.meta.env.DEV` de App.js) — les router en production exposerait
@@ -384,7 +404,7 @@ export function runSpaRoutesCheck(options = {}) {
         // Le gabarit attendu dépend de la route : sa propre page pré-rendue
         // si elle existe, sinon app.html — JAMAIS index.html.
         const expected = PRERENDERED_ROUTES.includes(pathname.replace(/^\//, ''))
-          ? `/${pathname.replace(/^\//, '')}.html`
+          ? `/${shellFileFor(pathname)}`
           : APP_HTML;
         if (destination !== expected) {
           errors.push(
@@ -443,9 +463,18 @@ export function runSpaRoutesCheck(options = {}) {
 
   // ── 6ter. Routes privées non indexables ──────────────────────────────────
   const headerRules = Array.isArray(config.headers) ? config.headers : [];
-  const robotsTagFor = (source) => {
+  const robotsTagFor = (route) => {
     for (const entry of headerRules) {
-      if (!entry || entry.source !== source || !Array.isArray(entry.headers)) continue;
+      if (!entry || !Array.isArray(entry.headers)) continue;
+      const source = String(entry.source || '');
+      // Exact, ou motif qui VISE cette route : « /dashboard/:onglet » ne peut
+      // pas être nommée exactement. « /(.*) » la capture aussi, mais il couvre
+      // la racine — donc tout le site : un noindex posé là désindexerait les
+      // pages publiques au lieu de protéger celle-ci.
+      const targeted =
+        source === route ||
+        (matchesPattern(route, source) && !patternToRegex(source).test('/'));
+      if (!targeted) continue;
       const found = entry.headers.find(
         (h) => h && String(h.key).toLowerCase() === 'x-robots-tag'
       );
@@ -453,19 +482,16 @@ export function runSpaRoutesCheck(options = {}) {
     }
     return null;
   };
-  const privateRoutesInApp = PRIVATE_ROUTES.filter((route) => productionRoutes.includes(route));
-  if (productionRoutes.length > 0 && privateRoutesInApp.length === 0) {
-    errors.push(
-      'aucune route de PRIVATE_ROUTES ne correspond à une route de App.js : ce garde ne vérifie ' +
-        "plus rien (route renommée ?) — mettre à jour PRIVATE_ROUTES avec les noms réels"
-    );
-  }
-  for (const route of privateRoutesInApp) {
+  const privateRoutes = privateRoutesOf(productionRoutes, rewrites);
+  for (const route of privateRoutes) {
     const tag = robotsTagFor(route);
     if (tag === null) {
       errors.push(
-        `vercel.json : la route privée « ${route} » n'a pas d'en-tête X-Robots-Tag — ` +
-          'un tableau de bord indexé est une page vide dans les résultats de recherche'
+        `vercel.json : la route « ${route} » n'est déclarée NI publique NI privée — aucun texte ` +
+          `dans src/config/page-meta.js (donc servie par le gabarit nu ${APP_HTML}, titre « Kojo ») ` +
+          'et aucun X-Robots-Tag noindex. Choisir : déclarer ses textes dans src/config/page-meta.js ' +
+          '(page publique, coquille pré-rendue et indexée), ou ajouter « X-Robots-Tag: noindex, ' +
+          'follow » pour cette route dans vercel.json (page privée)'
       );
     } else if (!/noindex/i.test(tag)) {
       errors.push(`vercel.json : « ${route} » doit porter noindex, pas « ${tag} »`);
@@ -483,7 +509,7 @@ export function runSpaRoutesCheck(options = {}) {
     const appPathOnDisk = path.join(buildDir, 'app.html');
     if (!existsSync(appPathOnDisk)) {
       errors.push(
-        `build/app.html absent : toutes les routes clientes (${PRIVATE_ROUTES.join(', ')}) ` +
+        `build/app.html absent : toutes les routes clientes (${privateRoutes.join(', ')}) ` +
           'serviraient une page inexistante en production'
       );
     } else {

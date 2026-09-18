@@ -32,7 +32,7 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { SITE_ORIGIN } from './site-meta.js';
+import { SITE_ORIGIN, shellFileFor } from './site-meta.js';
 // Table UNIQUE de la correspondance route → carte OG, partagée avec
 // vite.config.js qui écrit ces coquilles : la carte de chaque shell est LUE
 // ici et non recopiée (voir la section « og:image » plus bas).
@@ -42,7 +42,8 @@ const buildDir = path.join(process.cwd(), 'build');
 const errors = [];
 
 // Coquilles lues, indexées par nom de fichier : la section og:image dérive le
-// nom attendu du chemin de la route (« /jobs » → jobs.html, « / » → index.html).
+// nom attendu du chemin de la route via la correspondance UNIQUE
+// (scripts/site-meta.js — `shellFileFor`), partagée avec le build.
 const shells = {};
 
 const read = (name) => {
@@ -238,7 +239,7 @@ if (support) {
 // index.html) ; les routes sans coquille (/dashboard, /profile, servies par
 // app.html) sont ignorées faute de fichier.
 for (const route of OG_CARD_ROUTES) {
-  const name = route.path === '/' ? 'index.html' : `${route.path.slice(1)}.html`;
+  const name = shellFileFor(route.path);
   const html = shells[name];
   if (!html) continue;
   if (!html.includes(`${SITE_ORIGIN}${route.image}`)) {

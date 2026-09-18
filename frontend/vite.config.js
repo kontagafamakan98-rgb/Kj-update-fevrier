@@ -18,7 +18,7 @@ import { PAGE_META } from './src/config/page-meta.js'
 // Identité publique du site : origine canonique ET origine de l'API, possédées
 // par scripts/site-meta.js. Le build n'en garde aucune copie — leur PAIRE est ce
 // que le backend doit autoriser en CORS (scripts/check-cors-preflight.js).
-import { API_ORIGIN, SITE_ORIGIN } from './scripts/site-meta.js'
+import { API_ORIGIN, SITE_ORIGIN, shellFileFor } from './scripts/site-meta.js'
 
 // « Une page de route publique annonce-t-elle ses métadonnées ? » : les règles
 // qui ne lisent QUE les sources sont jouées ICI, par le build (voir le plugin
@@ -966,7 +966,7 @@ export default defineConfig(({ mode }) => {
                 `<meta charset="utf-8" />${link}`
               )
             }
-            fs.writeFileSync(path.join(outDir, `${route}.html`), out, 'utf8')
+            fs.writeFileSync(path.join(outDir, shellFileFor(routePath)), out, 'utf8')
           }
 
           // ── Shell de l'ACCUEIL dans index.html ─────────────────────────

@@ -40,7 +40,10 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { metaContent } from './site-meta.js';
+import { metaContent, shellFileFor } from './site-meta.js';
+// La liste des pages pré-rendues est DÉRIVÉE de la table des textes : c'était une
+// seconde déclaration des mêmes pages que le build (voir PRERENDERED_PAGES).
+import { PAGE_META } from '../src/config/page-meta.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(__dirname, '..');
@@ -54,15 +57,17 @@ export const DESCRIPTION_MAX = 160;
 export const MIN_WORDS = 300;
 // Pages pré-rendues qui ont leur PROPRE shell : le shell de l'accueil ne doit
 // pas s'y retrouver (et inversement).
-export const PRERENDERED_PAGES = [
-  'jobs.html',
-  'login.html',
-  'register.html',
-  'forgot-password.html',
-  'payment.html',
-  'how-it-works.html',
-  'support.html',
-];
+//
+// ── DÉRIVÉE, et non recopiée ──────────────────────────────────────────────
+// Cette liste était écrite à la main — sept noms de fichiers, une SECONDE
+// déclaration des pages que le build pré-rend (src/config/page-meta.js). Une
+// page ajoutée à la table et oubliée ici n'était donc pas comparée : son shell
+// pouvait dupliquer celui de l'accueil (ou publier la description de l'accueil)
+// sans qu'aucune règle ne le voie. La table est la source ; la correspondance
+// route → fichier est celle de scripts/site-meta.js, partagée avec le build.
+export const PRERENDERED_PAGES = Object.keys(PAGE_META)
+  .filter((route) => route !== '/')
+  .map(shellFileFor);
 
 /**
  * Contenu de `<div id="root">…`, jusqu'au `</div>` qui FERME ce div.
