@@ -21,6 +21,10 @@ from kojo_settings import (
     REFERRAL_SPONSOR_REWARD,
     logger,
 )
+# Durée de conservation d'un compte supprimé : l'échéance est DEMANDÉE à la
+# règle de conservation au lieu d'être recopiée ici — c'est la même durée que
+# celle de l'index TTL et celle que publie PRIVACY.md.
+from kojo_retention import echeance_de_purge
 from kojo_core import (
     get_current_user, is_valid_image_content, sanitize_email,
     upload_image_to_cloudinary, upload_profile_photo_to_cloudinary,
@@ -1047,6 +1051,77 @@ JOB_LOCATION_FIELDS = (
     "geo",
 )
 
+# --- Anonymisation RGPD : ce qui advient de CHAQUE champ du compte ------------
+# Deux tables dont l'union doit couvrir EXACTEMENT les champs du modèle `User`
+# (plus les champs de document hors modèle, déclarés à part) :
+#
+#   * `ANONYMISATION_CHAMPS` — effacés, et par quelle valeur. Le `$set` de
+#     l'endpoint est CONSTRUIT depuis cette table, donc une valeur effacée n'a
+#     qu'un propriétaire : retirer une ligne ici retire l'effacement, et le test
+#     le voit rougir.
+#   * `CHAMPS_CONSERVES` — conservés (ou réécrits), chacun avec sa RAISON.
+#
+# L'invariant est porté par `test_delete_account_erases_identity_and_referral_pii` :
+# un champ du modèle absent des deux tables fait ÉCHOUER le test en le nommant.
+# C'est ce qui remplace la liste d'assertions tenue à la main — ajouter une PII
+# au modèle oblige à trancher ici, au lieu de la laisser survivre en silence.
+ANONYMISATION_CHAMPS = {
+    # PII nominatives : sans elles, le document présenté comme anonymisé gardait
+    # le nom de la personne, et un accès direct à la collection permettait de la
+    # réidentifier.
+    "first_name": None,
+    "last_name": None,
+    # Texte LIBRE : la bio redonnait en clair le nom et le téléphone effacés
+    # juste à côté, dans le même document.
+    "bio": None,
+    # Profil professionnel : `worker_profiles` (qui porte les specialities) est
+    # supprimé en cascade, donc garder `skills` ici laissait la moitié du même
+    # profil derrière lui.
+    "skills": [],
+    "phone": None,
+    "password_hash": None,
+    "google_sub": None,
+    "profile_photo": None,
+    "payment_accounts": None,
+    "payment_accounts_count": 0,
+    "referral_code": None,
+    "referred_by": None,
+    "referral_reward_balance": 0.0,
+    "referral_rewards": [],
+    # Hors modèle `User` : permissions de l'équipe, posées sur le compte par
+    # kojo_core.ensure_owner_exists et lues par /owner/monitor. Un compte
+    # supprimé ne peut garder aucun accès élevé.
+    "permissions": [],
+}
+
+# Champs CONSERVÉS dans le document anonymisé, avec la raison — c'est la
+# contrepartie de la table ci-dessus, et elle est exhaustive comme elle.
+CHAMPS_CONSERVES = {
+    "id": "identifiant interne (UUID) : clé des paiements et des missions qui le référencent, aucune identité",
+    "email": "RÉÉCRITE en adresse de service @kojo.deleted : l'adresse de la personne ne survit pas, mais la forme reste valide pour les index uniques",
+    "user_type": "rôle technique, nécessaire aux agrégats et aux missions conservées",
+    "country": "pays de rattachement, sans identité",
+    "preferred_language": "préférence d'interface, sans identité",
+    "legal_documents_accepted": "preuve de consentement aux documents légaux : une obligation se prouve, elle ne s'efface pas",
+    "legal_documents_accepted_at": "horodatage de ce consentement",
+    "legal_documents_version": "version acceptée des documents",
+    "is_owner": "booléen dérivé de l'email (recalculé à chaque lecture) ; aucun contrôle d'accès ne lit ce champ — verify_owner_access compare les emails",
+    "is_verified": "état de vérification, sans identité",
+    "email_verified": "état de vérification, sans identité",
+    "email_verified_at": "horodatage de cette vérification",
+    "referral_first_job_rewarded": "état de récompense de parrainage (booléen), sans identité",
+    "rating": "moyenne des avis RECUS, qui sont conservés parce qu'ils appartiennent aussi au travailleur qui les a reçus",
+    "total_reviews": "compteur de ces avis, sans identité",
+    "created_at": "horodatage de création, conservé avec la trace comptable",
+    "updated_at": "REÉCRITE à l'horodatage de la suppression",
+}
+
+# Champs que le document porte SANS figurer dans le modèle `User` (écrits
+# directement en base, par le dépôt ou par l'endpoint). Déclarés pour que
+# l'union ci-dessus puisse être une ÉGALITÉ : un champ hors modèle non déclaré
+# ici, ou une faute de frappe dans l'une des deux tables, fait échouer le test.
+CHAMPS_HORS_MODELE = frozenset({"permissions", "deleted", "deleted_at", "purge_at"})
+
 @router.delete("/users/account")
 async def delete_my_account(current_user: User = Depends(get_current_user)):
     """Supprime définitivement le compte de l'utilisateur connecté.
@@ -1220,29 +1295,17 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
         {"$set": {
             "deleted": True,
             "deleted_at": now,
+            # Échéance de purge : ce champ est la DATE DE MORT du document
+            # anonymisé (règle `users` de kojo_retention). Sans lui, le filtre
+            # de purge ne verrait jamais ce document et l'anonymisation serait
+            # définitive — ce que la politique ne promet pas.
+            "purge_at": echeance_de_purge("users", now),
             "email": anonymous_email,
-            "password_hash": None,
-            # Les PII NOMINATIVES : sans elles, le document présenté comme
-            # anonymisé gardait le nom de la personne, et un export ou un accès
-            # direct à la collection permettait de la réidentifier.
-            "first_name": None,
-            "last_name": None,
-            "bio": None,
-            # Le profil professionnel : `worker_profiles` (qui porte specialties)
-            # est supprimé en cascade, donc garder `skills` ici laissait la
-            # moitié du même profil derrière lui.
-            "skills": [],
-            "phone": None,
-            "payment_accounts": None,
-            "payment_accounts_count": 0,
-            "google_sub": None,
-            "profile_photo": None,
-            "referral_code": None,
-            "referred_by": None,
-            "referral_reward_balance": 0.0,
-            "referral_rewards": [],
-            "permissions": [],
             "updated_at": now,
+            # Les valeurs effacées viennent d'ANONYMISATION_CHAMPS (une seule
+            # table, donc le test qui la parcourt prouve l'effacement RÉEL au
+            # lieu de réaffirmer une liste recopiée à côté du code).
+            **ANONYMISATION_CHAMPS,
         }}
     )
 
@@ -1315,6 +1378,13 @@ USER_DATA_SOURCES = (
 # compte, sans quoi un code encore valide pour cette personne manquerait à son
 # export alors qu'il est conservé sur elle.
 USER_DATA_BY_EMAIL = ("email_otps",)
+
+# Le champ par lequel ces collections se lisent : elles ne portent pas
+# d'identifiant de compte, elles sont indexées par l'ADRESSE. Nommé ici pour que
+# le test qui confronte l'export et la suppression n'ait pas à recopier ce champ
+# (la suppression ne les touche pas : elles périment par leur propre règle de
+# conservation, kojo_retention).
+USER_DATA_BY_EMAIL_FIELD = "email"
 
 # Collections qui ne portent AUCUNE donnée d'un utilisateur. Elles sont listées
 # quand même : le test de classement exige que TOUTE collection du backend soit
@@ -1399,7 +1469,7 @@ async def export_my_data(current_user: User = Depends(get_current_user)):
         }
 
     # Les collections de USER_DATA_BY_EMAIL (codes OTP) sont indexées par EMAIL.
-    otp_query = {"email": user_email}
+    otp_query = {USER_DATA_BY_EMAIL_FIELD: user_email}
     otp_total = await db.email_otps.count_documents(otp_query)
     otp_documents = await db.email_otps.find(otp_query).to_list(
         length=EXPORT_LIMIT_PER_COLLECTION
