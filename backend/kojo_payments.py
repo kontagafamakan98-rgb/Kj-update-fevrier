@@ -513,6 +513,26 @@ def map_paydunya_status(raw_status: Optional[str]) -> str:
     }
     return mapping.get(normalized, 'pending')
 
+def maj_statut_collecte(statut: str, champs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """L'UNIQUE écriture du STATUT d'une collecte (le paiement d'un client).
+
+    Invariant porté ICI, et plus par le filtre de purge : `expires_at` —
+    l'échéance du checkout — n'existe que sur un paiement encore `pending`. À la
+    sortie de `pending`, l'échéance est RETIRÉE. Sans ça, un paiement abouti
+    conservait une échéance périmée, indiscernable d'un panier abandonné par la
+    date seule, et sa survie ne tenait qu'à la clause `status` du filtre
+    partiel de la règle de conservation : un refactor du filtre pouvait
+    supprimer des pièces comptables sans qu'un test bronche.
+
+    Cette clause de statut reste un SECOND FILET, pour les documents écrits
+    AVANT ce changement, qui portent encore une échéance périmée — mais elle
+    n'est plus ce qui protège un paiement neuf.
+    """
+    maj: Dict[str, Any] = {"$set": {"status": statut, **(champs or {})}}
+    if statut != "pending":
+        maj["$unset"] = {"expires_at": ""}
+    return maj
+
 async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> Dict[str, Any]:
     invoice_token = payment_record.get('invoice_token')
     if not invoice_token or not is_paydunya_configured():
@@ -523,8 +543,11 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
     provider_status = invoice_data.get('status') or payload.get('status')
     local_status = map_paydunya_status(provider_status)
 
+    # `status` n'est PAS mis ici : c'est maj_statut_collecte qui écrit le
+    # statut, et c'est lui qui retire l'échéance de checkout en sortant de
+    # `pending` (invariant). Deux écritures du statut = deux endroits à tenir
+    # d'accord, donc un invariant qui ne tient plus par construction.
     update_fields = {
-        'status': local_status,
         'provider_status': provider_status,
         'provider_confirm_payload': payload,
         'updated_at': datetime.now(timezone.utc).isoformat()
@@ -539,7 +562,9 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
         if not payment_record.get('payout_status'):
             update_fields['payout_status'] = 'held'
 
-    await db.payments.update_one({'id': payment_record['id']}, {'$set': update_fields})
+    await db.payments.update_one(
+        {'id': payment_record['id']}, maj_statut_collecte(local_status, update_fields)
+    )
     latest = await db.payments.find_one({'id': payment_record['id']})
     return latest or payment_record
 

@@ -134,9 +134,13 @@ RETENTION_RULES: Tuple[RegleDeConservation, ...] = (
         lifetime=timedelta(hours=PAYMENT_PENDING_EXPIRY_HOURS),
         porte_par="PAYMENT_PENDING_EXPIRY_HOURS",
         portee=(
-            "le seul paiement resté `pending` (client parti, IPN perdu) — "
-            "un paiement complété ou annulé ne porte pas `expires_at` et n'est "
-            "JAMAIS purgé (obligation comptable)"
+            "le seul paiement resté `pending` (client parti, IPN perdu). Depuis "
+            "que sortir de `pending` RETIRE `expires_at` (kojo_payments."
+            "maj_statut_collecte), l'invariant « porte `expires_at` = encore en "
+            "attente » tient à l'ÉCRITURE : un paiement abouti ne porte plus "
+            "d'échéance, et il n'est JAMAIS purgé (obligation comptable). La "
+            "clause de statut reste un SECOND FILET pour les documents écrits "
+            "avant ce changement, qui portent encore une échéance périmée"
         ),
         partial={"status": "pending", "expires_at": {"$exists": True}},
     ),
