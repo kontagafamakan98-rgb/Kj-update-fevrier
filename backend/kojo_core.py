@@ -26,6 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from kojo_models import PaymentAccount, User, WA_PHONE_RULES
+from kojo_retention import RETENTION_RULES
 from kojo_settings import (
     APP_ENV,
     APP_VERSION,
@@ -245,20 +246,12 @@ async def create_database_indexes():
         await db.payments.create_index("status")
         await db.payments.create_index("invoice_token", sparse=True)
         await db.payments.create_index([("created_at", -1)])
-        # Nettoyage automatique des factures PENDING jamais terminées (client
-        # parti, IPN perdu) : chaque checkout pending pose `expires_at`
-        # (48h) ; l'index TTL partiel supprime ces documents après expiration
-        # SANS toucher aux paiements complétés/annulés (ils ne matchent pas
-        # le filtre partiel status=pending).
-        await db.payments.create_index(
-            [("expires_at", 1)],
-            partialFilterExpression={"status": "pending", "expires_at": {"$exists": True}},
-            expireAfterSeconds=0,
-        )
+        # (index TTL des paiements : dans le bloc de conservation plus bas,
+        # créé depuis kojo_retention.RETENTION_RULES)
 
         # Email OTP collection indexes
         await db.email_otps.create_index([("email", 1), ("purpose", 1)], unique=True)
-        await db.email_otps.create_index("expires_at", expireAfterSeconds=0)
+        # (index TTL des codes OTP : bloc de conservation plus bas)
         await db.email_otps.create_index([("created_at", -1)])
 
         # Notifications collection indexes
@@ -266,8 +259,7 @@ async def create_database_indexes():
         await db.notifications.create_index("user_id")
         await db.notifications.create_index([("user_id", 1), ("is_read", 1)])
         await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
-        # TTL : suppression automatique des notifications après 90 jours
-        await db.notifications.create_index("created_at", expireAfterSeconds=90 * 24 * 3600)
+        # (index TTL des notifications : bloc de conservation plus bas)
 
         # Reviews (avis) collection indexes
         await db.reviews.create_index("id", unique=True)
@@ -281,11 +273,19 @@ async def create_database_indexes():
         await db.push_tokens.create_index("user_id")
         await db.push_tokens.create_index([("user_id", 1), ("active", 1)])
 
-        # TTL index: Mongo purge automatiquement les tokens révoqués une fois
-        # leur date d'expiration naturelle (expire_at) atteinte - la collection
-        # de révocation reste donc de taille bornée sans job de nettoyage manuel.
         await db.revoked_tokens.create_index("jti", unique=True)
-        await db.revoked_tokens.create_index("expire_at", expireAfterSeconds=0)
+        # (index TTL des jetons révoqués : bloc de conservation plus bas)
+
+        # --- Index TTL : conservation des données ----------------------------
+        # Ces index ne reçoivent plus leur `expireAfterSeconds` écrit à la main
+        # ici : la durée ET l'index viennent de kojo_retention.RETENTION_RULES,
+        # qui est aussi ce dont PRIVACY.md publie le tableau. Un chiffre écrit
+        # des deux côtés finit toujours par diverger ; un garde le refuse
+        # désormais (.github/scripts/check-privacy-policy.py).
+        for regle in RETENTION_RULES:
+            await db[regle.collection].create_index(
+                regle.ttl_field, **regle.options_index()
+            )
 
         logger.info("✅ MongoDB indexes created successfully")
     except Exception as e:

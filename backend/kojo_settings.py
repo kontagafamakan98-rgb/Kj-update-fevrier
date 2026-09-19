@@ -104,6 +104,41 @@ JWT_ALGORITHM = "HS256"
 
 JWT_EXPIRATION_HOURS = 24
 
+# --- Durées de conservation des données ---------------------------------
+# Ces deux durées vivaient en clair, chacune à un seul endroit : 90 jours dans
+# l'index TTL de kojo_core, 48 h dans le corps de la création d'un paiement.
+# Elles sont nommées ici pour que kojo_retention.py les CITE au lieu de les
+# recopier, et que la politique publiée (PRIVACY.md) en dérive au lieu de
+# répéter un chiffre que personne ne relirait. Voir kojo_retention.py.
+NOTIFICATION_RETENTION_DAYS = 90
+
+# Délai laissé à un checkout resté `pending` (client parti, IPN perdu) avant
+# que l'index TTL partiel ne supprime le document.
+PAYMENT_PENDING_EXPIRY_HOURS = 48
+
+# Compte SUPPRIMÉ : la suppression n'efface pas le document, elle l'ANONYMISE
+# (les paiements le référencent, cf. kojo_routers_users). Il doit donc finir par
+# disparaître au lieu de rester indéfiniment. Le délai court à partir de la
+# suppression et couvre la fenêtre où un litige de paiement ou une réclamation
+# peut encore désigner ce compte par son identifiant interne.
+DELETED_ACCOUNT_RETENTION_DAYS = 90
+
+# Ticket support : nom, téléphone, email et message en TEXTE LIBRE — le
+# document le plus identifiant du dépôt, et celui dont personne ne relit la
+# valeur. Le délai court à partir de la CRÉATION (un ticket jamais traité doit
+# disparaître comme les autres, sinon la collection n'est bornée par rien).
+SUPPORT_TICKET_RETENTION_DAYS = 365
+
+# Message : il appartient aux DEUX parties d'une mission, donc il survit à la
+# suppression d'un compte et sert de trace quand un désaccord arrive longtemps
+# après la mission. Le délai court à partir de l'envoi.
+MESSAGE_RETENTION_DAYS = 730
+
+# Fréquence du passage de purge (minutes). L'index TTL reste la garantie de
+# fond ; ce balayage applique les mêmes règles côté application et les rend
+# observables. Une fois par jour suffit largement.
+RETENTION_SWEEP_INTERVAL_MINUTES = int(os.environ.get('RETENTION_SWEEP_INTERVAL_MINUTES', '1440'))
+
 # --- Vérification email (OTP) ---
 _env_email_otp_secret = os.environ.get('EMAIL_OTP_SECRET', '').strip()
 if _env_email_otp_secret:
