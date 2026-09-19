@@ -1257,15 +1257,25 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   relevés locaux — plus élevés de 1,9 à 2,5 fois (Python : 33-42 s / 17 s) et de
   2,6 à 4,6 fois (Node : 83-146 s / 32 s) — le représentaient mal.
 * **le périmètre des rejeux est DÉRIVÉ DE LA TABLE, pas choisi par le job** :
-  les 18 mutations Node démarrent chacune un runner Vitest (**32 s sur les 77 s
-  du job** `frontend-build`) et les 11 Python un pytest par mutation
-  (**17 s**). Les trois étapes qui rejouent une preuve — les deux runners et le
-  rejeu OG — demandent donc à la table si leur rejeu est dû, plutôt que de
-  choisir chacune son filtre : le workflow passe la base de la PR (ou rien sur
-  `main`) et la dérivation vit dans le harnais, qui possède la table. Le
-  registre déclare ces étapes (`rejeux`), et le harnais REFUSE un registre où un
-  runner déclaré n'a pas d'étape : une mutation que personne ne rejoue serait
-  un garde aveugle.
+  les 18 mutations Node démarrent chacune un runner Vitest et les 11 Python un
+  pytest par mutation. Mesuré sur le run 35464937754 (celui qui a livré cette
+  dérivation) : étape Node **25 s sur les 61 s du job** `frontend-build`, étape
+  Python **17 s** sur les 141 s de `backend-tests` — et **32 s sur 77 s** pour
+  la même étape Node au run 35457261081 : deux runs, de la variance, pas deux
+  mesures comparables. Le rejeu OG coûte désormais **deux étapes** : la question
+  de portée (1 s, qui n'existe que pour que le YAML ne décide pas) puis le rejeu
+  lui-même (3 s, quand il est dû). Les trois étapes qui rejouent une preuve —
+  les deux runners et le rejeu OG — demandent donc à la table si leur rejeu est
+  dû, plutôt que de choisir chacune son filtre : le workflow passe la base de la
+  PR (ou rien sur `main`) et la dérivation vit dans le harnais, qui possède la
+  table. Le registre déclare ces étapes (`rejeux`), et le harnais REFUSE un
+  registre où un runner déclaré n'a pas d'étape : une mutation que personne ne
+  rejoue serait un garde aveugle.
+
+  Ce que coûte une PR qui ne touche AUCUN garde, lui, n'est mesuré qu'en local
+  pour l'instant (0 mutation retenue, sortie « rien à rejouer ici », ~1 s) : le
+  chiffre du runner pour ce cas sera lu sur la première PR qui n'en touche
+  aucun — je ne l'affirme pas avant.
 
   Trois garde-fous, tous dans le sens de l'erreur sûre : si la **table** ou le
   **harnais** a bougé, la portée n'est plus une information fiable et TOUT est
