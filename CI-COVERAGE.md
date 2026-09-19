@@ -975,10 +975,12 @@ cette égalité tenable sont verrouillés par des tests depuis F17.
 
 Ce qui tient F16, ce sont les refus de `frontend/scripts/gen-og-images.py` : deux
 cartes pour une même route, carte incomplète, route qui n'est pas un chemin absolu,
-dossier sans aucune carte, clé i18n absente ou vide, texte que la carte ne peut pas
-porter (mot plus large que la colonne, plus de lignes que la mise en page n'en
-réserve), bloc plus haut que la carte. Sans eux, une carte pourrait annoncer autre
-chose que sa page en restant « conforme » au manifeste.
+dossier sans aucune carte, clé i18n absente ou vide, mot plus large que la colonne,
+plus de lignes que la mise en page n'en réserve — et un bloc plus haut que la carte,
+qui est un FILET pour la CONSTANTE de mise en page, jamais un refus qu'un texte
+déclenche (les 3 lignes de titre et 4 de description que `LAYOUTS` réserve tiennent :
+340 px sur les 550 de la wide, 380 sur les 670 de la carrée). Sans ces refus, une
+carte pourrait annoncer autre chose que sa page en restant « conforme » au manifeste.
 
 Or **aucun test du dépôt ne les exerçait**. Deux fichiers mentionnaient bien le
 générateur — `scripts/__tests__/check-og-assets.test.js` et
@@ -986,19 +988,22 @@ générateur — `scripts/__tests__/check-og-assets.test.js` et
 que le NOM (l'égalité générateur ↔ manifeste) : neutraliser un de ces refus ne
 faisait rougir personne. C'était le seul faux vert que F16 pouvait encore produire.
 
-**Correctif — `backend/tests/test_gen_og_images.py`** (24 tests). Le module est
-chargé par son CHEMIN (comme `test_dmarc_policy.py` charge
+**Correctif — `backend/tests/test_gen_og_images.py`** (22 cas). Le module est chargé
+par son CHEMIN (comme `test_dmarc_policy.py` charge
 `backend/scripts/dmarc_policy.py`) et son `CARDS_DIR` est redirigé vers un dossier
-temporaire : aucun fichier du dépôt n'est écrit. Les refus sont tous vérifiables
-**sans police de référence et sans image produite** — la CI n'a ni Arial ni besoin
-des PNG, alors que ce sont ces refus qui décident de ce que les cartes disent. Le
-cas « texte trop large » s'éprouve avec des textes absurdes (80 « A » pour une
-colonne de 200 px, 400 mots pour 3 lignes) : sur un runner sans Arial, la police de
-repli mesure autrement mais pas assez pour les faire tenir, donc le verdict ne
-dépend pas de la machine. Deux tests ne vérifient pas un refus mais l'invariant qui
-rend F16 possible : les lignes repliées, rejointes par une espace, redonnent le
-texte publié par la page — c'est ce qui autorise `check-og-assets.js` à comparer
-les lignes du manifeste à `fr.json`.
+temporaire : aucun fichier du dépôt n'est écrit. Chaque cas est un refus, ou
+l'invariant qui le rend tenable : le texte replié redonne le texte publié par la page
+— c'est ce qui autorise `check-og-assets.js` à comparer les lignes du manifeste à
+`fr.json` — et les lignes réservées par `LAYOUTS` tiennent dans la carte, ce qui est
+la vérification qui donne son sens au filet ci-dessus. Aucune assertion ne porte sur
+la FORMULATION d'un message : chacune nomme le coupable pris dans l'entrée du test
+(fichier, champ, clé i18n, route, mot), donc reformuler un refus ne rougit pas la
+suite. Les refus sont tous vérifiables **sans police de référence et sans image
+produite** — la CI n'a ni Arial ni besoin des PNG, alors que ce sont ces refus qui
+décident de ce que les cartes disent. Le cas « texte trop large » s'éprouve avec des
+textes absurdes (80 « A » pour une colonne de 200 px, 400 mots pour 3 lignes) : sur un
+runner sans Arial, la police de repli mesure autrement mais pas assez pour les faire
+tenir, donc le verdict ne dépend pas de la machine.
 
 Les faits que le GÉNÉRATEUR possède sont **lus sur le module**, jamais recopiés
 dans le test : la liste des champs exigés (`REQUIRED_CARD_KEYS`, un cas par champ)
@@ -1006,56 +1011,37 @@ et la police du titre de la wide (`LAYOUTS`, par `fonts_for`). Une liste écrite
 mémoire deviendrait fausse en silence — exactement le défaut que cette passe
 supprime — et c'est prouvé par mutation (voir plus bas).
 
-**Preuves — huit mutations, un refus neutralisé par mutation** (chaque ligne `if … :`
-remplacée par un `if False:` de même indentation, sur le fichier réel, restauré à
-l'empreinte SHA-256 près) :
+**Preuve automatique — `.github/scripts/check-og-test-mutations.py`**, étape du job
+`backend-tests`. Un test qu'on n'a jamais vu échouer ne prouve rien, et cette preuve
+n'existait jusqu'ici que HORS du dépôt — huit mutations manuelles du fichier réel,
+restaurées à l'empreinte SHA-1 — donc rien ne pouvait la rejouer depuis un checkout.
+Le garde copie dans une arborescence TEMPORAIRE le fichier de test, le générateur et
+le dictionnaire (mêmes profondeurs), exige que la suite PASSE sur les copies intactes
+— l'état de référence, sans lequel n'importe quel rouge serait un faux positif —,
+puis neutralise **un refus à la fois** en remplaçant la LIGNE ENTIÈRE par `if False:`
+(le motif est la ligne, pas une sous-chaîne : la priorité des opérateurs avait rendu
+fausse une première mutation manuelle, `if False and … or …`, dont la seconde moitié
+survivait) et exige que la suite ÉCHOUE. Les **9 refus** font 9 rouges en 10 s sur
+`main` ; une mutation sans effet (« ce refus n'est verrouillé par rien »), une ligne
+de refus introuvable et un état de référence rouge échouent au nom du refus concerné.
+Le dépôt n'est jamais modifié, donc il n'y a plus d'empreinte à restaurer.
 
-| Refus neutralisé | Rouge |
-|---|---|
-| deux cartes pour la même route | **2** — le refus nommé, et « rien n'est écrit quand la donnée est refusée » |
-| champ de carte manquant | **6** — les 5 champs, plus le champ blanc |
-| route pas un chemin absolu | **1** |
-| clé i18n absente | **6** — les 5 formes de clé, plus la description |
-| plus de lignes que réservé | **1** |
-| mot plus large que la colonne | **1** |
-| bloc plus haut que la carte wide | **1** — filet, voir ci-dessous |
-| bloc plus haut que la carte carrée | **1** — filet, voir ci-dessous |
-
-**Le refus « bloc plus haut que la carte » est un FILET, qu'aucune carte
-n'atteint.** `LAYOUTS` réserve au plus 3 lignes au titre et 4 à la description, et
-ce maximum tient dans la carte : 340 px sur les 550 de la wide, 380 sur les 670 de
-la carrée — vérifiable en appelant les deux renderers avec ces deux nombres de
-lignes, aucun refus n'est levé (mesuré le 19/09/2026, cf. la docstring des deux
-cas). Ils restent donc pour la CONSTANTE de mise en page : ils rougissent si les
-lignes réservées s'élargissent sans que la carte grandisse, jamais pour un texte
-réel. La ligne du tableau dit seulement qu'une mutation de ce `if` fait rougir un
-test — pas qu'un partage social peut la déclencher.
+**Et le garde est prouvé lui-même** — `backend/tests/test_og_mutation_guard.py` (6
+cas) : il refuse une suite qui passe TOUJOURS malgré la mutation (le cas central : le
+garde ne se contente pas de lancer pytest, il exige un rouge), une ligne de refus
+absente du générateur et un périmètre incomplet ; il passe sur le dépôt réel par le
+même appel que la CI ; et chaque entrée de sa table neutralise UNE seule ligne du
+vrai générateur.
 
 **Mutation du champ exigé — la dérivation suit le générateur** (rejouée le
 19/09/2026 sur le fichier réel : `REQUIRED_CARD_KEYS` reçoit un sixième champ,
-`alt`) : la collecte passe de **24 à 25 cas** et le nouveau cas
-`test_nomme_le_fichier_et_le_champ_manquant[alt]` est bien là — l'ancienne liste
-recopiée n'aurait produit aucun cas pour ce champ. La suite rougit en **nommant**
-le champ, par les tests qui attendent une carte acceptée :
-
-```
-test_deux_routes_differentes_sont_acceptees → SystemExit:
-  og-cards/jobs.json : champ(s) manquant(s) alt — une carte nomme la route qu'elle sert…
-test_refuse_la_seconde_en_nommant_les_deux_fichiers →
-  « og-cards/premiere.json : champ(s) manquant(s) alt » (le champ est vérifié avant la route)
-3 failed, 22 passed
-```
-
+`alt`) : la collecte passe de **22 à 23 cas**, et le nouveau cas est bien COLLECTÉ —
+une liste recopiée dans le test n'aurait produit aucun cas pour ce champ. **2 échecs**
+nomment le champ (`og-cards/jobs.json : champ(s) manquant(s) alt`) : ce sont les deux
+cas qui attendent une carte ACCEPTÉE (le refus de doublon et celui de route non
+absolue tombaient désormais sur le champ manquant, vérifié avant eux) ;
 `gen-og-images.py` restauré à l'empreinte SHA-1
-`a94e9b9cdc2fe6e31862e0b5acacf3cf3f7690a1` — identique avant et après.
-
-`frontend/scripts/gen-og-images.py` restauré à l'empreinte
-`99f301db42f26f7517ed7cb373d8551be45418464128215b2e184b5d850ae355` — identique
-avant et après la passe. Un détail de méthode, parce qu'il a failli me tromper : la
-**première** forme de mutation (`if False and <condition>`) laissait survivre la
-seconde moitié d'une condition `… or …` (priorité des opérateurs), donc la branche
-« clé vide » passait sans rien prouver — c'est en changeant de forme, pas en
-relisant le tableau, que le sixième rouge est apparu.
+`a94e9b9cdc2fe6e31862e0b5acacf3cf3f7690a1`, identique avant et après.
 
 **Limites assumées** : le refus tombe à la LECTURE des données, donc une clé i18n
 absente sur la 2ᵉ carte laisse la 1ʳᵉ carte déjà écrite dans `public/` — le verdict
@@ -1087,7 +1073,8 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
-| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (24 tests : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet, inatteignable par une carte : le maximum de lignes que `LAYOUTS` réserve tient dans la carte** —, **sans police de référence ni image produite**, l'invariant lignes repliées ↔ texte publié, et « rien n'est écrit quand la donnée est refusée ») ; la liste des champs exigés et la police du titre sont LUES sur le générateur, jamais recopiées ; + **huit** mutations rejouées le 19/09/2026 sur le fichier réel, chacune neutralisant UN refus par un `if False:` (2, 6, 1, 6, 1, 1, 1 et 1 tests rouges) **et** une mutation du champ exigé (un sixième champ ajouté à `REQUIRED_CARD_KEYS` → collecte 24 → **25 cas**, suite rouge nommant le champ), restauré aux empreintes identiques (§3 F17) |
+| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus les deux invariants : lignes repliées ↔ texte publié, et lignes réservées qui tiennent dans la carte) ; la liste des champs exigés et la police du titre sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés AUTOMATIQUEMENT dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py` (**9 refus, 9 rouges, le dépôt jamais modifié**), et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
+| `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (6 cas : une suite qui passe TOUJOURS malgré la mutation est refusée avec son `::error`, une ligne de refus absente est une erreur, un périmètre incomplet est une erreur, le câblage dans `backend-tests`, chaque entrée neutralise UNE ligne du vrai générateur, et le garde passe sur le dépôt réel par le même appel que la CI) |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de
