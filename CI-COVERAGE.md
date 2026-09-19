@@ -1272,10 +1272,13 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   registre où un runner déclaré n'a pas d'étape : une mutation que personne ne
   rejoue serait un garde aveugle.
 
-  Ce que coûte une PR qui ne touche AUCUN garde, lui, n'est mesuré qu'en local
-  pour l'instant (0 mutation retenue, sortie « rien à rejouer ici », ~1 s) : le
-  chiffre du runner pour ce cas sera lu sur la première PR qui n'en touche
-  aucun — je ne l'affirme pas avant.
+  Ce que coûte une PR qui ne touche AUCUN garde est désormais mesuré sur le
+  runner aussi (run 35465610175, PR de documentation seule) : étape Node **1 s**
+  (0 mutation retenue), étape Python **4 s** au lieu des 17 s qu'elle payait en
+  rejouant tout, et rejeu OG **sauté** (question de portée 1 s, étape de rejeu
+  0 s). Jobs : `frontend-build` 45 s au lieu de 61, `backend-tests` 130 s. C'est
+  le seul cas où le filtre économise vraiment — une PR qui touche un garde
+  rejoue, par construction, tout ce que ce garde implique.
 
   Trois garde-fous, tous dans le sens de l'erreur sûre : si la **table** ou le
   **harnais** a bougé, la portée n'est plus une information fiable et TOUT est
