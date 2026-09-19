@@ -29,7 +29,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Audits détectent les régressions** | 4 contrôles injectés qui doivent sortir en échec : `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes`. C'est un **méta-test** : si un garde devient aveugle, ce job rougit. | Non — c'est le job le mieux conçu du lot. Mais il ne couvre que **4** contrôles, sur la vingtaine que le workflow exécute : les autres doivent leur crédibilité à leurs propres tests (§4). |
 | **Workflow lint (actionlint + shellcheck)** | YAML/expressions de `ci.yml` invalides ; shellcheck sur `.github/scripts/*.sh` et `backend/scripts/*.sh` (les deux globs résolvent : `resolve-vercel-url.sh`, `loadtest_real_flow.sh`). | Non. Seul `rhysd/actionlint` est **épinglé** (`v1.7.12`). |
 | **Fly env doc-prod (drift + secrets)** | Formats des références du dépôt (`--refs-only`, sans réseau) ; drift `fly.toml` ↔ runtime ; secret obligatoire manquant ; doublon `[env]`↔secret ; secret orphelin ; clé `.env.example` absente de Fly. **Token absent → `exit 2` → job rouge** (échec bruyant, pas de saut). | Partiellement : les formats des **secrets déployés** (via `flyctl ssh`) et le snapshot de digests sont silencieusement inopérants (§3, F4). |
-| **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict. | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
+| **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict, et le garde des durées publiées (`check-privacy-policy.py`, §3 F18). | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
 | **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles mais encore larges (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. |
@@ -1125,6 +1125,56 @@ message n'est pas celui de la convention du générateur ; et le RENDU (polices
 réellement retenues, octets des PNG) reste prouvé par `check-og-reproducible.js` et
 `check-og-assets.js`, pas par ces tests.
 
+### F18 — Les durées de conservation publiées pouvaient dériver sans que rien ne rougisse — **fermé le 19/09/2026**
+
+Pendant combien de temps une donnée vit en base était écrit à TROIS endroits qui ne se
+parlaient pas : `expireAfterSeconds` en clair dans l'index TTL de `kojo_core.py`, la
+durée réellement inscrite dans le document à la création (`expires_at` d'un paiement —
+48 h écrit en clair dans `kojo_routers_payments.py`, `expires_at` d'un OTP), et le
+chiffre cité dans la politique de confidentialité. Aucun test ne les confrontait :
+changer un délai laissait le document annoncer l'ancien indéfiniment, en silence.
+C'est le motif F17 appliqué à un document de conformité — sauf qu'ici l'écart ne
+casse rien, il fait seulement mentir un document que personne ne relit.
+
+`backend/kojo_retention.py` possède désormais les durées : `kojo_core` crée ses index
+TTL depuis `RETENTION_RULES` (plus un seul `expireAfterSeconds` littéral),
+`kojo_routers_payments.py` lit `PAYMENT_PENDING_EXPIRY_HOURS`, et le tableau de
+`PRIVACY.md` est ENGENDRÉ par `.github/scripts/check-privacy-policy.py`. Le garde
+importe le module réel, compare ligne par ligne et nomme la collection et la colonne
+fautives ; il ÉCHOUE plutôt que de passer quand il ne peut pas conclure (module
+importable, marqueurs du bloc présents). Il est le SEUL exécutant de cette preuve sur
+le dépôt réel (étape du job `backend-tests`, ≈ 0,55 s mesurés hors CI : les trois
+mesures locales donnent 546, 578 et 540 ms) ; `backend/tests/test_privacy_policy_guard.py`
+ne la rejoue pas — il prouve, sur des copies mutées hors du dépôt, qu'un écart est
+refusé et nommé.
+
+**Les durées sont appliquées, et c'est une mesure** (ajouté le 19/09/2026) : les sept
+règles sont traduites en filtre par `RegleDeConservation.query_de_purge`, et
+`backend/tests/test_retention_purge.py` (10 cas) le vérifie DES DEUX CÔTÉS — ce qui
+doit disparaître disparaît, ce qui doit survivre survit (un compte ACTIF portant une
+échéance ancienne, un paiement complété). Le document de compte supprimé porte
+désormais son échéance : sans elle, le filtre exige `purge_at` et la durée publiée
+aurait été purement décorative. Sept mutations rejouées le 19/09/2026 sur les fichiers
+réels (filtre du compte supprimé, seuil des règles à date de création, fusion du filtre
+partiel, symbole de la durée, écriture de l'échéance, périmètre de la purge, comparaison
+des dates BSON dans la FakeDB) font chacune rougir **le test qui possède cette
+garantie** — le nom est vérifié dans la ligne `FAILED`, pas seulement « un test a
+échoué » — restaurées à l'empreinte SHA-1 identique des quatre fichiers. La FakeDB
+a dû apprendre à comparer des dates BSON : les modèles écrivent de vrais `datetime`,
+donc une plage sur une date rendait `False` et la purge ne trouvait jamais rien, en
+silence. `--write` écrit désormais en LF (`newline=""`) : sous Windows il convertissait
+auparavant TOUT le document en CRLF alors que `.gitattributes` fixe `*.md text eol=lf`,
+une conversion que `git diff` ne montre pas (git normalise au commit).
+
+**Limites assumées** : le tableau ne couvre que les collections PURGÉES
+automatiquement — `jobs`, `job_proposals`, `reviews`, `worker_profiles` et
+`push_tokens` ne sont bornées que par la suppression du compte qui les porte, ce que
+`PRIVACY.md` §3 déclare ; la prose du document n'a pas de garde, donc seule la recopie
+d'une durée engendrée dans cette prose est refusée (par un test, pas par le garde) ; et
+le garde compare la valeur ÉVALUÉE du module, donc une variable d'environnement qui
+déplace `EMAIL_OTP_EXPIRY_MINUTES` en production n'est pas vue par la CI, qui tourne
+sans elle — le document le dit à l'endroit où il compte (§3).
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -1147,15 +1197,37 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus dérivés de son arbre, chacun rougissant le test qui lui appartient, 3,0 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
 | `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (8 cas : **la dérivation lit chaque `raise SystemExit` et signale celui qu'aucun `if` ne porte**, **la neutralisation vise la portion que l'arbre désigne — une autre ligne qui ressemble reste intacte**, **un test qui rougit sous plusieurs refus n'en verrouille aucun**, un refus que personne n'exerce est signalé, une suite déjà rouge arrête tout avant la première mutation, un périmètre incomplet est une erreur ; sur le vrai générateur, la dérivation couvre chaque `raise` et chaque condition est neutralisable ; les décisions se testent sur des verdicts ÉCRITS D'AVANCE — **ces cas n'exécutent jamais pytest** — et le dernier contrôle exige UNE occurrence du commandement, dans le job `backend-tests`, celui qui installe les dépendances de l'étape) ; la partie VERTE du garde n'a qu'un exécutant, l'étape de CI, et **huit mutations, une par cas, rejouées le 19/09/2026 sur une copie du garde (dépôt jamais touché, code 1 et `1 failed` à chaque fois)** montrent que chaque cas sait échouer |
-| **`check-prerender-shells.js`** | **rien** |
+| `check-privacy-policy.py` | `backend/tests/test_privacy_policy_guard.py` (14 cas mesurés le 19/09/2026, 4,3 s : sur une COPIE du dépôt, une durée changée dans le module, une ligne retirée du document, une cellule éditée à la main, une collection ajoutée au code sans ligne, une ligne publiée que le code ne porte pas, des marqueurs absents, un module absent et `--write` qui répare — chacun rend **1** en nommant la collection et la colonne ; plus les invariants de propriétaire unique : plus aucun `expireAfterSeconds` littéral dans `kojo_core`, chaque règle créant SON index avec son filtre partiel, les mots des durées calculés et non recopiés, aucune durée engendrée recopiée dans la prose du document, et UNE occurrence du commandement, dans le job qui installe `requirements.txt`) ; six mutations rejouées le 19/09/2026 sur les fichiers réels (document, règle, `kojo_settings`, filtre partiel, `kojo_core`), chacune rouge et nommée, restaurées à l'empreinte SHA-1 identique des quatre fichiers — §3 F18 |
+| `check-prerender-shells.js` | `scripts/__tests__/check-prerender-shells.test.js` (11 tests : le garde EXÉCUTÉ en sous-processus sur une arborescence de build fixture conforme — vérifiée verte — puis neuf régressions injectées une à une : `#root` vidé, modulepreload du chunk Home perdu, h1 de login retiré, champ de formulaire register retiré, `og:image` d'une coquille retiré (carte LUE dans la table unique), coquille absente du build, page pré-rendue routée d'un seul côté, catch-all `/(.*)` réintroduit, `vercel.json` illisible — chacune exige `exit 1` ET le message qui nomme le coupable) |
 
-`check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de
-fichier `check-prerender-shells.test.js`, aucune fixture, aucune entrée dans le
-méta-test. Autrement dit, rien dans le dépôt ne démontre qu'il sait échouer. S'il
-devenait aveugle (mauvaise condition, chemin d'artefact modifié par une montée de
-version de Vite), la CI resterait verte sans que personne ne le voie — c'est le
-seul garde dans ce cas, et c'est la première chose à corriger si l'on veut que
-« les gardes sont testés » soit une affirmation vraie sans exception.
+`check-prerender-shells.js` était, jusqu'au 19/09/2026, le **seul** garde du
+dépôt dont rien ne démontrait qu'il sait échouer : référencé uniquement par
+`ci.yml`, sans fixture ni test. S'il devenait aveugle (mauvaise condition, chemin
+d'artefact modifié par une montée de version de Vite), la CI serait restée verte
+sans que personne ne le voie.
+
+Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne :
+
+* `.github/scripts/guard-proofs.json` déclare **chaque** garde du dépôt
+  (`frontend/scripts/`, `.github/scripts/`, `backend/scripts/`) avec son rôle,
+  qui l'exécute, et sa preuve ;
+* `backend/tests/test_guard_failure_proofs.py` refuse un garde exécuté par la CI
+  sans preuve REJOUBABLE : le fichier doit exister, être collecté par le runner
+  déclaré (Vitest ou pytest), et **nommer** le garde qu'il prouve ; il refuse
+  aussi un garde que RIEN n'exécute s'il n'est pas déclaré comme tel avec un
+  motif **et** consigné au §7 ci-dessous ;
+* `.github/scripts/check-guard-mutations.py` rejoue les mutations déclarées :
+  neutraliser une ligne d'un garde **réel** doit faire rougir SA preuve en la
+  nommant — le fichier est restauré à l'octet et son empreinte SHA-1 vérifiée,
+  et une mutation dont le littéral a disparu est un ÉCHEC (sinon un refactor
+  suffirait à éteindre la preuve en silence) ;
+* le registre refuse enfin une mutation qui ne vise pas le garde lui-même ou qui
+  n'a aucun effet (`trouve == remplace`) ; les deux runners sont rejoués par la
+  CI, Python dans `backend-tests` et Node dans `frontend-build`, et le fichier de
+  couverture vérifie la présence de ces deux invocations.
+
+Ajouter un garde sans preuve d'échec est donc désormais un rouge, pas une
+découverte fortuite.
 
 ### Une preuve, un exécutant
 
@@ -1535,6 +1607,14 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    évite la panne reste : backend (`FRONTEND_APP_URL` / `CORS_ORIGINS`) d'abord,
    frontend ensuite. Les réessais de la sonde (6 × 15 s) absorbent la fenêtre du
    déploiement Fly, qui tourne dans le même run.
+10. **`frontend/scripts/audit_tdz.cjs` n'a AUCUN exécutant** : ni workflow, ni
+    test, ni script npm ne l'appelle. C'est un audit statique ponctuel (classe
+    TDZ), déclaré comme tel dans `.github/scripts/guard-proofs.json`
+    (`invoque_par: "aucun"`) avec son motif — et c'est la SEULE entrée dans ce
+    cas : `backend/tests/test_guard_failure_proofs.py` refuse tout autre garde
+    sans preuve rejouable, et exige qu'un garde sans exécutant soit consigné
+    ici même. L'angle mort est donc NOMMÉ plutôt que silencieux ; en sortir
+    demande de l'exécuter quelque part (test ou étape).
 
 ## 8. Tenir ce document à jour
 

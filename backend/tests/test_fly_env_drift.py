@@ -417,31 +417,6 @@ class TestCheckReferenceFormats:
         assert not any("FLY_API_TOKEN" in line for line in bloc), bloc
 
 
-def _secrets_miroir_du_repo(check):
-    """Table de secrets Fly ARTIFICIELLE qui satisfait tous les contrôles.
-
-    Construite depuis les références RÉELLES du dépôt (.env.example +
-    DEPLOY_FLYIO.md), moins les clés déjà publiques dans fly.toml [env] (sinon
-    DOUBLON), les optionnelles et le snapshot. Sert de base neutre : on y
-    ajoute ensuite un secret pour n'observer QUE la règle testée.
-    """
-    fly_env = check.parse_fly_toml_env(check.FLY_TOML.read_text(encoding="utf-8"))
-    example = set(check.parse_env_example(check.ENV_EXAMPLE.read_text(encoding="utf-8")))
-    required = set(check.required_secrets_from_deploy_doc())
-    keys = (
-        (example | required)
-        - set(fly_env)
-        - set(check.OPTIONAL_KEYS)
-        - set(check.NON_SENSITIVE_SNAPSHOT)
-    )
-    return {k: "digest" for k in sorted(keys)}
-
-
-def _live_env_fly_toml(check):
-    """Environnement runtime simulé = [env] de fly.toml (donc aucun drift)."""
-    return check.parse_fly_toml_env(check.FLY_TOML.read_text(encoding="utf-8"))
-
-
 class TestOrphelinsBoutEnBout:
     """Le check ORPHELINS doit FAIRE ÉCHOUER le job, pas seulement exister.
 
@@ -450,10 +425,75 @@ class TestOrphelinsBoutEnBout:
     et le code de sortie réellement non nul. Sans eux, un refactor pouvait
     retirer l'appel — ou l'une des sources — et la CI serait restée verte en ne
     détectant plus aucun secret déployé absent des références du dépôt.
+
+    Tout se mesure en UNE exécution de main(), hors ligne, sur des références
+    FIXTURE. L'audit des formats des fichiers RÉELS est déjà payé par l'étape
+    `--refs-only` de la CI (dont le verdict est mesuré par
+    `TestCheckReferenceFormats`) ; le repayer ici ne le rendrait pas plus vrai.
+    Le montage est donc construit pour que la SEULE divergence possible soit
+    celle qu'on plante — ce qui remplace l'ancien cas « base neutre », un second
+    main() qui ne servait qu'à prouver que l'échec venait bien de l'injection.
     """
 
+    # Références fixture : des valeurs CONFORMES (mêmes formes que les vraies,
+    # mêmes validateurs), pour que le seul écart mesuré soit celui qu'on injecte.
+    FLY_TOML_FIXTURE = (
+        "[env]\n"
+        "BACKEND_PUBLIC_URL = 'https://api.kojoforafrica.cc.cd'\n"
+        "FRONTEND_APP_URL = 'https://kj-update-fevrier.vercel.app'\n"
+        "TRUSTED_HOSTS = '*.internal,api.kojoforafrica.cc.cd'\n"
+    )
+    # Doc avec un bloc `fly secrets set` : deux secrets REQUIS (les placeholders
+    # « ... » ne sont pas validés) — `required` est donc déterministe, sans
+    # dépendre du contenu de DEPLOY_FLYIO.md.
+    DEPLOY_DOC_FIXTURE = (
+        "# Déploiement\n\n"
+        "```bash\n"
+        "fly secrets set \\\n"
+        "  MONGO_URL=... \\\n"
+        "  JWT_SECRET=...\n"
+        "```\n"
+    )
+    # Une clé OPTIONNELLE et vide : la couverture .env.example l'ignore.
+    ENV_EXAMPLE_FIXTURE = "CORS_ORIGINS=\n"
+    # La TROISIÈME source : une clé que SEUL kojo_settings.py nomme.
+    SETTINGS_FIXTURE = (
+        "import os\n\n"
+        'SETTINGS_ONLY = os.environ.get("SECRET_LU_DANS_KOJO_SETTINGS_SEULEMENT")\n'
+    )
+    SECRETS_FIXTURE = {
+        # Requis par la doc fixture → présence exigée, et couverts.
+        "MONGO_URL": "digest",
+        "JWT_SECRET": "digest",
+        # Référencé par la SEULE troisième source → PAS orphelin.
+        "SECRET_LU_DANS_KOJO_SETTINGS_SEULEMENT": "digest",
+        # Référencé nulle part → le SEUL orphelin attendu.
+        "SECRET_MORT_REFERENCE_NULLE_PART": "digest",
+    }
+
+    @pytest.fixture
+    def references_fixture(self, check, tmp_path):
+        """Pointe le module vers des références FIXTURE (hors ligne, aucun
+        fichier du dépôt lu), et restaure chemins ET caches après le test — le
+        module est partagé par toute la session."""
+        chemins = (check.FLY_TOML, check.ENV_EXAMPLE, check.DEPLOY_DOC, check.SETTINGS)
+        caches = (check._fly_toml_env_cache, check._settings_refs_cache)
+        check.FLY_TOML = tmp_path / "fly.toml"
+        check.ENV_EXAMPLE = tmp_path / ".env.example"
+        check.DEPLOY_DOC = tmp_path / "DEPLOY_FLYIO.md"
+        check.SETTINGS = tmp_path / "kojo_settings.py"
+        check.FLY_TOML.write_text(self.FLY_TOML_FIXTURE, encoding="utf-8")
+        check.ENV_EXAMPLE.write_text(self.ENV_EXAMPLE_FIXTURE, encoding="utf-8")
+        check.DEPLOY_DOC.write_text(self.DEPLOY_DOC_FIXTURE, encoding="utf-8")
+        check.SETTINGS.write_text(self.SETTINGS_FIXTURE, encoding="utf-8")
+        check._fly_toml_env_cache = None
+        check._settings_refs_cache = None
+        yield
+        check.FLY_TOML, check.ENV_EXAMPLE, check.DEPLOY_DOC, check.SETTINGS = chemins
+        check._fly_toml_env_cache, check._settings_refs_cache = caches
+
     def _run(self, check, monkeypatch, secrets):
-        """Exécute main() hors ligne, avec une table de secrets simulée."""
+        """Exécute main() hors ligne : aucun accès réseau, secrets simulés."""
         monkeypatch.setattr(check, "API_TOKEN", "jeton-factice")
         monkeypatch.setattr(
             check,
@@ -462,7 +502,11 @@ class TestOrphelinsBoutEnBout:
                 {
                     "id": "machine-test",
                     "state": "started",
-                    "config": {"env": _live_env_fly_toml(check)},
+                    "config": {
+                        "env": check.parse_fly_toml_env(
+                            check.FLY_TOML.read_text(encoding="utf-8")
+                        )
+                    },
                 }
             ],
         )
@@ -471,46 +515,25 @@ class TestOrphelinsBoutEnBout:
         check.errors, check.checked = [], []
         return check.main([])
 
-    def test_base_miroir_du_repo_passe(self, check, monkeypatch, capsys):
-        # Base neutre : prouve que l'échec du test suivant vient bien de l'ajout
-        # du secret, et non du montage artificiel.
-        rc = self._run(check, monkeypatch, _secrets_miroir_du_repo(check))
-        out = capsys.readouterr().out
-        assert "ORPHELIN" not in out, out
-        assert rc == 0, out
-
-    def test_secret_deploye_absent_des_references_fait_echouer_le_job(
-        self, check, monkeypatch, capsys
+    def test_orphelin_detecte_sans_repayer_l_audit_des_formats(
+        self, check, monkeypatch, capsys, references_fixture
     ):
-        secrets = _secrets_miroir_du_repo(check)
-        secrets["SECRET_MORT_REFERENCE_NULLE_PART"] = "digest"
-        rc = self._run(check, monkeypatch, secrets)
+        # UNE exécution, sur la fixture. Elle porte à la fois un secret déployé
+        # absent des trois sources ET un secret que seul kojo_settings.py nomme
+        # (sans lui, ce cas serait sauté quand le dépôt n'en a plus).
+        rc = self._run(check, monkeypatch, self.SECRETS_FIXTURE)
         out = capsys.readouterr().out
-        assert rc == 1, out
+
+        # 1) Le secret absent des trois sources est NOMMÉ, et le job échoue.
         assert "[ORPHELIN SECRET_MORT_REFERENCE_NULLE_PART]" in out, out
-
-    def test_secret_reference_seulement_dans_kojo_settings_n_est_pas_orphelin(
-        self, check, monkeypatch, capsys
-    ):
-        # Verrouille la TROISIÈME source de `known` : un secret absent de
-        # .env.example et de la doc, mais lu par kojo_settings.py, n'est PAS un
-        # orphelin — sans cette source la CI crierait à tort sur des secrets
-        # bien réels (et l'équipe apprendrait à ignorer le check).
-        fly_env = check.parse_fly_toml_env(check.FLY_TOML.read_text(encoding="utf-8"))
-        publiees = (
-            set(check.parse_env_example(check.ENV_EXAMPLE.read_text(encoding="utf-8")))
-            | set(check.required_secrets_from_deploy_doc())
-            | set(fly_env)
-        )
-        seulement_settings = sorted(check._settings_referenced_keys() - publiees)
-        if not seulement_settings:
-            pytest.skip("aucune clé référencée uniquement dans kojo_settings.py")
-        secrets = _secrets_miroir_du_repo(check)
-        secrets[seulement_settings[0]] = "digest"
-        rc = self._run(check, monkeypatch, secrets)
-        out = capsys.readouterr().out
-        assert "ORPHELIN" not in out, out
-        assert rc == 0, out
+        assert rc == 1, out
+        # 2) C'est la SEULE divergence : la fixture est propre par construction,
+        #    donc un montage cassé (ou un contrôle qui crie à tort) rougit ici
+        #    au lieu de se cacher derrière une base neutre exécutée à part.
+        assert len(check.errors) == 1, check.errors
+        # 3) La troisième source est CÂBLÉE : sans elle, la clé ci-dessous
+        #    deviendrait un second orphelin et l'égalité ci-dessus tomberait.
+        assert all("SECRET_LU_DANS_KOJO_SETTINGS_SEULEMENT" not in e for e in check.errors)
 
     def test_le_check_est_bien_cable_dans_le_workflow_ci(self, check):
         # Un orphelin ne peut être détecté que si le job appelle réellement le

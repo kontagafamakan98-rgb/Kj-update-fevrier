@@ -269,6 +269,10 @@ curl -s https://kojoforafrica.cc.cd/ | grep -c 'href="tel:'        # 2
   (atténuation CGNAT Afrique de l'Ouest).
 - `/api/stats`, `/api/users/{user_id}/profile-photo` et `/api/health` :
   requièrent une authentification / ne divulguent plus l'environnement.
+- **Données personnelles** : ce qui est conservé, ce qui est effacé à la
+  suppression de compte, et pendant combien de temps — `PRIVACY.md`. Les durées
+  de ce document sont engendrées depuis `backend/kojo_retention.py`, le module
+  dont `kojo_core` crée ses index TTL, et la CI refuse une divergence.
 
 ## CI
 

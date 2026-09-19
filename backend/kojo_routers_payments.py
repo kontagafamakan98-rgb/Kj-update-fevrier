@@ -17,6 +17,7 @@ from kojo_settings import (
     OWNER_EMAIL,
     PAYDUNYA_MODE,
     PAYDUNYA_STORE_NAME,
+    PAYMENT_PENDING_EXPIRY_HOURS,
     logger,
 )
 from kojo_core import (
@@ -482,9 +483,15 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
         'commission_amount': breakdown['commission_amount'],
         'worker_amount': breakdown['worker_amount'],
         'idempotency_key': request.idempotency_key or None,
-        # TTL : les factures PENDING jamais terminées sont purgées par
-        # l'index expireAfterSeconds après 48h (voir kojo_core).
-        'expires_at': (datetime.now(timezone.utc) + timedelta(hours=48)).isoformat(),
+        # TTL : les factures PENDING jamais terminées sont purgées par l'index
+        # de kojo_retention après PAYMENT_PENDING_EXPIRY_HOURS. La durée est
+        # NOMMÉE des deux côtés (ici et dans l'index) au lieu d'être écrite en
+        # clair, pour qu'un changement de délai ne puisse pas n'en déplacer
+        # qu'un — ce qui laisserait un document purgé avant sa date, ou
+        # l'inverse.
+        'expires_at': (
+            datetime.now(timezone.utc) + timedelta(hours=PAYMENT_PENDING_EXPIRY_HOURS)
+        ).isoformat(),
         'created_at': datetime.now(timezone.utc).isoformat(),
         'updated_at': datetime.now(timezone.utc).isoformat(),
     }

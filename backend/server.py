@@ -46,7 +46,7 @@ from kojo_payments import (
     paydunya_circuit_state,
     refresh_paydunya_circuit_from_db,
 )
-from kojo_scheduler import payout_stuck_sweeper_loop
+from kojo_scheduler import payout_stuck_sweeper_loop, retention_purge_loop
 from kojo_settings import APP_ENV, APP_VERSION, FRONTEND_APP_URL, logger
 
 
@@ -543,6 +543,10 @@ async def lifespan(application: FastAPI):
     # Surveille les décaissements bloqués (releasing/refunding) : re-vérifie
     # PayDunya et alerte le propriétaire au-delà du seuil (kojo_scheduler).
     payout_sweeper_task = asyncio.create_task(payout_stuck_sweeper_loop())
+    # Applique les règles de conservation (kojo_retention) côté application :
+    # document de compte supprimé, ticket support, message. L'index TTL reste la
+    # garantie de fond ; ce passage est l'étage observable et testable.
+    retention_task = asyncio.create_task(retention_purge_loop())
     logger.info("✅ API Kojo prête!")
 
     yield  # l'application tourne ici
@@ -550,8 +554,9 @@ async def lifespan(application: FastAPI):
     # ---- SHUTDOWN ----
     rate_limit_task.cancel()
     payout_sweeper_task.cancel()
+    retention_task.cancel()
     try:
-        await asyncio.gather(rate_limit_task, payout_sweeper_task)
+        await asyncio.gather(rate_limit_task, payout_sweeper_task, retention_task)
     except asyncio.CancelledError:
         pass
     client.close()

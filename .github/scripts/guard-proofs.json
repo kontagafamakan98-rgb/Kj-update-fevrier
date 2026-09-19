@@ -1,0 +1,336 @@
+{
+  "doc": [
+    "Registre des PREUVES D'ÉCHEC des gardes du dépôt : qui exécute quoi, et",
+    "quelle preuve rejouable démontre que le garde sait ROUGIR.",
+    "",
+    "Un garde dont rien ne démontre qu'il peut échouer est un garde qui peut",
+    "devenir aveugle en silence : c'est le motif F17 de CI-COVERAGE.md, appliqué",
+    "à l'ensemble des gardes. Avant ce fichier, la seule trace était une phrase",
+    "de commit ou une ligne de prose dans CI-COVERAGE.md ; ici, c'est un fait",
+    "vérifié par backend/tests/test_guard_failure_proofs.py (existence de la",
+    "preuve, lien réel vers le garde, classement exhaustif) et, pour les entrées",
+    "qui le déclarent, rejoué par .github/scripts/check-guard-mutations.py.",
+    "",
+    "Règles du fichier :",
+    "  * role = \"garde\"  : le script AUDITE le dépôt et sort en 1 sur un écart ;",
+    "  * role = \"outil\"  : il rend un service (générer, résoudre, rapporter) et",
+    "    ne prononce pas de verdict — jamais un garde déclassé pour faire taire",
+    "    un test, d'où le champ `motif` obligatoire ;",
+    "  * invoque_par = \"ci\" | \"test\" | \"aucun\" : qui l'exécute réellement ;",
+    "  * un garde sans preuve n'est admis que si invoque_par = \"aucun\", avec un",
+    "    `motif` ET une ligne dans CI-COVERAGE.md §7 (angle mort assumé).",
+    "",
+    "`mutations` : les gardes dont la preuve est rejouée par le harnais",
+    "générique (neutralisation d'une ligne du garde RÉEL, preuve exécutée, retour",
+    "au SHA-1 d'origine). Une mutation qui ne fait rien rougir est un échec du",
+    "harnais, pas un succès silencieux.",
+    "",
+    "`attend` : ce que la sortie de la preuve doit NOMMER. La règle est que ce soit",
+    "le TEST PROPRIÉTAIRE du refus (son nom, ou son nodeid `FAILED chemin::test`)",
+    "— jamais un mot du message. Un motif qui ne nomme qu'une formulation passerait",
+    "au vert si la mutation faisait rougir un test VOISIN, c'est-à-dire si le rouge",
+    "ne venait pas de ce refus."
+  ],
+  "gardes": [
+    {
+      "chemin": "frontend/scripts/audit_api_returns.cjs",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/audit_api_returns.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/audit_tdz.cjs",
+      "role": "garde",
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "audit statique ponctuel (classe TDZ) : ni workflow ni test ne l'exécute — seul garde du dépôt sans exécutant, consigné dans CI-COVERAGE.md §7"
+    },
+    {
+      "chemin": "frontend/scripts/check-api-split.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-api-split.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-bundle-size.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-bundle-size.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-cors-preflight.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-cors-preflight.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-generated-icons.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-generated-icons.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-home-shell.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-home-shell.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-job-og-contract.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-job-og-contract.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-og-assets.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-og-assets.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-og-images.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-og-images.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-og-job-200.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-og-job-200.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-og-reproducible.js",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-og-assets.test.js",
+      "runner": "vitest",
+      "motif": "lancé par `npm run check:og-reproducible`, jamais par un workflow : sa preuve est le volet reproductibilité de check-og-assets.test.js"
+    },
+    {
+      "chemin": "frontend/scripts/check-pack2-chunks.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/pack2-size.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-pack2-i18n-hygiene.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-pack2-i18n-hygiene.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-page-meta.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-page-meta.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-prerender-shells.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-pwa-manifest.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-pwa-manifest.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-script-deps.js",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-script-deps.test.js",
+      "runner": "vitest",
+      "motif": "aucun workflow ne l'appelle : sa preuve est son test Vitest, qui vérifie l'état du dépôt"
+    },
+    {
+      "chemin": "frontend/scripts/check-seo-production.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-spa-routes.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
+      "runner": "vitest"
+    },
+    {
+      "chemin": ".github/scripts/check-email-auth.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_email_auth_probe.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-exec-bits.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_exec_bits.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-fly-env-drift.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-guard-mutations.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_guard_mutation_runner.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-og-test-mutations.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_og_mutation_guard.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-privacy-policy.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_privacy_policy_guard.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-test-existence-assertions.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_existence_assertion_guard.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/check-workflow-pins.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_ci_workflow_pins.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": "backend/scripts/audit_docstrings.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_audit_docstrings_meta.py",
+      "runner": "pytest"
+    },
+    {
+      "chemin": "backend/scripts/audit_none_signatures.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_audit_none_signatures.py",
+      "runner": "pytest",
+      "motif": "aucun workflow ne l'appelle : sa preuve est le test qui l'exécute sur le dépôt réel"
+    },
+    {
+      "chemin": ".github/scripts/resolve-vercel-url.sh",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-lhci-env.test.js",
+      "runner": "vitest",
+      "motif": "résolveur d'URL de preview : il ne prononce aucun verdict, sa conformité de câblage est vérifiée par check-lhci-env"
+    },
+    {
+      "chemin": "frontend/scripts/bundle-size-report.js",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/bundle-size-report.test.js",
+      "runner": "vitest",
+      "motif": "rapport de tailles (markdown + baseline) : le verdict appartient à check-bundle-size.js"
+    },
+    {
+      "chemin": "frontend/scripts/gen-og-images.py",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_gen_og_images.py",
+      "runner": "pytest",
+      "motif": "générateur : ses refus sont prouvés par test_gen_og_images.py, et le seul exécutant de cette preuve est check-og-test-mutations.py"
+    }
+  ],
+  "mutations": [
+    {
+      "id": "prerender-shells: catch-all de nouveau tolere",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "if (vercelRewrites.some((r) => r && r.source === '/(.*)')) {",
+      "remplace": "if (false && vercelRewrites.some((r) => r && r.source === '/(.*)')) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": ["npx", "vitest", "run", "scripts/__tests__/check-prerender-shells.test.js", "--reporter=basic"],
+      "cwd": "frontend",
+      "attend": ["refuse : catch-all"]
+    },
+    {
+      "id": "page-meta: langues illisibles tolerees",
+      "garde": "frontend/scripts/check-page-meta.js",
+      "cible": "frontend/scripts/check-page-meta.js",
+      "trouve": "  if (languages.length === 0) {",
+      "remplace": "  if (false && languages.length === 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-page-meta.test.js",
+      "commande": ["npx", "vitest", "run", "scripts/__tests__/check-page-meta.test.js", "--reporter=basic"],
+      "cwd": "frontend",
+      "attend": ["la liste des langues est illisible"]
+    },
+    {
+      "id": "privacy-policy: comparaison cellule neutralisee",
+      "garde": ".github/scripts/check-privacy-policy.py",
+      "cible": ".github/scripts/check-privacy-policy.py",
+      "trouve": "            if attendu_cellule != lignes_doc[collection][colonne]:",
+      "remplace": "            if False and attendu_cellule != lignes_doc[collection][colonne]:",
+      "runner": "python",
+      "preuve": "backend/tests/test_privacy_policy_guard.py",
+      "commande": ["{python}", "-m", "pytest", "tests/test_privacy_policy_guard.py", "-q", "--tb=no"],
+      "cwd": "backend",
+      "attend": ["FAILED tests/test_privacy_policy_guard.py::TestRefus::test_une_cellule_editee_a_la_main_est_refusee"]
+    },
+    {
+      "id": "existence-assertions: detection neutralisee",
+      "garde": ".github/scripts/check-test-existence-assertions.py",
+      "cible": ".github/scripts/check-test-existence-assertions.py",
+      "trouve": "        for line, message in check_file(path, relative):",
+      "remplace": "        for line, message in []:",
+      "runner": "python",
+      "preuve": "backend/tests/test_existence_assertion_guard.py",
+      "commande": ["{python}", "-m", "pytest", "tests/test_existence_assertion_guard.py", "-q", "--tb=no"],
+      "cwd": "backend",
+      "attend": ["FAILED tests/test_existence_assertion_guard.py::TestRefuses::test_main_retourne_1_et_annote"]
+    },
+    {
+      "id": "og-mutations: proprietaire d'un refus non verifie",
+      "garde": ".github/scripts/check-og-test-mutations.py",
+      "cible": ".github/scripts/check-og-test-mutations.py",
+      "trouve": "            owners[refusal] = sorted(set(failures.get(refusal, [])) - others)",
+      "remplace": "            owners[refusal] = sorted(set(failures.get(refusal, [])))",
+      "runner": "python",
+      "preuve": "backend/tests/test_og_mutation_guard.py",
+      "commande": ["{python}", "-m", "pytest", "tests/test_og_mutation_guard.py", "-q", "--tb=no"],
+      "cwd": "backend",
+      "attend": ["FAILED tests/test_og_mutation_guard.py::TestLeRapport::test_un_refus_dont_le_test_rougit_sous_un_autre_refus_est_refuse"]
+    }
+  ]
+}

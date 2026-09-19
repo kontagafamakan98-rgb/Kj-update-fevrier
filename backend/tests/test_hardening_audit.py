@@ -13,6 +13,7 @@ Couvre :
 - Support : le créateur peut suivre le statut de son ticket.
 - Wave indisponible au Mali / Burkina (validate_payment_accounts avec pays).
 """
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -21,9 +22,16 @@ import pytest
 from httpx import AsyncClient
 
 from kojo_core import db
-# La liste des coordonnées à effacer APPARTIENT au routeur : le test la lit au
-# lieu de la recopier, sinon un champ GPS ajouté demain laisserait ce test vert.
-from kojo_routers_users import JOB_LOCATION_FIELDS
+from kojo_models import User
+# Ce qui est effacé à la suppression APPARTIENT au routeur (et, pour les champs
+# hors modèle, au document) : le test LIT ces tables au lieu de les recopier,
+# sinon un champ PII ajouté demain laisserait ce test vert.
+from kojo_routers_users import (
+    ANONYMISATION_CHAMPS,
+    CHAMPS_CONSERVES,
+    CHAMPS_HORS_MODELE,
+    JOB_LOCATION_FIELDS,
+)
 
 from tests.conftest import (
     AUTH_REQUIRED_STATUS,
@@ -511,10 +519,38 @@ class TestAccountDeletion:
         assert job["deleted_at"] is not None
 
     async def test_delete_account_erases_identity_and_referral_pii(self, client: AsyncClient):
-        """Anonymisation RGPD du document CONSERVÉ (obligation comptable) :
-        plus aucun identifiant d'identité ni de quoi recréditer du parrainage —
-        y compris les permissions élevées, qu'un compte supprimé ne peut pas
-        garder."""
+        """Anonymisation RGPD du document CONSERVÉ (obligation comptable).
+
+        Deux propriétés, et c'est la première qui manquait : la COUVERTURE — un
+        champ PII ajouté au modèle `User` sans être effacé rougit ici en le
+        NOMMANT, là où une liste d'assertions recopiée resterait verte — puis
+        l'EFFET — chaque champ classé « effacé » a réellement perdu sa valeur,
+        et aucune de ces valeurs ne subsiste ailleurs dans le document.
+        """
+        # 1. COUVERTURE : l'union des deux tables doit être EXACTEMENT les champs
+        # du modèle `User`, plus les champs de document déclarés hors modèle.
+        modeles = set(User.model_fields)
+        effaces = set(ANONYMISATION_CHAMPS)
+        conserves = set(CHAMPS_CONSERVES)
+
+        non_classes = sorted(modeles - effaces - conserves)
+        assert not non_classes, (
+            f"champ(s) de User ni effacé(s) ni conservé(s) AVEC une raison : "
+            f"{non_classes} — les classer dans ANONYMISATION_CHAMPS (avec la "
+            f"valeur d'effacement) s'ils portent une identité, ou dans "
+            f"CHAMPS_CONSERVES (avec la raison) sinon"
+        )
+        inconnus = sorted((effaces | conserves) - modeles - set(CHAMPS_HORS_MODELE))
+        assert not inconnus, (
+            f"champ(s) classé(s) qui n'existent ni dans User ni dans "
+            f"CHAMPS_HORS_MODELE : {inconnus} — faute de frappe, ou champ de "
+            f"document à déclarer"
+        )
+
+        # 2. EFFET. Les valeurs de la fixture restent RÉALISTES : le document
+        # est relu et validé par le modèle `User` à chaque requête authentifiée,
+        # donc une valeur de forme arbitraire ferait échouer l'appel AVANT même
+        # d'atteindre la suppression (401 « Compte utilisateur invalide »).
         user = await register_and_login(client, BASE_USER)
         headers = {"Authorization": f"Bearer {user['access_token']}"}
         uid = user["user"]["id"]
@@ -530,14 +566,20 @@ class TestAccountDeletion:
             "skills": ["plomberie", "soudure"],
         }})
 
-        # Le nom, la bio et le profil sont en base AVANT la suppression : sans
-        # cette garde, les assertions d'effacement plus bas seraient vraies sur
-        # un compte qui n'en a jamais porté.
+        # Non-vacuité AVANT suppression, DÉRIVÉE de la table : chaque champ
+        # qu'elle dit effacé doit porter autre chose que sa valeur d'effacement,
+        # sinon l'égalité plus bas serait vraie sur un compte qui ne l'a jamais
+        # porté — et un champ neuf que la fixture ne remplit pas est signalé ici
+        # au lieu de passer pour une preuve.
         before = await db_find_one("users", {"id": uid})
-        assert before["first_name"] == "Kojo"
-        assert before["last_name"] == "Test"
-        assert before["bio"].startswith("Je suis Kofi")
-        assert before["skills"] == ["plomberie", "soudure"]
+        vides = sorted(
+            champ for champ, valeur in ANONYMISATION_CHAMPS.items()
+            if before.get(champ) == valeur
+        )
+        assert not vides, (
+            f"champ(s) sans valeur avant suppression (donc effacement NON "
+            f"prouvé) : {vides} — les remplir dans la fixture de ce test"
+        )
 
         resp = await client.delete("/api/users/account", headers=headers)
         assert resp.status_code == 200, resp.text
@@ -546,25 +588,45 @@ class TestAccountDeletion:
         assert stored["deleted"] is True
         assert stored["deleted_at"] is not None
         assert stored["email"].endswith("@kojo.deleted")
-        assert stored["password_hash"] is None
-        # Les PII NOMINATIVES : le document conservé est présenté comme anonymisé,
-        # donc aucune des deux ne peut survivre à la suppression.
-        assert stored["first_name"] is None
-        assert stored["last_name"] is None
-        # La bio est du TEXTE LIBRE : le nom effacé juste au-dessus y revenait
-        # en clair, avec le téléphone de surcroît.
-        assert stored["bio"] is None
-        assert stored["skills"] == []
-        assert stored["phone"] is None
-        assert stored["payment_accounts"] is None
-        assert stored["payment_accounts_count"] == 0
-        assert stored["google_sub"] is None
-        assert stored["profile_photo"] is None
-        assert stored["referral_code"] is None
-        assert stored["referred_by"] is None
-        assert stored["referral_reward_balance"] == 0.0
-        assert stored["referral_rewards"] == []
-        assert stored["permissions"] == []
+        assert stored["email"] != before["email"]
+
+        # 3. Chaque champ effacé porte la valeur d'effacement DÉCLARÉE (celle de
+        # la table, jamais une valeur choisie ici).
+        survivants = sorted(
+            (champ, stored.get(champ), valeur)
+            for champ, valeur in ANONYMISATION_CHAMPS.items()
+            if stored.get(champ) != valeur
+        )
+        assert not survivants, (
+            f"champ(s) sans leur valeur d'effacement [champ, trouvé, attendu] : "
+            f"{survivants}"
+        )
+
+        # 4. Balayage par VALEURS : toute chaîne qui vivait dans un champ effacé
+        # doit avoir disparu du document ENTIER, pas seulement de sa place. Un
+        # champ peut être effacé ici et recopié ailleurs (sous-document, avis,
+        # notification) — la boucle ci-dessus, qui regarde un champ à la fois,
+        # ne le verrait pas.
+        def _chaines(valeur):
+            if isinstance(valeur, str):
+                return [valeur]
+            if isinstance(valeur, dict):
+                return [s for v in valeur.values() for s in _chaines(v)]
+            if isinstance(valeur, (list, tuple)):
+                return [s for v in valeur for s in _chaines(v)]
+            return []
+
+        document = json.dumps(stored, default=str)
+        recopies = sorted({
+            chaine
+            for champ in ANONYMISATION_CHAMPS
+            for chaine in _chaines(before.get(champ))
+            if chaine in document
+        })
+        assert not recopies, (
+            f"valeur(s) du compte supprimé encore présente(s) ailleurs dans le "
+            f"document : {recopies}"
+        )
 
     async def test_delete_account_erases_support_tickets_and_job_locations(
         self, client: AsyncClient
@@ -634,9 +696,6 @@ class TestAccountDeletion:
             f"coordonnée(s) {sorted(leftovers)} du compte supprimé encore en base, "
             f"dans un champ que l'effacement ne couvre pas"
         )
-
-    def _patch_support(self, client):
-        pass
 
 
 @pytest.mark.asyncio

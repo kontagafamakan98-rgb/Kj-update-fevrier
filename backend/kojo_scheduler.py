@@ -21,12 +21,16 @@ from typing import Optional
 from kojo_core import db, resolve_owner_id
 from kojo_email import send_email_via_brevo_api
 from kojo_models import NotificationType
+# Les durées de conservation ne sont pas recopiées ici : la purge demande à
+# chaque règle son filtre (kojo_retention), qui porte aussi l'index TTL.
+from kojo_retention import RETENTION_RULES
 from kojo_settings import (
     OWNER_EMAIL,
     OWNER_USER_ID,
     PAYOUT_ALERT_REMINDER_DAYS,
     PAYOUT_ALERT_THRESHOLD_HOURS,
     PAYOUT_SWEEPER_INTERVAL_MINUTES,
+    RETENTION_SWEEP_INTERVAL_MINUTES,
     logger,
 )
 from kojo_shared import notify_user_localized
@@ -225,3 +229,51 @@ async def payout_stuck_sweeper_loop():
             break
         except Exception as exc:
             logger.warning(f"⚠️ Erreur sweeper décaissements bloqués: {exc}")
+
+
+async def retention_purge_once(now: Optional[datetime] = None) -> dict:
+    """Un passage de purge : supprime ce que les règles de conservation
+    déclarent dû.
+
+    Le filtre vient de `RegleDeConservation.query_de_purge` — la même règle que
+    l'index TTL, donc la purge ne peut pas contredire la durée publiée. Un
+    échec sur une collection n'empêche pas les autres : borner une collection
+    ne doit pas dépendre de l'état d'une autre.
+
+    Retourne {collection: documents supprimés} et ne logge que les passages non
+    vides — un log quotidien qui dit « 0 » finit par être ignoré.
+    """
+    now = now or datetime.now(timezone.utc)
+    supprimes = {}
+    for regle in RETENTION_RULES:
+        try:
+            resultat = await db[regle.collection].delete_many(
+                regle.query_de_purge(now)
+            )
+        except Exception as exc:
+            logger.warning(f"⚠️ Purge de conservation impossible ({regle.collection}): {exc}")
+            continue
+        nombre = getattr(resultat, "deleted_count", 0) or 0
+        if nombre:
+            supprimes[regle.collection] = nombre
+    if supprimes:
+        logger.info(f"🧹 Purge de conservation: {supprimes}")
+    return supprimes
+
+
+async def retention_purge_loop():
+    """Tâche de fond : applique les règles de conservation périodiquement.
+
+    Même modèle que `payout_stuck_sweeper_loop` : sommeil d'abord, annulable
+    proprement au shutdown, erreurs isolées par itération. L'index TTL reste la
+    garantie de fond (il agit même si cette boucle ne tourne pas) ; ce passage
+    est celui qu'un test peut exercer.
+    """
+    while True:
+        try:
+            await asyncio.sleep(RETENTION_SWEEP_INTERVAL_MINUTES * 60)
+            await retention_purge_once()
+        except asyncio.CancelledError:
+            break
+        except Exception as exc:
+            logger.warning(f"⚠️ Erreur purge de conservation: {exc}")

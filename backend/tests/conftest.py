@@ -12,12 +12,49 @@ DEUX MODES DE BASE DE DONNÉES :
    recommandé localement avec Docker : `docker run -d -p 27017:27017 mongo`).
 
 Le but du mode réel : éviter les faux positifs de la FakeDB (atomicité,
-indexes, opérateurs $inc/$push, tri, agrégations réels). Les helpers
-`db_insert` / `db_find` abstraient la différence pour les tests qui
-manipulent des documents directement.
+indexes, agrégations). Les helpers `db_insert` / `db_find` abstraient la
+différence pour les tests qui manipulent des documents directement.
+
+Ce que la FakeDB applique et ce qu'elle REFUSE (audit du 19/09/2026) :
+
+  * requêtes : égalité (sous-document = égalité EXACTE), chemins POINTÉS,
+    `$ne`, `$in`, `$nin`, `$exists`, `$gt`/`$gte`/`$lt`/`$lte` (comparaison
+    typée),    `$regex` + `$options`, `$or`, `$and`, `$geoWithin`/`$centerSphere` ;
+  * écritures : `$set` (chemins pointés compris), `$setOnInsert` (chemin upsert
+    uniquement), `$unset`, `$inc` et `$push` (chemins pointés compris, type
+    numérique préservé), et le REMPLACEMENT (document sans opérateur) ;
+  * tri : à clés MULTIPLES, chacune avec son sens, comparaison NUMÉRIQUE des
+    nombres et lexicographique des chaînes (les dates du dépôt sont des chaînes
+    ISO, donc l'ordre y est chronologique) ;
+  * curseur : `sort` puis `skip` puis `limit`, dans cet ordre (celui de Mongo) ;
+  * `insert_one` attribue et STOCKE un `_id`, et refuse un `_id` dupliqué
+    (`FakeDbDuplicateKey`) : l'index `_id` de Mongo est unique sans que
+    `create_index` ait à le déclarer.
+
+Tout opérateur HORS de ces listes lève `FakeDbUnsupportedOperator`. C'est
+volontaire : un opérateur ignoré en silence rend la requête plus permissive
+qu'en production (« la recherche trouve X » passe sans que rien ne filtre) ou
+fait disparaître une écriture (« le champ n'y est plus » passe sur un champ que
+le code devait poser). Exemples trouvés par cet audit : `$regex` (3
+clauses réelles dans la recherche de missions), `$setOnInsert` (le `created_at`
+d'un code OTP), `skip` appliqué AVANT le tri (donc toute page 2 d'une liste
+paginée), `find_one(sort=…)` trié au TEXTE (le « paiement le plus récent » de
+`kojo_routers_jobs`), `$inc` qui rendait `100.0` là où Mongo écrit `100`, et un
+update par REMPLACEMENT sans effet tout en rendant `modified_count=1`.
+
+Divergences CONNUES, non corrigées : les indexes uniques DÉCLARÉS
+(`create_index(..., unique=True)` : `email`, `id`, `google_sub`, la paire
+`(email, purpose)` des OTP, `(job_id, reviewer_id)` des avis) ne sont PAS
+appliqués — seul `_id` l'est ; `_id` est toujours retiré des résultats, même
+sans projection qui l'exclut (l'inverse d'un faux vert : un test qui le lit
+échoue en local et passerait en production) ; les agrégations (`aggregate`),
+`find_one_and_update`, `bulk_write`, `distinct`, `insert_many` et `replace_one`
+n'existent pas, donc leur emploi lève une AttributeError bruyante plutôt qu'un
+résultat faux (vérifié : aucun de ces appels dans `backend/` hors tests).
 """
 import asyncio
 import os
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -73,6 +110,347 @@ def _unset_path(doc: Dict, path: str) -> None:
     current.pop(parts[-1], None)
 
 
+class _Absent:
+    """Sentinelle : « ce chemin n'existe pas », distinct d'un None stocké."""
+
+    def __repr__(self):
+        return "<absent>"
+
+
+_ABSENT = _Absent()
+
+
+def _get_path(doc: Dict, path: str, sentinelle: Any = None) -> Any:
+    """Valeur d'un chemin POINTÉ (« location.latitude »), comme Mongo la lit.
+
+    La lecture littérale (`doc.get("location.latitude")`) rend toujours None :
+    toute clause visant un sous-champ ne pouvait donc jamais correspondre, ce qui
+    rend le filtre plus strict qu'en production (l'inverse de l'opérateur
+    ignoré, mais tout aussi faux).
+    """
+    courant: Any = doc
+    for part in path.split("."):
+        if not isinstance(courant, dict) or part not in courant:
+            return sentinelle
+        courant = courant[part]
+    return courant
+
+
+def _set_path(doc: Dict, path: str, valeur: Any) -> None:
+    """Écrit un chemin pointé en créant les sous-documents intermédiaires,
+    comme `$set: {"a.b": 1}` en production (sinon la clé "a.b" littérale est
+    créée, et le sous-champ que le code interroge ne bouge jamais)."""
+    parts = path.split(".")
+    courant = doc
+    for part in parts[:-1]:
+        suivant = courant.get(part)
+        if not isinstance(suivant, dict):
+            suivant = {}
+            courant[part] = suivant
+        courant = suivant
+    courant[parts[-1]] = valeur
+
+
+def _push_path(doc: Dict, path: str, valeur: Any) -> None:
+    """`$push` sur un CHEMIN pointé (« stats.vues »).
+
+    L'ancien code faisait `doc.setdefault(cle, []).append(...)` avec la clé
+    LITTÉRALE : un `$push` sur `a.b` créait une clé `"a.b"` à côté du
+    sous-document, donc le tableau que le code relit (`doc["a"]["b"]`) restait
+    inchangé alors que l'écriture était « passée ».
+    """
+    existant = _get_path(doc, path, sentinelle=_ABSENT)
+    if existant is _ABSENT:
+        _set_path(doc, path, [valeur])
+    elif isinstance(existant, list):
+        existant.append(valeur)
+    else:
+        # Mongo refuse `$push` sur un champ qui n'est pas un tableau.
+        raise FakeDbUnsupportedOperator(
+            f"$push sur {path!r} : ce champ existe et n'est pas un tableau"
+        )
+
+
+def _inc_path(doc: Dict, path: str, valeur: Any) -> None:
+    """`$inc` sur un CHEMIN pointé, en PRÉSERVANT le type numérique.
+
+    Deux divergences silencieuses ici : la clé littérale (même cause que
+    `$push`) et le `float()` systématique, qui transformait un compteur entier
+    en `100.0` — un test comparant un solde ou un compteur passait, et la
+    réponse JSON de l'API différait de la production (`100.0` au lieu de `100`).
+    """
+    existant = _get_path(doc, path, sentinelle=_ABSENT)
+    if existant is _ABSENT:
+        _set_path(doc, path, valeur)  # Mongo crée le champ avec l'incrément
+        return
+    est_nombre = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+    if not (est_nombre(existant) and est_nombre(valeur)):
+        raise FakeDbUnsupportedOperator(
+            f"$inc sur {path!r} : {existant!r} n'est pas un nombre (Mongo refuse)"
+        )
+    if isinstance(existant, int) and isinstance(valeur, int):
+        _set_path(doc, path, existant + valeur)   # entier + entier = entier
+    else:
+        _set_path(doc, path, float(existant) + float(valeur))
+
+
+def _vers_utc(valeur: datetime) -> datetime:
+    """Un `datetime` SANS fuseau est lu comme UTC : Mongo stocke des dates BSON
+    sans fuseau, et comparer un naïf avec un aware lève un TypeError que
+    l'appelant interprète comme « aucun match » (donc une purge muette)."""
+    return valeur if valeur.tzinfo else valeur.replace(tzinfo=timezone.utc)
+
+
+def _compare(doc_val: Any, op_val: Any, op: str) -> bool:
+    """Comparaison ordonnée, TYPÉE comme Mongo : deux nombres se comparent,
+    deux chaînes aussi (les dates de ce dépôt sont des chaînes ISO, donc
+    l'ordre lexicographique y est chronologique), et deux types différents ne
+    matchent pas.
+
+    L'ancienne version ne connaissait que `$gte`, en passant par `float()` :
+    composer une plage `$gte` + `$lte` laissait la borne haute ignorée (donc
+    plus de résultats qu'en production), et comparer des dates ISO levait un
+    TypeError interprété comme « aucun match ».
+    """
+    est_nombre = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool)
+    if est_nombre(doc_val) and est_nombre(op_val):
+        gauche, droite = float(doc_val), float(op_val)
+    elif isinstance(doc_val, str) and isinstance(op_val, str):
+        gauche, droite = doc_val, op_val
+    elif isinstance(doc_val, datetime) and isinstance(op_val, datetime):
+        # Les MODÈLES écrivent de vraies dates (`Message.timestamp`,
+        # `SupportTicket.created_at`, `User.created_at`), pas des chaînes ISO :
+        # sans cette branche, toute plage sur une date BSON rendait False, donc
+        # la purge de conservation ne trouvait jamais rien à supprimer — un
+        # faux vert silencieux de plus.
+        gauche, droite = _vers_utc(doc_val), _vers_utc(op_val)
+    else:
+        return False
+    if op == "$gt":
+        return gauche > droite
+    if op == "$gte":
+        return gauche >= droite
+    if op == "$lt":
+        return gauche < droite
+    return gauche <= droite
+
+
+def _regex(valeur: Any, motif: Any, options: str) -> bool:
+    """`$regex` + `$options`, ignorés en silence jusqu'ici.
+
+    Une clause `$regex` ignorée rendait la REQUÊTE ENTIÈRE plus permissive :
+    `GET /jobs?q=...` ramenait tout, donc un test « la recherche trouve cette
+    mission » passait sans que la recherche ne filtre quoi que ce soit.
+
+    Deux détails de Mongo sont respectés ici : un champ TABLEAU est testé
+    élément par élément, et un motif déjà compilé garde ses propres drapeaux.
+    Les deux cas ont un site d'appel réel (`_notify_matching_workers` pour le
+    tableau, `$in` pour un motif dans une liste).
+    """
+    if isinstance(valeur, list):
+        # Mongo applique la clause à un champ TABLEAU en la testant sur CHAQUE
+        # élément : `{"specialties": {"$regex": "^plomberie$"}}` matche un
+        # profil dont la liste contient « plomberie » — cas réel du push matching
+        # de `_notify_matching_workers`. Rendre False sur une liste vidait cette
+        # requête, et le repli « même pays » ne la rattrapait pas toujours (le
+        # job n'a pas de pays).
+        return any(_regex(element, motif, options) for element in valeur)
+    drapeaux = 0
+    if isinstance(motif, re.Pattern):
+        # Un motif DÉJÀ compilé porte ses propres drapeaux (`re.compile("x", re.I)`)
+        # et Mongo les honore : les perdre rendait `$in: [/plomb/i]` toujours faux.
+        drapeaux |= motif.flags
+        motif = motif.pattern
+    if not isinstance(motif, str) or not isinstance(valeur, str):
+        return False  # Mongo n'applique une expression qu'aux chaînes
+    for lettre, drapeau in (
+        ("i", re.IGNORECASE), ("m", re.MULTILINE),
+        ("s", re.DOTALL), ("x", re.VERBOSE),
+    ):
+        if lettre in (options or ""):
+            drapeaux |= drapeau
+    try:
+        return re.search(motif, valeur, drapeaux) is not None
+    except re.error:
+        return False
+
+
+def _dans_la_sphere(doc_val: Any, op_val: Any) -> bool:
+    """$geoWithin / $centerSphere en haversine (Mongo, lui, utilise l'index
+    2dsphere). Document de recherche : {type: Point, coordinates: [lng, lat]}."""
+    import math
+
+    centre = op_val.get("$centerSphere") if isinstance(op_val, dict) else None
+    if not centre or len(centre) != 2:
+        return False
+    doc_coords = doc_val.get("coordinates") if isinstance(doc_val, dict) else None
+    if not doc_coords or len(doc_coords) != 2:
+        return False
+    emplacement, rayon_radians = centre
+    lat1, lng1 = float(emplacement[1]), float(emplacement[0])
+    lat2, lng2 = float(doc_coords[1]), float(doc_coords[0])
+    to_rad = lambda d: d * math.pi / 180.0
+    d_lat = to_rad(lat2 - lat1)
+    d_lng = to_rad(lng2 - lng1)
+    a = (math.sin(d_lat / 2) ** 2
+         + math.cos(to_rad(lat1)) * math.cos(to_rad(lat2)) * math.sin(d_lng / 2) ** 2)
+    distance_km = 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return distance_km <= rayon_radians * 6371.0
+
+
+def _cle_de_tri(valeur: Any):
+    """Clé de tri qui ne compare pas des nombres comme du texte.
+
+    `sorted(key=str(doc.get(champ, "")))` classait « 9 » après « 100 », donc
+    `results[0]` pouvait être le mauvais document — un test qui affirme « le
+    premier est le plus récent / le plus cher » passait alors sur un tri que
+    Mongo n'aurait jamais produit. L'ordre des types est APPROXIMATIF (Mongo
+    place Booléen et Date après les chaînes) : ce qui est exact ici, c'est que
+    deux nombres se comparent en nombres et deux chaînes en chaînes, ce qui
+    couvre les tris réels du dépôt (montants, dates ISO).
+    """
+    if valeur is None:
+        return (0, 0.0, "")
+    if isinstance(valeur, bool):
+        return (1, float(valeur), "")
+    if isinstance(valeur, (int, float)):
+        return (2, float(valeur), "")
+    if isinstance(valeur, str):
+        return (3, 0.0, valeur)
+    if isinstance(valeur, datetime):
+        # Un tri sur une date BSON doit être chronologique : la branche
+        # précédente (`str(valeur)`) tombait juste pour des chaînes ISO à
+        # décalage identique, et faux dès que deux dates naïves et aware se
+        # côtoyaient.
+        return (2, _vers_utc(valeur).timestamp(), "")
+    return (4, 0.0, str(valeur))
+
+
+def _spec_de_tri(sort: Any) -> List:
+    """Normalise un `sort` de Mongo : `"champ"`, `("champ", -1)` ou
+    `[("a", 1), ("b", -1)]`."""
+    if not sort:
+        return []
+    if isinstance(sort, str):
+        return [(sort, 1)]
+    entrees = list(sort)
+    if entrees and isinstance(entrees[0], str):
+        if len(entrees) == 2 and isinstance(entrees[1], int):
+            return [(entrees[0], entrees[1])]
+        return [(entrees[0], 1)]
+    return [(champ, sens) for champ, sens in entrees]
+
+
+def _trie_multi(docs: List[Dict], spec: List) -> List[Dict]:
+    """Tri à clés MULTIPLES, chacune avec son sens.
+
+    Deux divergences silencieuses corrigées : `find_one(sort=…)` triait avec
+    `str(valeur)` (donc « 9 » après « 100 »), et le curseur ne retenait que la
+    PREMIÈRE paire d'un `sort([("a", 1), ("b", -1)])`, laissant le reste dans
+    l'ordre d'insertion. Un test « le premier est le plus récent / le plus
+    élevé » pouvait donc passer sur un document que Mongo n'aurait pas rendu.
+
+    Le tri de Python étant STABLE, appliquer les clés de la DERNIÈRE à la
+    première reproduit exactement l'ordre lexicographique par clés de Mongo.
+    """
+    resultat = list(docs)
+    for champ, sens in reversed(list(spec)):
+        resultat.sort(
+            key=lambda d, champ=champ: _cle_de_tri(_get_path(d, champ)),
+            reverse=(sens == -1),
+        )
+    return resultat
+
+
+def _applique_ecriture(doc: Dict, update: Dict, sur_insertion: bool = False) -> None:
+    """Applique un update Mongo à UN document.
+
+    `sur_insertion` distingue le chemin upsert : `$setOnInsert` ne s'applique
+    QUE là (c'est sa définition). L'ignorer laissait `created_at` absent du
+    document créé, ce qui faisait par exemple passer au vert un test comparant
+    `created_at` AVANT et APRÈS un renvoi de code : deux clés absentes sont
+    égales.
+    """
+    if not update:
+        raise FakeDbUnsupportedOperator(
+            "document de mise à jour vide : Mongo le refuse (l'ancienne FakeDB "
+            "rendait matched_count=1 sans rien écrire)"
+        )
+    if not any(cle.startswith("$") for cle in update):
+        # REMPLACEMENT : Mongo remplace TOUT le document sauf `_id`. Sans cette
+        # branche, la FakeDB ne faisait RIEN tout en rendant matched_count=1 et
+        # modified_count=1 : le plus coûteux des faux verts, puisque l'appelant
+        # voyait un succès et que rien, dans le test, ne pouvait le voir.
+        identifiant = doc.get("_id", _ABSENT)
+        if "_id" in update and identifiant is not _ABSENT and update["_id"] != identifiant:
+            raise FakeDbUnsupportedOperator("un remplacement ne peut pas changer `_id`")
+        doc.clear()
+        doc.update(update)
+        if identifiant is not _ABSENT:
+            doc["_id"] = identifiant
+        return
+    inconnus = sorted(
+        cle for cle in update if cle.startswith("$") and cle not in OPERATEURS_D_ECRITURE
+    )
+    if inconnus:
+        raise FakeDbUnsupportedOperator(
+            f"opérateur d'écriture non implémenté : {inconnus} (Mongo l'applique, "
+            f"la FakeDB non — un test passerait sur une écriture qui n'a pas eu lieu)"
+        )
+    if "$set" in update:
+        for cle, valeur in update["$set"].items():
+            _set_path(doc, cle, valeur)
+    if sur_insertion and "$setOnInsert" in update:
+        for cle, valeur in update["$setOnInsert"].items():
+            _set_path(doc, cle, valeur)
+    if "$unset" in update:
+        for cle in update["$unset"]:
+            _unset_path(doc, cle)
+    if "$inc" in update:
+        for cle, valeur in update["$inc"].items():
+            _inc_path(doc, cle, valeur)
+    if "$push" in update:
+        for cle, valeur in update["$push"].items():
+            if isinstance(valeur, dict) and "$each" in valeur:
+                raise FakeDbUnsupportedOperator(
+                    "$push avec $each n'est pas implémenté : l'ajouter tel quel "
+                    "glisserait le modificateur comme ÉLÉMENT du tableau"
+                )
+            _push_path(doc, cle, valeur)
+
+
+class FakeDbUnsupportedOperator(NotImplementedError):
+    """Opérateur Mongo que la FakeDB n'applique pas.
+
+    Lever est le SEUL choix sûr : un opérateur ignoré en silence rend la requête
+    plus permissive qu'en production (elle ramène tout, donc un test « la
+    recherche trouve X » passe sans rien prouver) ou fait disparaître une
+    écriture (donc un test « le champ n'y est plus » passe sur un champ que le
+    code devait poser). Les deux verstes vertes sans cause sont pires qu'un
+    échec : c'est exactement ce qui s'était produit avec `$unset`.
+    """
+
+
+class FakeDbDuplicateKey(ValueError):
+    """Violation d'unicité, comme `pymongo.errors.DuplicateKeyError`.
+
+    L'index `_id` existe TOUJOURS dans Mongo et il est unique, sans qu'aucun
+    `create_index` n'ait à le déclarer : deux documents de même `_id` sont donc
+    refusés ici comme en production.
+    """
+
+
+# Opérateurs de requête et d'écriture que cette FakeDB APPLIQUE. Ce qui n'est
+# pas ici lève, au lieu d'être ignoré (voir FakeDbUnsupportedOperator).
+OPERATEURS_DE_REQUETE = frozenset({
+    "$ne", "$in", "$nin", "$exists", "$gt", "$gte", "$lt", "$lte",
+    "$regex", "$geoWithin",
+})
+OPERATEURS_D_ECRITURE = frozenset({
+    "$set", "$setOnInsert", "$unset", "$inc", "$push",
+})
+
+
 class FakeCollection:
     def __init__(self):
         self._docs: List[Dict] = []
@@ -85,52 +463,64 @@ class FakeCollection:
             elif key == "$and":
                 if not all(self._match(sub, doc) for sub in value):
                     return False
-            elif isinstance(value, dict):
-                doc_val = doc.get(key)
+            elif key.startswith("$"):
+                raise FakeDbUnsupportedOperator(
+                    f"opérateur de requête non implémenté : {key!r} (clause {value!r})"
+                )
+            elif isinstance(value, dict) and any(
+                operateur.startswith("$") for operateur in value
+            ):
+                # Chemin POINTÉ (`location.latitude`) comme le vrai Mongo : une
+                # lecture littérale de la clé ne correspondrait jamais, donc la
+                # clause `$exists`/`$ne` sur un sous-champ ferait silencieusement
+                # zéro match (cas réel : le backfill géo de kojo_core).
+                doc_val = _get_path(doc, key)
                 for op, op_val in value.items():
-                    if op == "$ne" and doc_val == op_val:
+                    if op == "$options":
+                        continue  # consommé par $regex, comme dans Mongo
+                    if op not in OPERATEURS_DE_REQUETE:
+                        raise FakeDbUnsupportedOperator(
+                            f"opérateur de requête non implémenté : {op!r} "
+                            f"(clause {key!r})"
+                        )
+                    if not self._satisfait(op, op_val, doc_val, value, key, doc):
                         return False
-                    elif op == "$in" and doc_val not in op_val:
-                        return False
-                    elif op == "$nin" and doc_val in op_val:
-                        return False
-                    elif op == "$gte":
-                        try:
-                            if not (float(doc_val) >= float(op_val)):
-                                return False
-                        except (TypeError, ValueError):
-                            return False
-                    elif op == "$exists":
-                        if op_val and key not in doc:
-                            return False
-                        if not op_val and key in doc:
-                            return False
-                    elif op == "$geoWithin":
-                        # Implémentation haversine de $centerSphere pour la
-                        # FakeDB (le vrai Mongo utilise l'index 2dsphere).
-                        center_sphere = op_val.get("$centerSphere") if isinstance(op_val, dict) else None
-                        if not center_sphere or len(center_sphere) != 2:
-                            return False
-                        center, radius_radians = center_sphere
-                        doc_geo = doc.get(key) if isinstance(doc.get(key), dict) else None
-                        doc_coords = doc_geo.get("coordinates") if isinstance(doc_geo, dict) else None
-                        if not doc_coords or len(doc_coords) != 2:
-                            return False
-                        import math
-                        lat1, lng1 = float(center[1]), float(center[0])
-                        lat2, lng2 = float(doc_coords[1]), float(doc_coords[0])
-                        def _hav(lat_a, lng_a, lat_b, lng_b):
-                            to_rad = lambda d: d * math.pi / 180.0
-                            d_lat = to_rad(lat_b - lat_a)
-                            d_lng = to_rad(lng_b - lng_a)
-                            a = math.sin(d_lat / 2) ** 2 + math.cos(to_rad(lat_a)) * math.cos(to_rad(lat_b)) * math.sin(d_lng / 2) ** 2
-                            return 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-                        if _hav(lat1, lng1, lat2, lng2) > radius_radians * 6371.0:
-                            return False
             else:
-                if doc.get(key) != value:
+                # Sous-document SANS opérateur : Mongo exige l'ÉGALITÉ EXACTE du
+                # sous-document. L'ancienne lecture traitait ses clés comme des
+                # opérateurs, donc la clause était ignorée — plus permissive
+                # qu'en production.
+                if _get_path(doc, key) != value:
                     return False
         return True
+
+    def _satisfait(self, op, op_val, doc_val, clause, key, doc) -> bool:
+        """Une clause unitaire : Mongo la satisfait, ou non."""
+        if op == "$ne":
+            return doc_val != op_val
+        if op in ("$in", "$nin"):
+            # Un motif `re.Pattern` DANS une liste est une expression pour Mongo
+            # (`$in: [/^a/, "b"]`) ; la comparaison littérale de l'ancienne
+            # version ne pouvait jamais correspondre, donc la clause était plus
+            # STRICTE qu'en production.
+            appartient = any(
+                _regex(doc_val, membre, "") if isinstance(membre, re.Pattern)
+                else doc_val == membre
+                for membre in op_val
+            )
+            return appartient if op == "$in" else not appartient
+        if op == "$exists":
+            # `$exists` porte sur le CHEMIN réellement présent, pas sur une clé
+            # littérale : `_get_path` rend None, d'où le test explicite ci-dessous.
+            present = _get_path(doc, key, sentinelle=_ABSENT) is not _ABSENT
+            return present if op_val else not present
+        if op in ("$gt", "$gte", "$lt", "$lte"):
+            return _compare(doc_val, op_val, op)
+        if op == "$regex":
+            return _regex(doc_val, op_val, clause.get("$options", ""))
+        if op == "$geoWithin":
+            return _dans_la_sphere(doc_val, op_val)
+        raise FakeDbUnsupportedOperator(f"opérateur de requête non implémenté : {op!r}")
 
     def _project(self, doc: Dict, projection: Optional[Dict]) -> Dict:
         if not projection:
@@ -147,16 +537,11 @@ class FakeCollection:
         Accepte sort="field" ou sort=[("field", -1)] comme le vrai Mongo."""
         query = query or {}
         matches = [d for d in self._docs if self._match(query, d)]
-        if sort and len(matches) > 1:
-            if isinstance(sort, list):
-                sort_key, sort_dir = sort[0]
-            else:
-                sort_key, sort_dir = sort, 1
-            matches = sorted(
-                matches,
-                key=lambda d: str(d.get(sort_key, "")),
-                reverse=sort_dir == -1,
-            )
+        if sort:
+            # Le tri passe par `_trie_multi` (clés multiples, clé numérique) :
+            # l'ancien `str(d.get(sort_key, ""))` classait « 9 » après « 100 »,
+            # donc le « paiement le plus récent » pouvait être le mauvais.
+            matches = _trie_multi(matches, _spec_de_tri(sort))
         if not matches:
             return None
         return self._project(matches[0], projection)
@@ -167,41 +552,54 @@ class FakeCollection:
         return FakeCursor(results)
 
     async def insert_one(self, doc: Dict):
-        self._docs.append(dict(doc))
+        """Mongo attribue ET STOCKE un `_id` (index unique par construction).
+
+        L'ancienne version rendait un `inserted_id` tiré au hasard sans jamais
+        le ranger, et acceptait deux documents de même `_id` : un test qui
+        exerçait la branche « doublon » restait vert en local alors que la CI
+        (vrai Mongo) l'aurait refusé. Le `_id` stocké ne change aucun résultat,
+        puisque `_project` le retire des lectures.
+        """
+        entre = dict(doc)
+        identifiant = entre.setdefault("_id", str(uuid.uuid4()))
+        if any(existant.get("_id", _ABSENT) == identifiant for existant in self._docs):
+            raise FakeDbDuplicateKey(
+                f"`_id` dupliqué : {identifiant!r} (l'index `_id` de Mongo est unique)"
+            )
+        self._docs.append(entre)
         result = MagicMock()
-        result.inserted_id = doc.get("_id", str(uuid.uuid4()))
+        result.inserted_id = identifiant
         return result
 
     async def update_one(self, query: Dict, update: Dict, upsert: bool = False):
         for doc in self._docs:
             if self._match(query, doc):
-                if "$set" in update:
-                    doc.update(update["$set"])
-                if "$unset" in update:
-                    for k in update["$unset"]:
-                        _unset_path(doc, k)
-                if "$inc" in update:
-                    for k, v in update["$inc"].items():
-                        doc[k] = float(doc.get(k, 0)) + float(v)
-                if "$push" in update:
-                    for k, v in update["$push"].items():
-                        doc.setdefault(k, []).append(v)
+                _applique_ecriture(doc, update)
                 result = MagicMock()
                 result.matched_count = 1
                 result.modified_count = 1
+                # `upserted_id` est posé EXPLICITEMENT : sans cela, MagicMock
+                # fabrique un attribut véridique, et un test qui teste
+                # `if result.upserted_id:` prendrait silencieusement la branche
+                # « inséré » sur une mise à jour.
+                result.upserted_id = None
                 return result
-        if upsert:
-            new_doc = {}
-            new_doc.update(query)
-            if "$set" in update:
-                new_doc.update(update["$set"])
-            if "$inc" in update:
-                for k, v in update["$inc"].items():
-                    new_doc[k] = float(v)
-            self._docs.append(new_doc)
         result = MagicMock()
         result.matched_count = 0
         result.modified_count = 0
+        result.upserted_id = None
+        if upsert:
+            # Mongo construit le document depuis les égalités de la requête,
+            # puis $set / $setOnInsert / $inc. `$setOnInsert` est le propre du
+            # chemin insert : c'est ici, et seulement ici, qu'il s'applique.
+            new_doc = {k: v for k, v in query.items() if not k.startswith("$")}
+            _applique_ecriture(new_doc, update, sur_insertion=True)
+            # Mongo attribue TOUJOURS un `_id` au document inséré : sans cela
+            # `upserted_id` valait None sur un vrai insert, et le seul moyen de
+            # distinguer « inséré » de « mis à jour » disparaissait.
+            new_doc.setdefault("_id", str(uuid.uuid4()))
+            self._docs.append(new_doc)
+            result.upserted_id = new_doc["_id"]
         return result
 
     async def delete_one(self, query: Dict):
@@ -223,17 +621,7 @@ class FakeCollection:
             if not self._match(query, doc):
                 continue
             matched += 1
-            if "$set" in update:
-                doc.update(update["$set"])
-            if "$unset" in update:
-                for k in update["$unset"]:
-                    _unset_path(doc, k)
-            if "$inc" in update:
-                for k, v in update["$inc"].items():
-                    doc[k] = float(doc.get(k, 0)) + float(v)
-            if "$push" in update:
-                for k, v in update["$push"].items():
-                    doc.setdefault(k, []).append(v)
+            _applique_ecriture(doc, update)
         result = MagicMock()
         result.matched_count = matched
         result.modified_count = matched
@@ -260,47 +648,48 @@ class FakeCollection:
 class FakeCursor:
     def __init__(self, docs: List[Dict]):
         self._docs = list(docs)
-        self._sort_key = None
-        self._sort_dir = 1
+        self._sort_spec: List = []
+        self._skip = 0
+        self._limit = None
 
     def sort(self, key_or_list, direction=1):
-        # Accepte sort("field", 1) ou sort([("field", 1)])
-        if isinstance(key_or_list, list):
-            if key_or_list:
-                self._sort_key, self._sort_dir = key_or_list[0]
+        # Accepte sort("field", -1) et sort([("a", 1), ("b", -1)]) : l'ancienne
+        # version ne retenait que la PREMIÈRE paire et ignorait le reste.
+        if isinstance(key_or_list, str):
+            self._sort_spec = [(key_or_list, direction)]
         else:
-            self._sort_key = key_or_list
-            self._sort_dir = direction
+            self._sort_spec = _spec_de_tri(key_or_list)
         return self
 
     def skip(self, n):
-        self._docs = self._docs[n:]
+        # `skip`/`limit` sont DIFFÉRÉS : Mongo les applique APRÈS le tri.
+        # L'ancienne version coupait la liste AVANT de la trier, donc
+        # `find(...).sort("created_at", -1).skip(10)` — la page 2 d'une liste
+        # paginée — rendait une page prise dans l'ordre d'insertion.
+        self._skip = int(n or 0)
         return self
 
     def limit(self, n):
-        if n:
-            self._docs = self._docs[:n]
+        self._limit = n or None
         return self
 
-    def _sorted_docs(self):
-        if not self._sort_key:
-            return self._docs
-        reverse = self._sort_dir == -1
-        return sorted(
-            self._docs,
-            key=lambda d: str(d.get(self._sort_key, "")),
-            reverse=reverse
-        )
+    def _resultats(self):
+        docs = _trie_multi(self._docs, self._sort_spec) if self._sort_spec else list(self._docs)
+        if self._skip:
+            docs = docs[self._skip:]
+        if self._limit:
+            docs = docs[:self._limit]
+        return docs
 
     async def to_list(self, length=None):
-        docs = self._sorted_docs()
+        docs = self._resultats()
         return docs[:length] if length else docs
 
     def __aiter__(self):
         return self._iter()
 
     async def _iter(self):
-        for doc in self._sorted_docs():
+        for doc in self._resultats():
             yield doc
 
 
