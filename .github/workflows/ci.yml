@@ -316,6 +316,25 @@ jobs:
         working-directory: backend
         run: python scripts/audit_docstrings.py --fail-on-warning
 
+      # ── Les durées publiées sont-elles celles que le code applique ? ────────
+      # PRIVACY.md est le document que personne ne relit quand un délai change,
+      # et la durée d'un TTL vivait jusqu'ici dans trois fichiers qui ne se
+      # parlaient pas. Le tableau du document est donc ENGENDRÉ depuis
+      # backend/kojo_retention.py — le module dont kojo_core crée ses index — et
+      # cette étape refuse une divergence en nommant la collection et la colonne
+      # fautives, plutôt qu'un « le document ne correspond pas ».
+      #
+      # Cette étape est le SEUL exécutant sur le dépôt réel : c'est ici que le
+      # verdict et les `::error` sont publiés, donc ici qu'un relecteur de PR les
+      # lit. backend/tests/test_privacy_policy_guard.py ne la rejoue pas — il
+      # prouve, sur des copies mutées hors du dépôt, que le garde SAIT échouer,
+      # et vérifie que cette étape est la seule.
+      #
+      # Dans CE job (et pas workflow-lint) : le garde importe le module réel, donc
+      # kojo_settings et ses dépendances, installées par requirements.txt.
+      - name: Check published retention durations match the code
+        run: python .github/scripts/check-privacy-policy.py
+
       # ── Santé d'import : le VERDICT est publié en annotation de PR ──────────
       # Un fichier présent peut porter un `NameError` que personne ne voit (le
       # 2026-08-27, il a atteint la production alors que toutes les assertions
@@ -382,6 +401,20 @@ jobs:
       # dépendances). La même preuve n'est donc payée qu'une fois par push.
       - name: Check OG refusals are locked by their tests (mutation replay)
         run: python .github/scripts/check-og-test-mutations.py
+
+      # Le harnais GÉNÉRIQUE de mutation des gardes : chaque entrée de
+      # .github/scripts/guard-proofs.json neutralise une ligne d'un garde RÉEL et
+      # exige que SA preuve déclarée rougisse en la nommant. Le garde est restauré
+      # à l'octet et son empreinte SHA-1 vérifiée ; une mutation qui ne mord pas —
+      # ou dont le littéral a disparu — est un échec, jamais un succès silencieux.
+      #
+      # Ici le runner Python (pytest) ; le runner Node (Vitest) l'est dans
+      # frontend-build, seul job qui installe les dépendances du frontend. Le
+      # registre est validé par backend/tests/test_guard_failure_proofs.py, qui
+      # vérifie AUSSI la présence de ces deux invocations : retirer une étape
+      # éteindrait la moitié de la preuve sans que rien ne rougisse.
+      - name: Mutations des gardes — preuve d'échec (runner Python)
+        run: python .github/scripts/check-guard-mutations.py --runner python
 
   # ─── Frontend : tests Vitest + build Vite ────────────────────────────────
   frontend-build:
@@ -557,6 +590,13 @@ jobs:
       - name: Check bundle size
         working-directory: frontend
         run: node scripts/check-bundle-size.js
+
+      # Même harnais que dans backend-tests, runner Node (Vitest) : les mutations
+      # des gardes frontend sont rejouées ici, seul job qui a `node_modules`.
+      # Aucun `working-directory` : le harnais résout la racine du dépôt depuis
+      # son propre fichier, pas depuis le répertoire courant.
+      - name: Mutations des gardes — preuve d'échec (runner Node)
+        run: python3 .github/scripts/check-guard-mutations.py --runner node
 
   # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
   # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou
