@@ -5,6 +5,8 @@ résolution quand PayDunya confirme, alerte unique au propriétaire au-delà du
 seuil (24 h), non-alerte sous le seuil, non-spam après la première alerte, et
 escalade quand la re-vérification est indisponible.
 """
+import asyncio
+import contextlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -574,6 +576,43 @@ class TestOwnerResolutionByEmail:
         assert email_mock.call_args.args[0] == owner["user"]["email"]
 
 
+@contextlib.contextmanager
+def circuit_background_tasks():
+    """Retient les écritures et alertes que le circuit PLANIFIE, pour les ATTENDRE.
+
+    Le circuit écrit en tâche de fond (`call_soon_threadsafe` → `ensure_future`).
+    Ces tests attendaient un DÉLAI : sur un runner chargé, la lecture au bout de 5 s
+    rendait un document périmé et `main` rougissait (`assert 2 == 0`). `drain()`
+    attend maintenant les tâches elles-mêmes — aucune horloge — donc ce qui est
+    vérifié est ce qui a été écrit, même si l'écriture prend 6 s.
+
+    La planification devient une création de tâche directe (le test EST sur la
+    boucle) ; les coroutines sont celles de la production.
+    """
+    import kojo_payments as payments
+
+    pending = []
+
+    def spawn(coroutine):
+        """Crée la tâche que la production vient de planifier, et la retient."""
+        def wrapper():
+            pending.append(asyncio.ensure_future(coroutine()))
+        return wrapper
+
+    with patch.object(payments, "_schedule_circuit_persist",
+                      spawn(payments._circuit_upsert)), \
+         patch.object(payments, "_schedule_circuit_owner_alert",
+                      spawn(payments._circuit_owner_alert)):
+
+        async def drain():
+            """Attend ce qui a été planifié : les tâches, jamais un délai."""
+            tasks, pending[:] = pending[:], []
+            if tasks:
+                await asyncio.gather(*tasks)
+
+        yield drain
+
+
 # ---------------------------------------------------------------------------
 # 💾 Persistance MongoDB de l'état du circuit breaker (kojo_payments)
 # ---------------------------------------------------------------------------
@@ -586,40 +625,6 @@ class TestPaydunyaCircuitPersistence:
     (refresh_paydunya_circuit_from_db avant les points de lecture). Règle de
     fraîcheur : un circuit OUVERT en mémoire (échecs locaux récents) n'est
     jamais écrasé par un état fermé persisté par un autre worker."""
-
-    async def _flush(self):
-        """Laisse la tâche d'upsert (call_soon_threadsafe) s'exécuter.
-
-        En mode réel (Mongo), l'upsert est une vraie I/O réseau exécutée en
-        tâche de fond : `sleep(0)` ne suffit pas à la terminer. On donne la
-        main à la boucle plusieurs fois avec un vrai délai pour laisser
-        l'écriture aboutir (déterministe quel que soit le mode).
-        """
-        import asyncio as _asyncio
-        for _ in range(10):
-            await _asyncio.sleep(0.01)
-
-    async def _wait_for_circuit_doc(self, expected_failures=None, *, timeout: float = 5.0):
-        """Attend que le doc circuit `_id: "global"` soit persisté en base.
-
-        En mode réel, l'upsert est une I/O réseau asynchrone en tâche de
-        fond : on poll la base jusqu'à ce que l'écriture soit visible (ou
-        timeout). En FakeDB l'écriture est instantanée → premier poll OK.
-        Si `expected_failures` est fourni, on attend aussi que le compteur
-        corresponde (le doc peut déjà exister avec une valeur périmée).
-        """
-        import asyncio as _asyncio
-        deadline = _asyncio.get_running_loop().time() + timeout
-        while True:
-            stored = await db_find_one("paydunya_circuit", {"_id": "global"})
-            if stored is not None and (
-                expected_failures is None
-                or stored.get("consecutive_failures") == expected_failures
-            ):
-                return stored
-            if _asyncio.get_running_loop().time() > deadline:
-                return stored
-            await _asyncio.sleep(0.05)
 
     async def test_persists_transitions_and_reloads_on_init(self, client: AsyncClient):
         """Chaque transition (échec compté, succès → reset) est écrite en base,
@@ -636,23 +641,25 @@ class TestPaydunyaCircuitPersistence:
 
         try:
             # Capture la boucle (comme le lifespan en prod) + mémoire propre.
-            with patch.dict(
+            with circuit_background_tasks() as drain, patch.dict(
                 "kojo_payments._paydunya_circuit",
                 {"state": "closed", "consecutive_failures": 0, "opened_at": 0.0},
             ):
                 await init_paydunya_circuit()
 
-                # 2 échecs réseau → compteur 2, PERSISTÉ en base.
+                # 2 échecs réseau → compteur 2, PERSISTÉ en base. L'écriture est
+                # ATTENDUE, pas guettée : ce qui est lu est ce qui a été écrit.
                 _circuit_record_failure()
                 _circuit_record_failure()
-                stored = await self._wait_for_circuit_doc()
-                assert stored is not None
+                await drain()
+                stored = await db_find_one("paydunya_circuit", {"_id": "global"})
                 assert stored["state"] == "closed"
                 assert stored["consecutive_failures"] == 2
 
                 # Un succès referme et réécrit (compteur à 0).
                 _circuit_record_success()
-                stored = await self._wait_for_circuit_doc(expected_failures=0)
+                await drain()
+                stored = await db_find_one("paydunya_circuit", {"_id": "global"})
                 assert stored["state"] == "closed"
                 assert stored["consecutive_failures"] == 0
 
@@ -749,11 +756,6 @@ class TestPaydunyaCircuitOwnerAlert:
     L'alerte part UNE fois par passage en open (pas de spam tant que le
     circuit reste ouvert). L'état du circuit est aussi exposé dans /health."""
 
-    async def _flush(self):
-        import asyncio as _asyncio
-        for _ in range(10):
-            await _asyncio.sleep(0.01)
-
     async def test_alert_fires_once_when_circuit_opens(self, client: AsyncClient):
         """5 échecs réseau → ouverture → UNE alerte (notif + email) ; les
         échecs suivants, circuit toujours ouvert, ne re-alertent pas."""
@@ -761,7 +763,7 @@ class TestPaydunyaCircuitOwnerAlert:
         from kojo_payments import _circuit_record_failure, init_paydunya_circuit
 
         try:
-            with patch.dict(
+            with circuit_background_tasks() as drain, patch.dict(
                 "kojo_payments._paydunya_circuit",
                 {"state": "closed", "consecutive_failures": 0, "opened_at": 0.0},
             ), \
@@ -770,10 +772,11 @@ class TestPaydunyaCircuitOwnerAlert:
                  patch("kojo_payments.send_email_via_brevo_api") as email_mock:
                 await init_paydunya_circuit()
 
-                # 5 échecs → le circuit s'ouvre → UNE alerte (notif + email).
+                # 5 échecs → le circuit s'ouvre → UNE alerte (notif + email) :
+                # l'alerte est ATTENDUE, pas guettée.
                 for _ in range(5):
                     _circuit_record_failure()
-                await self._flush()
+                await drain()
 
                 assert notify_mock.call_count == 1
                 assert email_mock.call_count == 1
@@ -783,7 +786,7 @@ class TestPaydunyaCircuitOwnerAlert:
                 # (l'alerte est liée à la TRANSITION, pas à chaque échec).
                 for _ in range(3):
                     _circuit_record_failure()
-                await self._flush()
+                await drain()
                 assert notify_mock.call_count == 1
                 assert email_mock.call_count == 1
         finally:
