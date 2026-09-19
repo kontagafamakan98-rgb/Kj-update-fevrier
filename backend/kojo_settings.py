@@ -6,6 +6,7 @@ import logging
 import logging.handlers
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict
 
@@ -34,18 +35,76 @@ for stream in (sys.stdout, sys.stderr):
         except Exception:
             pass
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.handlers.RotatingFileHandler(
-            'kojo_backend.log',
+# Journal rotatif : chemin ABSOLU, JAMAIS dans l'arbre du dépôt.
+#
+# Le chemin était relatif (`'kojo_backend.log'`), donc résolu contre le
+# répertoire courant : lancé depuis backend/ il déposait 10 Mo × 6 dans l'arbre
+# du dépôt, et une suite de tests en laissait un de plus à chaque exécution
+# (constaté le 19/09/2026 : 3,5 Mo dans backend/ et 178 Ko à la racine). Un
+# fichier de journal n'est pas un livrable, et rien ici ne le relit : `fly logs`
+# lit la sortie standard.
+#
+# KOJO_LOG_FILE décide, sinon le répertoire temporaire du système (hors dépôt) :
+#   KOJO_LOG_FILE non défini (auto) → temporaire du système, rien sous pytest
+#   KOJO_LOG_FILE=/chemin/absolu   → ce fichier (valeur explicite, même en test)
+#   KOJO_LOG_FILE=stdout|off|0|""  → aucun fichier, sortie standard seule
+#
+# Sous pytest, "auto" désactive le fichier : la suite n'écrit plus rien, et un
+# verrou Windows laissé par un RotatingFileHandler tué ne peut plus bloquer le
+# run suivant (constaté le 19/09/2026 : 83 s → 496 s).
+_VALEURS_SANS_FICHIER = ("", "0", "off", "false", "none", "stdout")
+
+
+def chemin_du_journal(environ=None, en_test=None):
+    """Chemin ABSOLU du journal rotatif, ou None si l'écriture fichier est
+    désactivée. Le résultat ne dépend PAS du répertoire courant — c'est
+    exactement ce qui déposait des dizaines de mégaoctets dans l'arbre.
+
+    `environ` et `en_test` sont injectables pour que la règle soit vérifiable
+    sans manipuler l'environnement du processus ni l'état de `sys.modules`.
+    """
+    environ = os.environ if environ is None else environ
+    if en_test is None:
+        en_test = "pytest" in sys.modules
+    # La variable est lue par son NOM littéral : c'est la forme que
+    # `.github/scripts/check-fly-env-drift.py` sait reconnaître comme optionnelle
+    # (défaut de repli non vide), et elle se lit sans détour.
+    brut = str(environ.get("KOJO_LOG_FILE", "auto")).strip()
+    if brut.lower() in _VALEURS_SANS_FICHIER:
+        return None
+    if brut.lower() == "auto":
+        if en_test:
+            return None
+        return Path(tempfile.gettempdir()).resolve() / "kojo" / "kojo_backend.log"
+    return Path(brut).expanduser().resolve()
+
+
+def _handlers_de_journal(chemin):
+    """Les sorties de journalisation. Une destination non inscriptible ne doit
+    JAMAIS empêcher le démarrage : on retombe alors sur la sortie standard."""
+    handlers = [logging.StreamHandler(sys.stdout)]
+    if chemin is None:
+        return handlers
+    try:
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.handlers.RotatingFileHandler(
+            str(chemin),
             maxBytes=10*1024*1024,
             backupCount=5,
             encoding='utf-8'
-        )
-    ]
+        ))
+    except OSError as exc:
+        print("⚠️ journal fichier indisponible (%s) — sortie standard seule" % exc)
+    return handlers
+
+
+# Résolu une fois, au chargement : ce que le processus écrit réellement.
+JOURNAL_FILE = chemin_du_journal()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=_handlers_de_journal(JOURNAL_FILE),
 )
 logger = logging.getLogger("kojo_backend")
 

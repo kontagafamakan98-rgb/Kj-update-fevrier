@@ -119,9 +119,13 @@ Quatre précisions que le tableau ne dit pas :
 
 ## 4. Journalisation
 
-Le backend écrit sur la sortie standard et dans un fichier rotatif
-(`kojo_backend.log`, 10 Mo × 6) — `backend/kojo_settings.py`. Ce fichier n'est
-pas versionné (`.gitignore`, `*.log.*`) et vit hors du dépôt.
+Le backend écrit sur la sortie standard et, hors suite de tests, dans un fichier
+rotatif (`kojo_backend.log`, 10 Mo × 6) — `backend/kojo_settings.py`. Ce fichier
+ne vit jamais dans le dépôt : son chemin est ABSOLU et pointe le répertoire
+temporaire du système, déplaçable ou désactivable par `KOJO_LOG_FILE`
+(`stdout`/`off` pour n'écrire que sur la sortie standard). Sous pytest l'écriture
+fichier est désactivée, donc une exécution de la suite ne laisse rien derrière
+elle ; `.gitignore` (`*.log.*`) reste le filet contre un `git add -A` distrait.
 
 ## 5. Ce que cette politique ne couvre pas
 
