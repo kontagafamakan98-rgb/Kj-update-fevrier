@@ -1244,15 +1244,19 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   trois sondes qui parlent HTTP (`check-cors-preflight`, `check-seo-production`,
   `check-og-job-200`) reçoivent leur `fetch` par injection ; la seule adresse
   réellement appelée est `http://127.0.0.1:1`, où rien n'écoute (le cas qui prouve
-  qu'un accueil injoignable ne fait pas conclure « absent »). Coût mesuré en local
-  (Windows, démarrage de `npx` compris, `build/` présent), en deux relevés de la
-  même table le 19/09/2026 : **33 à 42 s** pour les 11 mutations Python et **83 à
-  146 s** pour les 18 Node — c'est le runner Node qui domine, et son coût varie
-  avec la charge de la machine (le chiffre de CI est plus stable, mais n'a pas
-  été relevé ici).
+  qu'un accueil injoignable ne fait pas conclure « absent »). Coût : mesuré en
+  local (Windows, démarrage de `npx` compris, `build/` présent) à **33 à 42 s**
+  pour les 11 mutations Python et **83 à 146 s** pour les 18 Node — et **sur le
+  runner** à **32 s** pour ces mêmes 18 mutations (étape « Mutations des gardes
+  — preuve d'échec (runner Node) » du run 35457261081, lue par l'API, sur un job
+  `frontend-build` de 77 s au total). L'écart local/runner n'est pas une
+  imprécision de mesure : l'essentiel du coût local est le démarrage de `npx`
+  sous Windows, qui n'existe pas sur le runner. C'est donc le chiffre du runner
+  qui dit le prix par push, et les relevés locaux — plus élevés — le
+  représentaient mal.
 * **la preuve Node est filtrée sur une PR, ENTIÈRE sur `main`** : les 18
-  mutations Node démarrent chacune un runner Vitest et pèsent à elles seules
-  l'essentiel de l'étape. Une PR ne rejoue donc que celles dont le **garde** ou
+  mutations Node démarrent chacune un runner Vitest, soit **32 s sur les 77 s du
+  job** `frontend-build`. Une PR ne rejoue donc que celles dont le **garde** ou
   la **preuve** a changé (`--changed-from`), et `main` les rejoue toutes : aucun
   changement ne peut justifier d'en sauter une quand c'est la fusion qui livre.
   Deux garde-fous plutôt qu'un, parce qu'un filtre peut mentir dans les deux
