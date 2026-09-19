@@ -1000,6 +1000,12 @@ rend F16 possible : les lignes repliées, rejointes par une espace, redonnent le
 texte publié par la page — c'est ce qui autorise `check-og-assets.js` à comparer
 les lignes du manifeste à `fr.json`.
 
+Les faits que le GÉNÉRATEUR possède sont **lus sur le module**, jamais recopiés
+dans le test : la liste des champs exigés (`REQUIRED_CARD_KEYS`, un cas par champ)
+et la police du titre de la wide (`LAYOUTS`, par `fonts_for`). Une liste écrite de
+mémoire deviendrait fausse en silence — exactement le défaut que cette passe
+supprime — et c'est prouvé par mutation (voir plus bas).
+
 **Preuves — huit mutations, un refus neutralisé par mutation** (chaque ligne `if … :`
 remplacée par un `if False:` de même indentation, sur le fichier réel, restauré à
 l'empreinte SHA-256 près) :
@@ -1012,8 +1018,36 @@ l'empreinte SHA-256 près) :
 | clé i18n absente | **6** — les 5 formes de clé, plus la description |
 | plus de lignes que réservé | **1** |
 | mot plus large que la colonne | **1** |
-| bloc plus haut que la carte wide | **1** |
-| bloc plus haut que la carte carrée | **1** |
+| bloc plus haut que la carte wide | **1** — filet, voir ci-dessous |
+| bloc plus haut que la carte carrée | **1** — filet, voir ci-dessous |
+
+**Le refus « bloc plus haut que la carte » est un FILET, qu'aucune carte
+n'atteint.** `LAYOUTS` réserve au plus 3 lignes au titre et 4 à la description, et
+ce maximum tient dans la carte : 340 px sur les 550 de la wide, 380 sur les 670 de
+la carrée — vérifiable en appelant les deux renderers avec ces deux nombres de
+lignes, aucun refus n'est levé (mesuré le 19/09/2026, cf. la docstring des deux
+cas). Ils restent donc pour la CONSTANTE de mise en page : ils rougissent si les
+lignes réservées s'élargissent sans que la carte grandisse, jamais pour un texte
+réel. La ligne du tableau dit seulement qu'une mutation de ce `if` fait rougir un
+test — pas qu'un partage social peut la déclencher.
+
+**Mutation du champ exigé — la dérivation suit le générateur** (rejouée le
+19/09/2026 sur le fichier réel : `REQUIRED_CARD_KEYS` reçoit un sixième champ,
+`alt`) : la collecte passe de **24 à 25 cas** et le nouveau cas
+`test_nomme_le_fichier_et_le_champ_manquant[alt]` est bien là — l'ancienne liste
+recopiée n'aurait produit aucun cas pour ce champ. La suite rougit en **nommant**
+le champ, par les tests qui attendent une carte acceptée :
+
+```
+test_deux_routes_differentes_sont_acceptees → SystemExit:
+  og-cards/jobs.json : champ(s) manquant(s) alt — une carte nomme la route qu'elle sert…
+test_refuse_la_seconde_en_nommant_les_deux_fichiers →
+  « og-cards/premiere.json : champ(s) manquant(s) alt » (le champ est vérifié avant la route)
+3 failed, 22 passed
+```
+
+`gen-og-images.py` restauré à l'empreinte SHA-1
+`a94e9b9cdc2fe6e31862e0b5acacf3cf3f7690a1` — identique avant et après.
 
 `frontend/scripts/gen-og-images.py` restauré à l'empreinte
 `99f301db42f26f7517ed7cb373d8551be45418464128215b2e184b5d850ae355` — identique
@@ -1053,7 +1087,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
-| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (24 tests : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **sans police de référence ni image produite** —, l'invariant lignes repliées ↔ texte publié, et « rien n'est écrit quand la donnée est refusée ») + **huit** mutations rejouées le 19/09/2026 sur le fichier réel, chacune neutralisant UN refus par un `if False:` (2, 6, 1, 6, 1, 1, 1 et 1 tests rouges), restauré à l'empreinte identique (§3 F17) |
+| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (24 tests : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet, inatteignable par une carte : le maximum de lignes que `LAYOUTS` réserve tient dans la carte** —, **sans police de référence ni image produite**, l'invariant lignes repliées ↔ texte publié, et « rien n'est écrit quand la donnée est refusée ») ; la liste des champs exigés et la police du titre sont LUES sur le générateur, jamais recopiées ; + **huit** mutations rejouées le 19/09/2026 sur le fichier réel, chacune neutralisant UN refus par un `if False:` (2, 6, 1, 6, 1, 1, 1 et 1 tests rouges) **et** une mutation du champ exigé (un sixième champ ajouté à `REQUIRED_CARD_KEYS` → collecte 24 → **25 cas**, suite rouge nommant le champ), restauré aux empreintes identiques (§3 F17) |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de
