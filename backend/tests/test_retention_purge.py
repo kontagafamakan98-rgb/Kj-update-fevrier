@@ -179,6 +179,64 @@ async def test_la_purge_supprime_le_du_et_laisse_le_reste():
     }
 
 
+async def test_la_purge_epargne_les_paiements_encore_requis():
+    """Les paiements « encore requis » — ceux qui doivent survivre.
+
+    Le cas qui compte ici est CELUI DE LA PRODUCTION, et il ne se devine pas :
+    les documents écrits AVANT que sortir de `pending` ne retire l'échéance
+    (`kojo_payments.maj_statut_collecte` — l'invariant est mesuré par
+    `test_paiement_echeance_checkout.py`) portent encore une échéance périmée.
+    Un paiement `completed` (puis `released`) de cette génération est donc
+    indiscernable d'un panier abandonné par la seule date.
+
+    Ce qui le protège est l'autre moitié du filtre partiel, `status: pending` :
+    c'est le SECOND FILET, celui qui couvre l'existant. Retirer cette clause (ou
+    ajouter une règle qui l'oublie) supprimerait des pièces comptables —
+    l'argent a été versé — et aucun autre cas ne le verrait : le paiement
+    `completed` du test voisin, lui, ne porte pas d'échéance (forme d'après
+    l'invariant), donc il survit même sans la clause `status`.
+    """
+    await db_insert("payments", {
+        # Panier abandonné d'hier : dû, il doit partir.
+        "id": "paiement-en-attente-echu",
+        "status": "pending",
+        "expires_at": MAINTENANT - timedelta(minutes=1),
+    })
+    await db_insert("payments", {
+        # En cours, dans sa fenêtre : le client peut encore payer.
+        "id": "paiement-en-attente-frais",
+        "status": "pending",
+        "expires_at": MAINTENANT + timedelta(hours=1),
+    })
+    await db_insert("payments", {
+        # Payé PUIS versé, échéance jamais retirée : pièce comptable.
+        "id": "paiement-verse-echeance-perimee",
+        "status": "completed",
+        "payout_status": "released",
+        "payout_kind": "payout",
+        "expires_at": MAINTENANT - timedelta(days=30),
+    })
+    await db_insert("payments", {
+        # Séquestré, en attente de décision : le litige peut encore s'ouvrir.
+        "id": "paiement-sequestre-echeance-perimee",
+        "status": "completed",
+        "payout_status": "held",
+        "expires_at": MAINTENANT - timedelta(days=30),
+    })
+
+    supprimes = await retention_purge_once(MAINTENANT)
+
+    assert await _identifiants("payments") == [
+        "paiement-en-attente-frais",
+        "paiement-sequestre-echeance-perimee",
+        "paiement-verse-echeance-perimee",
+    ], "un paiement encore requis a été purgé"
+    assert supprimes == {"payments": 1}, (
+        "seul le panier abandonné doit partir — sans ce compte, le cas ne "
+        "prouverait pas que la purge agit"
+    )
+
+
 async def test_un_second_passage_ne_supprime_plus_rien():
     """La purge est IDEMPOTENTE : elle tourne tous les jours, donc un second
     passage sur un état déjà purgé doit être un non-événement (sans quoi le
