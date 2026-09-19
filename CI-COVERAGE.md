@@ -1056,17 +1056,24 @@ dont le test du refus touche aussi le refus des champs manquants est refusé (li
 384), et un cas où le test ne l'exerce plus l'est aussi — cette fois comme « AUCUN
 test ».
 
-**Et le garde est prouvé lui-même** — `backend/tests/test_og_mutation_guard.py` (11
-cas, 2,3 s) : `raise` sans `if`, condition qui s'écrit aussi ailleurs dans le
+**Et le garde est prouvé lui-même** — `backend/tests/test_og_mutation_guard.py` (10
+cas, 0,37 s) : `raise` sans `if`, condition qui s'écrit aussi ailleurs dans le
 générateur, test qui rougit sous plusieurs refus, refus que personne n'exerce, suite
-déjà rouge sur les copies intactes, périmètre incomplet, et le câblage de l'étape.
-Les décisions se testent en remplaçant la seule frontière du garde — lancer pytest —
-par des verdicts écrits d'avance ; **un seul cas fait le trajet complet** et exige les
-propriétaires nommés, pour que ce câblage ne repose pas sur des verdicts imaginaires.
-La première version de ces cas lançait pytest douze fois et coûtait **+30 s sur le
-runner** (étape des tests : 111,0 s, contre 81,0 s au run précédent, même source) ;
-ramenés à trois processus imbriqués, ils coûtent 2,3 s en local, et l'étape des tests
-est revenue de 111,0 s à **80,0 s** sur le runner (`eef604d`), soit son niveau d'avant.
+déjà rouge sur les copies intactes, périmètre incomplet.
+
+**Ni ces cas ni aucun autre de la suite n'exécutent pytest.** Les décisions se testent
+en remplaçant la seule frontière du garde — lancer pytest — par des verdicts écrits
+d'avance, et le seul contrôle qui subsiste sur l'étape est son CÂBLAGE : le
+commandement apparaît UNE fois dans le workflow, dans le job `backend-tests`, celui
+qui installe `backend/requirements.txt` — donc Pillow, que le fichier de test importe
+et que les copies du garde exécutent. Cinq mutations le prouvent, chacune restaurée à
+l'empreinte SHA-1 : retirer la propriété d'un rouge, ignorer l'état de référence,
+ajouter un second exécutant ailleurs, sortir l'étape du job backend, ou cesser d'y
+installer les dépendances font rougir le test visé (code 1, `1 failed`). Cette suite a
+d'abord lancé pytest douze fois, ce qui coûtait **+30 s sur le runner** (étape des
+tests : 111,0 s, contre 81,0 s au run précédent, même source) ; elle ne le lance plus
+du tout, et l'étape des tests est revenue de 111,0 s à **80,0 s** sur le runner, soit
+son niveau d'avant.
 
 **Un seul exécutant, et la suite le dit** : rejouer les mutations dans la suite ET
 dans l'étape payait la même preuve deux fois par push. Mesuré des deux côtés : la
@@ -1074,9 +1081,8 @@ suite de `main` est passée de **82,5 s** (`798e31d`, avant la répartition) à
 **78,9 s** (`8f2b1b9`, après) sur le runner, et de 89,1 s à 81,1 s en local, tandis que
 l'étape coûte 3,0 à 5,0 s sur le runner selon le run et 10,2 s en local. L'étape
 rejoue donc les
-mutations seule ; la suite prouve que le garde sait refuser **sans les rejouer**
-(2,3 s, dont un seul cas qui lance vraiment pytest) et n'affirme de la partie verte
-que son câblage.
+mutations seule ; la suite éprouve les décisions du garde **sans lancer pytest le
+moins du monde** (10 cas, 0,37 s) et n'affirme de la partie verte que son câblage.
 
 **Mutation du champ exigé — la dérivation suit le générateur** (rejouée le
 19/09/2026 sur le fichier réel : `REQUIRED_CARD_KEYS` reçoit un sixième champ,
@@ -1119,7 +1125,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus dérivés de son arbre, chacun rougissant le test qui lui appartient, 3,0 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
-| `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (11 cas : un `raise` sans `if` est un orphelin signalé, une condition déjà écrite ailleurs dans le générateur n'est pas prise pour elle-même, **un test qui rougit sous plusieurs refus n'en verrouille aucun**, un refus que personne n'exerce est signalé, une suite déjà rouge arrête tout avant la première mutation, un périmètre incomplet est une erreur ; les décisions se testent sur des verdicts écrits d'avance et UN cas fait le trajet complet en nommant les propriétaires ; sur le vrai générateur, la dérivation couvre chaque `raise` et chaque condition est neutralisable, et le câblage de l'étape est vérifié) ; la partie VERTE du garde n'a qu'un exécutant, l'étape de CI, et la suite n'en affirme que le câblage — c'est le test qui le dit, pas la doc |
+| `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (10 cas : un `raise` sans `if` est un orphelin signalé, une condition déjà écrite ailleurs dans le générateur n'est pas prise pour elle-même, **un test qui rougit sous plusieurs refus n'en verrouille aucun**, un refus que personne n'exerce est signalé, une suite déjà rouge arrête tout avant la première mutation, un périmètre incomplet est une erreur ; sur le vrai générateur, la dérivation couvre chaque `raise` et chaque condition est neutralisable ; les décisions se testent sur des verdicts ÉCRITS D'AVANCE — **ces cas n'exécutent jamais pytest** — et le contrôle qui reste exige UNE occurrence du commandement, dans le job `backend-tests`, celui qui installe les dépendances de l'étape) ; la partie VERTE du garde n'a qu'un exécutant, l'étape de CI, et cinq mutations (restaurées à l'empreinte) montrent que chaque cas sait échouer |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de

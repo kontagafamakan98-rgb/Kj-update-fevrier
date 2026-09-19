@@ -1,25 +1,23 @@
 # -*- coding: utf-8 -*-
 """Le garde qui prouve que les tests des refus du générateur OG savent échouer.
 
-.github/scripts/check-og-test-mutations.py existe parce que cette preuve avait été
-faite à la main — huit mutations du générateur, restaurées à l'empreinte SHA-1 —
-donc hors du dépôt : une preuve qu'on ne peut pas rejouer depuis un checkout ne
-protège rien. Ce garde la rejoue, et il en est le SEUL propriétaire : l'étape du job
-`backend-tests` l'exécute une fois par push.
+.github/scripts/check-og-test-mutations.py rejoue, sur des COPIES, la neutralisation
+de chaque refus de frontend/scripts/gen-og-images.py : c'est la preuve que
+backend/tests/test_gen_og_images.py verrouille vraiment quelque chose. Cette preuve a
+UN seul exécutant — l'étape du job `backend-tests`, qui la paie une fois par push
+(3,0 à 5,0 s sur le runner) — et ce fichier-ci n'en est pas un second : il n'exécute
+JAMAIS pytest.
 
-Ce fichier-ci prouve que le garde SAIT refuser — un `raise` sans `if` (la dérivation
-ne saurait plus quand il tombe), une condition qui s'écrit aussi ailleurs, un test
-qui rougit sous plusieurs refus, un refus que personne n'exerce, une suite déjà rouge
-sur les copies intactes, un périmètre incomplet — sans rejouer les neuf mutations du
-vrai générateur, ce qui paierait deux fois la même preuve.
-
-Ce qui lance vraiment pytest (une fois : l'état de référence, plus une mutation par
-refus) est remplacé par des verdicts écrits d'avance dans les cas de décision : le
-processus pytest sur un runner coûte des secondes, et le coût de la suite est ce que
-cette famille de passes traque. Un seul cas fait le trajet complet, pour que le
-câblage ne repose pas sur des verdicts imaginaires.
+Ce qu'il prouve tient en trois choses : la dérivation des refus est lue dans l'arbre
+du générateur (un `raise` sans `if` est un orphelin, une condition écrite aussi
+ailleurs ne compte pas), les DÉCISIONS du garde sur des verdicts écrits d'avance (un
+refus que personne n'exerce, un test partagé entre deux refus, une suite déjà rouge,
+un périmètre incomplet), et le CÂBLAGE de l'étape qui, elle, rejoue tout pour de vrai.
+Si la frontière du garde changeait de forme, c'est cette étape qui le dirait : elle
+seule voit passer de vrais rouges.
 """
 import importlib.util
+import re
 import shutil
 from pathlib import Path
 
@@ -38,6 +36,16 @@ def _load_guard():
 
 
 GUARD = _load_guard()
+COMMAND = "python .github/scripts/check-og-test-mutations.py"
+
+TWO_REFUSALS = """\
+def check(value):
+    if value < 0:
+        raise SystemExit('valeur négative')
+    if value > 10:
+        raise SystemExit('valeur trop grande')
+    return value
+"""
 
 THREE_REFUSALS = """\
 def check(value):
@@ -50,15 +58,6 @@ def check(value):
     return value
 """
 
-TWO_REFUSALS = """\
-def check(value):
-    if value < 0:
-        raise SystemExit('valeur négative')
-    if value > 10:
-        raise SystemExit('valeur trop grande')
-    return value
-"""
-
 # Un refus que rien ne porte : la dérivation ne peut pas savoir quand il tombe.
 ORPHAN = """\
 def check(value):
@@ -67,55 +66,56 @@ def check(value):
     raise SystemExit('sans if')
 """
 
-# La suite charge le générateur FACTICE par son chemin, comme le vrai fichier de test.
-LOADER = """\
-import importlib.util
-from pathlib import Path
 
-_SPEC = importlib.util.spec_from_file_location(
-    "gen_factice",
-    Path(__file__).resolve().parent.parent.parent / "frontend" / "scripts" / "gen-og-images.py",
-)
-GEN = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(GEN)
-
-
-def refuse(value):
-    try:
-        GEN.check(value)
-    except SystemExit:
-        return True
-    return False
-"""
-
-BLIND_SUITE = "def test_rien():\n    assert True\n"
-BROKEN_SUITE = "def test_rien():\n    assert False\n"
-
-# Un test par refus : chacun rougit sous le sien SEUL.
-TWO_OWNERS_SUITE = LOADER + """
-
-def test_refuse_la_valeur_negative():
-    assert refuse(-1)
-
-
-def test_refuse_la_valeur_trop_grande():
-    assert refuse(11)
-"""
-
-
-def fake_repo(tmp_path, generator, suite):
-    """Une arborescence où le générateur ET la suite sont ceux du cas, aux chemins
-    réels : c'est ce qui permet de fabriquer le cas qu'on veut prouver."""
+def fake_repo(tmp_path, generator):
+    """Une arborescence où le GÉNÉRATEUR est celui du cas, aux chemins réels. Le
+    fichier de test n'est jamais exécuté ici — la seule frontière du garde est
+    remplacée — donc son contenu n'a pas à être une suite : seul son existence
+    compte pour le périmètre."""
     tree = tmp_path / "repo"
     for relative in (GUARD.GENERATOR_FILE, GUARD.DICTIONARY_FILE):
         target = tree / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relative, target)
     (tree / GUARD.GENERATOR_FILE).write_text(generator, encoding="utf-8")
-    test = tree / GUARD.TEST_FILE
-    test.parent.mkdir(parents=True, exist_ok=True)
-    test.write_text(suite, encoding="utf-8")
+    suite = tree / GUARD.TEST_FILE
+    suite.parent.mkdir(parents=True, exist_ok=True)
+    suite.write_text("def test_rien():\n    assert True\n", encoding="utf-8")
     return tree
+
+
+def job_block(name, workflow):
+    """Le bloc YAML d'un job : de sa clé, indentée de deux espaces, à la suivante."""
+    lines = workflow.splitlines()
+    start = next(index for index, line in enumerate(lines) if line.strip() == "%s:" % name)
+    end = next(
+        (
+            index
+            for index, line in enumerate(lines[start + 1 :], start + 1)
+            if re.match(r"^  [A-Za-z0-9_-]+:$", line)
+        ),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])
+
+
+@pytest.fixture
+def verdicts(monkeypatch):
+    """Remplace la seule frontière du garde — lancer pytest — par des verdicts écrits
+    d'avance, refus par refus, le premier appel étant l'état de référence."""
+    calls = []
+
+    def _install(reference_ok, *per_refusal):
+        def fake_suite(tree, python):
+            calls.append(tree)
+            if len(calls) == 1:
+                return (0 if reference_ok else 1, "", [])
+            return (0, "", list(per_refusal[len(calls) - 2]))
+
+        monkeypatch.setattr(GUARD, "suite_run", fake_suite)
+        return calls
+
+    return _install
 
 
 class TestDerivation:
@@ -165,46 +165,19 @@ class TestDerivation:
             for index, (before, after) in enumerate(zip(source.splitlines(), mutated.splitlines()))
             if before != after
         ]
-
-        assert changed == [1]
         alike = lambda text: [
             index for index, line in enumerate(text.splitlines()) if line.strip() == "if value < 0:"
         ]
+
+        assert changed == [1]
         assert alike(source) == [1, 9], "la source doit bien porter deux lignes identiques"
         assert alike(mutated) == [9], "la seconde doit survivre intacte"
-
-
-@pytest.fixture
-def verdicts(monkeypatch):
-    """Remplace la seule frontière du garde — lancer pytest — par des verdicts écrits
-    d'avance : les décisions se testent alors sans démarrer pytest une douzaine de
-    fois, et le cas de bout en bout plus bas garde le câblage honnête.
-
-    Les rouges sont donnés refus par refus, dans l'ordre du générateur, le premier
-    appel étant l'état de référence (qui doit passer).
-    """
-
-    def _install(reference_ok=True, *per_refusal):
-        calls = []
-
-        def fake_suite(tree, python):
-            calls.append(tree)
-            if len(calls) == 1:
-                return (0 if reference_ok else 1, "", [])
-            return (0, "", list(per_refusal[len(calls) - 2]))
-
-        monkeypatch.setattr(GUARD, "suite_run", fake_suite)
-        return calls
-
-    return _install
 
 
 class TestLeRapport:
     """Ce que le garde conclut des rouges qu'il mesure."""
 
-    def test_un_refus_dont_le_test_rougit_sous_un_autre_refus_est_refuse(
-        self, tmp_path, verdicts
-    ):
+    def test_un_refus_dont_le_test_rougit_sous_un_autre_refus_est_refuse(self, tmp_path, verdicts):
         """Le défaut que ce garde est seul à voir : un rouge collatéral. Le test
         partagé rougit bien sous les deux refus, et pourtant il n'en verrouille aucun
         — et le refus qui a son test à lui passe, ce qui prouve que la règle ne
@@ -215,7 +188,7 @@ class TestLeRapport:
             ["partage::test_commun"],
             ["partage::test_commun"],
         )
-        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS, BLIND_SUITE))
+        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS))
 
         assert [label for label, _ in report.errors] == [GUARD.label_of(5), GUARD.label_of(7)]
         assert all("aucun ne lui appartient" in message for _, message in report.errors)
@@ -229,7 +202,7 @@ class TestLeRapport:
         muté de lui-même, et signalé tant qu'aucun test ne rougit sous lui — là où une
         table tenue à la main l'aurait ignoré."""
         verdicts(True, ["suite::test_du_premier"], [], ["suite::test_du_troisieme"])
-        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS, BLIND_SUITE))
+        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS))
 
         assert [label for label, _ in report.errors] == [GUARD.label_of(5)]
         assert "AUCUN test" in report.errors[0][1]
@@ -239,7 +212,7 @@ class TestLeRapport:
         suite doit d'abord PASSER sur les copies intactes, et rien ne doit être muté
         ensuite."""
         calls = verdicts(False, ["suite::test_quelconque"])
-        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS, BROKEN_SUITE))
+        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS))
 
         assert [label for label, _ in report.errors] == ["état de référence"]
         assert report.owners == {} and len(calls) == 1
@@ -251,29 +224,24 @@ class TestLeRapport:
         assert len(report.errors) == 1 and "périmètre" in report.errors[0][1]
 
 
-class TestBoutEnBout:
-    def test_deux_refus_deux_tests_chacun_nomme_comme_proprietaire(self, tmp_path):
-        """Le seul cas qui lance vraiment pytest : c'est lui qui prouve que les rouges
-        lus dans la sortie réelle désignent le bon test, et donc que les verdicts des
-        cas ci-dessus ne sont pas des fictions confortables."""
-        report = GUARD.run(fake_repo(tmp_path, TWO_REFUSALS, TWO_OWNERS_SUITE))
+class TestCablage:
+    def test_le_seul_executeur_est_l_etape_du_job_backend(self):
+        """La preuve est payée une fois par push, ici et nulle part ailleurs : le
+        commandement n'apparaît qu'une fois dans le workflow, dans le job qui installe
+        `backend/requirements.txt` — donc Pillow, que le fichier de test importe et que
+        les copies du garde exécutent."""
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        backend = job_block("backend-tests", workflow)
 
-        assert report.errors == []
-        owners = {refusal.condition: owned for refusal, owned in report.owners.items()}
-        assert [GUARD.short(name) for name in owners["value < 0"]] == [
-            "test_refuse_la_valeur_negative"
-        ]
-        assert [GUARD.short(name) for name in owners["value > 10"]] == [
-            "test_refuse_la_valeur_trop_grande"
-        ]
+        assert workflow.count(COMMAND) == 1, "un second exécutant paierait la même preuve deux fois"
+        assert COMMAND in backend
+        assert "-r requirements.txt" in backend, "sans ses dépendances, l'étape ne peut pas tourner"
 
-
-class TestDepotReel:
     def test_la_derivation_couvre_chaque_raise_du_generateur(self):
         """Ce que le garde verra en CI, sur le vrai générateur : chaque refus a une
-        condition unique et neutralisable, et AUCUN `raise SystemExit` n'est hors de
-        sa portée. C'est ce qui remplace la table tenue à la main : un refus ajouté
-        est muté, un `raise` sans `if` est signalé."""
+        condition unique et neutralisable, et AUCUN `raise SystemExit` n'est hors de sa
+        portée. C'est ce qui remplace la table tenue à la main : un refus ajouté est
+        muté, un `raise` sans `if` est signalé."""
         source = (REPO_ROOT / GUARD.GENERATOR_FILE).read_text(encoding="utf-8")
         refusals, orphans = GUARD.parse_refusals(source)
         conditions = [refusal.condition for refusal in refusals]
@@ -291,12 +259,3 @@ class TestDepotReel:
                 if before != after
             ]
             assert len(changed) == 1, refusal
-
-    def test_le_garde_est_cable_dans_la_ci(self):
-        """Le garde ne sert que s'il tourne, et il tourne ICI pour tout le monde :
-        c'est l'étape qui rejoue les mutations, sur un job qui a pytest et Pillow (le
-        fichier de test importe le générateur réel). Rien ne le rejoue dans la suite :
-        ce contrôle de câblage est tout ce que la suite en dit."""
-        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
-
-        assert "python .github/scripts/check-og-test-mutations.py" in workflow

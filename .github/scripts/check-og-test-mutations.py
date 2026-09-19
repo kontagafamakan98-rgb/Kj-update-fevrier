@@ -34,9 +34,11 @@ refus doit donc avoir un test À LUI — un test qui rougit sous ce refus et sou
 aucun autre. L'appartenance est mesurée, pas déclarée : les rouges d'un refus sont
 confrontés à ceux des autres.
 
-CE GARDE est le seul à rejouer ces mutations : la suite de tests, elle, prouve
-qu'il sait refuser sans les rejouer — deux propriétaires de la même preuve la
-paieraient deux fois par push (3,0 à 5,0 s ici sur le runner selon le run, 10,2 s en local ; la suite
+CE GARDE est le seul à rejouer ces mutations, et l'étape de CI est son seul exécutant :
+la suite de tests, elle, n'exécute JAMAIS pytest — elle éprouve les décisions
+ci-dessus sur des verdicts écrits d'avance et ne vérifie de cette étape que son
+câblage (une occurrence, dans le job qui installe ses dépendances). Deux payeurs de la
+même preuve la paieraient deux fois par push (3,0 à 5,0 s ici sur le runner selon le run, 10,2 s en local ; la suite
 de `main` a perdu les ~4 s que lui coûtait la reprise, cf. CI-COVERAGE §3 F17).
 
 Ce qui est refusé
