@@ -55,6 +55,24 @@ TEST_OTP_CODE = "123456"
 # FakeCollection et FakeDB (mode local sans MongoDB)
 # ---------------------------------------------------------------------------
 
+def _unset_path(doc: Dict, path: str) -> None:
+    """Retire un chemin pointé (« location.latitude »), comme `$unset` de Mongo :
+    la CLÉ disparaît du document (ce n'est pas une mise à None).
+
+    Sans ce support, la FakeDB ignorait `$unset` en silence : une écriture qui
+    efface des champs ne changeait rien, et le test qui la vérifie échouait pour
+    une raison qui n'existait qu'en local — ou pire, passait si l'assertion
+    portait sur l'absence et que le champ n'avait jamais été posé.
+    """
+    parts = path.split(".")
+    current: Any = doc
+    for part in parts[:-1]:
+        current = current.get(part) if isinstance(current, dict) else None
+        if not isinstance(current, dict):
+            return
+    current.pop(parts[-1], None)
+
+
 class FakeCollection:
     def __init__(self):
         self._docs: List[Dict] = []
@@ -159,6 +177,9 @@ class FakeCollection:
             if self._match(query, doc):
                 if "$set" in update:
                     doc.update(update["$set"])
+                if "$unset" in update:
+                    for k in update["$unset"]:
+                        _unset_path(doc, k)
                 if "$inc" in update:
                     for k, v in update["$inc"].items():
                         doc[k] = float(doc.get(k, 0)) + float(v)
@@ -204,6 +225,9 @@ class FakeCollection:
             matched += 1
             if "$set" in update:
                 doc.update(update["$set"])
+            if "$unset" in update:
+                for k in update["$unset"]:
+                    _unset_path(doc, k)
             if "$inc" in update:
                 for k, v in update["$inc"].items():
                     doc[k] = float(doc.get(k, 0)) + float(v)
