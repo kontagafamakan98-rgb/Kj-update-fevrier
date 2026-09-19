@@ -28,6 +28,12 @@ const CONFIGURED_HTML = `<!doctype html><html><head>
 <script type="application/ld+json">{"@type":"LocalBusiness","sameAs":["https://www.facebook.com/kojo","http://insecure.test"]}</script>
 </head><body><div id="root"><a href="https://www.facebook.com/kojo" rel="me noreferrer">Facebook</a></div><footer><a href="https://www.facebook.com/kojo" rel="me noreferrer">Facebook</a></footer></body></html>`;
 
+// HTML « requis seulement » : les trois intégrations REQUISES sont là, la
+// facultative non. C'est l'état attendu une fois GA4 et GSC posés — et il doit
+// laisser la sonde stricte VERTE, sinon le rouge quotidien ne voudrait plus rien
+// dire.
+const REQUIRED_ONLY_HTML = CONFIGURED_HTML.replace(' https://plausible.io', '');
+
 // HTML « non configuré » : l'état de la production tant que Vercel n'a rien.
 const UNCONFIGURED_HTML = `<!doctype html><html><head>
 <link rel="canonical" href="https://kojoforafrica.cc.cd/" />
@@ -241,6 +247,37 @@ describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
     });
 
     expect(result.manquantes).toEqual([]);
+  });
+
+  it('reste VERTE quand seule l’intégration FACULTATIVE manque', async () => {
+    // Le cas qui compte après la pose des valeurs requises : Plausible est un
+    // choix d'exploitation, pas un défaut. Une sonde qui échouerait encore ici
+    // resterait rouge à jamais et on apprendrait à l'ignorer.
+    expect(analyzeSeoServedHtml(REQUIRED_ONLY_HTML).plausible.present).toBe(false);
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: stubFetch({ '/': REQUIRED_ONLY_HTML, '/sitemap.xml': SITEMAP_XML }),
+    });
+
+    expect(result.manquantes).toEqual([]);
+    // Elle est quand même PUBLIÉE — un silence total cacherait le choix.
+    expect(result.notices.join('\n')).toContain('Plausible (facultatif) : ABSENT');
+    expect(result.notices.join('\n')).toContain('FACULTATIF : son absence ne fait pas échouer');
+  });
+
+  it('refuse les REQUISES absentes et ne nomme la facultative que dans le refus', async () => {
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: stubFetch({ '/': UNCONFIGURED_HTML, '/sitemap.xml': SITEMAP_XML }),
+    });
+
+    const refuse = result.manquantes.join('\n');
+    for (const env of ['VITE_GA_MEASUREMENT_ID', 'VITE_GSC_VERIFICATION', 'VITE_SOCIAL_*']) {
+      expect(refuse).toContain(env);
+    }
+    expect(refuse).not.toContain('VITE_PLAUSIBLE_DOMAIN');
   });
 
   it('une sonde SANS VERDICT échoue aussi : rien mesuré n’est pas « rien de cassé »', async () => {

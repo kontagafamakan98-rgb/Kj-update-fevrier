@@ -586,12 +586,23 @@ Deux pièces ferment cet écart, et **aucune ne fait de bruit sur une PR** :
 
 | Pièce | Ce qu'elle fait | Quand |
 |---|---|---|
-| `check-seo-production.js --strict` | refuse chaque intégration absente (elle nomme la variable à poser), et refuse AUSSI de conclure quand la production est illisible — « rien de mesuré » n'est pas « rien de cassé » | à la demande |
+| `check-seo-production.js --strict` | refuse chaque intégration **requise** absente (elle nomme la variable à poser) ; une **facultative** absente est publiée mais ne bloque pas ; refuse AUSSI de conclure quand la production est illisible — « rien de mesuré » n'est pas « rien de cassé » | à la demande |
 | `.github/workflows/seo-production-probe.yml` | lance la sonde **stricte** sur la production, une fois par jour (`17 6 * * *`), sans secret (HTML public) | quotidien |
 
 L'étape de `ci.yml` **reste informative** : un rouge sur chaque PR bloquerait des
 fusions pour une variable que personne n'a encore obtenue. Ce qui change, c'est
 que le silence n'est plus possible — un run rouge quotidien est un fait visible.
+
+**Seules les REQUISES bloquent, et c'est mesuré, pas supposé.** Le premier run
+réel de la sonde (`35476895792`, 19/09/2026, `workflow_dispatch`) échouait sur
+**trois** intégrations dont Plausible — qui est un choix d'exploitation. Une
+sonde qui reste rouge après la pose des valeurs requises est une sonde qu'on
+apprend à ignorer : c'est le silence, par un autre chemin. La table des
+intégrations porte donc `required` (GA4, Search Console et liens sociaux oui ;
+Plausible non), le mode strict ne refuse que celles-là, et une facultative
+absente reste publiée avec la mention `FACULTATIF : son absence ne fait pas
+échouer la sonde stricte`. Deux tests tiennent la règle, et la mutation du script
+réel les fait rougir **par leur nom**.
 
 **Ce qui manque encore, nommé et vérifié par l'API GitHub le 19/09/2026** : le
 secret `KOJO_GA_MEASUREMENT_ID` est **absent** des secrets du dépôt
