@@ -1028,9 +1028,10 @@ puis neutralise **un refus à la fois** : la condition devient `False` à la pos
 exacte que l'arbre désigne (remplacer la LIGNE ENTIÈRE était le premier réflexe, et
 la priorité des opérateurs avait d'ailleurs rendu fausse une première mutation
 manuelle, `if False and … or …`, dont la seconde moitié survivait) et exige que la
-suite ÉCHOUE. Les **9 refus** font 9 rouges : **3,0 s sur le runner** (horodatages de
-l'étape du run de `0de919f`, 03:40:28Z → 03:40:31Z ; 4,0 s aux runs de `8f2b1b9` et
-`019dc5f0`, même source) et **10,2 s en local**, où la police et la machine diffèrent.
+suite ÉCHOUE. Les **9 refus** font 9 rouges : **3,0 à 5,0 s sur le runner selon le run**
+(horodatages des étapes de `0de919f`, `eef604d`, `8f2b1b9` et `019dc5f0`, même source :
+3,0 s, 5,0 s, 4,0 s, 4,0 s) et **10,2 s en local**, où la police et la machine
+diffèrent.
 Un état de référence rouge échoue au nom de l'état de référence, un refus que
 personne n'exerce au nom de sa ligne. Le dépôt n'est jamais modifié, donc il n'y a
 plus d'empreinte à restaurer.
@@ -1064,13 +1065,15 @@ par des verdicts écrits d'avance ; **un seul cas fait le trajet complet** et ex
 propriétaires nommés, pour que ce câblage ne repose pas sur des verdicts imaginaires.
 La première version de ces cas lançait pytest douze fois et coûtait **+30 s sur le
 runner** (étape des tests : 111,0 s, contre 81,0 s au run précédent, même source) ;
-ramenés à trois processus imbriqués, ils coûtent 2,3 s en local.
+ramenés à trois processus imbriqués, ils coûtent 2,3 s en local, et l'étape des tests
+est revenue de 111,0 s à **80,0 s** sur le runner (`eef604d`), soit son niveau d'avant.
 
 **Un seul exécutant, et la suite le dit** : rejouer les mutations dans la suite ET
 dans l'étape payait la même preuve deux fois par push. Mesuré des deux côtés : la
 suite de `main` est passée de **82,5 s** (`798e31d`, avant la répartition) à
 **78,9 s** (`8f2b1b9`, après) sur le runner, et de 89,1 s à 81,1 s en local, tandis que
-l'étape coûte 3,0 s sur le runner et 10,2 s en local. L'étape rejoue donc les
+l'étape coûte 3,0 à 5,0 s sur le runner selon le run et 10,2 s en local. L'étape
+rejoue donc les
 mutations seule ; la suite prouve que le garde sait refuser **sans les rejouer**
 (2,3 s, dont un seul cas qui lance vraiment pytest) et n'affirme de la partie verte
 que son câblage.
