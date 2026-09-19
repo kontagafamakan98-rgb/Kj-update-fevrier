@@ -48,7 +48,11 @@ def _load_generator():
 GENERATOR = _load_generator()
 
 # Une carte complète : la route servie, les clés i18n des textes de cette page, et
-# ses deux sorties.
+# ses deux sorties. Ces cinq noms sont écrits ici parce que chacun attend une VALEUR
+# (un chemin, une clé, un fichier) qu'aucun test ne peut inventer : une table dérivée
+# obligerait à en inventer une pour un champ que le générateur exigerait demain. Ce
+# qui compte est le mode d'échec, et il est bruyant — un sixième champ exigé fait
+# rougir deux cas, mesuré, au lieu de passer inaperçu.
 CARD = {
     "route": "/jobs",
     "title": "jobsMetaTitle",

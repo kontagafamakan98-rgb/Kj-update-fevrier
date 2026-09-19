@@ -362,6 +362,11 @@ jobs:
       #
       # Dans CE job (et pas workflow-lint) : le fichier de test importe le
       # générateur réel, donc Pillow, installé ici par requirements.txt.
+      #
+      # Cette étape est le SEUL endroit qui rejoue les mutations (4,6 s mesurés sur
+      # le runner) : le test du garde prouve qu'il sait refuser — mutation sans
+      # effet, ligne introuvable, refus hors table — sans les rejouer, pour que la
+      # même preuve ne soit pas payée deux fois à chaque push.
       - name: Check OG refusals are locked by their tests (mutation replay)
         run: python .github/scripts/check-og-test-mutations.py
 

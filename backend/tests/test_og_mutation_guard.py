@@ -4,17 +4,18 @@
 .github/scripts/check-og-test-mutations.py existe parce que cette preuve avait été
 faite à la main — huit mutations du générateur, restaurées à l'empreinte SHA-1 —
 donc hors du dépôt : une preuve qu'on ne peut pas rejouer depuis un checkout ne
-protège rien. Ce fichier prouve le garde LUI-MÊME : qu'il refuse une mutation sans
-effet, une ligne de refus introuvable et un périmètre cassé, et qu'il passe sur le
-dépôt réel (ce que la CI exécute aussi, en étape propre).
+protège rien. Ce garde la rejoue, et il en est le SEUL propriétaire : l'étape du job
+`backend-tests` l'exécute une fois par push, et ce fichier-ci prouve qu'il sait
+refuser — mutation sans effet, ligne introuvable, refus absent de sa table,
+périmètre cassé — sans rejouer les neuf mutations, ce qui doublerait le coût de la
+même preuve.
 
-Les cas de refus tournent sur des arborescences temporaires, avec UNE seule
-mutation (la table est réduite pour le cas) : rejouer les neuf ici doublerait le
-temps de la suite sans rien prouver de plus — c'est le rôle de la CI.
+Les cas de refus tournent sur des arborescences temporaires, avec UNE seule entrée
+de table (elle est réduite pour le cas) : rejouer les neuf ici ne prouverait rien de
+plus que ce que la CI exécute.
 """
 import importlib.util
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -38,6 +39,13 @@ GUARD = _load_guard()
 # ce qui place le garde devant le cas qu'il doit savoir refuser.
 BLIND_SUITE = "def test_rien():\n    assert True\n"
 
+# Un refus que la table du garde ne connaît pas, ajouté au générateur copié : c'est
+# le dixième refus qui pourrait être oublié demain.
+EXTRA_REFUSAL = (
+    "    if not OUTPUT_NAME.startswith('og-'):\n"
+    "        raise SystemExit('nom de sortie invalide')\n"
+)
+
 
 @pytest.fixture
 def one_mutation(monkeypatch):
@@ -51,7 +59,7 @@ def fake_repo(tmp_path):
     """Une arborescence où le GÉNÉRATEUR est le vrai — donc ses lignes de refus sont
     celles du dépôt — mais où la suite de test est choisie par le cas."""
 
-    def _build(test_source=BLIND_SUITE, drop=None):
+    def _build(test_source=BLIND_SUITE, gone=None, extra_refusal=False):
         work = tmp_path / "repo"
         for relative in (GUARD.GENERATOR_FILE, GUARD.DICTIONARY_FILE):
             target = work / relative
@@ -60,12 +68,13 @@ def fake_repo(tmp_path):
         test = work / GUARD.TEST_FILE
         test.parent.mkdir(parents=True, exist_ok=True)
         test.write_text(test_source, encoding="utf-8")
-        if drop is not None:
-            generator = work / GUARD.GENERATOR_FILE
-            generator.write_text(
-                generator.read_text(encoding="utf-8").replace(drop, "if False:  # deja neutralise"),
-                encoding="utf-8",
-            )
+        generator = work / GUARD.GENERATOR_FILE
+        source = generator.read_text(encoding="utf-8")
+        if gone is not None:
+            source = source.replace(gone, "if False:  # deja neutralise")
+        if extra_refusal:
+            source += "\n\n" + EXTRA_REFUSAL
+        generator.write_text(source, encoding="utf-8")
         return work
 
     return _build
@@ -87,13 +96,24 @@ class TestRefuses:
     def test_une_ligne_de_refus_introuvable_est_une_erreur(self, fake_repo, one_mutation):
         """Le garde vise des lignes du générateur : si l'une disparaît, il doit le dire
         plutôt que de croire avoir tout couvert avec huit mutations sur neuf."""
-        work = fake_repo(drop=GUARD.MUTATIONS[0][1])
+        work = fake_repo(gone=GUARD.MUTATIONS[0][1])
 
         errors = GUARD.run(work, sys.executable)
 
-        assert len(errors) == 1
-        label, message = errors[0]
+        label, message = next(item for item in errors if item[0] == GUARD.MUTATIONS[0][0])
         assert label == GUARD.MUTATIONS[0][0] and GUARD.MUTATIONS[0][1] in message
+
+    def test_un_refus_absent_de_la_table_est_signale(self, fake_repo, one_mutation):
+        """Le périmètre de la table n'est pas ce qui la définit : chaque `raise
+        SystemExit` du générateur est dérivé de sa source, donc un refus que la table
+        ignore est signalé — sinon un dixième refus passerait vert."""
+        work = fake_repo(extra_refusal=True)
+        added = EXTRA_REFUSAL.splitlines()[0].strip()
+
+        errors = GUARD.run(work, sys.executable)
+
+        assert added in [label for label, _ in errors], errors
+        assert any(GUARD.GENERATOR_FILE in message for label, message in errors if label == added)
 
     def test_un_perimetre_incomplet_est_une_erreur(self, tmp_path, one_mutation):
         """Rien à copier (mauvaise racine) : une erreur, pas un succès silencieux."""
@@ -103,11 +123,16 @@ class TestRefuses:
 
 
 class TestDepotReel:
-    def test_chaque_mutation_designe_une_ligne_unique_du_generateur(self):
-        """La table du garde suit le générateur : chaque ligne visée existe, et la
-        neutraliser ne change QU'une ligne — celle-là."""
+    def test_la_table_couvre_exactement_les_refus_du_generateur(self):
+        """La table et le générateur disent la même chose : chaque entrée neutralise
+        une ligne EXISTANTE (une seule, la sienne), et aucune ligne portant un refus
+        n'est oubliée."""
         source = (REPO_ROOT / GUARD.GENERATOR_FILE).read_text(encoding="utf-8")
+        covered = [condition for _, condition in GUARD.MUTATIONS]
+        derived = GUARD.refusal_lines(source)
 
+        assert len(derived) >= 5, "la dérivation ne voit plus aucun refus : elle est cassée"
+        assert sorted(derived) == sorted(covered)
         for label, condition in GUARD.MUTATIONS:
             mutated = GUARD.neutralized(source, condition)
             assert mutated is not None, "%s : la ligne « %s » a disparu du générateur" % (label, condition)
@@ -119,23 +144,10 @@ class TestDepotReel:
             assert len(changed) == 1 and "if False:" in mutated.splitlines()[changed[0]], label
 
     def test_le_garde_est_cable_dans_la_ci(self):
-        """Le garde ne sert que s'il tourne : la CI doit l'appeler, sur un job qui a
-        pytest et Pillow (le fichier de test importe le générateur réel)."""
+        """Le garde ne sert que s'il tourne, et il tourne ICI pour tout le monde : c'est
+        l'étape qui rejoue les mutations, sur un job qui a pytest et Pillow (le fichier
+        de test importe le générateur réel). Rien ne le rejoue dans la suite : ce
+        contrôle de câblage est tout ce que la suite en dit."""
         workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
         assert "python .github/scripts/check-og-test-mutations.py" in workflow
-
-    def test_le_garde_passe_sur_le_depot_reel(self):
-        """Le chemin vert — celui que la CI exécute — par le même appel que la CI :
-        les neuf refus sont verrouillés par le fichier de test réel."""
-        done = subprocess.run(
-            [sys.executable, ".github/scripts/check-og-test-mutations.py"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-
-        assert done.returncode == 0, done.stdout + done.stderr
-        assert "[OK] %d refus" % len(GUARD.MUTATIONS) in done.stdout

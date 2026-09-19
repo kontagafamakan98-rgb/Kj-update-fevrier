@@ -991,11 +991,13 @@ faisait rougir personne. C'était le seul faux vert que F16 pouvait encore produ
 **Correctif — `backend/tests/test_gen_og_images.py`** (22 cas). Le module est chargé
 par son CHEMIN (comme `test_dmarc_policy.py` charge
 `backend/scripts/dmarc_policy.py`) et son `CARDS_DIR` est redirigé vers un dossier
-temporaire : aucun fichier du dépôt n'est écrit. Chaque cas est un refus, ou
-l'invariant qui le rend tenable : le texte replié redonne le texte publié par la page
-— c'est ce qui autorise `check-og-assets.js` à comparer les lignes du manifeste à
-`fr.json` — et les lignes réservées par `LAYOUTS` tiennent dans la carte, ce qui est
-la vérification qui donne son sens au filet ci-dessus. Aucune assertion ne porte sur
+temporaire : aucun fichier du dépôt n'est écrit. Les 22 cas se répartissent
+exactement en **20 refus** et **2 cas d'un seul invariant** — les lignes que `LAYOUTS`
+réserve au titre et à la description tiennent dans la carte, en wide et en carrée —,
+qui est ce qui donne son sens au filet ci-dessus ; l'autre invariant, le repli qui
+redonne le texte publié (ce qui autorise `check-og-assets.js` à comparer le manifeste
+à `fr.json`), est une assertion À L'INTÉRIEUR du cas de refus « texte trop long », pas
+un cas à part. Aucune assertion ne porte sur
 la FORMULATION d'un message : chacune nomme le coupable pris dans l'entrée du test
 (fichier, champ, clé i18n, route, mot), donc reformuler un refus ne rougit pas la
 suite. Les refus sont tous vérifiables **sans police de référence et sans image
@@ -1006,10 +1008,14 @@ runner sans Arial, la police de repli mesure autrement mais pas assez pour les f
 tenir, donc le verdict ne dépend pas de la machine.
 
 Les faits que le GÉNÉRATEUR possède sont **lus sur le module**, jamais recopiés
-dans le test : la liste des champs exigés (`REQUIRED_CARD_KEYS`, un cas par champ)
-et la police du titre de la wide (`LAYOUTS`, par `fonts_for`). Une liste écrite de
-mémoire deviendrait fausse en silence — exactement le défaut que cette passe
-supprime — et c'est prouvé par mutation (voir plus bas).
+dans le test : la liste des champs exigés (`REQUIRED_CARD_KEYS`, un cas par champ),
+la police du titre de la wide (`LAYOUTS`, par `fonts_for`), la colonne
+(`measure_width`) et les lignes réservées (`LAYOUTS`). Une liste écrite de mémoire
+deviendrait fausse en silence — exactement le défaut que cette passe supprime — et
+c'est prouvé par mutation (voir plus bas). Restent les cinq NOMS de champs de la carte
+de référence du test (`CARD`) : ce sont des entrées, pas des faits du générateur —
+chaque champ attend une valeur qu'un test ne peut pas inventer — et leur écart est
+bruyant : un sixième champ exigé fait rougir deux cas (mesuré).
 
 **Preuve automatique — `.github/scripts/check-og-test-mutations.py`**, étape du job
 `backend-tests`. Un test qu'on n'a jamais vu échouer ne prouve rien, et cette preuve
@@ -1021,17 +1027,32 @@ le dictionnaire (mêmes profondeurs), exige que la suite PASSE sur les copies in
 puis neutralise **un refus à la fois** en remplaçant la LIGNE ENTIÈRE par `if False:`
 (le motif est la ligne, pas une sous-chaîne : la priorité des opérateurs avait rendu
 fausse une première mutation manuelle, `if False and … or …`, dont la seconde moitié
-survivait) et exige que la suite ÉCHOUE. Les **9 refus** font 9 rouges en 10 s sur
-`main` ; une mutation sans effet (« ce refus n'est verrouillé par rien »), une ligne
-de refus introuvable et un état de référence rouge échouent au nom du refus concerné.
-Le dépôt n'est jamais modifié, donc il n'y a plus d'empreinte à restaurer.
+survivait) et exige que la suite ÉCHOUE. Les **9 refus** font 9 rouges : **4,6 s
+mesurés sur le runner** (groupe ouvert à 01:53:09.889 dans le journal du run de
+`main`, sortie `[OK]` à 01:53:14.464 ; 10,1 s en local, où la police et la machine
+diffèrent) ; une mutation sans effet (« ce refus n'est verrouillé par rien »), une
+ligne de refus introuvable et un état de référence rouge échouent au nom du refus
+concerné. Le dépôt n'est jamais modifié, donc il n'y a plus d'empreinte à restaurer.
+
+**Le périmètre de sa table est DÉRIVÉ, pas déclaré** : `refusal_lines()` lit chaque
+`raise SystemExit` du générateur et la condition juste au-dessus, et `run()` signale
+un refus absent de la table comme une entrée qui ne porte plus de refus. Un dixième
+refus ajouté au générateur ne peut donc pas passer vert — ce que la table seule,
+tenue à la main, ne garantissait pas.
 
 **Et le garde est prouvé lui-même** — `backend/tests/test_og_mutation_guard.py` (6
-cas) : il refuse une suite qui passe TOUJOURS malgré la mutation (le cas central : le
-garde ne se contente pas de lancer pytest, il exige un rouge), une ligne de refus
-absente du générateur et un périmètre incomplet ; il passe sur le dépôt réel par le
-même appel que la CI ; et chaque entrée de sa table neutralise UNE seule ligne du
-vrai générateur.
+cas, 3,3 s) : il refuse une suite qui passe TOUJOURS malgré la mutation (le cas
+central : il ne se contente pas de lancer pytest, il exige un rouge), une ligne de
+refus absente du générateur, un périmètre incomplet et **un refus hors table** ; il
+exige que chaque entrée neutralise UNE seule ligne du vrai générateur, et vérifie le
+câblage de l'étape.
+
+**Un seul exécutant, et la suite le dit** : rejouer les mutations dans la suite ET
+dans l'étape payait la même preuve deux fois par push (4,6 s sur le runner **plus**
+~10 s dans la suite, mesuré au tour d'audit du 19/09/2026). L'étape les rejoue seule ;
+la suite prouve que le garde sait refuser **sans les rejouer** (3,3 s, dont 2 s de
+pytest imbriqué pour ses cas de refus) et n'affirme de la partie verte que son
+câblage.
 
 **Mutation du champ exigé — la dérivation suit le générateur** (rejouée le
 19/09/2026 sur le fichier réel : `REQUIRED_CARD_KEYS` reçoit un sixième champ,
@@ -1073,8 +1094,8 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
-| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus les deux invariants : lignes repliées ↔ texte publié, et lignes réservées qui tiennent dans la carte) ; la liste des champs exigés et la police du titre sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés AUTOMATIQUEMENT dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py` (**9 refus, 9 rouges, le dépôt jamais modifié**), et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
-| `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (6 cas : une suite qui passe TOUJOURS malgré la mutation est refusée avec son `::error`, une ligne de refus absente est une erreur, un périmètre incomplet est une erreur, le câblage dans `backend-tests`, chaque entrée neutralise UNE ligne du vrai générateur, et le garde passe sur le dépôt réel par le même appel que la CI) |
+| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus, 9 rouges, 4,6 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
+| `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (6 cas : une suite qui passe TOUJOURS malgré la mutation est refusée avec son `::error`, une ligne de refus absente du générateur est une erreur, **un refus absent de sa table est signalé**, un périmètre incomplet est une erreur, la table couvre EXACTEMENT les refus dérivés du générateur et chaque entrée neutralise UNE seule ligne, le câblage dans `backend-tests`) ; la partie VERTE du garde n'a qu'un exécutant, l'étape de CI, et la suite n'en affirme que le câblage — c'est le test qui le dit, pas la doc |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de
