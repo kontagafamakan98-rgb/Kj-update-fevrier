@@ -344,6 +344,27 @@ jobs:
           DISABLE_TRUSTED_HOST_MIDDLEWARE: "true"
         run: python -m pytest tests/ -q --tb=short
 
+      # Les refus du générateur de cartes OG (frontend/scripts/gen-og-images.py)
+      # sont ce qui empêche une carte d'annoncer autre chose que sa page, et
+      # backend/tests/test_gen_og_images.py les verrouille. Mais un test qu'on n'a
+      # jamais vu échouer ne prouve rien : cette preuve avait été faite à la main
+      # (mutations du générateur, restaurées à l'empreinte SHA-1), donc hors du
+      # dépôt, et rien ne pouvait la rejouer.
+      #
+      # Ce garde la rejoue — sur des COPIES temporaires, le dépôt n'est jamais
+      # modifié : il neutralise un refus à la fois (sa ligne `if …:` devient
+      # `if False:`) et exige que la suite rougisse. Un refus dont la
+      # neutralisation ne fait rien rougir n'est verrouillé par rien, et une ligne
+      # de refus introuvable veut dire que le générateur a changé sans que le garde
+      # suive : les deux échouent ici. Voir
+      # .github/scripts/check-og-test-mutations.py, prouvé par
+      # backend/tests/test_og_mutation_guard.py.
+      #
+      # Dans CE job (et pas workflow-lint) : le fichier de test importe le
+      # générateur réel, donc Pillow, installé ici par requirements.txt.
+      - name: Check OG refusals are locked by their tests (mutation replay)
+        run: python .github/scripts/check-og-test-mutations.py
+
   # ─── Frontend : tests Vitest + build Vite ────────────────────────────────
   frontend-build:
     name: Frontend tests + build (Node/Vite)
