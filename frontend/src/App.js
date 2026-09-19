@@ -27,6 +27,12 @@ const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
+// Les trois pages de CONFIANCE (qui édite le site, comment le joindre, ce qu'il
+// fait des données) : pré-rendues comme les autres pages publiques, donc leur
+// liste vit dans src/config/page-meta.js et leur coquille dans vite.config.js.
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Privacy = lazy(() => import("./pages/Privacy"));
 
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -135,28 +141,38 @@ function LegalFooter() {
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
   const copy = {
     fr: {
+      about: 'À propos',
       legal: 'Politique de confidentialité',
+      terms: "Conditions d'utilisation",
       contact: 'Nous contacter',
       itinerary: 'Itinéraire',
     },
     en: {
+      about: 'About',
       legal: 'Privacy Policy',
+      terms: 'Terms of use',
       contact: 'Contact us',
       itinerary: 'Directions',
     },
     wo: {
+      about: 'Ci nun',
       legal: 'Politique de confidentialité',
-      contact: 'Nous contacter',
+      terms: "Conditions d'utilisation",
+      contact: 'Wax ak nun',
       itinerary: 'Itinéraire',
     },
     bm: {
+      about: 'Anw kunnafoni',
       legal: 'Politique de confidentialité',
-      contact: 'Nous contacter',
+      terms: "Conditions d'utilisation",
+      contact: 'Aw ni ce',
       itinerary: 'Itinéraire',
     },
     mos: {
+      about: 'Tõnd wɛɛngẽ',
       legal: 'Politique de confidentialité',
-      contact: 'Nous contacter',
+      terms: "Conditions d'utilisation",
+      contact: 'Togs tõnd',
     }
   };
   const labels = copy[currentLanguage] || copy.fr;
@@ -185,12 +201,24 @@ function LegalFooter() {
           </a>
         </address>
         <div className="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">
-          <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
-            {labels.legal}
-          </a>
-          <Link to="/support" className="hover:text-orange-800 underline underline-offset-2">
+          {/* Les trois pages de confiance, en LIEN INTERNE : un crawler sans
+              JavaScript ne les trouve que par ici (et par le pied de page de la
+              coquille statique, qui porte les mêmes liens). « Contact » menait
+              au support — une page de suivi de ticket, pas une page de
+              contact — et « Politique de confidentialité » à un .docx dont un
+              moteur ne lisait rien. */}
+          <Link to="/about" className="hover:text-orange-800 underline underline-offset-2">
+            {labels.about}
+          </Link>
+          <Link to="/contact" className="hover:text-orange-800 underline underline-offset-2">
             {labels.contact}
           </Link>
+          <Link to="/privacy" className="hover:text-orange-800 underline underline-offset-2">
+            {labels.legal}
+          </Link>
+          <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
+            {labels.terms}
+          </a>
           {SOCIAL_LINKS.map((social) => (
             <a
               key={social.key}
@@ -283,6 +311,9 @@ function AppRoutes() {
             {/* Public routes - eagerly loaded */}
             <Route path="/" element={<Home />} />
             <Route path="/how-it-works" element={<HowItWorks />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/login" element={
               <Suspense fallback={<LoginSkeleton />}>
                 <Login />

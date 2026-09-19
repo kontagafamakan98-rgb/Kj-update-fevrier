@@ -28,6 +28,9 @@
  *   /dashboard        prod          27  0,0450 ×27                  0,06
  *   /payment          prod          18  0,0450 ×18                  0,06
  *   /profile          prod          27  0,0450 ×27                  0,06
+ *   /about            repli local    3  0,0000 ×3                   0,01
+ *   /contact          repli local    3  0,0000 ×3                   0,01
+ *   /privacy          repli local    3  0,0000 ×3                   0,01
  *
  * Trois marges sont explicites, parce qu'elles ne se déduisent pas du chiffre :
  *   • /register 0,015 — la régression corrigée par #19 valait 0,0165 : elle DOIT
@@ -46,6 +49,19 @@
  * ferait rougir la CI au premier pixel déplacé (un bandeau, un toast), ce qui
  * ferait passer une mesure pour une régression. 0,01 reste 10× plus strict que
  * le seuil « bon » de Lighthouse (0,1).
+ *
+ * ── Les trois pages de confiance, mesurées le 19/09/2026 ────────────────────
+ * /about, /contact et /privacy sont neuves : elles n'ont donc AUCUN run dans un
+ * job de main, et la règle « pas de page auditée sans plafond mesuré » imposait
+ * de les mesurer avant de les déclarer. Mesure faite avec le MÊME outil, sur le
+ * MÊME build : Lighthouse (3 runs par page) contre
+ * `scripts/vercel-rewrite-server.js`, le serveur qui rejoue la table de
+ * rewrites de vercel.json — c'est le repli que la CI utilise déjà pour une PR.
+ * 0,0000 sur les 9 runs. La base est nommée `repli local` dans le tableau
+ * ci-dessus précisément parce qu'elle ne vient PAS d'un job de main : les
+ * premiers runs de production confirmeront ou contrediront ce 0 — et si l'une
+ * des trois bouge, c'est son budget qui devra suivre, pas la mesure qui
+ * s'effacera.
  */
 
 /**
@@ -92,6 +108,12 @@ const CLS_BUDGETS = {
   '/dashboard': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
   '/payment': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 18 runs' },
   '/profile': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
+  // Mesurées le 19/09/2026 (3 runs chacune) contre le serveur de rewrites local,
+  // faute de run de main : voir l'en-tête. 0 constaté, 0,01 exigé — même
+  // prudence que les autres pages mesurées à 0.
+  '/about': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 3 runs (repli local)' },
+  '/contact': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 3 runs (repli local)' },
+  '/privacy': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 3 runs (repli local)' },
 };
 
 /**

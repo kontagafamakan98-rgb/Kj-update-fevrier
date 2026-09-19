@@ -56,6 +56,15 @@ export const DECLARED_PAGE_META = {
     description: 'howItWorksMetaDescription',
   },
   '/support': { title: 'supportMetaTitle', description: 'supportMetaDescription' },
+  // Les trois pages « de confiance » qu'un moteur (et un annonceur) exige avant
+  // de faire crédit au site : qui l'édite, comment le joindre, ce qu'il fait des
+  // données. Elles n'ont pas de visuel dédié — la carte générique les sert — mais
+  // elles publient, comme les autres, un titre et une description PROPRES :
+  // sans cette déclaration, le build refuserait la route (elle n'aurait rien à
+  // écrire dans sa coquille) et un crawler sans JavaScript ne verrait rien.
+  '/about': { title: 'aboutMetaTitle', description: 'aboutMetaDescription' },
+  '/contact': { title: 'contactMetaTitle', description: 'contactMetaDescription' },
+  '/privacy': { title: 'privacyMetaTitle', description: 'privacyMetaDescription' },
 };
 
 /**

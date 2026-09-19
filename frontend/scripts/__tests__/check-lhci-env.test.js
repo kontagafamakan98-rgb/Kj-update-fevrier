@@ -88,6 +88,11 @@ describe('lighthouserc — sélection des pages auditées', () => {
   // budgets ne mesurent rien) et les pages PUBLIQUES, dont /register et
   // /forgot-password corrigées par les PR #19/#20 — tandis que le repli build
   // local n'audite que des pages réellement servies.
+  // Les trois pages de confiance (/about, /contact, /privacy) SONT auditées :
+  // la liste auditée est celle des pages du projet, donc c'est elle qui décide
+  // quelles coquilles le build écrit. Les oublier ici ne les ferait pas
+  // disparaître du site — mais elles ne seraient plus mesurées, et le budget CLS
+  // par route de lhci-cls-budgets.cjs n'aurait plus rien à comparer.
   it('audite les pages d’un déploiement réel (dont /register et /forgot-password)', () => {
     const paths = pathsOf(readConfig(), 'DEPLOYMENT_PATHS');
     expect(paths).toEqual([
@@ -99,6 +104,9 @@ describe('lighthouserc — sélection des pages auditées', () => {
       '/payment',
       '/how-it-works',
       '/support',
+      '/about',
+      '/contact',
+      '/privacy',
       '/dashboard',
       '/profile',
     ]);

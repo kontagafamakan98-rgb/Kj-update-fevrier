@@ -422,6 +422,13 @@ async def get_sitemap_xml():
         (base + "/login", "weekly", "0.8"),
         (base + "/register", "weekly", "0.8"),
         (base + "/jobs", "hourly", "0.9"),
+        # Les trois pages de confiance : un moteur (et une régie publicitaire)
+        # cherche à savoir qui édite le site, comment le joindre et ce qu'il fait
+        # des données. Elles existent en pages pré-rendues depuis le 19/09/2026 ;
+        # les lister ici est ce qui les rend DÉCOUVRABLES sans lien entrant.
+        (base + "/about", "monthly", "0.6"),
+        (base + "/contact", "monthly", "0.6"),
+        (base + "/privacy", "yearly", "0.4"),
     ]
 
     lines = [

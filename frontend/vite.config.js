@@ -380,6 +380,26 @@ export default defineConfig(({ mode }) => {
             `</div>`,
             `</section>`,
 
+            // Qui sommes-nous : le contenu de fond de l'accueil, ajouté après
+            // un audit qui reprochait à la page ses 401 mots — un moteur n'y
+            // trouvait pas de quoi comprendre QUI édite le site. Mêmes clés i18n
+            // et mêmes classes que la section équivalente de src/pages/Home.js :
+            // le crawler sans JavaScript et le navigateur lisent un seul texte.
+            `<section class="py-12 md:py-16 bg-white">`,
+            `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
+            `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('homeAboutTitle'))}</h2>`,
+            `<p class="text-gray-600 mb-4">${esc(T('homeAboutText1'))}</p>`,
+            `<p class="text-gray-600">${esc(T('homeAboutText2'))}</p>`,
+            `<p class="mt-6 text-sm">`,
+            `<a href="/about" class="text-orange-600 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`,
+            ` · `,
+            `<a href="/contact" class="text-orange-600 underline underline-offset-2">${esc(T('contactTitle'))}</a>`,
+            ` · `,
+            `<a href="/privacy" class="text-orange-600 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`,
+            `</p>`,
+            `</div>`,
+            `</section>`,
+
             // Contact (N.A.P. + liens cliquables) : section réelle, pas un
             // bloc caché — elle est aussi dans le footer React, donc elle
             // survit au montage.
@@ -447,8 +467,12 @@ export default defineConfig(({ mode }) => {
             `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">Itinéraire</a>`,
             `</address>`,
             `<div class="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">`,
-            `<a href="/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx" target="_blank" rel="noreferrer" class="hover:text-orange-800 underline underline-offset-2">Politique de confidentialité</a>`,
-            `<a href="/support" class="hover:text-orange-800 underline underline-offset-2">Nous contacter</a>`,
+            // Les trois pages de confiance, liées depuis le corps de page :
+            // c'est par ces liens qu'un crawler sans JavaScript les DÉCOUVRE.
+            `<a href="/about" class="hover:text-orange-800 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`,
+            `<a href="/contact" class="hover:text-orange-800 underline underline-offset-2">${esc(T('contactTitle'))}</a>`,
+            `<a href="/privacy" class="hover:text-orange-800 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`,
+            `<a href="/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx" target="_blank" rel="noreferrer" class="hover:text-orange-800 underline underline-offset-2">Conditions d'utilisation</a>`,
             ...socialLinks.map(
               (social) =>
                 `<a href="${esc(social.url)}" target="_blank" rel="me noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(social.label)}</a>`
@@ -820,6 +844,106 @@ export default defineConfig(({ mode }) => {
               + `<a href="/how-it-works" class="text-orange-600 underline underline-offset-2">${esc(T('howItWorksTitle'))}</a>`
               + ` · `
               + `<a href="/jobs" class="text-orange-600 underline underline-offset-2">${esc(T('viewJobs'))}</a>`
+              + `</p>`
+              + `</div>`,
+            // ── Les trois pages de CONFIANCE ─────────────────────────────
+            // /about, /contact, /privacy : ce qu'un moteur (et une régie
+            // publicitaire) exige avant de faire crédit au site — qui l'édite,
+            // comment le joindre, ce qu'il fait des données. Elles étaient
+            // ABSENTES du site : la politique de confidentialité n'existait
+            // qu'en .docx, et « Contact » renvoyait au support.
+            //
+            // Le shell reproduit l'état INITIAL de la page React (mêmes
+            // sections, mêmes classes, mêmes textes via les clés i18n) : un
+            // crawler sans JavaScript lit la page entière, et createRoot efface
+            // ce contenu au montage sans décaler quoi que ce soit.
+            about: `<div class="h-16 bg-white border-b border-gray-200"></div>`
+              + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-4">${esc(T('aboutTitle'))}</h1>`
+              + `<p class="text-gray-600 mb-8">${esc(T('aboutIntro'))}</p>`
+              + `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">`
+              + [
+                  ['💼', 'findWork', 'findWorkDescription'],
+                  ['🤝', 'connect', 'connectDescription'],
+                  ['💰', 'securePayments', 'securePaymentsDescription'],
+                ]
+                  .map(
+                    ([icon, titleKey, textKey]) =>
+                      `<div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">` +
+                      `<div class="text-2xl mb-3">${icon}</div>` +
+                      `<h2 class="text-lg font-semibold text-gray-900 mb-2">${esc(T(titleKey))}</h2>` +
+                      `<p class="text-sm text-gray-600">${esc(T(textKey))}</p>` +
+                      `</div>`
+                  )
+                  .join('') +
+              `</div>`
+              + `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 mb-10">`
+              + `<h2 class="text-xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`
+              + `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`
+              + `<p class="text-emerald-700 mt-3 text-sm">${esc(T('escrowTrustBullets'))}</p>`
+              + `</div>`
+              + `<p class="text-sm text-gray-500">`
+              + `<a href="/contact" class="text-orange-600 underline underline-offset-2">${esc(T('contactTitle'))}</a>`
+              + ` · `
+              + `<a href="/privacy" class="text-orange-600 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`
+              + ` · `
+              + `<a href="/how-it-works" class="text-orange-600 underline underline-offset-2">${esc(T('howItWorksTitle'))}</a>`
+              + `</p>`
+              + `</div>`,
+            contact: `<div class="h-16 bg-white border-b border-gray-200"></div>`
+              + `<div class="max-w-2xl mx-auto px-4 py-8">`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T('contactTitle'))}</h1>`
+              + `<p class="text-gray-600 mb-3">${esc(T('contactIntro'))}</p>`
+              + `<p class="text-sm text-gray-500 mb-6">${esc(T('contactHelpText'))}</p>`
+              + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
+              + `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Appeler</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
+              + `</a>`
+              + `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">WhatsApp</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
+              + `</a>`
+              + `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Envoyer un e-mail</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`
+              + `</a>`
+              + `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
+              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`
+              + `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`
+              + `</a>`
+              + `</div>`
+              + `<iframe src="${esc(contact.mapsEmbedUrl)}" title="Carte — Kojo, ${esc(contact.address)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" class="mt-6 w-full rounded-xl border border-gray-200" style="height:320px;border:0;"></iframe>`
+              + `<p class="mt-6 text-sm text-gray-500">`
+              + `<a href="/about" class="text-orange-600 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`
+              + ` · `
+              + `<a href="/privacy" class="text-orange-600 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`
+              + ` · `
+              + `<a href="/support" class="text-orange-600 underline underline-offset-2">${esc(T('support'))}</a>`
+              + `</p>`
+              + `</div>`,
+            privacy: `<div class="h-16 bg-white border-b border-gray-200"></div>`
+              + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-4">${esc(T('privacyTitle'))}</h1>`
+              + `<p class="text-gray-600 mb-8">${esc(T('privacyIntro'))}</p>`
+              + [
+                  ['privacyDataTitle', 'privacyDataBody'],
+                  ['privacyRetentionTitle', 'privacyRetentionBody'],
+                  ['privacyRightsTitle', 'privacyRightsBody'],
+                  ['privacyContactSectionTitle', 'privacyContactBody'],
+                ]
+                  .map(
+                    ([titleKey, bodyKey]) =>
+                      `<section class="mb-8">` +
+                      `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T(titleKey))}</h2>` +
+                      `<p class="text-gray-600">${esc(T(bodyKey))}</p>` +
+                      `</section>`
+                  )
+                  .join('') +
+              `<p class="text-sm text-gray-500">`
+              + `<a href="/contact" class="text-orange-600 underline underline-offset-2">${esc(T('contactTitle'))}</a>`
+              + ` · `
+              + `<a href="/about" class="text-orange-600 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`
               + `</p>`
               + `</div>`,
           }

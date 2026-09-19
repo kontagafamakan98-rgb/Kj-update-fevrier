@@ -102,6 +102,15 @@ const localBase = 'http://localhost:4173';
 // /payment est protégée — le Bearer du job CI la rend comme un utilisateur
 // connecté, ce que sa coquille pré-rendue décrit déjà.
 const LOCAL_FALLBACK_PATHS = ['/'];
+// Les trois pages de CONFIANCE (/about, /contact, /privacy) sont dans cette
+// liste : c est elle qui decide quelles coquilles le build ecrit, donc quelles
+// pages un crawler sans JavaScript peut lire. Elles n ont pas de carte OG
+// dediee, la carte generique les sert.
+//
+// ⚠️ AUCUN commentaire A L INTERIEUR du tableau : deux extracteurs le lisent
+// naivement — le build y prend le texte entre apostrophes, le test de cette
+// config y coupe sur les virgules. Un commentaire place la est donc lu comme
+// une page. Le mode d emploi reste ici, hors des crochets.
 const DEPLOYMENT_PATHS = [
   '/',
   '/jobs',
@@ -111,6 +120,9 @@ const DEPLOYMENT_PATHS = [
   '/payment',
   '/how-it-works',
   '/support',
+  '/about',
+  '/contact',
+  '/privacy',
   '/dashboard',
   '/profile',
 ];
