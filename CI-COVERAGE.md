@@ -1247,13 +1247,15 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   qu'un accueil injoignable ne fait pas conclure « absent »). Coût : mesuré en
   local (Windows, démarrage de `npx` compris, `build/` présent) à **33 à 42 s**
   pour les 11 mutations Python et **83 à 146 s** pour les 18 Node — et **sur le
-  runner** à **32 s** pour ces mêmes 18 mutations (étape « Mutations des gardes
-  — preuve d'échec (runner Node) » du run 35457261081, lue par l'API, sur un job
-  `frontend-build` de 77 s au total). L'écart local/runner n'est pas une
-  imprécision de mesure : l'essentiel du coût local est le démarrage de `npx`
-  sous Windows, qui n'existe pas sur le runner. C'est donc le chiffre du runner
-  qui dit le prix par push, et les relevés locaux — plus élevés — le
-  représentaient mal.
+  runner**, sur le même run (`35457261081`, lu par l'API), à **17 s** pour les 11
+  mutations Python (étape « Mutations des gardes — preuve d'échec (runner
+  Python) », job `backend-tests`) et **32 s** pour les 18 Node (étape « Mutations
+  des gardes — preuve d'échec (runner Node) », job `frontend-build` de 77 s au
+  total). L'écart local/runner n'est pas une imprécision de mesure : l'essentiel
+  du coût local est le démarrage de `npx` sous Windows, qui n'existe pas sur le
+  runner. C'est donc le chiffre du runner qui dit le prix par push, et les
+  relevés locaux — plus élevés de 1,9 à 2,5 fois (Python : 33-42 s / 17 s) et de
+  2,6 à 4,6 fois (Node : 83-146 s / 32 s) — le représentaient mal.
 * **la preuve Node est filtrée sur une PR, ENTIÈRE sur `main`** : les 18
   mutations Node démarrent chacune un runner Vitest, soit **32 s sur les 77 s du
   job** `frontend-build`. Une PR ne rejoue donc que celles dont le **garde** ou
