@@ -21,6 +21,9 @@ import pytest
 from httpx import AsyncClient
 
 from kojo_core import db
+# La liste des coordonnées à effacer APPARTIENT au routeur : le test la lit au
+# lieu de la recopier, sinon un champ GPS ajouté demain laisserait ce test vert.
+from kojo_routers_users import JOB_LOCATION_FIELDS
 
 from tests.conftest import (
     AUTH_REQUIRED_STATUS,
@@ -34,6 +37,38 @@ from tests.conftest import (
     issue_email_verification_token,
     register_and_login,
 )
+
+
+def _path_value(doc, path):
+    """Valeur d'un chemin pointé (« location.latitude ») dans un document, ou
+    None si la clé est absente — c'est l'absence qui est exigée après
+    effacement (`$unset` retire la clé, il ne la met pas à None)."""
+    current = doc or {}
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current
+
+
+def _numbers_in(value):
+    """Tous les nombres présents dans une valeur imbriquée.
+
+    Sert à balayer un document par VALEURS plutôt que par noms de champs : la
+    liste des champs à effacer appartient au routeur, et si un champ GPS y
+    disparaissait demain, les vérifications par nom cesseraient de regarder au
+    bon endroit sans rien dire. Les coordonnées de la fixture sont distinctives,
+    donc leur présence résiduelle trahit n'importe quel champ qui les porte.
+    """
+    if isinstance(value, bool):
+        return set()
+    if isinstance(value, (int, float)):
+        return {float(value)}
+    if isinstance(value, dict):
+        return set().union(*[_numbers_in(v) for v in value.values()]) if value else set()
+    if isinstance(value, (list, tuple, set)):
+        return set().union(*[_numbers_in(v) for v in value]) if value else set()
+    return set()
 
 
 @pytest.mark.asyncio
@@ -491,14 +526,18 @@ class TestAccountDeletion:
             "referral_reward_balance": 5000.0,
             "referral_rewards": [{"id": "r-1", "amount": 5000}],
             "permissions": ["admin_access"],
+            "bio": "Je suis Kofi, joignable au +221771234567",
+            "skills": ["plomberie", "soudure"],
         }})
 
-        # Le nom est en base AVANT la suppression : sans cette garde, les
-        # assertions d'effacement plus bas seraient vraies sur un compte qui
-        # n'avait jamais porté de nom.
+        # Le nom, la bio et le profil sont en base AVANT la suppression : sans
+        # cette garde, les assertions d'effacement plus bas seraient vraies sur
+        # un compte qui n'en a jamais porté.
         before = await db_find_one("users", {"id": uid})
         assert before["first_name"] == "Kojo"
         assert before["last_name"] == "Test"
+        assert before["bio"].startswith("Je suis Kofi")
+        assert before["skills"] == ["plomberie", "soudure"]
 
         resp = await client.delete("/api/users/account", headers=headers)
         assert resp.status_code == 200, resp.text
@@ -512,6 +551,10 @@ class TestAccountDeletion:
         # donc aucune des deux ne peut survivre à la suppression.
         assert stored["first_name"] is None
         assert stored["last_name"] is None
+        # La bio est du TEXTE LIBRE : le nom effacé juste au-dessus y revenait
+        # en clair, avec le téléphone de surcroît.
+        assert stored["bio"] is None
+        assert stored["skills"] == []
         assert stored["phone"] is None
         assert stored["payment_accounts"] is None
         assert stored["payment_accounts_count"] == 0
@@ -522,6 +565,75 @@ class TestAccountDeletion:
         assert stored["referral_reward_balance"] == 0.0
         assert stored["referral_rewards"] == []
         assert stored["permissions"] == []
+
+    async def test_delete_account_erases_support_tickets_and_job_locations(
+        self, client: AsyncClient
+    ):
+        """Les deux autres survivants relevés par l'audit RGPD : le ticket
+        support du compte (texte libre qui peut nommer l'utilisateur) est
+        SUPPRIMÉ, et les missions postées par ce client perdent TOUTE coordonnée
+        — une seule restante suffirait à re-situer un compte supprimé."""
+        user = await register_and_login(client, BASE_USER)
+        headers = {"Authorization": f"Bearer {user['access_token']}"}
+        uid = user["user"]["id"]
+        ticket_id = str(uuid.uuid4())
+        job_id = str(uuid.uuid4())
+
+        await db_insert("support_tickets", {
+            "id": ticket_id, "user_id": uid, "full_name": "Kojo Test",
+            "phone": "+221771234567", "email": "test@kojo.sn", "reason": "autre",
+            "message": "Je suis Kofi, joignable au +221771234567",
+            "channel": "robot", "status": "new",
+        })
+        # Les trois formes de coordonnées qu'une mission peut porter : celle
+        # partagée au travailleur, celle du lieu, et le point GeoJSON de la
+        # recherche par rayon (voir JOB_LOCATION_FIELDS).
+        coordinates = {14.7, -17.4}
+        await db_insert("jobs", {
+            "id": job_id, "title": "Mission postée", "client_id": uid,
+            "status": "open", "deleted": False,
+            "location": {"address": "Sacré-Cœur 3, Dakar", "latitude": 14.7,
+                         "longitude": -17.4, "coordinates": [14.7, -17.4]},
+            "shared_location": {"latitude": 14.7, "longitude": -17.4,
+                                "maps_url": "https://maps.google.com/?q=14.7,-17.4"},
+            "geo": {"type": "Point", "coordinates": [-17.4, 14.7]},
+        })
+
+        # Non-vacuité AVANT suppression, et périmètre tenu par la source : si un
+        # champ GPS est ajouté au routeur sans que cette fixture le porte, le
+        # test le dit ici au lieu de passer pour une preuve.
+        before_job = await db_find_one("jobs", {"id": job_id})
+        assert (await db_find_one("support_tickets", {"id": ticket_id}))["full_name"]
+        uncovered = [
+            field for field in JOB_LOCATION_FIELDS if _path_value(before_job, field) is None
+        ]
+        assert not uncovered, (
+            f"la fixture ne porte aucune coordonnée pour {uncovered} : l'effacement "
+            f"de ces champs ne serait pas prouvé"
+        )
+
+        resp = await client.delete("/api/users/account", headers=headers)
+        assert resp.status_code == 200, resp.text
+
+        assert await db_find_one("support_tickets", {"id": ticket_id}) is None, (
+            "ticket support du compte supprimé encore présent"
+        )
+
+        job = await db_find_one("jobs", {"id": job_id})
+        assert job["deleted"] is True
+        survivors = [
+            field for field in JOB_LOCATION_FIELDS if _path_value(job, field) is not None
+        ]
+        assert not survivors, (
+            f"coordonnée(s) du compte supprimé encore présente(s) sur la mission : {survivors}"
+        )
+        # Balayage par VALEURS : aucune des coordonnées du client ne doit rester,
+        # même dans un champ que JOB_LOCATION_FIELDS ne nomme pas.
+        leftovers = _numbers_in(job) & coordinates
+        assert not leftovers, (
+            f"coordonnée(s) {sorted(leftovers)} du compte supprimé encore en base, "
+            f"dans un champ que l'effacement ne couvre pas"
+        )
 
     def _patch_support(self, client):
         pass

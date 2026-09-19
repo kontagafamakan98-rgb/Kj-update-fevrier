@@ -1031,6 +1031,20 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
 # une relance est sûre).
 REFUNDABLE_PAYOUT_STATES = ("held", "release_failed", "refund_failed")
 
+# Champs qui situent physiquement un client dans une mission. La mission
+# supprimée n'en garde AUCUN : elle est filtrée partout par `deleted`, donc plus
+# personne ne la lit, et une seule coordonnée restante suffirait à re-situer le
+# compte supprimé. `geo` est le point GeoJSON de la recherche par rayon ;
+# `location.coordinates` la forme historique — les deux dérivent de
+# location.latitude/longitude à des époques différentes.
+JOB_LOCATION_FIELDS = (
+    "shared_location",
+    "location.latitude",
+    "location.longitude",
+    "location.coordinates",
+    "geo",
+)
+
 @router.delete("/users/account")
 async def delete_my_account(current_user: User = Depends(get_current_user)):
     """Supprime définitivement le compte de l'utilisateur connecté.
@@ -1052,16 +1066,18 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
        réinitialisées (annulées, assignment retiré) et le CLIENT est remboursé
        des fonds séquestrés — les données du client ne sont pas supprimées.
 
-    Puis : soft delete + anonymisation des PII (email masqué ; nom, prénom, mot
-    de passe et numéro de téléphone effacés) → les jetons existants deviennent inutiles
-    (get_current_user rejette un compte `deleted`, et aucun login possible
-    sans password_hash).
-    Cascade : push tokens, notifications, propositions envoyées, avis laissés ;
-    les jobs créés par le client sont soft-deleted. Les messages restent (ils
-    appartiennent aussi à l'autre partie). Les enregistrements DE PAIEMENT
-    sont conservés (obligation comptable / lutte contre la fraude) : ils
-    référencent des identifiants internes, plus aucune PII n'y est jointe
-    après anonymisation.
+    Puis : soft delete + anonymisation des PII (email masqué ; nom, prénom,
+    bio, profil professionnel, mot de passe et numéro de téléphone effacés) →
+    les jetons existants deviennent inutiles (get_current_user rejette un compte
+    `deleted`, et aucun login possible sans password_hash).
+    Cascade : push tokens, notifications, propositions envoyées, avis laissés,
+    tickets support (supprimés, et non anonymisés : leur message est du texte
+    libre qui peut nommer l'utilisateur) ; les jobs créés par le client sont
+    soft-deleted ET perdent toute coordonnée GPS (la sienne, partagée ou non).
+    Les messages restent (ils appartiennent aussi à l'autre partie). Les
+    enregistrements DE PAIEMENT sont conservés (obligation comptable / lutte
+    contre la fraude) : ils référencent des identifiants internes, plus aucune
+    PII n'y est jointe après anonymisation.
 
     Returns:
         dict: {message, deleted: true}.
@@ -1209,6 +1225,11 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
             # direct à la collection permettait de la réidentifier.
             "first_name": None,
             "last_name": None,
+            "bio": None,
+            # Le profil professionnel : `worker_profiles` (qui porte specialties)
+            # est supprimé en cascade, donc garder `skills` ici laissait la
+            # moitié du même profil derrière lui.
+            "skills": [],
             "phone": None,
             "payment_accounts": None,
             "payment_accounts_count": 0,
@@ -1229,12 +1250,25 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     await db.worker_profiles.delete_many({"user_id": user_id})
     await db.job_proposals.delete_many({"worker_id": user_id})
     await db.reviews.delete_many({"reviewer_id": user_id})
+    # Les tickets support du compte sont SUPPRIMES, pas anonymisés : leur
+    # `message` est du texte libre écrit par l'utilisateur, qui peut nommer,
+    # situer ou donner un téléphone dans une phrase. Effacer full_name/phone/
+    # email laisserait le reste de la phrase intacte — donc une suppression est
+    # la seule qui soit une garantie, et ces tickets appartiennent au même
+    # utilisateur que les notifications et les propositions, déjà supprimées.
+    await db.support_tickets.delete_many({"user_id": user_id})
     # Les missions POSTÉES par ce client sont closes (plus de nouvelles
-    # propositions, plus visibles publiquement). Les messages restent
+    # propositions, plus visibles publiquement) et perdent TOUTE coordonnée :
+    # `$unset` plutôt que `None`, pour que la clé disparaisse au lieu de rester
+    # en place avec une valeur vide (l'index géospatial 2dsphere ignore un
+    # document sans `geo`, il ne le situe plus). Les messages restent
     # (ils appartiennent aussi à l'autre partie).
     await db.jobs.update_many(
         {"client_id": user_id},
-        {"$set": {"deleted": True, "deleted_at": now, "status": "cancelled"}},
+        {
+            "$set": {"deleted": True, "deleted_at": now, "status": "cancelled"},
+            "$unset": {field: "" for field in JOB_LOCATION_FIELDS},
+        },
     )
 
     # Used by get_current_user (aucune session ne peut plus se réauthentifier) :
