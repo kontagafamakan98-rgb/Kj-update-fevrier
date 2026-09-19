@@ -8,8 +8,12 @@
  * c'est le même fichier de données qui déclare les deux. Deux erreurs
  * silencieuses sont possibles et doivent être nommées : une carte servie à une
  * route que personne n'a déclarée, et des textes de page déclarés à deux endroits
- * — d'où le dernier bloc, qui confronte les deux tables au MÊME fichier de
- * données, lu sur le disque.
+ * — d'où le dernier bloc, qui confronte la table servie aux fichiers de données
+ * lus sur le disque.
+ *
+ * Les textes, eux, ne sont plus comparés : ils sortent du même fichier pour la
+ * carte et pour la page. Ce qui reste à vérifier, c'est le CÂBLAGE — un fichier
+ * de données présent sur le disque mais absent de la table servie.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -19,14 +23,14 @@ import {
   CARD_PAGE_META,
   GENERIC_CARD,
   cardPageMetaFrom,
-  cardsFromManifest,
+  cardsFromDeclarations,
   ogCardFor,
 } from '../og-cards';
 import { PAGE_META } from '../page-meta';
 
-describe('cardsFromManifest — la route déclarée décide de la carte', () => {
+describe('cardsFromDeclarations — la route déclarée décide de la carte', () => {
   it('sert la carte déclarée à la route déclarée', () => {
-    const cards = cardsFromManifest([
+    const cards = cardsFromDeclarations([
       { route: '/jobs', wide: 'og-jobs.png', square: 'og-jobs-square.png' },
     ]);
 
@@ -38,7 +42,7 @@ describe('cardsFromManifest — la route déclarée décide de la carte', () => 
   it('n’invente aucune route à partir du NOM des fichiers', () => {
     // `og-image-1200x630.png` ne nomme aucune page : c'est la carte de la racine,
     // et seule sa déclaration le dit.
-    const cards = cardsFromManifest([
+    const cards = cardsFromDeclarations([
       { route: '/', wide: 'og-image-1200x630.png', square: 'og-square-1200x1200.png' },
     ]);
 
@@ -49,7 +53,7 @@ describe('cardsFromManifest — la route déclarée décide de la carte', () => 
   });
 
   it('normalise la route déclarée (« /jobs/ » est la même page que « /jobs »)', () => {
-    const cards = cardsFromManifest([{ route: '/jobs/', wide: 'a.png', square: 'b.png' }]);
+    const cards = cardsFromDeclarations([{ route: '/jobs/', wide: 'a.png', square: 'b.png' }]);
 
     expect(cards['/jobs']).toEqual({ image: '/a.png', imageSquare: '/b.png' });
     expect(cards['/jobs/']).toBeUndefined();
@@ -63,12 +67,12 @@ describe('cardsFromManifest — la route déclarée décide de la carte', () => 
       { route: '/x', wide: 'a.png' },
       { wide: 'a.png', square: 'b.png' },
     ]) {
-      expect(cardsFromManifest([card]), JSON.stringify(card)).toEqual({});
+      expect(cardsFromDeclarations([card]), JSON.stringify(card)).toEqual({});
     }
   });
 
   it('est vide — sans planter — pour une liste vide ou absente', () => {
-    for (const cards of [[], undefined, null]) expect(cardsFromManifest(cards)).toEqual({});
+    for (const cards of [[], undefined, null]) expect(cardsFromDeclarations(cards)).toEqual({});
   });
 });
 
@@ -90,16 +94,18 @@ describe('cardPageMetaFrom — les textes de page que les cartes déclarent', ()
   });
 });
 
-// Les cartes du dépôt, lues dans leurs FICHIERS DE DONNÉES — jamais dans le
-// manifeste que ce module lit lui-même : le fichier de données fait autorité, et
-// c'est lui qui est confronté aux deux tables servies à l'app et au build.
+// Le CÂBLAGE des fichiers de données : ce module les importe un par un, donc
+// ajouter un fichier de scripts/og-cards/ sans l'importer servirait la carte
+// générique à sa place, sans que rien ne le dise. C'est le seul reste de
+// comparaison — les TEXTES, eux, ne sont plus comparés : ils sont lus dans le
+// même fichier par la carte et par la page.
 const CARDS_DIR = path.resolve(__dirname, '..', '..', '..', 'scripts', 'og-cards');
 const DECLARED = readdirSync(CARDS_DIR)
   .filter((name) => name.endsWith('.json'))
   .sort()
   .map((name) => ({ name, card: JSON.parse(readFileSync(path.join(CARDS_DIR, name), 'utf8')) }));
 
-describe('dépôt réel — une carte, une page, une déclaration', () => {
+describe('dépôt réel — chaque fichier de données est câblé, et sa page le lit', () => {
   it('chaque carte déclarée est servie à SA route, et ses PNG existent', () => {
     // Un dépôt sans carte ferait passer les boucles suivantes pour des preuves.
     expect(DECLARED.length).toBeGreaterThan(0);

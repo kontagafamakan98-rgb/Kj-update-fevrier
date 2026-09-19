@@ -37,12 +37,18 @@ exiger l'égalité avec le dictionnaire : un titre renommé sans régénération
 
 Le script écrit aussi un MANIFESTE (scripts/og-assets.manifest.json) :
 dimensions, taille et empreinte SHA-256 de chaque PNG, empreinte de ce script,
-empreinte des fichiers de données, la route et les textes (lignes dessinées) de
-chaque carte, et polices réellement retenues. C'est ce manifeste que le garde CI
-(scripts/check-og-assets.js) confronte aux fichiers versionnés : une carte
-modifiée à la main, un texte changé sans régénération, ou des cartes régénérées
-avec une AUTRE police (aspect différent) font échouer la CI sans qu'il soit besoin
-de disposer des polices sur le runner.
+empreinte des fichiers de données, la route de chaque carte avec les LIGNES
+réellement dessinées, et polices réellement retenues. C'est ce manifeste que le
+garde CI (scripts/check-og-assets.js) confronte aux fichiers versionnés : une
+carte modifiée à la main, un texte changé sans régénération, ou des cartes
+régénérées avec une AUTRE police (aspect différent) font échouer la CI sans qu'il
+soit besoin de disposer des polices sur le runner.
+
+Ce manifeste ne recopie AUCUNE déclaration : la route y sert de clé de jointure
+avec le fichier de données, et les textes n'y figurent que sous la forme des
+lignes MESURÉES au dessin. src/config/og-cards.js — le module qui sert le runtime
+ET le build — lit les mêmes scripts/og-cards/*.json que ce script : la carte et
+sa page sortent donc d'un seul document, par construction.
 
 Options (pour régénérer ailleurs sans toucher à public/) :
     --out-dir <dossier>   dossier de sortie des PNG (défaut : public/)
@@ -530,11 +536,12 @@ def write_manifest(out_dir, manifest_path, cards):
     une carte s'ajoute, et aucun consommateur n'en dépend (le garde et
     src/config/og-cards.js indexent par route).
 
-    `cards` porte ce que la carte DIT : sa route, les clés de texte de sa page et
-    les LIGNES réellement dessinées (par format). src/config/og-cards.js en dérive
-    la carte servie à chaque route ET les textes de cette route ; le garde CI
-    recompose les lignes pour exiger l'égalité avec le dictionnaire — c'est ce qui
-    rend impossible qu'une carte et sa page annoncent deux textes.
+    `cards` porte ce que ce script a MESURÉ : la route de chaque carte (clé de
+    jointure avec son fichier de données) et les LIGNES réellement dessinées, par
+    format. Les textes ne sont PAS recopiés ici : le fichier de données fait
+    autorité pour le runtime comme pour le dessin, et le garde CI recompose les
+    lignes consignées pour exiger l'égalité avec le dictionnaire — c'est ce qui
+    attrape un PNG périmé derrière un manifeste frais.
     """
     assets = [
         entry
@@ -553,10 +560,6 @@ def write_manifest(out_dir, manifest_path, cards):
         'cards': [
             {
                 'route': card['route'],
-                'title': card['title'],
-                'description': card['description'],
-                'wide': card['wide'],
-                'square': card['square'],
                 'lines': card['lines'],
             }
             for card in cards

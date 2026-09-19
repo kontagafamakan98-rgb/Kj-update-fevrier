@@ -59,7 +59,6 @@
   ],
   "cards": [
     {
-      "description": "homeMetaDescription",
       "lines": {
         "square": {
           "description": [
@@ -84,13 +83,9 @@
           ]
         }
       },
-      "route": "/",
-      "square": "og-square-1200x1200.png",
-      "title": "homeMetaTitle",
-      "wide": "og-image-1200x630.png"
+      "route": "/"
     },
     {
-      "description": "jobsMetaDescription",
       "lines": {
         "square": {
           "description": [
@@ -111,13 +106,9 @@
           ]
         }
       },
-      "route": "/jobs",
-      "square": "og-jobs-square.png",
-      "title": "jobsMetaTitle",
-      "wide": "og-jobs.png"
+      "route": "/jobs"
     },
     {
-      "description": "loginMetaDescription",
       "lines": {
         "square": {
           "description": [
@@ -138,10 +129,7 @@
           ]
         }
       },
-      "route": "/login",
-      "square": "og-login-square.png",
-      "title": "loginMetaTitle",
-      "wide": "og-login.png"
+      "route": "/login"
     }
   ],
   "cards_sha256": "25580004c68f853c770be5b2beec0ad99c857a115a49b9c7a0ee089158ebfdad",
@@ -150,5 +138,5 @@
     "regular": "arial.ttf"
   },
   "generator": "gen-og-images.py",
-  "generator_sha256": "99f301db42f26f7517ed7cb373d8551be45418464128215b2e184b5d850ae355"
+  "generator_sha256": "e31533d3acee96ddc4d42802f75da979ea820d48354f469c706930c8b21c86a5"
 }
