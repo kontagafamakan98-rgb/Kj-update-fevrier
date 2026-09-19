@@ -378,16 +378,21 @@ Ces dix lignes décrivent le HTML servi **avant le shell pré-rendu** (PR #27,
 `aa5efd9^` (c'est exactement ce que la production servait, le shell étant
 généré au build) comparé au build d'aujourd'hui :
 
-| Mesure | Avant PR #27 | Aujourd'hui |
+| Mesure | Avant PR #27 | Aujourd'hui (pages de confiance livrées) |
 |---|---|---|
 | `<title>` | **65** caractères (> 60) | 53 |
 | meta description | **170** caractères (> 160) | 151 |
 | `h1` | **0** | 1 |
-| mots visibles | **19** (11 + les 8 du `<noscript>`) | 405 |
-| liens `<a>` internes | **0** | 17 |
+| mots visibles | **19** (11 + les 8 du `<noscript>`) | **520** |
+| liens `<a>` internes | **0** | **22** |
 | `tel:` / `mailto:` | **0 / 0** | 2 / 2 |
 | `LocalBusiness` | **absent** | présent |
 | `#root` | vide | shell de l'accueil |
+
+La colonne d'aujourd'hui vient du garde lui-même
+(`node scripts/check-home-shell.js` : « 1 h1, 520 mots, 22 liens internes ») et
+non d'un comptage ad hoc : ce qui est publié ici est exactement ce que la CI
+refuse de laisser régresser (plancher 500 mots).
 
 Le « 19 mots » du rapport est donc l'empreinte **exacte** de l'ancien HTML (il
 comptait le `<noscript>`), et les deux longueurs signalées étaient réellement
@@ -567,6 +572,36 @@ des heures — le sitemap est servi par le backend Fly, dont le déploiement est
 indépendant de celui du frontend. Un écart est donc nommé (`ÉCART : l'origine
 attendue est …`) au lieu de se déduire d'une carte OG cassée, et sans bloquer
 davantage.
+
+── **Le silence, lui, était le vrai défaut — fermé le 19/09/2026** ─────────────
+Cette sonde était **informative à dessein** (« une configuration incomplète est
+un fait d'exploitation, pas une régression de code ») : elle publiait un
+`::notice` par intégration absente et ne faisait **jamais** échouer le job. Le
+résultat est mesurable : GA4 et la meta Search Console étaient absents de la
+production, et **aucun run n'était rouge nulle part** — la CI verte ne disait
+rien de ces deux intégrations. Un rapport qui ne peut pas échouer n'est pas une
+vérification.
+
+Deux pièces ferment cet écart, et **aucune ne fait de bruit sur une PR** :
+
+| Pièce | Ce qu'elle fait | Quand |
+|---|---|---|
+| `check-seo-production.js --strict` | refuse chaque intégration absente (elle nomme la variable à poser), et refuse AUSSI de conclure quand la production est illisible — « rien de mesuré » n'est pas « rien de cassé » | à la demande |
+| `.github/workflows/seo-production-probe.yml` | lance la sonde **stricte** sur la production, une fois par jour (`17 6 * * *`), sans secret (HTML public) | quotidien |
+
+L'étape de `ci.yml` **reste informative** : un rouge sur chaque PR bloquerait des
+fusions pour une variable que personne n'a encore obtenue. Ce qui change, c'est
+que le silence n'est plus possible — un run rouge quotidien est un fait visible.
+
+**Ce qui manque encore, nommé et vérifié par l'API GitHub le 19/09/2026** : le
+secret `KOJO_GA_MEASUREMENT_ID` est **absent** des secrets du dépôt
+(`KOJO_GSC_VERIFICATION` y est, mais le workflow `SEO Vercel env (manual)` exige
+les deux et refuse de partir à moitié : ses **deux** runs — `35370209109`
+(18/09) et `35474512717` (19/09, lancé pour vérifier) — sont en échec sur la même
+branche, code 2 = la branche « il manque une valeur, rien n'a été écrit » ; le
+workflow en compte exactement deux, lu par l'API le 19/09/2026). Une seule valeur
+débloque donc **les deux** intégrations. La sonde quotidienne restera
+rouge jusqu'à ce qu'elle soit posée : c'est le prix, et c'est le but.
 
 Rejouer la mesure, sur la production comme sur un build local :
 

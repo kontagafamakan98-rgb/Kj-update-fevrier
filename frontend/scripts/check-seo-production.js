@@ -2,6 +2,10 @@
 /**
  * SONDE SEO de la PRODUCTION — rapport informatif, ne bloque rien.
  *
+ * Deux MODES : informatif (défaut) et `--strict`, où une intégration absente
+ * fait ÉCHOUER la sonde. Le mode informatif est ce qui a laissé F9 ouvert :
+ * quatre intégrations absentes de la production, et aucun run rouge nulle part.
+ *
  * Deux sections, et deux `::notice` par fait constaté :
  *
  * 1. INTÉGRATIONS — les quatre réclamées par un audit SEO « sans JavaScript »
@@ -205,11 +209,13 @@ function sitemapNotice({ locs, error }, attendue) {
 export async function runSeoProductionReport({
   base = process.env.KOJO_LHCI_BASE_URL || SITE_ORIGIN,
   fetchImpl = fetch,
+  strict = false,
 } = {}) {
   const cleanBase = String(base).trim().replace(/\/+$/, '');
   if (LOOPBACK.test(cleanBase)) {
     return {
       skipped: true,
+      manquantes: [],
       notices: [
         `base locale (${cleanBase}) : les intégrations SEO/analytics s'activent par ` +
           "variables d'environnement posées sur Vercel — un build local ne dit rien de " +
@@ -228,18 +234,31 @@ export async function runSeoProductionReport({
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     html = await response.text();
   } catch (error) {
-    return { skipped: true, notices: [`accueil non lisible (${error.message}) : aucune conclusion.`] };
+    return {
+      skipped: true,
+      manquantes: [],
+      notices: [`accueil non lisible (${error.message}) : aucune conclusion.`],
+    };
   }
 
   const analysis = analyzeSeoServedHtml(html);
   const sitemap = await readSitemap(cleanBase, fetchImpl);
-  const present = INTEGRATIONS.filter(({ key }) => analysis[key].present).length;
+  const presentes = INTEGRATIONS.filter(({ key }) => analysis[key].present);
+  // Ce que le mode strict refuse : les intégrations ABSENTES, nommées avec la
+  // variable à poser — sinon un rouge ne dirait pas quoi corriger.
+  const manquantes = INTEGRATIONS.filter(({ key }) => !analysis[key].present).map(
+    (integration) => noticeFor(integration, analysis[integration.key])
+  );
   return {
     skipped: false,
+    manquantes,
+    analyse: analysis,
     notices: [
       ...INTEGRATIONS.map((integration) => noticeFor(integration, analysis[integration.key])),
-      `${present}/${INTEGRATIONS.length} intégration(s) présente(s) sur ${cleanBase} — ce rapport ` +
-        'ne bloque rien (cf. CI-COVERAGE.md, F9).',
+      `${presentes.length}/${INTEGRATIONS.length} intégration(s) présente(s) sur ${cleanBase} — ` +
+        (strict
+          ? 'cette sonde BLOQUE (cf. CI-COVERAGE.md, F9).'
+          : 'ce rapport ne bloque rien (cf. CI-COVERAGE.md, F9).'),
       canonicalNotice(canonicalHref(html), SITE_ORIGIN),
       sitemapNotice(sitemap, SITE_ORIGIN),
     ],
@@ -247,8 +266,32 @@ export async function runSeoProductionReport({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  // ── Deux modes, et pourquoi ────────────────────────────────────────────────
+  // INFORMATIF (défaut, l'étape de ci.yml sur main) : une configuration
+  // incomplète est un fait d'exploitation, pas une régression de code — un rouge
+  // sur chaque PR bloquerait des fusions pour une variable que personne n'a
+  // encore obtenue.
+  // STRICT (--strict, la sonde PÉRIODIQUE) : c'est ce mode qui met fin au
+  // silence. Une intégration absente, ou une sonde qui ne peut pas conclure,
+  // ÉCHOUE bruyamment — sans bloquer une PR.
+  const strict = process.argv.includes('--strict');
   const flag = process.argv.indexOf('--base');
-  const result = await runSeoProductionReport(flag === -1 ? {} : { base: process.argv[flag + 1] });
-  console.log(`Sonde SEO de la production — ${result.skipped ? 'sans verdict' : 'verdict publié'}`);
+  const result = await runSeoProductionReport(
+    flag === -1 ? { strict } : { base: process.argv[flag + 1], strict }
+  );
+  console.log(
+    `Sonde SEO de la production — ${result.skipped ? 'sans verdict' : 'verdict publié'}${strict ? ' [strict]' : ''}`
+  );
   for (const notice of result.notices) console.log(`::notice title=SEO production::${notice}`);
+  if (strict) {
+    // Une sonde qui ne peut pas conclure échoue : un « sans verdict » vert
+    // voudrait dire « rien de cassé » alors que rien n'a été mesuré.
+    const echecs = result.skipped
+      ? ['sonde sans verdict : la production n’a pas pu être lue — aucune conclusion n’est possible']
+      : result.manquantes;
+    for (const echec of echecs) {
+      console.error(`::error title=SEO production::${echec}`);
+    }
+    process.exitCode = echecs.length ? 1 : 0;
+  }
 }

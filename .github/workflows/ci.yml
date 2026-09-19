@@ -865,7 +865,13 @@ jobs:
       # Cette sonde lit le HTML réellement servi et publie un `::notice` par
       # intégration (présente / absente + la variable à poser). Elle ne fait
       # JAMAIS échouer le job : une configuration incomplète est un fait
-      # d'exploitation, pas une régression de code.
+      # d'exploitation, pas une régression de code — un rouge sur chaque PR
+      # bloquerait des fusions pour une variable que personne n'a encore.
+      #
+      # L'INFORMATIF SEUL était le défaut (F9) : deux intégrations absentes de la
+      # production, et aucun run rouge nulle part. C'est
+      # `.github/workflows/seo-production-probe.yml` qui ferme ce silence : le
+      # MÊME script, en `--strict`, une fois par jour — voir CI-COVERAGE.md, F9.
       #
       # main uniquement : sur une PR, la base peut être une preview ou la pile
       # locale, et un « absent » n'y dirait rien de la production (le script
