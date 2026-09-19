@@ -352,21 +352,30 @@ jobs:
       # dépôt, et rien ne pouvait la rejouer.
       #
       # Ce garde la rejoue — sur des COPIES temporaires, le dépôt n'est jamais
-      # modifié : il neutralise un refus à la fois (sa ligne `if …:` devient
-      # `if False:`) et exige que la suite rougisse. Un refus dont la
-      # neutralisation ne fait rien rougir n'est verrouillé par rien, et une ligne
-      # de refus introuvable veut dire que le générateur a changé sans que le garde
-      # suive : les deux échouent ici. Voir
-      # .github/scripts/check-og-test-mutations.py, prouvé par
+      # modifié. Il n'a pas de table à tenir : il LIT les refus dans l'arbre du
+      # générateur (chaque `raise SystemExit` que porte un `if`), neutralise un
+      # refus à la fois (`if <condition>:` devient `if False:`, à la position exacte
+      # de la condition) et exige que la suite échoue. Et un rouge quelconque ne
+      # suffit pas : il mesure l'appartenance et exige que chaque refus ait un test
+      # À LUI, qui rougit sous lui et sous aucun autre — sinon une casse collatérale
+      # ferait croire à un refus verrouillé.
+      #
+      # Quatre choses échouent donc ici : un refus ajouté au générateur que personne
+      # n'exerce (il est muté sans qu'on ait à le déclarer), un `raise` sorti du
+      # corps de son `if` (la dérivation ne saurait plus quand il tombe), un refus
+      # que seul un test partagé fait rougir, et une suite déjà rouge sur les copies
+      # intactes — l'état de référence, sans lequel aucun rouge ne serait concluant.
+      # Voir .github/scripts/check-og-test-mutations.py, prouvé par
       # backend/tests/test_og_mutation_guard.py.
       #
       # Dans CE job (et pas workflow-lint) : le fichier de test importe le
       # générateur réel, donc Pillow, installé ici par requirements.txt.
       #
-      # Cette étape est le SEUL endroit qui rejoue les mutations (4,6 s mesurés sur
-      # le runner) : le test du garde prouve qu'il sait refuser — mutation sans
-      # effet, ligne introuvable, refus hors table — sans les rejouer, pour que la
-      # même preuve ne soit pas payée deux fois à chaque push.
+      # Cette étape est le SEUL endroit qui rejoue les mutations (3,0 à 5,0 s mesurés
+      # sur le runner selon le run) : le test du garde prouve qu'il sait refuser —
+      # un refus que personne n'exerce, un test partagé entre deux refus, un `raise`
+      # sans `if`, une condition écrite ailleurs — sans les rejouer, pour que la même
+      # preuve ne soit pas payée deux fois à chaque push.
       - name: Check OG refusals are locked by their tests (mutation replay)
         run: python .github/scripts/check-og-test-mutations.py
 
