@@ -533,6 +533,46 @@ def maj_statut_collecte(statut: str, champs: Optional[Dict[str, Any]] = None) ->
         maj["$unset"] = {"expires_at": ""}
     return maj
 
+def maj_sequestre(etat: str, champs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """L'UNIQUE écriture de l'état de SÉQUESTRE d'une collecte (`payout_status`,
+    l'escrow de ce système) : `held` tant que rien n'a bougé, puis soit le
+    versement au travailleur (`releasing` → `released` ou `release_failed`),
+    soit la restitution au client (`refunding` → `refunded` ou `refund_failed`).
+
+    Pourquoi un seul écrivain, comme pour le statut et l'échéance : chaque
+    transition d'escrow est un MOUVEMENT D'ARGENT, et elle n'est légitime que
+    si elle est écrite avec la trace qui la rend vérifiable et relançable
+    (`payout_kind`, `disburse_token`, `payout_failure_reason`,
+    `disburse_provider_response`...). Une écriture directe du champ peut faire
+    changer l'état sans cette trace — c'est-à-dire déplacer de l'argent dans un
+    sens que plus rien ne permet de confirmer, ni de rattraper après un échec.
+
+    Le champ est donc gouverné par un invariant croisé (le solde et sa trace),
+    et il n'a qu'un écrivain : cette fonction. Les autres écrivains du dépôt
+    sont refusés par `test_paiement_echeance_checkout.py`, qui dérive qui écrit
+    quoi de ce module plutôt que d'une liste tenue à la main.
+    """
+    return {"$set": {"payout_status": etat, **(champs or {})}}
+
+
+def maj_collecte_et_sequestre(
+    statut: str, etat_sequestre: str, champs: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Une écriture qui touche DEUX invariants croisés à la fois : la collecte
+    qui vient d'être payée (`status` + retrait de `expires_at`) et l'ouverture
+    de son séquestre (`payout_status`).
+
+    La fusion est faite ICI, par les deux propriétaires, jamais recomposée chez
+    l'appelant : un appelant qui recollerait lui-même les deux documents
+    pourrait poser l'un sans l'autre, et l'invariant croisé redeviendrait une
+    convention au lieu d'une construction. Une seule écriture Mongo porte donc
+    les deux.
+    """
+    document = maj_statut_collecte(statut, champs)
+    document["$set"].update(maj_sequestre(etat_sequestre)["$set"])
+    return document
+
+
 async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> Dict[str, Any]:
     invoice_token = payment_record.get('invoice_token')
     if not invoice_token or not is_paydunya_configured():
@@ -553,17 +593,27 @@ async def sync_payment_status_with_paydunya(payment_record: Dict[str, Any]) -> D
         'updated_at': datetime.now(timezone.utc).isoformat()
     }
 
+    # Le sequestre s'ouvre au moment ou la collecte est payee. La DECISION est
+    # prise ici, mais l'ecriture du champ appartient a son proprietaire
+    # (maj_sequestre) : deux endroits ecrivant payout_status = deux endroits a
+    # tenir d'accord, donc un invariant qui ne tient plus par construction.
+    # Un sequestre deja engage ('released'/'releasing'/'refunded'...) n'est
+    # jamais reinitialise par une reconfirmation tardive du meme paiement.
+    ouvre_sequestre = bool(
+        local_status == 'completed'
+        and not payment_record.get('completed_at')
+        and not payment_record.get('payout_status')
+    )
     if local_status == 'completed' and not payment_record.get('completed_at'):
         update_fields['completed_at'] = datetime.now(timezone.utc).isoformat()
-        # payout_status suit l'etat du versement au TRAVAILLEUR, separement du
-        # statut de la collecte. Initialise seulement s'il n'a jamais ete
-        # defini, pour ne pas ecraser 'released'/'releasing' en cas de
-        # reconfirmation d'un paiement deja traite plus loin dans le flux.
-        if not payment_record.get('payout_status'):
-            update_fields['payout_status'] = 'held'
 
+    document = (
+        maj_collecte_et_sequestre(local_status, 'held', update_fields)
+        if ouvre_sequestre
+        else maj_statut_collecte(local_status, update_fields)
+    )
     await db.payments.update_one(
-        {'id': payment_record['id']}, maj_statut_collecte(local_status, update_fields)
+        {'id': payment_record['id']}, document
     )
     latest = await db.payments.find_one({'id': payment_record['id']})
     return latest or payment_record

@@ -32,6 +32,7 @@ from kojo_payments import (
     calculate_payment_breakdown, check_paydunya_disburse_status,
     create_paydunya_invoice, get_effective_commission_rate,
     get_paydunya_channel, is_paydunya_circuit_open, is_paydunya_configured,
+    maj_sequestre,
     refresh_paydunya_circuit_from_db,
     normalize_payment_country, serialize_payment_record,
     sync_payment_status_with_paydunya,
@@ -202,11 +203,7 @@ async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
 
     await db.payments.update_one(
         {"id": payment_id},
-        {"$set": {
-            "payout_status": new_status,
-            "disburse_verified_payload": check_result,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }}
+        maj_sequestre(new_status, {"disburse_verified_payload": check_result, "updated_at": datetime.now(timezone.utc).isoformat()})
     )
     updated = await db.payments.find_one({"id": payment_id})
     if updated:
@@ -284,12 +281,7 @@ async def paydunya_disburse_ipn(request: Request):
     previous_payout_status = payment_record.get('payout_status')
     await db.payments.update_one(
         {'id': payment_record['id']},
-        {'$set': {
-            'payout_status': payout_status,
-            'disburse_callback_payload': payload,
-            'disburse_verified_payload': check_result,
-            'updated_at': datetime.now(timezone.utc).isoformat()
-        }}
+        maj_sequestre(payout_status, {'disburse_callback_payload': payload, 'disburse_verified_payload': check_result, 'updated_at': datetime.now(timezone.utc).isoformat()})
     )
 
     # Notifier le client quand l'IPN tranche un remboursement en attente

@@ -28,6 +28,12 @@ Trois choses, dans cet ordre parce que l'ordre porte la preuve :
 
 La clause `status: pending` du filtre de purge reste un SECOND FILET : les
 documents écrits avant ce changement portent encore une échéance périmée.
+
+Le fichier porte aussi les DEUX AUTRES champs dont un invariant croisé dépend,
+dans le même mouvement : le statut lui-même, et l'état de séquestre
+(`payout_status`), dont chaque transition est un mouvement d'argent qui n'est
+lisible que s'il est écrit avec sa trace. Leur point d'écriture unique n'est pas
+énuméré ici : il se LIT sur `kojo_payments` — voir la section finale.
 """
 import ast
 import uuid
@@ -220,16 +226,30 @@ class TestEcheanceDeCheckout:
 
 
 # ---------------------------------------------------------------------------
-# Le point unique, vérifié sur le CODE réel
+# Les points uniques d'écriture, DÉRIVÉS du code
 # ---------------------------------------------------------------------------
-# L'invariant ne vaut que si personne d'autre n'écrit le statut d'une collecte :
-# un second écrivain pourrait le faire changer sans retirer l'échéance, et la
-# survie d'un paiement versé retomberait sur la clause du filtre de purge — la
-# dépendance que ce lot supprime. Le contrôle lit les sources de production
-# plutôt qu'une liste d'appels à tenir à jour : un appel ajouté demain est
-# examiné sans qu'on pense à l'inscrire ici.
+# L'invariant de l'échéance ne vaut que si personne d'autre n'écrit le statut
+# d'une collecte : un second écrivain pourrait le faire changer sans retirer
+# l'échéance, et la survie d'un paiement versé retomberait sur la clause du
+# filtre de purge — la dépendance que ce fichier supprime.
+#
+# Le champ de séquestre (`payout_status`, l'escrow de ce système) porte le même
+# genre de couplage : chaque transition est un MOUVEMENT D'ARGENT, et elle n'est
+# lisible que si elle est écrite avec la trace qui la rend confirmable et
+# relançable (`payout_kind`, `disburse_token`, `payout_failure_reason`, réponse
+# du prestataire). Une écriture directe du champ ferait changer l'état sans
+# cette trace.
+#
+# Qui écrit quoi n'est PAS énuméré ici : la table se LIT sur le module
+# propriétaire (`kojo_payments`), en relevant les clés de champ que chaque
+# fonction y écrit dans un document de mise à jour. Un champ gouverné ajouté
+# demain est couvert sans que ce fichier change — ce qu'il ne peut pas couvrir
+# est dit à la fin.
 RACINE = Path(__file__).resolve().parents[2]
+CODAGE = "utf-8"
 ECRITURES = {"update_one", "update_many", "find_one_and_update", "replace_one"}
+OPERATEURS = {"$set", "$unset"}
+MODULE_PROPRIETAIRE = RACINE / "backend" / "kojo_payments.py"
 
 
 def _sources_de_production():
@@ -237,7 +257,7 @@ def _sources_de_production():
     return sorted([*backend.glob("kojo_*.py"), backend / "server.py"])
 
 
-def _appels_ciblant_les_paiements(arbre):
+def _ecritures_sur_les_paiements(arbre):
     for noeud in ast.walk(arbre):
         if (
             isinstance(noeud, ast.Call)
@@ -248,38 +268,195 @@ def _appels_ciblant_les_paiements(arbre):
             yield noeud
 
 
-def _ecrit_le_statut(mise_a_jour) -> bool:
-    """Le document écrit porte-t-il une clé `status` ? La constante cherchée est
-    exactement « status » : `payout_status` (versement au travailleur, qui suit
-    une autre horloge) n'est donc pas confondu avec elle."""
-    if mise_a_jour is None:
-        return False
-    for noeud in ast.walk(mise_a_jour):
+def _champs_du_document(noeud) -> set:
+    """Les clés de champ qu'un document `{"$set": {...}}` écrit en clair."""
+    champs = set()
+    if not isinstance(noeud, ast.Dict):
+        return champs
+    for cle, valeur in zip(noeud.keys, noeud.values):
+        if (
+            isinstance(cle, ast.Constant)
+            and cle.value in OPERATEURS
+            and isinstance(valeur, ast.Dict)
+        ):
+            champs |= {c.value for c in valeur.keys if isinstance(c, ast.Constant)}
+    return champs
+
+
+def _champs_ecrits_dans(fonction) -> set:
+    """Les champs qu'une fonction écrit dans un document de mise à jour, que le
+    document soit un littéral (`{"$set": {...}}`) ou une affectation du même
+    genre qui complète le document déjà construit (`doc["$unset"] = {...}`)."""
+    champs = set()
+    for noeud in ast.walk(fonction):
         if isinstance(noeud, ast.Dict):
-            for cle in noeud.keys:
-                if isinstance(cle, ast.Constant) and cle.value == "status":
-                    return True
-    return False
+            champs |= _champs_du_document(noeud)
+        elif isinstance(noeud, ast.Assign):
+            cible = noeud.targets[0]
+            if (
+                isinstance(cible, ast.Subscript)
+                and isinstance(cible.slice, ast.Constant)
+                and cible.slice.value in OPERATEURS
+                and isinstance(noeud.value, ast.Dict)
+            ):
+                champs |= {
+                    c.value for c in noeud.value.keys if isinstance(c, ast.Constant)
+                }
+    return champs
 
 
-def _passe_par_le_point_unique(mise_a_jour) -> bool:
-    return (
-        isinstance(mise_a_jour, ast.Call)
-        and "maj_statut_collecte" in ast.unparse(mise_a_jour)
+def _module_proprietaire():
+    arbre = ast.parse(MODULE_PROPRIETAIRE.read_text(encoding=CODAGE))
+    fonctions = {
+        noeud.name: noeud
+        for noeud in arbre.body
+        if isinstance(noeud, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    return arbre, fonctions
+
+
+def _table_des_ecrivains() -> dict:
+    """{champ gouverné: {noms des fonctions qui l'écrivent}} — lu sur le module
+    propriétaire, jamais énuméré dans ce fichier."""
+    _, fonctions = _module_proprietaire()
+    table: dict = {}
+    for nom, fonction in fonctions.items():
+        for champ in _champs_ecrits_dans(fonction):
+            table.setdefault(champ, set()).add(nom)
+    return table
+
+
+def _producteurs(fonctions, ecrivains) -> set:
+    """Les fonctions du module propriétaire habilitées à produire un document de
+    mise à jour : celles qui écrivent un champ gouverné, et celles qui les
+    COMPOSENT (elles appellent un producteur) — une écriture qui touche deux
+    invariants à la fois reste une écriture des propriétaires, pas un
+    bricolage d'appelant. Le calcul va jusqu'au point fixe pour qu'une
+    composition de composition soit couverte aussi."""
+    producteurs = set(ecrivains)
+    ajoute = True
+    while ajoute:
+        ajoute = False
+        for nom, fonction in fonctions.items():
+            if nom in producteurs:
+                continue
+            appels = {
+                noeud.func.id
+                for noeud in ast.walk(fonction)
+                if isinstance(noeud, ast.Call) and isinstance(noeud.func, ast.Name)
+            }
+            if appels & producteurs:
+                producteurs.add(nom)
+                ajoute = True
+    return producteurs
+
+
+def _forme_du_document(noeud, arbre, profondeur=3):
+    """Déplie un document de mise à jour : renvoie (champs écrits en clair,
+    noms des fonctions qui le construisent).
+
+    Un nom local est résolu sur ses assignations du module : deux écrivains du
+    dépôt construisent leur document dans une variable avant de le passer, et
+    ne pas les lire reviendrait à ne pas les contrôler. Ce qui reste hors de
+    portée est dit en fin de fichier."""
+    champs, appels = set(), set()
+    if noeud is None or profondeur <= 0:
+        return champs, appels
+    if isinstance(noeud, ast.Dict):
+        return _champs_du_document(noeud), appels
+    if isinstance(noeud, ast.Call):
+        if isinstance(noeud.func, ast.Name):
+            appels.add(noeud.func.id)
+        return champs, appels
+    if isinstance(noeud, ast.IfExp):
+        brancher = (noeud.body, noeud.orelse)
+    elif isinstance(noeud, ast.Name):
+        brancher = tuple(
+            assigne.value
+            for assigne in ast.walk(arbre)
+            if isinstance(assigne, ast.Assign)
+            and isinstance(assigne.targets[0], ast.Name)
+            and assigne.targets[0].id == noeud.id
+        )
+    else:
+        # Lecture (`await db.payments.find_one(...)`) ou expression dynamique.
+        return champs, appels
+    for branche in brancher:
+        sous_champs, sous_appels = _forme_du_document(branche, arbre, profondeur - 1)
+        champs |= sous_champs
+        appels |= sous_appels
+    return champs, appels
+
+
+def test_les_champs_a_invariant_croise_ont_un_seul_ecrivain():
+    """Chaque champ dont un invariant croisé dépend a UN écrivain, et le tableau
+    qui le dit est dérivé du module propriétaire."""
+    table = _table_des_ecrivains()
+
+    # Non-vacuité, dérivée elle aussi : les champs que la règle de conservation
+    # des paiements interroge dans son filtre partiel sont gouvernés. Sans cette
+    # borne, une dérivation qui ne trouverait rien rendrait tout le reste vert.
+    regle_paiements = next(
+        regle for regle in RETENTION_RULES if regle.collection == "payments"
+    )
+    assert set(regle_paiements.partial or {}) <= set(table), (
+        "des champs du filtre de purge des paiements ne sont gouvernés par "
+        f"aucun écrivain : {sorted(set(regle_paiements.partial or {}) - set(table))}"
+    )
+    # Le séquestre ne figure dans aucun filtre de purge : c'est la SEULE entrée
+    # exigée ici sans être dérivée, parce que la demande porte sur lui.
+    assert "payout_status" in table, (
+        "le champ de séquestre n'est écrit par aucune fonction de "
+        "kojo_payments : l'argent peut changer d'état sans point unique"
+    )
+
+    doubles = {champ: sorted(noms) for champ, noms in table.items() if len(noms) > 1}
+    assert not doubles, (
+        f"un champ gouverné est écrit par plusieurs fonctions, donc l'invariant "
+        f"croisé n'a plus un seul point de passage : {doubles}"
     )
 
 
-def test_le_statut_d_une_collecte_a_un_seul_ecrivain():
-    """Aucune source de production n'écrit le statut d'une collecte ailleurs que
-    par `kojo_payments.maj_statut_collecte` — celui qui retire l'échéance."""
-    ecrivains = []
+def test_les_champs_gouvernes_ne_s_ecrivent_que_chez_leur_ecrivain():
+    """Aucune source de production n'écrit un champ gouverné sur `db.payments`
+    autrement que par un écrivain du module propriétaire."""
+    table = _table_des_ecrivains()
+    gouvernes = set(table)
+    _, fonctions = _module_proprietaire()
+    producteurs = _producteurs(
+        fonctions, {nom for noms in table.values() for nom in noms}
+    )
+
+    violations = []
     for chemin in _sources_de_production():
-        arbre = ast.parse(chemin.read_text(encoding="utf-8"))
-        for appel in _appels_ciblant_les_paiements(arbre):
-            mise_a_jour = appel.args[1] if len(appel.args) > 1 else None
-            if _ecrit_le_statut(mise_a_jour) and not _passe_par_le_point_unique(mise_a_jour):
-                ecrivains.append(f"{chemin.name}:{appel.lineno}")
-    assert not ecrivains, (
-        "écriture directe du statut d'une collecte, hors du point unique qui "
-        f"retire l'échéance de checkout : {ecrivains}"
+        arbre = ast.parse(chemin.read_text(encoding=CODAGE))
+        for appel in _ecritures_sur_les_paiements(arbre):
+            if len(appel.args) < 2:
+                continue
+            champs, appels = _forme_du_document(appel.args[1], arbre)
+            for champ in sorted(champs & gouvernes):
+                violations.append(
+                    f"{chemin.name}:{appel.lineno} écrit {champ!r} en clair, "
+                    f"hors de {sorted(table[champ])}"
+                )
+            for nom in sorted(appels - producteurs):
+                violations.append(
+                    f"{chemin.name}:{appel.lineno} construit son document avec "
+                    f"{nom}(), qui n'est pas un écrivain dérivé de "
+                    f"{MODULE_PROPRIETAIRE.name}"
+                )
+    assert not violations, (
+        "écriture d'un champ à invariant croisé hors de son point unique :\n  "
+        + "\n  ".join(violations)
     )
+
+
+# LIMITES, dites plutôt que supposées :
+#   * un document assemblé dynamiquement (un dictionnaire construit par
+#     compréhension, une clé calculée) n'est pas lisible ici — le contrôle
+#     porte sur ce que l'AST montre, et refuse seulement ce qu'il voit ;
+#   * un champ qui n'est encore écrit par aucune fonction du module
+#     propriétaire n'est pas gouverné : c'est en l'écrivant là-bas qu'il le
+#     devient, et le trou est alors visible dans la table ;
+#   * la table ne dit pas que l'écrivain est correct, seulement qu'il est
+#     UNIQUE — ce que fait la transition est mesuré par les tests de flux.
