@@ -30,7 +30,12 @@ from kojo_core import (
     upload_image_to_cloudinary, upload_profile_photo_to_cloudinary,
     validate_payment_accounts,
 )
-from kojo_shared import apply_referral_payout_confirmed, notify_user_localized
+from kojo_shared import (
+    apply_referral_payout_confirmed,
+    nom_affiche,
+    notify_user_localized,
+    retirer_nom_des_notifications_tiers,
+)
 from kojo_payments import (
     build_disburse_callback_url,
     create_paydunya_disburse_invoice, get_mobile_money_account,
@@ -1098,6 +1103,7 @@ ANONYMISATION_CHAMPS = {
 # contrepartie de la table ci-dessus, et elle est exhaustive comme elle.
 CHAMPS_CONSERVES = {
     "id": "identifiant interne (UUID) : clé des paiements et des missions qui le référencent, aucune identité",
+    "_id": "clé primaire de Mongo, posée par la base et jamais réécrite par la suppression (le document anonymisé la porte encore) : aucune identité, l'identifiant applicatif est `id`",
     "email": "RÉÉCRITE en adresse de service @kojo.deleted : l'adresse de la personne ne survit pas, mais la forme reste valide pour les index uniques",
     "user_type": "rôle technique, nécessaire aux agrégats et aux missions conservées",
     "country": "pays de rattachement, sans identité",
@@ -1120,7 +1126,7 @@ CHAMPS_CONSERVES = {
 # directement en base, par le dépôt ou par l'endpoint). Déclarés pour que
 # l'union ci-dessus puisse être une ÉGALITÉ : un champ hors modèle non déclaré
 # ici, ou une faute de frappe dans l'une des deux tables, fait échouer le test.
-CHAMPS_HORS_MODELE = frozenset({"permissions", "deleted", "deleted_at", "purge_at"})
+CHAMPS_HORS_MODELE = frozenset({"permissions", "deleted", "deleted_at", "purge_at", "_id"})
 
 @router.delete("/users/account")
 async def delete_my_account(current_user: User = Depends(get_current_user)):
@@ -1147,10 +1153,14 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     bio, profil professionnel, mot de passe et numéro de téléphone effacés) →
     les jetons existants deviennent inutiles (get_current_user rejette un compte
     `deleted`, et aucun login possible sans password_hash).
+
     Cascade : push tokens, notifications, propositions envoyées, avis laissés,
-    tickets support (supprimés, et non anonymisés : leur message est du texte
-    libre qui peut nommer l'utilisateur) ; les jobs créés par le client sont
-    soft-deleted ET perdent toute coordonnée GPS (la sienne, partagée ou non).
+     tickets support (supprimés, et non anonymisés : leur message est du texte
+     libre qui peut nommer l'utilisateur) ; le NOM du compte est retiré des
+     notifications de l'AUTRE PARTIE (les gabarits de proposition l'interpolent à
+     l'écriture, donc la copie vit dans la boîte du tiers et survivrait à
+     l'anonymisation) ; les jobs créés par le client sont soft-deleted ET
+     perdent toute coordonnée GPS (la sienne, partagée ou non).
     Les messages restent (ils appartiennent aussi à l'autre partie). Les
     enregistrements DE PAIEMENT sont conservés (obligation comptable / lutte
     contre la fraude) : ils référencent des identifiants internes, plus aucune
@@ -1312,6 +1322,14 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     # Cascade des données directement liées au compte.
     await db.push_tokens.delete_many({"user_id": user_id})
     await db.notifications.delete_many({"user_id": user_id})
+    # Les notifications dont ce compte était le DESTINATAIRE viennent de partir,
+    # mais le nom vit aussi chez l'autre partie : `proposal_received` et
+    # `proposal_accepted` l'interpolent à l'écriture (kojo_shared), et la copie
+    # appartient au TIERS. Le nom est lu sur `current_user`, chargé au début de
+    # la requête : le `$set` d'anonymisation ci-dessus a déjà vidé le document,
+    # mais l'objet en mémoire, lui, porte encore le nom — après lui, plus rien ne
+    # le retrouverait.
+    await retirer_nom_des_notifications_tiers(user_id, nom_affiche(current_user))
     await db.worker_profiles.delete_many({"user_id": user_id})
     await db.job_proposals.delete_many({"worker_id": user_id})
     await db.reviews.delete_many({"reviewer_id": user_id})

@@ -344,12 +344,17 @@ class TestEcritures:
             {"id": "1", "status": "pending", "temporaire": True},
         ])
 
+        identifiant = (await collection.find_one({"id": "1"}))["_id"]
+
         resultat = await collection.update_one({"id": "1"}, {"id": "1", "status": "done"})
         doc = await collection.find_one({"id": "1"})
 
-        assert doc == {"id": "1", "status": "done"}, (
-            "un remplacement doit retirer les champs absents du document de remplacement"
-        )
+        assert {cle: valeur for cle, valeur in doc.items() if cle != "_id"} == {
+            "id": "1", "status": "done"
+        }, "un remplacement doit retirer les champs absents du document de remplacement"
+        # `_id` est IMMUABLE : Mongo le conserve même quand le remplacement ne le
+        # nomme pas (et refuse un remplacement qui le changerait).
+        assert doc["_id"] == identifiant
         assert resultat.matched_count == 1 and resultat.modified_count == 1
 
     async def test_inc_garde_un_compteur_entier(self):
@@ -531,15 +536,30 @@ class TestInsertion:
         with pytest.raises(FakeDbDuplicateKey, match=r"dupliqué"):
             await collection.insert_one({"_id": premier.inserted_id, "id": "2"})
 
-    async def test_l_id_stocke_ne_fuit_pas_dans_les_lectures(self):
-        """Le `_id` est rangé mais reste retiré des résultats : la fidélité de
-        l'insertion ne doit rien changer à ce que les tests lisent."""
+    async def test_l_id_est_rendu_par_les_lectures_comme_chez_mongo(self):
+        """Mongo rend TOUJOURS `_id` (sauf exclusion explicite) : la FakeDB le
+        retirait, et cette divergence n'était pas neutre. `notify_user` lit le
+        destinataire par `find_one({"id": …}, {"deleted": 1})` puis sort si le
+        document est falsy — la projection rendait `{}`, donc AUCUNE notification
+        n'était écrite en local, alors qu'elle l'est en CI (Mongo réel). La suite
+        ne disait pas la même chose des deux côtés, et la fonctionnalité de
+        notification n'était couverte nulle part en local.
+        """
         collection = _collection("insertion_lecture")
 
         await collection.insert_one({"id": "1"})
         lu = await collection.find_one({"id": "1"})
 
-        assert lu == {"id": "1"}
+        assert set(lu) == {"id", "_id"}, lu
+        assert lu["id"] == "1"
+
+        # Projection inclusive : `_id` reste là, les autres champs partent.
+        projeté = await collection.find_one({"id": "1"}, {"id": 1})
+        assert set(projeté) == {"id", "_id"}, projeté
+
+        # Exclusion explicite : le seul cas où Mongo le retire.
+        sans_id = await collection.find_one({"id": "1"}, {"_id": 0})
+        assert sans_id == {"id": "1"}, sans_id
 
 
 async def _creer_mission(client, headers, titre, description):

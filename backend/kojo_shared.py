@@ -4,6 +4,7 @@ envoi conditionnel de l'adresse de la mission au travailleur."""
 
 import asyncio
 import json as _json
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -370,6 +371,72 @@ def _get_notif_msgs(lang: str, key: str, **kwargs) -> tuple:
         _interpolate(entry["title"], **kwargs),
         _interpolate(entry["body"], **kwargs),
     )
+
+
+# ---------------------------------------------------------------------------
+# Nom affiché d'un compte — et comment il cesse de survivre chez l'AUTRE PARTIE
+# ---------------------------------------------------------------------------
+# `proposal_received` (reçue par le client) et `proposal_accepted` (reçue par le
+# travailleur) citent le nom de l'autre partie : le nom est CONSTRUIT à
+# l'écriture puis recopié dans le document du destinataire. Une seule
+# construction sert donc aux deux écritures ET à l'effacement à la suppression
+# du compte — deux constructions divergentes feraient survivre un nom que la
+# cascade ne saurait plus retrouver.
+NOM_COMPTE_SUPPRIME = "Un compte supprimé"
+
+
+def nom_affiche(compte: Any) -> str:
+    """Nom affiché d'un compte (« Awa Diop »), ou chaîne vide s'il n'en a pas.
+
+    Accepte le document Mongo (dict) comme l'objet du modèle : les deux formes
+    circulent dans le dépôt, et l'effacement doit chercher EXACTEMENT ce que
+    l'écriture a interpolé.
+    """
+
+    def champ(nom: str):
+        if isinstance(compte, dict):
+            return compte.get(nom)
+        return getattr(compte, nom, None)
+
+    morceaux = [str(champ("first_name") or "").strip(), str(champ("last_name") or "").strip()]
+    return " ".join(morceau for morceau in morceaux if morceau)
+
+
+async def retirer_nom_des_notifications_tiers(user_id: str, nom: str) -> int:
+    """Retire le nom d'un compte supprimé des notifications des AUTRES.
+
+    Les gabarits de proposition interpolent le nom à l'ÉCRITURE : la copie vit
+    donc dans la boîte de l'autre partie, que `delete_many({"user_id": …})` ne
+    touche pas. La recherche porte sur le NOM lui-même, pas sur une liste de
+    types de notification recopiée : un gabarit qui se mettrait à citer un nom
+    demain reste couvert sans qu'on y pense.
+
+    Renvoie le nombre de notifications réécrites (mesuré, jamais supposé).
+    """
+    nom = (nom or "").strip()
+    if not nom:
+        return 0
+    motif = re.escape(nom)
+    filtre = {
+        "user_id": {"$ne": user_id},
+        "$or": [
+            {"title": {"$regex": motif}},
+            {"body": {"$regex": motif}},
+        ],
+    }
+    reecrites = 0
+    for notification in await db.notifications.find(filtre).to_list(length=None):
+        champs = {}
+        for champ in ("title", "body"):
+            valeur = notification.get(champ)
+            if isinstance(valeur, str) and nom in valeur:
+                champs[champ] = valeur.replace(nom, NOM_COMPTE_SUPPRIME)
+        if champs:
+            await db.notifications.update_one(
+                {"id": notification["id"]}, {"$set": champs}
+            )
+            reecrites += 1
+    return reecrites
 
 
 async def get_user_language(user_id: str) -> str:

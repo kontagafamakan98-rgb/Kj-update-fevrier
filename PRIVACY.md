@@ -62,7 +62,8 @@ comptable des paiements qui le référencent :
 - les notifications, propositions, avis écrits, jetons push et profil
   travailleur sont supprimés ; les sessions en cours ne peuvent plus se
   réauthentifier ;
-- les **messages restent** au-delà de la suppression du compte — ils appartiennent aussi à l'autre partie — puis suivent l'échéance de la règle `messages` (section 3).
+- les **messages restent** au-delà de la suppression du compte — ils appartiennent aussi à l'autre partie — puis suivent l'échéance de la règle `messages` (section 3). Un message garde ce que son auteur a écrit ; rien ne peut en être retiré sans le réécrire ;
+- le **nom du compte est retiré des notifications de l'autre partie** : les gabarits de proposition et d'acceptation l'interpolent à l'écriture (`backend/kojo_shared.py`), donc la copie vit dans la boîte du destinataire et survivrait à l'anonymisation. Elle est réécrite avec un libellé neutre (`NOM_COMPTE_SUPPRIME`) au moment de la suppression, la notification elle-même étant CONSERVÉE (le tiers garde l'information « une proposition a été reçue ») — `backend/tests/test_notifications_nom_compte_supprime.py` mesure les deux sens sur le flux mission réel.
 
 ### Droit d'accès — `GET /api/users/account/export`
 
