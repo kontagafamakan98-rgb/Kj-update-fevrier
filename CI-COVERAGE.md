@@ -1222,15 +1222,16 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   et une mutation dont le littéral a disparu est un ÉCHEC (sinon un refactor
   suffirait à éteindre la preuve en silence) ;
 * le registre refuse enfin une mutation qui ne vise pas le garde lui-même ou qui
-  n'a aucun effet (`trouve == remplace`) ; les deux runners sont rejoués par la
-  CI, Python dans `backend-tests` et Node dans `frontend-build`, et le fichier de
-  couverture vérifie la présence de ces deux invocations.
+  n'a aucun effet (`trouve == remplace`) ; chaque runner est rejoué par une étape
+  déclarée sous `rejeux` — Python dans `backend-tests`, Node dans
+  `frontend-build` — et le fichier de couverture vérifie que ces étapes sont
+  invoquées **par leur nom** et qu'aucun job ne nomme plus un runner.
 * **le registre est EXHAUSTIF** : chaque entrée est soit **mutée**, soit déclarée
   `hors_mutation` **avec son motif**. Un garde ni muté ni justifié est un refus
   (`SpecInvalide`), pas un oubli silencieux — la couverture ne dépend donc plus
-  de la vigilance de celui qui ajoute un garde. Au 19/09/2026 : **29 mutations**
+  de la vigilance de celui qui ajoute un garde. Au 19/09/2026 : **30 mutations**
   couvrent les **28** entrées mutables des **33** déclarées (le harnais en porte
-  deux : ses décisions, et son filtre par changement), et les 5 autres sont des
+  trois : ses décisions, son filtre par changement, et le rejeu d'une étape due), et les 5 autres sont des
   exclusions motivées —
   `audit_tdz.cjs` et `check-og-reproducible.js` (sans exécutant, §7),
   `resolve-vercel-url.sh` et `bundle-size-report.js` (outils sans verdict : rien
@@ -1262,15 +1263,33 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   dérivation) : étape Node **25 s sur les 61 s du job** `frontend-build`, étape
   Python **17 s** sur les 141 s de `backend-tests` — et **32 s sur 77 s** pour
   la même étape Node au run 35457261081 : deux runs, de la variance, pas deux
-  mesures comparables. Le rejeu OG coûte désormais **deux étapes** : la question
-  de portée (1 s, qui n'existe que pour que le YAML ne décide pas) puis le rejeu
-  lui-même (3 s, quand il est dû). Les trois étapes qui rejouent une preuve —
-  les deux runners et le rejeu OG — demandent donc à la table si leur rejeu est
-  dû, plutôt que de choisir chacune son filtre : le workflow passe la base de la
-  PR (ou rien sur `main`) et la dérivation vit dans le harnais, qui possède la
-  table. Le registre déclare ces étapes (`rejeux`), et le harnais REFUSE un
-  registre où un runner déclaré n'a pas d'étape : une mutation que personne ne
-  rejoue serait un garde aveugle.
+  mesures comparables.
+
+  Chacune des trois étapes qui rejouent une preuve — les deux runners et le
+  rejeu OG — coûte désormais **deux étapes** de workflow : la **question de
+  portée** (`--etape NOM`) puis le rejeu lui-même, sous la porte du verdict
+  (`--etape NOM --rejouer` pour un runner, le garde déclaré pour le rejeu OG).
+  La question coûte ce que l'étape payait déjà en interne pour décider toute
+  seule — le calcul est le même, il a seulement quitté le YAML : mesuré sur le
+  runner au run 35465610175, **4 s** pour le runner Python et **1 s** pour le
+  runner Node (étapes filtrées qui ne rejouaient rien), et la question du rejeu
+  OG y coûtait déjà **1 s**. Ce que la porte ajoute est donc de la lecture, pas
+  du calcul — et quand elle répond `non`, l'étape de rejeu ne démarre pas du tout.
+  Un job ne nomme plus ni runner ni filtre : il DÉSIGNE
+  une étape de la table, et c'est la table qui sait ce que cette étape couvre.
+  Le harnais REFUSE un registre où un runner déclaré n'a pas d'étape, où une
+  étape déclare un runner qu'aucune mutation ne porte (elle rejouerait rien en
+  restant verte), ou si `--changed-from` est donné sans `--etape` — un filtre
+  sur le harnais entier était précisément la façon dont un job choisissait le
+  sien.
+
+  **Le verdict et le rejeu sont la même mesure** (`etat_d_etape`) : la liste de
+  mutations exécutées est celle que le verdict vient de déclarer due. Deux
+  calculs auraient été deux occasions de diverger, et la divergence irait dans
+  le sens du faux vert — une porte ouverte par un `rejeu=oui` au-dessus d'un
+  rejeu vide, ou l'inverse. Un changement dans la table ou le harnais est ce
+  qui rend la portée non fiable : il est donc traité dans la même fonction que
+  le filtre par mutation, pas à côté.
 
   Ce que coûte une PR qui ne touche AUCUN garde est désormais mesuré sur le
   runner aussi (run 35465610175, PR de documentation seule) : étape Node **1 s**
@@ -1278,7 +1297,9 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   rejouant tout, et rejeu OG **sauté** (question de portée 1 s, étape de rejeu
   0 s). Jobs : `frontend-build` 45 s au lieu de 61, `backend-tests` 130 s. C'est
   le seul cas où le filtre économise vraiment — une PR qui touche un garde
-  rejoue, par construction, tout ce que ce garde implique.
+  rejoue, par construction, tout ce que ce garde implique — et la forme en deux
+  étapes ne change plus ce chiffre : quand la portée dit `non`, l'étape de rejeu
+  ne démarre pas du tout (0 s), au lieu de démarrer pour ne rien faire.
 
   Trois garde-fous, tous dans le sens de l'erreur sûre : si la **table** ou le
   **harnais** a bougé, la portée n'est plus une information fiable et TOUT est

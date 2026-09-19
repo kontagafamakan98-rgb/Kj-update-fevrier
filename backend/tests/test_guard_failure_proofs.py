@@ -259,16 +259,22 @@ class TestMutations:
         ]
         assert fautes == [], "\n  ".join(fautes)
 
-    def test_les_deux_runners_sont_rejoues_par_la_ci(self, registre):
-        """La CI a deux jobs (Node, Python) : chacun rejoue SES mutations. Sans
-        cette vérification, retirer une des deux étapes éteindrait la moitié de
-        la preuve sans que rien ne rougisse."""
+    def test_chaque_runner_est_rejoue_par_l_etape_declaree(self, registre):
+        """Chaque runner du registre est couvert par une étape déclarée, et cette
+        étape est réellement invoquée par un workflow. Sans cette vérification,
+        retirer une des étapes éteindrait la moitié de la preuve — ou déplacer
+        le runner d'une mutation la ferait tomber dans une étape qui ne la rejoue
+        pas — sans que rien ne rougisse."""
         runners = {m["runner"] for m in registre["mutations"]}
         workflow = texte_des_workflows()
+        etapes = {etape["runner"]: etape["nom"] for etape in registre["rejeux"] if etape.get("runner")}
         fautes = []
         for runner in sorted(runners):
-            if ("--runner %s" % runner) not in workflow:
-                fautes.append("aucun job CI ne rejoue les mutations « %s »" % runner)
+            nom = etapes.get(runner)
+            if not nom:
+                fautes.append("aucune étape déclarée ne rejoue les mutations « %s »" % runner)
+            elif ("--etape %s" % nom) not in workflow:
+                fautes.append("aucun workflow n'invoque l'étape « %s » (runner %s)" % (nom, runner))
         assert fautes == [], "\n  ".join(fautes)
 
     def test_le_perimetre_vient_de_la_table_pas_du_job(self):
@@ -286,16 +292,60 @@ class TestMutations:
         workflow = texte_des_workflows()
         fautes = []
         for etape in registre["rejeux"]:
-            if etape.get("runner"):
-                invoquee = ("--runner %s" % etape["runner"]) in workflow
-            else:
-                invoquee = ("--etape %s" % etape["nom"]) in workflow
-            if not invoquee:
+            if ("--etape %s" % etape["nom"]) not in workflow:
                 fautes.append(
                     "étape « %s » déclarée dans le registre, invoquée par aucun workflow"
                     % etape["nom"]
                 )
         assert fautes == [], "\n  ".join(fautes)
+
+        # Un job DÉSIGNE une étape, il ne choisit pas un filtre : nommer un runner
+        # était exactement cette façon de choisir, donc le drapeau ne doit plus
+        # apparaître dans une commande (un commentaire qui le cite n'en est pas
+        # une).
+        commandes = [
+            ligne for ligne in workflow.splitlines()
+            if "--changed-from" in ligne and not ligne.strip().startswith("#")
+        ]
+        filtres_par_job = [ligne.strip() for ligne in commandes if "--runner" in ligne]
+        assert filtres_par_job == [], (
+            "un job choisit encore son filtre au lieu de demander son verdict à la "
+            "table : %s" % filtres_par_job
+        )
+
+        # Et un verdict que personne ne consomme serait un calcul décoratif :
+        # chaque étape qui DEMANDE sa portée publie son `rejeu`, et l'étape qui
+        # rejoue ne démarre que sur ce verdict.
+        sans_porte = []
+        portees = 0
+        for bloc in workflow.split("- name:"):
+            lignes = bloc.splitlines()
+            if not any(
+                "--etape" in ligne and "--changed-from" in ligne and "--rejouer" not in ligne
+                and not ligne.strip().startswith("#")
+                for ligne in lignes
+            ):
+                continue
+            portees += 1
+            identifiants = [
+                ligne.split(":", 1)[1].strip() for ligne in lignes
+                if ligne.strip().startswith("id:")
+            ]
+            if not identifiants:
+                sans_porte.append(lignes[0].strip() or "(étape sans nom)")
+                continue
+            if not any(
+                ("steps.%s.outputs.rejeu" % identifiant) in workflow
+                for identifiant in identifiants
+            ):
+                sans_porte.append(lignes[0].strip() or "(étape sans nom)")
+        assert portees >= len(registre["rejeux"]), (
+            "toutes les étapes déclarées ne demandent pas leur portée : %d portée(s) "
+            "pour %d étape(s)" % (portees, len(registre["rejeux"]))
+        )
+        assert sans_porte == [], (
+            "verdict de portée publié mais consommé par aucune étape : %s" % sans_porte
+        )
 
         # Une COMMUNE, pas une prose : un commentaire qui nomme le drapeau n'est
         # pas une invocation, et le confondre ferait accuser l'étape voisine.
