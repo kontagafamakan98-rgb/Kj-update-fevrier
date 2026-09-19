@@ -2,9 +2,11 @@
 /**
  * SONDE SEO de la PRODUCTION — rapport informatif, ne bloque rien.
  *
- * Deux MODES : informatif (défaut) et `--strict`, où une intégration absente
- * fait ÉCHOUER la sonde. Le mode informatif est ce qui a laissé F9 ouvert :
- * quatre intégrations absentes de la production, et aucun run rouge nulle part.
+ * Deux MODES : informatif (défaut) et `--strict`, où une intégration REQUISE
+ * absente fait ÉCHOUER la sonde (une facultative n'échoue pas : une sonde rouge
+ * en permanence est une sonde qu'on ignore). Le mode informatif est ce qui a
+ * laissé F9 ouvert : quatre intégrations absentes de la production, et aucun run
+ * rouge nulle part.
  *
  * Deux sections, et deux `::notice` par fait constaté :
  *
@@ -36,12 +38,19 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SITE_ORIGIN, canonicalHref, metaContent } from './site-meta.js';
 
-// Les quatre intégrations, et la variable d'environnement qui les active.
+// Les quatre intégrations, la variable d'environnement qui les active, et si
+// leur ABSENCE est un défaut (`required`) ou un choix d'exploitation.
+//
+// `required` existe pour que le mode strict ne bloque que sur ce qui doit être
+// là : une sonde quotidienne qui échouerait AUSSI sur une intégration
+// facultative resterait rouge à jamais après la pose des valeurs requises, et
+// une sonde rouge en permanence est une sonde qu'on apprend à ignorer —
+// exactement le silence qu'elle est censée fermer.
 export const INTEGRATIONS = [
-  { key: 'ga4', label: 'Google Analytics 4', env: 'VITE_GA_MEASUREMENT_ID' },
-  { key: 'gsc', label: 'Search Console (balise meta)', env: 'VITE_GSC_VERIFICATION' },
-  { key: 'plausible', label: 'Plausible (facultatif)', env: 'VITE_PLAUSIBLE_DOMAIN' },
-  { key: 'social', label: 'Liens sociaux (sameAs du LocalBusiness)', env: 'VITE_SOCIAL_*' },
+  { key: 'ga4', label: 'Google Analytics 4', env: 'VITE_GA_MEASUREMENT_ID', required: true },
+  { key: 'gsc', label: 'Search Console (balise meta)', env: 'VITE_GSC_VERIFICATION', required: true },
+  { key: 'plausible', label: 'Plausible (facultatif)', env: 'VITE_PLAUSIBLE_DOMAIN', required: false },
+  { key: 'social', label: 'Liens sociaux (sameAs du LocalBusiness)', env: 'VITE_SOCIAL_*', required: true },
 ];
 
 const LOOPBACK = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i;
@@ -119,9 +128,12 @@ export function analyzeSeoServedHtml(html = '') {
 }
 
 /** Une ligne par intégration : ce qui est présent, ou la variable à poser. */
-export function noticeFor({ key, label, env }, state) {
+export function noticeFor({ key, label, env, required = true }, state) {
   if (!state.present) {
-    return `${label} : ABSENT — poser ${env} dans Vercel → Settings → Environment Variables, puis REDÉPLOYER (les VITE_* sont inlinées au build).`;
+    return (
+      `${label} : ABSENT — poser ${env} dans Vercel → Settings → Environment Variables, puis REDÉPLOYER (les VITE_* sont inlinées au build).` +
+      (required ? '' : ' FACULTATIF : son absence ne fait pas échouer la sonde stricte.')
+    );
   }
   const detail =
     key === 'ga4'
@@ -244,20 +256,23 @@ export async function runSeoProductionReport({
   const analysis = analyzeSeoServedHtml(html);
   const sitemap = await readSitemap(cleanBase, fetchImpl);
   const presentes = INTEGRATIONS.filter(({ key }) => analysis[key].present);
-  // Ce que le mode strict refuse : les intégrations ABSENTES, nommées avec la
-  // variable à poser — sinon un rouge ne dirait pas quoi corriger.
-  const manquantes = INTEGRATIONS.filter(({ key }) => !analysis[key].present).map(
-    (integration) => noticeFor(integration, analysis[integration.key])
-  );
+  const requises = INTEGRATIONS.filter(({ required }) => required);
+  // Ce que le mode strict refuse : les intégrations REQUISES absentes, nommées
+  // avec la variable à poser — sinon un rouge ne dirait pas quoi corriger. Une
+  // intégration facultative absente est publiée en notice et n'entre pas ici.
+  const manquantes = requises
+    .filter(({ key }) => !analysis[key].present)
+    .map((integration) => noticeFor(integration, analysis[integration.key]));
   return {
     skipped: false,
     manquantes,
     analyse: analysis,
     notices: [
       ...INTEGRATIONS.map((integration) => noticeFor(integration, analysis[integration.key])),
-      `${presentes.length}/${INTEGRATIONS.length} intégration(s) présente(s) sur ${cleanBase} — ` +
+      `${presentes.length}/${INTEGRATIONS.length} intégration(s) présente(s) sur ${cleanBase} ` +
+        `(dont ${presentes.filter(({ required }) => required).length}/${requises.length} requise(s)) — ` +
         (strict
-          ? 'cette sonde BLOQUE (cf. CI-COVERAGE.md, F9).'
+          ? 'cette sonde BLOQUE sur les intégrations REQUISES, pas sur les facultatives (cf. CI-COVERAGE.md, F9).'
           : 'ce rapport ne bloque rien (cf. CI-COVERAGE.md, F9).'),
       canonicalNotice(canonicalHref(html), SITE_ORIGIN),
       sitemapNotice(sitemap, SITE_ORIGIN),
