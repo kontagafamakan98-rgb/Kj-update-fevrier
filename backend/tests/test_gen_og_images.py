@@ -4,25 +4,16 @@
 
 Ces refus sont ce qui empêche une carte d'annoncer autre chose que sa page : la
 carte DESSINE le titre et la description de sa route, résolus dans
-src/i18n/fr.json, et `scripts/check-og-assets.js` compare les lignes consignées
-dans le manifeste à ce dictionnaire. Deux fichiers mentionnaient le générateur
-(check-og-assets.test.js, check-og-images.test.js) sans jamais l'exécuter : un
-refus perdu y serait passé vert.
-
-Deux règles, et ce sont elles qui rendent ce fichier durablement utile :
-
-- chaque cas est un refus, ou l'invariant qui le rend tenable — pas un fait
-  décoratif ;
-- aucun fait que le GÉNÉRATEUR possède — champs exigés, police, colonne, lignes
-  réservées — n'est recopié ici, et aucune assertion ne porte sur la FORMULATION
-  d'un message : elle nomme le coupable pris dans son entrée (fichier, champ, clé
-  i18n, route, mot), donc reformuler un refus ne rougit pas la suite.
+src/i18n/fr.json. Deux règles rendent ce fichier durablement utile : chaque cas est
+un refus, ou l'invariant qui le rend tenable ; et aucun fait que le GÉNÉRATEUR
+possède — champs exigés, police, colonne, lignes réservées — n'y est recopié, aucune
+assertion ne portant sur la FORMULATION d'un message (elle nomme le coupable pris
+dans son entrée : fichier, champ, clé i18n, route, mot).
 
 Le module est chargé par son CHEMIN et son `CARDS_DIR` redirigé vers un dossier
-temporaire : aucun fichier du dépôt n'est écrit. Ces cas ne dépendent ni d'une
-police installée ni d'une image produite — la CI n'a ni Arial ni les PNG, alors
-que ce sont ces refus qui décident de ce que les cartes disent. La capacité de ce
-fichier à échouer est mesurée par .github/scripts/check-og-test-mutations.py.
+temporaire : aucun fichier du dépôt n'est écrit, et rien ne dépend d'une police
+installée ni d'une image produite. La capacité de ce fichier à échouer est mesurée
+par .github/scripts/check-og-test-mutations.py.
 """
 import importlib.util
 import json
@@ -48,11 +39,9 @@ def _load_generator():
 GENERATOR = _load_generator()
 
 # Une carte complète : la route servie, les clés i18n des textes de cette page, et
-# ses deux sorties. Ces cinq noms sont écrits ici parce que chacun attend une VALEUR
-# (un chemin, une clé, un fichier) qu'aucun test ne peut inventer : une table dérivée
-# obligerait à en inventer une pour un champ que le générateur exigerait demain. Ce
-# qui compte est le mode d'échec, et il est bruyant — un sixième champ exigé fait
-# rougir deux cas, mesuré, au lieu de passer inaperçu.
+# ses deux sorties. Chacun de ces cinq noms attend une VALEUR (un chemin, une clé, un
+# fichier) qu'aucun test ne peut inventer ; ce qui compte est le mode d'échec, et il
+# est bruyant — un sixième champ exigé fait rougir deux cas, mesuré.
 CARD = {
     "route": "/jobs",
     "title": "jobsMetaTitle",

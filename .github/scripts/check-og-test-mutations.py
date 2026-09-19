@@ -2,50 +2,26 @@
 # -*- coding: utf-8 -*-
 """Vérifie que les tests des refus du générateur OG savent échouer, et que chacun a SON test.
 
-Pourquoi ce garde
------------------
 backend/tests/test_gen_og_images.py verrouille les refus de
 frontend/scripts/gen-og-images.py — les seuls endroits qui empêchent une carte
 d'annoncer autre chose que sa page. Un test qu'on n'a jamais vu échouer ne prouve
-rien, et cette preuve avait été faite une fois à la main (huit mutations du
-générateur, restaurées à l'empreinte SHA-1) : une preuve qu'on ne peut pas rejouer
-depuis un checkout ne protège rien. Ce garde la rend automatique.
+rien : ce garde neutralise donc un refus à la fois, sur une COPIE de l'arborescence
+(le dépôt n'est jamais écrit), et exige que la suite échoue.
 
-Ce qu'il fait — sur des COPIES, jamais sur le dépôt
----------------------------------------------------
-Il reconstruit une arborescence temporaire (copies du fichier de test, du
-générateur et du dictionnaire, à la même profondeur), exige que la suite PASSE sur
-les copies intactes, puis neutralise un refus à la fois — `if <condition>:` devient
-`if False:` — et exige que la suite ÉCHOUE.
+Aucune table à tenir : les refus sont LUS dans l'arbre du générateur (un
+`raise SystemExit` que porte un `if`), et l'appartenance est MESURÉE — un rouge
+quelconque ne suffit pas, chaque refus doit avoir un test qui rougit sous lui seul.
 
-Complet par construction
-------------------------
-Il n'y a pas de table de mutations à tenir : elle est LUE dans l'arbre du
-générateur, un refus par `raise SystemExit` que porte un `if`. Un refus ajouté
-là-bas est donc muté automatiquement, et un `raise SystemExit` qu'aucun `if` ne
-porte est signalé au lieu d'être sauté. Un générateur qui perdrait ses refus ne
-peut pas non plus rendre ce garde vert : la suite échouerait sur les copies
-intactes, ce que l'état de référence vérifie avant la première mutation.
+Le garde est le seul à rejouer ces mutations et l'étape de CI son seul exécutant :
+la suite éprouve les décisions ci-dessus sur des verdicts écrits d'avance et ne
+vérifie de l'étape que son câblage. Deux payeurs la paieraient deux fois par push
+(3,0 à 5,0 s sur le runner selon le run, 10,2 s en local — cf. CI-COVERAGE §3 F17).
 
-Le test qui possède un refus
-----------------------------
-Un rouge ne suffit pas : une casse collatérale en produit un n'importe où. Chaque
-refus doit donc avoir un test À LUI — un test qui rougit sous ce refus et sous
-aucun autre. L'appartenance est mesurée, pas déclarée : les rouges d'un refus sont
-confrontés à ceux des autres.
-
-CE GARDE est le seul à rejouer ces mutations, et l'étape de CI est son seul exécutant :
-la suite de tests, elle, n'exécute JAMAIS pytest — elle éprouve les décisions
-ci-dessus sur des verdicts écrits d'avance et ne vérifie de cette étape que son
-câblage (une occurrence, dans le job qui installe ses dépendances). Deux payeurs de la
-même preuve la paieraient deux fois par push (3,0 à 5,0 s ici sur le runner selon le run, 10,2 s en local ; la suite
-de `main` a perdu les ~4 s que lui coûtait la reprise, cf. CI-COVERAGE §3 F17).
-
-Ce qui est refusé
------------------
-  - une suite qui ne passe pas sur les copies intactes : c'est l'état de
-    référence, sans lui n'importe quel rouge serait un faux positif ;
-  - un `raise SystemExit` que la dérivation ne voit pas (aucun `if` ne le porte) ;
+Ce qui est refusé :
+  - une suite qui ne passe pas sur les copies intactes (l'état de référence, sans
+    lequel n'importe quel rouge serait un faux positif) ;
+  - un `raise SystemExit` porté par aucun `if` : la dérivation ne saurait pas quand
+    il tombe, donc il est signalé au lieu d'être sauté ;
   - un refus dont la neutralisation ne fait rougir AUCUN test ;
   - un refus qui fait rougir des tests, mais dont aucun ne lui appartient.
 
