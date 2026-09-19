@@ -22,7 +22,8 @@ rien rougir n'est pas verrouillé par ce fichier de test.
 CE GARDE est le seul à rejouer ces mutations : la suite de tests, elle, prouve
 qu'il sait refuser (mutation sans effet, ligne introuvable, refus hors table) sans
 les rejouer — deux propriétaires de la même preuve la paieraient deux fois par push
-(4,6 s sur le runner ici, ~10 s dans la suite avant cette répartition).
+(4,6 s ici sur le runner, 10,1 s en local ; la suite de `main` a perdu les ~4 s que
+lui coûtait la reprise, cf. CI-COVERAGE §3 F17).
 
 Complet par construction
 ------------------------

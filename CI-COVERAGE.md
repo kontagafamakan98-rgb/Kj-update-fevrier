@@ -1048,11 +1048,13 @@ exige que chaque entrée neutralise UNE seule ligne du vrai générateur, et vé
 câblage de l'étape.
 
 **Un seul exécutant, et la suite le dit** : rejouer les mutations dans la suite ET
-dans l'étape payait la même preuve deux fois par push (4,6 s sur le runner **plus**
-~10 s dans la suite, mesuré au tour d'audit du 19/09/2026). L'étape les rejoue seule ;
-la suite prouve que le garde sait refuser **sans les rejouer** (3,3 s, dont 2 s de
-pytest imbriqué pour ses cas de refus) et n'affirme de la partie verte que son
-câblage.
+dans l'étape payait la même preuve deux fois par push. Mesuré des deux côtés : la
+suite de `main` est passée de **82,5 s** (`798e31d`, avant la répartition) à
+**78,9 s** (`8f2b1b9`, après) sur le runner, et de 89,1 s à 81,1 s en local, tandis que
+l'étape coûte 4,6 s sur le runner et 10,1 s en local. L'étape rejoue donc les
+mutations seule ; la suite prouve que le garde sait refuser **sans les rejouer**
+(3,3 s, dont ~2 s de pytest imbriqué pour ses cas de refus) et n'affirme de la partie
+verte que son câblage.
 
 **Mutation du champ exigé — la dérivation suit le générateur** (rejouée le
 19/09/2026 sur le fichier réel : `REQUIRED_CARD_KEYS` reçoit un sixième champ,
