@@ -35,20 +35,24 @@ est vérifiée par empreinte, et le script refuse de rendre la main sans elle.
 
 Usage :
     python .github/scripts/check-guard-mutations.py               # tous
-    python .github/scripts/check-guard-mutations.py --runner node
     python .github/scripts/check-guard-mutations.py --list        # valide le spec
-    python .github/scripts/check-guard-mutations.py --only ID
-    python .github/scripts/check-guard-mutations.py --changed-from REF
-    python .github/scripts/check-guard-mutations.py --changed-from   # base de la PR
+    python .github/scripts/check-guard-mutations.py --only ID     # une seule
     python .github/scripts/check-guard-mutations.py --etape NOM --changed-from
+    python .github/scripts/check-guard-mutations.py --etape NOM --rejouer --changed-from
 
-COÛT ET PÉRIMÈTRE — c'est la TABLE qui décide, pas le job. Les mutations Node
-pèsent l'essentiel d'une étape (~2,5 min, un runner Vitest chacune) et les
-mutations Python ~17 s : `--changed-from` ne rejoue que celles dont le garde, la
-preuve, un module importé ou un fichier partagé du runner a changé. Le workflow
-ne choisit donc plus quel filtre appliquer à quel job — il passe la référence de
-la PR (ou rien sur `main`) et c'est `_base_du_changement` qui tranche, dans le
-même sens pour toutes les étapes.
+COÛT ET PÉRIMÈTRE — c'est la TABLE qui décide, pas le job, et le job ne désigne
+plus un filtre : il DEMANDE à la table, par le nom d'une étape déclarée sous
+`rejeux` (`--etape`), si son rejeu est dû, puis exécute ce que cette étape doit
+(`--rejouer`). Il n'y a donc plus de « runner » passé en argument : nommer un
+runner était la façon dont un job choisissait son filtre, et ce choix appartient
+à la table. Les mutations Node pèsent l'essentiel d'une étape (~2,5 min, un
+runner Vitest chacune) et les mutations Python ~17 s : une étape n'est due que
+si le garde, la preuve, un module importé ou un fichier partagé du runner d'UNE
+de ses mutations a changé — et elle ne rejoue alors que celles-là. La référence
+de comparaison vient de `_base_du_changement`, la même fonction pour toutes les
+étapes. Le verdict qu'un workflow relaie et le rejeu qu'il exécute ensuite sont
+d'ailleurs la MÊME mesure (`etat_d_etape`) : deux calculs séparés seraient deux
+occasions de diverger, et la divergence irait dans le sens du faux vert.
 
 Trois règles vont dans le sens de l'erreur sûre : on rejoue TOUT quand la table
 ou le harnais a bougé (c'est eux qui calculent la sélection), TOUT quand la base
@@ -200,6 +204,16 @@ def charger_spec(chemin=SPEC):
                 raise SpecInvalide(
                     "etape %s : « %s » n'est pas une entree du registre" % (etape["nom"], chemin)
                 )
+        if etape.get("runner") and not any(
+            mutation["runner"] == etape["runner"] for mutation in spec["mutations"]
+        ):
+            # Une étape qui declare un runner sans qu'aucune mutation ne porte ce
+            # runner ne rejouerait RIEN en restant verte : c'est un faux vert de
+            # la meme famille que l'ancien filtre de runner vide.
+            raise SpecInvalide(
+                "etape %s : aucune mutation de runner « %s » — elle ne prouverait rien"
+                % (etape["nom"], etape["runner"])
+            )
         if porte_sur and not etape.get("pourquoi"):
             # Une etape qui porte sur des ENTREES plutot que sur un runner doit
             # dire pourquoi : c'est la seule declaration du fichier qui ne soit
@@ -589,136 +603,14 @@ def executer(mutation, racine):
     return True, "rouge nommé (%s)" % ", ".join(mutation["attend"])
 
 
-def _publier_verdict(verdict, motif):
-    """Rend le verdict à GitHub Actions, quand on tourne dans une étape : c'est
-    ce qui permet au workflow de RELAYER une décision prise ici, au lieu de
-    choisir lui-même quel filtre appliquer à quel job."""
-    chemin = os.environ.get("GITHUB_OUTPUT")
-    if not chemin:
-        return
-    with io.open(chemin, "a", encoding="utf-8", newline="\n") as flux:
-        flux.write("rejeu=%s\n" % verdict)
-        flux.write("motif=%s\n" % motif.replace("\n", " "))
+def rejouer(mutations):
+    """Exécute les mutations données et rend le code de sortie : 1 si une seule
+    est restée verte sans motif, 0 sinon.
 
-
-def verdict_d_etape(spec, nom, demande=None, racine=REPO_ROOT):
-    """Le verdict de portée d'une étape déclarée : `oui` (à rejouer) ou `non`,
-    avec son motif. N'exécute aucune mutation : c'est une QUESTION à la table.
-
-    Le verdict porte sur des FICHIERS dérivés — ceux du garde, de sa preuve, des
-    modules qu'ils importent ou citent, et des fichiers partagés du runner. Une
-    étape sans changement dans son périmètre n'a rien à rejouer ; tout le reste
-    (base introuvable, invocation nue) rend `oui`.
+    Un rejeu VIDE n'est pas un échec ici : c'est le cas d'une étape à qui le
+    verdict ne devait rien, et c'est `rejouer_l_etape` qui le dit. Ce qui reste
+    un échec, c'est une mutation qui ne mord pas.
     """
-    etape = etape_de(spec, nom)
-    a_rejouer, fichiers = portee_de_l_etape(spec, etape, racine)
-    base, motif_base = _base_du_changement(demande, racine)
-    if base is None:
-        verdict, motif = "oui", motif_base
-    else:
-        changes = fichiers_changes(base, racine)
-        sensibles = _sensibles_touches(changes)
-        touche = sorted(fichiers & changes)
-        if sensibles:
-            verdict = "oui"
-            motif = (
-                "%s : la table ou le harnais a changé (%s), donc la portée n'est plus ce "
-                "qui décide" % (motif_base, ", ".join(sensibles))
-            )
-        elif touche:
-            verdict = "oui"
-            motif = "%s : %d fichier(s) modifié(s), dont %s" % (
-                motif_base, len(changes), ", ".join(touche[:3])
-            )
-        else:
-            verdict = "non"
-            motif = "%s : aucun de ses %d fichier(s) n'a bougé" % (motif_base, len(fichiers))
-    couvre = "%d mutation(s)" % len(a_rejouer) if a_rejouer else "preuve exécutée telle quelle"
-    print("Etape de rejeu « %s » (%s) → rejeu=%s — %s" % (nom, couvre, verdict, motif))
-    if verdict == "non":
-        print("::notice title=Rejeu non du::%s" % motif)
-    _publier_verdict(verdict, motif)
-    return 0
-
-
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--runner", choices=RUNNERS, help="ne rejoue que ce runner")
-    parser.add_argument("--only", help="ne rejoue que cette mutation")
-    parser.add_argument("--list", action="store_true", help="valide le registre sans muter")
-    parser.add_argument(
-        "--etape",
-        help="ne rejoue rien : rend le verdict de portée d'une étape déclarée dans le "
-             "registre (rejeu=oui|non, publié dans GITHUB_OUTPUT) et son motif",
-    )
-    parser.add_argument(
-        "--changed-from", nargs="?", const="auto", metavar="REF",
-        help="ne rejoue que les mutations dont le garde ou la preuve a changé depuis REF. "
-             "Nue, la référence est DÉRIVÉE de l'environnement de la PR ; sans base "
-             "trouvée (main, dispatch), la preuve ENTIÈRE est due",
-    )
-    args = parser.parse_args(argv)
-
-    try:
-        spec = charger_spec()
-    except SpecInvalide as exc:
-        print("[ECHEC] %s" % exc)
-        print("::error title=Registre de preuves invalide::%s" % exc)
-        return 1
-
-    if args.etape:
-        try:
-            return verdict_d_etape(spec, args.etape, args.changed_from)
-        except SpecInvalide as exc:
-            print("[ECHEC] %s" % exc)
-            print("::error title=Etape de rejeu inconnue::%s" % exc)
-            return 1
-
-    mutations = spec["mutations"]
-    if args.runner:
-        mutations = [m for m in mutations if m["runner"] == args.runner]
-        if not mutations:
-            # Un filtre qui ne couvre rien est un faux vert : le runner demandé
-            # n'a plus aucune mutation, donc l'étape de CI ne prouverait rien.
-            print("[ECHEC] --runner %s ne sélectionne AUCUNE mutation" % args.runner)
-            return 1
-    if args.only:
-        mutations = [m for m in mutations if m["id"] == args.only]
-        if not mutations:
-            print("[ECHEC] --only %s ne correspond à aucune mutation" % args.only)
-            return 1
-    if args.changed_from:
-        base, motif_base = _base_du_changement(args.changed_from)
-        if base is None:
-            print("%s : %d mutation(s) à rejouer" % (motif_base, len(mutations)))
-        else:
-            try:
-                changes = fichiers_changes(base)
-            except SpecInvalide as exc:
-                print("[ECHEC] %s" % exc)
-                print("::error title=Filtre de mutation illisible::%s" % exc)
-                return 1
-            mutations, motif = mutations_concernees(mutations, changes)
-            print(
-                "Filtre --changed-from %s (%s) : %d fichier(s) modifié(s) → %d mutation(s) (%s)"
-                % (base, motif_base, len(changes), len(mutations), motif)
-            )
-            if not mutations:
-                # Ce n'est PAS un faux vert : aucune preuve ne peut avoir changé de
-                # comportement puisque ni son garde ni elle-même n'a bougé — et la
-                # preuve ENTIÈRE est rejouée sur `main` à la fusion.
-                print(
-                    "[OK] aucun garde ni preuve modifié : rien à rejouer ici "
-                    "(la preuve entière est due sur main)"
-                )
-                return 0
-
-    if args.list:
-        print("Registre valide : %d gardes, %d mutations" % (len(spec["gardes"]), len(spec["mutations"])))
-        for mutation in spec["mutations"]:
-            print("  [%s] %s → %s" % (mutation["runner"], mutation["id"], mutation["preuve"]))
-        return 0
-
     print("Harnais de mutation des gardes — %d mutation(s) à rejouer" % len(mutations))
     echecs = []
     for mutation in mutations:
@@ -737,6 +629,184 @@ def main(argv=None):
         len(mutations), len(mutations),
     ))
     return 0
+
+
+def _publier_verdict(verdict, motif):
+    """Rend le verdict à GitHub Actions, quand on tourne dans une étape : c'est
+    ce qui permet au workflow de RELAYER une décision prise ici, au lieu de
+    choisir lui-même quel filtre appliquer à quel job."""
+    chemin = os.environ.get("GITHUB_OUTPUT")
+    if not chemin:
+        return
+    with io.open(chemin, "a", encoding="utf-8", newline="\n") as flux:
+        flux.write("rejeu=%s\n" % verdict)
+        flux.write("motif=%s\n" % motif.replace("\n", " "))
+
+
+def etat_d_etape(spec, nom, demande=None, racine=REPO_ROOT):
+    """Le verdict d'une étape déclarée ET le rejeu qu'elle doit — la MÊME mesure.
+
+    Le verdict qu'un workflow relaie et la liste de mutations qu'il exécutera
+    ensuite sont calculés ici, une seule fois, par le même chemin : deux calculs
+    séparés seraient deux occasions de diverger, et la divergence irait dans le
+    sens du faux vert (une étape déclarée due qui ne rejoue rien, ou l'inverse).
+    N'exécute aucune mutation : c'est une QUESTION à la table.
+
+    Le périmètre porte sur des FICHIERS dérivés — ceux du garde, de sa preuve,
+    des modules qu'ils importent ou citent, et des fichiers partagés du runner.
+    Une étape de runner tient donc son verdict DE SES MUTATIONS : elle est due
+    si l'une d'elles est concernée, et c'est exactement la liste qu'elle rejoue.
+    Une étape sans runner (`porte_sur`) n'a pas de mutation à rejouer : son
+    verdict vient des fichiers des entrées qu'elle déclare porter. Tout le reste
+    (base introuvable, invocation nue) rend `oui` — jamais moins.
+
+    Retourne (etape, verdict, motif, mutations dues, total du runner).
+    """
+    etape = etape_de(spec, nom)
+    a_rejouer, fichiers = portee_de_l_etape(spec, etape, racine)
+    base, motif_base = _base_du_changement(demande, racine)
+    if base is None:
+        return etape, "oui", motif_base, list(a_rejouer), len(a_rejouer)
+    changes = fichiers_changes(base, racine)
+    if etape.get("runner"):
+        dues, motif_filtre = mutations_concernees(a_rejouer, changes)
+        if dues:
+            return etape, "oui", "%s (%s)" % (motif_base, motif_filtre), dues, len(a_rejouer)
+    else:
+        sensibles = _sensibles_touches(changes)
+        touche = sorted(fichiers & changes)
+        if sensibles:
+            return etape, "oui", (
+                "%s : la table ou le harnais a changé (%s), donc la portée n'est plus ce "
+                "qui décide" % (motif_base, ", ".join(sensibles))
+            ), [], 0
+        if touche:
+            return etape, "oui", "%s : %d fichier(s) modifié(s), dont %s" % (
+                motif_base, len(changes), ", ".join(touche[:3])
+            ), [], 0
+    return etape, "non", (
+        "%s : aucun de ses %d fichier(s) n'a bougé" % (motif_base, len(fichiers))
+    ), [], len(a_rejouer)
+
+
+def _dire_l_etape(etape, verdict, motif, dues, total):
+    """Écrit le verdict d'une étape et le publie pour le workflow qui le relaie."""
+    couvre = (
+        "%d mutation(s) sur %d" % (len(dues), total) if etape.get("runner")
+        else "preuve exécutée telle quelle"
+    )
+    print("Etape de rejeu « %s » (%s) → rejeu=%s — %s" % (etape["nom"], couvre, verdict, motif))
+    if verdict == "non":
+        print("::notice title=Rejeu non du::%s" % motif)
+    _publier_verdict(verdict, motif)
+
+
+def verdict_d_etape(spec, nom, demande=None, racine=REPO_ROOT):
+    """Le verdict de portée d'une étape déclarée : `oui` (à rejouer) ou `non`,
+    avec son motif. N'exécute aucune mutation, et ne rend que le verdict — c'est
+    la question qu'un workflow pose pour ne même pas démarrer une étape qui
+    n'est pas due."""
+    _dire_l_etape(*etat_d_etape(spec, nom, demande, racine))
+    return 0
+
+
+def rejouer_l_etape(spec, nom, demande=None, racine=REPO_ROOT):
+    """Exécute ce que l'étape doit : ses mutations dues, dérivées de la table.
+
+    Une étape à qui le verdict ne doit rien n'exécute AUCUNE mutation et sort en
+    0 : c'est un rejeu qui n'était pas dû, pas un rejeu raté — et le verdict est
+    publié quand même, pour que la porte qui a laissé passer la dise.
+    """
+    etape = etape_de(spec, nom)
+    if not etape.get("runner"):
+        # Une étape qui porte sur des entrées déclarées n'exécute aucune mutation
+        # du harnais : c'est le workflow qui lance sa preuve, sous la porte du
+        # verdict. L'inviter à rejouer serait un rejeu qui ne prouve rien.
+        raise SpecInvalide(
+            "etape %s : elle ne rejoue aucune mutation du harnais (elle porte sur des "
+            "preuves exécutées telles quelles) — c'est le workflow qui lance sa preuve"
+            % nom
+        )
+    _, verdict, motif, dues, total = etat_d_etape(spec, nom, demande, racine)
+    _dire_l_etape(etape, verdict, motif, dues, total)
+    if verdict == "oui" and dues:
+        return rejouer(dues)
+    print(
+        "[OK] aucun rejeu dû pour cette étape : rien n'a été exécuté "
+        "(la preuve ENTIÈRE est due sur main)"
+    )
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--only", help="ne rejoue que cette mutation")
+    parser.add_argument("--list", action="store_true", help="valide le registre sans muter")
+    parser.add_argument(
+        "--etape",
+        help="la seule porte d'entrée d'un job : le NOM d'une étape déclarée sous "
+             "« rejeux ». Sans --rejouer, rend son verdict de portée (rejeu=oui|non, "
+             "publié dans GITHUB_OUTPUT) et son motif ; avec --rejouer, exécute ce que "
+             "cette étape doit",
+    )
+    parser.add_argument(
+        "--rejouer", action="store_true",
+        help="avec --etape : exécute les mutations dues de cette étape, dérivées de la "
+             "table, au lieu de rendre seulement son verdict",
+    )
+    parser.add_argument(
+        "--changed-from", nargs="?", const="auto", metavar="REF",
+        help="avec --etape : la référence à laquelle comparer l'arbre. Nue, elle est "
+             "DÉRIVÉE de l'environnement de la PR ; sans base trouvée (main, dispatch), "
+             "la preuve ENTIÈRE est due",
+    )
+    args = parser.parse_args(argv)
+    if args.rejouer and not args.etape:
+        # `--rejouer` dit COMMENT exécuter ; `--etape` dit QUOI. Sans étape, il
+        # ne reste qu'un filtre implicite — exactement ce que la table a pris.
+        print("[ECHEC] --rejouer a besoin de --etape : c'est la table qui dit ce qui est dû")
+        return 2
+    if args.changed_from and not args.etape:
+        # La portée se DEMANDE à la table, par le nom d'une étape : filtrer le
+        # harnais entier depuis un job était la façon dont ce job choisissait son
+        # filtre, et c'est ce choix qui n'a plus lieu d'être.
+        print(
+            "[ECHEC] --changed-from n'a de sens qu'avec --etape : la portée d'un rejeu "
+            "se demande à la table, par le nom de l'étape"
+        )
+        return 2
+
+    try:
+        spec = charger_spec()
+    except SpecInvalide as exc:
+        print("[ECHEC] %s" % exc)
+        print("::error title=Registre de preuves invalide::%s" % exc)
+        return 1
+
+    if args.etape:
+        try:
+            if args.rejouer:
+                return rejouer_l_etape(spec, args.etape, args.changed_from)
+            return verdict_d_etape(spec, args.etape, args.changed_from)
+        except SpecInvalide as exc:
+            print("[ECHEC] %s" % exc)
+            print("::error title=Etape de rejeu inconnue::%s" % exc)
+            return 1
+
+    mutations = spec["mutations"]
+    if args.only:
+        mutations = [m for m in mutations if m["id"] == args.only]
+        if not mutations:
+            print("[ECHEC] --only %s ne correspond à aucune mutation" % args.only)
+            return 1
+
+    if args.list:
+        print("Registre valide : %d gardes, %d mutations" % (len(spec["gardes"]), len(spec["mutations"])))
+        for mutation in spec["mutations"]:
+            print("  [%s] %s → %s" % (mutation["runner"], mutation["id"], mutation["preuve"]))
+        return 0
+
+    return rejouer(mutations)
 
 
 if __name__ == "__main__":

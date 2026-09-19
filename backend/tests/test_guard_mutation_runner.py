@@ -344,15 +344,13 @@ bougé — puisque c'est eux qui calculent la sélection.
         with pytest.raises(harnais.SpecInvalide):
             harnais.fichiers_changes("ref-qui-n-existe-pas-kojo", REPO_ROOT)
 
-    def test_main_sur_filtre_vide_le_dit_et_reussit(self, harnais, monkeypatch, capsys):
-        # Une PR qui ne touche aucun garde ne paie rien — et le dit, plutôt que
-        # de laisser croire que la preuve a tourné.
-        monkeypatch.setattr(harnais, "charger_spec", lambda chemin=None: _spec())
-        monkeypatch.setattr(harnais, "fichiers_changes", lambda depuis, racine=None: set())
-        assert harnais.main(["--runner", "python", "--changed-from", "une-ref"]) == 0
-        sortie = capsys.readouterr().out
-        assert "rien à rejouer" in sortie, sortie
-        assert "main" in sortie, sortie
+    def test_un_filtre_sans_etape_est_refuse(self, harnais, capsys):
+        # La portée se DEMANDE à la table, par le nom d'une étape : filtrer le
+        # harnais entier depuis un job était la façon dont ce job choisissait son
+        # filtre, et c'est ce choix qui n'a plus lieu d'être.
+        assert harnais.main(["--changed-from", "une-ref"]) == 2
+        assert harnais.main(["--rejouer"]) == 2
+        assert "--etape" in capsys.readouterr().out
 
 
 class TestPorteeDesEtapes:
@@ -477,6 +475,73 @@ class TestPorteeDesEtapes:
             harnais.verdict_d_etape(_spec(), "etape-qui-n-existe-pas", "une-ref")
 
 
+class TestRejeuDesEtapes:
+    """Une étape ne choisit plus son filtre : elle demande son verdict à la table
+    et rejoue ce que ce verdict lui doit.
+
+    Ces cas mesurent les deux sens de la MÊME décision — une étape due exécute
+    exactement ses mutations dues, une étape qui n'est due à rien n'exécute rien
+    — et le refus d'un rejeu qui ne pourrait rien prouver.
+    """
+
+    def _spec_deux_mutations(self):
+        return _spec(
+            gardes=[_garde(), _garde(chemin="autre.txt", preuve="preuve2.py")],
+            mutations=[
+                _mutation(id="concernee"),
+                _mutation(id="intacte", garde="autre.txt", cible="autre.txt", preuve="preuve2.py"),
+            ],
+        )
+
+    def _mesurer(self, harnais, monkeypatch, tmp_path, changes):
+        """Rejoue l'étape runner-python pour un changement donné, en enregistrant
+        les mutations réellement exécutées."""
+        monkeypatch.setattr(harnais, "charger_spec", lambda chemin=None: self._spec_deux_mutations())
+        monkeypatch.setattr(harnais, "fichiers_changes", lambda base, racine=None: changes)
+        sortie = tmp_path / "github_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(sortie))
+        executees = []
+        monkeypatch.setattr(
+            harnais, "executer",
+            lambda mutation, racine: (executees.append(mutation["id"]), (True, "rouge nommé"))[1],
+        )
+        return executees, sortie
+
+    def test_une_etape_due_rejoue_ses_mutations_dues(self, harnais, monkeypatch, tmp_path):
+        executees, sortie = self._mesurer(harnais, monkeypatch, tmp_path, {"garde.txt"})
+        assert harnais.main(["--etape", "runner-python", "--rejouer", "--changed-from", "une-ref"]) == 0
+        assert executees == ["concernee"], executees
+        assert "rejeu=oui" in sortie.read_text(encoding="utf-8")
+
+    def test_une_etape_pas_due_n_execute_rien(self, harnais, monkeypatch, tmp_path):
+        executees, sortie = self._mesurer(
+            harnais, monkeypatch, tmp_path, {"frontend/src/App.jsx"}
+        )
+        assert harnais.main(["--etape", "runner-python", "--rejouer", "--changed-from", "une-ref"]) == 0
+        assert executees == [], executees
+        assert "rejeu=non" in sortie.read_text(encoding="utf-8")
+
+    def test_le_verdict_et_le_rejeu_sortent_de_la_meme_mesure(self, harnais, monkeypatch, tmp_path):
+        # Le verdict publié et la liste exécutée sont calculés ensemble : ce cas
+        # les confronte sur le MÊME changement, pour qu'une porte puisse ne pas
+        # laisser passer un rejeu vide sous un verdict « oui ».
+        executees, sortie = self._mesurer(harnais, monkeypatch, tmp_path, {"preuve2.py"})
+        harnais.main(["--etape", "runner-python", "--rejouer", "--changed-from", "une-ref"])
+        verdict = "oui" if "rejeu=oui" in sortie.read_text(encoding="utf-8") else "non"
+        assert verdict == ("oui" if executees else "non"), (verdict, executees)
+
+    def test_une_etape_sans_runner_refuse_de_rejouer(self, harnais, monkeypatch):
+        # Une étape qui porte sur des entrées déclarées n'exécute aucune mutation
+        # du harnais : l'inviter à rejouer serait un rejeu qui ne prouve rien.
+        spec = _spec(rejeux=[
+            _etape(),
+            _etape(nom="og", runner=None, porte_sur=["garde.txt"], pourquoi="motif"),
+        ])
+        monkeypatch.setattr(harnais, "charger_spec", lambda chemin=None: spec)
+        monkeypatch.setattr(harnais, "fichiers_changes", lambda base, racine=None: {"garde.txt"})
+        assert harnais.main(["--etape", "og", "--rejouer", "--changed-from", "une-ref"]) == 1
+
+
 class TestRegistreReel:
     def test_le_registre_du_depot_est_valide(self, harnais):
         registre = harnais.charger_spec(REPO_ROOT / ".github" / "scripts" / "guard-proofs.json")
@@ -498,11 +563,10 @@ class TestRegistreReel:
     def test_only_inconnu_est_un_echec(self, harnais):
         assert harnais.main(["--only", "mutation-qui-n-existe-pas"]) == 1
 
-    def test_runner_sans_mutation_est_un_echec(self, harnais, monkeypatch, tmp_path):
-        # Un filtre de runner qui ne sélectionne RIEN doit échouer : sinon une
-        # étape de CI pourrait ne plus rien prouver en restant verte.
-        spec = _spec(mutations=[_mutation(runner="python")])
-        spec["mutations"][0]["garde"] = "garde.txt"
-        monkeypatch.setattr(harnais, "charger_spec", lambda chemin=None: spec)
-        monkeypatch.setattr(harnais, "REPO_ROOT", tmp_path)
-        assert harnais.main(["--runner", "node"]) == 1
+    def test_runner_sans_mutation_est_un_echec(self, harnais, tmp_path):
+        # Une étape qui déclare un runner qu'AUCUNE mutation ne porte rejouerait
+        # rien en restant verte — le même faux vert que l'ancien filtre de runner
+        # vide, refusé maintenant là où la table se lit.
+        chemin = _ecrire_spec(tmp_path, _spec(rejeux=[_etape(nom="runner-node", runner="node")]))
+        with pytest.raises(harnais.SpecInvalide):
+            harnais.charger_spec(chemin)

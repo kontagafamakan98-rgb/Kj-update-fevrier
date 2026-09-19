@@ -430,15 +430,27 @@ jobs:
       # registre est validé par backend/tests/test_guard_failure_proofs.py, qui
       # vérifie AUSSI la présence de ces deux invocations : retirer une étape
       # éteindrait la moitié de la preuve sans que rien ne rougisse.
-      # PORTÉE : le runner Python obéit à la même règle que le Node — la
-      # référence de la PR est passée à l'environnement, et c'est le harnais qui
-      # en dérive quelles mutations sont dues (17 s sur le runner pour les 11).
-      # `--changed-from` NU : la base est dérivée ici, pas par le job.
-      - name: Mutations des gardes — preuve d'échec (runner Python)
+      # PORTÉE : ce job ne choisit ni runner ni filtre — il DEMANDE à la table,
+      # par le nom de l'étape déclarée (`--etape runner-python`), si son rejeu est
+      # dû, et relaie le verdict. Ce que l'étape rejoue se dérive de la table :
+      # les mutations de ce runner, chacune avec la fermeture de ses dépendances
+      # (garde, preuve, modules importés ou cités, fichiers partagés du runner).
+      # La référence de la PR arrive par l'environnement ; `_base_du_changement`
+      # en fait la même chose pour les trois étapes, et « pas de base » veut dire
+      # preuve ENTIÈRE (17 s sur le runner pour les 11 mutations).
+      - name: Portée du rejeu Python (dérivée de la table des preuves)
+        id: portee_python
         env:
           KOJO_MUTATIONS_DEPUIS: ${{ github.event.pull_request.base.sha }}
           KOJO_BRANCHE_DE_BASE: ${{ github.base_ref }}
-        run: python .github/scripts/check-guard-mutations.py --runner python --changed-from
+        run: python .github/scripts/check-guard-mutations.py --etape runner-python --changed-from
+
+      - name: Mutations des gardes — preuve d'échec (runner Python)
+        if: steps.portee_python.outputs.rejeu == 'oui'
+        env:
+          KOJO_MUTATIONS_DEPUIS: ${{ github.event.pull_request.base.sha }}
+          KOJO_BRANCHE_DE_BASE: ${{ github.base_ref }}
+        run: python .github/scripts/check-guard-mutations.py --etape runner-python --rejouer --changed-from
 
   # ─── Frontend : tests Vitest + build Vite ────────────────────────────────
   frontend-build:
@@ -626,12 +638,13 @@ jobs:
       # rejouées ; sur `main` (et en dispatch), la preuve est ENTIÈRE — aucun
       # changement ne peut alors justifier de sauter une mutation, sinon un garde
       # cesserait d'être prouvé sans que rien ne rougisse. Le choix « quelles
-      # mutations sont concernées » appartient au harnais, qui possède la table ;
-      # celui de la RÉFÉRENCE de comparaison aussi : le script ne fait plus ici
-      # quinze lignes de git fetch, il passe la base de la PR et laisse
-      # `_base_du_changement` décider — la même fonction pour les trois étapes.
-      # Si la base est introuvable, on rejoue TOUT : jamais moins.
-      - name: Mutations des gardes — preuve d'échec (runner Node)
+      # mutations sont concernées » appartient à la table, qui déclare cette étape
+      # sous un NOM : le job demande `--etape runner-node` et rien d'autre, comme
+      # les deux autres étapes. La RÉFÉRENCE de comparaison est décidée au même
+      # endroit (`_base_du_changement`) : le script ne fait plus ici quinze lignes
+      # de git fetch. Si la base est introuvable, on rejoue TOUT : jamais moins.
+      - name: Portée du rejeu Node (dérivée de la table des preuves)
+        id: portee_node
         env:
           # Vides hors `pull_request` (push sur main, workflow_dispatch) : c'est
           # l'invocation ENTIÈRE qui tourne alors. Passés par l'environnement
@@ -639,7 +652,14 @@ jobs:
           # faire dans une ligne de commande.
           KOJO_MUTATIONS_DEPUIS: ${{ github.event.pull_request.base.sha }}
           KOJO_BRANCHE_DE_BASE: ${{ github.base_ref }}
-        run: python3 .github/scripts/check-guard-mutations.py --runner node --changed-from
+        run: python3 .github/scripts/check-guard-mutations.py --etape runner-node --changed-from
+
+      - name: Mutations des gardes — preuve d'échec (runner Node)
+        if: steps.portee_node.outputs.rejeu == 'oui'
+        env:
+          KOJO_MUTATIONS_DEPUIS: ${{ github.event.pull_request.base.sha }}
+          KOJO_BRANCHE_DE_BASE: ${{ github.base_ref }}
+        run: python3 .github/scripts/check-guard-mutations.py --etape runner-node --rejouer --changed-from
 
   # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
   # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou
