@@ -38,12 +38,22 @@ Usage :
     python .github/scripts/check-guard-mutations.py --runner node
     python .github/scripts/check-guard-mutations.py --list        # valide le spec
     python .github/scripts/check-guard-mutations.py --only ID
+    python .github/scripts/check-guard-mutations.py --changed-from REF
+
+COÛT ET PÉRIMÈTRE : la preuve Node pèse l'essentiel du temps de l'étape (~2,5 min
+sur 18 mutations, qui démarrent chacune un runner Vitest). `--changed-from` ne
+rejoue donc que les mutations dont le GARDE ou la PREUVE a changé — sur une PR,
+où la preuve ENTIÈRE est payée une seconde fois à la fusion, sur `main`. Le
+filtre ne peut pas sous-estimer le changement (cf. `fichiers_changes`), et il
+n'est pas consulté du tout quand `main` rejoue tout : un garde qui cesserait
+d'être prouvé faute de changement détecté serait un faux vert de plus.
 """
 import argparse
 import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -167,6 +177,106 @@ def charger_spec(chemin=SPEC):
     return spec
 
 
+# Fichiers dont un changement invalide le FILTRE lui-même : la sélection est
+# calculée à partir d'eux, donc quand ils bougent, une liste de « gardes
+# touchés » ne dit plus rien de fiable — on rejoue tout.
+SENSIBLES_AU_FILTRE = ("guard-proofs.json", "check-guard-mutations.py")
+
+
+def fichiers_changes(depuis, racine=REPO_ROOT):
+    """Les fichiers qui diffèrent entre `depuis` et l'arbre courant.
+
+    UNE seule référence (`git diff REF`), PAS trois points : un clone superficiel
+    n'a pas la base de fusion, et l'erreur dangereuse serait de SOUS-ESTIMER le
+    changement — donc de sauter une mutation. Cette forme peut au pire en
+    rapporter trop (y compris un changement non committé) : on paie une preuve de
+    plus, jamais une de moins.
+    """
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", depuis],
+        cwd=str(racine), capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise SpecInvalide(
+            "git diff %s a échoué (%s) : un filtre qui ne peut pas lire le "
+            "changement est un filtre qui pourrait ne rien rejouer"
+            % (depuis, (proc.stderr or b"").decode("utf-8", "replace").strip() or "sans message")
+        )
+    return {
+        ligne.strip().replace("\\", "/")
+        for ligne in proc.stdout.decode("utf-8", "replace").splitlines()
+        if ligne.strip()
+    }
+
+
+def _imports_locaux(chemin, racine):
+    """Les modules du dépôt qu'un fichier importe par un chemin RELATIF.
+
+    Un garde n'est pas seulement son fichier : `check-home-shell.js` et huit
+    autres importent `site-meta.js`, donc modifier ce module partagé peut changer
+    ce qu'ils refusent sans que ni le garde ni sa preuve n'ait bougé. Les compter
+    est ce qui rend le filtre honnête plutôt qu'optimiste.
+    """
+    fichier = racine / chemin
+    if not fichier.is_file():
+        return set()
+    try:
+        texte = fichier.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return set()
+
+    trouves = set()
+    for motif in re.findall(r"(?:from|require\()\s*['\"](\.[^'\"]+)['\"]", texte):
+        base = fichier.parent / motif
+        candidats = [base]
+        candidats += [base.with_name(base.name + ext) for ext in (".js", ".cjs", ".mjs", ".py")]
+        candidats.append(base / "__init__.py")
+        for candidat in candidats:
+            if candidat.is_file():
+                trouves.add(candidat.resolve().relative_to(racine.resolve()).as_posix())
+                break
+    return trouves
+
+
+def fichiers_impliques(mutation, racine=REPO_ROOT):
+    """Tout ce dont un changement peut modifier ce que la mutation prouve :
+    le garde, sa preuve, et les modules locaux importés — de proche en proche,
+    puisqu'un module partagé peut en importer un autre."""
+    impliques = {mutation["cible"]}
+    if mutation.get("preuve"):
+        impliques.add(mutation["preuve"])
+    while True:
+        avant = len(impliques)
+        for chemin in sorted(impliques):
+            impliques |= _imports_locaux(chemin, racine)
+        if len(impliques) == avant:
+            return impliques
+
+
+def mutations_concernees(mutations, changes):
+    """(mutations à rejouer, motif) pour un changement donné.
+
+    Une mutation est rejouée si le GARDE qu'elle neutralise ou la PREUVE qui doit
+    rougir a changé — c'est la seule chose qui puisse modifier ce qu'elle prouve.
+    Si la TABLE ou le HARNAIS a changé, la sélection n'est plus une information
+    fiable (c'est eux qui la calculent) : on rejoue tout.
+    """
+    touche = sorted(
+        fichier for fichier in SENSIBLES_AU_FILTRE
+        if any(change == fichier or change.endswith("/" + fichier) for change in changes)
+    )
+    if touche:
+        return list(mutations), (
+            "la table ou le harnais a changé (%s) : le filtre ne peut plus être ce qui "
+            "décide, tout est rejoué" % ", ".join(touche)
+        )
+    retenues = [
+        mutation for mutation in mutations
+        if fichiers_impliques(mutation) & changes
+    ]
+    return retenues, "garde, preuve ou module importé modifiés"
+
+
 def commande_de(mutation):
     """La commande de preuve : `{python}` devient l'interpréteur courant (le venv
     du job, jamais un python3 implicite) et le premier mot est résolu sur le
@@ -246,6 +356,11 @@ def main(argv=None):
     parser.add_argument("--runner", choices=RUNNERS, help="ne rejoue que ce runner")
     parser.add_argument("--only", help="ne rejoue que cette mutation")
     parser.add_argument("--list", action="store_true", help="valide le registre sans muter")
+    parser.add_argument(
+        "--changed-from", metavar="REF",
+        help="ne rejoue que les mutations dont le garde ou la preuve a changé depuis REF "
+             "(la preuve ENTIÈRE reste due sur main)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -268,6 +383,27 @@ def main(argv=None):
         if not mutations:
             print("[ECHEC] --only %s ne correspond à aucune mutation" % args.only)
             return 1
+    if args.changed_from:
+        try:
+            changes = fichiers_changes(args.changed_from)
+        except SpecInvalide as exc:
+            print("[ECHEC] %s" % exc)
+            print("::error title=Filtre de mutation illisible::%s" % exc)
+            return 1
+        mutations, motif = mutations_concernees(mutations, changes)
+        print(
+            "Filtre --changed-from %s : %d fichier(s) modifié(s) → %d mutation(s) (%s)"
+            % (args.changed_from, len(changes), len(mutations), motif)
+        )
+        if not mutations:
+            # Ce n'est PAS un faux vert : aucune preuve ne peut avoir changé de
+            # comportement puisque ni son garde ni elle-même n'a bougé — et la
+            # preuve ENTIÈRE est rejouée sur `main` à la fusion.
+            print(
+                "[OK] aucun garde ni preuve modifié : rien à rejouer ici "
+                "(la preuve entière est due sur main)"
+            )
+            return 0
 
     if args.list:
         print("Registre valide : %d gardes, %d mutations" % (len(spec["gardes"]), len(spec["mutations"])))

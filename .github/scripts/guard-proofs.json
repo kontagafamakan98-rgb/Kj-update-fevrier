@@ -525,6 +525,27 @@
       ]
     },
     {
+      "id": "guard-mutations: filtre par changement neutralise",
+      "garde": ".github/scripts/check-guard-mutations.py",
+      "cible": ".github/scripts/check-guard-mutations.py",
+      "trouve": "        if fichiers_impliques(mutation) & changes",
+      "remplace": "        if True or fichiers_impliques(mutation) & changes",
+      "runner": "python",
+      "preuve": "backend/tests/test_guard_mutation_runner.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_guard_mutation_runner.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_guard_mutation_runner.py::TestFiltreParChangement::test_rien_de_touche_ne_rejoue_rien"
+      ]
+    },
+    {
       "id": "home-shell: nombre de h1 non verifie",
       "garde": "frontend/scripts/check-home-shell.js",
       "cible": "frontend/scripts/check-home-shell.js",
