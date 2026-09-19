@@ -4,9 +4,10 @@ import re
 import secrets
 import string
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from kojo_core import db
@@ -21,8 +22,9 @@ from kojo_settings import (
     logger,
 )
 from kojo_core import (
-    get_current_user, is_valid_image_content, upload_image_to_cloudinary,
-    upload_profile_photo_to_cloudinary, validate_payment_accounts,
+    get_current_user, is_valid_image_content, sanitize_email,
+    upload_image_to_cloudinary, upload_profile_photo_to_cloudinary,
+    validate_payment_accounts,
 )
 from kojo_shared import apply_referral_payout_confirmed, notify_user_localized
 from kojo_payments import (
@@ -1278,3 +1280,150 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
 
     logger.info(f"✅ Compte supprimé (soft delete): {user_id}")
     return {"message": "Votre compte Kojo a été supprimé. Au revoir !", "deleted": True}
+
+
+# ---------------------------------------------------------------------------
+# Export des données personnelles (droit d'accès RGPD) — GET /users/account/export
+# ---------------------------------------------------------------------------
+
+# Ce que le dépôt conserve pour un compte : chaque source nomme la collection ET
+# les champs qui peuvent porter l'identifiant de l'utilisateur (un document est
+# à lui si l'un d'eux le désigne). C'est la contrepartie exacte de la cascade de
+# suppression ci-dessus, et la raison pour laquelle les deux vivent dans le même
+# fichier : « ce qu'on garde » et « quand on l'efface » se lisent ensemble.
+#
+# Un document conservé à cause d'une AUTRE partie (un message reçu, un avis
+# reçu) est rendu quand même : c'est une donnée personnelle de l'utilisateur
+# même quand elle ne lui appartient pas.
+USER_DATA_SOURCES = (
+    ("users", ("id",)),
+    ("worker_profiles", ("user_id",)),
+    ("jobs", ("client_id", "assigned_worker_id")),
+    ("job_proposals", ("worker_id",)),
+    ("messages", ("sender_id", "receiver_id")),
+    ("payments", ("payer_id", "receiver_id")),
+    ("commissions", ("worker_id",)),
+    ("reviews", ("reviewer_id", "reviewee_id")),
+    ("notifications", ("user_id",)),
+    ("support_tickets", ("user_id",)),
+    ("push_tokens", ("user_id",)),
+)
+
+# Collections qui portent des données d'un utilisateur mais SANS clé
+# d'identifiant : elles se lisent autrement que par `USER_DATA_SOURCES`. Ici les
+# codes OTP, indexés par EMAIL — l'endpoint les rend donc avec l'adresse du
+# compte, sans quoi un code encore valide pour cette personne manquerait à son
+# export alors qu'il est conservé sur elle.
+USER_DATA_BY_EMAIL = ("email_otps",)
+
+# Collections qui ne portent AUCUNE donnée d'un utilisateur. Elles sont listées
+# quand même : le test de classement exige que TOUTE collection du backend soit
+# dans l'une de ces listes, donc en ajouter une oblige à trancher ici au lieu de
+# la voir manquer à l'export sans que rien ne le dise.
+NO_USER_DATA_COLLECTIONS = (
+    "revoked_tokens",  # jti + date d'expiration, aucune identité
+    "settings",        # configuration globale (taux de commission)
+)
+
+# Secrets qui ne sortent JAMAIS d'un export : ils ne servent pas la personne qui
+# demande ses données et les recopier dans un fichier téléchargé les exposerait.
+EXPORT_WITHHELD_FIELDS = {"users": ("password_hash",), "email_otps": ("otp_hash",)}
+
+# Plafond par collection : un export qui raconte tout doit pouvoir le faire, mais
+# pas au prix d'une réponse non bornée. Le dépassement est SIGNALÉ par
+# `truncated` (un export d'accès incomplet qui se tait n'est pas conforme).
+EXPORT_LIMIT_PER_COLLECTION = 1000
+
+
+def _exportable(value):
+    """Rend un document Mongo sérialisable : dates en ISO, le reste (ObjectId,
+    Decimal…) en texte. Un export qui lève sur un identifiant interne n'est pas
+    un export."""
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _exportable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_exportable(item) for item in value]
+    return str(value)
+
+
+def _without_secrets(collection: str, document: dict) -> dict:
+    """Le document, moins les champs de EXPORT_WITHHELD_FIELDS."""
+    withheld = EXPORT_WITHHELD_FIELDS.get(collection, ())
+    return {
+        key: _exportable(value)
+        for key, value in (document or {}).items()
+        if key not in withheld
+    }
+
+def _user_documents_query(user_id: str, fields) -> dict:
+    """Documents dont l'un des champs désigne ce compte."""
+    return {"$or": [{field: user_id} for field in fields]}
+
+
+@router.get("/users/account/export")
+async def export_my_data(current_user: User = Depends(get_current_user)):
+    """Export des données personnelles du compte connecté (droit d'accès RGPD).
+
+    Rend tout ce que le dépôt conserve pour cet identifiant, collection par
+    collection, dans la forme où c'est stocké — y compris ce qui est conservé
+    à cause d'une autre partie (messages reçus, avis reçus, paiements où
+    l'utilisateur est le destinataire).
+
+    Deux choses ne sortent pas : `password_hash` et le condensé d'un code OTP en
+    attente (`otp_hash`) — des secrets, qu'un fichier téléchargé ne doit pas
+    contenir (voir EXPORT_WITHHELD_FIELDS, rendu dans `withheld`).
+
+    Une collection plafonnée (EXPORT_LIMIT_PER_COLLECTION) le dit par
+    `truncated: true` : un export incomplet qui se tairait ne serait pas un
+    droit d'accès.
+
+    Returns:
+        dict: {generated_at, user_id, account, collections, withheld}.
+    """
+    user_id = current_user.id
+    user_email = sanitize_email(current_user.email)
+    collections = {}
+
+    for name, fields in USER_DATA_SOURCES:
+        query = _user_documents_query(user_id, fields)
+        total = await db[name].count_documents(query)
+        documents = await db[name].find(query).to_list(length=EXPORT_LIMIT_PER_COLLECTION)
+        collections[name] = {
+            "count": total,
+            "truncated": total > len(documents),
+            "documents": [_without_secrets(name, doc) for doc in documents],
+        }
+
+    # Les collections de USER_DATA_BY_EMAIL (codes OTP) sont indexées par EMAIL.
+    otp_query = {"email": user_email}
+    otp_total = await db.email_otps.count_documents(otp_query)
+    otp_documents = await db.email_otps.find(otp_query).to_list(
+        length=EXPORT_LIMIT_PER_COLLECTION
+    )
+    collections["email_otps"] = {
+        "count": otp_total,
+        "truncated": otp_total > len(otp_documents),
+        "documents": [_without_secrets("email_otps", doc) for doc in otp_documents],
+    }
+
+    # Le compte lui-même sort sous `account` : c'est le document que la personne
+    # reconnaît, pas une collection parmi les autres.
+    users_entry = collections.pop("users")
+    account = users_entry["documents"][0] if users_entry["documents"] else None
+
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "user_id": user_id,
+        "account": account,
+        "collections": collections,
+        "withheld": {name: list(fields) for name, fields in EXPORT_WITHHELD_FIELDS.items()},
+    }
+    logger.info(f"✅ Export RGPD servi pour le compte {user_id}")
+    return JSONResponse(
+        content=payload,
+        headers={"Content-Disposition": f'attachment; filename="kojo-donnees-{user_id}.json"'},
+    )
