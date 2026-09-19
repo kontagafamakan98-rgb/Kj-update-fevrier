@@ -36,7 +36,7 @@ confrontés à ceux des autres.
 
 CE GARDE est le seul à rejouer ces mutations : la suite de tests, elle, prouve
 qu'il sait refuser sans les rejouer — deux propriétaires de la même preuve la
-paieraient deux fois par push (4,6 s ici sur le runner, 10,1 s en local ; la suite
+paieraient deux fois par push (3,0 s ici sur le runner, 10,2 s en local ; la suite
 de `main` a perdu les ~4 s que lui coûtait la reprise, cf. CI-COVERAGE §3 F17).
 
 Ce qui est refusé

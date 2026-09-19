@@ -1024,37 +1024,56 @@ restaurées à l'empreinte SHA-1 — donc rien ne pouvait la rejouer depuis un c
 Le garde copie dans une arborescence TEMPORAIRE le fichier de test, le générateur et
 le dictionnaire (mêmes profondeurs), exige que la suite PASSE sur les copies intactes
 — l'état de référence, sans lequel n'importe quel rouge serait un faux positif —,
-puis neutralise **un refus à la fois** en remplaçant la LIGNE ENTIÈRE par `if False:`
-(le motif est la ligne, pas une sous-chaîne : la priorité des opérateurs avait rendu
-fausse une première mutation manuelle, `if False and … or …`, dont la seconde moitié
-survivait) et exige que la suite ÉCHOUE. Les **9 refus** font 9 rouges : **4,6 s
-mesurés sur le runner** (groupe ouvert à 01:53:09.889 dans le journal du run de
-`main`, sortie `[OK]` à 01:53:14.464 ; 10,1 s en local, où la police et la machine
-diffèrent) ; une mutation sans effet (« ce refus n'est verrouillé par rien »), une
-ligne de refus introuvable et un état de référence rouge échouent au nom du refus
-concerné. Le dépôt n'est jamais modifié, donc il n'y a plus d'empreinte à restaurer.
+puis neutralise **un refus à la fois** : la condition devient `False` à la position
+exacte que l'arbre désigne (remplacer la LIGNE ENTIÈRE était le premier réflexe, et
+la priorité des opérateurs avait d'ailleurs rendu fausse une première mutation
+manuelle, `if False and … or …`, dont la seconde moitié survivait) et exige que la
+suite ÉCHOUE. Les **9 refus** font 9 rouges : **3,0 s sur le runner** (horodatages de
+l'étape du run de `0de919f`, 03:40:28Z → 03:40:31Z ; 4,0 s aux runs de `8f2b1b9` et
+`019dc5f0`, même source) et **10,2 s en local**, où la police et la machine diffèrent.
+Un état de référence rouge échoue au nom de l'état de référence, un refus que
+personne n'exerce au nom de sa ligne. Le dépôt n'est jamais modifié, donc il n'y a
+plus d'empreinte à restaurer.
 
-**Le périmètre de sa table est DÉRIVÉ, pas déclaré** : `refusal_lines()` lit chaque
-`raise SystemExit` du générateur et la condition juste au-dessus, et `run()` signale
-un refus absent de la table comme une entrée qui ne porte plus de refus. Un dixième
-refus ajouté au générateur ne peut donc pas passer vert — ce que la table seule,
-tenue à la main, ne garantissait pas.
+**La table des mutations n'existe plus : elle est LUE dans l'arbre du générateur.**
+Chaque `raise SystemExit` que porte un `if` devient une mutation, avec sa ligne et le
+texte de sa condition ; un `raise SystemExit` qu'aucun `if` ne porte est un ORPHELIN,
+signalé au lieu d'être sauté. Un dixième refus ajouté au générateur est donc muté sans
+que personne ne le déclare — prouvé sur une COPIE du générateur réel (le dépôt n'est
+pas touché) : un refus ajouté à la fin du module est muté et signalé à sa ligne (622)
+comme n'étant verrouillé par rien, et un `raise` extrait dans un helper est signalé à
+sa ligne (339) comme n'étant porté par aucun `if`. Comme la suite ne passe que si les
+refus existent, un générateur qui perdrait ses refus ne peut pas rendre ce garde vert.
 
-**Et le garde est prouvé lui-même** — `backend/tests/test_og_mutation_guard.py` (6
-cas, 3,3 s) : il refuse une suite qui passe TOUJOURS malgré la mutation (le cas
-central : il ne se contente pas de lancer pytest, il exige un rouge), une ligne de
-refus absente du générateur, un périmètre incomplet et **un refus hors table** ; il
-exige que chaque entrée neutralise UNE seule ligne du vrai générateur, et vérifie le
-câblage de l'étape.
+**Chaque refus doit avoir SON test.** Un rouge quelconque ne prouve rien : n'importe
+quelle casse collatérale en produit un. L'appartenance est donc mesurée — les rouges
+d'un refus sont confrontés à ceux des autres — et un refus dont tous les rouges
+rougissent aussi sous un autre refus échoue, en nommant cet autre refus. Mesuré sur le
+vrai fichier de test : les 9 refus ont chacun au moins un test qui ne rougit que sous
+lui, et aucun test ne rougit sous deux refus. Sur une copie du fichier de test, un cas
+dont le test du refus touche aussi le refus des champs manquants est refusé (ligne
+384), et un cas où le test ne l'exerce plus l'est aussi — cette fois comme « AUCUN
+test ».
+
+**Et le garde est prouvé lui-même** — `backend/tests/test_og_mutation_guard.py` (11
+cas, 2,3 s) : `raise` sans `if`, condition qui s'écrit aussi ailleurs dans le
+générateur, test qui rougit sous plusieurs refus, refus que personne n'exerce, suite
+déjà rouge sur les copies intactes, périmètre incomplet, et le câblage de l'étape.
+Les décisions se testent en remplaçant la seule frontière du garde — lancer pytest —
+par des verdicts écrits d'avance ; **un seul cas fait le trajet complet** et exige les
+propriétaires nommés, pour que ce câblage ne repose pas sur des verdicts imaginaires.
+La première version de ces cas lançait pytest douze fois et coûtait **+30 s sur le
+runner** (étape des tests : 111,0 s, contre 81,0 s au run précédent, même source) ;
+ramenés à trois processus imbriqués, ils coûtent 2,3 s en local.
 
 **Un seul exécutant, et la suite le dit** : rejouer les mutations dans la suite ET
 dans l'étape payait la même preuve deux fois par push. Mesuré des deux côtés : la
 suite de `main` est passée de **82,5 s** (`798e31d`, avant la répartition) à
 **78,9 s** (`8f2b1b9`, après) sur le runner, et de 89,1 s à 81,1 s en local, tandis que
-l'étape coûte 4,6 s sur le runner et 10,1 s en local. L'étape rejoue donc les
+l'étape coûte 3,0 s sur le runner et 10,2 s en local. L'étape rejoue donc les
 mutations seule ; la suite prouve que le garde sait refuser **sans les rejouer**
-(3,3 s, dont ~2 s de pytest imbriqué pour ses cas de refus) et n'affirme de la partie
-verte que son câblage.
+(2,3 s, dont un seul cas qui lance vraiment pytest) et n'affirme de la partie verte
+que son câblage.
 
 **Mutation du champ exigé — la dérivation suit le générateur** (rejouée le
 19/09/2026 sur le fichier réel : `REQUIRED_CARD_KEYS` reçoit un sixième champ,
@@ -1096,8 +1115,8 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
-| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus, 9 rouges, 4,6 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
-| `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (6 cas : une suite qui passe TOUJOURS malgré la mutation est refusée avec son `::error`, une ligne de refus absente du générateur est une erreur, **un refus absent de sa table est signalé**, un périmètre incomplet est une erreur, la table couvre EXACTEMENT les refus dérivés du générateur et chaque entrée neutralise UNE seule ligne, le câblage dans `backend-tests`) ; la partie VERTE du garde n'a qu'un exécutant, l'étape de CI, et la suite n'en affirme que le câblage — c'est le test qui le dit, pas la doc |
+| `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus dérivés de son arbre, chacun rougissant le test qui lui appartient, 3,0 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
+| `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (11 cas : un `raise` sans `if` est un orphelin signalé, une condition déjà écrite ailleurs dans le générateur n'est pas prise pour elle-même, **un test qui rougit sous plusieurs refus n'en verrouille aucun**, un refus que personne n'exerce est signalé, une suite déjà rouge arrête tout avant la première mutation, un périmètre incomplet est une erreur ; les décisions se testent sur des verdicts écrits d'avance et UN cas fait le trajet complet en nommant les propriétaires ; sur le vrai générateur, la dérivation couvre chaque `raise` et chaque condition est neutralisable, et le câblage de l'étape est vérifié) ; la partie VERTE du garde n'a qu'un exécutant, l'étape de CI, et la suite n'en affirme que le câblage — c'est le test qui le dit, pas la doc |
 | **`check-prerender-shells.js`** | **rien** |
 
 `check-prerender-shells.js` est référencé **uniquement** par `ci.yml` : pas de

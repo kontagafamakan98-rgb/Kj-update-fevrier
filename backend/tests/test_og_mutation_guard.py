@@ -7,15 +7,23 @@ donc hors du dépôt : une preuve qu'on ne peut pas rejouer depuis un checkout n
 protège rien. Ce garde la rejoue, et il en est le SEUL propriétaire : l'étape du job
 `backend-tests` l'exécute une fois par push.
 
-Ce fichier-ci prouve que le garde SAIT refuser — suite aveugle, condition ambiguë,
-raise sans `if`, tests partagés entre deux refus, état de référence cassé, périmètre
-incomplet — sans rejouer les neuf mutations du vrai générateur, ce qui paierait deux
-fois la même preuve. Chaque cas monte donc une arborescence minuscule : un
-générateur factice de deux refus, et la suite qui les exerce.
+Ce fichier-ci prouve que le garde SAIT refuser — un `raise` sans `if` (la dérivation
+ne saurait plus quand il tombe), une condition qui s'écrit aussi ailleurs, un test
+qui rougit sous plusieurs refus, un refus que personne n'exerce, une suite déjà rouge
+sur les copies intactes, un périmètre incomplet — sans rejouer les neuf mutations du
+vrai générateur, ce qui paierait deux fois la même preuve.
+
+Ce qui lance vraiment pytest (une fois : l'état de référence, plus une mutation par
+refus) est remplacé par des verdicts écrits d'avance dans les cas de décision : le
+processus pytest sur un runner coûte des secondes, et le coût de la suite est ce que
+cette famille de passes traque. Un seul cas fait le trajet complet, pour que le
+câblage ne repose pas sur des verdicts imaginaires.
 """
 import importlib.util
 import shutil
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 GUARD_PATH = REPO_ROOT / ".github" / "scripts" / "check-og-test-mutations.py"
@@ -31,10 +39,14 @@ def _load_guard():
 
 GUARD = _load_guard()
 
-ONE_REFUSAL = """\
+THREE_REFUSALS = """\
 def check(value):
     if value < 0:
         raise SystemExit('valeur négative')
+    if value > 10:
+        raise SystemExit('valeur trop grande')
+    if value == 5:
+        raise SystemExit('cinq pile')
     return value
 """
 
@@ -80,13 +92,6 @@ BLIND_SUITE = "def test_rien():\n    assert True\n"
 BROKEN_SUITE = "def test_rien():\n    assert False\n"
 
 # Un test par refus : chacun rougit sous le sien SEUL.
-ONE_OWNER_SUITE = LOADER + """
-
-
-def test_refuse_la_valeur_negative():
-    assert refuse(-1)
-"""
-
 TWO_OWNERS_SUITE = LOADER + """
 
 def test_refuse_la_valeur_negative():
@@ -95,14 +100,6 @@ def test_refuse_la_valeur_negative():
 
 def test_refuse_la_valeur_trop_grande():
     assert refuse(11)
-"""
-
-# Un seul test pour les deux refus : il rougit sous l'un comme sous l'autre, donc
-# aucun des deux n'a de test qui lui appartienne.
-SHARED_SUITE = LOADER + """
-
-def test_refuse_les_deux():
-    assert refuse(-1) and refuse(11)
 """
 
 
@@ -177,38 +174,88 @@ class TestDerivation:
         assert alike(mutated) == [9], "la seconde doit survivre intacte"
 
 
-class TestRefuses:
-    def test_une_suite_aveugle_ne_verrouille_rien(self, tmp_path):
-        """Le garde ne se contente pas de lancer pytest : il exige un ROUGE. Une suite
-        qui passe toujours doit donc lui faire nommer le refus, avec l'annotation que
-        la CI affiche."""
-        report = GUARD.run(fake_repo(tmp_path, ONE_REFUSAL, BLIND_SUITE))
+@pytest.fixture
+def verdicts(monkeypatch):
+    """Remplace la seule frontière du garde — lancer pytest — par des verdicts écrits
+    d'avance : les décisions se testent alors sans démarrer pytest une douzaine de
+    fois, et le cas de bout en bout plus bas garde le câblage honnête.
 
-        assert [label for label, _ in report.errors] == [GUARD.label_of(3)]
-        assert "AUCUN test" in report.errors[0][1]
+    Les rouges sont donnés refus par refus, dans l'ordre du générateur, le premier
+    appel étant l'état de référence (qui doit passer).
+    """
 
-    def test_un_test_qui_rougit_sous_tous_les_refus_n_en_prouve_aucun(self, tmp_path):
+    def _install(reference_ok=True, *per_refusal):
+        calls = []
+
+        def fake_suite(tree, python):
+            calls.append(tree)
+            if len(calls) == 1:
+                return (0 if reference_ok else 1, "", [])
+            return (0, "", list(per_refusal[len(calls) - 2]))
+
+        monkeypatch.setattr(GUARD, "suite_run", fake_suite)
+        return calls
+
+    return _install
+
+
+class TestLeRapport:
+    """Ce que le garde conclut des rouges qu'il mesure."""
+
+    def test_un_refus_dont_le_test_rougit_sous_un_autre_refus_est_refuse(
+        self, tmp_path, verdicts
+    ):
         """Le défaut que ce garde est seul à voir : un rouge collatéral. Le test
-        partagé rougit bien sous chacun des deux refus, et pourtant il n'en verrouille
-        aucun — chaque refus doit avoir un test qui rougit sous lui SEUL."""
-        report = GUARD.run(fake_repo(tmp_path, TWO_REFUSALS, SHARED_SUITE))
+        partagé rougit bien sous les deux refus, et pourtant il n'en verrouille aucun
+        — et le refus qui a son test à lui passe, ce qui prouve que la règle ne
+        refuse pas tout."""
+        verdicts(
+            True,
+            ["suite::test_du_premier", "partage::test_commun"],
+            ["partage::test_commun"],
+            ["partage::test_commun"],
+        )
+        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS, BLIND_SUITE))
 
-        assert [label for label, _ in report.errors] == [GUARD.label_of(3), GUARD.label_of(5)]
+        assert [label for label, _ in report.errors] == [GUARD.label_of(5), GUARD.label_of(7)]
         assert all("aucun ne lui appartient" in message for _, message in report.errors)
-        assert all(report.owners[refusal] == [] for refusal in report.owners)
+        assert "if value == 5:" in report.errors[0][1], "l'autre refus doit être nommé"
+        owners = list(report.owners.values())
+        assert owners[0] == ["suite::test_du_premier"], "le refus qui a son test passe"
+        assert owners[1:] == [[], []]
 
-    def test_un_refus_ajoute_est_mute_sans_que_personne_ne_le_declare(self, tmp_path):
-        """Ce que la dérivation remplace : la table. Le générateur gagne un refus que
-        la suite n'exerce pas ; le garde le mute de lui-même et le signale avec sa
-        ligne, là où une table tenue à la main l'aurait ignoré."""
-        report = GUARD.run(fake_repo(tmp_path, TWO_REFUSALS, ONE_OWNER_SUITE))
+    def test_un_refus_que_personne_n_exerce_est_rapporte(self, tmp_path, verdicts):
+        """Ce que la dérivation remplace : la table. Un refus ajouté au générateur est
+        muté de lui-même, et signalé tant qu'aucun test ne rougit sous lui — là où une
+        table tenue à la main l'aurait ignoré."""
+        verdicts(True, ["suite::test_du_premier"], [], ["suite::test_du_troisieme"])
+        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS, BLIND_SUITE))
 
         assert [label for label, _ in report.errors] == [GUARD.label_of(5)]
         assert "AUCUN test" in report.errors[0][1]
 
-    def test_un_test_propre_a_son_refus_suffit_a_le_verrouiller(self, tmp_path):
-        """La contre-épreuve : la règle d'appartenance ne refuse pas tout. Deux refus,
-        deux tests, chacun nommé comme propriétaire du sien."""
+    def test_une_suite_deja_rouge_arrete_avant_toute_mutation(self, tmp_path, verdicts):
+        """Sans état de référence, n'importe quel rouge serait un faux positif : la
+        suite doit d'abord PASSER sur les copies intactes, et rien ne doit être muté
+        ensuite."""
+        calls = verdicts(False, ["suite::test_quelconque"])
+        report = GUARD.run(fake_repo(tmp_path, THREE_REFUSALS, BROKEN_SUITE))
+
+        assert [label for label, _ in report.errors] == ["état de référence"]
+        assert report.owners == {} and len(calls) == 1
+
+    def test_un_perimetre_incomplet_est_une_erreur(self, tmp_path):
+        """Rien à copier (mauvaise racine) : une erreur, pas un succès silencieux."""
+        report = GUARD.run(tmp_path / "absent")
+
+        assert len(report.errors) == 1 and "périmètre" in report.errors[0][1]
+
+
+class TestBoutEnBout:
+    def test_deux_refus_deux_tests_chacun_nomme_comme_proprietaire(self, tmp_path):
+        """Le seul cas qui lance vraiment pytest : c'est lui qui prouve que les rouges
+        lus dans la sortie réelle désignent le bon test, et donc que les verdicts des
+        cas ci-dessus ne sont pas des fictions confortables."""
         report = GUARD.run(fake_repo(tmp_path, TWO_REFUSALS, TWO_OWNERS_SUITE))
 
         assert report.errors == []
@@ -219,20 +266,6 @@ class TestRefuses:
         assert [GUARD.short(name) for name in owners["value > 10"]] == [
             "test_refuse_la_valeur_trop_grande"
         ]
-
-    def test_une_suite_cassee_est_refusee_avant_toute_mutation(self, tmp_path):
-        """Sans état de référence, n'importe quel rouge serait un faux positif : la
-        suite doit d'abord PASSER sur les copies intactes."""
-        report = GUARD.run(fake_repo(tmp_path, ONE_REFUSAL, BROKEN_SUITE))
-
-        assert [label for label, _ in report.errors] == ["état de référence"]
-        assert report.owners == {}
-
-    def test_un_perimetre_incomplet_est_une_erreur(self, tmp_path):
-        """Rien à copier (mauvaise racine) : une erreur, pas un succès silencieux."""
-        report = GUARD.run(tmp_path / "absent")
-
-        assert len(report.errors) == 1 and "périmètre" in report.errors[0][1]
 
 
 class TestDepotReel:
