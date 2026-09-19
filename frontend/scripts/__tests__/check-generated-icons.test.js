@@ -37,7 +37,6 @@ import {
 // modifié.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../..');
 
 const tempDirs = [];
 

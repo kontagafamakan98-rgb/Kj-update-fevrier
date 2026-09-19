@@ -25,8 +25,12 @@ coverage/
 .next/
 out/
 
-# Logs
+# Logs — `*.log.*` couvre les rotations, que `*.log` laissait passer : le
+# suffixe numérique faisait échapper le fichier. Source : le RotatingFileHandler
+# de backend/kojo_settings.py (`kojo_backend.log`, maxBytes=10 Mo, backupCount=5)
+# produit jusqu'à kojo_backend.log.5, soit ~50 Mo qu'un `git add -A` emportait.
 *.log
+*.log.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

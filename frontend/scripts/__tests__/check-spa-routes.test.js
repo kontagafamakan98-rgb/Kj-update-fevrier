@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import {
   DEV_ONLY_ROUTES,
   JOB_REWRITE_SOURCE,
@@ -32,10 +31,6 @@ import {
 //   • les routes gardées par import.meta.env.DEV ne sont pas routées ;
 //   • un vercel.json absent/illisible, un 404.html manquant ou indexable, une
 //     route backend disparue : tout cela ÉCHOUE.
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FRONTEND_DIR = path.resolve(__dirname, '../..');
-const REPO_ROOT = path.resolve(FRONTEND_DIR, '..');
 
 const tempDirs = [];
 

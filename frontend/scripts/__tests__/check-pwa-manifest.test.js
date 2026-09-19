@@ -2,7 +2,6 @@ import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import {
   MANIFEST_FILE,
   FAMILY_MANIFEST_FILE,
@@ -20,9 +19,6 @@ import {
 //
 // Le garde s'appuie sur l'inventaire de la famille (icons-assets.manifest.json),
 // qui est donc construit ici comme une fixture : aucun Python n'est requis.
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../..');
 
 const tempDirs = [];
 

@@ -3,7 +3,6 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import {
   CARDS_DIR_NAME,
   MANIFEST_NAME,
@@ -30,9 +29,6 @@ import {
 //
 // Les cas négatifs tournent sur une arborescence temporaire : le vrai dépôt
 // n'est jamais modifié.
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../..');
 
 const tempDirs = [];
 
