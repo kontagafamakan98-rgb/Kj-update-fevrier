@@ -84,7 +84,10 @@ class CopieDuDepot:
         self.document.write_text(texte, encoding="utf-8")
 
     def texte_module(self) -> str:
-        return self.module.read_text(encoding="utf-8", newline="")
+        # `open(..., newline="")` et non `Path.read_text(newline=…)` : ce mot-clé
+        # n'existe qu'à partir de Python 3.13, et la CI tourne en 3.11.
+        with open(self.module, "r", encoding="utf-8", newline="") as flux:
+            return flux.read()
 
     def ecrire_module(self, texte: str) -> None:
         # newline="" : un aller-retour en mode texte convertit LF en CRLF sous
