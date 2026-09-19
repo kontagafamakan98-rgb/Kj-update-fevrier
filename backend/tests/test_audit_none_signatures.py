@@ -1,6 +1,7 @@
 """Contrats du script audit_none_signatures.py."""
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -12,10 +13,18 @@ SCRIPT = Path(__file__).parents[1] / "scripts" / "audit_none_signatures.py"
 def run_audit(tmp_path: Path, source: str) -> subprocess.CompletedProcess[str]:
     fixture = tmp_path / "routes.py"
     fixture.write_text(source, encoding="utf-8")
+    # Le script rend son verdict en français accentué : l'encodage du tube est
+    # donc figé des DEUX côtés. Un `PYTHONIOENCODING=utf-8` seulement hérité de
+    # l'environnement faisait écrire l'enfant en UTF-8 pendant que le parent
+    # décodait en cp1252 (`auditées` → `auditÃ©es`) : un faux rouge local sous
+    # Windows, invisible en CI où tout est en UTF-8.
     return subprocess.run(
         [sys.executable, str(SCRIPT), str(fixture)],
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
 
