@@ -1228,8 +1228,10 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
 * **le registre est EXHAUSTIF** : chaque entrée est soit **mutée**, soit déclarée
   `hors_mutation` **avec son motif**. Un garde ni muté ni justifié est un refus
   (`SpecInvalide`), pas un oubli silencieux — la couverture ne dépend donc plus
-  de la vigilance de celui qui ajoute un garde. Au 19/09/2026 : **28 mutations**
-  couvrent 28 des **33** entrées, et les 5 autres sont des exclusions motivées —
+  de la vigilance de celui qui ajoute un garde. Au 19/09/2026 : **29 mutations**
+  couvrent les **28** entrées mutables des **33** déclarées (le harnais en porte
+  deux : ses décisions, et son filtre par changement), et les 5 autres sont des
+  exclusions motivées —
   `audit_tdz.cjs` et `check-og-reproducible.js` (sans exécutant, §7),
   `resolve-vercel-url.sh` et `bundle-size-report.js` (outils sans verdict : rien
   à neutraliser), et `gen-og-images.py` (déjà muté par
@@ -1244,10 +1246,27 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   réellement appelée est `http://127.0.0.1:1`, où rien n'écoute (le cas qui prouve
   qu'un accueil injoignable ne fait pas conclure « absent »). Coût mesuré en local
   (Windows, démarrage de `npx` compris, `build/` présent), en deux relevés de la
-  même table le 19/09/2026 : **33 à 35 s** pour les 10 mutations Python et **83 à
+  même table le 19/09/2026 : **33 à 42 s** pour les 11 mutations Python et **83 à
   146 s** pour les 18 Node — c'est le runner Node qui domine, et son coût varie
   avec la charge de la machine (le chiffre de CI est plus stable, mais n'a pas
   été relevé ici).
+* **la preuve Node est filtrée sur une PR, ENTIÈRE sur `main`** : les 18
+  mutations Node démarrent chacune un runner Vitest et pèsent à elles seules
+  l'essentiel de l'étape. Une PR ne rejoue donc que celles dont le **garde** ou
+  la **preuve** a changé (`--changed-from`), et `main` les rejoue toutes : aucun
+  changement ne peut justifier d'en sauter une quand c'est la fusion qui livre.
+  Deux garde-fous plutôt qu'un, parce qu'un filtre peut mentir dans les deux
+  sens : si la table ou le harnais a bougé, la sélection n'est plus une
+  information fiable et TOUT est rejoué ; si la base de comparaison est
+  introuvable, l'étape retombe sur la preuve entière. Le choix « quelles
+  mutations sont concernées » appartient au harnais, qui possède la table — le
+  workflow ne recopie aucune liste. Le périmètre d'une mutation n'est pas un
+  fichier mais une **fermeture** : le garde, sa preuve, et les modules qu'ils
+  importent de proche en proche — neuf gardes importent `site-meta.js`, donc le
+  toucher rejoue ces neuf mutations, et `check-og-images.js` en rejoue quatre.
+  Limite dite : une *donnée* de test (un JSON, un PNG) modifiée seule ne rejoue
+  rien — ce n'est pas un module importé, et la mutation correspondante est
+  rejouée à la fusion, sur `main`.
 
 Ajouter un garde sans preuve d'échec est donc désormais un rouge, pas une
 découverte fortuite.

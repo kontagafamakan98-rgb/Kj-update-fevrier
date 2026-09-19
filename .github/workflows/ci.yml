@@ -595,8 +595,45 @@ jobs:
       # des gardes frontend sont rejouées ici, seul job qui a `node_modules`.
       # Aucun `working-directory` : le harnais résout la racine du dépôt depuis
       # son propre fichier, pas depuis le répertoire courant.
+      #
+      # PÉRIMÈTRE : ces 18 mutations démarrent chacune un runner Vitest et pèsent
+      # l'essentiel de l'étape (~2,5 min). Sur une PR, seules celles dont le GARDE
+      # ou la PREUVE a changé sont rejouées ; sur `main` (et en dispatch), la
+      # preuve est ENTIÈRE — aucun changement ne peut alors justifier de sauter
+      # une mutation, sinon un garde cesserait d'être prouvé sans que rien ne
+      # rougisse. Le choix « quelles mutations sont concernées » appartient au
+      # harnais, qui possède la table (le workflow ne recopie aucune liste).
+      # Si la base de comparaison est introuvable, on rejoue TOUT : jamais moins.
       - name: Mutations des gardes — preuve d'échec (runner Node)
-        run: python3 .github/scripts/check-guard-mutations.py --runner node
+        env:
+          # Vides hors `pull_request` (push sur main, workflow_dispatch) : c'est
+          # l'invocation ENTIÈRE qui tourne alors. Passés par l'environnement
+          # plutôt qu'interpolés dans le script : un nom de branche n'a rien à
+          # faire dans une ligne de commande.
+          KOJO_MUTATIONS_DEPUIS: ${{ github.event.pull_request.base.sha }}
+          KOJO_BRANCHE_DE_BASE: ${{ github.base_ref }}
+        run: |
+          BASE=""
+          if [ -n "$KOJO_MUTATIONS_DEPUIS" ]; then
+            # Le clone est superficiel (depth 1) : la base du PR n'est pas dans
+            # l'arbre, on la récupère à la demande — par SHA si GitHub l'accepte,
+            # sinon par le nom de branche de base.
+            for REF in "$KOJO_MUTATIONS_DEPUIS" "$KOJO_BRANCHE_DE_BASE"; do
+              if [ -z "$REF" ]; then
+                continue
+              fi
+              if git fetch --depth=1 origin "$REF" > /dev/null 2>&1; then
+                BASE="FETCH_HEAD"
+                break
+              fi
+            done
+          fi
+          if [ -n "$BASE" ]; then
+            python3 .github/scripts/check-guard-mutations.py --runner node --changed-from "$BASE"
+          else
+            echo "Preuve ENTIÈRE : pas de base de comparaison (main, dispatch, ou base indisponible)"
+            python3 .github/scripts/check-guard-mutations.py --runner node
+          fi
 
   # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
   # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou

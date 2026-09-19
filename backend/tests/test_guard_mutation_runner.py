@@ -235,6 +235,87 @@ class TestRestauration:
         assert harnais.commande_de({"commande": ["{python}", "-m", "pytest"]})[0] == sys.executable
 
 
+class TestFiltreParChangement:
+    """La preuve Node est filtrée sur une PR : le filtre doit être SUR, et la
+    preuve entière doit rester due sur `main` (cf. `test_guard_failure_proofs`).
+
+    Un filtre qui sous-estime le changement ferait exactement ce que le harnais
+existe pour empêcher : un garde qui cesse d'être prouvé sans que rien ne
+rougisse. D'où deux règles mesurées ici : on rejoue dès que le GARDE ou la
+PREUVE a bougé, et on rejoue TOUT quand c'est la table ou le harnais qui a
+bougé — puisque c'est eux qui calculent la sélection.
+    """
+
+    def _mutations(self):
+        return [
+            _mutation(id="garde-A", garde="a.txt", cible="a.txt", preuve="preuve-a.py"),
+            _mutation(id="garde-B", garde="b.txt", cible="b.txt", preuve="preuve-b.py"),
+            _mutation(id="garde-C", garde="c.txt", cible="c.txt", preuve="preuve-c.py"),
+        ]
+
+    def test_le_garde_modifie_rejoue_sa_mutation(self, harnais):
+        retenues, motif = harnais.mutations_concernees(self._mutations(), {"a.txt"})
+        assert [m["id"] for m in retenues] == ["garde-A"], motif
+
+    def test_la_preuve_modifiee_rejoue_sa_mutation(self, harnais):
+        # Le garde n'a pas bougé, mais la preuve qui doit rougir, si : c'est la
+        # moitié de ce que la mutation prouve.
+        retenues, motif = harnais.mutations_concernees(self._mutations(), {"preuve-b.py"})
+        assert [m["id"] for m in retenues] == ["garde-B"], motif
+
+    def test_rien_de_touche_ne_rejoue_rien(self, harnais):
+        retenues, _ = harnais.mutations_concernees(self._mutations(), {"frontend/src/App.jsx"})
+        assert retenues == []
+
+    def test_un_module_importe_par_le_garde_rejoue_sa_mutation(self, harnais):
+        # Les gardes frontend ne sont pas des fichiers isolés : neuf d'entre eux
+        # importent `site-meta.js`. Modifier ce module partagé peut changer ce
+        # qu'ils refusent sans que le garde ni sa preuve n'ait bougé — un filtre
+        # qui l'ignorerait serait optimiste sur un changement réel.
+        mutation = _mutation(
+            id="home-shell",
+            garde="frontend/scripts/check-home-shell.js",
+            cible="frontend/scripts/check-home-shell.js",
+            preuve="frontend/scripts/__tests__/check-home-shell.test.js",
+        )
+        retenues, _ = harnais.mutations_concernees([mutation], {"frontend/scripts/site-meta.js"})
+        assert [m["id"] for m in retenues] == ["home-shell"]
+        # Et la preuve fait partie de ce qui compte, pas seulement le garde.
+        assert "frontend/scripts/check-home-shell.js" in harnais.fichiers_impliques(mutation)
+        assert "frontend/scripts/site-meta.js" in harnais.fichiers_impliques(mutation)
+
+    def test_la_table_modifiee_rejoue_tout(self, harnais):
+        # La sélection est CALCULÉE par la table : quand celle-ci bouge, la
+        # sélection ne dit plus rien de fiable, donc on ne saute rien.
+        retenues, motif = harnais.mutations_concernees(
+            self._mutations(), {".github/scripts/guard-proofs.json"}
+        )
+        assert len(retenues) == 3, motif
+        assert "table ou le harnais" in motif, motif
+
+    def test_le_harnais_modifie_rejoue_tout(self, harnais):
+        retenues, motif = harnais.mutations_concernees(
+            self._mutations(), {".github/scripts/check-guard-mutations.py"}
+        )
+        assert len(retenues) == 3, motif
+
+    def test_un_filtre_illisible_est_un_echec(self, harnais):
+        # Un garde qui ne peut pas conclure échoue : une référence inexistante ne
+        # doit jamais se traduire par « rien à rejouer ».
+        with pytest.raises(harnais.SpecInvalide):
+            harnais.fichiers_changes("ref-qui-n-existe-pas-kojo", REPO_ROOT)
+
+    def test_main_sur_filtre_vide_le_dit_et_reussit(self, harnais, monkeypatch, capsys):
+        # Une PR qui ne touche aucun garde ne paie rien — et le dit, plutôt que
+        # de laisser croire que la preuve a tourné.
+        monkeypatch.setattr(harnais, "charger_spec", lambda chemin=None: _spec())
+        monkeypatch.setattr(harnais, "fichiers_changes", lambda depuis, racine=None: set())
+        assert harnais.main(["--runner", "python", "--changed-from", "une-ref"]) == 0
+        sortie = capsys.readouterr().out
+        assert "rien à rejouer" in sortie, sortie
+        assert "main" in sortie, sortie
+
+
 class TestRegistreReel:
     def test_le_registre_du_depot_est_valide(self, harnais):
         registre = harnais.charger_spec(REPO_ROOT / ".github" / "scripts" / "guard-proofs.json")
