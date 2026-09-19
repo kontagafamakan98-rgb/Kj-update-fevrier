@@ -34,11 +34,12 @@
  *      régénération, cartes refaites ailleurs avec une AUTRE police —
  *      détectable sur n'importe quel runner, sans dépendre des polices
  *      installées ;
- *   6. recompose le TEXTE que chaque carte dessine (les lignes consignées dans
- *      le manifeste) et exige qu'il soit EXACTEMENT le titre et la description
- *      de sa page, lus dans src/i18n/fr.json. C'est cette égalité qui rend
- *      impossible qu'un visuel de partage et la page qu'il annonce disent deux
- *      textes différents : renommer un titre sans régénérer les cartes fait
+ *   6. recompose le TEXTE réellement dessiné (les lignes que le générateur a
+ *      consignées) et exige qu'il soit EXACTEMENT le texte de la page — résolu
+ *      par la CLÉ que déclare le fichier de données, lue dans src/i18n/fr.json.
+ *      La clé n'est donc pas recopiée dans le manifeste, et l'égalité porte sur
+ *      la seule chose qu'une déclaration ne peut pas dire : ce qui est dessiné
+ *      dans les PNG versionnés. Renommer un titre sans régénérer les cartes fait
  *      échouer ce check, au lieu de laisser un PNG périmé derrière un manifeste
  *      « frais ».
  *
@@ -192,16 +193,6 @@ export const readDeclaredCards = (cardsDir) => {
 };
 
 /**
- * Empreinte du CONTENU des cartes : même recette OCTET POUR OCTET que
- * `cards_sha256()` du générateur (nom de fichier + LF + contenu normalisé en LF,
- * fichiers triés).
- *
- * Le texte n'est plus dans le générateur, donc l'empreinte du générateur ne peut
- * plus le couvrir : sans celle-ci, changer une accroche sans relancer le script
- * laisserait des PNG périmés derrière un manifeste « frais », et la CI dirait
- * vert sur des cartes que plus personne ne peut reproduire.
- */
-/**
  * La règle de fond : le texte qu'une carte DESSINE est celui de sa page.
  *
  * Le générateur consigne dans le manifeste les LIGNES réellement dessinées (par
@@ -212,10 +203,11 @@ export const readDeclaredCards = (cardsDir) => {
  * renommé sans régénérer les cartes, et un manifeste retouché à la main pour y
  * faire dire autre chose que ce que la page publie.
  *
- * `cards` (les fichiers de données) dit ce qui a été DESSINÉ ; le manifeste dit ce
- * qui est VRAI dans les PNG versionnés. Les deux doivent dire la même chose, sinon
- * les empreintes (cards_sha256) et cette égalité désignent le même coupable : une
- * carte à régénérer.
+ * Le manifeste ne recopie AUCUNE déclaration : il ne porte, par carte, que sa
+ * route (clé de jointure) et les lignes mesurées au dessin. Le texte attendu est
+ * donc lu là où la carte ET la page le lisent — le fichier de données, puis le
+ * dictionnaire — et la seule chose qui reste à confronter est ce qui a été
+ * RÉELLEMENT dessiné dans les PNG versionnés, que rien d'autre ne peut dire.
  *
  * @param {object} options
  * @param {Array<object>} options.cards Cartes déclarées (readDeclaredCards).
@@ -245,15 +237,6 @@ export const checkCardTexts = ({ cards = [], manifest, dictionary }) => {
           `(${CARDS_DIR_NAME}/${card.name}) : manifeste périmé — relance scripts/${GENERATOR_NAME}`
       );
       continue;
-    }
-    for (const key of ['title', 'description', 'wide', 'square']) {
-      if (entry[key] !== card[key]) {
-        errors.push(
-          `${MANIFEST_NAME} : la carte « ${card.route} » y annonce ${key} = « ${entry[key]} », mais ` +
-            `${CARDS_DIR_NAME}/${card.name} déclare « ${card[key]} » — manifeste périmé ou retouché ` +
-            `à la main, relance scripts/${GENERATOR_NAME}`
-        );
-      }
     }
     for (const [kind, field] of [
       ['wide', 'title'],
@@ -300,6 +283,16 @@ export const checkCardTexts = ({ cards = [], manifest, dictionary }) => {
   return errors;
 };
 
+/**
+ * Empreinte du CONTENU des cartes : même recette OCTET POUR OCTET que
+ * `cards_sha256()` du générateur (nom de fichier + LF + contenu normalisé en LF,
+ * fichiers triés).
+ *
+ * Le texte n'est plus dans le générateur, donc l'empreinte du générateur ne peut
+ * plus le couvrir : sans celle-ci, changer une accroche sans relancer le script
+ * laisserait des PNG périmés derrière un manifeste « frais », et la CI dirait
+ * vert sur des cartes que plus personne ne peut reproduire.
+ */
 const cardsFingerprint = (cardsDir) => {
   const names = existsSync(cardsDir)
     ? readdirSync(cardsDir).filter((name) => name.endsWith('.json')).sort()
@@ -376,7 +369,8 @@ export const runOgAssetsCheck = (opts = {}) => {
     }
 
     if (nameLooksLikeOgGenerator(name)) {
-      fail(          `second générateur OG détecté (${name}) : son nom annonce un ` +
+      fail(
+        `second générateur OG détecté (${name}) : son nom annonce un ` +
           `générateur, or une seule source de vérité est autorisée, ` +
           `scripts/${GENERATOR_NAME} — un checker qui se contente de LIRE les ` +
           `cartes n'est pas concerné (il n'écrit aucune image)`
@@ -385,7 +379,8 @@ export const runOgAssetsCheck = (opts = {}) => {
     }
 
     if (contentLooksLikeOgGenerator(source)) {
-      fail(          `second générateur OG détecté (${name}) : ce fichier écrit une carte ` +
+      fail(
+        `second générateur OG détecté (${name}) : ce fichier écrit une carte ` +
           `OG, or une seule source de vérité est autorisée, ` +
           `scripts/${GENERATOR_NAME} — un checker qui se contente de LIRE les ` +
           `cartes n'est pas concerné (il n'écrit aucune image)`

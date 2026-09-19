@@ -6,7 +6,6 @@ import { runOgImageCheck, ROUTES, deriveRoutes, lighthouseAuditedPaths } from '.
 // La table des cartes appartient à src/config/og-cards.js : les scripts la
 // LISENT, ils ne la possèdent pas (c'est elle que les pages utilisent aussi).
 import { CARDS_BY_ROUTE, GENERIC_CARD } from '../../src/config/og-cards';
-import manifest from '../../scripts/og-assets.manifest.json';
 
 // Tests du garde-fou « og:image par route » (scripts/check-og-images.js).
 //

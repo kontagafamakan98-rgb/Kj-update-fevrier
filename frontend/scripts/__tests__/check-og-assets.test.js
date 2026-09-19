@@ -440,31 +440,9 @@ describe('check-og-assets — conformité des PNG versionnés', () => {
   });
 });
 
-describe('check-og-assets — dépôt réel', () => {
-  it('est vert sur le dépôt courant (une seule source de vérité)', () => {
-    const result = run({ root: REPO_ROOT });
-    expect(result.errors).toEqual([]);
-    expect(result.ok).toBe(true);
-    // Les trois cartes du pré-rendu par route + variantes carrées + favicon.
-    const files = result.assets.map((asset) => asset.file);
-    expect(files).toContain('og-jobs.png');
-    expect(files).toContain('og-login.png');
-    expect(files).toContain('og-image-1200x630.png');
-    expect(result.assets.every((asset) => asset.width > 0 && asset.height > 0)).toBe(true);
-  });
-
-  it('le manifeste versionné décrit les cartes du dépôt, avec la police de référence', () => {
-    const manifest = readManifest(REPO_ROOT);
-    expect(manifest.generator).toBe('gen-og-images.py');
-    expect(manifest.fonts).toEqual(REFERENCE_FONTS);
-    expect(manifest.assets).toHaveLength(7);
-    // Le manifeste est écrit par Python, l'empreinte recalculée en JavaScript :
-    // ce cas est la preuve que les deux recettes donnent le MÊME octet.
-    expect(manifest.cards_sha256).toBe(
-      cardsFingerprint(path.join(REPO_ROOT, 'scripts', CARDS_DIR_NAME))
-    );
-  });
-});
+// Le dépôt réel n'est pas rejoué ici : l'étape « Check Open Graph assets » de la
+// CI le fait sur le runner (dimensions des PNG, manifeste et empreinte
+// `cards_sha256` comprises), et la payer deux fois par push n'ajoute rien.
 
 describe('check-og-assets — manifeste de reproductibilité', () => {
   it('cas nominal : manifeste cohérent avec les fichiers → ok', () => {

@@ -1052,8 +1052,8 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
        réinitialisées (annulées, assignment retiré) et le CLIENT est remboursé
        des fonds séquestrés — les données du client ne sont pas supprimées.
 
-    Puis : soft delete + anonymisation des PII (email masqué, mot de passe et
-    numéro de téléphone effacés) → les jetons existants deviennent inutiles
+    Puis : soft delete + anonymisation des PII (email masqué ; nom, prénom, mot
+    de passe et numéro de téléphone effacés) → les jetons existants deviennent inutiles
     (get_current_user rejette un compte `deleted`, et aucun login possible
     sans password_hash).
     Cascade : push tokens, notifications, propositions envoyées, avis laissés ;
@@ -1204,6 +1204,11 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
             "deleted_at": now,
             "email": anonymous_email,
             "password_hash": None,
+            # Les PII NOMINATIVES : sans elles, le document présenté comme
+            # anonymisé gardait le nom de la personne, et un export ou un accès
+            # direct à la collection permettait de la réidentifier.
+            "first_name": None,
+            "last_name": None,
             "phone": None,
             "payment_accounts": None,
             "payment_accounts_count": 0,

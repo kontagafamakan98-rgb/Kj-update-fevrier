@@ -62,11 +62,8 @@ describe('check-job-og-contract — le pré-rendu de production est exécuté', 
     expect(hasPrerender, python ? prerender.error : 'aucun interpréteur Python trouvé').toBe(true);
   });
 
-  it('le dépôt réel tient le contrat (titre, description, carte)', () => {
-    const result = runJobOgContractCheck({ root: REPO_ROOT, base: BASE, quiet: true });
-    expect(result.errors).toEqual([]);
-    expect(result.ok).toBe(true);
-  });
+  // Le dépôt réel n'est pas rejoué ici : l'étape « Check job OG contract » de la CI
+  // l'examine sur le runner, titre, description et carte compris.
 });
 
 describe.skipIf(!hasPrerender)('check-job-og-contract — ce qui doit échouer', () => {

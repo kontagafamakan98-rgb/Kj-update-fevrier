@@ -20,6 +20,8 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
+from kojo_core import db
+
 from tests.conftest import (
     AUTH_REQUIRED_STATUS,
     BASE_JOB,
@@ -241,6 +243,14 @@ class TestPasswordVersionRevocation:
         assert resp_free.json()["message"] == resp_used.json()["message"]
 
 
+# Contrat RGPD, ÉCRIT ici et non lu sur l'implémentation : ces trois états
+# signifient que PayDunya n'a exécuté AUCUN décaissement, donc que l'argent est
+# encore dû au payeur qui supprime son compte. Une liste dérivée de
+# `kojo_routers_users.REFUNDABLE_PAYOUT_STATES` ne pourrait pas signaler la
+# régression : retirer un état du code retirerait aussi le cas qui le vérifie.
+REFUNDABLE_ESCROW_STATES = ("held", "release_failed", "refund_failed")
+
+
 @pytest.mark.asyncio
 class TestAccountDeletion:
     async def test_delete_account_revokes_sessions_and_cascades(self, client: AsyncClient):
@@ -291,13 +301,16 @@ class TestAccountDeletion:
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
 
-    async def test_delete_account_refunds_held_payment_before_anonymization(self, client: AsyncClient):
-        """Point 1 RGPD : les fonds séquestrés (held) sont remboursés AVANT la
-        purge de payment_accounts. La preuve de l'ordre est implicite : si
-        l'anonymisation précédait le refund, execute_paydunya_refund ne
-        trouverait plus de compte mobile money → refund_failed → 409. Ici on
-        exige 200 + refunded, donc le refund a tourné avec les comptes encore
-        en base."""
+    @pytest.mark.parametrize("payout_status", REFUNDABLE_ESCROW_STATES)
+    async def test_delete_account_refunds_escrow_before_anonymization(
+        self, client: AsyncClient, payout_status: str
+    ):
+        """Point 1 RGPD : les fonds séquestrés sont remboursés AVANT la purge de
+        payment_accounts, dans les TROIS états où PayDunya n'a rien exécuté. La
+        preuve de l'ordre est implicite : si l'anonymisation précédait le
+        refund, execute_paydunya_refund ne trouverait plus de compte mobile
+        money → refund_failed → 409. Ici on exige 200 + refunded, donc le refund
+        a tourné avec les comptes encore en base."""
         user = await register_and_login(client, BASE_USER)
         headers = {"Authorization": f"Bearer {user['access_token']}"}
         job_id = str(uuid.uuid4())
@@ -305,7 +318,9 @@ class TestAccountDeletion:
             "id": job_id, "title": "Mission payée", "client_id": user["user"]["id"],
             "status": "in_progress", "deleted": False,
         })
-        await self._insert_payment(user["user"]["id"], job_id=job_id, payout_status="held")
+        await self._insert_payment(
+            user["user"]["id"], job_id=job_id, payout_status=payout_status
+        )
 
         with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "refund-token-abc", "response_code": "00"}), \
@@ -417,6 +432,96 @@ class TestAccountDeletion:
             assert mock_submit.call_count == 0, f"{payout_status}: submit émis à tort"
             stored = await db_find_one("users", {"id": user["user"]["id"]})
             assert stored.get("deleted") is True
+
+    async def test_delete_account_cascades_profile_proposals_and_reviews(self, client: AsyncClient):
+        """Cascade RGPD : le profil travailleur, les propositions envoyées et
+        les avis laissés disparaissent — et les missions POSTÉES par ce compte
+        sont closes et retirées du public (un compte supprimé ne doit plus
+        signer de contenu ni laisser une mission ouverte)."""
+        user = await register_and_login(client, BASE_USER)
+        headers = {"Authorization": f"Bearer {user['access_token']}"}
+        uid = user["user"]["id"]
+        job_id = str(uuid.uuid4())
+        await db_insert("jobs", {
+            "id": job_id, "title": "Mission postée", "client_id": uid,
+            "status": "open", "deleted": False,
+        })
+        await db_insert("worker_profiles", {
+            "id": str(uuid.uuid4()), "user_id": uid, "skills": ["plumbing"],
+        })
+        await db_insert("job_proposals", {
+            "id": str(uuid.uuid4()), "worker_id": uid, "job_id": job_id,
+            "status": "pending",
+        })
+        await db_insert("reviews", {
+            "id": str(uuid.uuid4()), "reviewer_id": uid, "job_id": job_id,
+            "rating": 5,
+        })
+
+        resp = await client.delete("/api/users/account", headers=headers)
+        assert resp.status_code == 200, resp.text
+
+        for collection, query in (
+            ("worker_profiles", {"user_id": uid}),
+            ("job_proposals", {"worker_id": uid}),
+            ("reviews", {"reviewer_id": uid}),
+        ):
+            assert await db_find_one(collection, query) is None, (
+                f"{collection} : contenu du compte supprimé encore présent"
+            )
+
+        job = await db_find_one("jobs", {"id": job_id})
+        assert job["deleted"] is True
+        assert job["status"] == "cancelled"
+        assert job["deleted_at"] is not None
+
+    async def test_delete_account_erases_identity_and_referral_pii(self, client: AsyncClient):
+        """Anonymisation RGPD du document CONSERVÉ (obligation comptable) :
+        plus aucun identifiant d'identité ni de quoi recréditer du parrainage —
+        y compris les permissions élevées, qu'un compte supprimé ne peut pas
+        garder."""
+        user = await register_and_login(client, BASE_USER)
+        headers = {"Authorization": f"Bearer {user['access_token']}"}
+        uid = user["user"]["id"]
+        await db.users.update_one({"id": uid}, {"$set": {
+            "google_sub": "google-oauth-sub-123",
+            "profile_photo": "https://res.cloudinary.com/kojo/photo.jpg",
+            "referral_code": "KOJO-123456",
+            "referred_by": "KOJO-000001",
+            "referral_reward_balance": 5000.0,
+            "referral_rewards": [{"id": "r-1", "amount": 5000}],
+            "permissions": ["admin_access"],
+        }})
+
+        # Le nom est en base AVANT la suppression : sans cette garde, les
+        # assertions d'effacement plus bas seraient vraies sur un compte qui
+        # n'avait jamais porté de nom.
+        before = await db_find_one("users", {"id": uid})
+        assert before["first_name"] == "Kojo"
+        assert before["last_name"] == "Test"
+
+        resp = await client.delete("/api/users/account", headers=headers)
+        assert resp.status_code == 200, resp.text
+
+        stored = await db_find_one("users", {"id": uid})
+        assert stored["deleted"] is True
+        assert stored["deleted_at"] is not None
+        assert stored["email"].endswith("@kojo.deleted")
+        assert stored["password_hash"] is None
+        # Les PII NOMINATIVES : le document conservé est présenté comme anonymisé,
+        # donc aucune des deux ne peut survivre à la suppression.
+        assert stored["first_name"] is None
+        assert stored["last_name"] is None
+        assert stored["phone"] is None
+        assert stored["payment_accounts"] is None
+        assert stored["payment_accounts_count"] == 0
+        assert stored["google_sub"] is None
+        assert stored["profile_photo"] is None
+        assert stored["referral_code"] is None
+        assert stored["referred_by"] is None
+        assert stored["referral_reward_balance"] == 0.0
+        assert stored["referral_rewards"] == []
+        assert stored["permissions"] == []
 
     def _patch_support(self, client):
         pass

@@ -602,19 +602,6 @@ describe('lecture PNG', () => {
   });
 });
 
-describe('dépôt réel', () => {
-  // Ce cas lance deux fois le vrai générateur (rapport de pixels + rejeu) : sous
-  // la charge de la suite complète il dépasse le délai par défaut de 5 s, d'où le
-  // délai explicite — mesuré 2,8 s seul, 8,8 s en parallèle.
-  it(
-    'est vert sur les vrais fichiers, avec les vraies empreintes',
-    () => {
-      const result = runGeneratedIconsCheck({ root: REPO_ROOT, quiet: true });
-      expect(result.errors).toEqual([]);
-      expect(result.ok).toBe(true);
-      // Les huit tailles PWA, les variantes maskable et le favicon clair.
-      expect(result.outputs.length).toBeGreaterThanOrEqual(SIZES.length + MASKABLE.length);
-    },
-    60000
-  );
-});
+// Le dépôt réel n'est pas rejoué ici : l'étape « Check generated icons family » de
+// la CI le fait sur le runner, pixels et empreintes compris. C'était le cas le plus
+// lent de ce fichier (60 s de délai, 8,8 s mesurés en parallèle de la suite).

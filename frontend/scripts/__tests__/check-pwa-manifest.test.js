@@ -357,13 +357,5 @@ describe('lecture pure', () => {
   });
 });
 
-describe('dépôt réel', () => {
-  it('est vert sur le vrai manifeste et le vrai inventaire', () => {
-    const result = runPwaManifestCheck({ root: REPO_ROOT, quiet: true });
-    expect(result.errors).toEqual([]);
-    expect(result.ok).toBe(true);
-    // Deux icônes normales + deux variantes maskable réellement fabriquées.
-    expect(result.icons).toHaveLength(4);
-    expect(result.icons.every((icon) => !icon.maskable || icon.src.includes('-maskable'))).toBe(true);
-  });
-});
+// Le dépôt réel n'est pas rejoué ici : l'étape « Check PWA manifest » de la CI le
+// fait sur le runner, sur le vrai manifeste et le vrai inventaire d'icônes.

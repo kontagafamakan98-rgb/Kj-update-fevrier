@@ -107,9 +107,8 @@ class TestDepotReel:
         assert error is None
         assert mode == check.EXECUTABLE_MODE
 
-    def test_main_retourne_0_sur_le_depot(self, check, capsys):
-        assert check.main(["--repo-root", str(REPO_ROOT)]) == 0
-        assert "[OK]" in capsys.readouterr().out
+    # Le passage du garde sur le dépôt réel n'est pas rejoué ici : l'étape
+    # « Check executable bits (gradlew) » du job APK le fait à chaque push.
 
     def test_le_workflow_invoque_le_gradlew_directement(self, check):
         """Si le workflow appelait `sh gradlew`, ce garde perdrait son objet."""

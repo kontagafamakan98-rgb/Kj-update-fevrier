@@ -393,15 +393,28 @@ class TestCheckReferenceFormats:
         check.check_reference_formats()
         assert not any("MONGO_URL" in e for e in check.errors), check.errors
 
-    def test_main_refs_only_sans_token(self, check, capsys, monkeypatch):
-        # --refs-only doit fonctionner SANS FLY_API_TOKEN (exit 0 sur les
-        # références réelles conformes).
-        monkeypatch.setenv("FLY_API_TOKEN", "")
-        import importlib
-        rc = check.main(["--refs-only"])
-        assert rc == 0
-        out = capsys.readouterr().out
-        assert "références du dépôt conformes" in out
+    def test_le_step_refs_only_tourne_sans_jeton(self):
+        # `--refs-only` doit tourner SANS FLY_API_TOKEN : c'est ce qui permet à
+        # l'audit des formats de références de tourner à CHAQUE push. Le verdict
+        # sur les références réelles appartient à l'étape de CI qui l'exécute ;
+        # ici on ne vérifie que son câblage (une étape qui exigerait un jeton ne
+        # tournerait jamais sur une PR).
+        workflow = (
+            BACKEND_DIR.parent / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+        lines = workflow.splitlines()
+        index = next(
+            (
+                i
+                for i, line in enumerate(lines)
+                if "name: Audit formats des références (refs-only)" in line
+            ),
+            None,
+        )
+        assert index is not None, "l'étape refs-only a disparu du workflow"
+        bloc = lines[index : index + 4]
+        assert any("--refs-only" in line for line in bloc), bloc
+        assert not any("FLY_API_TOKEN" in line for line in bloc), bloc
 
 
 def _secrets_miroir_du_repo(check):

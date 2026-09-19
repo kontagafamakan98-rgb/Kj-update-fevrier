@@ -12,9 +12,11 @@ import {
 // Tests du MESUREUR de poids pack2PageI18n (scripts/check-pack2-chunks.js) :
 //   - le payload extrait correspond aux VALEURS de traduction réelles
 //     (dédupliquées, langues exclues, commentaires ignorés) ;
-//   - le budget alerte quand un dictionnaire dépasse le seuil ;
-//   - runPack2Check mesure tous les scopes du dépôt et reste vert sur le
-//     build courant (aucun chunk fusionné ≥ 3 scopes, aucun dépassement).
+//   - le budget alerte quand un dictionnaire dépasse le seuil.
+//
+// runPack2Check sur le dépôt + le build réels n'est pas rejoué ici : l'étape
+// « Check pack2PageI18n chunk splitting » de la CI l'exécute après `vite build`,
+// sur le vrai bundle — que cette suite, qui tourne avant le build, ne peut pas voir.
 
 const PACK2_DIR = path.resolve(__dirname, '../../src/utils/pack2PageI18n');
 const readScope = (name) => fs.readFileSync(path.join(PACK2_DIR, `${name}.js`), 'utf8');
@@ -78,27 +80,5 @@ describe('check-pack2-chunks : mesureur de poids des dictionnaires', () => {
     const result = runPack2Check({ root: path.resolve(__dirname, '../..'), budget: 100 });
     const overBudget = result.errors.some((e) => e.includes('> budget'));
     expect(overBudget).toBe(true);
-  });
-
-  it('runPack2Check est vert sur le build courant (aucune fusion, aucun dépassement)', () => {
-    const repo = path.resolve(__dirname, '../..');
-    // CI exécute les tests AVANT `vite build` : si build/assets n'existe pas,
-    // le check bundle est inapplicable — on ne teste que la partie source
-    // (l'échec sur build absent est couvert par le cas négatif ci-dessus).
-    const hasBuild = fs.existsSync(path.join(repo, 'build', 'assets'));
-    const result = runPack2Check({ root: repo });
-    if (!hasBuild) {
-      expect(result.ok).toBe(false); // build/assets introuvable → échec attendu
-      expect(result.errors.join('\n')).toMatch(/build\/assets/);
-      return;
-    }
-    expect(result.ok).toBe(true);
-    expect(result.errors).toEqual([]);
-    // Chaque scope du dépôt est mesuré et rapporté.
-    const scopes = fs
-      .readdirSync(PACK2_DIR)
-      .filter((f) => f.endsWith('.js') && f !== 'core.js')
-      .map((f) => f.replace(/\.js$/, ''));
-    expect(result.report.map((r) => r.scope).sort()).toEqual(scopes.sort());
   });
 });

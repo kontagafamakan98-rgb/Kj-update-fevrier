@@ -643,13 +643,5 @@ describe('check-page-meta — la carte annoncée, et une seule déclaration par 
   });
 });
 
-describe('check-page-meta — dépôt réel', () => {
-  const hasBuild = fs.existsSync(path.join(FRONTEND, 'build', 'index.html'));
-
-  it.skipIf(!hasBuild)('est vert sur le dépôt construit, coquilles ET pages', () => {
-    const result = runPageMetaCheck({ root: FRONTEND, quiet: true });
-    expect(result.errors).toEqual([]);
-    expect(result.checked.length).toBeGreaterThanOrEqual(Object.keys(PAGE_META).length);
-    expect(result.pages.length).toBeGreaterThanOrEqual(Object.keys(PAGE_META).length);
-  });
-});
+// Le dépôt construit n'est pas rejoué ici : l'étape « Check page meta agrees » de
+// la CI le fait juste après le build, sur les mêmes artefacts.
