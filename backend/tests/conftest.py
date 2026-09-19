@@ -45,9 +45,10 @@ update par REMPLACEMENT sans effet tout en rendant `modified_count=1`.
 Divergences CONNUES, non corrigées : les indexes uniques DÉCLARÉS
 (`create_index(..., unique=True)` : `email`, `id`, `google_sub`, la paire
 `(email, purpose)` des OTP, `(job_id, reviewer_id)` des avis) ne sont PAS
-appliqués — seul `_id` l'est ; `_id` est toujours retiré des résultats, même
-sans projection qui l'exclut (l'inverse d'un faux vert : un test qui le lit
-échoue en local et passerait en production) ; les agrégations (`aggregate`),
+appliqués — seul `_id` l'est ; le `_id` attribué est une CHAÎNE (uuid4) là où
+Mongo pose un `ObjectId` : les lectures qui l'exposent portent donc ici un texte,
+même si les deux modes s'accordent depuis qu'il est INCLUS dans les résultats ;
+les agrégations (`aggregate`),
 `find_one_and_update`, `bulk_write`, `distinct`, `insert_many` et `replace_one`
 n'existent pas, donc leur emploi lève une AttributeError bruyante plutôt qu'un
 résultat faux (vérifié : aucun de ces appels dans `backend/` hors tests).
@@ -523,13 +524,24 @@ class FakeCollection:
         raise FakeDbUnsupportedOperator(f"opérateur de requête non implémenté : {op!r}")
 
     def _project(self, doc: Dict, projection: Optional[Dict]) -> Dict:
+        """Projection fidèle à Mongo : `_id` est INCLUS sauf exclusion explicite.
+
+        L'ancienne version le retirait TOUJOURS. Ce n'était pas neutre :
+        `find_one({"id": …}, {"deleted": 1})` rendait `{}` (un document vide est
+        falsy), donc la garde anti-notification-orpheline de
+        `kojo_shared.notify_user` (« destinataire absent ») sortait AVANT
+        d'écrire quoi que ce soit — la fonctionnalité de notification était
+        INERTE en local alors qu'elle fonctionne en CI (Mongo réel, qui inclut
+        `_id`) : la suite ne disait pas la même chose des deux côtés.
+        """
         if not projection:
-            return {k: v for k, v in doc.items() if k != "_id"}
+            return dict(doc)
         include = {k for k, v in projection.items() if v and k != "_id"}
         exclude = {k for k, v in projection.items() if not v}
+        garder_identifiant = {"_id"} if projection.get("_id", 1) else set()
         if include:
-            return {k: v for k, v in doc.items() if k in include}
-        return {k: v for k, v in doc.items() if k not in exclude and k != "_id"}
+            return {k: v for k, v in doc.items() if k in include | garder_identifiant}
+        return {k: v for k, v in doc.items() if k not in exclude | (set() if garder_identifiant else {"_id"})}
 
     async def find_one(self, query=None, projection=None, sort=None):
         """find_one avec tri optionnel (utilisé par ex. par la clôture de

@@ -24,7 +24,7 @@ from kojo_core import (
     get_current_user,
     get_current_user_optional,
 )
-from kojo_shared import notify_user_localized, _dispatch_address_to_worker
+from kojo_shared import notify_user_localized, _dispatch_address_to_worker, nom_affiche
 from kojo_payments import (
     build_disburse_callback_url,
     create_paydunya_disburse_invoice, get_paydunya_withdraw_mode,
@@ -979,7 +979,7 @@ async def create_proposal(
     # Notifier le client qu'une nouvelle proposition est arrivée
     client_id = job.get("client_id")
     if client_id:
-        worker_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Un travailleur"
+        worker_name = nom_affiche(current_user) or "Un travailleur"
         asyncio.create_task(notify_user_localized(
             user_id=client_id,
             key="proposal_received",
@@ -1148,7 +1148,7 @@ async def accept_job_proposal(
         )
 
     # Notifier le travailleur que sa proposition a été acceptée (sa langue)
-    client_name = f"{current_user.first_name} {current_user.last_name}".strip() or "Le client"
+    client_name = nom_affiche(current_user) or "Le client"
     asyncio.create_task(notify_user_localized(
         user_id=worker_id,
         key="proposal_accepted",
