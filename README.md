@@ -356,6 +356,32 @@ git ls-remote --heads origin                  # source de vérité
 git branch -r                                 # après un fetch --prune
 ```
 
+#### Références de suivi fantômes : élagage automatique
+
+Supprimer la branche distante ne retire pas la **référence de suivi** que le
+clone local en garde (`refs/remotes/origin/<branche>`) : elle survit jusqu'au
+fetch suivant, et s'accumule à chaque PR fusionnée si on ne passe pas `--prune` à
+la main. Ce clone pose donc l'élagage une fois pour toutes :
+
+```bash
+git config --local fetch.prune true
+```
+
+Vérifié : un `git fetch`, un `git pull --ff-only`, un `git remote update` et un
+`git fetch --all` retirent tous la référence dont la branche n'existe plus sur
+`origin`, sans option à retenir. Comme `delete_branch_on_merge`, c'est un réglage
+**par clone** et non versionné : à reposer après un nouveau clone.
+
+Cet élagage ne couvre **pas** les étiquettes (`git tag`) — une étiquette dont le
+distant n'a plus la trace reste en place. L'élaguer demanderait `fetch.pruneTags`,
+qui supprime aussi toute étiquette locale absente du distant (une étiquette de
+sauvegarde, par exemple) : volontairement non activé. Vérifier à la main :
+
+```bash
+for t in $(git tag); do git ls-remote --tags origin "refs/tags/$t" | grep -q . \
+  || echo "absente du distant : $t"; done
+```
+
 Ce réglage est un paramètre du **dépôt**, pas du code : il n'est pas
 versionné et ne peut pas être vérifié par la CI (il faudrait un jeton
 administrateur). Pour le modifier : `Settings → General → Pull Requests`, ou
