@@ -45,7 +45,8 @@
       "invoque_par": "aucun",
       "preuve": null,
       "runner": null,
-      "motif": "audit statique ponctuel (classe TDZ) : ni workflow ni test ne l'exécute — seul garde du dépôt sans exécutant, consigné dans CI-COVERAGE.md §7"
+      "motif": "audit statique ponctuel (classe TDZ) : ni workflow ni test ne l'exécute — seul garde du dépôt sans exécutant, consigné dans CI-COVERAGE.md §7",
+      "hors_mutation": "aucun exécutant : ni workflow ni test ne le lance, donc aucune preuve ne peut rougir — seul garde du dépôt sans exécutant, consigné dans CI-COVERAGE.md §7"
     },
     {
       "chemin": "frontend/scripts/check-api-split.js",
@@ -113,10 +114,11 @@
     {
       "chemin": "frontend/scripts/check-og-reproducible.js",
       "role": "garde",
-      "invoque_par": "test",
-      "preuve": "frontend/scripts/__tests__/check-og-assets.test.js",
-      "runner": "vitest",
-      "motif": "lancé par `npm run check:og-reproducible`, jamais par un workflow : sa preuve est le volet reproductibilité de check-og-assets.test.js"
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "script à point d'entrée (process.exit à l'import) : aucun workflow ni test ne l'exécute — son verdict de reproductibilité exige le générateur et ses polices",
+      "hors_mutation": "aucune preuve ne peut rougir : le seul test qui le nomme (check-og-assets.test.js) vérifie un texte de renvoi produit par check-og-assets.js et n'importe jamais ce module. Mesuré : neutraliser la comparaison d'empreinte du générateur a laissé la preuve verte"
     },
     {
       "chemin": "frontend/scripts/check-pack2-chunks.js",
@@ -252,7 +254,8 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-lhci-env.test.js",
       "runner": "vitest",
-      "motif": "résolveur d'URL de preview : il ne prononce aucun verdict, sa conformité de câblage est vérifiée par check-lhci-env"
+      "motif": "résolveur d'URL de preview : il ne prononce aucun verdict, sa conformité de câblage est vérifiée par check-lhci-env",
+      "hors_mutation": "outil sans verdict : sa preuve (check-lhci-env.test.js) n'importe que fs/path, elle lit le câblage lighthouserc/CI et n'exécute jamais le script — neutraliser le .sh ne la fait pas rougir"
     },
     {
       "chemin": "frontend/scripts/bundle-size-report.js",
@@ -260,7 +263,8 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/bundle-size-report.test.js",
       "runner": "vitest",
-      "motif": "rapport de tailles (markdown + baseline) : le verdict appartient à check-bundle-size.js"
+      "motif": "rapport de tailles (markdown + baseline) : le verdict appartient à check-bundle-size.js",
+      "hors_mutation": "outil sans verdict : son ok/errors vient de check-bundle-size.js (muté ci-dessus) ; ses seuls refus sont la PUBLICATION du commentaire GitHub (réseau + GITHUB_TOKEN), et sa preuve couvre la mise en forme, pas un refus — rien à neutraliser qui rougisse hors ligne"
     },
     {
       "chemin": "frontend/scripts/gen-og-images.py",
@@ -268,45 +272,174 @@
       "invoque_par": "test",
       "preuve": "backend/tests/test_gen_og_images.py",
       "runner": "pytest",
-      "motif": "générateur : ses refus sont prouvés par test_gen_og_images.py, et le seul exécutant de cette preuve est check-og-test-mutations.py"
+      "motif": "générateur : ses refus sont prouvés par test_gen_og_images.py, et le seul exécutant de cette preuve est check-og-test-mutations.py",
+      "hors_mutation": "déjà prouvé par mutation : ses refus sont neutralisés par check-og-test-mutations.py, et le rejouer ici paierait deux fois la même preuve"
     }
   ],
   "mutations": [
     {
-      "id": "prerender-shells: catch-all de nouveau tolere",
-      "garde": "frontend/scripts/check-prerender-shells.js",
-      "cible": "frontend/scripts/check-prerender-shells.js",
-      "trouve": "if (vercelRewrites.some((r) => r && r.source === '/(.*)')) {",
-      "remplace": "if (false && vercelRewrites.some((r) => r && r.source === '/(.*)')) {",
+      "id": "api-split: fuite d'un groupe lazy toleree",
+      "garde": "frontend/scripts/check-api-split.js",
+      "cible": "frontend/scripts/check-api-split.js",
+      "trouve": "  if (leaked.length) {",
+      "remplace": "  if (false && leaked.length) {",
       "runner": "node",
-      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
-      "commande": ["npx", "vitest", "run", "scripts/__tests__/check-prerender-shells.test.js", "--reporter=basic"],
+      "preuve": "frontend/scripts/__tests__/check-api-split.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-api-split.test.js",
+        "--reporter=basic"
+      ],
       "cwd": "frontend",
-      "attend": ["refuse : catch-all"]
+      "attend": [
+        "un marqueur URL lazy"
+      ]
     },
     {
-      "id": "page-meta: langues illisibles tolerees",
-      "garde": "frontend/scripts/check-page-meta.js",
-      "cible": "frontend/scripts/check-page-meta.js",
-      "trouve": "  if (languages.length === 0) {",
-      "remplace": "  if (false && languages.length === 0) {",
+      "id": "audit-api-returns: hors perimetre traite comme une erreur",
+      "garde": "frontend/scripts/audit_api_returns.cjs",
+      "cible": "frontend/scripts/audit_api_returns.cjs",
+      "trouve": "      if (isOutOfScopePath(c.path)) {",
+      "remplace": "      if (false && isOutOfScopePath(c.path)) {",
       "runner": "node",
-      "preuve": "frontend/scripts/__tests__/check-page-meta.test.js",
-      "commande": ["npx", "vitest", "run", "scripts/__tests__/check-page-meta.test.js", "--reporter=basic"],
+      "preuve": "frontend/scripts/__tests__/audit_api_returns.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/audit_api_returns.test.js",
+        "--reporter=basic"
+      ],
       "cwd": "frontend",
-      "attend": ["la liste des langues est illisible"]
+      "attend": [
+        "WARNING INFRA : verbe interdit"
+      ]
     },
     {
-      "id": "privacy-policy: comparaison cellule neutralisee",
-      "garde": ".github/scripts/check-privacy-policy.py",
-      "cible": ".github/scripts/check-privacy-policy.py",
-      "trouve": "            if attendu_cellule != lignes_doc[collection][colonne]:",
-      "remplace": "            if False and attendu_cellule != lignes_doc[collection][colonne]:",
+      "id": "audit-docstrings: route metier sans docstring toleree",
+      "garde": "backend/scripts/audit_docstrings.py",
+      "cible": "backend/scripts/audit_docstrings.py",
+      "trouve": "        if docstring is None:",
+      "remplace": "        if False and docstring is None:",
       "runner": "python",
-      "preuve": "backend/tests/test_privacy_policy_guard.py",
-      "commande": ["{python}", "-m", "pytest", "tests/test_privacy_policy_guard.py", "-q", "--tb=no"],
+      "preuve": "backend/tests/test_audit_docstrings_meta.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_audit_docstrings_meta.py",
+        "-q",
+        "--tb=no"
+      ],
       "cwd": "backend",
-      "attend": ["FAILED tests/test_privacy_policy_guard.py::TestRefus::test_une_cellule_editee_a_la_main_est_refusee"]
+      "attend": [
+        "FAILED tests/test_audit_docstrings_meta.py::TestAuditDocstringsMeta::test_business_regression_is_an_error"
+      ]
+    },
+    {
+      "id": "audit-none-signatures: docstring manquante toleree",
+      "garde": "backend/scripts/audit_none_signatures.py",
+      "cible": "backend/scripts/audit_none_signatures.py",
+      "trouve": "    if not docstring.strip():",
+      "remplace": "    if False and not docstring.strip():",
+      "runner": "python",
+      "preuve": "backend/tests/test_audit_none_signatures.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_audit_none_signatures.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_audit_none_signatures.py::test_missing_docstring_fails"
+      ]
+    },
+    {
+      "id": "bundle-size: budget du JS initial ignore",
+      "garde": "frontend/scripts/check-bundle-size.js",
+      "cible": "frontend/scripts/check-bundle-size.js",
+      "trouve": "  if (initialGzip > BUDGETS.initialGzip) {",
+      "remplace": "  if (false && initialGzip > BUDGETS.initialGzip) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-bundle-size.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-bundle-size.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "dépasse le budget"
+      ]
+    },
+    {
+      "id": "cors-preflight: etoile acceptee sur requete creditee",
+      "garde": "frontend/scripts/check-cors-preflight.js",
+      "cible": "frontend/scripts/check-cors-preflight.js",
+      "trouve": "  if (allowed === '*') {",
+      "remplace": "  if (false && allowed === '*') {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-cors-preflight.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-cors-preflight.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le navigateur rejette une requ"
+      ]
+    },
+    {
+      "id": "email-auth: verdict absent accepte",
+      "garde": ".github/scripts/check-email-auth.py",
+      "cible": ".github/scripts/check-email-auth.py",
+      "trouve": "    if verdict is None:",
+      "remplace": "    if False and verdict is None:",
+      "runner": "python",
+      "preuve": "backend/tests/test_email_auth_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_email_auth_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_email_auth_probe.py::TestLectureDesVerdicts::test_verdict_absent_nest_pas_un_pass"
+      ]
+    },
+    {
+      "id": "exec-bits: mode non executable tolere",
+      "garde": ".github/scripts/check-exec-bits.py",
+      "cible": ".github/scripts/check-exec-bits.py",
+      "trouve": "    elif mode != EXECUTABLE_MODE:",
+      "remplace": "    elif False and mode != EXECUTABLE_MODE:",
+      "runner": "python",
+      "preuve": "backend/tests/test_exec_bits.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_exec_bits.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_exec_bits.py::TestModeGit::test_mode_100644_est_signale_avec_la_reparation"
+      ]
     },
     {
       "id": "existence-assertions: detection neutralisee",
@@ -316,9 +449,180 @@
       "remplace": "        for line, message in []:",
       "runner": "python",
       "preuve": "backend/tests/test_existence_assertion_guard.py",
-      "commande": ["{python}", "-m", "pytest", "tests/test_existence_assertion_guard.py", "-q", "--tb=no"],
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_existence_assertion_guard.py",
+        "-q",
+        "--tb=no"
+      ],
       "cwd": "backend",
-      "attend": ["FAILED tests/test_existence_assertion_guard.py::TestRefuses::test_main_retourne_1_et_annote"]
+      "attend": [
+        "FAILED tests/test_existence_assertion_guard.py::TestRefuses::test_main_retourne_1_et_annote"
+      ]
+    },
+    {
+      "id": "fly-env-drift: variable absente du runtime toleree",
+      "garde": ".github/scripts/check-fly-env-drift.py",
+      "cible": ".github/scripts/check-fly-env-drift.py",
+      "trouve": "        if live_val is None:",
+      "remplace": "        if False and live_val is None:",
+      "runner": "python",
+      "preuve": "backend/tests/test_fly_env_drift.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_fly_env_drift.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_fly_env_drift.py::TestCheckPublicEnv::test_manquant_detecte"
+      ]
+    },
+    {
+      "id": "generated-icons: ICO sans image tolere",
+      "garde": "frontend/scripts/check-generated-icons.js",
+      "cible": "frontend/scripts/check-generated-icons.js",
+      "trouve": "  if (count === 0) return { ok: false, reason: \"aucune image (count=0)\" };",
+      "remplace": "  if (false) return { ok: false, reason: \"aucune image (count=0)\" };",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-generated-icons.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-generated-icons.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "un ICO sans aucune image"
+      ]
+    },
+    {
+      "id": "guard-mutations: rouge sans le motif attendu accepte",
+      "garde": ".github/scripts/check-guard-mutations.py",
+      "cible": ".github/scripts/check-guard-mutations.py",
+      "trouve": "    if manquants:",
+      "remplace": "    if False and manquants:",
+      "runner": "python",
+      "preuve": "backend/tests/test_guard_mutation_runner.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_guard_mutation_runner.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_guard_mutation_runner.py::TestDecisions::test_rouge_sans_le_motif_attendu_est_un_echec"
+      ]
+    },
+    {
+      "id": "home-shell: nombre de h1 non verifie",
+      "garde": "frontend/scripts/check-home-shell.js",
+      "cible": "frontend/scripts/check-home-shell.js",
+      "trouve": "  if (h1s.length !== 1) {",
+      "remplace": "  if (false && h1s.length !== 1) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-home-shell.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-home-shell.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "exige exactement un h1"
+      ]
+    },
+    {
+      "id": "job-og-contract: titre divergent tolere",
+      "garde": "frontend/scripts/check-job-og-contract.js",
+      "cible": "frontend/scripts/check-job-og-contract.js",
+      "trouve": "  if (title !== app.title) {",
+      "remplace": "  if (false && title !== app.title) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-job-og-contract.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-job-og-contract.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "un TITRE renomm"
+      ]
+    },
+    {
+      "id": "og-assets: carte incomplete toleree",
+      "garde": "frontend/scripts/check-og-assets.js",
+      "cible": "frontend/scripts/check-og-assets.js",
+      "trouve": "  if (missing.length > 0) {",
+      "remplace": "  if (false && missing.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-og-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-og-assets.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "ne nomme pas ses DEUX sorties"
+      ]
+    },
+    {
+      "id": "og-images: titre de mission absent tolere",
+      "garde": "frontend/scripts/check-og-images.js",
+      "cible": "frontend/scripts/check-og-images.js",
+      "trouve": "    if (jobTitle && !detailHtml.includes(jobTitle)) {",
+      "remplace": "    if (false && jobTitle && !detailHtml.includes(jobTitle)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-og-images.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-og-images.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le titre de la mission est absent du HTML servi"
+      ]
+    },
+    {
+      "id": "og-job-200: en-tete d'authentification illisible non signale",
+      "garde": "frontend/scripts/check-og-job-200.js",
+      "cible": "frontend/scripts/check-og-job-200.js",
+      "trouve": "      errors.push(\"KOJO_LHCI_AUTH_HEADER illisible (JSON invalide) — repli sur le login du compte CI\");",
+      "remplace": "      if (false) errors.push(\"KOJO_LHCI_AUTH_HEADER illisible (JSON invalide) — repli sur le login du compte CI\");",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-og-job-200.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-og-job-200.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "un KOJO_LHCI_AUTH_HEADER illisible"
+      ]
     },
     {
       "id": "og-mutations: proprietaire d'un refus non verifie",
@@ -328,9 +632,220 @@
       "remplace": "            owners[refusal] = sorted(set(failures.get(refusal, [])))",
       "runner": "python",
       "preuve": "backend/tests/test_og_mutation_guard.py",
-      "commande": ["{python}", "-m", "pytest", "tests/test_og_mutation_guard.py", "-q", "--tb=no"],
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_og_mutation_guard.py",
+        "-q",
+        "--tb=no"
+      ],
       "cwd": "backend",
-      "attend": ["FAILED tests/test_og_mutation_guard.py::TestLeRapport::test_un_refus_dont_le_test_rougit_sous_un_autre_refus_est_refuse"]
+      "attend": [
+        "FAILED tests/test_og_mutation_guard.py::TestLeRapport::test_un_refus_dont_le_test_rougit_sous_un_autre_refus_est_refuse"
+      ]
+    },
+    {
+      "id": "pack2-chunks: depassement de budget ignore",
+      "garde": "frontend/scripts/check-pack2-chunks.js",
+      "cible": "frontend/scripts/check-pack2-chunks.js",
+      "trouve": "  if (raw > budget) {",
+      "remplace": "  if (false && raw > budget) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/pack2-size.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/pack2-size.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "un dictionnaire dépasse le budget"
+      ]
+    },
+    {
+      "id": "pack2-i18n-hygiene: prefixe dynamique ignore",
+      "garde": "frontend/scripts/check-pack2-i18n-hygiene.js",
+      "cible": "frontend/scripts/check-pack2-i18n-hygiene.js",
+      "trouve": "      if ([...prefixes].some((p) => key.startsWith(p))) return false;",
+      "remplace": "      if (false && [...prefixes].some((p) => key.startsWith(p))) return false;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-pack2-i18n-hygiene.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-pack2-i18n-hygiene.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "préfixe dynamique"
+      ]
+    },
+    {
+      "id": "page-meta: langues illisibles tolerees",
+      "garde": "frontend/scripts/check-page-meta.js",
+      "cible": "frontend/scripts/check-page-meta.js",
+      "trouve": "  if (languages.length === 0) {",
+      "remplace": "  if (false && languages.length === 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-page-meta.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-page-meta.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "la liste des langues est illisible"
+      ]
+    },
+    {
+      "id": "prerender-shells: catch-all de nouveau tolere",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "if (vercelRewrites.some((r) => r && r.source === '/(.*)')) {",
+      "remplace": "if (false && vercelRewrites.some((r) => r && r.source === '/(.*)')) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-prerender-shells.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : catch-all"
+      ]
+    },
+    {
+      "id": "privacy-policy: comparaison cellule neutralisee",
+      "garde": ".github/scripts/check-privacy-policy.py",
+      "cible": ".github/scripts/check-privacy-policy.py",
+      "trouve": "            if attendu_cellule != lignes_doc[collection][colonne]:",
+      "remplace": "            if False and attendu_cellule != lignes_doc[collection][colonne]:",
+      "runner": "python",
+      "preuve": "backend/tests/test_privacy_policy_guard.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_privacy_policy_guard.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_privacy_policy_guard.py::TestRefus::test_une_cellule_editee_a_la_main_est_refusee"
+      ]
+    },
+    {
+      "id": "pwa-manifest: manifeste absent tolere",
+      "garde": "frontend/scripts/check-pwa-manifest.js",
+      "cible": "frontend/scripts/check-pwa-manifest.js",
+      "trouve": "  if (!existsSync(manifestPath)) {",
+      "remplace": "  if (false && !existsSync(manifestPath)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-pwa-manifest.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-pwa-manifest.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un manifeste absent"
+      ]
+    },
+    {
+      "id": "script-deps: lock desynchronise tolere",
+      "garde": "frontend/scripts/check-script-deps.js",
+      "cible": "frontend/scripts/check-script-deps.js",
+      "trouve": "  if (!sameJson(pkg[section], lockRoot[section])) {",
+      "remplace": "  if (false && !sameJson(pkg[section], lockRoot[section])) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-script-deps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-script-deps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sans le lock"
+      ]
+    },
+    {
+      "id": "seo-production: sameAs declare jamais confronte au HTML",
+      "garde": "frontend/scripts/check-seo-production.js",
+      "cible": "frontend/scripts/check-seo-production.js",
+      "trouve": "      hosts.add(new URL(url).host);",
+      "remplace": "      hosts.add(new URL(url).host + '.kojo-invalide');",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-seo-production.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sameAs https"
+      ]
+    },
+    {
+      "id": "spa-routes: 404.html avec script toleree",
+      "garde": "frontend/scripts/check-spa-routes.js",
+      "cible": "frontend/scripts/check-spa-routes.js",
+      "trouve": "  if (/<script/i.test(html)) {",
+      "remplace": "  if (false && /<script/i.test(html)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-spa-routes.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "404.html en noindex et sans script"
+      ]
+    },
+    {
+      "id": "workflow-pins: reference conforme signalee",
+      "garde": ".github/scripts/check-workflow-pins.py",
+      "cible": ".github/scripts/check-workflow-pins.py",
+      "trouve": "        if ok:",
+      "remplace": "        if False and ok:",
+      "runner": "python",
+      "preuve": "backend/tests/test_ci_workflow_pins.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_ci_workflow_pins.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_ci_workflow_pins.py::TestLectureDuWorkflow::test_motif_valide_sur_fixture_rend_exit_zero"
+      ]
     }
   ]
 }

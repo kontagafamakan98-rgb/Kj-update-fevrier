@@ -114,6 +114,30 @@ class TestValidationDuRegistre:
         with pytest.raises(harnais.SpecInvalide):
             harnais.charger_spec(_ecrire_spec(tmp_path, _spec(gardes=[_garde(role="verificateur")])))
 
+    def test_garde_ni_mute_ni_exclu(self, harnais, tmp_path):
+        # L'exhaustivité est une RÈGLE, pas un espoir : un garde ajouté sans
+        # mutation et sans motif d'exclusion doit rendre le registre invalide,
+        # sinon il resterait sans preuve d'échec sans que rien ne le signale.
+        spec = _spec(gardes=[_garde(), _garde(chemin="autre.txt", preuve="p.py", runner="pytest")])
+        with pytest.raises(harnais.SpecInvalide):
+            harnais.charger_spec(_ecrire_spec(tmp_path, spec))
+
+    def test_garde_mute_et_declare_hors_atteinte(self, harnais, tmp_path):
+        # Les deux à la fois : soit il est prouvé par mutation, soit on déclare
+        # ne pas pouvoir — l'un des deux ment, donc le registre est refusé.
+        garde = _garde()
+        garde["hors_mutation"] = "motif"
+        with pytest.raises(harnais.SpecInvalide):
+            harnais.charger_spec(_ecrire_spec(tmp_path, _spec(gardes=[garde])))
+
+    def test_garde_exclu_avec_motif_est_accepte(self, harnais, tmp_path):
+        # La voie d'exclusion reste OUVERTE et motivée : sans ce cas, la règle
+        # ci-dessus pourrait être satisfaite en refusant tout.
+        exclu = _garde(chemin="hors.txt", invoque="aucun", preuve=None, runner=None)
+        exclu["hors_mutation"] = "aucune preuve ne peut rougir (mesuré)"
+        spec = {"gardes": [_garde(), exclu], "mutations": [_mutation()]}
+        assert harnais.charger_spec(_ecrire_spec(tmp_path, spec))["gardes"]
+
     def test_registre_valide_est_charge(self, harnais, tmp_path):
         registre = harnais.charger_spec(_ecrire_spec(tmp_path, _spec()))
         assert registre["gardes"][0]["chemin"] == "garde.txt"

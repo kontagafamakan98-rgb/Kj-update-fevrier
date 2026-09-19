@@ -1225,6 +1225,29 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   n'a aucun effet (`trouve == remplace`) ; les deux runners sont rejoués par la
   CI, Python dans `backend-tests` et Node dans `frontend-build`, et le fichier de
   couverture vérifie la présence de ces deux invocations.
+* **le registre est EXHAUSTIF** : chaque entrée est soit **mutée**, soit déclarée
+  `hors_mutation` **avec son motif**. Un garde ni muté ni justifié est un refus
+  (`SpecInvalide`), pas un oubli silencieux — la couverture ne dépend donc plus
+  de la vigilance de celui qui ajoute un garde. Au 19/09/2026 : **28 mutations**
+  couvrent 28 des **33** entrées, et les 5 autres sont des exclusions motivées —
+  `audit_tdz.cjs` et `check-og-reproducible.js` (sans exécutant, §7),
+  `resolve-vercel-url.sh` et `bundle-size-report.js` (outils sans verdict : rien
+  à neutraliser), et `gen-og-images.py` (déjà muté par
+  `check-og-test-mutations.py` : le rejouer ici paierait deux fois la preuve).
+* **le filtre est mesuré, pas supposé** : une entrée n'entre dans la table que si
+  sa preuve peut rougir **hors ligne** et **sans artefact de build**. Deux mesures
+  ont servi de critère plutôt qu'une inspection : les 18 mutations Node ont été
+  rejouées avec `frontend/build` **retiré de l'arbre** — **18/18 rouges, 81 s**,
+  chaque preuve montant sa propre fixture dans un répertoire temporaire — et les
+  trois sondes qui parlent HTTP (`check-cors-preflight`, `check-seo-production`,
+  `check-og-job-200`) reçoivent leur `fetch` par injection ; la seule adresse
+  réellement appelée est `http://127.0.0.1:1`, où rien n'écoute (le cas qui prouve
+  qu'un accueil injoignable ne fait pas conclure « absent »). Coût mesuré en local
+  (Windows, démarrage de `npx` compris, `build/` présent), en deux relevés de la
+  même table le 19/09/2026 : **33 à 35 s** pour les 10 mutations Python et **83 à
+  146 s** pour les 18 Node — c'est le runner Node qui domine, et son coût varie
+  avec la charge de la machine (le chiffre de CI est plus stable, mais n'a pas
+  été relevé ici).
 
 Ajouter un garde sans preuve d'échec est donc désormais un rouge, pas une
 découverte fortuite.
@@ -1610,11 +1633,28 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
 10. **`frontend/scripts/audit_tdz.cjs` n'a AUCUN exécutant** : ni workflow, ni
     test, ni script npm ne l'appelle. C'est un audit statique ponctuel (classe
     TDZ), déclaré comme tel dans `.github/scripts/guard-proofs.json`
-    (`invoque_par: "aucun"`) avec son motif — et c'est la SEULE entrée dans ce
-    cas : `backend/tests/test_guard_failure_proofs.py` refuse tout autre garde
-    sans preuve rejouable, et exige qu'un garde sans exécutant soit consigné
-    ici même. L'angle mort est donc NOMMÉ plutôt que silencieux ; en sortir
-    demande de l'exécuter quelque part (test ou étape).
+    (`invoque_par: "aucun"`) avec son motif :
+    `backend/tests/test_guard_failure_proofs.py` refuse tout autre garde sans
+    preuve rejouable, et exige qu'un garde sans exécutant soit consigné ici
+    même. L'angle mort est donc NOMMÉ plutôt que silencieux ; en sortir demande
+    de l'exécuter quelque part (test ou étape).
+11. **`frontend/scripts/check-og-reproducible.js` est le SECOND garde sans
+    exécutant — et sa capacité à échouer n'est prouvée par rien** (mesuré le
+    19/09/2026). Il se lançait jusqu'ici par `npm run check:og-reproducible`,
+    mais **aucun workflow ne l'appelle et aucun test ne l'importe** : c'est un
+    script à point d'entrée (`process.exit` à l'import), donc écarté du test
+    d'import-santé, et le seul test qui écrit son nom
+    (`scripts/__tests__/check-og-assets.test.js`) vérifie un TEXTE DE RENVOI
+    produit par `check-og-assets.js` (« relancer node
+    scripts/check-og-reproducible.js ») sans jamais charger le module. Le
+    registre déclarait donc une preuve que ce fichier ne pouvait pas faire rougir :
+    neutraliser sa comparaison d'empreinte de générateur laisse la suite VERTE
+    (mesuré, avant correction). `preuve` est désormais `null`,
+    `invoque_par: "aucun"`, et l'entrée porte `hors_mutation` avec ce motif. Son
+    verdict (cartographier les PNG régénérés octet pour octet) exige le
+    générateur **et ses polices** : il ne peut donc pas être rejoué dans la suite
+    hors ligne, et il n'est mesuré nulle part en production — l'angle mort est
+    nommé, pas fermé.
 
 ## 8. Tenir ce document à jour
 
