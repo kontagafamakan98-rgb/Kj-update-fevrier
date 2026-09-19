@@ -271,33 +271,54 @@ class TestMutations:
                 fautes.append("aucun job CI ne rejoue les mutations « %s »" % runner)
         assert fautes == [], "\n  ".join(fautes)
 
-    def test_la_preuve_entiere_reste_due_sur_main(self):
-        """Le runner Node peut être FILTRÉ par changement sur une PR (~2,5 min
-        pour 18 mutations) — mais alors la preuve ENTIÈRE doit rester due quelque
-        part, sinon un garde cesserait d'être prouvé par le simple fait qu'une PR
-        ne l'a pas touché. Deux invocations doivent donc exister : une filtrée
-        (PR uniquement) et une entière."""
+    def test_le_perimetre_vient_de_la_table_pas_du_job(self):
+        """Le workflow ne choisit plus quel filtre appliquer à quel job : il
+        passe la référence de la PR et c'est la table qui décide ce qui est dû.
+
+        Ce qui se vérifie ICI est le CÂBLAGE — chaque étape déclarée est
+        réellement invoquée, et aucun filtre ne s'applique hors PR (où la preuve
+        entière est due). Le fait que « pas de base » veuille dire « preuve
+        entière » est une DÉCISION du harnais : elle est mesurée dans
+        `test_guard_mutation_runner.py`, sur la fonction, pas sur le texte du
+        YAML — un test de texte ne saurait pas la distinguer d'un filtre cassé.
+        """
+        registre = json.loads(SPEC.read_text(encoding="utf-8"))
         workflow = texte_des_workflows()
-        invocations = [
-            ligne.strip() for ligne in workflow.splitlines()
-            if "check-guard-mutations.py" in ligne and "--runner node" in ligne
-        ]
-        entieres = [ligne for ligne in invocations if "--changed-from" not in ligne]
-        filtrees = [ligne for ligne in invocations if "--changed-from" in ligne]
-        assert entieres, (
-            "le runner Node n'est invoqué QUE par un filtre de changement : la "
-            "preuve entière n'est plus due nulle part"
-        )
-        assert filtrees, (
-            "aucune invocation filtrée : le coût par PR est reparti à la hausse, "
-            "ou la ligne a été renommée sans que ce test le sache"
+        fautes = []
+        for etape in registre["rejeux"]:
+            if etape.get("runner"):
+                invoquee = ("--runner %s" % etape["runner"]) in workflow
+            else:
+                invoquee = ("--etape %s" % etape["nom"]) in workflow
+            if not invoquee:
+                fautes.append(
+                    "étape « %s » déclarée dans le registre, invoquée par aucun workflow"
+                    % etape["nom"]
+                )
+        assert fautes == [], "\n  ".join(fautes)
+
+        # Une COMMUNE, pas une prose : un commentaire qui nomme le drapeau n'est
+        # pas une invocation, et le confondre ferait accuser l'étape voisine.
+        blocs = []
+        for bloc in workflow.split("- name:"):
+            commandes = [
+                ligne for ligne in bloc.splitlines()
+                if "--changed-from" in ligne and not ligne.strip().startswith("#")
+            ]
+            if commandes:
+                blocs.append(bloc)
+        assert blocs, (
+            "aucun rejeu filtré : le coût par PR est reparti à la hausse, ou la "
+            "ligne a été renommée sans que ce test le sache"
         )
         # Le filtre ne vaut que pour une PR : sur un push de `main` (et en
-        # dispatch), l'expression de base est vide, donc c'est l'invocation
-        # entière qui tourne. L'exiger ici empêche d'attacher le filtre à une
-        # étape qui s'exécuterait aussi sur `main`.
-        blocs = [bloc for bloc in workflow.split("- name:") if "--changed-from" in bloc]
-        sans_condition = [bloc.strip().splitlines()[0] for bloc in blocs if "github.event.pull_request" not in bloc]
+        # dispatch), l'expression de base est vide, donc c'est le rejeu entier
+        # qui tourne. L'exiger ici empêche d'attacher le filtre à une étape qui
+        # s'exécuterait aussi sur `main`.
+        sans_condition = [
+            bloc.strip().splitlines()[0] for bloc in blocs
+            if "github.event.pull_request" not in bloc
+        ]
         assert sans_condition == [], (
             f"un filtre de changement s'applique aussi hors PR : {sans_condition}"
         )

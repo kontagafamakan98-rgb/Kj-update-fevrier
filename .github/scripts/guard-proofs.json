@@ -276,6 +276,24 @@
       "hors_mutation": "déjà prouvé par mutation : ses refus sont neutralisés par check-og-test-mutations.py, et le rejouer ici paierait deux fois la même preuve"
     }
   ],
+  "rejeux": [
+    {
+      "nom": "runner-python",
+      "runner": "python"
+    },
+    {
+      "nom": "runner-node",
+      "runner": "node"
+    },
+    {
+      "nom": "og",
+      "porte_sur": [
+        ".github/scripts/check-og-test-mutations.py",
+        "frontend/scripts/gen-og-images.py"
+      ],
+      "pourquoi": "cette étape n'exécute aucune mutation du harnais : elle lance check-og-test-mutations.py, et son périmètre est celui des entrées qu'elle DÉCLARE porter — le générateur dont elle neutralise les refus, sa preuve, et le harnais lui-même. Les fichiers, eux, se dérivent : imports, chemins cités, fichiers partagés du runner"
+    }
+  ],
   "mutations": [
     {
       "id": "api-split: fuite d'un groupe lazy toleree",

@@ -39,16 +39,27 @@ Usage :
     python .github/scripts/check-guard-mutations.py --list        # valide le spec
     python .github/scripts/check-guard-mutations.py --only ID
     python .github/scripts/check-guard-mutations.py --changed-from REF
+    python .github/scripts/check-guard-mutations.py --changed-from   # base de la PR
+    python .github/scripts/check-guard-mutations.py --etape NOM --changed-from
 
-COÛT ET PÉRIMÈTRE : la preuve Node pèse l'essentiel du temps de l'étape (~2,5 min
-sur 18 mutations, qui démarrent chacune un runner Vitest). `--changed-from` ne
-rejoue donc que les mutations dont le GARDE ou la PREUVE a changé — sur une PR,
-où la preuve ENTIÈRE est payée une seconde fois à la fusion, sur `main`. Le
-filtre ne peut pas sous-estimer le changement (cf. `fichiers_changes`), et il
-n'est pas consulté du tout quand `main` rejoue tout : un garde qui cesserait
-d'être prouvé faute de changement détecté serait un faux vert de plus.
+COÛT ET PÉRIMÈTRE — c'est la TABLE qui décide, pas le job. Les mutations Node
+pèsent l'essentiel d'une étape (~2,5 min, un runner Vitest chacune) et les
+mutations Python ~17 s : `--changed-from` ne rejoue que celles dont le garde, la
+preuve, un module importé ou un fichier partagé du runner a changé. Le workflow
+ne choisit donc plus quel filtre appliquer à quel job — il passe la référence de
+la PR (ou rien sur `main`) et c'est `_base_du_changement` qui tranche, dans le
+même sens pour toutes les étapes.
+
+Trois règles vont dans le sens de l'erreur sûre : on rejoue TOUT quand la table
+ou le harnais a bougé (c'est eux qui calculent la sélection), TOUT quand la base
+de comparaison est introuvable, et TOUT sur `main` — un garde qui cesserait
+d'être prouvé faute de changement détecté serait un faux vert de plus. Le
+périmètre d'une mutation suit en revanche les dépendances DÉRIVÉES de la source
+(imports relatifs, imports absolus du dépôt, chemins cités en clair), en
+incluant trop plutôt que trop peu.
 """
 import argparse
+import ast
 import hashlib
 import io
 import json
@@ -93,6 +104,7 @@ class SpecInvalide(Exception):
 
 
 CHAMPS_GARDE = {"chemin", "role", "invoque_par", "preuve", "runner", "motif", "hors_mutation"}
+CHAMPS_REJEU = {"nom", "runner", "porte_sur", "pourquoi"}
 
 
 def charger_spec(chemin=SPEC):
@@ -156,6 +168,58 @@ def charger_spec(chemin=SPEC):
         if mutation["trouve"] == mutation["remplace"]:
             raise SpecInvalide("mutation %s : « trouve » == « remplace » (aucun effet)" % mutation["id"])
 
+    # LES ETAPES DE REJEU : ce sont elles qui portent le PERIMETRE. Le workflow
+    # ne choisit plus quel filtre appliquer a quel job — il demande a la table,
+    # par le nom de l'etape, ce qu'il doit rejouer. Une etape declaree soit un
+    # runner (les mutations qu'il couvre), soit des entrees du registre
+    # (`porte_sur`) : dans les deux cas les FICHIERS sont derives, jamais
+    # recopies.
+    if not isinstance(spec.get("rejeux"), list) or not spec["rejeux"]:
+        raise SpecInvalide("registre : « rejeux » doit etre une liste non vide")
+    noms_etapes = set()
+    for etape in spec["rejeux"]:
+        inconnus = set(etape) - CHAMPS_REJEU
+        if inconnus:
+            raise SpecInvalide("etape %s : champ inconnu %s" % (etape.get("nom"), sorted(inconnus)))
+        if not etape.get("nom"):
+            raise SpecInvalide("etape sans nom dans « rejeux »")
+        if etape["nom"] in noms_etapes:
+            raise SpecInvalide("etape %s declaree deux fois" % etape["nom"])
+        noms_etapes.add(etape["nom"])
+        porte_sur = etape.get("porte_sur") or []
+        if not etape.get("runner") and not porte_sur:
+            raise SpecInvalide(
+                "etape %s : ni runner ni porte_sur — elle ne dit pas ce qu'elle rejoue" % etape["nom"]
+            )
+        if etape.get("runner") and etape["runner"] not in RUNNERS:
+            raise SpecInvalide(
+                "etape %s : runner « %s » inconnu" % (etape["nom"], etape["runner"])
+            )
+        for chemin in porte_sur:
+            if chemin not in chemins:
+                raise SpecInvalide(
+                    "etape %s : « %s » n'est pas une entree du registre" % (etape["nom"], chemin)
+                )
+        if porte_sur and not etape.get("pourquoi"):
+            # Une etape qui porte sur des ENTREES plutot que sur un runner doit
+            # dire pourquoi : c'est la seule declaration du fichier qui ne soit
+            # pas derivee d'un runner, donc celle qui pourrait devenir un fourre-
+            # tout si on ne l'expliquait pas.
+            raise SpecInvalide(
+                "etape %s : porte sur des entrees sans « pourquoi »" % etape["nom"]
+            )
+
+    # Aucun runner declare ne doit rester sans etape : sinon ses mutations
+    # seraient rejouees par personne, et la table le dirait sans que rien ne
+    # rougisse. Les portees se DERIVENT de ce que les etapes declarent.
+    couverts = {etape["runner"] for etape in spec["rejeux"] if etape.get("runner")}
+    orphelins = sorted({mutation["runner"] for mutation in spec["mutations"]} - couverts)
+    if orphelins:
+        raise SpecInvalide(
+            "runner(s) sans etape de rejeu declaree : %s — leurs mutations ne seraient "
+            "rejouees nulle part" % orphelins
+        )
+
     # EXHAUSTIVITE : chaque entree du registre est soit mutee, soit declaree
     # hors d'atteinte AVEC son motif. Sans cette regle, un garde ajoute demain
     # resterait sans preuve d'echec sans que rien ne le signale — le faux vert
@@ -209,16 +273,56 @@ def fichiers_changes(depuis, racine=REPO_ROOT):
     }
 
 
-def _imports_locaux(chemin, racine):
-    """Les modules du dépôt qu'un fichier importe par un chemin RELATIF.
+# Fichiers qui pesent sur TOUTE preuve d'un runner : config de collecte, points
+# d'entree implicites, dependances installees. Un changement la-dedans peut
+# changer le verdict d'une preuve sans que le garde ni elle aient bouge — les
+# ignorer serait le trou par lequel le filtre sous-estimerait un changement.
+FICHIERS_PARTAGES = {
+    "python": ("backend/pytest.ini", "backend/tests/conftest.py"),
+    "node": ("frontend/vite.config.js", "frontend/package.json",
+             "frontend/package-lock.json"),
+}
+
+# Extensions qu'un chemin CITÉ dans une source peut désigner. Une preuve qui
+# écrit « .github/scripts/x.py » dépend de ce fichier : le citer est la seule
+# façon dont le dépôt dit ce lien, donc on le lit plutôt que de le supposer.
+EXTENSIONS_CITEES = (".py", ".js", ".cjs", ".mjs", ".json", ".sh", ".yml", ".yaml")
+
+
+def _resolution(chemin, racine):
+    """Le chemin, normalisé en relatif POSIX, s'il existe dans le dépôt."""
+    fichier = racine / chemin
+    if fichier.is_file():
+        return fichier.resolve().relative_to(racine.resolve()).as_posix()
+    return None
+
+
+def _imports_du_depot(chemin, racine):
+    """Tout ce dont un fichier du dépôt DÉPEND, tel que sa source le dit.
 
     Un garde n'est pas seulement son fichier : `check-home-shell.js` et huit
     autres importent `site-meta.js`, donc modifier ce module partagé peut changer
-    ce qu'ils refusent sans que ni le garde ni sa preuve n'ait bougé. Les compter
-    est ce qui rend le filtre honnête plutôt qu'optimiste.
+    ce qu'ils refusent sans que ni le garde ni sa preuve n'ait bougé. Trois
+    formes sont lues, et chacune a été rencontrée dans le dépôt :
+
+      * l'import RELATIF (`./x`, `../x`, `from .x import y`) ;
+      * l'import ABSOLU d'un module du dépôt (`import kojo_retention`,
+        `from tests.conftest import ...`) — la moitié des preuves Python ;
+      * un chemin CITÉ en clair (`".github/scripts/x.py"`), qui est la façon
+        dont un garde désigne le fichier qu'il audite ou qu'il neutralise.
+
+    Le sens de l'erreur est choisi : on inclut TROP, jamais trop peu — une
+    mutation rejouée pour rien coûte des secondes, une mutation sautée à tort
+    rend un garde aveugle en silence.
     """
     fichier = racine / chemin
     if not fichier.is_file():
+        return set()
+    if fichier.suffix not in (".py", ".js", ".cjs", ".mjs"):
+        # Un JSON, une config, un shell : le dépôt n'y DÉCLARE pas ses
+        # dépendances, et les lire comme du code ferait entrer des fichiers
+        # cités par hasard dans la fermeture (mesuré : 103 fichiers au lieu de
+        # 15 avant cette borne).
         return set()
     try:
         texte = fichier.read_text(encoding="utf-8")
@@ -226,6 +330,8 @@ def _imports_locaux(chemin, racine):
         return set()
 
     trouves = set()
+
+    # 1. Imports relatifs (JS et Python).
     for motif in re.findall(r"(?:from|require\()\s*['\"](\.[^'\"]+)['\"]", texte):
         base = fichier.parent / motif
         candidats = [base]
@@ -235,22 +341,89 @@ def _imports_locaux(chemin, racine):
             if candidat.is_file():
                 trouves.add(candidat.resolve().relative_to(racine.resolve()).as_posix())
                 break
+
+    # 2. Imports absolus de modules du dépôt.
+    for nom in re.findall(r"^\s*(?:import|from)\s+([A-Za-z_][\w.]*)", texte, re.M):
+        if nom.startswith("kojo_") or nom.startswith("scripts") or nom.startswith("tests"):
+            morceaux = nom.split(".")
+            candidats = ["/".join(morceaux) + suffixe
+                         for suffixe in (".py", "/__init__.py")]
+            candidats += ["backend/" + c for c in list(candidats)]
+            for candidat in candidats:
+                resolu = _resolution(candidat, racine)
+                if resolu:
+                    trouves.add(resolu)
+                    break
+
+    # 3. Chemins cités en clair — dans une EXPRESSION, pas dans une docstring ni
+    # dans un commentaire. La différence n'est pas cosmétique : le harnais
+    # lui-même cite `site-meta.js` en prose, et compter cette prose comme une
+    # dépendance relierait ses mutations à la moitié du dépôt (mesuré : 181
+    # fichiers au lieu de 15), donc à un filtre qui ne filtre plus.
+    try:
+        arbre = ast.parse(texte)
+    except SyntaxError:
+        arbre = None
+    if arbre is not None:
+        prose = {
+            id(noeud.value)
+            for noeud in ast.walk(arbre)
+            if isinstance(noeud, ast.Expr) and isinstance(noeud.value, ast.Constant)
+            and isinstance(noeud.value.value, str)
+        }
+        for noeud in ast.walk(arbre):
+            if not (isinstance(noeud, ast.Constant) and isinstance(noeud.value, str)):
+                continue
+            if id(noeud) in prose or not noeud.value.endswith(EXTENSIONS_CITEES):
+                continue
+            for candidat in (noeud.value, "backend/" + noeud.value, "frontend/" + noeud.value):
+                resolu = _resolution(candidat, racine)
+                if resolu:
+                    trouves.add(resolu)
+                    break
+
     return trouves
 
 
-def fichiers_impliques(mutation, racine=REPO_ROOT):
-    """Tout ce dont un changement peut modifier ce que la mutation prouve :
-    le garde, sa preuve, et les modules locaux importés — de proche en proche,
-    puisqu'un module partagé peut en importer un autre."""
-    impliques = {mutation["cible"]}
-    if mutation.get("preuve"):
-        impliques.add(mutation["preuve"])
+# Le registre nomme le runner par son cadriciel (`pytest`, `vitest`) ; le
+# harnais, par sa famille de fichiers partagés (`python`, `node`). Les deux se
+# lisent ici plutot que d'etre recopies dans chaque entree.
+FAMILLE_DE_RUNNER = {"pytest": "python", "vitest": "node"}
+
+
+def fichiers_impliques(entree, racine=REPO_ROOT):
+    """Tout ce dont un changement peut modifier ce que cette entrée prouve :
+    le garde (ou la cible), sa preuve, les fichiers partagés de son runner, et
+    ce que ces fichiers importent ou citent — de proche en proche, puisqu'un
+    module partagé peut lui-même en citer un autre.
+
+    L'entrée est une mutation (`cible`) ou une entrée de `gardes` (`chemin`) :
+    les deux formes se lisent ici, parce que le périmètre d'une étape de rejeu
+    se calcule sur la seconde quand elle ne rejoue pas de mutation.
+    """
+    impliques = {entree.get("cible") or entree["chemin"]}
+    if entree.get("preuve"):
+        impliques.add(entree["preuve"])
+    famille = FAMILLE_DE_RUNNER.get(entree.get("runner"), entree.get("runner"))
+    impliques |= {
+        chemin for chemin in FICHIERS_PARTAGES.get(famille, ())
+        if (racine / chemin).is_file()
+    }
     while True:
         avant = len(impliques)
         for chemin in sorted(impliques):
-            impliques |= _imports_locaux(chemin, racine)
+            impliques |= _imports_du_depot(chemin, racine)
         if len(impliques) == avant:
             return impliques
+
+
+def _sensibles_touches(changes):
+    """Les fichiers du filtre lui-même qui ont changé. Quand ils bougent, la
+    sélection ne dit plus rien de fiable : c'est eux qui la calculent."""
+    return sorted(
+        fichier for fichier in SENSIBLES_AU_FILTRE
+        if any(change == fichier or change.endswith("/" + fichier) for change in changes)
+    )
 
 
 def mutations_concernees(mutations, changes):
@@ -261,10 +434,7 @@ def mutations_concernees(mutations, changes):
     Si la TABLE ou le HARNAIS a changé, la sélection n'est plus une information
     fiable (c'est eux qui la calculent) : on rejoue tout.
     """
-    touche = sorted(
-        fichier for fichier in SENSIBLES_AU_FILTRE
-        if any(change == fichier or change.endswith("/" + fichier) for change in changes)
-    )
+    touche = _sensibles_touches(changes)
     if touche:
         return list(mutations), (
             "la table ou le harnais a changé (%s) : le filtre ne peut plus être ce qui "
@@ -275,6 +445,74 @@ def mutations_concernees(mutations, changes):
         if fichiers_impliques(mutation) & changes
     ]
     return retenues, "garde, preuve ou module importé modifiés"
+
+
+def etape_de(spec, nom):
+    """L'étape de rejeu déclarée sous ce nom, ou une erreur nommée."""
+    for etape in spec["rejeux"]:
+        if etape["nom"] == nom:
+            return etape
+    raise SpecInvalide(
+        "etape de rejeu inconnue : %r (declarées : %s)"
+        % (nom, sorted(e["nom"] for e in spec["rejeux"]))
+    )
+
+
+def portee_de_l_etape(spec, etape, racine=REPO_ROOT):
+    """Ce qu'une étape de rejeu couvre : (mutations à rejouer, fichiers dont le
+    changement la rend due).
+
+    Une étape de runner tient ses fichiers de SES mutations ; une étape qui ne
+    rejoue pas de mutation (une preuve exécutée telle quelle) les tient des
+    entrées qu'elle déclare porter. Dans les deux cas la dérivation est la même
+    fonction : le périmètre n'est pas écrit deux fois.
+    """
+    if etape.get("runner"):
+        a_rejouer = [m for m in spec["mutations"] if m["runner"] == etape["runner"]]
+    else:
+        a_rejouer = []
+    fichiers = set()
+    for entree in a_rejouer or [
+        next(g for g in spec["gardes"] if g["chemin"] == chemin)
+        for chemin in (etape.get("porte_sur") or [])
+    ]:
+        fichiers |= fichiers_impliques(entree, racine)
+    return a_rejouer, fichiers
+
+
+def _base_du_changement(demande=None, racine=REPO_ROOT):
+    """La référence à laquelle comparer l'arbre, ou None pour rejouer ENTIER.
+
+    C'est ICI que se règle la portée, et nulle part ailleurs : le workflow ne
+    choisit plus quel filtre appliquer à quel job — il passe la référence que
+    GitHub lui donne et c'est cette fonction qui décide. Deux règles, et elles
+    vont dans le sens de l'erreur sûre :
+
+      * invocation NU (sur `main`, en dispatch) → preuve entière ;
+      * base introuvable (clone superficiel, SHA non récupérable) → preuve
+        ENTIÈRE aussi, avec son motif affiché. Jamais moins.
+    """
+    if demande and demande != "auto":
+        return demande, "référence passée en argument"
+    if not demande:
+        return None, "invocation sans filtre (push sur main, dispatch) : preuve ENTIÈRE due"
+    vues = 0
+    for ref in (os.environ.get("KOJO_MUTATIONS_DEPUIS"),
+                os.environ.get("KOJO_BRANCHE_DE_BASE")):
+        if not ref:
+            continue
+        vues += 1
+        proc = subprocess.run(
+            ["git", "fetch", "--depth=1", "origin", ref],
+            cwd=str(racine), capture_output=True,
+        )
+        if proc.returncode == 0:
+            return "FETCH_HEAD", "base de comparaison récupérée (%s)" % ref[:12]
+    if not vues:
+        # Sur `main` et en dispatch il n'y a pas de PR : c'est le rejeu entier
+        # qui est dû, et le dire ainsi évite de faire croire à un échec.
+        return None, "aucune base de PR fournie (push sur main, dispatch) : preuve ENTIÈRE due"
+    return None, "base de comparaison introuvable : preuve ENTIÈRE due (jamais moins)"
 
 
 def commande_de(mutation):
@@ -351,15 +589,73 @@ def executer(mutation, racine):
     return True, "rouge nommé (%s)" % ", ".join(mutation["attend"])
 
 
+def _publier_verdict(verdict, motif):
+    """Rend le verdict à GitHub Actions, quand on tourne dans une étape : c'est
+    ce qui permet au workflow de RELAYER une décision prise ici, au lieu de
+    choisir lui-même quel filtre appliquer à quel job."""
+    chemin = os.environ.get("GITHUB_OUTPUT")
+    if not chemin:
+        return
+    with io.open(chemin, "a", encoding="utf-8", newline="\n") as flux:
+        flux.write("rejeu=%s\n" % verdict)
+        flux.write("motif=%s\n" % motif.replace("\n", " "))
+
+
+def verdict_d_etape(spec, nom, demande=None, racine=REPO_ROOT):
+    """Le verdict de portée d'une étape déclarée : `oui` (à rejouer) ou `non`,
+    avec son motif. N'exécute aucune mutation : c'est une QUESTION à la table.
+
+    Le verdict porte sur des FICHIERS dérivés — ceux du garde, de sa preuve, des
+    modules qu'ils importent ou citent, et des fichiers partagés du runner. Une
+    étape sans changement dans son périmètre n'a rien à rejouer ; tout le reste
+    (base introuvable, invocation nue) rend `oui`.
+    """
+    etape = etape_de(spec, nom)
+    a_rejouer, fichiers = portee_de_l_etape(spec, etape, racine)
+    base, motif_base = _base_du_changement(demande, racine)
+    if base is None:
+        verdict, motif = "oui", motif_base
+    else:
+        changes = fichiers_changes(base, racine)
+        sensibles = _sensibles_touches(changes)
+        touche = sorted(fichiers & changes)
+        if sensibles:
+            verdict = "oui"
+            motif = (
+                "%s : la table ou le harnais a changé (%s), donc la portée n'est plus ce "
+                "qui décide" % (motif_base, ", ".join(sensibles))
+            )
+        elif touche:
+            verdict = "oui"
+            motif = "%s : %d fichier(s) modifié(s), dont %s" % (
+                motif_base, len(changes), ", ".join(touche[:3])
+            )
+        else:
+            verdict = "non"
+            motif = "%s : aucun de ses %d fichier(s) n'a bougé" % (motif_base, len(fichiers))
+    couvre = "%d mutation(s)" % len(a_rejouer) if a_rejouer else "preuve exécutée telle quelle"
+    print("Etape de rejeu « %s » (%s) → rejeu=%s — %s" % (nom, couvre, verdict, motif))
+    if verdict == "non":
+        print("::notice title=Rejeu non du::%s" % motif)
+    _publier_verdict(verdict, motif)
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--runner", choices=RUNNERS, help="ne rejoue que ce runner")
     parser.add_argument("--only", help="ne rejoue que cette mutation")
     parser.add_argument("--list", action="store_true", help="valide le registre sans muter")
     parser.add_argument(
-        "--changed-from", metavar="REF",
-        help="ne rejoue que les mutations dont le garde ou la preuve a changé depuis REF "
-             "(la preuve ENTIÈRE reste due sur main)",
+        "--etape",
+        help="ne rejoue rien : rend le verdict de portée d'une étape déclarée dans le "
+             "registre (rejeu=oui|non, publié dans GITHUB_OUTPUT) et son motif",
+    )
+    parser.add_argument(
+        "--changed-from", nargs="?", const="auto", metavar="REF",
+        help="ne rejoue que les mutations dont le garde ou la preuve a changé depuis REF. "
+             "Nue, la référence est DÉRIVÉE de l'environnement de la PR ; sans base "
+             "trouvée (main, dispatch), la preuve ENTIÈRE est due",
     )
     args = parser.parse_args(argv)
 
@@ -369,6 +665,14 @@ def main(argv=None):
         print("[ECHEC] %s" % exc)
         print("::error title=Registre de preuves invalide::%s" % exc)
         return 1
+
+    if args.etape:
+        try:
+            return verdict_d_etape(spec, args.etape, args.changed_from)
+        except SpecInvalide as exc:
+            print("[ECHEC] %s" % exc)
+            print("::error title=Etape de rejeu inconnue::%s" % exc)
+            return 1
 
     mutations = spec["mutations"]
     if args.runner:
@@ -384,26 +688,30 @@ def main(argv=None):
             print("[ECHEC] --only %s ne correspond à aucune mutation" % args.only)
             return 1
     if args.changed_from:
-        try:
-            changes = fichiers_changes(args.changed_from)
-        except SpecInvalide as exc:
-            print("[ECHEC] %s" % exc)
-            print("::error title=Filtre de mutation illisible::%s" % exc)
-            return 1
-        mutations, motif = mutations_concernees(mutations, changes)
-        print(
-            "Filtre --changed-from %s : %d fichier(s) modifié(s) → %d mutation(s) (%s)"
-            % (args.changed_from, len(changes), len(mutations), motif)
-        )
-        if not mutations:
-            # Ce n'est PAS un faux vert : aucune preuve ne peut avoir changé de
-            # comportement puisque ni son garde ni elle-même n'a bougé — et la
-            # preuve ENTIÈRE est rejouée sur `main` à la fusion.
+        base, motif_base = _base_du_changement(args.changed_from)
+        if base is None:
+            print("%s : %d mutation(s) à rejouer" % (motif_base, len(mutations)))
+        else:
+            try:
+                changes = fichiers_changes(base)
+            except SpecInvalide as exc:
+                print("[ECHEC] %s" % exc)
+                print("::error title=Filtre de mutation illisible::%s" % exc)
+                return 1
+            mutations, motif = mutations_concernees(mutations, changes)
             print(
-                "[OK] aucun garde ni preuve modifié : rien à rejouer ici "
-                "(la preuve entière est due sur main)"
+                "Filtre --changed-from %s (%s) : %d fichier(s) modifié(s) → %d mutation(s) (%s)"
+                % (base, motif_base, len(changes), len(mutations), motif)
             )
-            return 0
+            if not mutations:
+                # Ce n'est PAS un faux vert : aucune preuve ne peut avoir changé de
+                # comportement puisque ni son garde ni elle-même n'a bougé — et la
+                # preuve ENTIÈRE est rejouée sur `main` à la fusion.
+                print(
+                    "[OK] aucun garde ni preuve modifié : rien à rejouer ici "
+                    "(la preuve entière est due sur main)"
+                )
+                return 0
 
     if args.list:
         print("Registre valide : %d gardes, %d mutations" % (len(spec["gardes"]), len(spec["mutations"])))

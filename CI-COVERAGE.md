@@ -1256,23 +1256,34 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   runner. C'est donc le chiffre du runner qui dit le prix par push, et les
   relevés locaux — plus élevés de 1,9 à 2,5 fois (Python : 33-42 s / 17 s) et de
   2,6 à 4,6 fois (Node : 83-146 s / 32 s) — le représentaient mal.
-* **la preuve Node est filtrée sur une PR, ENTIÈRE sur `main`** : les 18
-  mutations Node démarrent chacune un runner Vitest, soit **32 s sur les 77 s du
-  job** `frontend-build`. Une PR ne rejoue donc que celles dont le **garde** ou
-  la **preuve** a changé (`--changed-from`), et `main` les rejoue toutes : aucun
-  changement ne peut justifier d'en sauter une quand c'est la fusion qui livre.
-  Deux garde-fous plutôt qu'un, parce qu'un filtre peut mentir dans les deux
-  sens : si la table ou le harnais a bougé, la sélection n'est plus une
-  information fiable et TOUT est rejoué ; si la base de comparaison est
-  introuvable, l'étape retombe sur la preuve entière. Le choix « quelles
-  mutations sont concernées » appartient au harnais, qui possède la table — le
-  workflow ne recopie aucune liste. Le périmètre d'une mutation n'est pas un
-  fichier mais une **fermeture** : le garde, sa preuve, et les modules qu'ils
-  importent de proche en proche — neuf gardes importent `site-meta.js`, donc le
-  toucher rejoue ces neuf mutations, et `check-og-images.js` en rejoue quatre.
-  Limite dite : une *donnée* de test (un JSON, un PNG) modifiée seule ne rejoue
-  rien — ce n'est pas un module importé, et la mutation correspondante est
-  rejouée à la fusion, sur `main`.
+* **le périmètre des rejeux est DÉRIVÉ DE LA TABLE, pas choisi par le job** :
+  les 18 mutations Node démarrent chacune un runner Vitest (**32 s sur les 77 s
+  du job** `frontend-build`) et les 11 Python un pytest par mutation
+  (**17 s**). Les trois étapes qui rejouent une preuve — les deux runners et le
+  rejeu OG — demandent donc à la table si leur rejeu est dû, plutôt que de
+  choisir chacune son filtre : le workflow passe la base de la PR (ou rien sur
+  `main`) et la dérivation vit dans le harnais, qui possède la table. Le
+  registre déclare ces étapes (`rejeux`), et le harnais REFUSE un registre où un
+  runner déclaré n'a pas d'étape : une mutation que personne ne rejoue serait
+  un garde aveugle.
+
+  Trois garde-fous, tous dans le sens de l'erreur sûre : si la **table** ou le
+  **harnais** a bougé, la portée n'est plus une information fiable et TOUT est
+  rejoué ; si la **base de comparaison** est introuvable (clone superficiel,
+  SHA non récupérable), tout est rejoué aussi ; et hors PR (push sur `main`,
+  dispatch) il n'y a pas de base du tout, donc la preuve ENTIÈRE est due.
+
+  Le périmètre d'une mutation n'est pas un fichier mais une **fermeture** lue
+  sur la source : le garde, sa preuve, les modules qu'ils importent — relativement
+  ou par leur nom de module du dépôt — les chemins qu'ils citent dans une
+  EXPRESSION (pas dans une docstring : le harnais lui-même cite `site-meta.js`
+  en prose, et compter cette prose le reliait à 103 fichiers au lieu de 15,
+  mesuré), et les fichiers qui pèsent sur toute preuve d'un runner
+  (`pytest.ini`, `conftest.py` ; `vite.config.js`, `package.json`,
+  `package-lock.json`). Neuf gardes importent `site-meta.js` : le toucher
+  rejoue ces neuf mutations. Limite dite : un changement qui n'entre dans
+  aucune de ces formes est invisible du filtre — d'où le rejeu entier sur
+  `main`, qui reste le filet de dernier recours.
 
 Ajouter un garde sans preuve d'échec est donc désormais un rouge, pas une
 découverte fortuite.
