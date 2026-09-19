@@ -2,19 +2,10 @@
 """Le garde qui prouve que les tests des refus du générateur OG savent échouer.
 
 .github/scripts/check-og-test-mutations.py rejoue, sur des COPIES, la neutralisation
-de chaque refus de frontend/scripts/gen-og-images.py : c'est la preuve que
-backend/tests/test_gen_og_images.py verrouille vraiment quelque chose. Cette preuve a
-UN seul exécutant — l'étape du job `backend-tests`, qui la paie une fois par push
-(3,0 à 5,0 s sur le runner) — et ce fichier-ci n'en est pas un second : il n'exécute
-JAMAIS pytest.
-
-Ce qu'il prouve tient en trois choses : la dérivation des refus est lue dans l'arbre
-du générateur (un `raise` sans `if` est un orphelin, une condition écrite aussi
-ailleurs ne compte pas), les DÉCISIONS du garde sur des verdicts écrits d'avance (un
-refus que personne n'exerce, un test partagé entre deux refus, une suite déjà rouge,
-un périmètre incomplet), et le CÂBLAGE de l'étape qui, elle, rejoue tout pour de vrai.
-Si la frontière du garde changeait de forme, c'est cette étape qui le dirait : elle
-seule voit passer de vrais rouges.
+de chaque refus de frontend/scripts/gen-og-images.py. Cette preuve a UN seul
+exécutant — l'étape du job `backend-tests` — et ce fichier-ci n'en est pas un
+second : il n'exécute JAMAIS pytest, il éprouve la dérivation, les DÉCISIONS du
+garde sur des verdicts écrits d'avance et le CÂBLAGE de l'étape.
 """
 import importlib.util
 import re
@@ -121,35 +112,21 @@ def verdicts(monkeypatch):
 class TestDerivation:
     """La table n'est pas écrite : elle est lue dans l'arbre du générateur."""
 
-    def test_chaque_raise_et_la_condition_qui_le_porte(self):
+    def test_lit_chaque_refus_et_signe_un_raise_sans_if(self):
         refusals, orphans = GUARD.parse_refusals(TWO_REFUSALS)
 
         assert [(refusal.line, refusal.condition) for refusal in refusals] == [
             (3, "value < 0"),
             (5, "value > 10"),
         ]
-        assert orphans == []
+        assert orphans == [], "aucun raise hors d'un if ici"
 
-    def test_un_raise_sans_if_est_un_orphelin(self):
         refusals, orphans = GUARD.parse_refusals(ORPHAN)
 
         assert [refusal.condition for refusal in refusals] == ["value < 0"]
-        assert orphans == [4]
+        assert orphans == [4], "le raise sans if est signalé, pas sauté"
 
-    def test_neutralise_la_seule_ligne_qui_porte_le_refus(self):
-        refusals, _ = GUARD.parse_refusals(TWO_REFUSALS)
-        mutated = GUARD.neutralized(TWO_REFUSALS, refusals[1])
-        changed = [
-            index
-            for index, (before, after) in enumerate(
-                zip(TWO_REFUSALS.splitlines(), mutated.splitlines())
-            )
-            if before != after
-        ]
-
-        assert changed == [3] and mutated.splitlines()[3].strip() == "if False:"
-
-    def test_une_autre_ligne_qui_ressemble_ne_compte_pas(self):
+    def test_neutralise_la_portion_que_l_arbre_designe(self):
         """Le générateur réel porte « if not name.endswith('.json'): » deux fois : une
         fois pour ignorer un fichier, une fois pour refuser. Le remplacement vise la
         portion que l'arbre désigne, donc ce n'est pas un motif à retrouver — et la
@@ -169,7 +146,7 @@ class TestDerivation:
             index for index, line in enumerate(text.splitlines()) if line.strip() == "if value < 0:"
         ]
 
-        assert changed == [1]
+        assert changed == [1] and mutated.splitlines()[1].strip() == "if False:"
         assert alike(source) == [1, 9], "la source doit bien porter deux lignes identiques"
         assert alike(mutated) == [9], "la seconde doit survivre intacte"
 
