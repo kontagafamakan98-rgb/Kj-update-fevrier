@@ -374,8 +374,10 @@ jobs:
       # Cette étape est le SEUL endroit qui rejoue les mutations (3,0 à 5,0 s mesurés
       # sur le runner selon le run) : le test du garde prouve qu'il sait refuser —
       # un refus que personne n'exerce, un test partagé entre deux refus, un `raise`
-      # sans `if`, une condition écrite ailleurs — sans les rejouer, pour que la même
-      # preuve ne soit pas payée deux fois à chaque push.
+      # sans `if`, une condition écrite ailleurs — sans jamais lancer pytest : les
+      # décisions s'éprouvent sur des verdicts écrits d'avance, et de cette étape la
+      # suite ne vérifie que le CÂBLAGE (une occurrence, dans ce job, qui installe ses
+      # dépendances). La même preuve n'est donc payée qu'une fois par push.
       - name: Check OG refusals are locked by their tests (mutation replay)
         run: python .github/scripts/check-og-test-mutations.py
 
