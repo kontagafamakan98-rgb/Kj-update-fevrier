@@ -174,7 +174,7 @@ et la configuration sont, eux, vérifiés avant merge.
   avec le bit, la règle `eol=lf` de `.gitattributes` étant alors la cause). Il
   échoue aussi, volontairement, quand il ne peut pas conclure (git absent,
   fichier non suivi) : un garde ne doit jamais rassurer en silence. Verrouillé
-  par `backend/tests/test_exec_bits.py` (20 tests, dont deux en sous-processus
+  par `backend/tests/test_exec_bits.py` (19 tests mesurés le 19/09/2026, dont deux en sous-processus
   avec un encodage de console hostile — le premier chemin de succès plantait sur
   un emoji hors cp1252 au lieu de conclure).
 - **Aucun artefact n'est publié** (contrairement à Lighthouse, qui uploade ses
@@ -630,7 +630,7 @@ Deux points de méthode que l'exécution a imposés :
 
 **Preuves** : le dépôt est vert (`runJobOgContractCheck` → 0 erreur, mission
 réelle) ; les mutations sont exercées par `scripts/__tests__/check-job-og-contract.test.js`
-(15 tests) sur le HTML du **module de production** — titre renommé d'un côté,
+(14 tests mesurés le 19/09/2026) sur le HTML du **module de production** — titre renommé d'un côté,
 carte renommée, variante carrée retirée, description coupée d'un caractère de
 plus, canonical divergent ou absent, mission sans annonce côté application, règle
 de coupe par unités UTF-16 (F15) —, et
@@ -917,21 +917,33 @@ Ce que la chaîne transmet ensuite, sans recopie :
 ```
 scripts/og-cards/*.json   route + clés de texte de la page + sorties   ← la seule déclaration
         │
-        ├── gen-og-images.py      dessine fr.json[clés], consigne les LIGNES dessinées
+        ├──► src/config/og-cards.js      lue par le BUILD et par le RUNTIME
+        │        ├─ CARDS_BY_ROUTE  (route → carte servie)
+        │        └─ CARD_PAGE_META  (route → clés de texte)
+        │                   │
+        │     src/config/page-meta.js   PAGE_META = déclarées ∪ cartes
         │
-        └── og-assets.manifest.json ──► src/config/og-cards.js
-                                          ├─ CARDS_BY_ROUTE  (route → carte servie)
-                                          └─ CARD_PAGE_META  (route → clés de texte)
-                                                     │
-                                        src/config/page-meta.js   PAGE_META = déclarées ∪ cartes
+        └── gen-og-images.py   dessine fr.json[clés], consigne les LIGNES MESURÉES
+                │
+                └── og-assets.manifest.json   route + lignes dessinées, empreintes, polices
+                        │
+                        └── check-og-assets.js   recompose les lignes et exige fr.json[clé]
 ```
+
+**L'égalité carte ↔ page est structurelle, pas vérifiée.** Depuis le 19/09/2026,
+le module qui sert le runtime ET le build lit les fichiers de données eux-mêmes ;
+le manifeste ne recopie plus ni route, ni clés, ni fichiers (mesuré le 19/09/2026 :
+`cards` ne porte plus que `route` et `lines`). Une carte ne peut donc plus annoncer
+autre chose que sa page : les deux surfaces lisent un seul document. Ce qui reste à
+confronter est ce qu'une déclaration ne peut pas dire — ce qui est RÉELLEMENT
+dessiné dans les PNG versionnés.
 
 **Trois gardes, un par maillon**
 
 | Maillon | Garde | Ce qu'il refuse |
 |---|---|---|
 | la carte dessine le texte de sa page | `check-og-assets.js` (5a-ter) | les LIGNES consignées, recomposées, ne sont pas EXACTEMENT `fr.json[clé]` — un titre renommé sans régénérer les cartes |
-| le manifeste dit vrai | `check-og-assets.js` | l'entrée `cards` ne correspond plus au fichier de données (manifeste retouché à la main), aucune carte ne sert « / », ou une carte incomplète (nommée, jamais sautée) |
+| le manifeste nomme chaque carte déclarée | `check-og-assets.js` | aucune entrée `cards` pour une route que `scripts/og-cards/` déclare (manifeste périmé), aucune carte ne sert « / », ou une clé de texte absente de `fr.json` — ce garde ne compare plus deux copies : le manifeste ne porte plus la route que comme jointure |
 | une route, une déclaration | `check-page-meta.js` (règle H, jouée par le build) | la route est déclarée des DEUX côtés : par une carte ET par la table écrite à la main |
 
 La règle F de `check-page-meta.js` a disparu avec la convention de nom qu'elle
@@ -960,7 +972,8 @@ jobsMetaTitle renommé dans fr.json, cartes NON régénérées :
 Côté page, RIEN ne change : les trois routes à carte déclarent les mêmes clés
 qu'avant (`homeMetaTitle`, `jobsMetaTitle`, `loginMetaTitle`…), donc le HTML servi,
 les titres d'onglet et les exports i18n sont identiques — c'est le VISUEL qui cesse
-d'annoncer autre chose. `npx vitest run` : **48 fichiers / 630 tests** ;
+d'annoncer autre chose. `npx vitest run` au 18/09/2026 : **48 fichiers / 630 tests** (620 tests le
+19/09/2026, après la suppression des rejeux d'étapes) ;
 `npm run build` en 0 ; les huit gardes frontend en 0.
 
 **Limites assumées** : la carte dessine le texte FRANÇAIS (la langue des coquilles)
@@ -1123,13 +1136,13 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
 | `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
-| `check-og-assets.js` | `scripts/__tests__/check-og-assets.test.js` (36 tests : générateur unique par le nom ET le contenu, dimensions réelles des PNG, orphelins, manifeste, polices de référence, **et le TEXTE dessiné** — lignes recomposées ≠ dictionnaire, manifeste retouché à la main, carte incomplète nommée, aucune carte pour « / », route non absolue, dictionnaire illisible) + mutation rejouée le 18/09/2026 sur le fichier réel : `jobsMetaTitle` renommé sans régénérer les cartes → garde en **1**, message nommé, restauré sans modification résiduelle (§3 F16) ; la reproduction octet pour octet des cartes est prouvée par `check-og-reproducible.js` (7 fichiers, police de référence) |
+| `check-og-assets.js` | `scripts/__tests__/check-og-assets.test.js` (34 tests mesurés le 19/09/2026 : générateur unique par le nom ET le contenu, dimensions réelles des PNG, orphelins, manifeste, polices de référence, **et le TEXTE dessiné** — lignes recomposées ≠ dictionnaire, manifeste retouché à la main, carte incomplète nommée, aucune carte pour « / », route non absolue, dictionnaire illisible) + mutation rejouée le 18/09/2026 sur le fichier réel : `jobsMetaTitle` renommé sans régénérer les cartes → garde en **1**, message nommé, restauré sans modification résiduelle (§3 F16) ; la reproduction octet pour octet des cartes est prouvée par `check-og-reproducible.js` (7 fichiers, police de référence) |
 | `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide) ; le **jeu de référence** (5 missions, frontière des 150 sur un accent, un emoji BMP, un astral et avant un astral) est comparé mission par mission, et la règle de coupe d'AVANT (unités UTF-16) est détectée — mutation rejouée le 18/09/2026 sur le fichier réel : garde en **1** (6 problèmes) et 4 tests rouges, restauré à l'empreinte identique (§3 F15) ; l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
-| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (39 tests : les 7 règles savent échouer — dont un build PÉRIMÉ (texte **et** carte), une table vide, une route déclarée à la fois par une carte et par la table écrite à la main (règle H, injectée), une clé de page absente d'une seule langue, une langue publiée sans dictionnaire et un dictionnaire que personne ne charge —, leurs exemptions, dépôt réel vert) **et** le plugin de build lui-même, `requirePageMeta` : monté sur une arborescence dont la page est muette (`buildStart` doit lever) + `scripts/__tests__/check-page-meta-build-wiring.test.js` (2 tests, environnement Node : le `vite.config.js` RÉEL installe le plugin en `apply: 'build'`, et la config ne le réécrit pas) — mutations automatisées le 18/09/2026 sur les trois maillons (plugin retiré, `apply: 'serve'`, `buildStart` sans appel → la suite rougit) + mutations rejouées à la main : page privée de son `usePageMeta()` (§3 F12) et deux mutations de dictionnaire (§3 F14) → `npm run build` en **1** à chaque fois, tout restauré à l'octet |
+| `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (38 tests mesurés le 19/09/2026 : les 7 règles savent échouer — dont un build PÉRIMÉ (texte **et** carte), une table vide, une route déclarée à la fois par une carte et par la table écrite à la main (règle H, injectée), une clé de page absente d'une seule langue, une langue publiée sans dictionnaire et un dictionnaire que personne ne charge —, leurs exemptions) — le passage du garde sur le dépôt réel appartient à l'étape de CI **et** le plugin de build lui-même, `requirePageMeta` : monté sur une arborescence dont la page est muette (`buildStart` doit lever) + `scripts/__tests__/check-page-meta-build-wiring.test.js` (2 tests, environnement Node : le `vite.config.js` RÉEL installe le plugin en `apply: 'build'`, et la config ne le réécrit pas) — mutations automatisées le 18/09/2026 sur les trois maillons (plugin retiré, `apply: 'serve'`, `buildStart` sans appel → la suite rougit) + mutations rejouées à la main : page privée de son `usePageMeta()` (§3 F12) et deux mutations de dictionnaire (§3 F14) → `npm run build` en **1** à chaque fois, tout restauré à l'octet |
 | `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
-| la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (33 tests : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
+| la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (31 tests mesurés le 19/09/2026 : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus dérivés de son arbre, chacun rougissant le test qui lui appartient, 3,0 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
@@ -1143,6 +1156,29 @@ devenait aveugle (mauvaise condition, chemin d'artefact modifié par une montée
 version de Vite), la CI resterait verte sans que personne ne le voie — c'est le
 seul garde dans ce cas, et c'est la première chose à corriger si l'on veut que
 « les gardes sont testés » soit une affirmation vraie sans exception.
+
+### Une preuve, un exécutant
+
+Une étape de CI et un test qui rejoue la MÊME preuve sur le même dépôt la paient
+deux fois par push. Recensé et corrigé le 19/09/2026 : **treize rejeux supprimés**,
+chacun laissant la preuve à l'étape qui l'exécute déjà — `check-og-assets.js`,
+`check-page-meta.js`, `check-pwa-manifest.js`, `check-spa-routes.js`,
+`check-generated-icons.js`, `check-job-og-contract.js`, `check-api-split.js`,
+`check-pack2-chunks.js`, `check-workflow-pins.py`,
+`check-test-existence-assertions.py` (deux fois : par sous-processus puis en
+process), `check-exec-bits.py`, le pyflakes des modules découpés
+(`python -m pyflakes kojo_*.py server.py`) et
+`check-fly-env-drift.py --refs-only`. Même logique pour `test_import_health.py` :
+l'étape dédiée du job `backend-tests` est son seul exécutant, la suite complète du
+même job l'exclut (`--ignore=tests/test_import_health.py`).
+
+Les suites ne gardent donc que ce qu'elles seules peuvent prouver : les règles sur
+fixtures (injecter une régression), les contrats de code de sortie, et — là où il
+existe — le CÂBLAGE de l'étape, parce qu'une étape retirée du workflow rendrait la
+preuve inexistante sans que rien ne rougisse. Deux exceptions assumées :
+`check-script-deps.js` n'a **pas** d'étape, la suite Vitest est son seul
+propriétaire ; et `check-exec-bits.py` reste rejoué en sous-processus sous une console
+`cp1252`, une propriété que l'étape (UTF-8) ne prouve pas.
 
 À côté de ces gardes, un test d'IMPORT-SANTÉ remplace les assertions
 d'existence qui s'étaient dispersées (« ce fichier est-il sur le disque ? ») :
@@ -1169,8 +1205,8 @@ des tests — sans quoi les annotations n'existeraient ni en vert ni en rouge �
 le job `backend-tests` a un pas dédié
 (`pytest tests/test_import_health.py --capture=tee-sys`) qui recopie la sortie
 capturée dans le journal du job, celui que GitHub lit. Il ne demande ni MongoDB ni
-secret, et dure deux secondes ; le fichier continue de tourner dans la suite
-complète, où il garde son rôle de test.
+secret, et dure deux secondes ; depuis le 19/09/2026 la suite complète du même job
+l'exclut, pour que cette preuve n'ait qu'un exécutant.
 
 Deux canaux publient les métadonnées d'une page — `og:image`, `<title>`, `meta
 description` — : le HTML **pré-rendu** (écrit par `vite.config.js`, vérifié en HTTP

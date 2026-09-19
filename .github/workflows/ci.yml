@@ -342,7 +342,9 @@ jobs:
           APP_ENV: test
           REDIS_URL: ""
           DISABLE_TRUSTED_HOST_MIDDLEWARE: "true"
-        run: python -m pytest tests/ -q --tb=short
+        # test_import_health.py tourne déjà à l'étape précédente (celle qui publie
+        # le verdict en annotation) : on ne paie pas deux fois la même preuve.
+        run: python -m pytest tests/ -q --tb=short --ignore=tests/test_import_health.py
 
       # Les refus du générateur de cartes OG (frontend/scripts/gen-og-images.py)
       # sont ce qui empêche une carte d'annoncer autre chose que sa page, et

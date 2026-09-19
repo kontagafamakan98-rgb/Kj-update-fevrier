@@ -18,8 +18,6 @@ Les exemples tournent sur des fichiers écrits dans un dossier temporaire ; le
 dépôt réel n'est jamais modifié, et il doit rester propre.
 """
 import importlib.util
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -165,10 +163,6 @@ class TestAccepts:
 
 
 class TestDepotReel:
-    def test_le_depot_ne_contient_plus_ces_assertions(self, guard):
-        errors = guard.run(REPO_ROOT)
-        assert errors == [], "\n".join(message for _, _, message in errors)
-
     def test_le_perimetre_couvre_reellement_les_deux_langages(self, guard):
         files = guard.test_files(REPO_ROOT)
         relative = [path.relative_to(REPO_ROOT).as_posix() for path in files]
@@ -184,14 +178,5 @@ class TestDepotReel:
             "le garde doit être exécuté par la CI — sinon il serait vert sans jamais tourner"
         )
 
-    def test_le_script_se_lance_en_sous_processus(self):
-        proc = subprocess.run(
-            [sys.executable, str(SCRIPT)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            cwd=str(REPO_ROOT),
-        )
-        assert proc.returncode == 0, proc.stdout + proc.stderr
-        assert "[OK]" in proc.stdout
+    # Le garde sur le dépôt réel n'est pas rejoué ici : l'étape « Check test
+    # assertions describe behaviour » du job `workflow-lint` le fait sur le runner.

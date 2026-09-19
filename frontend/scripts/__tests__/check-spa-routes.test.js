@@ -198,12 +198,8 @@ describe('check-spa-routes — routage conforme', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('le dépôt réel est vert', () => {
-    const result = runSpaRoutesCheck();
-    expect(result.errors).toEqual([]);
-    expect(result.ok).toBe(true);
-    expect(result.rewrites).toBeGreaterThan(20);
-  });
+  // Le dépôt réel n'est pas rejoué ici : l'étape « Check SPA routing » de la CI
+  // l'examine sur le runner, réécritures de vercel.json et route inconnue comprises.
 });
 
 describe('check-spa-routes — sémantique 404 (pas de catch-all)', () => {
@@ -583,8 +579,5 @@ describe('check-spa-routes — routes privées non indexables', () => {
     expect(run(project).errors.join('\n')).toContain('noindex');
   });
 
-  it('le dépôt réel protège toutes ses routes privées', () => {
-    const result = runSpaRoutesCheck();
-    expect(result.errors.filter((e) => e.includes('X-Robots-Tag'))).toEqual([]);
-  });
+  // Les routes privées du dépôt réel sont tenues par la même étape de CI.
 });

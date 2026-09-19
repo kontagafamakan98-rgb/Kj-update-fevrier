@@ -136,10 +136,8 @@ class TestLectureDuWorkflow:
 class TestWorkflowReel:
     """La non-régression qui protège réellement les jobs."""
 
-    def test_aucune_reference_de_branche_dans_ci_yml(self, check):
-        errors, conforming = check.check_workflow(WORKFLOW)
-        assert errors == [], "\n".join(errors)
-        assert len(conforming) > 20, "le garde doit voir toutes les références du workflow"
+    # Le garde sur le dépôt réel n'est pas rejoué ici : l'étape « Check ci.yml pins
+    # dependencies » du job `workflow-lint` le fait sur le runner.
 
     def test_setup_flyctl_est_epingle_et_non_une_branche(self):
         contenu = WORKFLOW.read_text(encoding="utf-8")

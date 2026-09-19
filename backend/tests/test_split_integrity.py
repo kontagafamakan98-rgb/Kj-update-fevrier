@@ -218,15 +218,10 @@ def test_le_perimetre_des_modules_est_derive_et_complet():
     )
 
 
-def test_no_undefined_names_in_split_modules():
-    """Garde-fou : aucun nom non défini dans les modules découpés.
-
-    Aucun module n'a besoin d'être IMPORTÉ ici : pyflakes ne fait qu'analyser des
-    fichiers. Qu'un module échoue à s'importer est la question d'un autre garde,
-    plus fort que celui-ci — tests/test_import_health.py.
-    """
-    undefined = undefined_names([BACKEND_DIR / name for name in split_modules()])
-    assert not undefined, "Noms non définis détectés dans les modules découpés:\n" + "\n".join(undefined)
+# Le garde pyflakes sur le dépôt réel n'est pas rejoué ici : l'étape « Check split
+# modules for undefined names » du job `backend-tests` le fait sur le runner.
+# Qu'un module échoue à s'importer est la question d'un autre garde, plus fort —
+# tests/test_import_health.py.
 
 
 def test_le_garde_echoue_quand_on_retire_un_import(tmp_path):

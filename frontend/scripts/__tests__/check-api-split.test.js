@@ -14,10 +14,11 @@ import {
 //   - le contrat au niveau SOURCE : aucun fichier ne peut importer un groupe
 //     lazy depuis services/api (seul services/apiEndpoints est autorisé) ;
 //   - le contrat au niveau BUNDLE : aucun marqueur URL d'un groupe lazy dans
-//     le chunk d'entrée index-*.js, et les groupes core toujours présents ;
-//   - le check est vert sur le dépôt + build courants.
-
-const REPO_ROOT = path.resolve(__dirname, '../..');
+//     le chunk d'entrée index-*.js, et les groupes core toujours présents.
+//
+// Le passage du garde sur le dépôt ET le build réels n'est pas rejoué ici :
+// l'étape « Check services/api split » de la CI le fait après `vite build`, sur
+// le vrai bundle — que cette suite, qui tourne avant le build, ne peut pas voir.
 
 // Arbre source minimal pour les tests négatifs (le vrai dépôt ne doit pas
 // être modifié) :
@@ -128,27 +129,5 @@ describe('check-api-split : contrat au niveau BUNDLE', () => {
     const result = runApiSplitCheck({ root: fx.root });
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/core ABSENT/);
-  });
-});
-
-describe('check-api-split : vert sur le dépôt et le build courants', () => {
-  it('passe sur le repo + build actuels (18 groupes, core présent)', () => {
-    const repo = REPO_ROOT;
-    // CI exécute les tests AVANT `vite build` : sans build/assets, seule la
-    // partie source est vérifiable — le check bundle est couvert par les cas
-    // négatifs ci-dessus sur fixtures.
-    const hasBuild = fs.existsSync(path.join(repo, 'build', 'assets'));
-    const result = runApiSplitCheck({ root: repo });
-    if (!hasBuild) {
-      // Sans bundle, seule la partie source est vérifiable : le check échoue
-      // proprement sur « build/assets introuvable » (cas couvert), sans
-      // aucune erreur de contrat source.
-      expect(result.ok).toBe(false);
-      expect(result.errors.join('\n')).toMatch(/build\/assets\/? introuvable/);
-      expect(result.errors.join('\n')).not.toMatch(/services\/apiEndpoints/);
-      return;
-    }
-    expect(result.ok).toBe(true);
-    expect(result.errors).toEqual([]);
   });
 });
