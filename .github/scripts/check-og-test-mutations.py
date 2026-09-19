@@ -19,12 +19,26 @@ les copies intactes, puis neutralise un refus à la fois — sa ligne `if …:` 
 `if False:` — et exige que la suite ÉCHOUE. Un refus dont la neutralisation ne fait
 rien rougir n'est pas verrouillé par ce fichier de test.
 
+CE GARDE est le seul à rejouer ces mutations : la suite de tests, elle, prouve
+qu'il sait refuser (mutation sans effet, ligne introuvable, refus hors table) sans
+les rejouer — deux propriétaires de la même preuve la paieraient deux fois par push
+(4,6 s sur le runner ici, ~10 s dans la suite avant cette répartition).
+
+Complet par construction
+------------------------
+La table ci-dessous nomme les refus à neutraliser, mais son PÉRIMÈTRE ne vient pas
+d'elle : chaque `raise SystemExit` du générateur est dérivé de sa source, et un
+refus que la table ne couvre pas est signalé. Un dixième refus ajouté là-bas ne
+peut donc pas passer inaperçu.
+
 Ce qui est refusé
 -----------------
   - une suite qui ne passe pas sur les copies intactes : c'est l'état de
     référence, sans lui n'importe quel rouge serait un faux positif ;
   - une ligne de refus introuvable ou ambiguë dans le générateur (le garde est
     périmé : une erreur, jamais un succès silencieux) ;
+  - un refus du générateur absent de la table (le périmètre est incomplet) ;
+  - une entrée de la table qui ne porte plus de refus ;
   - une mutation qui laisse la suite verte.
 
 Utilisation : python3 .github/scripts/check-og-test-mutations.py [--root .]
@@ -57,6 +71,21 @@ MUTATIONS = (
     ("bloc plus haut que la carte wide", "if height > H - 80:"),
     ("bloc plus haut que la carte carrée", "if height > available:"),
 )
+
+
+def refusal_lines(source):
+    """Les conditions qui portent un refus : chaque `raise SystemExit` du générateur et
+    la ligne `if … :` juste au-dessus.
+
+    Dérivées de la source, jamais recopiées : c'est ce qui rend le périmètre de ce
+    garde solidaire du générateur au lieu de dépendre d'une liste tenue à la main.
+    """
+    lines = source.splitlines()
+    return [
+        lines[index - 1].strip()
+        for index, line in enumerate(lines)
+        if index and "raise SystemExit" in line and lines[index - 1].lstrip().startswith("if ")
+    ]
 
 
 def neutralized(source, condition):
@@ -118,6 +147,27 @@ def run(root, python=sys.executable):
                     % output.strip()[-1500:],
                 )
             ]
+
+        derived = refusal_lines(source)
+        covered = [condition for _, condition in MUTATIONS]
+        for line in derived:
+            if line not in covered:
+                errors.append(
+                    (
+                        line,
+                        "%s refuse aussi sur « %s », que la table ne couvre pas : ajouter son "
+                        "entrée à MUTATIONS" % (GENERATOR_FILE, line),
+                    )
+                )
+        for line in covered:
+            if line not in derived:
+                errors.append(
+                    (
+                        line,
+                        "« %s » ne porte plus de refus dans %s : l'entrée de MUTATIONS est "
+                        "périmée" % (line, GENERATOR_FILE),
+                    )
+                )
 
         for label, condition in MUTATIONS:
             mutated = neutralized(source, condition)
