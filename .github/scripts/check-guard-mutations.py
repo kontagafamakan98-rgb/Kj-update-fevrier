@@ -82,7 +82,7 @@ class SpecInvalide(Exception):
     """Le registre ne dit pas une chose vérifiable."""
 
 
-CHAMPS_GARDE = {"chemin", "role", "invoque_par", "preuve", "runner", "motif"}
+CHAMPS_GARDE = {"chemin", "role", "invoque_par", "preuve", "runner", "motif", "hors_mutation"}
 
 
 def charger_spec(chemin=SPEC):
@@ -145,6 +145,25 @@ def charger_spec(chemin=SPEC):
             )
         if mutation["trouve"] == mutation["remplace"]:
             raise SpecInvalide("mutation %s : « trouve » == « remplace » (aucun effet)" % mutation["id"])
+
+    # EXHAUSTIVITE : chaque entree du registre est soit mutee, soit declaree
+    # hors d'atteinte AVEC son motif. Sans cette regle, un garde ajoute demain
+    # resterait sans preuve d'echec sans que rien ne le signale — le faux vert
+    # que ce harnais existe pour fermer.
+    mutes = {mutation["garde"] for mutation in spec["mutations"]}
+    for garde in spec["gardes"]:
+        mute = garde["chemin"] in mutes
+        declare = bool(garde.get("hors_mutation"))
+        if mute and declare:
+            raise SpecInvalide(
+                "garde %s : muté ET déclaré hors d'atteinte — l'un des deux ment"
+                % garde["chemin"]
+            )
+        if not mute and not declare:
+            raise SpecInvalide(
+                "garde %s : ni mutation, ni motif d'exclusion — sa capacité à échouer n'est "
+                "prouvée par rien" % garde["chemin"]
+            )
     return spec
 
 
