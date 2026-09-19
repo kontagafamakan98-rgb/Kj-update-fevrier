@@ -28,6 +28,7 @@ from kojo_shared import notify_user_localized, _dispatch_address_to_worker, nom_
 from kojo_payments import (
     build_disburse_callback_url,
     create_paydunya_disburse_invoice, get_paydunya_withdraw_mode,
+    maj_sequestre,
     strip_country_code_for_disburse, submit_paydunya_disburse_invoice,
 )
 
@@ -689,11 +690,7 @@ async def execute_paydunya_refund(payment_record: dict) -> str:
     if not refund_method or not refund_phone:
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {
-                "payout_status": "refund_failed",
-                "payout_failure_reason": "Le client n'a pas de compte Orange Money ou Wave configuré",
-                "updated_at": now_iso,
-            }}
+            maj_sequestre("refund_failed", {"payout_failure_reason": "Le client n'a pas de compte Orange Money ou Wave configuré", "updated_at": now_iso})
         )
         return "refund_failed"
 
@@ -713,22 +710,14 @@ async def execute_paydunya_refund(payment_record: dict) -> str:
         # get-invoice REFUSÉ : PayDunya n'a rien exécuté → échec sûr, relançable.
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {
-                "payout_status": "refund_failed",
-                "payout_failure_reason": str(exc.detail),
-                "updated_at": now_iso,
-            }}
+            maj_sequestre("refund_failed", {"payout_failure_reason": str(exc.detail), "updated_at": now_iso})
         )
         return "refund_failed"
     except Exception as exc:
         logger.error(f"⚠️ Erreur inattendue lors de la préparation du remboursement: {exc}")
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {
-                "payout_status": "refund_failed",
-                "payout_failure_reason": "Erreur inattendue lors de la préparation du remboursement",
-                "updated_at": now_iso,
-            }}
+            maj_sequestre("refund_failed", {"payout_failure_reason": "Erreur inattendue lors de la préparation du remboursement", "updated_at": now_iso})
         )
         return "refund_failed"
 
@@ -754,11 +743,7 @@ async def execute_paydunya_refund(payment_record: dict) -> str:
         logger.error(f"⚠️ Réponse incertaine du submit PayDunya (remboursement): {exc}")
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {
-                "payout_status": "refunding",
-                "disburse_error": f"Réponse incertaine du submit: {exc}",
-                "updated_at": now_iso,
-            }}
+            maj_sequestre("refunding", {"disburse_error": f"Réponse incertaine du submit: {exc}", "updated_at": now_iso})
         )
         return "refunding"
 
@@ -778,22 +763,19 @@ async def execute_paydunya_refund(payment_record: dict) -> str:
     if provider_status == "success":
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {"payout_status": "refunded"}}
+            maj_sequestre("refunded")
         )
         return "refunded"
     if provider_status == "pending":
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {"payout_status": "refunding"}}
+            maj_sequestre("refunding")
         )
         return "refunding"
 
     await db.payments.update_one(
         {"id": payment_record["id"]},
-        {"$set": {
-            "payout_status": "refund_failed",
-            "payout_failure_reason": submit_result.get("response_text") or "Échec du remboursement PayDunya",
-        }}
+        maj_sequestre("refund_failed", {"payout_failure_reason": submit_result.get("response_text") or "Échec du remboursement PayDunya"})
     )
     return "refund_failed"
 
@@ -850,11 +832,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
         # Verrou atomique (CAS) : "held"/"release_failed" → "refunding".
         lock_result = await db.payments.update_one(
             {"id": payment_record["id"], "payout_status": payout_status},
-            {"$set": {
-                "payout_status": "refunding",
-                "payout_kind": "refund",
-                "updated_at": now_iso,
-            }}
+            maj_sequestre("refunding", {"payout_kind": "refund", "updated_at": now_iso})
         )
         if lock_result.matched_count == 0:
             raise HTTPException(
@@ -1226,7 +1204,7 @@ async def complete_job_and_release_payment(
     # un double-versement en cas de double-clic/appel concurrent.
     lock_result = await db.payments.update_one(
         {"id": payment_record["id"], "payout_status": current_payout_status},
-        {"$set": {"payout_status": "releasing", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        maj_sequestre("releasing", {"updated_at": datetime.now(timezone.utc).isoformat()})
     )
     if lock_result.matched_count == 0:
         raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
@@ -1250,11 +1228,7 @@ async def complete_job_and_release_payment(
     async def _mark_release_failed(reason: str):
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {
-                "payout_status": "release_failed",
-                "payout_failure_reason": reason,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
+            maj_sequestre("release_failed", {"payout_failure_reason": reason, "updated_at": datetime.now(timezone.utc).isoformat()})
         )
         await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
         await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
@@ -1318,11 +1292,7 @@ async def complete_job_and_release_payment(
         logger.error(f"⚠️ Réponse incertaine du submit PayDunya (versement travailleur): {exc}")
         await db.payments.update_one(
             {"id": payment_record["id"]},
-            {"$set": {
-                "payout_status": "releasing",
-                "disburse_error": f"Réponse incertaine du submit: {exc}",
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
+            maj_sequestre("releasing", {"disburse_error": f"Réponse incertaine du submit: {exc}", "updated_at": datetime.now(timezone.utc).isoformat()})
         )
         final_payout_status = "releasing"
     else:
@@ -1354,7 +1324,7 @@ async def complete_job_and_release_payment(
                 {"$set": {"payout_failure_reason": submit_result.get("response_text") or "Échec du versement PayDunya"}}
             )
 
-        await db.payments.update_one({"id": payment_record["id"]}, {"$set": {"payout_status": final_payout_status}})
+        await db.payments.update_one({"id": payment_record["id"]}, maj_sequestre(final_payout_status))
 
     await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
     await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))

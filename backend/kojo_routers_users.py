@@ -39,8 +39,8 @@ from kojo_shared import (
 from kojo_payments import (
     build_disburse_callback_url,
     create_paydunya_disburse_invoice, get_mobile_money_account,
-    get_paydunya_withdraw_mode, strip_country_code_for_disburse,
-    submit_paydunya_disburse_invoice,
+    get_paydunya_withdraw_mode, maj_sequestre,
+    strip_country_code_for_disburse, submit_paydunya_disburse_invoice,
 )
 # Réutilise le remboursement PayDunya de kojo_routers_jobs (point unique de
 # vérité du décaissement de refund, avec verrou CAS et mapping IPN refund-aware).
@@ -977,11 +977,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
         # (referral_withdrawal_in_progress).
         await db.payments.update_one(
             {"id": payment_id},
-            {"$set": {
-                "payout_status": "released",
-                "disburse_provider_response": submit_result,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
+            maj_sequestre("released", {"disburse_provider_response": submit_result, "updated_at": datetime.now(timezone.utc).isoformat()}),
         )
         await apply_referral_payout_confirmed({"id": payment_id})
         return {
@@ -994,7 +990,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     if provider_status == "pending":
         await db.payments.update_one(
             {"id": payment_id},
-            {"$set": {"payout_status": "releasing", "disburse_provider_response": submit_result}},
+            maj_sequestre("releasing", {"disburse_provider_response": submit_result}),
         )
         asyncio.create_task(notify_user_localized(
             user_id=current_user.id,
@@ -1016,12 +1012,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     # referral_lock_released) — même chemin que l'IPN / le check-status.
     await db.payments.update_one(
         {"id": payment_id},
-        {"$set": {
-            "payout_status": "release_failed",
-            "payout_failure_reason": submit_result.get("response_text") or "Échec du retrait PayDunya",
-            "disburse_provider_response": submit_result,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }},
+        maj_sequestre("release_failed", {"payout_failure_reason": submit_result.get("response_text") or "Échec du retrait PayDunya", "disburse_provider_response": submit_result, "updated_at": datetime.now(timezone.utc).isoformat()}),
     )
     await apply_referral_payout_confirmed({"id": payment_id})
     return {
@@ -1214,11 +1205,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
         payout_status = payment.get("payout_status") or "held"
         lock_result = await db.payments.update_one(
             {"id": payment["id"], "payout_status": payout_status},
-            {"$set": {
-                "payout_status": "refunding",
-                "payout_kind": "refund",
-                "updated_at": now,
-            }},
+            maj_sequestre("refunding", {"payout_kind": "refund", "updated_at": now}),
         )
         if lock_result.matched_count == 0:
             # Concurrence : un autre flux traite déjà ce paiement.
@@ -1262,11 +1249,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
             if payout_status in REFUNDABLE_PAYOUT_STATES:
                 lock_result = await db.payments.update_one(
                     {"id": job_payment["id"], "payout_status": payout_status},
-                    {"$set": {
-                        "payout_status": "refunding",
-                        "payout_kind": "refund",
-                        "updated_at": now,
-                    }},
+                    maj_sequestre("refunding", {"payout_kind": "refund", "updated_at": now}),
                 )
                 if lock_result.matched_count:
                     await execute_paydunya_refund(job_payment)

@@ -14,6 +14,7 @@ from kojo_core import (
 )
 from kojo_payments import (
     get_effective_commission_rate,
+    maj_sequestre,
     paydunya_circuit_state,
     refresh_paydunya_circuit_from_db,
 )
@@ -304,10 +305,7 @@ async def retry_payment_refund(payment_id: str, owner_user = Depends(verify_owne
     # Verrou CAS : relance uniquement depuis refund_failed.
     lock_result = await db.payments.update_one(
         {"id": payment_id, "payout_status": "refund_failed"},
-        {"$set": {
-            "payout_status": "refunding",
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }}
+        maj_sequestre("refunding", {"updated_at": datetime.now(timezone.utc).isoformat()})
     )
     if lock_result.matched_count == 0:
         raise HTTPException(status_code=409, detail="Remboursement déjà en cours")
