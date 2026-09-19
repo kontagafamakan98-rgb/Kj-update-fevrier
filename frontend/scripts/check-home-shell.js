@@ -54,7 +54,10 @@ export const I18N_FR = 'src/i18n/fr.json';
 export const COUNTRY_DISPLAY = 'src/components/CountryDisplay.js';
 export const TITLE_MAX = 60;
 export const DESCRIPTION_MAX = 160;
-export const MIN_WORDS = 300;
+// Plancher de contenu de l'accueil : 300 mots suffisaient à un crawler pour
+// comprendre la page, 500 est le seuil qu'un audit de référencement réclame.
+// Le garde avait le mauvais seuil — il ne pouvait donc pas voir le manque.
+export const MIN_WORDS = 500;
 // Pages pré-rendues qui ont leur PROPRE shell : le shell de l'accueil ne doit
 // pas s'y retrouver (et inversement).
 //

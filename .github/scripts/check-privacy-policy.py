@@ -32,7 +32,9 @@ Usage :
   python3 .github/scripts/check-privacy-policy.py --write    # régénère le bloc
 """
 import argparse
+import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -127,6 +129,62 @@ def _rendre_tableau(retention) -> str:
 
 def _rendre_bloc(retention) -> str:
     return f"{DEBUT}\n{_rendre_tableau(retention)}\n{FIN}"
+
+
+# ── La SECONDE surface qui publie les durées : la page /privacy ───────────────
+# PRIVACY.md n'est lu que par ceux qui ouvrent le dépôt ; la page publique est ce
+# qu'un visiteur et un moteur lisent vraiment. Les deux surfaces sortent de la
+# même règle (backend/kojo_retention.py) : comparer la page au CODE, et non au
+# document, évite qu'une durée corrigée d'un côté laisse l'autre annoncer
+# l'ancienne — l'écart exact que ce garde existe pour supprimer.
+PAGE_CONFIDENTIALITE = "frontend/src/i18n/fr.json"
+CLE_DUREES_PUBLIEES = "privacyRetentionBody"
+# Motif d'une durée TELLE QU'ELLE EST PUBLIÉE : « 10 minutes », « 48 heures »,
+# « 90 jours ». Sert à refuser un chiffre que le code n'applique pas — sans lui,
+# une durée retirée du code survivrait dans la page sans que rien ne rougisse.
+DUREE_PUBLIEE = re.compile(r"\d+\s*(?:minutes?|heures?|jours?)")
+
+
+def _verifier_page_publique(repo_root: Path, retention, regles) -> list:
+    """Les durées de la page /privacy sont-elles celles du code ?
+
+    Rend la liste des écarts (vide si tout concorde). Un fichier absent ou
+    illisible EST un écart : la page publie des durées, donc leur vérification
+    ne peut pas disparaître en silence.
+    """
+    chemin = repo_root / PAGE_CONFIDENTIALITE
+    if not chemin.is_file():
+        return [
+            f"{PAGE_CONFIDENTIALITE} introuvable : les durées publiées par la page "
+            f"/privacy ne sont plus vérifiables"
+        ]
+    try:
+        dictionnaire = json.loads(chemin.read_text(encoding="utf-8"))
+    except Exception as exc:  # JSON cassé : le build échouerait aussi, mais ici on le dit
+        return [f"{PAGE_CONFIDENTIALITE} illisible ({exc}) : durées de la page non vérifiables"]
+
+    texte = dictionnaire.get(CLE_DUREES_PUBLIEES)
+    if not isinstance(texte, str) or not texte.strip():
+        return [
+            f"{PAGE_CONFIDENTIALITE} : clé « {CLE_DUREES_PUBLIEES} » absente ou vide — "
+            f"la page /privacy ne publie plus aucune durée"
+        ]
+
+    attendues = {
+        retention.formater_duree(regle.lifetime, retention.unite_du_symbole(regle.porte_par))
+        for regle in regles
+    }
+    messages = [
+        f"page /privacy : la durée « {duree} » du code n'est pas publiée par "
+        f"« {CLE_DUREES_PUBLIEES} »"
+        for duree in sorted(duree for duree in attendues if duree not in texte)
+    ]
+    messages += [
+        f"page /privacy : la durée « {publiee} » n'est portée par AUCUNE règle de "
+        f"conservation — le code n'applique pas ce chiffre"
+        for publiee in sorted({m.group(0) for m in DUREE_PUBLIEE.finditer(texte)} - attendues)
+    ]
+    return messages
 
 
 def _lignes_du_tableau(bloc: str) -> dict:
@@ -225,6 +283,23 @@ def main(argv=None) -> int:
     attendu = _rendre_bloc(retention)
     texte = doc.read_text(encoding="utf-8")
 
+    # La page publique est vérifiée AVANT toute écriture, y compris en --write :
+    # régénérer le document pendant que la page contredit le code laisserait
+    # croire que les deux surfaces s'accordent.
+    ecarts_page = _verifier_page_publique(repo_root, retention, regles)
+    if args.write and ecarts_page:
+        for message in ecarts_page:
+            print(f"[ECHEC] {message}", file=sys.stderr)
+            print(f"::error file={PAGE_CONFIDENTIALITE}::{message}", file=sys.stderr)
+        print(
+            "\nRien n'a été régénéré : la page /privacy et "
+            "backend/kojo_retention.py ne disent pas la même chose. Corriger "
+            "« privacyRetentionBody » (src/i18n/fr.json) à partir du code, jamais "
+            "l'inverse.",
+            file=sys.stderr,
+        )
+        return 1
+
     if args.write:
         debut, fin = texte.find(DEBUT), texte.find(FIN)
         if debut == -1 or fin == -1 or fin < debut:
@@ -259,13 +334,21 @@ def main(argv=None) -> int:
         return 1
 
     actuel = texte[debut:fin + len(FIN)]
-    if actuel != attendu:
-        for message in _diagnostiquer(attendu, actuel):
+    ecarts_doc = _diagnostiquer(attendu, actuel) if actuel != attendu else []
+    # Les DEUX surfaces sont rapportées ensemble, jamais l'une après l'autre :
+    # n'annoncer que la première ferait corriger, puis relancer, puis découvrir
+    # la seconde — et un garde qui cache un écart sur deux finit par être ignoré.
+    if ecarts_doc or ecarts_page:
+        for message in ecarts_doc:
             print(f"[ECHEC] {message}", file=sys.stderr)
             print(f"::error file=PRIVACY.md::{message}", file=sys.stderr)
+        for message in ecarts_page:
+            print(f"[ECHEC] {message}", file=sys.stderr)
+            print(f"::error file={PAGE_CONFIDENTIALITE}::{message}", file=sys.stderr)
         print(
-            "\nLa politique publiée annonce une durée que le code n'applique pas. "
-            "Régénérer : python3 .github/scripts/check-privacy-policy.py --write",
+            "\nUne durée publiée n'est pas celle que le code applique "
+            "(PRIVACY.md et/ou la page /privacy). Régénérer le document : "
+            "python3 .github/scripts/check-privacy-policy.py --write",
             file=sys.stderr,
         )
         return 1

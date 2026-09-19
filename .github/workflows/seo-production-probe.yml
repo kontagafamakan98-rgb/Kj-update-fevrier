@@ -1,0 +1,47 @@
+name: SEO production probe (daily)
+
+# ─── Pourquoi une sonde PÉRIODIQUE en plus de l'étape de ci.yml ──────────────
+# L'étape de `ci.yml` lit la production en mode INFORMATIF : elle publie un
+# `::notice` par intégration absente et ne fait jamais échouer le job. C'est
+# précisément ce qui a laissé F9 ouvert — des intégrations (GA4, meta Search
+# Console, liens sociaux, domaines GA de la CSP) absentes de la production, la
+# CI verte, et AUCUN run rouge nulle part. Un rapport que personne ne lit et qui
+# ne peut pas échouer n'est pas une vérification.
+#
+# Cette sonde-ci est STRICTE (`--strict`) : une intégration absente, ou une
+# sonde qui ne peut pas conclure, fait échouer le run. Elle tourne une fois par
+# jour au lieu de chaque push, à dessein : elle ne bloque aucune PR pour une
+# variable d'exécution, mais elle rend le silence impossible — un run rouge
+# quotidien est un fait visible, pas une note enterrée dans un log.
+#
+# Elle n'a besoin d'AUCUN secret : elle lit du HTML public. C'est ce qui la rend
+# capable de constater un écart de configuration que le dépôt ne peut pas
+# connaître autrement (les `VITE_*` sont inlinées au build par Vercel).
+on:
+  schedule:
+    # 06:17 UTC : hors des heures pleines, pour ne pas concurrencer les crons
+    # d'autres dépôts sur un runner partagé.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Sonde SEO de la production (stricte)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Aucune dépendance à installer : le script n'utilise que des modules
+      # `node:` et `fetch`. Il lit l'accueil réellement servi ET le sitemap, puis
+      # échoue en nommant chaque intégration absente et la variable à poser.
+      - name: Lire le HTML servi et échouer si une intégration manque
+        working-directory: frontend
+        run: node scripts/check-seo-production.js --strict

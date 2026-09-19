@@ -312,6 +312,32 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Qui sommes-nous : le contenu de fond de l'accueil. Un audit de
+          référencement reprochait à la page d'accueil ses 401 mots — un moteur
+          n'y trouvait pas de quoi comprendre qui édite le site. Le même bloc
+          est rendu par la coquille statique (vite.config.js), avec les mêmes
+          clés i18n : un crawler sans JavaScript le lit aussi. */}
+      <section className="py-12 md:py-16 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">{t('homeAboutTitle')}</h2>
+          <p className="text-gray-600 mb-4">{t('homeAboutText1')}</p>
+          <p className="text-gray-600">{t('homeAboutText2')}</p>
+          <p className="mt-6 text-sm">
+            <Link to="/about" className="text-orange-600 underline underline-offset-2">
+              {t('aboutTitle')}
+            </Link>
+            {' · '}
+            <Link to="/contact" className="text-orange-600 underline underline-offset-2">
+              {t('contactTitle')}
+            </Link>
+            {' · '}
+            <Link to="/privacy" className="text-orange-600 underline underline-offset-2">
+              {t('privacyTitle')}
+            </Link>
+          </p>
+        </div>
+      </section>
     </div>
   );
 }

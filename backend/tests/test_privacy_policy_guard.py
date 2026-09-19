@@ -31,6 +31,10 @@ BACKEND = REPO_ROOT / "backend"
 GUARD = REPO_ROOT / ".github" / "scripts" / "check-privacy-policy.py"
 DOC_NAME = "PRIVACY.md"
 MODULE_RELATIF = Path("backend") / "kojo_retention.py"
+# La SECONDE surface qui publie les durées : la page /privacy. Le garde la
+# compare au code (pas au document), donc la copie doit la porter elle aussi.
+PAGE_RELATIVE = Path("frontend") / "src" / "i18n" / "fr.json"
+CLE_DUREES = "privacyRetentionBody"
 COMMAND = "python .github/scripts/check-privacy-policy.py"
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
@@ -76,6 +80,18 @@ class CopieDuDepot:
             (REPO_ROOT / DOC_NAME).read_text(encoding="utf-8"), encoding="utf-8"
         )
         shutil.copy2(BACKEND / "kojo_retention.py", self.module)
+        # Copie du VRAI dictionnaire (il porte les textes de la page) : le cas
+        # « copie intacte est verte » prouve ainsi que la page publiée dit
+        # aujourd'hui la même chose que le code.
+        self.page = self.racine / PAGE_RELATIVE
+        self.page.parent.mkdir(parents=True, exist_ok=True)
+        self.page.write_bytes((REPO_ROOT / PAGE_RELATIVE).read_bytes())
+
+    def texte_page(self) -> str:
+        return self.page.read_text(encoding="utf-8")
+
+    def ecrire_page(self, texte: str) -> None:
+        self.page.write_text(texte, encoding="utf-8")
 
     def texte_document(self) -> str:
         return self.document.read_text(encoding="utf-8")
@@ -127,6 +143,32 @@ class TestRefus:
         assert code == 1, sortie
         assert "notifications" in sortie
         assert "30 jours" in sortie and "90 jours" in sortie
+
+    def test_une_duree_changee_dans_la_page_publique_est_refusee(self, copie):
+        """PRIVACY.md n'est lu que par ceux qui ouvrent le dépôt ; la page
+        /privacy est ce qu'un visiteur et un moteur lisent. Les deux surfaces
+        sortant du MÊME module, le garde refuse un écart sur l'une comme sur
+        l'autre — et il nomme laquelle, sinon un relecteur recouperait les deux."""
+        copie.ecrire_page(_remplacer(
+            copie.texte_page(), "365 jours", "360 jours",
+        ))
+
+        code, sortie = _lancer(copie.racine)
+
+        assert code == 1, sortie
+        assert "page /privacy" in sortie
+        assert "365 jours" in sortie and "360 jours" in sortie
+
+    def test_une_page_publique_absente_est_refusee(self, copie):
+        """Un garde qui ne conclut pas doit ÉCHOUER : sans le dictionnaire, les
+        durées publiées par la page redeviennent invérifiables, et un vert
+        laisserait croire qu'elles ont été comparées."""
+        copie.page.unlink()
+
+        code, sortie = _lancer(copie.racine)
+
+        assert code == 1, sortie
+        assert "fr.json" in sortie
 
     def test_une_ligne_retiree_du_document_est_refusee(self, copie):
         """Une donnée purgée que la politique ne nomme plus est exactement ce

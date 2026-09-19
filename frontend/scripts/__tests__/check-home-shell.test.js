@@ -5,6 +5,7 @@ import path from 'path';
 import {
   CONTACT_JSON,
   DESCRIPTION_MAX,
+  MIN_WORDS,
   TITLE_MAX,
   countWords,
   cssEscapedClass,
@@ -45,7 +46,11 @@ const CONTACT = {
   mapsEmbedUrl: 'https://www.google.com/maps?q=Bamako&output=embed',
 };
 
-const FILLER = Array.from({ length: 320 }, (_, index) => `mot${index}`).join(' ');
+// Le rembourrage DÉRIVE du plancher du garde : quand le seuil est passé de 300
+// à 500 mots (audit SEO), la fixture recopiée à 320 mots a fait rougir trois
+// tests qui n'avaient rien à voir avec la question. Une marge de 100 mots garde
+// la fixture conforme sans la recoller au chiffre à chaque fois.
+const FILLER = Array.from({ length: MIN_WORDS + 100 }, (_, index) => `mot${index}`).join(' ');
 
 const SHELL_CSS =
   '.min-h-screen{min-height:100vh}.text-3xl{font-size:1.875rem}.mt-8{margin-top:2rem}' +

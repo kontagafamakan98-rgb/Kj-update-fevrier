@@ -215,6 +215,46 @@ describe('section Domaine — ce qui se détecte tout seul après une migration'
   });
 });
 
+describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
+  // Le mode informatif est ce qui a laissé F9 ouvert des jours : quatre
+  // intégrations absentes de la production, et aucun run rouge. Le mode strict
+  // est celui de la sonde PÉRIODIQUE (.github/workflows/seo-production-probe.yml).
+  it('refuse une intégration absente et nomme la variable à poser', async () => {
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: stubFetch({ '/': UNCONFIGURED_HTML, '/sitemap.xml': SITEMAP_XML }),
+    });
+
+    expect(result.skipped).toBe(false);
+    expect(result.manquantes.length).toBeGreaterThan(0);
+    // Le rouge doit dire QUOI corriger : un échec muet oblige à relire le script.
+    expect(result.manquantes.join('\n')).toContain('VITE_GA_MEASUREMENT_ID');
+    expect(result.notices.join('\n')).toContain('BLOQUE');
+  });
+
+  it('ne trouve rien à refuser quand les quatre intégrations sont présentes', async () => {
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: stubFetch({ '/': CONFIGURED_HTML, '/sitemap.xml': SITEMAP_XML }),
+    });
+
+    expect(result.manquantes).toEqual([]);
+  });
+
+  it('une sonde SANS VERDICT échoue aussi : rien mesuré n’est pas « rien de cassé »', async () => {
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: stubFetch({}, { fail: true }),
+    });
+
+    expect(result.skipped).toBe(true);
+    expect(result.manquantes).toEqual([]);
+  });
+});
+
 describe('ligne de commande', () => {
   it('sort en 0 sur une base locale, avec le notice qui explique pourquoi', () => {
     const run = spawnSync(process.execPath, [SCRIPT, '--base', 'http://127.0.0.1:1'], {
@@ -223,5 +263,16 @@ describe('ligne de commande', () => {
     });
     expect(run.status).toBe(0);
     expect(run.stdout).toContain('::notice title=SEO production::base locale');
+  });
+
+  it('--strict sur une base locale ÉCHOUE : aucune conclusion n’est possible', () => {
+    // Une base loopback ne dit rien de la production : un mode strict qui y
+    // resterait vert ferait passer « non mesuré » pour « conforme ».
+    const run = spawnSync(process.execPath, [SCRIPT, '--base', 'http://127.0.0.1:1', '--strict'], {
+      encoding: 'utf8',
+      cwd: FRONTEND_DIR,
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain('::error title=SEO production::');
   });
 });
