@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { api } from '../api';
+import { api, handleApiError, TRANSPORT_FAILURE_MESSAGE } from '../api';
+import fr from '../../i18n/fr.json';
 
 // api.js doit construire ses URLs via le module unique buildApiUrl : la base
 // (VITE_API_URL / REACT_APP_BACKEND_URL) peut être définie avec OU sans /api,
@@ -371,5 +372,51 @@ describe('api — rotation du jeton (X-Kojo-Token)', () => {
 
     await api.get('/auth/me');
     expect(localStorage.getItem('token')).toBe('old-token');
+  });
+});
+
+// Une coupure de TRANSPORT (hors ligne, DNS, CORS, serveur injoignable) est le
+// moment où l'utilisateur a le MOINS besoin de lire de l'anglais technique :
+// `fetch` rejette alors un TypeError (« Failed to fetch », « Load failed ») que
+// les pages affichaient tel quel dans leur bandeau d'erreur. La frontière de
+// l'API le remplace par un message du produit, et la page qui sait traduire
+// garde la main : elle passe son propre repli à `handleApiError`.
+describe('api — coupure réseau : le texte du navigateur n’atteint pas l’interface', () => {
+  const coupure = (message) => Object.assign(new Error(message), { estCoupureReseau: true });
+
+  beforeEach(() => {
+    vi.stubEnv('VITE_API_URL', 'https://stub.example');
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('le rejet porte le message du produit, pas « Failed to fetch »', async () => {
+    const erreur = await api.get('/jobs').catch((error) => error);
+    expect(erreur.message).toBe(TRANSPORT_FAILURE_MESSAGE);
+    expect(erreur.estCoupureReseau).toBe(true);
+  });
+
+  it('le message du transport est celui que le produit publie déjà (clé i18n networkConnectionError)', () => {
+    expect(TRANSPORT_FAILURE_MESSAGE).toBe(fr.networkConnectionError);
+  });
+
+  it('la page qui traduit garde la main : son repli gagne sur le message du transport', () => {
+    expect(handleApiError(coupure(TRANSPORT_FAILURE_MESSAGE), 'Kojo est injoignable')).toBe('Kojo est injoignable');
+  });
+
+  it('le détail du serveur reste prioritaire, et une erreur levée localement n’est pas maquillée', () => {
+    expect(handleApiError({ response: { data: { detail: 'Adresse inconnue' } } }, 'Erreur')).toBe('Adresse inconnue');
+    expect(handleApiError(new Error('Le fichier dépasse 5 Mo'), 'Erreur')).toBe('Le fichier dépasse 5 Mo');
+  });
+
+  it('une annulation volontaire n’est pas transformée en coupure réseau', async () => {
+    global.fetch = vi.fn().mockRejectedValue(Object.assign(new Error('The user aborted a request.'), { name: 'AbortError' }));
+    const erreur = await api.get('/jobs').catch((error) => error);
+    expect(erreur.name).toBe('AbortError');
+    expect(erreur.estCoupureReseau).toBeUndefined();
   });
 });
