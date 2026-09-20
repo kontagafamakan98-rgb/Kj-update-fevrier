@@ -80,6 +80,9 @@
  *   • `REQUETES_HORS_CONTROLE` — la requête RETARDE un peintre de l'artefact
  *     (la ligne de contact de /login derrière l'appel aux pays). Bloquée : le
  *     peintre redevient celui de l'artefact, et la grandeur est ASSERTÉE.
+ *     Le tag GA4 y a figuré quelques heures le 20/09/2026, avant d'être chargé
+ *     APRÈS `load` : il ne retarde plus aucun peintre, donc il n'y est plus
+ *     (voir « Ce qui n'est PLUS bloqué » sous la table).
  *   • `LCP_PRODUIT_PAR_UNE_REPONSE` — la réponse EST le peintre (la liste des
  *     missions). Bloquée ou non, le LCP est le moment où la réponse est connue :
  *     la grandeur n'est pas assertée sur cette route, et le reste du socle l'est.
@@ -188,17 +191,23 @@ const REQUETES_HORS_CONTROLE = {
     'de /login y valait 3836 / 3781 / 3912 ms pour un FCP de 1 028 ms, sur le même code ' +
     'que le job vert de 12:29, qui le mesurait à 1 767 ms. Bloquée : 1 112 ms mesuré contre ' +
     'le serveur de rewrites local (mêmes budgets, chemin de mesure débarrassé d’un tiers)',
-  '*googletagmanager.com*':
-    'le tag GA4 posé le 20/09/2026 à 12:59 est la requête la plus lente des rapports du job ' +
-    'rouge de 14:31-14:38 (58 à 174 s de temps réseau simulé, sur TOUTES les pages) et le ' +
-    'LCP de la coquille de /login y est passé de ~1,7 s à 4 261 / 4 343 / 4 266 ms — alors ' +
-    'que la même page servie en production, mesurée depuis un poste hors runner, vaut ' +
-    '1 239 ms. Sous bridage 4G, ce tiers occupe une connexion et retarde le chunk critique : ' +
-    'la mesure doit être celle de l’artefact, pas celle de sa portée réseau',
-  '*google-analytics.com*':
-    'la mesure (`/g/collect`) que le tag ci-dessus déclenche : même origine tierce, même ' +
-    'effet sur le chemin critique, et elle n’existe que si le tag a pu se charger',
 };
+
+// ── Ce qui n'est PLUS bloqué : le tag GA4 (retiré le 20/09/2026) ──────────────
+// `googletagmanager.com` ET son `google-analytics.com/g/collect` ont été bloqués
+// pendant quelques heures le 20/09/2026 : le tag était alors `async` dans le
+// `<head>`, donc une requête du CHEMIN CRITIQUE (58 à 174 s de temps réseau
+// simulé, LCP de /login de ~1,7 s à 4,26 s). Ce n'est plus le cas : le tag est
+// DÉCLARÉ dans le HTML (`data-kojo-ga-src`) et chargé APRÈS `load` (voir
+// `src/utils/analytics.js` et CI-COVERAGE.md, F6). Le LCP est finalisé au
+// `load` : un tiers qui démarre après ne peut plus le décider.
+//
+// Le blocage est donc RETIRÉ, pas oublié : le gate mesure désormais ce qu'un
+// visiteur reçoit, tag compris. Mesuré sur le build servi localement, bridage 4G
+// simulé, 3 runs sur l'accueil, tag actif et RIEN de bloqué : LCP 1 446 / 1 253
+// / 2 007 ms, contre 12 005 / 1 603 / 1 939 ms avec l'ancien tag `async`.
+// Le test de ce fichier refuse qu'un motif GA revienne sans que la décision soit
+// rouverte : rebloquer un tiers est un choix, et un choix se justifie.
 
 /**
  * Routes dont le LCP (et le SCORE, qui le pèse) dépend d'une RÉPONSE de l'API :
