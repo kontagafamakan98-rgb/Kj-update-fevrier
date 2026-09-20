@@ -11,7 +11,37 @@
  * « Cannot use assertMatrix with other options ») : l'entrée globale sans motif
  * porte donc les autres budgets, et chaque route porte le sien.
  *
- * ── Les valeurs sont MESURÉES, pas choisies ─────────────────────────────────
+ * ── Deux statistiques, parce que les grandeurs ne se comportent pas pareil ──
+ * L'AGRÉGATION est choisie par entrée, selon ce que la grandeur décrit :
+ *   • le socle global (score, FCP, LCP, TBT) est mesuré au MEILLEUR des 3 runs
+ *     (`optimistic`) : ces grandeurs dépendent du CPU du runner, dont le bruit
+ *     est UNILATÉRAL — une machine chargée ne peut qu'AJOUTER du temps. Le
+ *     meilleur run décrit donc le coût propre de l'artefact, quand une
+ *     régression, elle, monte dans les trois runs ;
+ *   • le CLS par route reste sur la MÉDIANE (`median`) : c'est une propriété du
+ *     DOM et du CSS, pas de la machine — relevé identique d'un run à l'autre
+ *     (0 / 0,009 / 0,045 selon la page, 3 runs par page le 19/09/2026), donc la
+ *     médiane y est à la fois stable et la plus stricte.
+ *
+ * ── Pourquoi le socle n'est PAS sur la médiane (mesuré le 20/09/2026) ─────
+ * Deux jobs de `main` portant le MÊME arbre (14e0531) : l'un vert (08:10),
+ * l'autre rouge (08:50), verdict décidé par la SEULE assertion
+ * `categories:performance >= 0,9` sur `/login` — 0,79 de médiane, runs à
+ * 1,00 / 0,79 / 0,77. Les budgets explicites (FCP, LCP, TBT, CLS), eux, sont
+ * passés dans LES DEUX jobs. Ce qui a bougé n'est pas l'artefact :
+ *
+ *   /login, 3 runs  score   FCP   LCP   TBT   Script Evaluation   plus longue tâche
+ *   job vert        0,99   1386  2361    23   174 ms             71 ms
+ *   job rouge       0,79   1400  1774   890   995 ms             908 ms   (run 3)
+ *                   (run 1 : score 1,00, TBT 0 ms)
+ *
+ * Mêmes octets, même page, et 5,7× de temps d'évaluation de script : la machine
+ * a faim. Le score est une moyenne pondérée où le TBT pèse 30 % : cette famine
+ * le traverse — pendant que le budget TBT, lui, restait à 74 % de son plafond.
+ * Une médiane sur 3 runs ne peut pas distinguer « un run sur trois a souffert »
+ * de « la page a régressé » ; le meilleur des 3 le peut.
+ *
+ * ── Les valeurs sont MESURÉES, pas choisies ────────────────────────────────
  * Relevé des rapports Lighthouse réellement archivés par les jobs de `main` et
  * de PR (artifacts `lighthouse-reports` : 3 runs par page et par job, agrégation
  * par MÉDIANE comme en CI). Valeurs CLS par run, 9 jobs de main + 8 jobs de PR :
@@ -140,7 +170,11 @@ const clsAssertionMatrix = (routes, globalAssertions) => {
     // Sans `matchingUrlPattern`, cette entrée s'applique à TOUTES les URLs
     // (le filtre est alors absent : @lhci/utils/src/assertions.js). Elle ne
     // porte AUCUN budget CLS : c'est tout l'intérêt de la matrice.
-    { aggregationMethod: 'median', assertions: globalAssertions },
+    // `optimistic` = le MEILLEUR des 3 runs : voir l'en-tête, « Deux
+    // statistiques ». Sur les 2 jobs de `main` du 20/09/2026 (39 runs, 13
+    // pages), le pire meilleur-run valait 0,97 de score, 1 380 ms de FCP,
+    // 2 587 ms de LCP et 10 ms de TBT — les mêmes seuils, un verdict stable.
+    { aggregationMethod: 'optimistic', assertions: globalAssertions },
     ...routes.map((route) => ({
       matchingUrlPattern: patternFor(route),
       aggregationMethod: 'median',

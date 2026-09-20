@@ -22,7 +22,7 @@ Conséquence directe : « à chaque push » signifie en réalité **à chaque pu
 `main` et à chaque PR vers `main`**. Une branche de travail peut accumuler
 plusieurs commits entre deux validations ; le premier signal vient de la PR.
 
-## 2. Les 8 jobs, et ce qui les fait réellement échouer
+## 2. Les 9 jobs, et ce qui les fait réellement échouer
 
 | Job (nom affiché) | Échoue réellement sur | Peut réussir sans rien vérifier |
 |---|---|---|
@@ -209,9 +209,10 @@ Deux points que ces chiffres imposent :
 - **le TBT d'un runner partagé est bimodal** (0-30 ms la plupart du temps,
   jusqu'à 2 878 ms sur un run, pour la même page et le même commit). Le plafond
   de 1 200 ms est donc au-dessus du bruit, pas au-dessus d'un objectif de
-  performance : avec `numberOfRuns: 2` et l'agrégation `optimistic` (minimum) qui
-  prévalaient, une seule mesure décidait du sort du job. Le passage à
-  **3 runs + médiane** est ce qui rend le budget interprétable.
+  performance : avec `numberOfRuns: 2` et une seule mesure, un run décidait du
+  sort du job. Le passage à **3 runs** est ce qui rend le budget interprétable —
+  mais 3 runs ne suffisent pas à choisir la statistique : voir « Correctif du
+  20/09/2026 » plus bas, qui remplace la médiane sur le socle global.
 - **le CLS de /jobs était un défaut réel** : 0,1353 le 16/09/2026, identique
   sur les 3 runs, au-dessus du seuil Lighthouse de 0,1. Le plafond global avait
   été relevé à 0,15 en conséquence, ce qui rendait /jobs tolérant à presque
@@ -247,11 +248,12 @@ de 9 jobs de `main` et 8 jobs de PR, 3 runs par page, agrégation par médiane) 
 pour `/login` à cause de son run isolé) sont écrites dans
 `frontend/scripts/lhci-cls-budgets.cjs`, avec les compteurs de runs.
 
-Trois propriétés sont tenues par des tests plutôt que par la relecture :
-
-- `assertMatrix` est **exclusif** d'`assertions`/`aggregationMethod` dans
-  `@lhci/utils` ; l'agrégation par médiane est donc portée par chaque entrée, et
-  un retour du plafond global dans `lighthouserc.cjs` est refusé ;
+Trois propriétés sont tenues par des tests plutôt que par la relecture :- `assertMatrix` est **exclusif** d'`assertions`/`aggregationMethod` dans
+  `@lhci/utils` ; l'agrégation est donc portée par chaque entrée, et un retour du
+  plafond global dans `lighthouserc.cjs` est refusé ;
+- la statistique de chaque entrée est **verrouillée** : le socle global agrège au
+  meilleur des 3 runs, le CLS par route à la médiane (voir « Correctif du
+  20/09/2026 »).
 - chaque page auditée a **son** entrée, et le socle (sans motif) ne porte aucun
   budget CLS — sinon les deux se cumuleraient et le plus large gagnerait ;
 - une page auditée **sans budget mesuré** fait échouer le **chargement** de la
@@ -273,10 +275,65 @@ La variable est nécessaire pour rejouer ces lignes : sans `KOJO_LHCI_BASE_URL`,
 lhci retombe sur le repli local (l'accueil seul), donc la matrice ne couvre qu'une
 page.
 
-Un TBT 40× au-dessus de la médiane ou un LCP doublé passent encore au vert :
-la détection d'une régression *relative* exigerait un serveur LHCI, absent. Le
-garde attrape un **effondrement**, sauf sur le CLS où il attrape désormais la
-régression fine de chaque page.
+Un TBT 40× au-dessus du meilleur run ou un LCP au-dessus de 3 500 ms passent
+encore au vert : la détection d'une régression *relative* exigerait un serveur
+LHCI, absent. Le garde attrape un **effondrement**, sauf sur le CLS où il attrape
+désormais la régression fine de chaque page — et, ce que ce correctif apporte, il
+le fait avec un verdict **reproductible** : le même artefact donne le même
+verdict.
+
+### F6bis — Correctif du 20/09/2026 : le verdict du job ne dépend plus du tirage du runner
+
+`main` a rougi le 20/09/2026 (run `35500653504`, arbre `14e0531`) sur la SEULE
+assertion `categories:performance` de `/login` : médiane 0,79, runs `1,00 / 0,79
+/ 0,77`. Le même arbre, huit minutes plus tôt, passait vert (run `35498834165`) —
+et les budgets explicites (`FCP`, `LCP`, `TBT`, `CLS` par route) passaient dans
+**les deux** jobs. Les 39 rapports des deux jobs, lus dans les artifacts
+`lighthouse-reports` :
+
+```
+/login, 3 runs   score   FCP    LCP    TBT    Script Evaluation   plus longue tâche
+job vert         0,99    1386   2361     23   174 ms             71 ms
+job rouge        0,79    1400   1774    890   995 ms             908 ms   (run 3)
+                 (run 1 : score 1,00, TBT 0 ms)
+```
+
+Mêmes octets, même page, et 5,7× de temps d'évaluation de script : c'est le runner
+qui a faim, pas le code. Le score étant une moyenne pondérée où le TBT pèse 30 %,
+cette famine le traverse — alors que le budget TBT, lui, restait à 74 % de son
+plafond. Une médiane sur 3 runs ne peut pas distinguer « un run sur trois a
+souffert » de « la page a régressé ».
+
+**Ce qui a changé : la statistique, jamais un seuil.** Le socle global (score,
+FCP, LCP, TBT) se compare désormais au **meilleur des 3 runs** — le bruit d'un
+runner est *unilatéral*, il ne peut qu'ajouter du temps, donc le meilleur run
+décrit le coût propre de l'artefact, quand une régression monte dans les trois.
+Le **CLS par route reste à la médiane** : c'est une propriété du DOM et du CSS,
+relevée identique d'un run à l'autre (0 / 0,009 / 0,045 selon la page), donc la
+médiane y est à la fois la plus stricte et la plus stable. Aucun plafond n'a été
+relevé.
+
+Relevé de la nouvelle statistique sur les 2 jobs de `main` du 20/09/2026 (39 runs,
+13 pages) — pire **meilleur-run** : score 0,97, FCP 1 380 ms, LCP 2 587 ms, TBT
+10 ms, soit des marges de 1,35× à 120× sous les seuils.
+
+Preuves rejouées hors ligne sur les rapports **réels** des deux jobs
+(`.lighthouseci/` reconstruit depuis l'artifact, `KOJO_LHCI_BASE_URL` posée) :
+
+```
+config d'AVANT, rapports du run rouge   → « expected: >=0.9  found: 0.79 »   exit 1
+config d'APRÈS, rapports du run rouge   → « All results processed! »          exit 0
+config d'APRÈS, rapports du run vert    → « All results processed! »          exit 0
+LCP de /login à 4 200 ms sur les 3 runs → « largest-contentful-paint »        exit 1
+score de /login à 0,55 sur les 3 runs   → « categories.performance »          exit 1
+CLS de /register à 0,03 sur les 3 runs  → « cumulative-layout-shift »         exit 1
+(0,015 de budget : c'est la valeur que la régression #19 produisait)
+TBT de /jobs à 3 000 ms sur les 3 runs  → « total-blocking-time »             exit 1
+```
+
+Témoin vert avant et après, rapports sources intacts à l'empreinte SHA-1, et le
+verrou de la statistique est tenu par un test
+(`scripts/__tests__/lhci-cls-budgets.test.js`) plutôt que par la relecture.
 
 ### F2bis — Lighthouse n'auditait qu'UNE page, à cause d'un nom de variable
 
