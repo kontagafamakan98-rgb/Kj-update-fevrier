@@ -298,9 +298,16 @@ tiers fait au plus grand peintre :
   simulé sous bridage 4G), pendant que le LCP de la coquille de `/login` passe
   de ~1,7 s à 4 261 / 4 343 / 4 266 ms. La même page servie en production vaut
   **1 239 ms** mesurée depuis un poste hors runner : le coût vient du chemin
-  réseau du runner vers un tiers, pas de l'artefact — et sous 4G réelle, un tag
-  tiers qui occupe une connexion retarde aussi le chunk critique, ce qui est un
-  sujet PRODUIT (charger GA après le `load`, pas avant) plutôt qu'un budget ;
+  réseau du runner vers un tiers, pas de l'artefact. Le sujet PRODUIT a été
+  traité le 20/09/2026 : le tag n'est plus `async` dans le `<head>`, il est
+  **déclaré** dans le HTML (`data-kojo-ga-src`, donc toujours visible de la sonde
+  SEO et d'un audit « no-JS ») et chargé **après `load`** par
+  `src/utils/analytics.js`. Mesuré sur le build servi localement, bridage 4G
+  simulé de Lighthouse, 3 runs sur l'accueil : LCP **12 005 / 1 603 /
+  1 939 ms → 1 446 / 1 253 / 2 007 ms** — meilleur run **1 603 → 1 253 ms**,
+  médiane **1 939 → 1 446 ms**, et le run à 12 s (score 0,54) disparaît. Le
+  blocage de `googletagmanager` dans le collect est conservé (le filet reste
+  utile), mais il ne porte plus l'essentiel ;
 - la réponse **EST** le peintre (`/jobs`) → bloquée ou non, le LCP reste le
   moment où la réponse est connue : **2 727 ms** avec la liste, **4 256 ms** avec
   l'état vide, **5 177 ms** avec la requête bloquée (les réessais avant l'état
@@ -561,7 +568,8 @@ production. Deux maillons manquaient :
 2. **Aucun test de l'injection.** `scripts/__tests__/seo-extras-injection.test.js`
    pilote désormais le **vrai** plugin `inject-seo-extras` du **vrai**
    `vite.config.js` (importé, jamais recopié) avec un environnement fabriqué, et
-   exige : balise `gtag/js?id=G-…` en `head`, meta `google-site-verification`,
+   exige : déclaration `gtag/js?id=G-…` en `head` (`data-kojo-ga-src`, adresse
+   dans le HTML servi, script NON exécuté au chargement), meta `google-site-verification`,
    `sameAs` peuplé des **seuls** profils `https://` déclarés, HTML intact sans
    variable, refus d'un identifiant non `G-…`, et — le piège le plus sournois —
    les origines GA (`googletagmanager.com`, `google-analytics.com`, `region1`)
@@ -695,7 +703,7 @@ KOJO_GA_MEASUREMENT_ID=G-… KOJO_GSC_VERIFICATION=… VERCEL_TOKEN=vcp_… \
 là. Relevé direct (`curl -sS https://kojoforafrica.cc.cd/`) :
 
 ```
-googletagmanager                       → 2 occurrences (balise gtag + origine CSP relâchée)
+googletagmanager                       → 2 occurrences (déclaration du tag + origine CSP relâchée)
 google-site-verification content=…     → présent (yfa2PfX1…)
 "sameAs"                               → 3 profils (facebook, instagram, x)
 ```
@@ -844,14 +852,14 @@ Rejouer la mesure, sur la production comme sur un build local :
 
 ```bash
 # la production sert-elle les balises ?
-curl -sS https://kojoforafrica.cc.cd/ | grep -c googletagmanager   # 2 = balise + origine CSP (0 = non configuré)
+curl -sS https://kojoforafrica.cc.cd/ | grep -c googletagmanager   # 2 = déclaration + origine CSP (0 = non configuré)
 curl -sS https://kojoforafrica.cc.cd/ | grep -o '"sameAs": \[[^]]*\]'
 
 # l'injection fonctionne-t-elle quand les variables sont posées ?
 cd frontend
 VITE_GA_MEASUREMENT_ID=G-TEST123456 VITE_GSC_VERIFICATION=jeton \
 VITE_SOCIAL_FACEBOOK=https://facebook.com/kojo-test npx vite build
-grep -c googletagmanager build/index.html   # 2 (balise + CSP relâchée)
+grep -c googletagmanager build/index.html   # 2 (déclaration + CSP relâchée)
 ```
 
 ### F10 — Le contrat `/jobs/:id` n'était vérifié qu'en HTTP, et jamais contre l'application — **fermé le 18/09/2026**

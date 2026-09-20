@@ -4,14 +4,19 @@
 //
 // 1. Plausible : le script externe https://plausible.io/js/script.js est
 //    ajouté au DOM seulement si VITE_PLAUSIBLE_DOMAIN est défini.
-// 2. Google Analytics 4 : la balise externe
-//    https://www.googletagmanager.com/gtag/js?id=… est injectée dans le HTML
+// 2. Google Analytics 4 : l'adresse du tag
+//    https://www.googletagmanager.com/gtag/js?id=… est DÉCLARÉE dans le HTML
 //    STATIQUE au build (plugin inject-seo-extras de vite.config.js) dès que
 //    VITE_GA_MEASUREMENT_ID est défini — un crawler sans JavaScript la voit
-//    donc, ce qu'un script ajouté par le bundle ne permet pas. C'est ICI, dans
-//    le module bundlé, que le `gtag('config')` est émis (pas d'inline), et un
-//    événement page_view est renvoyé à chaque navigation SPA (sinon GA ne
-//    verrait que l'accueil : react-router ne recharge pas la page).
+//    donc, et la sonde SEO de production la détecte. Le script lui-même n'est
+//    pas exécuté au chargement : c'est ICI, après `load` ou au premier temps
+//    mort, qu'il est injecté depuis cette déclaration. Sous bridage 4G, une
+//    balise `async` dans le `<head>` retardait le chunk critique et décidait du
+//    LCP (mesuré le 20/09/2026) ; la file `dataLayer`, elle, est prête
+//    immédiatement, donc les `gtag('config')`/`page_view` émis entre-temps sont
+//    traités à l'arrivée du script. Le `gtag('config')` est émis ici (pas
+//    d'inline) et un événement page_view est renvoyé à chaque navigation SPA
+//    (sinon GA ne verrait que l'accueil : react-router ne recharge pas la page).
 //
 // Aucun identifiant n'est codé en dur : sans variable d'environnement, ces
 // fonctions sont des no-op stricts (aucune requête, aucune erreur console).
@@ -49,10 +54,44 @@ const trackGaPageView = () => {
   });
 };
 
+/**
+ * Adresse du tag GA4 telle que le HTML servi la DÉCLARE, ou `''`.
+ *
+ * Lue sur la déclaration (`data-kojo-ga-src`) plutôt que reconstruite depuis
+ * la variable d'environnement : c'est la déclaration que la sonde SEO vérifie,
+ * donc charger une autre adresse ferait diverger le script chargé du tag
+ * audité. En dev, le plugin de build ne tourne pas : aucune déclaration, donc
+ * aucun tag — comme avant, où la balise statique n'existait qu'au build.
+ */
+export const gaScriptUrlFrom = (doc = typeof document === 'undefined' ? null : document) => {
+  const declared = doc?.querySelector('script[data-kojo-ga-src]');
+  return normalize(declared?.getAttribute('data-kojo-ga-src'));
+};
+
+const injectGaScript = (src) => {
+  if (document.querySelector('script[src*="googletagmanager.com/gtag/js"]')) return;
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = src;
+  document.head.appendChild(script);
+};
+
+// Hors du chemin critique : après `load`, ou au premier temps mort s'il vient
+// plus tôt. `requestIdleCallback` absent (Safari) → `setTimeout`, jamais un
+// chargement synchrone.
+const loadGaScriptAfterLoad = (src) => {
+  const charger = () => injectGaScript(src);
+  const planifier = () =>
+    typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback(charger, { timeout: 3000 })
+      : window.setTimeout(charger, 0);
+  if (document.readyState === 'complete') planifier();
+  else window.addEventListener('load', planifier, { once: true });
+};
+
 const initGoogleAnalytics = (measurementId) => {
-  // gtag.js est chargé par la balise statique du HTML ; on prépare juste la
-  // file d'attente si elle n'est pas encore initialisée (le script peut
-  // arriver après le boot React — async).
+  // La file d'attente est prête AVANT tout réseau : les commandes émises ici
+  // sont traitées quand le script arrive (il est chargé après `load`).
   window.dataLayer = window.dataLayer || [];
   if (typeof window.gtag !== 'function') {
     window.gtag = function gtag() {
@@ -65,6 +104,10 @@ const initGoogleAnalytics = (measurementId) => {
   // ci-dessous, comme les suivants, pour n'avoir qu'un seul chemin de code.
   window.gtag('config', measurementId, { send_page_view: false });
   trackGaPageView();
+
+  // Le tag déclaré par le HTML est chargé hors du chemin critique.
+  const src = gaScriptUrlFrom();
+  if (src) loadGaScriptAfterLoad(src);
 
   const wrap = (type) => {
     const original = window.history[type];
