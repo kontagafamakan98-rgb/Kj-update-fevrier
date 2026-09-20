@@ -7,6 +7,10 @@ import FlagIcon from '../components/FlagIcon';
 import { usePageMeta } from '../utils/seo';
 import { publicAPI } from '../services/apiEndpoints';
 import { safeLog } from '../utils/env';
+// Le corps de l'accueil (catégories, promesses, étapes) est DÉCLARÉ une fois :
+// src/config/page-sections.js, que le build lit pour écrire la coquille
+// pré-rendue. Ce composant en DÉRIVE au lieu de tenir sa propre liste.
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 export default function Home() {
   const { t } = useLanguage();
@@ -28,23 +32,14 @@ export default function Home() {
   const statCompleted = stats?.completed_jobs != null ? stats.completed_jobs : 500;
   const statCountries = stats?.countries != null ? stats.countries : 4;
 
-  // Liste alignée sur les catégories canoniques du backend (kojo_routers_jobs.py) :
-  // general, plumbing, electrical, construction, cleaning, gardening, tutoring,
-  // mechanics. « carpentry » et « computing » n'existent pas côté serveur (ils
-  // seraient normalisés en « general ») — les cliquer menait vers un filtre
-  // sans résultat.
-  const categories = [
-    { key: 'general', icon: '🛠️' },
-    { key: 'plumbing', icon: '🔧' },
-    { key: 'electrical', icon: '⚡' },
-    { key: 'construction', icon: '🏗️' },
-    { key: 'cleaning', icon: '🧽' },
-    { key: 'gardening', icon: '🌱' },
-    { key: 'tutoring', icon: '📚' },
-    { key: 'mechanics', icon: '🔩' },
-    { key: 'carpentry', icon: '🪚' },
-    { key: 'computing', icon: '💻' }
-  ];
+  // Catégories, promesses et étapes : lues dans la déclaration du corps de la
+  // page (src/config/page-sections.js) — la MÊME que le build utilise pour
+  // écrire la coquille pré-rendue. Recopiées ici, elles pouvaient diverger :
+  // une promesse ajoutée à la page ne paraissait pas pour un crawler sans
+  // JavaScript, et rien ne rougissait. `labelKey` est aussi le code de
+  // catégorie canonique du backend (kojo_routers_jobs.py) : le libellé
+  // affiché et le filtre de /jobs sortent de la même valeur.
+  const { categories, promises, steps } = PAGE_SECTIONS['/'];
 
   const countries = getAllCountries().map((country, index) => ({
     ...country,
@@ -141,12 +136,12 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
             {categories.map((category) => (
               <Link
-                key={category.key}
-                to={`/jobs?category=${category.key}`}
+                key={category.labelKey}
+                to={`/jobs?category=${category.labelKey}`}
                 className="bg-white rounded-2xl shadow-md p-6 text-center hover:shadow-lg transform transition hover:scale-105"
               >
                 <div className="text-3xl md:text-4xl mb-3">{category.icon}</div>
-                <h3 className="font-medium text-gray-900 text-sm md:text-base">{t(category.key)}</h3>
+                <h3 className="font-medium text-gray-900 text-sm md:text-base">{t(category.labelKey)}</h3>
               </Link>
             ))}
           </div>
@@ -157,35 +152,17 @@ export default function Home() {
       <section className="py-12 md:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-            <div className="text-center">
-              <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl">💼</span>
+            {promises.map(({ icon, titleKey, descriptionKey }) => (
+              <div key={titleKey} className="text-center">
+                <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-2xl">{icon}</span>
+                </div>
+                <h3 className="text-xl font-semibold mb-4 text-gray-900">{t(titleKey)}</h3>
+                <p className="text-gray-600">
+                  {t(descriptionKey)}
+                </p>
               </div>
-              <h3 className="text-xl font-semibold mb-4 text-gray-900">{t('findWork')}</h3>
-              <p className="text-gray-600">
-                {t('findWorkDescription')}
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl">🤝</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-4 text-gray-900">{t('connect')}</h3>
-              <p className="text-gray-600">
-                {t('connectDescription')}
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
-                <span className="text-2xl">💰</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-4 text-gray-900">{t('securePayments')}</h3>
-              <p className="text-gray-600">
-                {t('securePaymentsDescription')}
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -201,35 +178,16 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-              <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">1️⃣</span>
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t('homeStep1Title')}</h3>
-              <p className="text-gray-600 text-sm">
-                {t('homeStep1Desc')}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-              <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">2️⃣</span>
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t('homeStep2Title')}</h3>
-              <p className="text-gray-600 text-sm">
-                {t('homeStep2Desc')}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-              <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">3️⃣</span>
-              </div>
-              <h3 className="text-lg font-semibold mb-2 text-gray-900">{t('homeStep3Title')}</h3>
-              <p className="text-gray-600 text-sm">
-                {t('homeStep3Desc')}
-              </p>
-            </div>
+            {steps.map(({ icon, titleKey, descriptionKey }) => (
+              <div key={titleKey} className="bg-white rounded-2xl shadow-md p-6 text-center">
+                <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">{icon}</span>
+                </div>
+                <h3 className="text-lg font-semibold mb-2 text-gray-900">{t(titleKey)}</h3>
+                <p className="text-gray-600 text-sm">
+                  {t(descriptionKey)}
+                </p>
+              </div>            ))}
           </div>
         </div>
       </section>
