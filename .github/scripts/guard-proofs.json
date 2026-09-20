@@ -865,6 +865,26 @@
       ]
     },
     {
+      "id": "seo-production: page du sitemap sans description toleree",
+      "garde": "frontend/scripts/check-seo-production.js",
+      "cible": "frontend/scripts/check-seo-production.js",
+      "trouve": "  if (!description) {",
+      "remplace": "  if (false && !description) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-seo-production.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une page sans description, en la nommant"
+      ]
+    },
+    {
       "id": "spa-routes: 404.html avec script toleree",
       "garde": "frontend/scripts/check-spa-routes.js",
       "cible": "frontend/scripts/check-spa-routes.js",

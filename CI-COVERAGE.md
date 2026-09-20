@@ -730,6 +730,19 @@ indépendant de celui du frontend. Un écart est donc nommé (`ÉCART : l'origin
 attendue est …`) au lieu de se déduire d'une carte OG cassée, et sans bloquer
 davantage.
 
+**Depuis le 20/09/2026, elle lit aussi CHAQUE page du sitemap, pas seulement
+l'accueil** (« Pages — N/N page(s) du sitemap vérifiée(s) »). Chaque page doit
+annoncer son `canonical`, son `<title>` et sa `description`, et le `canonical`
+est confronté à la page ELLE-MÊME, pas seulement à l'origine : une route qui
+annonce le `canonical` d'une autre a bien une adresse canonique, mais elle envoie
+les crawlers ailleurs. Avant cette passe, le sitemap annonçait huit pages dont
+sept n'étaient jamais lues — une page servie sans description restait
+silencieuse. Les fiches `/jobs/:id` sont **écartées** du contrôle de page (jusqu'à
+9 000 dans le sitemap, et leur cycle est déjà vérifié en HTTP contre la production
+par `check-og-job-200.js`) ; la notice le dit et les compte. Le contrôle de page
+partage le sort du reste : informatif sur les PR, **bloquant** sous `--strict` —
+une page du sitemap non servie (404) est refusée comme une page muette.
+
 ── **Le silence, lui, était le vrai défaut — fermé le 19/09/2026** ─────────────
 Cette sonde était **informative à dessein** (« une configuration incomplète est
 un fait d'exploitation, pas une régression de code ») : elle publiait un
@@ -1945,10 +1958,11 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    intégration absente, sur `main` uniquement), mais elle a un mode **strict**
    (`--strict`) que lance une fois par jour
    `.github/workflows/seo-production-probe.yml` : une intégration **requise**
-   absente y rougit, une facultative non (cf. F9). Restent deux limites, elles
-   réelles : seule l'accueil est sondée en HTML (les autres pages du sitemap et
-   leur `canonical` ne le sont pas — la sonde lit en revanche le
-   `/sitemap.xml` lui-même, pour l'hôte qu'il annonce), et un `Age` de cache non
+   absente y rougit, une facultative non (cf. F9). Chaque page du sitemap est
+   lue (canonical, title, description) — les fiches `/jobs/:id` exceptées, elles
+   couvertes en HTTP par `check-og-job-200.js`. Restent deux limites, elles
+   réelles : le contrôle de page ne suit que jusqu'à `MAX_PAGES` (20) pages
+   d'un sitemap qui en admet 9 000, et un `Age` de cache non
    nul n'est pas détecté — le
    HTML est servi en `must-revalidate`, donc l'edge revalide, mais la sonde ne
    le PROUVE pas (mesuré : `HIT` + `Age: 1` avec et sans `cache-control`).
