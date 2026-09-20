@@ -579,10 +579,11 @@ pendant les déploiements » (doc Vercel) ; ce que ça coûte, c'est de ne plus
 pouvoir la RELIRE pour vérifier. Les VALEURS, elles, viennent d'un compte Google
 (une propriété GA4, un jeton Search Console) : aucune commande ne peut les
 inventer. En revanche `frontend/scripts/setup-seo-env.js` fait en une fois les
-trois gestes qu'on oublie dans l'ordre — pose des deux variables (`production` ET
-`preview`, en `upsert`, donc rejouable), redéploiement de production, puis
-relecture du HTML servi par la sonde ci-dessus, avec **échec** si les deux balises
-n'y sont pas. Il tourne **depuis la CI**, sans jeton local : le workflow
+trois gestes qu'on oublie dans l'ordre — pose des variables FOURNIES (`production`
+ET `preview`, en `upsert`, donc rejouable), redéploiement de production, puis
+relecture du HTML servi par la sonde ci-dessus, avec **échec** si une balise
+fournie n'y est pas. L'unité d'écriture est la VARIABLE : une valeur non fournie
+laisse les autres passer et se nomme (voir « Correctif du 20/09/2026 » plus bas). Il tourne **depuis la CI**, sans jeton local : le workflow
 `.github/workflows/seo-vercel-env.yml` est **manuel** (`workflow_dispatch`) et lit
 les valeurs dans des **secrets de dépôt** :
 
@@ -592,16 +593,21 @@ les valeurs dans des **secrets de dépôt** :
 | `KOJO_GA_MEASUREMENT_ID` | identifiant de flux GA4, de la forme `G-…` |
 | `KOJO_GSC_VERIFICATION` | contenu de la balise `google-site-verification` |
 
-Bouton « Run workflow » sur **SEO Vercel env (manual)** : le job pose les deux
-variables (`production` ET `preview`, en `upsert`), redéploie la production,
-attend `READY`, relit le HTML servi et **échoue** si les deux balises n'y sont
-pas. Trois raisons à cette forme : aucun push ni PR ne peut déclencher une
-écriture sur la production Vercel (fichier `dispatch`-only, séparé de `ci.yml`,
-dont le bouton déploie le backend Fly), et les VALEURS ne sont jamais des entrées
-de dispatch — une entrée est publiée dans les logs du run, un secret ne l'est
-pas. Un secret absent fait échouer le job **avant toute écriture** (« Il manque
-une valeur — rien n'a été écrit », code 2) : une variable vide posée sur Vercel
-remplacerait la configuration en place par du vide.
+Bouton « Run workflow » sur **SEO Vercel env (manual)** : le job pose les
+variables FOURNIES (`production` ET `preview`, en `upsert`), redéploie la
+production, attend `READY`, relit le HTML servi et **échoue** si une balise
+fournie n'y est pas. Trois raisons à cette forme : aucun push ni PR ne peut
+déclencher une écriture sur la production Vercel (fichier `dispatch`-only, séparé
+de `ci.yml`, dont le bouton déploie le backend Fly), et les VALEURS ne sont jamais
+des entrées de dispatch — une entrée est publiée dans les logs du run, un secret
+ne l'est pas.
+
+Les codes de sortie disent ce qui s'est réellement passé : **2** = rien n'a pu
+être tenté (jeton absent, ou aucune valeur fournie), **1** = une valeur FOURNIE
+n'a pas atterri (forme refusée, écriture refusée, déploiement en erreur, ou
+absente du HTML après déploiement), **0** = tout ce qui était fourni est posé et
+visible. Une variable absente n'est **jamais** écrite — une chaîne vide posée sur
+Vercel remplacerait la configuration en place par du vide.
 
 Le même script reste lançable à la main, pour un diagnostic :
 
@@ -663,13 +669,43 @@ réel les fait rougir **par leur nom**.
 
 **Ce qui manque encore, nommé et vérifié par l'API GitHub le 19/09/2026** : le
 secret `KOJO_GA_MEASUREMENT_ID` est **absent** des secrets du dépôt
-(`KOJO_GSC_VERIFICATION` y est, mais le workflow `SEO Vercel env (manual)` exige
-les deux et refuse de partir à moitié : ses **deux** runs — `35370209109`
-(18/09) et `35474512717` (19/09, lancé pour vérifier) — sont en échec sur la même
-branche, code 2 = la branche « il manque une valeur, rien n'a été écrit » ; le
-workflow en compte exactement deux, lu par l'API le 19/09/2026). Une seule valeur
-débloque donc **les deux** intégrations. La sonde quotidienne restera
-rouge jusqu'à ce qu'elle soit posée : c'est le prix, et c'est le but.
+(`KOJO_GSC_VERIFICATION` y est). Ses **deux** runs — `35370209109` (18/09) et
+`35474512717` (19/09, lancé pour vérifier) — sont en échec sur la même branche,
+code 2 : la configuration d'alors exigeait les deux valeurs et refusait de partir
+à moitié. Coût mesuré de ce couplage : la balise Search Console, **dont la valeur
+existait depuis le 18/09**, n'a jamais atteint la production, faute de GA4 — et
+elle y est encore absente deux jours plus tard. C'est ce que le correctif du
+20/09/2026 supprime (voir le paragraphe suivant).
+
+── **Correctif du 20/09/2026 : l'écriture est par variable** ───────────────────
+Le tout-ou-rien protégeait une propriété réelle, mais **par variable** : ne
+jamais écrire une valeur absente. Coupler deux intégrations indépendantes
+n'ajoutait aucune sécurité — seulement un livrable bloqué par son voisin, ce qui
+vient d'être observé pendant deux jours. Le script pose donc chaque variable
+**fournie**, nomme en `::warning` chaque variable laissée de côté avec le secret à
+poser, ne tire **jamais** une valeur absente, et n'échoue que sur ce qui était
+fourni (codes ci-dessus). Ce qui reste vrai de l'esprit d'origine : rien n'est
+tu — la sonde STRICTE de production, elle, reste rouge et nomme l'intégration
+manquante, chaque jour.
+
+Preuves, sur le point d'entrée réel (`runSetup`), réseau stubbé et corps des
+requêtes capturés — 13 vérifications vertes :
+
+```
+GSC fourni seul (état de la prod) → 1 écriture (VITE_GSC_VERIFICATION), 1 redéploiement, exit 0,
+                                   GA4 nommée en avertissement ET dans le récapitulatif ;
+                                   VITE_GA_MEASUREMENT_ID jamais écrite (pas écrasée par du vide)
+les deux fournis                 → 2 écritures, vérification « GA4 + Search Console », exit 0
+rien fourni                      → 0 écriture, 0 déploiement, exit 2
+```
+
+Le choix de la liste est lui aussi dérivé : les intégrations à poser se lisent sur
+la table `INTEGRATIONS` de `check-seo-production.js` (celles qui sont `required`
+et qu'une variable unique active), jamais recopiées — un libellé de vérification
+qui divergerait du libellé publié est un faux vert qui ne peut plus s'écrire.
+
+La sonde quotidienne restera rouge jusqu'à ce que `KOJO_GA_MEASUREMENT_ID` soit
+posé : c'est le prix, et c'est le but.
 
 Rejouer la mesure, sur la production comme sur un build local :
 

@@ -1,16 +1,20 @@
 /**
  * Tests de scripts/setup-seo-env.js — les parties qui DÉCIDENT, sans réseau.
  *
- * Ce qui est vérifié, et rien de plus : ce qui manque est nommé AVANT toute
- * écriture (poser une variable à moitié, c'est un rouge silencieux côté audit),
- * le verdict de vérification ÉCHOUE quand le HTML ne porte pas la balise (sinon
- * la commande dirait « déployé, donc c'est bon »), et une erreur de l'API
+ * L'unité d'écriture est la VARIABLE (décision du 20/09/2026) : une valeur non
+ * fournie laisse les autres passer et se nomme, alors qu'une valeur fournie mais
+ * inutilisable fait échouer la commande. Ce qui est vérifié ici, et rien de
+ * plus : ce partage, le fait qu'une valeur absente n'est jamais écrite (une
+ * chaîne vide remplacerait la configuration en place), le verdict de
+ * vérification qui ÉCHOUE quand le HTML ne porte pas une balise FOURNIE (sinon
+ * la commande dirait « déployé, donc c'est bon »), et une erreur de l'API qui
  * remonte au lieu d'être avalée.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  blockingInputs,
   envPayload,
-  missingInputs,
+  planWrites,
   vercelApi,
   verifyIntegrations,
 } from '../setup-seo-env.js';
@@ -19,29 +23,65 @@ const GA = 'G-ABC1234567';
 const GSC = 'jeton-gsc-abc123';
 const ready = { VERCEL_TOKEN: 'vcp_test', KOJO_GA_MEASUREMENT_ID: GA, KOJO_GSC_VERIFICATION: GSC };
 
-describe('ce qu’il faut pour lancer, nommé avant toute écriture', () => {
+describe('ce qui rend la commande impossible (et rien d’autre)', () => {
   it('ne manque rien quand les trois valeurs sont là', () => {
-    expect(missingInputs(ready)).toEqual([]);
+    expect(blockingInputs(ready)).toEqual([]);
   });
 
-  it('nomme les deux valeurs absentes et le jeton', () => {
-    const problems = missingInputs({});
+  it('nomme le jeton absent, et le fait qu’aucune valeur n’est fournie', () => {
+    const problems = blockingInputs({});
     expect(problems.join('\n')).toContain('VERCEL_TOKEN');
-    expect(problems.join('\n')).toContain('KOJO_GA_MEASUREMENT_ID');
-    expect(problems.join('\n')).toContain('KOJO_GSC_VERIFICATION');
+    expect(problems.join('\n')).toContain('aucune valeur à poser');
   });
 
-  it('refuse un identifiant qui n’a pas la forme d’un flux GA4', () => {
-    // Un ID de propriété UA ou une chaîne quelconque produit une balise morte :
-    // la sonde dirait « PRÉSENT », l'analytics ne remonterait rien.
-    const problems = missingInputs({ ...ready, KOJO_GA_MEASUREMENT_ID: 'UA-1234-5' });
-    expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain("n'a pas la forme d'un identifiant GA4");
+  it('une SEULE valeur suffit à lancer : l’absente est nommée, pas bloquante', () => {
+    // Le point de la décision du 20/09/2026 : la valeur de Search Console était
+    // fournie depuis le 18/09 et n'a jamais atteint la production, faute de
+    // GA4. Une intégration ne bloque plus sa voisine.
+    expect(blockingInputs({ VERCEL_TOKEN: 'vcp_test', KOJO_GSC_VERIFICATION: GSC })).toEqual([]);
+    expect(blockingInputs({ VERCEL_TOKEN: 'vcp_test', KOJO_GA_MEASUREMENT_ID: GA })).toEqual([]);
   });
 
   it('en --dry-run, seul le jeton est exigé (lectures seules)', () => {
-    expect(missingInputs({ VERCEL_TOKEN: 'vcp_test' }, { dryRun: true })).toEqual([]);
-    expect(missingInputs({}, { dryRun: true }).join()).toContain('VERCEL_TOKEN');
+    expect(blockingInputs({ VERCEL_TOKEN: 'vcp_test' }, { dryRun: true })).toEqual([]);
+    expect(blockingInputs({}, { dryRun: true }).join()).toContain('VERCEL_TOKEN');
+  });
+});
+
+describe('le plan, par variable', () => {
+  it('écrit les deux valeurs quand les deux sont fournies', () => {
+    const { writes, absent, invalid } = planWrites(ready);
+    expect(writes.map((write) => write.key)).toEqual(['VITE_GA_MEASUREMENT_ID', 'VITE_GSC_VERIFICATION']);
+    expect(absent).toEqual([]);
+    expect(invalid).toEqual([]);
+  });
+
+  it('écrit la moitié disponible et NOMME l’autre', () => {
+    const { writes, absent, invalid } = planWrites({ KOJO_GSC_VERIFICATION: GSC });
+    expect(writes.map((write) => write.key)).toEqual(['VITE_GSC_VERIFICATION']);
+    expect(absent.join('\n')).toContain('Google Analytics 4');
+    expect(absent.join('\n')).toContain('KOJO_GA_MEASUREMENT_ID');
+    expect(invalid).toEqual([]);
+  });
+
+  it('n’écrit JAMAIS une valeur absente', () => {
+    // Une chaîne vide remplacerait la configuration en place par du vide : la
+    // raison d'être de l'ancien tout-ou-rien, tenue ici variable par variable.
+    const { writes } = planWrites({ KOJO_GA_MEASUREMENT_ID: '   ' });
+    expect(writes).toEqual([]);
+  });
+
+  it('refuse un identifiant qui n’a pas la forme d’un flux GA4, sans bloquer la voisine', () => {
+    // Un ID de propriété UA ou une chaîne quelconque produit une balise morte :
+    // la sonde dirait « PRÉSENT », l'analytics ne remonterait rien.
+    const { writes, invalid } = planWrites({ ...ready, KOJO_GA_MEASUREMENT_ID: 'UA-1234-5' });
+    expect(writes.map((write) => write.key)).toEqual(['VITE_GSC_VERIFICATION']);
+    expect(invalid).toHaveLength(1);
+    // Ce qui doit s'y lire : le coupable nommé (la variable ET la valeur), et la
+    // conséquence (une balise morte annoncée « PRÉSENT ») — pas une formulation.
+    expect(invalid[0]).toContain('KOJO_GA_MEASUREMENT_ID');
+    expect(invalid[0]).toContain('UA-1234-5');
+    expect(invalid[0]).toContain('balise morte');
   });
 });
 
@@ -76,6 +116,14 @@ describe('le verdict de vérification', () => {
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain('Google Analytics 4');
     expect(problems[0]).toContain('poser VITE_GA_MEASUREMENT_ID');
+  });
+
+  it('ne vérifie QUE ce qui a été écrit (une intégration non fournie n’est pas un échec)', () => {
+    // Sinon la commande reprocherait l'absence de GA4 alors qu'elle n'a jamais
+    // eu sa valeur à poser : c'est la sonde stricte qui porte ce rouge-là.
+    expect(verifyIntegrations(notices('ABSENT — poser VITE_GA_MEASUREMENT_ID', 'PRÉSENT — jeton jeton-gsc…'), ['Search Console (balise meta)'])).toEqual([]);
+    // Non-vacuité : la même lecture rougit bien quand la balise ÉCRITE manque.
+    expect(verifyIntegrations(notices('ABSENT — poser VITE_GA_MEASUREMENT_ID', 'PRÉSENT — jeton jeton-gsc…'), ['Google Analytics 4'])).toHaveLength(1);
   });
 
   it('dit aussi qu’aucune conclusion n’a été publiée', () => {

@@ -15,17 +15,27 @@
  *   1. résout le projet par son NOM (`VERCEL_PROJECT_NAME`), pour utiliser son
  *      `id` ensuite : le nom suffit aux endpoints Vercel, mais l'id évite de
  *      dépendre du slug du compte (équipe perso ou équipe) ;
- *   2. `POST /v10/projects/{id}/env?upsert=true` pour chaque variable, cible
- *      `production` ET `preview` — une preview sans la balise ferait échouer
- *      l'audit sur les PR, et `upsert` rend la commande rejouable (elle met à
- *      jour au lieu d'échouer en « already exists ») ;
+ *   2. `POST /v10/projects/{id}/env?upsert=true` pour chaque variable FOURNIE,
+ *      cible `production` ET `preview` — une preview sans la balise ferait
+ *      échouer l'audit sur les PR, et `upsert` rend la commande rejouable (elle
+ *      met à jour au lieu d'échouer en « already exists »). L'unité d'écriture
+ *      est la VARIABLE : une valeur non fournie laisse les autres passer et se
+ *      nomme en `::warning` (décision du 20/09/2026, voir INTEGRATIONS) ;
  *   3. `POST /v13/deployments` avec `deploymentId` du dernier déploiement de
  *      production : Vercel réutilise ses réglages et les variables DU PROJET
  *      telles qu'elles sont à cet instant (c'est le seul moyen de prendre en
  *      compte un changement de `VITE_*` sans pousser de commit) ;
  *   4. attend `READY`, puis relit le HTML servi avec la MÊME sonde que la CI
- *      (`check-seo-production.js`) et ÉCHOUE si les deux intégrations ne sont
- *      pas visibles. Un déploiement `READY` ne prouve pas que la balise est là.
+ *      (`check-seo-production.js`) et ÉCHOUE si une intégration FOURNIE n'est
+ *      pas visible. Un déploiement `READY` ne prouve pas que la balise est là.
+ *
+ * ── Le verdict ──────────────────────────────────────────────────────────────
+ *   0 : tout ce qui a été fourni est posé ET visible dans le HTML servi (les
+ *       intégrations non fournies sont nommées en avertissement — la sonde
+ *       STRICTE de production reste le gate qui rougit tant qu'elles manquent) ;
+ *   1 : une valeur fournie n'a pas atterri (écriture refusée, forme refusée,
+ *       déploiement en erreur, ou absente du HTML après déploiement) ;
+ *   2 : rien n'a pu être tenté (jeton absent, ou aucune valeur fournie).
  *
  * ── `type: 'encrypted'`, pas `sensitive` ────────────────────────────────────
  * Mesuré : une variable `sensitive` n'est plus relisible par l'API (ni par ce
@@ -48,12 +58,10 @@
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { runSeoProductionReport } from './check-seo-production.js';
+import { INTEGRATIONS as SONDE, runSeoProductionReport } from './check-seo-production.js';
 import { SITE_ORIGIN } from './site-meta.js';
 
 const API = 'https://api.vercel.com';
-const GA_KEY = 'VITE_GA_MEASUREMENT_ID';
-const GSC_KEY = 'VITE_GSC_VERIFICATION';
 const ENV_TARGETS = ['production', 'preview'];
 const COMMENT = 'SEO production (scripts/check-seo-production.js → setup-seo-env.js)';
 // « G- » + au moins 4 caractères : c'est la forme d'un ID de flux GA4. Un ID de
@@ -61,23 +69,117 @@ const COMMENT = 'SEO production (scripts/check-seo-production.js → setup-seo-e
 // rien, et l'audit dirait « PRÉSENT » sur une balise morte.
 const GA4_SHAPE = /^G-[A-Z0-9]{4,}$/;
 
-/** Ce qui manque pour que la commande puisse s'exécuter. Vide = prête. */
-export function missingInputs(env = process.env, { dryRun = false } = {}) {
+/**
+ * ── L'unité d'écriture est la VARIABLE, pas le lot ────────────────────────
+ * Et la liste des variables n'est PAS écrite ici : elle est LUE sur la sonde
+ * (`INTEGRATIONS` de check-seo-production.js), qui possède ce que « PRÉSENT »
+ * veut dire. Déclarer une seconde table ici aurait suffi à faire diverger le
+ * libellé vérifié du libellé publié — deux copies d'un même fait, la classe de
+ * défaut que ce dépôt supprime depuis des semaines.
+ *
+ * ── Pourquoi l'écriture n'est PAS tout-ou-rien (décision du 20/09/2026) ───
+ * Elle l'a été, et ça a coûté deux semaines : la valeur de Search Console est
+ * fournie (`KOJO_GSC_VERIFICATION`, secret créé le 18/09) et n'a JAMAIS atteint
+ * la production, parce que `KOJO_GA_MEASUREMENT_ID` manquait — les deux
+ * workflows lancés les 18 et 19/09 ont refusé d'écrire la moitié disponible, au
+ * motif qu'un état à moitié posé serait « un rouge silencieux côté audit ». Or
+ * ce rouge-là n'a rien de silencieux : la sonde nomme l'intégration manquante,
+ * chaque jour.
+ * Ce qui doit être interdit, c'est d'écrire une valeur ABSENTE (une chaîne vide
+ * remplacerait la configuration en place par du vide), et c'est déjà vérifié
+ * **par variable**. Coupler deux intégrations indépendantes n'ajoutait aucune
+ * sécurité — seulement un livrable bloqué par son voisin.
+ *
+ * Les deux propriétés qui restent tenues : rien n'est écrit sans valeur, et
+ * **rien n'est tu** : chaque intégration laissée de côté est nommée en
+ * `::warning` avec la variable à fournir, et la sonde STRICTE de production
+ * reste le gate qui rougit tant qu'une intégration requise manque.
+ */
+/**
+ * La forme attendue d'une valeur, par `key` de la sonde. Ce qui est une
+ * politique d'ÉCRITURE vit ici ; ce qui est un fait de la sonde (libellé,
+ * variable, caractère obligatoire) se lit là-bas.
+ *
+ * Une intégration requise à variable unique absente de cette table serait
+ * posée sans contrôle de forme : c'est visible (elle est écrite puis vérifiée
+ * par la sonde), jamais silencieux.
+ */
+const FORMES = { ga4: GA4_SHAPE };
+
+/**
+ * Ce que cette commande sait poser : les intégrations REQUISES de la sonde
+ * qu'une variable unique active.
+ *
+ * Le filtre écarte `VITE_SOCIAL_*` (plusieurs variables, géré au build) sans
+ * avoir à le nommer : l'important est qu'aucun libellé ni aucune variable Vercel
+ * ne soit recopié ici. C'est la sonde qui possède ce que « PRÉSENT » veut dire —
+ * et c'est son libellé, mot pour mot, que la vérification attend en retour.
+ */
+export const INTEGRATIONS = SONDE.filter(
+  (item) => item.required && /^VITE_[A-Z0-9_]+$/.test(item.env)
+).map((item) => ({
+  label: item.label,
+  vercelKey: item.env,
+  // Convention du dépôt : le secret GitHub porte le nom de la variable Vercel
+  // sans son préfixe `VITE_` (mesuré sur KOJO_GSC_VERIFICATION / VITE_GSC_…).
+  envKey: `KOJO_${item.env.replace(/^VITE_/, '')}`,
+  shape: FORMES[item.key] || null,
+}));
+
+/**
+ * Ce qui rend la commande IMPOSSIBLE — et rien d'autre.
+ *
+ * Le jeton, toujours. Et une valeur à poser : sans aucune valeur fournie, la
+ * commande n'aurait qu'un déploiement à produire sans rien changer.
+ */
+export function blockingInputs(env = process.env, { dryRun = false } = {}) {
   const problems = [];
-  const ga = String(env.KOJO_GA_MEASUREMENT_ID || '').trim();
-  const gsc = String(env.KOJO_GSC_VERIFICATION || '').trim();
   if (!String(env.VERCEL_TOKEN || '').trim()) {
     problems.push('VERCEL_TOKEN manquant — jeton Vercel ayant accès au projet (Settings → Tokens).');
   }
-  if (dryRun) return problems;
-  if (!ga) problems.push('KOJO_GA_MEASUREMENT_ID manquant — identifiant de flux GA4, de la forme G-XXXXXXXXXX.');
-  else if (!GA4_SHAPE.test(ga)) problems.push(`KOJO_GA_MEASUREMENT_ID « ${ga} » n'a pas la forme d'un identifiant GA4 (G-…).`);
-  if (!gsc) problems.push('KOJO_GSC_VERIFICATION manquant — le contenu de la balise google-site-verification de Search Console.');
+  if (!dryRun && !INTEGRATIONS.some((item) => String(env[item.envKey] || '').trim())) {
+    problems.push(
+      'aucune valeur à poser — fournir au moins ' +
+        INTEGRATIONS.map((item) => item.envKey).join(' ou ') +
+        ' (poser les deux est l’état attendu).'
+    );
+  }
   return problems;
 }
 
+/**
+ * Le plan, par variable : ce qui sera écrit, ce qui est absent, et ce qui est
+ * fourni mais inutilisable (forme refusée — jamais écrit, jamais avalé).
+ *
+ * `absent` reste un AVERTISSEMENT (la sonde stricte en fait un rouge) ; une
+ * valeur fournie mais mal formée reste une ERREUR, parce que l'opérateur croit
+ * l'avoir donnée : elle empêche l'écriture de CETTE variable et fait échouer la
+ * commande.
+ */
+export function planWrites(env = process.env) {
+  const writes = [];
+  const absent = [];
+  const invalid = [];
+  for (const item of INTEGRATIONS) {
+    const value = String(env[item.envKey] || '').trim();
+    if (!value) {
+      absent.push(`${item.label} : ${item.envKey} non fourni — cette intégration ne sera pas posée.`);
+      continue;
+    }
+    if (item.shape && !item.shape.test(value)) {
+      invalid.push(
+        `${item.envKey} « ${value} » n'a pas la forme attendue (${item.shape}) — écrit tel quel, il produirait ` +
+          'une balise morte que la sonde annoncerait « PRÉSENT ».'
+      );
+      continue;
+    }
+    writes.push(envPayload(item.vercelKey, value));
+  }
+  return { writes, absent, invalid };
+}
+
 /** Les libellés de la sonde qui doivent dire « PRÉSENT » après le déploiement. */
-export const REQUIRED_AFTER_DEPLOY = ['Google Analytics 4', 'Search Console (balise meta)'];
+export const REQUIRED_AFTER_DEPLOY = INTEGRATIONS.map((item) => item.label);
 
 /**
  * Les deux intégrations posées sont-elles RÉELLEMENT dans le HTML servi ?
@@ -136,6 +238,11 @@ export function envPayload(key, value) {
  * variables telles qu'elles sont au moment du build — c'est ce qui rend le
  * changement de `VITE_*` effectif sans nouveau commit.
  */
+/** L'entrée de la table qui possède cette clé Vercel (le libellé de la sonde). */
+function itemPour(vercelKey) {
+  return INTEGRATIONS.find((item) => item.vercelKey === vercelKey);
+}
+
 export async function redeployAndWait({ project, token, teamId, timeoutMs = 600000, pollMs = 15000, log = console.log }) {
   const list = await vercelApi(`/v6/deployments?projectId=${encodeURIComponent(project.id)}&target=production&limit=1`, { token, teamId });
   const previous = (list?.deployments || [])[0];
@@ -165,12 +272,12 @@ export async function redeployAndWait({ project, token, teamId, timeoutMs = 6000
   return { id: created.id, url: created.url, state };
 }
 
-/** Relit le HTML servi jusqu'à ce que les deux intégrations y soient. */
-async function verifyServedHtml({ base, attempts = 5, waitMs = 20000, log = console.log }) {
+/** Relit le HTML servi jusqu'à ce que les intégrations ÉCRITES y soient. */
+async function verifyServedHtml({ base, required, attempts = 5, waitMs = 20000, log = console.log }) {
   let problems = [];
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const result = await runSeoProductionReport({ base });
-    problems = verifyIntegrations(result.notices);
+    problems = verifyIntegrations(result.notices, required);
     log(`\n── HTML servi (${base}) — lecture ${attempt}/${attempts} ──`);
     for (const notice of result.notices) log(`::notice title=SEO production::${notice}`);
     if (problems.length === 0) return [];
@@ -197,10 +304,10 @@ export async function runSetup({
   const base = String(flag('--base', SITE_ORIGIN)).replace(/\/+$/, '');
   const timeoutMs = Number(flag('--timeout', '600')) * 1000;
 
-  const problems = missingInputs(env, { dryRun });
-  if (problems.length > 0) {
-    error(dryRun ? '✗ Il manque de quoi interroger Vercel :' : '✗ Il manque une valeur — rien n’a été écrit :');
-    for (const problem of problems) error(`   • ${problem}`);
+  const blocking = blockingInputs(env, { dryRun });
+  if (blocking.length > 0) {
+    error(dryRun ? '✗ Il manque de quoi interroger Vercel :' : '✗ Rien n’a pu être tenté — aucune écriture :');
+    for (const problem of blocking) error(`   • ${problem}`);
     error(
       dryRun
         ? '\nRelancer avec le jeton Vercel : VERCEL_TOKEN=vcp_… node scripts/setup-seo-env.js --dry-run'
@@ -209,26 +316,28 @@ export async function runSetup({
     return 2;
   }
 
-  const ga = String(env.KOJO_GA_MEASUREMENT_ID || '').trim();
-  const gsc = String(env.KOJO_GSC_VERIFICATION || '').trim();
+  const { writes, absent, invalid } = planWrites(env);
+  for (const problem of invalid) error(`✗ ${problem}`);
+  for (const skip of absent) {
+    log(`::warning title=Intégration non fournie::${skip} — elle ne sera PAS posée, et la sonde stricte reste rouge tant qu'elle manque.`);
+  }
+
   const project = await vercelApi(`/v9/projects/${encodeURIComponent(projectName)}`, { token, teamId });
   log(`Projet Vercel : ${project.name} (${project.id})${teamId ? ` — équipe ${teamId}` : ''}`);
 
   const existing = await vercelApi(`/v10/projects/${project.id}/env?decrypt=false`, { token, teamId });
   const keys = new Set((existing?.envs || []).map((item) => item.key));
-  for (const key of [GA_KEY, GSC_KEY]) {
-    log(`   ${key} : ${keys.has(key) ? 'déjà posée → sera mise à jour' : 'absente → sera créée'}`);
+  for (const write of writes) {
+    log(`   ${write.key} : ${keys.has(write.key) ? 'déjà posée → sera mise à jour' : 'absente → sera créée'}`);
   }
+  log(`   ${writes.length}/${INTEGRATIONS.length} intégration(s) à poser dans cette exécution.`);
 
-  const writes = [envPayload(GA_KEY, ga), envPayload(GSC_KEY, gsc)];
   if (dryRun) {
     log('\n--dry-run : aucune écriture, aucun déploiement. Charges utiles prévues :');
     for (const write of writes) {
-      // En --dry-run les valeurs peuvent être absentes : on montre alors QUELLE
-      // variable sera posée, plutôt qu'un masque vide qui ne dit rien.
-      const shown = write.value
-        ? `${write.value.slice(0, 6)}… (${write.value.length} caractères)`
-        : `<valeur de ${write.key.replace('VITE_', 'KOJO_')}>`;
+      // Valeur masquée : les deux premiers caractères suffisent à reconnaître
+      // « une valeur est bien là » sans la publier dans les logs du run.
+      const shown = `${write.value.slice(0, 3)}… (${write.value.length} caractères)`;
       log(`   POST /v10/projects/${project.id}/env?upsert=true ${JSON.stringify({ ...write, value: shown })}`);
     }
     const list = await vercelApi(`/v6/deployments?projectId=${encodeURIComponent(project.id)}&target=production&limit=1`, { token, teamId });
@@ -249,14 +358,40 @@ export async function runSetup({
   const deployment = await redeployAndWait({ project, token, teamId, timeoutMs, log });
   log(`✓ Déploiement ${deployment.state} — ${deployment.url}`);
 
-  const remaining = await verifyServedHtml({ base, log });
+  // Ce qui est vérifié, c'est ce qui a été ÉCRIT : une intégration non fournie
+  // n'est pas un échec de cette commande (elle est déjà nommée en amont, et
+  // c'est la sonde stricte qui en fait un rouge).
+  const labels = writes.map((write) => itemPour(write.key).label);
+  const remaining = await verifyServedHtml({ base, required: labels, log });
   if (remaining.length > 0) {
     error('\n✗ Le déploiement est passé, mais le HTML servi ne porte pas ce qu’il devait :');
     for (const problem of remaining) error(`   • ${problem}`);
     error('   Piste : la variable est peut-être limitée à un environnement (elle doit viser production ET preview), ou le build a échoué sans changer l’alias.');
     return 1;
   }
-  log('\n✓ GA4 et la meta Search Console sont dans le HTML de production, et les autres sondes sont inchangées.');
+  log(`\n✓ ${labels.join(' + ')} dans le HTML de production, et les autres sondes sont inchangées.`);
+
+  // Le reste est NOMMÉ, pas tu : c'est la sonde stricte de production qui est le
+  // gate, pas cette commande. Ce qui, en revanche, fait échouer la commande,
+  // c'est une valeur FOURNIE mais inutilisable : l'opérateur croit l'avoir
+  // donnée, donc il n'y a rien à lire ailleurs — ça doit être bruyant ici.
+  const restantes = INTEGRATIONS.filter(
+    (item) => !writes.some((write) => write.key === item.vercelKey)
+  );
+  if (restantes.length > 0) {
+    log(
+      `!! ${restantes.length}/${INTEGRATIONS.length} intégration(s) NON POSÉE(S) ici, faute de valeur : ` +
+        restantes.map((item) => `${item.label} (${item.envKey})`).join(', ') +
+        ' — la sonde STRICTE de production reste ROUGE tant qu’elles manquent.'
+    );
+  }
+  if (invalid.length > 0) {
+    error(
+      `\n✗ ${invalid.length} valeur(s) fournie(s) mais refusée(s) : ce qui a été posé l’est, ` +
+        'mais l’état attendu reste incomplet — corriger la valeur et relancer.'
+    );
+    return 1;
+  }
   return 0;
 }
 
