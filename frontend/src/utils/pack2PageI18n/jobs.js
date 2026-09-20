@@ -16,7 +16,15 @@ fr: {
   allStatuses: 'Tous les statuts',
   loadingMore: 'Chargement…',
   loadMore: 'Afficher plus de missions',
-  noApplicationsYet: 'Vous n\'avez pas encore postulé à une mission.'
+  noApplicationsYet: 'Vous n\'avez pas encore postulé à une mission.',
+  // États d'échec et de liste vide : chacun dit quoi faire ensuite (l'écran
+  // ne laisse plus une liste vide passer pour une panne, ni l'inverse).
+  retry: 'Réessayer',
+  loadErrorNetwork: 'Pas de connexion. Vérifiez votre réseau, puis réessayez.',
+  loadErrorServer: 'Le serveur n\'a pas répondu. Réessayez dans un instant.',
+  emptyFiltered: 'Aucune mission ne correspond à ces filtres.',
+  clearFilters: 'Effacer les filtres',
+  emptyHint: 'Élargissez votre recherche ou revenez plus tard.'
 },
 en: {
   searchPlaceholder: 'Title or description...',
@@ -29,7 +37,13 @@ en: {
   allStatuses: 'All statuses',
   loadingMore: 'Loading…',
   loadMore: 'Show more jobs',
-  noApplicationsYet: 'You have not applied to a job yet.'
+  noApplicationsYet: 'You have not applied to a job yet.',
+  retry: 'Try again',
+  loadErrorNetwork: 'No connection. Check your network, then try again.',
+  loadErrorServer: 'The server did not answer. Try again in a moment.',
+  emptyFiltered: 'No job matches these filters.',
+  clearFilters: 'Clear filters',
+  emptyHint: 'Widen your search or come back later.'
 }
 };
 dict.wo = withBase(dict.fr, {  searchPlaceholder: 'Tur walla melokaan...'

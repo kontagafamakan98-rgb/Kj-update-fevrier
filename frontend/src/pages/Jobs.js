@@ -121,7 +121,8 @@ export default function Jobs() {
   const [tab, setTab] = useState(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [loadError, setLoadError] = useState('');
+  // null = pas d'échec ; { message, reseau } = le dernier échec de chargement.
+  const [loadError, setLoadError] = useState(null);
   // null = pas encore chargé (JobCard retombe alors sur localStorage) ;
   // Set (même vide) = donnée serveur fiable disponible.
   const [appliedJobIds, setAppliedJobIds] = useState(null);
@@ -162,7 +163,7 @@ export default function Jobs() {
     } else {
       setLoading(true);
     }
-    setLoadError('');
+    setLoadError(null);
     try {
       const params = { limit: JOBS_PAGE_SIZE, page: targetPage };
       if (filters.search.trim()) params.q = filters.search.trim();
@@ -218,8 +219,14 @@ export default function Jobs() {
       safeLog.error('Jobs load error', error);
       // Le message d'échec appartient à la page (clé i18n), jamais au
       // navigateur : une coupure réseau affichait « Failed to fetch » en
-      // anglais au milieu d'un écran français.
-      setLoadError(handleApiError(error, t('networkConnectionError')));
+      // anglais au milieu d'un écran français. Le TYPE d'échec se lit sur
+      // l'erreur, pas sur sa formulation : sans réponse HTTP, c'est le réseau
+      // qu'il faut vérifier ; avec une réponse, c'est le serveur qui a failli.
+      const reseau = !error?.response;
+      setLoadError({
+        reseau,
+        message: handleApiError(error, reseau ? pageT('loadErrorNetwork') : pageT('loadErrorServer')),
+      });
       if (!append) setJobs([]);
     } finally {
       setLoading(false);
@@ -247,6 +254,19 @@ export default function Jobs() {
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTab, filters.search, filters.category, filters.status, user?.id, user?.user_type]);
+
+  // Rejouer la requête est une ACTION de la page : l'échec ne se répare plus en
+  // rechargeant l'onglet.
+  const reessayer = () => loadJobs();
+
+  // Filtres qui expliquent une liste vide (et que l'utilisateur peut lever) :
+  // sans eux, « rien à afficher » n'a pas la même prochaine étape.
+  const filtresActifs = Boolean(filters.search.trim() || filters.category || filters.status || radiusKm);
+  const effacerLesFiltres = () => {
+    setFilters({ category: '', status: '', search: '' });
+    setRadiusKm('');
+    setUserCoords(null);
+  };
 
   const filteredJobs = useMemo(() => {
     // Seul le filtre RAYON reste côté client (distance par rapport à la
@@ -447,7 +467,14 @@ export default function Jobs() {
 
       {loadError && (
         <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {loadError}
+          <p className="font-medium">{loadError.message}</p>
+          <button
+            onClick={reessayer}
+            disabled={loading}
+            className="mt-3 inline-flex items-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {loading ? t('loading') : pageT('retry')}
+          </button>
         </div>
       )}
 
@@ -467,11 +494,27 @@ export default function Jobs() {
         <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
           <JobsMap jobs={filteredJobs} />
         </div>
+      ) : loadError ? (
+        // L'échec est déjà expliqué par le bloc ci-dessus, avec son action :
+        // afficher ici un état vide ferait passer une panne pour une liste vide.
+        null
       ) : filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-          {effectiveTab === JOB_TAB_APPLICATIONS
-            ? (pageT('noApplicationsYet') || 'Vous n\'avez pas encore postulé à une mission.')
-            : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow'))}
+          {filtresActifs
+            ? pageT('emptyFiltered')
+            : (effectiveTab === JOB_TAB_APPLICATIONS
+              ? (pageT('noApplicationsYet') || 'Vous n\'avez pas encore postulé à une mission.')
+              : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')))}
+          {filtresActifs ? (
+            <button
+              onClick={effacerLesFiltres}
+              className="mt-4 inline-flex items-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              {pageT('clearFilters')}
+            </button>
+          ) : (
+            <p className="mt-2 text-sm text-gray-400">{pageT('emptyHint')}</p>
+          )}
         </div>
       ) : (
         <>
