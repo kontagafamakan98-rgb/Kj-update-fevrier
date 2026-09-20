@@ -885,6 +885,26 @@
       ]
     },
     {
+      "id": "seo-production: fiche /jobs/:id lue mais jamais jugee",
+      "garde": "frontend/scripts/check-seo-production.js",
+      "cible": "frontend/scripts/check-seo-production.js",
+      "trouve": "      page.error ? { url, disparue: page.error } : { url, defects: pageDefects(page) }",
+      "remplace": "      page.error ? { url, disparue: page.error } : { url, defects: [] }",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-seo-production.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une fiche dont la description manque, en la nommant"
+      ]
+    },
+    {
       "id": "spa-routes: 404.html avec script toleree",
       "garde": "frontend/scripts/check-spa-routes.js",
       "cible": "frontend/scripts/check-spa-routes.js",

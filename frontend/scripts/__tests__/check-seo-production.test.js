@@ -330,15 +330,71 @@ describe('section Pages — le sitemap servi, page par page', () => {
     expect(missing.manquantes.join('\n')).toContain('/how-it-works : non lisible (HTTP 404)');
   });
 
-  it('écarte les fiches /jobs/:id sans les lire (couvertes en HTTP ailleurs)', async () => {
-    const sitemap = SITEMAP_XML.replace(
+  // ── Échantillon des fiches /jobs/:id ──────────────────────────────
+  // Elles sont lues (canonical, title, description) SANS rejouer ce que
+  // check-og-job-200.js possède : la carte OG et le verrou 404.
+  const withJobs = (...ids) =>
+    SITEMAP_XML.replace(
       '</urlset>',
-      `  <url><loc>${SITE_ORIGIN}/jobs/abc123</loc></url>\n</urlset>`,
+      `${ids.map((id) => `  <url><loc>${SITE_ORIGIN}/jobs/${id}</loc></url>`).join('\n')}\n</urlset>`,
     );
+
+  it('échantillonne les fiches et juge leurs trois métadonnées, en bornant l’échantillon', async () => {
+    const result = await run({ '/jobs/abc123': pageFor('/jobs/abc123') }, withJobs('abc123'));
+
+    expect(result.jobPages.map(({ url }) => url)).toEqual([`${SITE_ORIGIN}/jobs/abc123`]);
+    expect(result.manquantes).toEqual([]);
+    const log = result.notices.join('\n');
+    expect(log).toContain('fiches /jobs/:id : 1 sur 1 vérifiée(s)');
+    expect(log).toContain('Échantillon borné à 3');
+    // La notice dit ce que l'échantillon NE couvre pas.
+    expect(log).toContain('check-og-job-200.js');
+  });
+
+  it('refuse une fiche dont la description manque, en la nommant', async () => {
+    const result = await run(
+      { '/jobs/abc123': pageFor('/jobs/abc123').replace(/<meta name="description"[^>]*>/, '') },
+      withJobs('abc123'),
+    );
+    expect(result.manquantes.join('\n')).toContain('/jobs/abc123 : description ABSENTE');
+  });
+
+  it('refuse un canonical de fiche qui désigne une autre fiche', async () => {
+    const result = await run(
+      {
+        '/jobs/abc123': pageFor('/jobs/abc123').replace(
+          `${SITE_ORIGIN}/jobs/abc123`,
+          `${SITE_ORIGIN}/jobs/xyz`,
+        ),
+      },
+      withJobs('abc123'),
+    );
+    expect(result.manquantes.join('\n')).toContain('désigne /jobs/xyz');
+  });
+
+  it('n’échoue PAS sur une fiche disparue entre le sitemap et sa lecture', async () => {
+    // Une mission clôturée disparaît normalement : un 404 n'est pas un défaut,
+    // c'est une mesure impossible — sinon la sonde rougirait au hasard.
+    const result = await run({}, withJobs('disparue'));
+    expect(result.manquantes).toEqual([]);
+    expect(result.notices.join('\n')).toContain('1 disparue(s) depuis la lecture du sitemap');
+  });
+
+  it('borne l’échantillon à 3 fiches même si le sitemap en annonce cinq', async () => {
+    const ids = ['a', 'b', 'c', 'd', 'e'];
     const seen = [];
-    const result = await run({}, sitemap, seen);
-    expect(seen).not.toContain('/jobs/abc123');
-    expect(result.notices.join('\n')).toContain('1 fiche(s) /jobs/:id écartée(s)');
+    await run(
+      Object.fromEntries(ids.map((id) => [`/jobs/${id}`, pageFor(`/jobs/${id}`)])),
+      withJobs(...ids),
+      seen,
+    );
+    expect(seen.filter((p) => /^\/jobs\/[a-e]$/.test(p))).toEqual(['/jobs/a', '/jobs/b', '/jobs/c']);
+  });
+
+  it('dit l’échantillon vide quand le sitemap ne liste aucune fiche', async () => {
+    // L'état réel de la production au 20/09/2026 : 8 URL, zéro fiche.
+    const result = await run();
+    expect(result.notices.join('\n')).toContain('fiches /jobs/:id : aucune dans le sitemap');
   });
 
   it('un sitemap illisible ne conclut rien sur les pages, sans faire tomber le reste', async () => {

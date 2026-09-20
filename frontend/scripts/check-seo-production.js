@@ -30,8 +30,9 @@
  *    son `<title>` et sa `description`. Avant, seule l'accueil était sondée : le
  *    sitemap annonçait huit pages dont sept n'étaient jamais lues, donc une page
  *    servie sans description (ou avec le canonical d'une autre) restait
- *    silencieuse. Les fiches `/jobs/:id` sont exclues ici — jusqu'à 9 000, et
- *    déjà vérifiées en HTTP contre la production par `check-og-job-200.js`.
+ *    silencieuse. Les fiches `/jobs/:id` du sitemap sont ensuite échantillonnées
+ *    (`MAX_JOB_PAGES`) et jugées sur les trois mêmes métadonnées ; leur carte OG
+ *    et le verrou 404 après suppression restent à `check-og-job-200.js`.
  *
  * En mode INFORMATIF (celui de `ci.yml`), le script ne fait JAMAIS échouer la
  * CI : une intégration non configurée ou un écart d'adresse sont des faits
@@ -242,16 +243,23 @@ function pathOf(url) {
   }
 }
 
-/**
- * Les fiches `/jobs/:id` du sitemap sont DÉLIBÉRÉMENT hors de cette section :
- * le sitemap en admet jusqu'à 9 000, leur cycle est déjà vérifié en HTTP contre
- * la production par `check-og-job-200.js`, et une fiche clôturée entre la
- * lecture du sitemap et la lecture de sa page ferait rougir la sonde pour rien.
- */
+/** Une fiche mission `/jobs/:id` du sitemap (et non la liste `/jobs`). */
 const JOB_DETAIL = /^\/jobs\/[^/]+\/?$/;
 
 /** Plafond de pages lues : borne le coût quotidien si un sitemap en annonce trop. */
 const MAX_PAGES = 20;
+
+/**
+ * Plafond de fiches `/jobs/:id` échantillonnées.
+ *
+ * Le sitemap en admet jusqu'à 9 000 et l'échantillon ne peut pas les couvrir :
+ * il vérifie que la FORME de la fiche tenue par le backend annonce bien
+ * `canonical`/`title`/`description`, sur des missions réelles. Ce que
+ * `check-og-job-200.js` possède déjà — la carte OG, ses variantes, le verrou
+ * 404 après suppression — n'est PAS rejoué ici, et l'échantillon ne prétend pas
+ * couvrir les fiches qu'il n'a pas lues (la notice le dit).
+ */
+const MAX_JOB_PAGES = 3;
 
 /**
  * Défauts d'une page vis-à-vis de sa PROPRE adresse, chacun nommant la page et
@@ -302,28 +310,29 @@ async function readPage(url, fetchImpl) {
 }
 
 /**
- * Les pages du sitemap à vérifier, et ce qui a été écarté.
+ * Les pages du sitemap à vérifier : les pages du SITE (toutes, jusqu'au
+ * plafond) et un ÉCHANTILLON borné des fiches `/jobs/:id`.
  *
  * @returns {Promise<{checked: Array<{url: string, defects: string[]}>, total: number,
- *   skippedJob: number, truncated: number}>}
+ *   truncated: number, jobs: {checked: Array, total: number, sampled: number}}>}
  */
 async function checkSitemapPages({ locs = [], fetchImpl, homeHtml }) {
-  const pages = [];
-  let skippedJob = 0;
+  const sitePages = [];
+  const jobPages = [];
   for (const loc of locs) {
+    let pathname;
     try {
-      if (JOB_DETAIL.test(new URL(loc).pathname)) {
-        skippedJob += 1;
-        continue;
-      }
+      pathname = new URL(loc).pathname;
     } catch (_error) {
       // `<loc>` illisible : déjà visible dans le décompte du sitemap.
       continue;
     }
-    pages.push(loc);
+    const cible = JOB_DETAIL.test(pathname) ? jobPages : sitePages;
+    if (!cible.includes(loc)) cible.push(loc);
   }
+
   const checked = [];
-  for (const url of pages.slice(0, MAX_PAGES)) {
+  for (const url of sitePages.slice(0, MAX_PAGES)) {
     // L'accueil est déjà lu pour les intégrations : ne pas le redemander.
     const page =
       pathOf(url) === '/' && homeHtml !== undefined
@@ -331,31 +340,77 @@ async function checkSitemapPages({ locs = [], fetchImpl, homeHtml }) {
         : await readPage(url, fetchImpl);
     checked.push({ url, defects: pageDefects(page) });
   }
-  return { checked, total: pages.length, skippedJob, truncated: pages.length - checked.length };
+
+  const sampled = [];
+  for (const url of jobPages.slice(0, MAX_JOB_PAGES)) {
+    const page = await readPage(url, fetchImpl);
+    // Une fiche peut être clôturée entre la lecture du sitemap et sa lecture :
+    // un 404 n'est PAS un défaut (une mission vivante disparaît normalement),
+    // c'est une mesure impossible — nommée, pas jugée. Une page servie en 200
+    // reste jugée sur ses métadonnées.
+    sampled.push(
+      page.error ? { url, disparue: page.error } : { url, defects: pageDefects(page) }
+    );
+  }
+
+  return {
+    checked,
+    total: sitePages.length,
+    truncated: sitePages.length - checked.length,
+    jobs: { checked: sampled, total: jobPages.length, sampled: sampled.length },
+  };
 }
 
 /**
- * Notices de la section « Pages » : un résumé, puis un `::notice` par défaut.
+ * Notices de l'échantillon des fiches `/jobs/:id`.
+ *
+ * @returns {{notices: string[], défauts: string[]}}
+ */
+export function jobSampleNotices({ checked = [], total = 0, sampled = 0 } = {}) {
+  if (total === 0) {
+    return {
+      notices: [
+        "Pages — fiches /jobs/:id : aucune dans le sitemap — l'échantillon est vide, " +
+          'aucune fiche vivante à vérifier (aucune conclusion sur cette forme de page).',
+      ],
+      défauts: [],
+    };
+  }
+  const défauts = checked.filter(({ defects }) => defects?.length).flatMap(({ defects }) => defects);
+  const disparues = checked.filter(({ disparue }) => disparue);
+  const notes = [`${sampled} sur ${total} vérifiée(s)`];
+  if (disparues.length) notes.push(`${disparues.length} disparue(s) depuis la lecture du sitemap (non jugées)`);
+  const résumé =
+    `Pages — fiches /jobs/:id : ${notes.join(' ; ')} (canonical, title, description) : ` +
+    (défauts.length ? `${défauts.length} défaut(s) nommé(s) ci-dessous` : 'conformes') +
+    `. Échantillon borné à ${MAX_JOB_PAGES} : la carte OG et le verrou 404 restent à check-og-job-200.js.`;
+  return { notices: [résumé, ...défauts.map((d) => `Pages — ${d}`)], défauts };
+}
+
+/**
+ * Notices de la section « Pages » : un résumé par famille, puis un `::notice`
+ * par défaut.
  *
  * @returns {{notices: string[], défauts: string[]}} Les défauts sont ceux que le
  *   mode strict refuse.
  */
-export function pagesNotices({ checked, total, skippedJob = 0, truncated = 0, error }) {
+export function pagesNotices({ checked = [], total = 0, truncated = 0, jobs = {}, error }) {
   if (error) {
     return { notices: [`Pages — non vérifiées : le sitemap n'est pas lisible (${error}).`], défauts: [] };
   }
   const notes = [];
-  if (skippedJob) notes.push(`${skippedJob} fiche(s) /jobs/:id écartée(s) — couvertes en HTTP par check-og-job-200.js`);
   if (truncated) notes.push(`${truncated} page(s) au-delà du plafond de ${MAX_PAGES}`);
-  const défauts = checked
-    .filter(({ defects }) => defects.length > 0)
-    .flatMap(({ defects }) => defects);
+  const défauts = checked.filter(({ defects }) => defects.length > 0).flatMap(({ defects }) => defects);
   const résumé =
     `Pages — ${checked.length}/${total} page(s) du sitemap vérifiée(s) (canonical, title, description) : ` +
     (défauts.length ? `${défauts.length} défaut(s) nommé(s) ci-dessous` : 'conformes') +
     (notes.length ? ` (${notes.join(' ; ')})` : '') +
     '.';
-  return { notices: [résumé, ...défauts.map((d) => `Pages — ${d}`)], défauts };
+  const echantillon = jobSampleNotices(jobs);
+  return {
+    notices: [résumé, ...défauts.map((d) => `Pages — ${d}`), ...echantillon.notices],
+    défauts: [...défauts, ...echantillon.défauts],
+  };
 }
 
 /**
@@ -427,6 +482,7 @@ export async function runSeoProductionReport({
     manquantes,
     analyse: analysis,
     pages: pages.checked,
+    jobPages: pages.jobs.checked,
     notices: [
       ...INTEGRATIONS.map((integration) => noticeFor(integration, analysis[integration.key])),
       `${presentes.length}/${INTEGRATIONS.length} intégration(s) présente(s) sur ${cleanBase} ` +
