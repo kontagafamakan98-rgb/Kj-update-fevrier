@@ -33,7 +33,7 @@ import { requirePageMeta } from './scripts/check-page-meta.js'
 // sections, ni celle des promesses, ni celle des moyens de contact, donc une
 // section ajoutée à une page ne peut plus manquer au HTML que lit un crawler
 // sans JavaScript (le build refuse une coquille incomplète, plus bas).
-import { PAGE_SECTIONS, pageSectionTextKeys, pageSectionLiterals } from './src/config/page-sections.js'
+import { PAGE_SECTIONS, pageSectionParts } from './src/config/page-sections.js'
 
 const OG_CARDS = Object.fromEntries(
   OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
@@ -219,19 +219,11 @@ export default defineConfig(({ mode }) => {
             { name: 'Burkina Faso', flag: '🇧🇫', color: 'bg-red-100' },
             { name: "Côte d'Ivoire", flag: '🇨🇮', color: 'bg-orange-100' },
           ]
-          // Catégories : mêmes clés que Home.js (canoniques côté backend).
-          const HOME_CATEGORIES = [
-            { key: 'general', icon: '🛠️' },
-            { key: 'plumbing', icon: '🔧' },
-            { key: 'electrical', icon: '⚡' },
-            { key: 'construction', icon: '🏗️' },
-            { key: 'cleaning', icon: '🧽' },
-            { key: 'gardening', icon: '🌱' },
-            { key: 'tutoring', icon: '📚' },
-            { key: 'mechanics', icon: '🔩' },
-            { key: 'carpentry', icon: '🪚' },
-            { key: 'computing', icon: '💻' },
-          ]
+          // Catégories, promesses et étapes : LISES dans la déclaration du corps
+          // de l'accueil (src/config/page-sections.js), que src/pages/Home.js
+          // lit aussi. Elles étaient recopiées ici, liste par liste : ajouter une
+          // catégorie à la page laissait la coquille derrière, en silence.
+          const homePlan = PAGE_SECTIONS['/']
 
           const homeShell = [
             // Placeholder navbar (hauteur réelle) — comme les shells /jobs et
@@ -283,11 +275,11 @@ export default defineConfig(({ mode }) => {
             `<p class="text-gray-600">${esc(T('findServiceYouNeed'))}</p>`,
             `</div>`,
             `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">`,
-            ...HOME_CATEGORIES.map(
+            ...homePlan.categories.map(
               (category) =>
-                `<a href="/jobs?category=${category.key}" class="bg-white rounded-2xl shadow-md p-6 text-center hover:shadow-lg transform transition hover:scale-105">` +
+                `<a href="/jobs?category=${category.labelKey}" class="bg-white rounded-2xl shadow-md p-6 text-center hover:shadow-lg transform transition hover:scale-105">` +
                 `<div class="text-3xl md:text-4xl mb-3">${category.icon}</div>` +
-                `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.key))}</h3>` +
+                `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.labelKey))}</h3>` +
                 `</a>`
             ),
             `</div>`,
@@ -298,12 +290,8 @@ export default defineConfig(({ mode }) => {
             `<section class="py-12 md:py-16 bg-white">`,
             `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
             `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">`,
-            ...[
-              ['💼', 'findWork', 'findWorkDescription'],
-              ['🤝', 'connect', 'connectDescription'],
-              ['💰', 'securePayments', 'securePaymentsDescription'],
-            ].map(
-              ([icon, titleKey, textKey]) =>
+            ...homePlan.promises.map(
+              ({ icon, titleKey, descriptionKey: textKey }) =>
                 `<div class="text-center">` +
                 `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><span class="text-2xl">${icon}</span></div>` +
                 `<h3 class="text-xl font-semibold mb-4 text-gray-900">${esc(T(titleKey))}</h3>` +
@@ -322,12 +310,8 @@ export default defineConfig(({ mode }) => {
             `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeHowItWorksSubtitle'))}</p>`,
             `</div>`,
             `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`,
-            ...[
-              ['1️⃣', 'homeStep1Title', 'homeStep1Desc'],
-              ['2️⃣', 'homeStep2Title', 'homeStep2Desc'],
-              ['3️⃣', 'homeStep3Title', 'homeStep3Desc'],
-            ].map(
-              ([icon, titleKey, textKey]) =>
+            ...homePlan.steps.map(
+              ({ icon, titleKey, descriptionKey: textKey }) =>
                 `<div class="bg-white rounded-2xl shadow-md p-6 text-center">` +
                 `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${icon}</span></div>` +
                 `<h3 class="text-lg font-semibold mb-2 text-gray-900">${esc(T(titleKey))}</h3>` +
@@ -501,9 +485,10 @@ export default defineConfig(({ mode }) => {
           const aboutPlan = PAGE_SECTIONS['/about']
           const contactPlan = PAGE_SECTIONS['/contact']
           const privacyPlan = PAGE_SECTIONS['/privacy']
+          const supportPlan = PAGE_SECTIONS['/support']
 
           // Le paragraphe de liens internes en fin de page : même balisage pour
-          // les trois coquilles, seule la marge d'en-tête change.
+          // chaque coquille, seul l'habillage du paragraphe change.
           const liensDePage = (plan, classes) =>
             `<p class="${classes}">` +
             plan.links
@@ -518,8 +503,8 @@ export default defineConfig(({ mode }) => {
           // Sans ce refus, une section ajoutée à la page React ne paraîtrait que
           // pour un navigateur, et un crawler sans JavaScript lirait une page
           // amputée — le défaut exact que la déclaration unique supprime.
-          // Les textes attendus se DÉDUISENT du plan (pageSectionTextKeys /
-          // pageSectionLiterals) : aucune seconde liste n'est tenue ici.
+          // Les textes attendus se DÉDUISENT du plan (pageSectionParts) : aucune
+          // seconde liste n'est tenue ici.
           const exigerCorpsDeclare = (routePath, route, corps) => {
             const plan = PAGE_SECTIONS[routePath]
             if (!plan) return
@@ -529,10 +514,8 @@ export default defineConfig(({ mode }) => {
                   `(SHELLS['${route}']) — un crawler sans JavaScript ne lirait rien de cette page.`
               )
             }
-            const attendus = [
-              ...pageSectionTextKeys(plan).map((key) => T(key)),
-              ...pageSectionLiterals(plan),
-            ]
+            const { cles, textes } = pageSectionParts(plan)
+            const attendus = [...cles.map((key) => T(key)), ...textes]
             const manquants = attendus.filter((texte) => !corps.includes(esc(texte)))
             if (manquants.length) {
               throw new Error(
@@ -852,8 +835,8 @@ export default defineConfig(({ mode }) => {
             support: `<div class="h-16 bg-white border-b border-gray-200"></div>`
               + `<div class="max-w-2xl mx-auto px-4 py-8">`
               + `<div class="mb-6 text-center">`
-              + `<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>`
-              + `<p class="text-gray-600">Une question, un problème ? Nous sommes là pour vous aider.</p>`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(supportPlan.texts.title)}</h1>`
+              + `<p class="text-gray-600">${esc(supportPlan.texts.subtitle)}</p>`
               + `</div>`
               + `<div class="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">`
               + `<h2 class="text-lg font-semibold text-gray-900 mb-1">Suivre une demande existante</h2>`
@@ -865,47 +848,38 @@ export default defineConfig(({ mode }) => {
               + `</div>`
               + `</div>`
               + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`
-              + `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">`
-              + `<span class="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 text-orange-600">💬</span>`
-              + `<span class="font-semibold text-gray-900">Parler avec le robot</span>`
-              + `<span class="text-xs text-gray-500">L'assistant vous guide en quelques questions</span>`
-              + `</div>`
-              + `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">`
-              + `<span class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">📞</span>`
-              + `<span class="font-semibold text-gray-900">Contacter directement le support</span>`
-              + `<span class="text-xs text-gray-500">Appel, e-mail ou WhatsApp</span>`
-              + `</div>`
-              + `</div>`
+              + supportPlan.modes
+                  .map(
+                    ({ shellIcon, badgeClass, title, subtitle }) =>
+                      `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">` +
+                      `<span class="flex h-12 w-12 items-center justify-center rounded-full ${badgeClass}">${shellIcon}</span>` +
+                      `<span class="font-semibold text-gray-900">${esc(title)}</span>` +
+                      `<span class="text-xs text-gray-500">${esc(subtitle)}</span>` +
+                      `</div>`
+                  )
+                  .join('') +
+              `</div>`
               + `<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">`
-              + `<h2 class="text-xl font-semibold text-gray-900 mb-1">Contacter directement le support</h2>`
-              + `<p class="text-sm text-gray-500 mb-5">Nous sommes joignables aux coordonnées ci-dessous.</p>`
+              + `<h2 class="text-xl font-semibold text-gray-900 mb-1">${esc(supportPlan.texts.directCardTitle)}</h2>`
+              + `<p class="text-sm text-gray-500 mb-5">${esc(supportPlan.texts.directCardSubtitle)}</p>`
               + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
-              + `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">Appeler</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
-              + `</a>`
-              + `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">WhatsApp</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
-              + `</a>`
-              + `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">Envoyer un e-mail</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`
-              + `</a>`
-              + `<div class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`
-              + `</div>`
-              + `</div>`
+              + supportPlan.rows
+                  .map((row) => {
+                    const interieur =
+                      `<span class="flex h-10 w-10 items-center justify-center rounded-full ${row.badgeClass}">${row.shellIcon}</span>` +
+                      `<div><div class="text-sm font-semibold text-gray-900">${esc(row.label)}</div>` +
+                      `<div class="text-xs text-gray-500${row.breakAll ? ' break-all' : ''}">${esc(row.value)}</div></div>`
+                    return row.href
+                      ? `<a href="${esc(row.href)}"${row.external ? ' target="_blank" rel="noreferrer"' : ''} class="${row.rowClass}">${interieur}</a>`
+                      : `<div class="${row.rowClass}">${interieur}</div>`
+                  })
+                  .join('') +
+              `</div>`
               + `</div>`
               // Maillage interne : le support mène au fonctionnement du service
               // et à la liste des missions (page utile pour un crawler qui
               // arrive ici depuis une recherche de contact).
-              + `<p class="mt-6 text-center text-sm text-gray-500">`
-              + `<a href="/how-it-works" class="text-orange-600 underline underline-offset-2">${esc(T('howItWorksTitle'))}</a>`
-              + ` · `
-              + `<a href="/jobs" class="text-orange-600 underline underline-offset-2">${esc(T('viewJobs'))}</a>`
-              + `</p>`
+              + liensDePage(supportPlan, 'mt-6 text-center text-sm text-gray-500')
               + `</div>`,
             // ── Les trois pages de CONFIANCE ─────────────────────────────
             // /about, /contact, /privacy : ce qu'un moteur (et une régie
@@ -1125,6 +1099,13 @@ export default defineConfig(({ mode }) => {
           // l'accueil peut donc vivre dans index.html sans être peint à tort
           // sur /dashboard ou /profile — ce qui était la raison de garder
           // #root vide jusqu'ici.
+          // Le corps de l'accueil est DÉCLARÉ comme celui des autres pages
+          // (plan « / » de src/config/page-sections.js) : la garde s'applique
+          // donc ici aussi. index.html est écrit à CET endroit, pas dans la
+          // boucle des routes pré-rendues (qui écarte « / » pour cette raison) :
+          // sans cet appel, l'accueil serait le seul corps non vérifié — et
+          // c'est exactement par là que la dérive silencieuse rentrerait.
+          exigerCorpsDeclare('/', 'home', homeShell)
           const withHomeShell = html.replace(
             '<div id="root"></div>',
             `<div id="root">${homeShell}</div>`

@@ -8,19 +8,18 @@ import { usePageMeta } from '../utils/seo';
 // Contact (N.A.P.) partagé avec le footer et le shell statique de l'accueil :
 // une seule source (src/config/contact.json) pour ne jamais publier deux
 // adresses ou deux numéros différents selon le canal.
-import { CONTACT } from '../config/contact';
+import { CONTACT, mailtoHref, telHref } from '../config/contact';
+// Les douze libellés que la coquille pré-rendue publie sont DÉCLARÉS une fois
+// (src/config/page-sections.js) : le build écrit le shell avec eux, et cette
+// page les lit pour son dictionnaire français.
+import { SUPPORT_COPY_FR } from '../config/page-sections';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^\+?[0-9\s\-.]{6,20}$/;
 
 const COPY = {
   fr: {
-    title: 'Support',
-    subtitle: 'Une question, un problème ? Nous sommes là pour vous aider.',
-    robotTitle: 'Parler avec le robot',
-    robotSubtitle: "L'assistant vous guide en quelques questions",
-    directTitle: 'Contacter directement le support',
-    directSubtitle: 'Appel, e-mail ou WhatsApp',
+    ...SUPPORT_COPY_FR,
     back: 'Retour',
     assistantName: 'Assistant Kojo',
     step: 'Étape',
@@ -56,12 +55,6 @@ const COPY = {
     ticketReason: 'Motif',
     ticketStatusLabel: 'Statut actuel',
     ticketSentOn: 'Envoyé le',
-    directCardTitle: 'Contacter directement le support',
-    directCardSubtitle: 'Nous sommes joignables aux coordonnées ci-dessous.',
-    call: 'Appeler',
-    whatsapp: 'WhatsApp',
-    sendEmail: 'Envoyer un e-mail',
-    address: 'Adresse',
   },
   en: {
     title: 'Support',
@@ -280,7 +273,7 @@ function DirectContactCard({ copy }) {
       <p className="text-sm text-gray-500 mb-5">{copy.directCardSubtitle}</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <a href={`tel:${CONTACT.phone}`} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
+        <a href={telHref} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600"><Phone size={18} /></span>
           <div>
             <div className="text-sm font-semibold text-gray-900">{copy.call}</div>
@@ -296,7 +289,7 @@ function DirectContactCard({ copy }) {
           </div>
         </a>
 
-        <a href={`mailto:${CONTACT.email}?subject=${encodeURIComponent('Contact KOJO')}`} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
+        <a href={mailtoHref} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600"><Mail size={18} /></span>
           <div>
             <div className="text-sm font-semibold text-gray-900">{copy.sendEmail}</div>

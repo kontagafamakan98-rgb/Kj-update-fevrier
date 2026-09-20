@@ -26,7 +26,122 @@ import { CONTACT, mailtoHref, telHref } from './contact.js';
 // données non textuelles (icônes, destination d'un lien, accent d'une ligne). Le
 // build refuse une coquille qui ne porte pas tout ce qui est déclaré ici (voir
 // `exigerCorpsDeclare` dans vite.config.js).
+// Textes FRANÇAIS que la coquille de /support publie. Ils vivent ici — et non
+// dans Support.js — parce que le build les écrit, et Support.js les LIT pour son
+// dictionnaire français : un seul exemplaire du texte, donc pas de seconde
+// déclaration à faire suivre. Les quatre autres langues restent dans Support.js.
+export const SUPPORT_COPY_FR = {
+  title: 'Support',
+  subtitle: 'Une question, un problème ? Nous sommes là pour vous aider.',
+  robotTitle: 'Parler avec le robot',
+  robotSubtitle: "L'assistant vous guide en quelques questions",
+  directTitle: 'Contacter directement le support',
+  directSubtitle: 'Appel, e-mail ou WhatsApp',
+  directCardTitle: 'Contacter directement le support',
+  directCardSubtitle: 'Nous sommes joignables aux coordonnées ci-dessous.',
+  call: 'Appeler',
+  whatsapp: 'WhatsApp',
+  sendEmail: 'Envoyer un e-mail',
+  address: 'Adresse',
+};
+
+// Les deux formes de ligne du bloc de contact : une ligne cliquable (avec son
+// survol) et une ligne de simple information. Elles servent aux DEUX canaux.
+const LIGNE_LIEN =
+  'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors';
+const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3';
+
 export const PAGE_SECTIONS = {
+  // L'accueil : le corps du shell (trois promesses, trois étapes, catégories)
+  // était recopié ici, liste par liste, face aux blocs de src/pages/Home.js —
+  // ajouter une catégorie ou une promesse à la page laissait la coquille
+  // derrière, sans que rien ne rougisse.
+  '/': {
+    categories: [
+      // `labelKey` est AUSSI le code de catégorie canonique du backend : le
+      // libellé affiché et le filtre de /jobs sortent donc de la même valeur.
+      { labelKey: 'general', icon: '🛠️' },
+      { labelKey: 'plumbing', icon: '🔧' },
+      { labelKey: 'electrical', icon: '⚡' },
+      { labelKey: 'construction', icon: '🏗️' },
+      { labelKey: 'cleaning', icon: '🧽' },
+      { labelKey: 'gardening', icon: '🌱' },
+      { labelKey: 'tutoring', icon: '📚' },
+      { labelKey: 'mechanics', icon: '🔩' },
+      { labelKey: 'carpentry', icon: '🪚' },
+      { labelKey: 'computing', icon: '💻' },
+    ],
+    promises: [
+      { icon: '💼', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
+      { icon: '🤝', titleKey: 'connect', descriptionKey: 'connectDescription' },
+      { icon: '💰', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
+    ],
+    steps: [
+      { icon: '1️⃣', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
+      { icon: '2️⃣', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
+      { icon: '3️⃣', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
+    ],
+  },
+
+  // /support : le bloc de contact de la coquille était recopié, libellé par
+  // libellé, face au dictionnaire de src/pages/Support.js.
+  '/support': {
+    texts: SUPPORT_COPY_FR,
+    modes: [
+      {
+        shellIcon: '💬',
+        badgeClass: 'bg-orange-100 text-orange-600',
+        title: SUPPORT_COPY_FR.robotTitle,
+        subtitle: SUPPORT_COPY_FR.robotSubtitle,
+      },
+      {
+        shellIcon: '📞',
+        badgeClass: 'bg-emerald-100 text-emerald-600',
+        title: SUPPORT_COPY_FR.directTitle,
+        subtitle: SUPPORT_COPY_FR.directSubtitle,
+      },
+    ],
+    rows: [
+      {
+        shellIcon: '📞',
+        label: SUPPORT_COPY_FR.call,
+        badgeClass: 'bg-orange-100 text-orange-600',
+        href: telHref,
+        value: CONTACT.phoneDisplay,
+        rowClass: LIGNE_LIEN,
+      },
+      {
+        shellIcon: '💬',
+        label: SUPPORT_COPY_FR.whatsapp,
+        badgeClass: 'bg-emerald-100 text-emerald-600',
+        href: CONTACT.whatsappUrl,
+        value: CONTACT.phoneDisplay,
+        external: true,
+        rowClass: LIGNE_LIEN,
+      },
+      {
+        shellIcon: '✉️',
+        label: SUPPORT_COPY_FR.sendEmail,
+        badgeClass: 'bg-blue-100 text-blue-600',
+        href: mailtoHref,
+        value: CONTACT.email,
+        breakAll: true,
+        rowClass: LIGNE_LIEN,
+      },
+      {
+        shellIcon: '📍',
+        label: SUPPORT_COPY_FR.address,
+        badgeClass: 'bg-gray-100 text-gray-600',
+        value: CONTACT.address,
+        rowClass: LIGNE_INFO,
+      },
+    ],
+    links: [
+      { to: '/how-it-works', labelKey: 'howItWorksTitle' },
+      { to: '/jobs', labelKey: 'viewJobs' },
+    ],
+  },
+
   '/about': {
     titleKey: 'aboutTitle',
     introKey: 'aboutIntro',
@@ -117,36 +232,38 @@ export const PAGE_SECTIONS = {
 };
 
 /**
- * Clés i18n que le corps d'une page publie, dans l'ordre où il les publie.
+ * Ce qu'un plan déclare publier, séparé en deux : les CLÉS i18n (résolues dans
+ * la langue du canal) et les TEXTES littéraux (déjà dans la langue de la
+ * coquille).
  *
- * C'est ce qui permet au build de REFUSER une coquille incomplète sans tenir une
- * seconde liste : les clés attendues se déduisent de la déclaration ci-dessus,
- * jamais d'une table écrite à côté.
+ * La règle est la convention du dépôt : un champ dont le nom finit par `Key`
+ * porte une clé i18n ; TOUT autre texte d'un plan est un texte que la coquille
+ * doit publier tel quel. Le build s'en sert pour REFUSER une coquille incomplète
+ * sans tenir de seconde liste — les attendus se déduisent du plan, jamais d'une
+ * table écrite à côté.
  *
- * @param {object} plan Plan d'une page (`PAGE_SECTIONS[route]`).
- * @returns {string[]} Clés i18n, dédoublonnées par ordre d'apparition.
- */
-export function pageSectionTextKeys(plan) {
-  const keys = [plan.titleKey, plan.introKey, plan.noteKey].filter(Boolean);
-  for (const card of plan.cards || []) keys.push(card.titleKey, card.descriptionKey);
-  if (plan.highlight) {
-    keys.push(plan.highlight.titleKey, plan.highlight.textKey, plan.highlight.bulletsKey);
-  }
-  for (const section of plan.sections || []) keys.push(section.titleKey, section.bodyKey);
-  for (const link of plan.links || []) keys.push(link.labelKey);
-  return [...new Set(keys)];
-}
-
-/**
- * Textes NON traduits d'une page : ce qu'une ligne de contact publie et que les
- * dictionnaires ne portent pas (libellé, valeur affichée, destination).
- *
- * Ils comptent autant que les clés : une coquille qui aurait gardé trois lignes
- * sur quatre se verrait ici comme ailleurs.
+ * Corollaire : un plan ne porte AUCUNE donnée interne. Ce qu'un plan déclare
+ * est publié par la coquille, sans exception — y compris la valeur d'un lien.
  *
  * @param {object} plan Plan d'une page (`PAGE_SECTIONS[route]`).
- * @returns {string[]} Textes littéraux attendus dans la coquille.
+ * @returns {{cles: string[], textes: string[]}} Attendus, dédoublonnés.
  */
-export function pageSectionLiterals(plan) {
-  return (plan.actions || []).flatMap((action) => [action.label, action.value, action.href]);
+export function pageSectionParts(plan) {
+  const cles = [];
+  const textes = [];
+  const visiter = (valeur, nom) => {
+    if (typeof valeur === 'string') {
+      (nom && nom.endsWith('Key') ? cles : textes).push(valeur);
+      return;
+    }
+    if (Array.isArray(valeur)) {
+      valeur.forEach((element) => visiter(element, nom));
+      return;
+    }
+    if (valeur && typeof valeur === 'object') {
+      Object.entries(valeur).forEach(([cle, sousValeur]) => visiter(sousValeur, cle));
+    }
+  };
+  visiter(plan, null);
+  return { cles: [...new Set(cles)], textes: [...new Set(textes)] };
 }
