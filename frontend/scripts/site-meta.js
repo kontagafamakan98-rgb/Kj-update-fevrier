@@ -136,6 +136,22 @@ export function canonicalHref(html) {
 }
 
 /**
+ * Texte de l'élément `<title>` servi — ce qu'un moteur affiche comme titre du
+ * résultat, et ce qu'un onglet de navigateur montre.
+ *
+ * Il vit ici, avec `metaContents`/`canonicalHref`, pour la même raison qu'eux :
+ * la sonde de production lit le `<title>` de chaque page du sitemap, et un
+ * motif recopié par lecteur serait une occasion de divergence de plus.
+ *
+ * @param {string} html HTML complet.
+ * @returns {string} Le titre, espaces de bord retirés, ou `''` si absent.
+ */
+export function titleOf(html) {
+  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(String(html));
+  return match ? match[1].trim() : '';
+}
+
+/**
  * La réponse interdit-elle l'indexation ?
  *
  * Les deux canaux comptent : l'en-tête `x-robots-tag` et `<meta name="robots">`.

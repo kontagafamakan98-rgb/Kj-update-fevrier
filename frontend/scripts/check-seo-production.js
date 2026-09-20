@@ -8,7 +8,7 @@
  * laissé F9 ouvert : quatre intégrations absentes de la production, et aucun run
  * rouge nulle part.
  *
- * Deux sections, et deux `::notice` par fait constaté :
+ * Trois sections, et un `::notice` par fait constaté :
  *
  * 1. INTÉGRATIONS — les quatre réclamées par un audit SEO « sans JavaScript »
  *    (balise Google Analytics 4, meta de vérification Search Console, `sameAs`
@@ -26,17 +26,24 @@
  *    adresses différentes pendant des heures, et rien ne le disait. L'écart est
  *    maintenant nommé, au lieu de se déduire d'une carte OG cassée.
  *
- * Le script ne fait JAMAIS échouer la CI : une intégration non configurée ou un
- * écart d'adresse sont des faits d'exploitation, pas des régressions de code. Il
- * refuse de conclure sur une base locale (repli des PR) — là, les variables sont
- * absentes par construction, et quatre « ABSENT » ne diraient rien de la
- * production.
+ * 3. PAGES — chaque page du sitemap est lue et doit annoncer son `canonical`,
+ *    son `<title>` et sa `description`. Avant, seule l'accueil était sondée : le
+ *    sitemap annonçait huit pages dont sept n'étaient jamais lues, donc une page
+ *    servie sans description (ou avec le canonical d'une autre) restait
+ *    silencieuse. Les fiches `/jobs/:id` sont exclues ici — jusqu'à 9 000, et
+ *    déjà vérifiées en HTTP contre la production par `check-og-job-200.js`.
+ *
+ * En mode INFORMATIF (celui de `ci.yml`), le script ne fait JAMAIS échouer la
+ * CI : une intégration non configurée ou un écart d'adresse sont des faits
+ * d'exploitation, pas des régressions de code. Il refuse de conclure sur une
+ * base locale (repli des PR) — là, les variables sont absentes par construction,
+ * et quatre « ABSENT » ne diraient rien de la production.
  *
  * Usage : cd frontend && node scripts/check-seo-production.js [--base URL]
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { SITE_ORIGIN, canonicalHref, metaContent } from './site-meta.js';
+import { SITE_ORIGIN, canonicalHref, metaContent, titleOf } from './site-meta.js';
 
 // Les quatre intégrations, la variable d'environnement qui les active, et si
 // leur ABSENCE est un défaut (`required`) ou un choix d'exploitation.
@@ -212,6 +219,146 @@ function sitemapNotice({ locs, error }, attendue) {
 }
 
 /**
+ * Métadonnées qu'une page PUBLIQUE doit annoncer, lues sur le HTML SERVI — ce
+ * qu'un crawler sans JavaScript reçoit réellement, pas ce que le build a écrit.
+ */
+export function analyzePageMetadata(html) {
+  return {
+    title: titleOf(html),
+    description: metaContent(html, 'description'),
+    canonical: canonicalHref(html),
+  };
+}
+
+/** Chemin d'une adresse, barre finale retirée (« / » et « / » restent égaux). */
+const normalizePathname = (value) => String(value).replace(/\/+$/, '') || '/';
+
+/** Le chemin d'une URL, ou la chaîne vide si elle est illisible. */
+function pathOf(url) {
+  try {
+    return new URL(url).pathname;
+  } catch (_error) {
+    return String(url);
+  }
+}
+
+/**
+ * Les fiches `/jobs/:id` du sitemap sont DÉLIBÉRÉMENT hors de cette section :
+ * le sitemap en admet jusqu'à 9 000, leur cycle est déjà vérifié en HTTP contre
+ * la production par `check-og-job-200.js`, et une fiche clôturée entre la
+ * lecture du sitemap et la lecture de sa page ferait rougir la sonde pour rien.
+ */
+const JOB_DETAIL = /^\/jobs\/[^/]+\/?$/;
+
+/** Plafond de pages lues : borne le coût quotidien si un sitemap en annonce trop. */
+const MAX_PAGES = 20;
+
+/**
+ * Défauts d'une page vis-à-vis de sa PROPRE adresse, chacun nommant la page et
+ * ce qui manque — un rouge muet obligerait à relire le script.
+ *
+ * Le canonical est confronté à la page elle-même, pas seulement à l'origine :
+ * une route qui annoncerait le canonical d'une AUTRE page a bien une adresse
+ * canonique, mais elle envoie les crawlers ailleurs.
+ */
+export function pageDefects({ url, html, error }) {
+  const path = pathOf(url);
+  if (error) {
+    return [`${path} : non lisible (${error}) — le sitemap annonce une page que la production ne sert pas.`];
+  }
+  const { title, description, canonical } = analyzePageMetadata(html);
+  const defects = [];
+  if (!title) {
+    defects.push(`${path} : <title> ABSENT — un résultat de recherche s'afficherait avec l'adresse brute.`);
+  }
+  if (!description) {
+    defects.push(`${path} : description ABSENTE — un moteur n'a aucun extrait à afficher.`);
+  }
+  if (!canonical) {
+    defects.push(`${path} : canonical ABSENT — un crawler ne peut pas trancher entre les adresses qui répondent.`);
+  } else if (!belongsTo(canonical, SITE_ORIGIN)) {
+    defects.push(`${path} : canonical ${canonical} — ÉCART : hors de l'origine attendue ${SITE_ORIGIN}.`);
+  } else if (normalizePathname(pathOf(canonical)) !== normalizePathname(path)) {
+    defects.push(
+      `${path} : canonical ${canonical} — ÉCART : désigne ${normalizePathname(pathOf(canonical))} au lieu de cette page.`,
+    );
+  }
+  return defects;
+}
+
+/** Lit une page du sitemap ; jamais d'exception, l'erreur devient un défaut nommé. */
+async function readPage(url, fetchImpl) {
+  try {
+    const response = await fetchImpl(url, {
+      redirect: 'follow',
+      headers: PROBE_HEADERS,
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) return { url, error: `HTTP ${response.status}` };
+    return { url, html: await response.text() };
+  } catch (error) {
+    return { url, error: error.message };
+  }
+}
+
+/**
+ * Les pages du sitemap à vérifier, et ce qui a été écarté.
+ *
+ * @returns {Promise<{checked: Array<{url: string, defects: string[]}>, total: number,
+ *   skippedJob: number, truncated: number}>}
+ */
+async function checkSitemapPages({ locs = [], fetchImpl, homeHtml }) {
+  const pages = [];
+  let skippedJob = 0;
+  for (const loc of locs) {
+    try {
+      if (JOB_DETAIL.test(new URL(loc).pathname)) {
+        skippedJob += 1;
+        continue;
+      }
+    } catch (_error) {
+      // `<loc>` illisible : déjà visible dans le décompte du sitemap.
+      continue;
+    }
+    pages.push(loc);
+  }
+  const checked = [];
+  for (const url of pages.slice(0, MAX_PAGES)) {
+    // L'accueil est déjà lu pour les intégrations : ne pas le redemander.
+    const page =
+      pathOf(url) === '/' && homeHtml !== undefined
+        ? { url, html: homeHtml }
+        : await readPage(url, fetchImpl);
+    checked.push({ url, defects: pageDefects(page) });
+  }
+  return { checked, total: pages.length, skippedJob, truncated: pages.length - checked.length };
+}
+
+/**
+ * Notices de la section « Pages » : un résumé, puis un `::notice` par défaut.
+ *
+ * @returns {{notices: string[], défauts: string[]}} Les défauts sont ceux que le
+ *   mode strict refuse.
+ */
+export function pagesNotices({ checked, total, skippedJob = 0, truncated = 0, error }) {
+  if (error) {
+    return { notices: [`Pages — non vérifiées : le sitemap n'est pas lisible (${error}).`], défauts: [] };
+  }
+  const notes = [];
+  if (skippedJob) notes.push(`${skippedJob} fiche(s) /jobs/:id écartée(s) — couvertes en HTTP par check-og-job-200.js`);
+  if (truncated) notes.push(`${truncated} page(s) au-delà du plafond de ${MAX_PAGES}`);
+  const défauts = checked
+    .filter(({ defects }) => defects.length > 0)
+    .flatMap(({ defects }) => defects);
+  const résumé =
+    `Pages — ${checked.length}/${total} page(s) du sitemap vérifiée(s) (canonical, title, description) : ` +
+    (défauts.length ? `${défauts.length} défaut(s) nommé(s) ci-dessous` : 'conformes') +
+    (notes.length ? ` (${notes.join(' ; ')})` : '') +
+    '.';
+  return { notices: [résumé, ...défauts.map((d) => `Pages — ${d}`)], défauts };
+}
+
+/**
  * @param {object} [options]
  * @param {string} [options.base] Base sondée (KOJO_LHCI_BASE_URL, sinon SITE_ORIGIN).
  * @param {Function} [options.fetchImpl] `fetch` injectable (tests).
@@ -255,18 +402,31 @@ export async function runSeoProductionReport({
 
   const analysis = analyzeSeoServedHtml(html);
   const sitemap = await readSitemap(cleanBase, fetchImpl);
+  // La section « Pages » suit le sitemap SERVI : ce qu'un sitemap annonce doit
+  // être servi avec ses métadonnées. Son HTML n'est lu que si le sitemap l'est.
+  const pages = await checkSitemapPages({
+    locs: sitemap.locs || [],
+    fetchImpl,
+    homeHtml: html,
+  });
+  const pagesRapport = pagesNotices(sitemap.error ? { error: sitemap.error } : pages);
   const presentes = INTEGRATIONS.filter(({ key }) => analysis[key].present);
   const requises = INTEGRATIONS.filter(({ required }) => required);
   // Ce que le mode strict refuse : les intégrations REQUISES absentes, nommées
-  // avec la variable à poser — sinon un rouge ne dirait pas quoi corriger. Une
-  // intégration facultative absente est publiée en notice et n'entre pas ici.
-  const manquantes = requises
-    .filter(({ key }) => !analysis[key].present)
-    .map((integration) => noticeFor(integration, analysis[integration.key]));
+  // avec la variable à poser, et chaque page du sitemap qui n'annonce pas ses
+  // métadonnées — sinon un rouge ne dirait pas quoi corriger. Une intégration
+  // facultative absente est publiée en notice et n'entre pas ici.
+  const manquantes = [
+    ...requises
+      .filter(({ key }) => !analysis[key].present)
+      .map((integration) => noticeFor(integration, analysis[integration.key])),
+    ...pagesRapport.défauts.map((défaut) => `Pages — ${défaut}`),
+  ];
   return {
     skipped: false,
     manquantes,
     analyse: analysis,
+    pages: pages.checked,
     notices: [
       ...INTEGRATIONS.map((integration) => noticeFor(integration, analysis[integration.key])),
       `${presentes.length}/${INTEGRATIONS.length} intégration(s) présente(s) sur ${cleanBase} ` +
@@ -276,6 +436,7 @@ export async function runSeoProductionReport({
           : 'ce rapport ne bloque rien (cf. CI-COVERAGE.md, F9).'),
       canonicalNotice(canonicalHref(html), SITE_ORIGIN),
       sitemapNotice(sitemap, SITE_ORIGIN),
+      ...pagesRapport.notices,
     ],
   };
 }

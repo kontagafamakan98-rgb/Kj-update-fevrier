@@ -22,6 +22,8 @@ const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-seo-production.js');
 // HTML « configuré » : ce que le plugin injecte quand les variables sont posées.
 const CONFIGURED_HTML = `<!doctype html><html><head>
 <link rel="canonical" href="https://kojoforafrica.cc.cd/" />
+<title>Titre de l'accueil</title>
+<meta name="description" content="Description de l'accueil">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.googletagmanager.com https://plausible.io">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ABC1234567"></script>
 <meta content="jeton-gsc-abc123" name="google-site-verification">
@@ -48,6 +50,31 @@ const SITEMAP_XML = `<?xml version="1.0" encoding="UTF-8"?>
   <url><loc>https://kojoforafrica.cc.cd/jobs</loc></url>
   <url><loc>https://kojoforafrica.cc.cd/how-it-works</loc></url>
 </urlset>`;
+
+// Une page du sitemap : ses trois métadonnées, sur sa propre adresse.
+const pageFor = (route) => `<!doctype html><html><head>
+<link rel="canonical" href="${SITE_ORIGIN}${route}" />
+<title>Titre de ${route}</title>
+<meta name="description" content="Description de ${route}">
+</head><body><div id="root"></div></body></html>`;
+
+// Les pages que le SITEMAP_XML annonce, telles que la production les sert.
+const SERVED_PAGES = {
+  '/': CONFIGURED_HTML,
+  '/jobs': pageFor('/jobs'),
+  '/how-it-works': pageFor('/how-it-works'),
+};
+
+// Double qui sert des pages ET retient les chemins demandés : la section Pages
+// ne doit pas relire l'accueil déjà lu pour les intégrations.
+const trackingFetch = (pages, sitemapXml, seen) =>
+  async (url) => {
+    const pathname = new URL(url).pathname;
+    if (seen) seen.push(pathname);
+    const map = { ...pages, ...(sitemapXml ? { '/sitemap.xml': sitemapXml } : {}) };
+    const html = map[pathname];
+    return { ok: html !== undefined, status: html === undefined ? 404 : 200, text: async () => html ?? '' };
+  };
 
 // Double fidèle d'une `Response` : `ok` fait partie du contrat, la sonde s'y fie
 // (`response.ok`), et un double qui l'omet testerait autre chose que la réalité.
@@ -172,7 +199,7 @@ describe('section Domaine — ce qui se détecte tout seul après une migration'
   const report = async (html, sitemapXml) => {
     const result = await runSeoProductionReport({
       base: SITE_ORIGIN,
-      fetchImpl: stubFetch({ '/': html, ...(sitemapXml ? { '/sitemap.xml': sitemapXml } : {}) }),
+      fetchImpl: trackingFetch({ ...SERVED_PAGES, '/': html }, sitemapXml),
     });
     expect(result.skipped).toBe(false);
     return result.notices.join('\n');
@@ -221,6 +248,100 @@ describe('section Domaine — ce qui se détecte tout seul après une migration'
   });
 });
 
+describe('section Pages — le sitemap servi, page par page', () => {
+  // « au-delà de / » : la sonde lisait l'accueil puis ignorait les sept autres
+  // pages que le sitemap annonce. Chaque page doit annoncer son canonical, son
+  // title et sa description, et une page défaillante est NOMMÉE.
+  const run = (over = {}, sitemapXml = SITEMAP_XML, seen) =>
+    runSeoProductionReport({
+      base: SITE_ORIGIN,
+      fetchImpl: trackingFetch({ ...SERVED_PAGES, ...over }, sitemapXml, seen),
+    });
+
+  it('lit chaque page du sitemap et ne redemande pas l’accueil déjà lu', async () => {
+    const seen = [];
+    const result = await run({}, SITEMAP_XML, seen);
+    expect(seen).toEqual(['/', '/sitemap.xml', '/jobs', '/how-it-works']);
+    expect(result.pages.map(({ url }) => url)).toEqual([
+      `${SITE_ORIGIN}/`,
+      `${SITE_ORIGIN}/jobs`,
+      `${SITE_ORIGIN}/how-it-works`,
+    ]);
+  });
+
+  it('dit « conformes » quand chaque page annonce ses trois métadonnées', async () => {
+    const result = await run();
+    expect(result.manquantes).toEqual([]);
+    expect(result.notices.join('\n')).toContain('3/3 page(s) du sitemap vérifiée(s)');
+    expect(result.notices.join('\n')).toContain('conformes');
+  });
+
+  it('refuse une page sans description, en la nommant', async () => {
+    const result = await run({
+      '/jobs': pageFor('/jobs').replace(/<meta name="description"[^>]*>/, ''),
+    });
+    expect(result.manquantes.join('\n')).toContain('/jobs : description ABSENTE');
+    // Le refus nomme la page fautive, pas les pages saines.
+    expect(result.manquantes.join('\n')).not.toContain('/how-it-works');
+  });
+
+  it('refuse un <title> absent', async () => {
+    const result = await run({ '/jobs': pageFor('/jobs').replace(/<title>[^<]*<\/title>/, '') });
+    expect(result.manquantes.join('\n')).toContain('/jobs : <title> ABSENT');
+  });
+
+  it('refuse un canonical qui désigne une AUTRE page', async () => {
+    // Avoir une adresse canonique ne suffit pas : celle-ci envoie les crawlers
+    // ailleurs, ce qu'un contrôle limité à l'origine ne verrait pas.
+    const result = await run({
+      '/jobs': pageFor('/jobs').replace(`${SITE_ORIGIN}/jobs`, `${SITE_ORIGIN}/login`),
+    });
+    expect(result.manquantes.join('\n')).toContain('/jobs : canonical');
+    expect(result.manquantes.join('\n')).toContain('désigne /login');
+  });
+
+  it('refuse un canonical hors de l’origine attendue', async () => {
+    const result = await run({
+      '/jobs': pageFor('/jobs').replace(SITE_ORIGIN, 'https://kj-update-fevrier.vercel.app'),
+    });
+    expect(result.manquantes.join('\n')).toContain("hors de l'origine attendue");
+  });
+
+  it('une page du sitemap non servie est refusée : un sitemap n’annonce pas du vide', async () => {
+    const missing = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      strict: true,
+      fetchImpl: async (url) => {
+        const pathname = new URL(url).pathname;
+        if (pathname === '/how-it-works') return { ok: false, status: 404, text: async () => '' };
+        const html = { ...SERVED_PAGES, '/sitemap.xml': SITEMAP_XML }[pathname];
+        return { ok: html !== undefined, status: html === undefined ? 404 : 200, text: async () => html ?? '' };
+      },
+    });
+    expect(missing.manquantes.join('\n')).toContain('/how-it-works : non lisible (HTTP 404)');
+  });
+
+  it('écarte les fiches /jobs/:id sans les lire (couvertes en HTTP ailleurs)', async () => {
+    const sitemap = SITEMAP_XML.replace(
+      '</urlset>',
+      `  <url><loc>${SITE_ORIGIN}/jobs/abc123</loc></url>\n</urlset>`,
+    );
+    const seen = [];
+    const result = await run({}, sitemap, seen);
+    expect(seen).not.toContain('/jobs/abc123');
+    expect(result.notices.join('\n')).toContain('1 fiche(s) /jobs/:id écartée(s)');
+  });
+
+  it('un sitemap illisible ne conclut rien sur les pages, sans faire tomber le reste', async () => {
+    const result = await runSeoProductionReport({
+      base: SITE_ORIGIN,
+      fetchImpl: trackingFetch(SERVED_PAGES),
+    });
+    expect(result.notices.join('\n')).toContain("Pages — non vérifiées : le sitemap n'est pas lisible");
+    expect(result.manquantes).toEqual([]);
+  });
+});
+
 describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
   // Le mode informatif est ce qui a laissé F9 ouvert des jours : quatre
   // intégrations absentes de la production, et aucun run rouge. Le mode strict
@@ -229,7 +350,7 @@ describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
     const result = await runSeoProductionReport({
       base: SITE_ORIGIN,
       strict: true,
-      fetchImpl: stubFetch({ '/': UNCONFIGURED_HTML, '/sitemap.xml': SITEMAP_XML }),
+      fetchImpl: trackingFetch({ ...SERVED_PAGES, '/': UNCONFIGURED_HTML }, SITEMAP_XML),
     });
 
     expect(result.skipped).toBe(false);
@@ -243,7 +364,7 @@ describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
     const result = await runSeoProductionReport({
       base: SITE_ORIGIN,
       strict: true,
-      fetchImpl: stubFetch({ '/': CONFIGURED_HTML, '/sitemap.xml': SITEMAP_XML }),
+      fetchImpl: trackingFetch(SERVED_PAGES, SITEMAP_XML),
     });
 
     expect(result.manquantes).toEqual([]);
@@ -257,7 +378,7 @@ describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
     const result = await runSeoProductionReport({
       base: SITE_ORIGIN,
       strict: true,
-      fetchImpl: stubFetch({ '/': REQUIRED_ONLY_HTML, '/sitemap.xml': SITEMAP_XML }),
+      fetchImpl: trackingFetch({ ...SERVED_PAGES, '/': REQUIRED_ONLY_HTML }, SITEMAP_XML),
     });
 
     expect(result.manquantes).toEqual([]);
@@ -270,7 +391,7 @@ describe('le mode STRICT — celui qui met fin au silence (F9)', () => {
     const result = await runSeoProductionReport({
       base: SITE_ORIGIN,
       strict: true,
-      fetchImpl: stubFetch({ '/': UNCONFIGURED_HTML, '/sitemap.xml': SITEMAP_XML }),
+      fetchImpl: trackingFetch({ ...SERVED_PAGES, '/': UNCONFIGURED_HTML }, SITEMAP_XML),
     });
 
     const refuse = result.manquantes.join('\n');
