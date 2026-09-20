@@ -75,13 +75,16 @@
  * n'apparaît plus : 0,0000 sur 27 runs depuis. Le plafond global de 0,15 le
  * tolérait ; le budget par route ne le tolérerait plus.
  *
- * ── Ce qui n'est PLUS asserté sur une route, et pourquoi ───────────────────
- * `LCP_PRODUIT_PAR_UN_TIERS` nomme les routes dont le LCP (et le score, qui le
- * pèse) est produit par une requête que le job ne contrôle pas. La matrice leur
- * retire ces deux grandeurs, avec la mesure qui l'établit ; les plafonds des
- * autres pages, eux, sont INCHANGÉS. Une entrée sans justification est refusée
- * par un test : une exception muette serait un budget qu'on ne mesure plus sans
- * le dire.
+ * ── Ce que le collect BLOQUE, et ce qu'il ne peut que constater ────────────
+ * Deux traitements, selon ce que le tiers fait au plus grand peintre :
+ *   • `REQUETES_HORS_CONTROLE` — la requête RETARDE un peintre de l'artefact
+ *     (la ligne de contact de /login derrière l'appel aux pays). Bloquée : le
+ *     peintre redevient celui de l'artefact, et la grandeur est ASSERTÉE.
+ *   • `LCP_PRODUIT_PAR_UNE_REPONSE` — la réponse EST le peintre (la liste des
+ *     missions). Bloquée ou non, le LCP est le moment où la réponse est connue :
+ *     la grandeur n'est pas assertée sur cette route, et le reste du socle l'est.
+ * Chaque entrée porte la mesure qui l'établit, et une entrée sans justification
+ * est refusée par un test.
  *
  * Deux routes mesurées à 0 se voient refuser 0 par prudence : un budget nul
  * ferait rougir la CI au premier pixel déplacé (un bandeau, un toast), ce qui
@@ -155,41 +158,71 @@ const CLS_BUDGETS = {
 };
 
 /**
- * Routes dont le LCP — et donc le SCORE, qui le pèse — est produit par une
- * requête que le job ne contrôle pas : mesurer ces deux grandeurs depuis un
- * runner mesure la latence d'un service tiers, pas l'artefact. Elles ne sont
- * donc PAS assertées sur ces routes ; tout le reste (FCP, TBT, CLS, et les
- * budgets explicites des autres pages) l'est.
+ * Les requêtes que le job NE CONTRÔLE PAS, et qui décidaient pourtant du
+ * verdict. Elles sont bloquées pendant le collect (`blockedUrlPatterns` dans
+ * `lighthouserc.cjs`, une propriété de Lighthouse, appliquée via CDP) : sans
+ * cela, le plus grand peintre de plusieurs pages est un contenu rendu APRÈS la
+ * réponse de l'API, donc le LCP (et le score, qui le pèse) mesure la latence de
+ * l'API — pas l'artefact.
  *
- * La preuve, mesurée sur deux jobs de `main` portant le MÊME code applicatif :
+ * La preuve, relevée sur les rapports RÉELS archivés de trois jobs de `main`
+ * portant le MÊME code applicatif :
  *
- *   /jobs, 3 runs      FCP    LCP des 3 runs        score        élément LCP
- *   job du 12:29       1389   2727 / 2737 / 2739    0,95         liste des missions
- *   job du 13:34        988   4256 / 4359 / 4468    0,73 / 0,84 / 0,85
- *                       ↑ LCP = le paragraphe d'état vide (« Élargissez votre
- *                         recherche… ») rendu APRÈS la réponse de GET /api/jobs
+ *   route    job       FCP     LCP des 3 runs           élément LCP
+ *   /jobs    12:29    1389    2727 / 2737 / 2739       la liste des missions
+ *   /jobs    13:34     988    4256 / 4359 / 4468       le paragraphe d'état vide
+ *   /login   13:54    1028    3836 / 3781 / 3912       la ligne de contact du formulaire
  *
- * Le FCP est même MEILLEUR dans le job rouge (988 ms contre 1 389 ms) : la
- * machine n'était pas chargée, c'est la réponse de l'API qui a mis ~3,3 s au
- * lieu de ~1,3 s. Trois runs serrés au-dessus du plafond ne sont donc pas du
- * bruit : c'est un tiers qui a répondu lentement, et aucun seuil ne peut rendre
- * ce verdict reproductible sans mesurer une surface que le job contrôle.
- *
- * Aucun plafond n'est relevé ici : les grandeurs qui décrivent l'artefact
- * gardent EXACTEMENT les leurs, et celles qu'un tiers décide cessent d'être
- * assertées sur les routes concernées — le reste du socle continue de rougir si
- * le bundle, le CSS ou l'hydratation régressent.
+ * Sur /jobs, le FCP est même MEILLEUR dans le job « rouge » (988 ms contre
+ * 1 389 ms) : la machine n'était pas chargée, c'est `GET /api/jobs` qui a mis
+ * ~3,3 s au lieu de ~1,3 s. Sur /login, la requête lente nommée par le rapport
+ * est `GET /api/geolocation/available-countries`. Trois runs serrés au-dessus du
+ * plafond ne sont donc pas du bruit de runner : c'est un tiers qui répond
+ * lentement, et aucun seuil ni aucune statistique ne rend ce verdict
+ * reproductible. Le champ s'en va mesurer ce qu'il doit : l'artefact se servit,
+ * s'hydrata et se peignit, sans qu'une requête de données décide de son LCP.
  */
-const LCP_PRODUIT_PAR_UN_TIERS = {
+const REQUETES_HORS_CONTROLE = {
+  '/api/geolocation/available-countries':
+    'c’est la requête LENTE nommée par les rapports du job rouge du 20/09/2026 (13:54) : ' +
+    'le LCP de /login y valait 3836 / 3781 / 3912 ms pour un FCP de 1 028 ms, sur le même ' +
+    'code que le job vert de 12:29 qui le mesurait à 1 767 ms. Bloquée : 1 112 ms mesuré ' +
+    'le 20/09/2026 contre le serveur de rewrites local (mêmes budgets, chemin de mesure ' +
+    'débarrassé d’un tiers)',
+};
+
+/**
+ * Routes dont le LCP (et le SCORE, qui le pèse) dépend d'une RÉPONSE de l'API :
+ * le plus grand peintre n'existe pas dans la coquille, il apparaît quand la
+ * requête se résout — dans un sens comme dans l'autre. Ces deux grandeurs n'y
+ * sont donc pas assertées ; la route garde FCP, TBT et son plafond CLS, et
+ * AUCUN seuil n'est relevé pour les autres pages.
+ *
+ * /jobs, mesuré le 20/09/2026 (Lighthouse, même build) :
+ *
+ *   réponse de GET /api/jobs   LCP     élément peint
+ *   liste servie (12:29)       2 727   la liste des missions
+ *   liste servie (13:34)       4 256   la liste (API ~2,6× plus lente)
+ *   plus rien à lister         4 256   le paragraphe d'état vide
+ *   requête BLOQUÉE (local)    5 177   le bandeau « Pas de connexion »
+ *
+ * Les quatre valeurs sont au-dessus du plafond de 3 500 ms, et la dernière est
+ * mesurée avec la requête bloquée : le LCP de /jobs est le moment où la RÉPONSE
+ * est connue (le temps de la requête, ou celui de ses réessais avant l'état
+ * d'erreur), jamais un choix de l'artefact. Le blocage ne le corrige pas — il
+ * ne corrige que les pages dont le tiers retardait un peintre de l'artefact.
+ */
+const LCP_PRODUIT_PAR_UNE_REPONSE = {
   '/jobs':
-    'élément LCP = le paragraphe d’état vide rendu par la réponse de GET /api/jobs ' +
-    '(2727 ms le 20/09 12:29, 4256 ms le 20/09 13:34 : même code, même FCP) — ' +
-    'la grandeur décrit la latence de l’API, pas l’artefact',
+    'le plus grand peintre de /jobs est la réponse de GET /api/jobs : 2 727 ms avec la ' +
+    'liste, 4 256 ms avec l’état vide, 5 177 ms avec la requête bloquée (réessais avant ' +
+    'l’état d’erreur) — trois issues, toutes au-dessus du plafond, pour un FCP de 886 à ' +
+    '1 389 ms qui, lui, reste asserté',
 };
 
 /** Le socle d'une route : ce qu'elle peut porter, pas ce que le job aimerait. */
 const soclePour = (route, socle) => {
-  if (!Object.hasOwn(LCP_PRODUIT_PAR_UN_TIERS, route)) return socle;
+  if (!Object.hasOwn(LCP_PRODUIT_PAR_UNE_REPONSE, route)) return socle;
   // Le score est une moyenne pondérée qui COMPREND le LCP : l'asserter
   // réimporterait exactement la grandeur qu'on vient de retirer.
   const { 'largest-contentful-paint': _lcp, 'categories:performance': _score, ...reste } = socle;
@@ -198,8 +231,8 @@ const soclePour = (route, socle) => {
 
 /**
  * Matrice d'assertions de `ci.assert` : PAR ROUTE, un socle de performance et un
- * plafond CLS — plus d'entrée globale, précisément pour qu'une exception puisse
- * porter sur UNE page au lieu d'affaiblir tout le monde.
+ * plafond CLS — plus d'entrée globale, pour qu'une éventuelle exception tienne
+ * sur UNE page au lieu d'affaiblir tout le monde.
  *
  * @param {string[]} routes Pages réellement auditées par ce run.
  * @param {object} socle Budgets communs (score, FCP, LCP, TBT).
@@ -240,4 +273,11 @@ const clsAssertionMatrix = (routes, socle) => {
   ];
 };
 
-module.exports = { CLS_BUDGETS, LCP_PRODUIT_PAR_UN_TIERS, clsAssertionMatrix, patternFor, soclePour };
+module.exports = {
+  CLS_BUDGETS,
+  LCP_PRODUIT_PAR_UNE_REPONSE,
+  REQUETES_HORS_CONTROLE,
+  clsAssertionMatrix,
+  patternFor,
+  soclePour,
+};
