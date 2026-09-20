@@ -745,11 +745,15 @@ est confronté à la page ELLE-MÊME, pas seulement à l'origine : une route qui
 annonce le `canonical` d'une autre a bien une adresse canonique, mais elle envoie
 les crawlers ailleurs. Avant cette passe, le sitemap annonçait huit pages dont
 sept n'étaient jamais lues — une page servie sans description restait
-silencieuse. Les fiches `/jobs/:id` sont **écartées** du contrôle de page (jusqu'à
-9 000 dans le sitemap, et leur cycle est déjà vérifié en HTTP contre la production
-par `check-og-job-200.js`) ; la notice le dit et les compte. Le contrôle de page
-partage le sort du reste : informatif sur les PR, **bloquant** sous `--strict` —
-une page du sitemap non servie (404) est refusée comme une page muette.
+silencieuse. Les fiches `/jobs/:id` du sitemap sont ensuite **échantillonnées**
+(`MAX_JOB_PAGES` = 3) et jugées sur les trois MÊMES métadonnées ; ce que
+`check-og-job-200.js` possède déjà — la carte OG, ses variantes, le verrou 404
+après suppression — n'est pas rejoué ici. Une fiche **disparue** entre la lecture
+du sitemap et sa lecture (404) n'est PAS un défaut : une mission se clôture
+normalement, la sonde le nomme sans juger. Le contrôle de page partage le sort du
+reste : informatif sur les PR, **bloquant** sous `--strict` — une page du sitemap
+non servie (404) est refusée comme une page muette, et une fiche servie en 200
+sans description aussi.
 
 ── **Le silence, lui, était le vrai défaut — fermé le 19/09/2026** ─────────────
 Cette sonde était **informative à dessein** (« une configuration incomplète est
@@ -1967,10 +1971,13 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    (`--strict`) que lance une fois par jour
    `.github/workflows/seo-production-probe.yml` : une intégration **requise**
    absente y rougit, une facultative non (cf. F9). Chaque page du sitemap est
-   lue (canonical, title, description) — les fiches `/jobs/:id` exceptées, elles
-   couvertes en HTTP par `check-og-job-200.js`. Restent deux limites, elles
-   réelles : le contrôle de page ne suit que jusqu'à `MAX_PAGES` (20) pages
-   d'un sitemap qui en admet 9 000, et un `Age` de cache non
+   lue (canonical, title, description), et un échantillon borné
+   (`MAX_JOB_PAGES` = 3) des fiches `/jobs/:id` est jugé sur ces trois mêmes
+   métadonnées. Restent trois limites, elles réelles : l'échantillon des fiches
+   ne couvre que jusqu'à 3 fiches sur un sitemap qui en admet 9 000 (et seulement
+   celles listées au moment de la lecture ; carte OG et verrou 404 restent à
+   `check-og-job-200.js`), le contrôle des pages du site ne suit que jusqu'à
+   `MAX_PAGES` (20), et un `Age` de cache non
    nul n'est pas détecté — le
    HTML est servi en `must-revalidate`, donc l'edge revalide, mais la sonde ne
    le PROUVE pas (mesuré : `HIT` + `Age: 1` avec et sans `cache-control`).
