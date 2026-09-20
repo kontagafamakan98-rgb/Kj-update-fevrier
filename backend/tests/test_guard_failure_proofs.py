@@ -194,27 +194,12 @@ class TestUnSeulExecutant:
             "déclarés « invoqué par la CI » alors qu'aucun workflow ne les appelle : %s" % fautes
         )
 
-    def test_un_garde_sans_executant_est_declare_et_documente(self, registre):
-        sans_executant = [
-            g for g in registre["gardes"]
-            if g["role"] == "garde" and g["invoque_par"] == "aucun"
-        ]
-        assert sans_executant, (
-            "ce test vérifie l'échappatoire : s'il n'y a plus aucun garde sans "
-            "exécutant, le retirer plutôt que le laisser passer à vide"
-        )
-        section = COUVERTURE.read_text(encoding="utf-8")
-        angles_morts = section.split("## 7.")[-1].split("## 8.")[0]
-        fautes = []
-        for garde in sans_executant:
-            if not garde.get("motif"):
-                fautes.append("%s : aucun motif" % garde["chemin"])
-            if not _motif_du_garde(garde["chemin"]).search(angles_morts):
-                fautes.append(
-                    "%s : garde sans exécutant non consigné dans CI-COVERAGE.md §7 "
-                    "(angles morts assumés)" % garde["chemin"]
-                )
-        assert fautes == [], "\n  ".join(fautes)
+    # NOTE (20/09/2026) : `test_un_garde_sans_executant_est_declare_et_documente`
+    # a été RETIRÉ, comme il le demandait lui-même (« s'il n'y a plus aucun garde
+    # sans exécutant, le retirer plutôt que le laisser passer à vide »).
+    # `audit_tdz.cjs` — le dernier — a reçu un exécutant (son test), et
+    # `check-og-reproducible.js` n'est pas un garde mais un outil. L'échappatoire
+    # qu'il vérifiait n'existe plus ; le test suivant couvre le cas restant.
 
     def test_un_outil_dit_pourquoi_ce_n_est_pas_un_garde(self, registre):
         fautes = [
