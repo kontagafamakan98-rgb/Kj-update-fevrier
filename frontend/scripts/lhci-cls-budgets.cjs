@@ -75,6 +75,14 @@
  * n'apparaît plus : 0,0000 sur 27 runs depuis. Le plafond global de 0,15 le
  * tolérait ; le budget par route ne le tolérerait plus.
  *
+ * ── Ce qui n'est PLUS asserté sur une route, et pourquoi ───────────────────
+ * `LCP_PRODUIT_PAR_UN_TIERS` nomme les routes dont le LCP (et le score, qui le
+ * pèse) est produit par une requête que le job ne contrôle pas. La matrice leur
+ * retire ces deux grandeurs, avec la mesure qui l'établit ; les plafonds des
+ * autres pages, eux, sont INCHANGÉS. Une entrée sans justification est refusée
+ * par un test : une exception muette serait un budget qu'on ne mesure plus sans
+ * le dire.
+ *
  * Deux routes mesurées à 0 se voient refuser 0 par prudence : un budget nul
  * ferait rougir la CI au premier pixel déplacé (un bandeau, un toast), ce qui
  * ferait passer une mesure pour une régression. 0,01 reste 10× plus strict que
@@ -147,16 +155,59 @@ const CLS_BUDGETS = {
 };
 
 /**
- * Matrice d'assertions de `ci.assert` : un plafond CLS PAR ROUTE, plus une
- * entrée GLOBALE (sans motif) pour ce qui ne dépend pas de la page.
+ * Routes dont le LCP — et donc le SCORE, qui le pèse — est produit par une
+ * requête que le job ne contrôle pas : mesurer ces deux grandeurs depuis un
+ * runner mesure la latence d'un service tiers, pas l'artefact. Elles ne sont
+ * donc PAS assertées sur ces routes ; tout le reste (FCP, TBT, CLS, et les
+ * budgets explicites des autres pages) l'est.
+ *
+ * La preuve, mesurée sur deux jobs de `main` portant le MÊME code applicatif :
+ *
+ *   /jobs, 3 runs      FCP    LCP des 3 runs        score        élément LCP
+ *   job du 12:29       1389   2727 / 2737 / 2739    0,95         liste des missions
+ *   job du 13:34        988   4256 / 4359 / 4468    0,73 / 0,84 / 0,85
+ *                       ↑ LCP = le paragraphe d'état vide (« Élargissez votre
+ *                         recherche… ») rendu APRÈS la réponse de GET /api/jobs
+ *
+ * Le FCP est même MEILLEUR dans le job rouge (988 ms contre 1 389 ms) : la
+ * machine n'était pas chargée, c'est la réponse de l'API qui a mis ~3,3 s au
+ * lieu de ~1,3 s. Trois runs serrés au-dessus du plafond ne sont donc pas du
+ * bruit : c'est un tiers qui a répondu lentement, et aucun seuil ne peut rendre
+ * ce verdict reproductible sans mesurer une surface que le job contrôle.
+ *
+ * Aucun plafond n'est relevé ici : les grandeurs qui décrivent l'artefact
+ * gardent EXACTEMENT les leurs, et celles qu'un tiers décide cessent d'être
+ * assertées sur les routes concernées — le reste du socle continue de rougir si
+ * le bundle, le CSS ou l'hydratation régressent.
+ */
+const LCP_PRODUIT_PAR_UN_TIERS = {
+  '/jobs':
+    'élément LCP = le paragraphe d’état vide rendu par la réponse de GET /api/jobs ' +
+    '(2727 ms le 20/09 12:29, 4256 ms le 20/09 13:34 : même code, même FCP) — ' +
+    'la grandeur décrit la latence de l’API, pas l’artefact',
+};
+
+/** Le socle d'une route : ce qu'elle peut porter, pas ce que le job aimerait. */
+const soclePour = (route, socle) => {
+  if (!Object.hasOwn(LCP_PRODUIT_PAR_UN_TIERS, route)) return socle;
+  // Le score est une moyenne pondérée qui COMPREND le LCP : l'asserter
+  // réimporterait exactement la grandeur qu'on vient de retirer.
+  const { 'largest-contentful-paint': _lcp, 'categories:performance': _score, ...reste } = socle;
+  return reste;
+};
+
+/**
+ * Matrice d'assertions de `ci.assert` : PAR ROUTE, un socle de performance et un
+ * plafond CLS — plus d'entrée globale, précisément pour qu'une exception puisse
+ * porter sur UNE page au lieu d'affaiblir tout le monde.
  *
  * @param {string[]} routes Pages réellement auditées par ce run.
- * @param {object} globalAssertions Budgets identiques pour toutes les pages.
+ * @param {object} socle Budgets communs (score, FCP, LCP, TBT).
  * @returns {Array<{matchingUrlPattern?: string, aggregationMethod: string,
  *   assertions: object}>} `ci.assert.assertMatrix`.
  * @throws {Error} Une page auditée n'a pas de budget CLS mesuré.
  */
-const clsAssertionMatrix = (routes, globalAssertions) => {
+const clsAssertionMatrix = (routes, socle) => {
   const sansBudget = routes.filter((route) => !Object.hasOwn(CLS_BUDGETS, route));
   if (sansBudget.length) {
     throw new Error(
@@ -167,14 +218,18 @@ const clsAssertionMatrix = (routes, globalAssertions) => {
     );
   }
   return [
-    // Sans `matchingUrlPattern`, cette entrée s'applique à TOUTES les URLs
-    // (le filtre est alors absent : @lhci/utils/src/assertions.js). Elle ne
-    // porte AUCUN budget CLS : c'est tout l'intérêt de la matrice.
     // `optimistic` = le MEILLEUR des 3 runs : voir l'en-tête, « Deux
     // statistiques ». Sur les 2 jobs de `main` du 20/09/2026 (39 runs, 13
     // pages), le pire meilleur-run valait 0,97 de score, 1 380 ms de FCP,
     // 2 587 ms de LCP et 10 ms de TBT — les mêmes seuils, un verdict stable.
-    { aggregationMethod: 'optimistic', assertions: globalAssertions },
+    ...routes.map((route) => ({
+      matchingUrlPattern: patternFor(route),
+      aggregationMethod: 'optimistic',
+      assertions: soclePour(route, socle),
+    })),
+    // Le CLS, lui, est une propriété du DOM et du CSS : relevé identique d'un
+    // run à l'autre (0 / 0,009 / 0,045 selon la page) — la médiane y est la
+    // statistique la plus stricte ET la plus stable.
     ...routes.map((route) => ({
       matchingUrlPattern: patternFor(route),
       aggregationMethod: 'median',
@@ -185,4 +240,4 @@ const clsAssertionMatrix = (routes, globalAssertions) => {
   ];
 };
 
-module.exports = { CLS_BUDGETS, clsAssertionMatrix, patternFor };
+module.exports = { CLS_BUDGETS, LCP_PRODUIT_PAR_UN_TIERS, clsAssertionMatrix, patternFor, soclePour };

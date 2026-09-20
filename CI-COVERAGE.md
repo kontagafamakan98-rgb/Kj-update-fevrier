@@ -32,7 +32,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict, et le garde des durées publiées (`check-privacy-policy.py`, §3 F18). | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
-| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles mais encore larges (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. |
+| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP vient de la réponse de `GET /api/jobs`, le LCP et le score ne sont plus assertés (F6, « Ce que le gate vérifie réellement sur `/jobs` »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
 
@@ -204,6 +204,12 @@ déploiement, 3 runs par page, médianes :
 | `total-blocking-time` | ≤ 1 200 ms (déploiement) · 1 600 ms (repli local) | médianes ≤ 30 ms |
 | `cumulative-layout-shift` | **un budget PAR ROUTE** (0,01 → 0,06 selon la page) | pire médiane mesurée : 0,0450 (`/dashboard`, `/payment`, `/profile`) |
 
+Depuis le 20/09/2026, le socle ci-dessus est porté **par route** (il n'y a plus
+ d'entrée globale), et `/jobs` ne porte plus le LCP ni le score — ces deux
+grandeurs y mesurent la latence de `GET /api/jobs`, pas l'artefact : mesure et
+décision dans « Ce que le gate vérifie réellement sur `/jobs` », plus bas. Les
+seuils des 12 autres pages sont **inchangés**.
+
 Deux points que ces chiffres imposent :
 
 - **le TBT d'un runner partagé est bimodal** (0-30 ms la plupart du temps,
@@ -251,14 +257,56 @@ pour `/login` à cause de son run isolé) sont écrites dans
 Trois propriétés sont tenues par des tests plutôt que par la relecture :- `assertMatrix` est **exclusif** d'`assertions`/`aggregationMethod` dans
   `@lhci/utils` ; l'agrégation est donc portée par chaque entrée, et un retour du
   plafond global dans `lighthouserc.cjs` est refusé ;
-- la statistique de chaque entrée est **verrouillée** : le socle global agrège au
+- la statistique de chaque entrée est **verrouillée** : le socle agrège au
   meilleur des 3 runs, le CLS par route à la médiane (voir « Correctif du
   20/09/2026 »).
-- chaque page auditée a **son** entrée, et le socle (sans motif) ne porte aucun
-  budget CLS — sinon les deux se cumuleraient et le plus large gagnerait ;
+- **plus d'entrée globale** : chaque page auditée a **ses** entrées (socle +
+  CLS), ce qui est le seul moyen d'attacher une exception à UNE page — une
+  entrée sans motif l'imposait à toutes. Un test refuse une matrice qui
+  contiendrait une entrée globale ;
 - une page auditée **sans budget mesuré** fait échouer le **chargement** de la
   config : elle serait sinon mesurée sans plafond, c'est-à-dire le trou que la
   passe ferme.
+
+#### Ce que le gate vérifie réellement sur `/jobs` (20/09/2026)
+
+Le 20/09/2026, `main` est redevenu rouge sur la SEULE route `/jobs`
+(`categories.performance` 0,73 / 0,84 / 0,85 et LCP 4 256 / 4 359 / 4 468 ms),
+alors que le job de 12:29 sur le **même code applicatif** la mesurait à
+0,95 / 2 727 ms. Le relevé des 39 rapports des deux jobs dit pourquoi :
+
+| Job | FCP | LCP des 3 runs | Élément LCP |
+|---|---|---|---|
+| 12:29 (vert) | 1 389 ms | 2 727 / 2 737 / 2 739 | la liste des missions |
+| 13:34 (rouge) | 988 ms | 4 256 / 4 359 / 4 468 | le paragraphe d'état vide (« Élargissez votre recherche… ») |
+
+Le FCP est **meilleur** dans le job rouge : la machine n'était pas chargée,
+c'est la réponse de `GET /api/jobs` qui a mis ~3,3 s au lieu de ~1,3 s. Trois
+runs serrés au-dessus du plafond ne sont donc pas du bruit de runner — c'est un
+tiers qui a répondu lentement, et aucune statistique ne rend ce verdict
+reproductible depuis un runner partagé. Décision : **sur cette route, les deux
+grandeurs qu'un tiers décide (LCP et le score, qui le pèse) ne sont plus
+assertées** ; `/jobs` garde FCP, TBT et son plafond CLS, et **aucun seuil n'est
+relevé pour les autres pages** (`/jobs` est la SEULE route de
+`LCP_PRODUIT_PAR_UN_TIERS`, dont la valeur est la justification, refusée si elle
+est vide).
+
+Preuve rejouée hors ligne avec le **même** moteur (`getAllAssertionResults` de
+`@lhci/utils`) sur les 39 + 39 rapports **réels** des deux jobs :
+
+```
+rapports du job ROUGE   config d'AVANT  → ROUGE : categories@/jobs, largest-contentful-paint@/jobs
+                        config d'APRÈS  → vert
+rapports du job VERT    config d'APRÈS  → vert          (aucune régression réintroduite)
+LCP muté à 4 200 ms sur les 12 autres pages             → ROUGE, les 12 nommées
+LCP muté à 4 200 ms sur /jobs SEUL                      → vert              (exception scopée)
+```
+
+Ce que le gate vérifie donc désormais : l'artefact (FCP, TBT, CLS PAR ROUTE,
+score et LCP sur les 12 pages qui ne dépendent d'aucun tiers), plus les gardes
+d'artefacts. Ce qu'il ne vérifie plus : la latence de l'API sur `/jobs` — elle
+n'est pas une propriété du build, et la mesurer depuis un runner revenait à tirer
+à pile ou face sur `main`.
 
 Preuves rejouées sur les 30 rapports **réels** du dernier run de `main`
 (`KOJO_LHCI_BASE_URL=https://kojoforafrica.cc.cd npx lhci assert`, `.lighthouseci/`

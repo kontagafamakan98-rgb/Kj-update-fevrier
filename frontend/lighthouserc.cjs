@@ -168,6 +168,15 @@ module.exports = {
       },
     },
     assert: {
+      // ── Un socle ET un budget CLS PAR ROUTE (plus d'entrée globale) ─────
+      // L'entrée globale (sans motif) a été retirée le 20/09/2026 : elle
+      // appliquait le MÊME jeu de budgets à toutes les pages, donc une exception
+      // justifiée sur une seule (voir plus bas) aurait affaibli toutes les
+      // autres. Chaque route porte désormais son socle, et une route dont une
+      // grandeur est produite par un tiers n'en porte pas moins : elle en porte
+      // moins (voir « Le LCP de /jobs », dans l'en-tête de
+      // scripts/lhci-cls-budgets.cjs, qui possède la table et la décision).
+      //
       // ── Un budget CLS PAR ROUTE, plus un socle commun ───────────────────
       // `assertMatrix` est EXCLUSIF d'`assertions`, `preset`, `budgetsFile` et
       // `aggregationMethod` (@lhci/utils/src/assertions.js lève « Cannot use
@@ -194,6 +203,18 @@ module.exports = {
       // scripts/lhci-cls-budgets.cjs, qui possède les deux. AUCUN seuil n'a été
       // relevé dans cette passe : seule la statistique comparée au seuil a
       // changé.
+        // ── Ce que la matrice porte PAR ROUTE ───────────────────────────────
+      // `clsAssertionMatrix` construit une entrée par page : le socle ci-dessous
+      // pour ce qu'une page peut porter, puis son plafond CLS. Deux raisons de
+      // ne pas écrire un socle global (vérifié par
+      // scripts/__tests__/lhci-cls-budgets.test.js) :
+      //   • une route dont le LCP vient d'une réponse d'API n'est pas mesurable
+      //     depuis un runner de façon reproductible (preuve mesurée dans
+      //     l'en-tête de lhci-cls-budgets.cjs) : elle ne porte pas ces deux
+      //     grandeurs, et une entrée globale le lui imposerait ;
+      //   • lhci refuse un motif qui couvrirait deux URLs (« Can only assert one
+      //     URL at a time! »), donc un socle par route est aussi le seul moyen
+      //     d'attacher une exception à UNE page.
       assertMatrix: clsAssertionMatrix(auditedPaths, {
         // ── Socle commun, mesuré le 16/09/2026 (3 runs par page, médianes) ──
         //   page        score  FCP ms  LCP ms  TBT ms (médiane, détail)
@@ -210,7 +231,10 @@ module.exports = {
         // souffre.
         'categories:performance': ['error', { minScore: 0.9 }],
         // LCP : pire meilleur-run mesuré 2587 ms sur les 2 jobs de main du
-        // 20/09/2026 (39 runs, 13 pages) — la marge reste ~1,4×.
+        // 20/09/2026 (39 runs, 13 pages) — la marge reste ~1,4×. Ce plafond
+        // n'est PAS relevé : la route dont le LCP est produit par une réponse
+        // d'API n'est simplement plus assertée sur cette grandeur (elle garde
+        // FCP, TBT et CLS) — voir `LCP_PRODUIT_PAR_UN_TIERS`.
         'largest-contentful-paint': ['error', { maxNumericValue: 3500 }],
         // TBT : interactivité. Le plafond du repli local est plus large et
         // documenté ici parce que ce repli tourne sur un runner partagé (même
