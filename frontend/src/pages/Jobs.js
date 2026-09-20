@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import JobCreateModal from '../components/JobCreateModal';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { jobsAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobs';
 import { getJobUiLabel } from '../utils/jobUiLocale';
@@ -215,7 +216,10 @@ export default function Jobs() {
       setHasMore(jobsData.length === JOBS_PAGE_SIZE);
     } catch (error) {
       safeLog.error('Jobs load error', error);
-      setLoadError(error?.response?.data?.detail || error.message || 'Erreur');
+      // Le message d'échec appartient à la page (clé i18n), jamais au
+      // navigateur : une coupure réseau affichait « Failed to fetch » en
+      // anglais au milieu d'un écran français.
+      setLoadError(handleApiError(error, t('networkConnectionError')));
       if (!append) setJobs([]);
     } finally {
       setLoading(false);

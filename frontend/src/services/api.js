@@ -126,7 +126,22 @@ const extractErrorMessage = (payload, fallback) => {
   return fallback;
 };
 
+// Une coupure de TRANSPORT (hors ligne, DNS, CORS, serveur injoignable) ne
+// passe pas par une réponse HTTP : `fetch` rejette, et son TypeError porte un
+// texte ANGLAIS du navigateur (« Failed to fetch », « Load failed »,
+// « NetworkError when attempting to fetch resource »). Les pages qui affichent
+// `error.message` — une dizaine — montraient donc cette phrase technique au
+// milieu d'un écran français, précisément quand la connexion est mauvaise.
+// On la remplace à la frontière (voir `request`), une fois pour toutes ; les
+// pages qui peuvent traduire passent leur propre repli à `handleApiError`
+// (clé i18n `networkConnectionError`), qui a alors la priorité.
+export const TRANSPORT_FAILURE_MESSAGE = 'Erreur de connexion. Vérifiez votre connexion internet.';
+
 export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
+  // Coupure réseau : le texte du navigateur n'est pas un message du produit,
+  // c'est le repli — traduit par la page — qui doit s'afficher.
+  if (error?.estCoupureReseau) return fallback;
+
   if (typeof error?.response?.data?.detail === 'string' && error.response.data.detail.trim()) {
     return error.response.data.detail.trim();
   }
@@ -308,19 +323,32 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
   const isSafeMethod = ['GET', 'HEAD', 'OPTIONS'].includes(method);
   const csrfToken = readCsrfCookie();
 
-  const response = await fetch(url, {
-    method,
-    credentials: 'include',
-    ...(signal ? { signal } : {}),
-    headers: {
-      Accept: 'application/json',
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(!isSafeMethod && csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
-      ...(headers || {}),
-    },
-    body: data === undefined ? undefined : (isFormData ? data : JSON.stringify(data)),
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      method,
+      credentials: 'include',
+      ...(signal ? { signal } : {}),
+      headers: {
+        Accept: 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(!isSafeMethod && csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+        ...(headers || {}),
+      },
+      body: data === undefined ? undefined : (isFormData ? data : JSON.stringify(data)),
+    });
+  } catch (cause) {
+    // Une annulation VOLONTAIRE n'est pas une panne : elle garde son identité
+    // (name === 'AbortError'), donc les appelants continuent de la distinguer
+    // d'un vrai échec.
+    if (cause?.name === 'AbortError') throw cause;
+
+    const error = new Error(TRANSPORT_FAILURE_MESSAGE);
+    error.estCoupureReseau = true;
+    error.cause = cause;
+    throw error;
+  }
 
   const rawText = await response.text();
   let payload = null;
