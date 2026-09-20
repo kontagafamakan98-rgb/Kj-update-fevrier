@@ -162,11 +162,6 @@ module.exports = {
     collect: {
       url: urls,
       numberOfRuns: 3,
-      // Le repli local mesure une machine partagée : `optimistic` (défaut)
-      // retenait le meilleur run (516 ms) et laissait passer le suivant à
-      // 1397 ms pour le même commit. La MÉDIANE décrit ce que vaut la page sur
-      // cette machine, et une vraie régression (tous les runs hauts) la fait
-      // bouger.
       settings: {
         chromeFlags: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage',
         extraHeaders,
@@ -176,11 +171,29 @@ module.exports = {
       // ── Un budget CLS PAR ROUTE, plus un socle commun ───────────────────
       // `assertMatrix` est EXCLUSIF d'`assertions`, `preset`, `budgetsFile` et
       // `aggregationMethod` (@lhci/utils/src/assertions.js lève « Cannot use
-      // assertMatrix with other options ») : l'agrégation par MÉDIANE est donc
-      // portée par CHAQUE entrée, sinon lhci refuserait la config. La table des
-      // budgets CLS — et les mesures qui les justifient — vit dans
+      // assertMatrix with other options ») : l'agrégation est donc portée par
+      // CHAQUE entrée, sinon lhci refuserait la config. La table des budgets
+      // CLS — et les mesures qui les justifient — vit dans
       // scripts/lhci-cls-budgets.cjs ; une page auditée sans budget MESURÉ fait
       // échouer le chargement de cette config (voir clsAssertionMatrix).
+      //
+      // ── Quelle statistique pour quelle grandeur ─────────────────────────
+      // Le socle commun est mesuré au MEILLEUR des 3 runs (`optimistic`), le CLS
+      // par route reste à la MÉDIANE. Le pourquoi est mesuré, pas choisi : deux
+      // jobs de `main` du 20/09/2026 sur le MÊME arbre (14e0531) ont rendu deux
+      // verdicts — vert à 08:10, rouge à 08:50 — et le rouge ne tenait qu'à
+      // `categories:performance` sur `/login` (médiane 0,79 ; runs 1,00 / 0,79 /
+      // 0,77). Les budgets explicites ci-dessous sont passés dans les deux. Ce
+      // qui avait bougé : sur `/login`, mêmes octets, `Script Evaluation`
+      // 174 ms → 995 ms et une tâche de 908 ms sur un run — le runner avait
+      // faim. Le bruit d'un runner est UNILATÉRAL : il ne peut qu'ajouter du
+      // temps, donc le meilleur run décrit le coût propre de l'artefact, tandis
+      // qu'une régression monte dans les trois. Le CLS, lui, ne dépend pas de la
+      // machine (relevé identique d'un run à l'autre) : la médiane y reste la
+      // statistique la plus stricte ET la plus stable. Détail complet dans
+      // scripts/lhci-cls-budgets.cjs, qui possède les deux. AUCUN seuil n'a été
+      // relevé dans cette passe : seule la statistique comparée au seuil a
+      // changé.
       assertMatrix: clsAssertionMatrix(auditedPaths, {
         // ── Socle commun, mesuré le 16/09/2026 (3 runs par page, médianes) ──
         //   page        score  FCP ms  LCP ms  TBT ms (médiane, détail)
@@ -190,23 +203,28 @@ module.exports = {
         //   /profile    0,97    1399    2496       2  [7, 2, 0]
         // Les TBT par run montrent la distribution réelle d'un runner partagé :
         // 0-30 ms le plus souvent, jusqu'à 2878 ms sur un run. C'est pourquoi
-        // numberOfRuns=3 et l'agrégation par MÉDIANE sont indispensables : une
-        // mesure unique serait une pièce de monnaie.
+        // numberOfRuns=3 est indispensable, et pourquoi la grandeur comparée au
+        // seuil est le MEILLEUR des 3 (voir « Quelle statistique pour quelle
+        // grandeur ») : une mesure unique serait une pièce de monnaie, et une
+        // médiane sur 3 runs l'est presque autant quand un run sur trois
+        // souffre.
         'categories:performance': ['error', { minScore: 0.9 }],
-        // LCP : pire médiane mesurée 2496 ms (marge ~1,4×).
+        // LCP : pire meilleur-run mesuré 2587 ms sur les 2 jobs de main du
+        // 20/09/2026 (39 runs, 13 pages) — la marge reste ~1,4×.
         'largest-contentful-paint': ['error', { maxNumericValue: 3500 }],
-        // TBT : interactivité. 500 ms sur le déploiement réel (mesuré vert sur
-        // main). Sur le repli local d'un runner partagé, le MÊME commit a
-        // mesuré 516 ms puis 1397 ms : un plafond de 500 y est une
-        // pièce de monnaie, pas un budget. Le plafond du repli est donc plus
-        // large et documenté ici, plutôt que de laisser la CI rougir au hasard
-        // (le budget strict reste appliqué partout où un vrai déploiement est
-        // audité, c'est-à-dire sur `main`).
+        // TBT : interactivité. Le plafond du repli local est plus large et
+        // documenté ici parce que ce repli tourne sur un runner partagé (même
+        // commit : 516 ms puis 1397 ms), plutôt que de laisser la CI rougir au
+        // hasard. Les deux plafonds sont INCHANGÉS par la passe du 20/09/2026 :
+        // c'est la statistique qui a changé, pas le budget. Comparés au meilleur
+        // des 3 runs, ils ne sont plus frôlés : sur les 2 jobs de main du
+        // 20/09/2026, le pire meilleur-run vaut 10 ms (déploiement réel).
         'total-blocking-time': [
           'error',
           { maxNumericValue: targetIsLocal ? 1600 : 1200 },
         ],
-        // FCP : pire médiane mesurée 1399 ms (marge ~1,8×).
+        // FCP : pire meilleur-run mesuré 1380 ms sur les 2 jobs de main du
+        // 20/09/2026 (39 runs, 13 pages) — la marge reste ~1,8×.
         'first-contentful-paint': ['error', { maxNumericValue: 2500 }],
       }),
     },

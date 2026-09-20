@@ -437,7 +437,7 @@ Des comptes de démonstration existent en production (backend Fly.io) :
 |---|---|---|---|
 | `makemoney0598@gmail.com` | client | voir secret | Test du parcours client (profil, photo, création de mission) |
 | `cesarijulies95@gmail.com` | worker | voir secret | Test du parcours worker (compétences, postulation) |
-| Compte client **dédié CI** (email du secret `LHCI_CI_EMAIL`) | client | voir secret `LHCI_CI_PASSWORD` | **Uniquement** pour le job Lighthouse CI (`lighthouse-ci`), qui audite `/dashboard`, `/jobs`, `/profile`. **Ne jamais l'utiliser à la main** : son isolation garantit des budgets Lighthouse déterministes. |
+| Compte client **dédié CI** (email du secret `LHCI_CI_EMAIL`) | client | voir secret `LHCI_CI_PASSWORD` | **Uniquement** pour le job Lighthouse CI (`lighthouse-ci`), qui audite `/dashboard`, `/jobs`, `/profile`. **Ne jamais l'utiliser à la main** : son isolation garantit que les pages auditées portent le MÊME état d'un run à l'autre (des données stables, pas un verdict stable — celui-ci vient de la statistique d'agrégation, cf. CI-COVERAGE.md §3 F6bis). |
 
 > **Isolation CI** : le compte Lighthouse CI est **distinct** des deux comptes
 d'exécution manuelle ci-dessus. Les tests e2e manuels modifient le profil, la
