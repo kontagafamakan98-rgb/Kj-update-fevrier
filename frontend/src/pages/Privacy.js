@@ -1,6 +1,8 @@
+import { Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 /**
  * Page « Politique de confidentialité ».
@@ -15,39 +17,39 @@ import { usePageMeta } from '../utils/seo';
  * index TTL — par `.github/scripts/check-privacy-policy.py`, le même garde qui
  * tient déjà le tableau de PRIVACY.md. Une durée changée dans le code sans
  * l'être ici fait échouer la CI.
+ *
+ * Les SECTIONS, elles, sont déclarées dans src/config/page-sections.js, que lit
+ * aussi vite.config.js : la coquille pré-rendue ne peut pas publier une autre
+ * liste de sections que cette page.
  */
 export default function Privacy() {
   const { t } = useLanguage();
   usePageMeta();
 
-  const SECTIONS = [
-    { title: t('privacyDataTitle'), body: t('privacyDataBody') },
-    { title: t('privacyRetentionTitle'), body: t('privacyRetentionBody') },
-    { title: t('privacyRightsTitle'), body: t('privacyRightsBody') },
-    { title: t('privacyContactSectionTitle'), body: t('privacyContactBody') },
-  ];
+  const { titleKey, introKey, sections, links } = PAGE_SECTIONS['/privacy'];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('privacyTitle')}</h1>
-        <p className="text-gray-600 mb-8">{t('privacyIntro')}</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">{t(titleKey)}</h1>
+        <p className="text-gray-600 mb-8">{t(introKey)}</p>
 
-        {SECTIONS.map((section) => (
-          <section key={section.title} className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">{section.title}</h2>
-            <p className="text-gray-600">{section.body}</p>
+        {sections.map((section) => (
+          <section key={section.titleKey} className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">{t(section.titleKey)}</h2>
+            <p className="text-gray-600">{t(section.bodyKey)}</p>
           </section>
         ))}
 
         <p className="text-sm text-gray-500">
-          <Link to="/contact" className="text-orange-600 underline underline-offset-2">
-            {t('contactTitle')}
-          </Link>
-          {' · '}
-          <Link to="/about" className="text-orange-600 underline underline-offset-2">
-            {t('aboutTitle')}
-          </Link>
+          {links.map((link, index) => (
+            <Fragment key={link.to}>
+              {index > 0 && ' · '}
+              <Link to={link.to} className="text-orange-600 underline underline-offset-2">
+                {t(link.labelKey)}
+              </Link>
+            </Fragment>
+          ))}
         </p>
       </div>
     </div>

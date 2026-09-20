@@ -27,6 +27,14 @@ import { API_ORIGIN, SITE_ORIGIN, shellFileFor } from './scripts/site-meta.js'
 // lui-même (scripts/check-page-meta.js) : UNE définition, exerçable par un test.
 import { requirePageMeta } from './scripts/check-page-meta.js'
 
+// Corps des pages pré-rendues « de confiance » (/about, /contact, /privacy) :
+// SOURCE UNIQUE dans src/config/page-sections.js — lue AUSSI par les pages au
+// runtime. Les coquilles s'en DÉRIVENT : elles ne recopient ni la liste des
+// sections, ni celle des promesses, ni celle des moyens de contact, donc une
+// section ajoutée à une page ne peut plus manquer au HTML que lit un crawler
+// sans JavaScript (le build refuse une coquille incomplète, plus bas).
+import { PAGE_SECTIONS, pageSectionTextKeys, pageSectionLiterals } from './src/config/page-sections.js'
+
 const OG_CARDS = Object.fromEntries(
   OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
 )
@@ -482,6 +490,59 @@ export default defineConfig(({ mode }) => {
             `</footer>`,
           ].join('')
 
+          // ── Le corps des pages de confiance est DÉCLARÉ, pas recopié ────
+          // src/config/page-sections.js est lu par les pages React ET par ici :
+          // la liste des promesses d'À propos, celle des sections de la page
+          // Confidentialité et celle des moyens de contact n'existent qu'à un
+          // seul endroit. Les clés i18n restent la source du TEXTE (T() plus
+          // haut casse le build si une clé manque) ; ce que le build refuse
+          // désormais, c'est une coquille qui ne porte pas tout ce que la page
+          // déclare (voir exigerCorpsDeclare).
+          const aboutPlan = PAGE_SECTIONS['/about']
+          const contactPlan = PAGE_SECTIONS['/contact']
+          const privacyPlan = PAGE_SECTIONS['/privacy']
+
+          // Le paragraphe de liens internes en fin de page : même balisage pour
+          // les trois coquilles, seule la marge d'en-tête change.
+          const liensDePage = (plan, classes) =>
+            `<p class="${classes}">` +
+            plan.links
+              .map(
+                ({ to, labelKey }) =>
+                  `<a href="${to}" class="text-orange-600 underline underline-offset-2">${esc(T(labelKey))}</a>`
+              )
+              .join(' · ') +
+            `</p>`
+
+          // Refuse une coquille qui ne porte pas tout ce que sa page déclare.
+          // Sans ce refus, une section ajoutée à la page React ne paraîtrait que
+          // pour un navigateur, et un crawler sans JavaScript lirait une page
+          // amputée — le défaut exact que la déclaration unique supprime.
+          // Les textes attendus se DÉDUISENT du plan (pageSectionTextKeys /
+          // pageSectionLiterals) : aucune seconde liste n'est tenue ici.
+          const exigerCorpsDeclare = (routePath, route, corps) => {
+            const plan = PAGE_SECTIONS[routePath]
+            if (!plan) return
+            if (!corps) {
+              throw new Error(
+                `prerender-shells : ${routePath} déclare son corps (src/config/page-sections.js) mais sa coquille est VIDE ` +
+                  `(SHELLS['${route}']) — un crawler sans JavaScript ne lirait rien de cette page.`
+              )
+            }
+            const attendus = [
+              ...pageSectionTextKeys(plan).map((key) => T(key)),
+              ...pageSectionLiterals(plan),
+            ]
+            const manquants = attendus.filter((texte) => !corps.includes(esc(texte)))
+            if (manquants.length) {
+              throw new Error(
+                `prerender-shells : la coquille ${routePath} ne porte pas ${manquants.length} élément(s) déclaré(s) par sa page ` +
+                  `— « ${manquants[0]} » manque. Le corps d'une page a UN propriétaire (src/config/page-sections.js) : ` +
+                  'la coquille s\'en dérive, elle ne peut pas le recopier.'
+              )
+            }
+          }
+
           const SHELLS = {
             home: homeShell,
             jobs: `<div class="h-16 bg-white border-b border-gray-200"></div>`
@@ -859,92 +920,63 @@ export default defineConfig(({ mode }) => {
             // ce contenu au montage sans décaler quoi que ce soit.
             about: `<div class="h-16 bg-white border-b border-gray-200"></div>`
               + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">`
-              + `<h1 class="text-3xl font-bold text-gray-900 mb-4">${esc(T('aboutTitle'))}</h1>`
-              + `<p class="text-gray-600 mb-8">${esc(T('aboutIntro'))}</p>`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-4">${esc(T(aboutPlan.titleKey))}</h1>`
+              + `<p class="text-gray-600 mb-8">${esc(T(aboutPlan.introKey))}</p>`
               + `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">`
-              + [
-                  ['💼', 'findWork', 'findWorkDescription'],
-                  ['🤝', 'connect', 'connectDescription'],
-                  ['💰', 'securePayments', 'securePaymentsDescription'],
-                ]
+              + aboutPlan.cards
                   .map(
-                    ([icon, titleKey, textKey]) =>
+                    ({ icon, titleKey, descriptionKey }) =>
                       `<div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">` +
                       `<div class="text-2xl mb-3">${icon}</div>` +
                       `<h2 class="text-lg font-semibold text-gray-900 mb-2">${esc(T(titleKey))}</h2>` +
-                      `<p class="text-sm text-gray-600">${esc(T(textKey))}</p>` +
+                      `<p class="text-sm text-gray-600">${esc(T(descriptionKey))}</p>` +
                       `</div>`
                   )
                   .join('') +
               `</div>`
               + `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 mb-10">`
-              + `<h2 class="text-xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`
-              + `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`
-              + `<p class="text-emerald-700 mt-3 text-sm">${esc(T('escrowTrustBullets'))}</p>`
+              + `<h2 class="text-xl font-bold text-emerald-900 mb-3">${esc(T(aboutPlan.highlight.titleKey))}</h2>`
+              + `<p class="text-emerald-800">${esc(T(aboutPlan.highlight.textKey))}</p>`
+              + `<p class="text-emerald-700 mt-3 text-sm">${esc(T(aboutPlan.highlight.bulletsKey))}</p>`
               + `</div>`
-              + `<p class="text-sm text-gray-500">`
-              + `<a href="/contact" class="text-orange-600 underline underline-offset-2">${esc(T('contactTitle'))}</a>`
-              + ` · `
-              + `<a href="/privacy" class="text-orange-600 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`
-              + ` · `
-              + `<a href="/how-it-works" class="text-orange-600 underline underline-offset-2">${esc(T('howItWorksTitle'))}</a>`
-              + `</p>`
+              + liensDePage(aboutPlan, 'text-sm text-gray-500')
               + `</div>`,
             contact: `<div class="h-16 bg-white border-b border-gray-200"></div>`
               + `<div class="max-w-2xl mx-auto px-4 py-8">`
-              + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T('contactTitle'))}</h1>`
-              + `<p class="text-gray-600 mb-3">${esc(T('contactIntro'))}</p>`
-              + `<p class="text-sm text-gray-500 mb-6">${esc(T('contactHelpText'))}</p>`
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T(contactPlan.titleKey))}</h1>`
+              + `<p class="text-gray-600 mb-3">${esc(T(contactPlan.introKey))}</p>`
+              + `<p class="text-sm text-gray-500 mb-6">${esc(T(contactPlan.noteKey))}</p>`
               + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
-              + `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">Appeler</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
-              + `</a>`
-              + `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">WhatsApp</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`
-              + `</a>`
-              + `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">Envoyer un e-mail</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`
-              + `</a>`
-              + `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`
-              + `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`
-              + `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`
-              + `</a>`
-              + `</div>`
+              + contactPlan.actions
+                  .map(
+                    ({ icon, label, badgeClass, href, value, external, breakAll }) =>
+                      `<a href="${esc(href)}"` +
+                      (external ? ` target="_blank" rel="noreferrer"` : '') +
+                      ` class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">` +
+                      `<span class="flex h-10 w-10 items-center justify-center rounded-full ${badgeClass}">${icon}</span>` +
+                      `<div><div class="text-sm font-semibold text-gray-900">${esc(label)}</div>` +
+                      `<div class="text-xs text-gray-500${breakAll ? ' break-all' : ''}">${esc(value)}</div></div>` +
+                      `</a>`
+                  )
+                  .join('') +
+              `</div>`
               + `<iframe src="${esc(contact.mapsEmbedUrl)}" title="Carte — Kojo, ${esc(contact.address)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" class="mt-6 w-full rounded-xl border border-gray-200" style="height:320px;border:0;"></iframe>`
-              + `<p class="mt-6 text-sm text-gray-500">`
-              + `<a href="/about" class="text-orange-600 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`
-              + ` · `
-              + `<a href="/privacy" class="text-orange-600 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`
-              + ` · `
-              + `<a href="/support" class="text-orange-600 underline underline-offset-2">${esc(T('support'))}</a>`
-              + `</p>`
+              + liensDePage(contactPlan, 'mt-6 text-sm text-gray-500')
               + `</div>`,
             privacy: `<div class="h-16 bg-white border-b border-gray-200"></div>`
               + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">`
-              + `<h1 class="text-3xl font-bold text-gray-900 mb-4">${esc(T('privacyTitle'))}</h1>`
-              + `<p class="text-gray-600 mb-8">${esc(T('privacyIntro'))}</p>`
-              + [
-                  ['privacyDataTitle', 'privacyDataBody'],
-                  ['privacyRetentionTitle', 'privacyRetentionBody'],
-                  ['privacyRightsTitle', 'privacyRightsBody'],
-                  ['privacyContactSectionTitle', 'privacyContactBody'],
-                ]
+              + `<h1 class="text-3xl font-bold text-gray-900 mb-4">${esc(T(privacyPlan.titleKey))}</h1>`
+              + `<p class="text-gray-600 mb-8">${esc(T(privacyPlan.introKey))}</p>`
+              + privacyPlan.sections
                   .map(
-                    ([titleKey, bodyKey]) =>
+                    ({ titleKey, bodyKey }) =>
                       `<section class="mb-8">` +
                       `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T(titleKey))}</h2>` +
                       `<p class="text-gray-600">${esc(T(bodyKey))}</p>` +
                       `</section>`
                   )
                   .join('') +
-              `<p class="text-sm text-gray-500">`
-              + `<a href="/contact" class="text-orange-600 underline underline-offset-2">${esc(T('contactTitle'))}</a>`
-              + ` · `
-              + `<a href="/about" class="text-orange-600 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`
-              + `</p>`
+              liensDePage(privacyPlan, 'text-sm text-gray-500')
               + `</div>`,
           }
 
@@ -1069,6 +1101,7 @@ export default defineConfig(({ mode }) => {
             // Shell statique du LCP : injecté dans <div id="root"> (vide à
             // l'origine) — peint immédiatement, effacé au montage React.
             const shell = SHELLS[route] || ''
+            exigerCorpsDeclare(routePath, route, shell)
             if (shell) {
               out = out.replace('<div id="root"></div>', `<div id="root">${shell}</div>`)
             }
