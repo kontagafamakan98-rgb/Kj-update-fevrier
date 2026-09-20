@@ -8,11 +8,18 @@ fichier tient cette propriété pour l'ENSEMBLE des gardes, et pas pour un lot.
 
 Trois faits sont vérifiés, chacun sur la source RÉELLE :
 
-1. EXHAUSTIVITÉ — tout script du dépôt dont le nom commence par `check-` ou
-   `audit_` (dans `frontend/scripts/`, `.github/scripts/`, `backend/scripts/`)
-   est déclaré dans `.github/scripts/guard-proofs.json`. Un garde ajouté
-   demain sans preuve fait donc rougir ici, en le nommant — au lieu d'être
-   invisible jusqu'à ce que quelqu'un pense à l'inventorier.
+1. EXHAUSTIVITÉ — TOUT script exécutable du dépôt (dans `frontend/scripts/`,
+   `.github/scripts/`, `backend/scripts/`) est déclaré dans
+   `.github/scripts/guard-proofs.json`, avec son rôle (`garde` ou `outil`). Un
+   script ajouté demain sans preuve fait donc rougir ici, en le nommant — au
+   lieu d'être invisible jusqu'à ce que quelqu'un pense à l'inventorier.
+
+   Ce périmètre était déduit du NOM (`check-`, `audit_`) : un outil nommé
+   `dmarc_policy.py`, `setup-seo-env.js` ou `lhci-cls-budgets.cjs` échappait
+   donc à la règle et restait non classé par simple omission — la décision
+   « est-ce un garde ? » se prenait en choisissant un nom de fichier, ce que
+   personne ne relit. Le périmètre est maintenant le RÉPERTOIRE : tout est
+   classé, et un outil se déclare comme tel avec son motif.
 2. PREUVE REJOUABLE — un garde exécuté par la CI doit désigner une preuve qui
    EXISTE, que le runner du dépôt collecte (Vitest pour le frontend, pytest
    pour le backend) et qui NOMME le garde qu'elle prouve. Un pointeur vers un
@@ -43,10 +50,10 @@ HARNAIS = REPO_ROOT / ".github" / "scripts" / "check-guard-mutations.py"
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 COUVERTURE = REPO_ROOT / "CI-COVERAGE.md"
 
-# Répertoires où vit un garde, et extensions admises.
+# Répertoires où vit un garde, et extensions admises. Le périmètre est le
+# RÉPERTOIRE, pas le préfixe du nom : voir le point 1 du docstring.
 DIRS_GARDES = ("frontend/scripts", ".github/scripts", "backend/scripts")
 EXTENSIONS = (".js", ".cjs", ".mjs", ".py", ".sh")
-PREFIXES = ("check-", "audit_")
 
 
 def _charger_harnais():
@@ -71,17 +78,16 @@ def registre(harnais):
 
 
 def scripts_gardes():
-    """Les scripts du dépôt qui portent un verdict — la surface à classer."""
+    """Les scripts du dépôt — la surface à classer (rôle `garde` ou `outil`)."""
     trouves = set()
     for dossier in DIRS_GARDES:
         racine = REPO_ROOT / dossier
         if not racine.is_dir():
             continue
         for fichier in sorted(racine.iterdir()):
-            if fichier.suffix not in EXTENSIONS:
+            if fichier.suffix not in EXTENSIONS or not fichier.is_file():
                 continue
-            if any(fichier.name.startswith(prefix) for prefix in PREFIXES):
-                trouves.add("%s/%s" % (dossier, fichier.name))
+            trouves.add("%s/%s" % (dossier, fichier.name))
     return trouves
 
 

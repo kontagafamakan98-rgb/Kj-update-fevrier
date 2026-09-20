@@ -1,6 +1,6 @@
 # Couverture réelle de la CI — ce qui est vérifié à chaque push
 
-> Audit du 16/09/2026. Source de vérité : `.github/workflows/ci.yml` (9 jobs,
+> Audit du 16/09/2026. Source de vérité : `.github/workflows/ci.yml` (10 jobs,
 > dont **8 requis** par la protection de branche).
 >
 > Ce document existe pour répondre à une question qu'un badge vert ne tranche pas :
@@ -13,8 +13,8 @@
 
 | Événement | CI |
 |---|---|
-| `push` sur `main` | **oui**, 9 jobs |
-| `pull_request` vers `main` | **oui**, 9 jobs (dont `deploy-fly` *skipped*) |
+| `push` sur `main` | **oui**, 10 jobs |
+| `pull_request` vers `main` | **oui**, 10 jobs (dont `deploy-fly` *skipped*) |
 | `workflow_dispatch` (manuel) | **oui** ; `deploy-fly` déploie même sans changement backend |
 | `push` sur une branche de travail | **non** — aucun run n'est déclenché |
 
@@ -22,7 +22,7 @@ Conséquence directe : « à chaque push » signifie en réalité **à chaque pu
 `main` et à chaque PR vers `main`**. Une branche de travail peut accumuler
 plusieurs commits entre deux validations ; le premier signal vient de la PR.
 
-## 2. Les 9 jobs, et ce qui les fait réellement échouer
+## 2. Les 10 jobs, et ce qui les fait réellement échouer
 
 | Job (nom affiché) | Échoue réellement sur | Peut réussir sans rien vérifier |
 |---|---|---|
@@ -34,7 +34,8 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
 | **Lighthouse performance budgets** | Assertions LHCI (`error`) sur **13 pages**, `check-og-images.js` et le **cycle `/jobs/:id` en HTTP**, les trois sur une pile locale « forme production » (§3, F3) ; sondes de production (`check-seo-production.js`, `check-cors-preflight.js`) sur `main`. | **Oui, sur le périmètre performance** : la surface auditée est un artefact servi par le job (ni CDN, ni cache d'edge — §3, F2ter), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
-| **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
+| **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui, sur le déploiement lui-même** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées — mais il le DIT désormais (`::notice` + résumé du run : « Backend non déployé », §3 F1). |
+| **Dépendances (avis de sécurité)** | Les avis **haut/critique** sur les dépendances de PRODUCTION du frontend (`npm audit --omit=dev`). | **Oui, sur le périmètre Python** : les avis des paquets Python sont CONSTATÉS, pas imposés (§7, point 7) — corriger `starlette`/`pillow` est une mise à jour de dépendances, pas un effet de bord d'un job. |
 
 ## 3. Les faux-verts : réussir sans avoir prouvé
 
@@ -54,6 +55,15 @@ que si un `backend/**` a changé, ou par un `workflow_dispatch` manuel.
 > Corollaire : `deploy-fly` ne dépend que de `backend-tests` (`needs:`). Un
 > frontend ou un mobile rouge **ne bloque pas** le déploiement backend — c'est
 > délibéré, et il faut le savoir avant de conclure qu'un `main` vert est cohérent.
+
+**Correctif du 20/09/2026 — le job le DIT désormais.** Une dernière étape
+(`if: always()`) publie un `::notice` et une ligne du résumé du run : « Backend
+**déployé** (flyctl deploy exécuté sur ce commit) » ou « Backend **NON déployé**
+(aucun changement `backend/**` : le service tourne le déploiement précédent) ».
+Le ✓ ne dit plus une chose ambiguë : il l'écrit dans le run lui-même, sans qu'il
+faille remonter les étapes `skipped` pour le déduire. Ce qui reste ouvert, et
+que ce correctif ne ferme pas : **rien ne vérifie le RÉSULTAT du déploiement**
+(F8) — ni `/health`, ni version servie, ni machine `started`.
 
 ### F2 — Lighthouse mesure `localhost` au lieu de la production
 
@@ -1631,13 +1641,17 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
 * **le registre est EXHAUSTIF** : chaque entrée est soit **mutée**, soit déclarée
   `hors_mutation` **avec son motif**. Un garde ni muté ni justifié est un refus
   (`SpecInvalide`), pas un oubli silencieux — la couverture ne dépend donc plus
-  de la vigilance de celui qui ajoute un garde. Au 20/09/2026 : **36 mutations**
-  couvrent les **29** entrées mutables des **33** déclarées (le harnais en porte
-  trois : ses décisions, son filtre par changement, et le rejeu d'une étape due), et les 4 autres sont des
-  exclusions motivées —
+  de la vigilance de celui qui ajoute un garde. Au 20/09/2026 : **37 mutations**
+  couvrent les **30** entrées mutables des **41** déclarées (le harnais en porte
+  trois : ses décisions, son filtre par changement, et le rejeu d'une étape due) ;
+  les 11 autres sont des exclusions motivées —
   `check-og-reproducible.js` (outil sans verdict reproductible, §7 item 11),
-  `resolve-vercel-url.sh` et `bundle-size-report.js` (outils sans verdict : rien
-  à neutraliser), et `gen-og-images.py` (déjà muté par
+  `resolve-vercel-url.sh`, `bundle-size-report.js`, `dmarc_policy.py`,
+  `provision_ci_test_account.py`, `loadtest_real_flow.sh`,
+  `lhci-cls-budgets.cjs`, `setup-seo-env.js`, `site-meta.js` et
+  `vercel-rewrite-server.js` (outils : rôle `outil`, un motif chacun — le
+  périmètre du registre est le RÉPERTOIRE depuis le 20/09/2026, plus le nom),
+  et `gen-og-images.py` (déjà muté par
   `check-og-test-mutations.py` : le rejouer ici paierait deux fois la preuve).
 * **le filtre est mesuré, pas supposé** : une entrée n'entre dans la table que si
   sa preuve peut rougir **hors ligne** et **sans artefact de build**. Deux mesures
@@ -2082,14 +2096,30 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    servie, ni machine `started`.
 4. **`deploy-fly` ne dépend pas du frontend ni du mobile** : un frontend rouge
    n'empêche pas un déploiement backend.
-5. **`timeout-minutes` posé le 20/09/2026** sur les 9 jobs de `ci.yml` et les 2
+5. **`timeout-minutes` posé le 20/09/2026** sur les jobs de `ci.yml` (10 depuis le
+   20/09/2026) et les 2
    workflows séparés (5 à 30 min, ≥ 3× la durée mesurée : un blocage rougit au
    lieu de patienter 360 min). **Reste ouvert : pas de `concurrency`** au niveau
    du workflow — seul `deploy-fly` a son groupe de concurrence, donc deux push
    rapprochés sur `main` font tourner deux runs en parallèle.
-6. **`push` sur une branche de travail : aucun run** (§1).
-7. **Pas d'audit de dépendances** (ni `npm audit`, ni job équivalent) : une CVE
-   dans les dépendances ne fait pas rougir la CI.
+6. **`push` sur une branche de travail : aucun run** (§1). C'est un CHOIX de
+   coût, pas un oubli : les 10 jobs rejouent ~13 min par push (Lighthouse, suite
+   backend contre MongoDB, build mobile), et le premier signal vient de la PR —
+   un push de travail n'est donc pas validé, il est seulement sauvegardé. Le
+   repoindre ne se tait pas au moins : §1 le dit avant la liste des jobs, là où
+   on lit « à chaque push ».
+7. **CLOS (20/09/2026) — la CI a un audit de dépendances**, et son périmètre est
+   écrit plutôt que supposé. Job `dependency-audit` : les dépendances de
+   PRODUCTION du frontend (celles qu'un visiteur télécharge) **sont un gate** —
+   mesuré à 0 avis haut/critique le 20/09/2026, donc exiger « aucun » ne relève
+   pas un seuil, il constate un état. Les dépendances de DÉVELOPPEMENT du
+   frontend et les paquets Python ne le sont **pas encore** : `pip-audit`
+   rapporte des avis réels sur les versions épinglées du dépôt
+   (`starlette`, `pillow`, `pytest`, `black`, mesurés le 20/09/2026), publiés en
+   `::warning` et dans le résumé du run. Les corriger est une mise à jour de
+   dépendances avec ses propres risques de rupture — une décision de
+   maintenance, nommée ici plutôt que noyée dans un gate qui rougirait `main`
+   au premier avis paru.
 8. **CLOS (20/09/2026) — la configuration SEO/analytics n'est plus seulement
    observée** : la sonde garde son mode informatif sur les PR (`::notice` par
    intégration absente, sur `main` uniquement), mais elle a un mode **strict**
@@ -2134,26 +2164,43 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
     diagnostic à lancer à la main pour vérifier la régénération octet pour octet
     des PNG) et garde `hors_mutation`, avec ce motif.
 
-12. **La quasi-totalité des pages n'a aucun test de RENDU.** 52 fichiers de test
-    frontend : 29 pour `scripts/`, 13 pour `utils/`, 3 pour `services/`, 4 pour
-    les pages (Jobs, Payment, ProfileCountryDetection, ProfileEditForm), 1
-    config, 1 contexte, 1 composant. **20 pages sur 23 n'en ont aucun** — et
-    c'est la classe exacte du bug qui a vidé l'accueil le 20/09/2026 : un
-    `ReferenceError` (`statX` lus avant la déclaration de leur table) que le
-    build vert, 5 gardes verts et 638 tests verts n'ont pas vu, seul un
-    navigateur l'a vu. Le harnais existe déjà (`src/pages/__tests__/Jobs.test.jsx`
-    : `vi.mock` des contextes, de `react-router-dom`, de la carte Leaflet et des
-    endpoints) ; la passe suivante est un **test de rendu par route** qui monte
-    chaque page de la liste unique des pages et exige qu'elle rende sans lever.
-13. **Trois outils utiles restent hors du registre des gardes, par omission**
-    (leur nom ne commence ni par `check-` ni par `audit_`, donc l'exhaustivité du
-    registre ne les réclame pas) : `backend/scripts/dmarc_policy.py` (politique
-    DMARC, ses propres tests), `backend/scripts/provision_ci_test_account.py`
-    (provisionne le compte client de la pile locale, appelé par `ci.yml`) et
-    `frontend/scripts/lhci-cls-budgets.cjs` (la table des budgets CLS, éprouvée
-    par `lhci-cls-budgets.test.js`). Aucun des trois ne prononce de verdict sur
-    le dépôt : les trois sont des OUTILS, mais ils ne sont pas DÉCLARÉS comme
-    tels — à trancher explicitement, pas par omission.
+12. **CLOS (20/09/2026) — chaque page a un test de RENDU.**
+    `src/pages/__tests__/pages-render.test.jsx` monte chaque page et exige
+    qu'elle se rende sans lever, avec un contenu non vide. La liste des pages est
+    **dérivée** (`import.meta.glob('../*.js')`) : une page ajoutée entre dans le
+    tour sans que personne touche au fichier — une liste recopiée aurait
+    reproduit le défaut qu'elle surveille. Son premier run a trouvé un vrai
+    défaut du même genre que l'incident de l'accueil : `Profile.js` lisait
+    `user.first_name` alors que `user` peut redevenir nul le temps d'une
+    déconnexion (écran blanc attrapé par l'ErrorBoundary) — la page rend
+    maintenant son squelette dans ce cas. Ce que ce fichier est : un test de
+    FUMÉE. Il ne remplace pas les tests de comportement (4 fichiers), et il ne
+    remplace pas un navigateur : les parcours restent vérifiés à la main (§7.1).
+13. **CLOS (20/09/2026) — le registre des gardes classe TOUT script du dépôt.**
+    Le périmètre de l'exhaustivité était déduit du NOM (`check-`, `audit_`) : un
+    outil nommé `dmarc_policy.py`, `setup-seo-env.js` ou `lhci-cls-budgets.cjs`
+    échappait donc à la règle, et la décision « est-ce un garde ? » se prenait en
+    choisissant un nom de fichier. Le périmètre est désormais le RÉPERTOIRE
+    (`frontend/scripts`, `.github/scripts`, `backend/scripts`) : tout script est
+    déclaré avec son rôle, `garde` ou `outil`, et un outil porte son motif. Les
+    huit scripts que ce changement fait apparaître sont classés — dont
+    `frontend/scripts/validate-vercel-json.mjs`, déclaré **garde** (il sort en 1
+    sur un `vercel.json` que Vercel refuserait) et prouvé par une mutation
+    rejouée (`validate-vercel-json: propriete interdite dans un item rewrites
+    toleree` → le test propriétaire rougit, nommé).
+14. **CLOS (20/09/2026) — la CI n'écrit plus en production.** Le cycle
+    `/jobs/:id` de `check-og-job-200.js` CRÉE puis SUPPRIME une mission : sa
+    capacité était déduite de l'adresse de la BASE servie (`localhost`), pas du
+    BACKEND écrit. Sur une PR dont la preview Vercel était résolue, la pile locale
+    n'était pas montée, `KOJO_BACKEND_URL` retombait sur son défaut — l'API de
+    PRODUCTION — et la mission de test était créée en base réelle puis supprimée
+    (un échec de nettoyage y laissait une annonce visible). Le contrôle porte
+    maintenant sur la seule adresse que le script écrit (`isControlledBackend` :
+    loopback uniquement) ; hors de là il se tait avec un `::notice` nommant la
+    raison. Contrepartie assumée : sur une PR dont la preview est auditée, le
+    chemin 200 n'est plus exercé par ce script (il l'est sur la pile locale — ce
+    que `main` monte depuis le 20/09/2026 — et en processus par
+    `backend/tests/test_job_og_cycle.py`).
 
 ## 8. Tenir ce document à jour
 

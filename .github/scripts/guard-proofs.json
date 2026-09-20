@@ -272,6 +272,77 @@
       "runner": "pytest",
       "motif": "générateur : ses refus sont prouvés par test_gen_og_images.py, et le seul exécutant de cette preuve est check-og-test-mutations.py",
       "hors_mutation": "déjà prouvé par mutation : ses refus sont neutralisés par check-og-test-mutations.py, et le rejouer ici paierait deux fois la même preuve"
+    },
+    {
+      "chemin": "backend/scripts/dmarc_policy.py",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_dmarc_policy.py",
+      "runner": "pytest",
+      "motif": "outil d'ops : il publie et observe la politique DMARC du domaine (DNS public, rapports Gmail) — son verdict porte sur l'état du DNS, pas sur un fichier du dépôt",
+      "hors_mutation": "muté par sa PROPRE preuve, pas par la table : test_dmarc_policy.py charge le module réel par chemin et verrouille ce qui décide (échelle des paliers, délai d'observation, retour arrière, parseur DNS) — une branche neutralisée y rougit, là où la table ne rejoue que les gardes qui portent un verdict sur le dépôt"
+    },
+    {
+      "chemin": "backend/scripts/provision_ci_test_account.py",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": null,
+      "runner": null,
+      "motif": "outil d'ops : il crée le compte client dédié CI dans la base jetable du job Lighthouse — il ne juge aucun fichier du dépôt",
+      "hors_mutation": "aucun refus du dépôt à neutraliser : ses échecs portent sur la base jetable et les secrets du job (Mongo injoignable, mot de passe absent), et aucun test ne le nomme — rien à faire rougir hors ligne"
+    },
+    {
+      "chemin": "backend/scripts/loadtest_real_flow.sh",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "outil de charge exécuté à la main contre un backend déployé (flyctl + flux auth/paiement) : il mesure, il ne prononce pas de verdict sur le dépôt",
+      "hors_mutation": "aucun verdict codé (aucun exit de jugement) : son exécution dépend d'un backend déployé et de flyctl — la neutraliser ne ferait rougir personne, donc la table n'a rien à y prouver"
+    },
+    {
+      "chemin": "frontend/scripts/lhci-cls-budgets.cjs",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/lhci-cls-budgets.test.js",
+      "runner": "vitest",
+      "motif": "TABLE de budgets CLS par route, lue par lighthouserc.cjs au moment d'asserter : elle fournit des valeurs, elle ne prononce pas de verdict",
+      "hors_mutation": "ce n'est pas un garde mais une table : ses valeurs et la statistique retenue (meilleur des 3 runs) sont verrouillées par son test, et le verdict appartient au runner lhci — neutraliser la table ne prouverait rien de plus"
+    },
+    {
+      "chemin": "frontend/scripts/setup-seo-env.js",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/setup-seo-env.test.js",
+      "runner": "vitest",
+      "motif": "outil d'ops : il pose les variables SEO sur Vercel, redéploie et relit le HTML servi (jeton + réseau) — il ne juge pas le dépôt",
+      "hors_mutation": "ses refus (1 = une valeur fournie n'a pas atterri, 2 = rien à tenter) dépendent de l'API Vercel et du redéploiement : aucune preuve hors ligne ne peut les faire rougir ; sa preuve verrouille l'analyse des entrées et les codes"
+    },
+    {
+      "chemin": "frontend/scripts/site-meta.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/site-meta.test.js",
+      "runner": "vitest",
+      "motif": "module de données partagé (origine canonique + lecture des balises du HTML servi) : il n'a aucune branche de refus, les gardes qui le lisent portent le verdict",
+      "hors_mutation": "il n'existe pas de refus à neutraliser dans une table : ce qui est affirmé de son contenu (origine, lecture des balises) est déjà verrouillé par son test"
+    },
+    {
+      "chemin": "frontend/scripts/vercel-rewrite-server.js",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/vercel-rewrite-server.test.js",
+      "runner": "vitest",
+      "motif": "serveur local de CI : il rejoue la table de rewrites de vercel.json devant le build et le backend du job — il sert, il ne juge rien",
+      "hors_mutation": "ses échecs portent sur son démarrage (port occupé, racine absente), pas sur une propriété du dépôt : sa preuve exerce le serveur réel sur fixtures, la table n'a pas de refus à y neutraliser"
+    },
+    {
+      "chemin": "frontend/scripts/validate-vercel-json.mjs",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/validate-vercel-json.test.js",
+      "runner": "vitest",
+      "motif": "valide frontend/vercel.json (schéma officiel, repli structurel hors ligne) : il sort en 1 sur un fichier que Vercel refuserait"
     }
   ],
   "rejeux": [
@@ -1023,6 +1094,26 @@
       "cwd": "frontend",
       "attend": [
         "exige X-Robots-Tag noindex sur chaque route privée"
+      ]
+    },
+    {
+      "id": "validate-vercel-json: propriete interdite dans un item rewrites toleree",
+      "garde": "frontend/scripts/validate-vercel-json.mjs",
+      "cible": "frontend/scripts/validate-vercel-json.mjs",
+      "trouve": "        if (!allowed.has(prop)) {",
+      "remplace": "        if (false && !allowed.has(prop)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/validate-vercel-json.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/validate-vercel-json.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "rejette un rewrite avec la propriété headers"
       ]
     }
   ]

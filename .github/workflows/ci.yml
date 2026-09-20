@@ -1351,3 +1351,80 @@ jobs:
         run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # Un run VERT ne dit pas si le backend déployé correspond à ce commit :
+      # quand rien de backend n'a bougé, les deux étapes ci-dessus sont
+      # `skipped` et le job passe en quelques secondes. Sans cette étape, « main
+      # est vert » se lisait à tort comme « la production tourne le code de
+      # main » ; le verdict est donc ÉCRIT (notice + résumé du run) au lieu
+      # d'être déduit d'une couleur.
+      - name: Dire si le backend a été déployé
+        if: always()
+        env:
+          BACKEND_CHANGED: ${{ steps.changes.outputs.backend }}
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "$BACKEND_CHANGED" = "true" ] || [ "$DISPATCH" = "true" ]; then
+            echo "::notice title=Backend déployé::flyctl deploy a été exécuté sur ce commit — le backend servi correspond à ce run."
+            echo "Backend déployé (flyctl deploy exécuté sur ce commit)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::notice title=Backend NON déployé::aucun changement dans backend/** sur ce push — le backend servi est celui du déploiement précédent, PAS ce commit."
+            echo "Backend non déployé (aucun changement backend/** : le service tourne le déploiement précédent)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # ─── Avis de sécurité des dépendances ──────────────────────────────────────
+  # Motif : le dépôt n'en avait AUCUN (angle mort assumé de CI-COVERAGE.md §7)
+  # — une dépendance vulnérable pouvait donc rester en place indéfiniment sans
+  # qu'aucun job le dise. Deux périmètres, deux régimes, et c'est le périmètre
+  # qui décide :
+  #   • les dépendances de PRODUCTION du frontend (celles qu'un visiteur
+  #     télécharge) SONT un gate : 0 avis au 20/09/2026, donc exiger « aucun
+  #     avis haut/critique » ne relève pas un seuil, il constate un état ;
+  #   • les dépendances de DÉVELOPPEMENT (frontend) et les paquets Python ne le
+  #     sont pas ENCORE : pip-audit rapporte des avis réels au 20/09/2026
+  #     (starlette, pillow, pytest, black — versions épinglées du dépôt), et les
+  #     corriger est une mise à jour de dépendances avec ses propres risques de
+  #     rupture : c'est une décision de maintenance, pas un effet de bord d'un
+  #     ajout de job. Le job les publie en annotation et dans le résumé du run —
+  #     constatés, nommés, pas transformés en vert silencieux.
+  dependency-audit:
+    name: Dépendances (avis de sécurité)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Depuis le LOCKFILE : aucun `npm ci` n'est nécessaire pour interroger le
+      # registre, et le job reste à quelques secondes.
+      - name: Avis sur les dépendances de production (frontend) — BLOQUANT
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Avis sur les dépendances Python (rapportés, non bloquants)
+        working-directory: backend
+        run: |
+          set -uo pipefail
+          python -m pip install --quiet pip-audit
+          echo "### Avis de sécurité — dépendances Python (backend/requirements.txt)" >> "$GITHUB_STEP_SUMMARY"
+          if python -m pip_audit -r requirements.txt --progress-spinner off > /tmp/pip-audit.txt 2>&1; then
+            echo "Aucun avis : les versions épinglées de requirements.txt sont à jour." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Avis CONSTATÉS (non bloquants — voir le motif dans ci.yml) :" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            grep -Ei '^[a-z0-9_.-]+ +[0-9]' /tmp/pip-audit.txt | head -40 >> "$GITHUB_STEP_SUMMARY" || true
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            while read -r paquet version avis corrige; do
+              echo "::warning title=Avis Python::$paquet $version — $avis (corrigé en $corrige)"
+            done < <(grep -Ei '^[a-z0-9_.-]+ +[0-9]' /tmp/pip-audit.txt | head -40)
+          fi
