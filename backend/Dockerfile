@@ -9,6 +9,17 @@
 
 FROM python:3.11-slim
 
+# ── Révision servie (KOJO_GIT_SHA) ───────────────────────────────────────────
+# Le commit dont l'image est construite, injecté par le job deploy-fly
+# (`flyctl deploy --build-arg KOJO_GIT_SHA=<sha>`) et publié par /health
+# (kojo_settings.APP_REVISION). C'est ce qui rend vérifiable, de l'extérieur, la
+# phrase « le backend servi est celui de ce commit » : sans cette valeur, un
+# déploiement sauté et un déploiement réussi étaient indistinguables.
+# Le défaut « inconnue » est REFUSÉ par le garde de déploiement : une image
+# construite sans révision ne doit pas passer pour vérifiée.
+ARG KOJO_GIT_SHA=inconnue
+ENV KOJO_GIT_SHA=$KOJO_GIT_SHA
+
 # Python en mode conteneur : pas de .pyc, sortie non bufferisée, pip silencieux
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

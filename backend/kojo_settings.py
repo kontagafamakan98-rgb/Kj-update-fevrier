@@ -137,6 +137,23 @@ APP_ENV = os.environ.get("APP_ENV", "production").strip().lower()
 # 1.0.2 : modèle User étendu (skills/bio exposés par /auth/me, PR #3).
 APP_VERSION = "1.0.2"
 
+# RÉVISION SERVIE — la réponse à « quel commit tourne réellement ? ».
+#
+# Pourquoi une seconde donnée, alors qu'APP_VERSION existe déjà : APP_VERSION est
+# une version PRODUIT, bumpée à la main quand on y pense ; elle ne dit donc jamais
+# si le backend servi correspond au commit poussé. Un `main` vert pouvait signifier
+# deux choses opposées (« le backend déployé est celui de ce commit » et « le
+# déploiement a été sauté, le service tourne la version précédente ») sans qu'aucun
+# job ne puisse les distinguer.
+#
+# La valeur est INJECTÉE AU BUILD (`--build-arg KOJO_GIT_SHA=<sha>`, cf.
+# backend/Dockerfile et le job deploy-fly) : elle décrit l'image, pas le runtime,
+# donc elle ne peut pas mentir sur ce qui a été construit. Vide en local et dans
+# les tests (aucune image n'a été construite) → « inconnue » est publié, et le
+# garde backend/scripts/check_deployed_revision.py refuse cette réponse : c'est
+# exactement le cas « le service servi n'est pas traçable ».
+APP_REVISION = os.environ.get("KOJO_GIT_SHA", "").strip()
+
 _env_jwt_secret = os.environ.get('JWT_SECRET', '').strip()
 
 if _env_jwt_secret:

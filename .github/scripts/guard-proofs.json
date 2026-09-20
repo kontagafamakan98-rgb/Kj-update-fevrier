@@ -343,6 +343,13 @@
       "preuve": "frontend/scripts/__tests__/validate-vercel-json.test.js",
       "runner": "vitest",
       "motif": "valide frontend/vercel.json (schéma officiel, repli structurel hors ligne) : il sort en 1 sur un fichier que Vercel refuserait"
+    },
+    {
+      "chemin": "backend/scripts/check_deployed_revision.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_deployed_revision.py",
+      "runner": "pytest"
     }
   ],
   "rejeux": [
@@ -1114,6 +1121,27 @@
       "cwd": "frontend",
       "attend": [
         "rejette un rewrite avec la propriété headers"
+      ]
+    },
+    {
+      "id": "deployed-revision: revision differente toleree",
+      "garde": "backend/scripts/check_deployed_revision.py",
+      "cible": "backend/scripts/check_deployed_revision.py",
+      "trouve": "    if servie == attendue:",
+      "remplace": "    if True:",
+      "runner": "python",
+      "preuve": "backend/tests/test_deployed_revision.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_deployed_revision.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_deployed_revision.py::TestVerdict::test_refuse_une_revision_differente_en_nommant_les_deux"
       ]
     }
   ]

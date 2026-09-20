@@ -47,7 +47,7 @@ from kojo_payments import (
     refresh_paydunya_circuit_from_db,
 )
 from kojo_scheduler import payout_stuck_sweeper_loop, retention_purge_loop
-from kojo_settings import APP_ENV, APP_VERSION, FRONTEND_APP_URL, logger
+from kojo_settings import APP_ENV, APP_REVISION, APP_VERSION, FRONTEND_APP_URL, logger
 
 
 # ---------------------------------------------------------------------------
@@ -119,9 +119,9 @@ async def root():
 async def _health_payload() -> dict:
     """Payload partagé des health checks (/api/health et /health).
 
-    Une seule source de vérité pour la version (APP_VERSION) et l'état DB :
-    les deux routes ci-dessous l'appellent, plus de dérive possible entre
-    /api/health et /health.
+    Une seule source de vérité pour la version (APP_VERSION), la RÉVISION
+    SERVIE (APP_REVISION) et l'état DB : les deux routes ci-dessous l'appellent,
+    plus de dérive possible entre /api/health et /health.
 
     L'état du circuit breaker GLOBAL PayDunya est exposé ici (et non seulement
     dans le dashboard owner) pour que les moniteurs d'infra et l'alerting
@@ -139,6 +139,11 @@ async def _health_payload() -> dict:
         "timestamp": datetime.now(timezone.utc),
         "database": "connected" if db_available else "unavailable",
         "version": APP_VERSION,
+        # Le commit dont l'image a été construite (injecté au build par
+        # `--build-arg KOJO_GIT_SHA`, cf. kojo_settings.APP_REVISION). Publié ici
+        # pour que le déploiement soit VÉRIFIABLE de l'extérieur : le job CI
+        # compare cette réponse au commit poussé et rougit sinon.
+        "revision": APP_REVISION or "inconnue",
         "paydunya_circuit": {
             "state": circuit["state"],
             "consecutive_failures": circuit["consecutive_failures"],
