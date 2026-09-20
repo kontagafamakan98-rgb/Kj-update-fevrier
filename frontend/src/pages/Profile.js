@@ -196,6 +196,16 @@ export default function Profile() {
     return <ProfileSkeleton t={t} pageT={pageT} />;
   }
 
+  // Sans session, cette page n'a rien à montrer : la route est protégée, mais
+  // `user` peut redevenir null le temps d'une déconnexion (ou d'une session
+  // expirée), et les champs ci-dessous (nom, note, type) le liraient alors
+  // directement — un écran blanc attrapé par l'ErrorBoundary. Le squelette dit
+  // « rien à afficher » sans texte inventé (défaut trouvé le 20/09/2026 par le
+  // rendu de fumée de src/pages/__tests__/pages-render.test.jsx).
+  if (!user) {
+    return <ProfileSkeleton t={t} pageT={pageT} />;
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="bg-white shadow rounded-lg overflow-hidden">

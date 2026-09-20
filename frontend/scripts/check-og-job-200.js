@@ -41,6 +41,21 @@
  * processus, et frontend/scripts/check-spa-routes.js vérifie la CONFIGURATION
  * qui l'achemine. Les trois sont complémentaires, pas redondants.
  *
+ * ── Aucune écriture en production depuis la CI (20/09/2026) ────────────────
+ * Le cycle CRÉE et SUPPRIME une mission : il n'écrit donc que dans un backend
+ * que le job contrôle. Cette capacité était déduite de l'adresse de la BASE
+ * servie (`localhost`), pas du BACKEND écrit : sur une PR dont la preview
+ * Vercel était résolue (KOJO_LHCI_BASE_URL posée), la pile locale n'était pas
+ * montée, KOJO_BACKEND_URL retombait sur son défaut — l'API de PRODUCTION — et
+ * la mission de test était créée en base réelle puis supprimée. Le contrôle
+ * est désormais fait sur la SEULE adresse que le script écrit :
+ * `isControlledBackend()` n'accepte qu'une adresse loopback. Hors de là, le
+ * script se tait avec un ::notice nommant la raison, plutôt que d'écrire chez
+ * le client. Contrepartie assumée et écrite : sur une PR dont la preview est
+ * auditée, le chemin 200 n'est plus exercé par la CI (il l'est par la pile
+ * locale — ce que `main` monte depuis le 20/09/2026 — et par
+ * backend/tests/test_job_og_cycle.py).
+ *
  * AUTHENTIFICATION : réutilise le jeton du compte CLIENT dédié CI — soit
  * KOJO_LHCI_AUTH_HEADER (déjà résolu par le job) soit un login avec
  * LHCI_CI_EMAIL/LHCI_CI_PASSWORD. POST /api/jobs exige user_type=client, et
@@ -87,6 +102,16 @@ export const POST_DELETE_LABEL = '/jobs/:id (après suppression)';
 // base après un échec de nettoyage.
 export const TEST_JOB_TITLE_PREFIX = '[CI] Mission de test OG';
 export const TEST_JOB_SKILL = 'ci-og-check';
+
+/**
+ * Le backend ciblé est-il CONTRÔLÉ par l'appelant ? Seule une adresse loopback
+ * l'est : la mission de test de ce script est une ÉCRITURE (POST puis DELETE),
+ * et une CI n'écrit pas chez le client. C'est la seule adresse que le script
+ * modifie qui décide — pas l'adresse de la base auditée, qui peut être celle du
+ * déploiement réel sans que rien n'y soit créé (voir l'en-tête).
+ */
+export const isControlledBackend = (backend) =>
+  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(String(backend || '').trim().replace(/\/+$/, ''));
 
 const TIMEOUT_MS = 20000;
 const fetchJson = async (res) => {
@@ -351,6 +376,9 @@ export async function runOgJob200Cycle({
   const result = {
     ok: false,
     skipped: false,
+    // Pourquoi le cycle n'a pas eu lieu ('' s'il a eu lieu) : les deux raisons
+    // n'ont pas la même contrepartie, donc elles ne se disent pas pareil.
+    skipReason: '',
     errors,
     notices,
     checked,
@@ -373,6 +401,7 @@ export async function runOgJob200Cycle({
   result.jobRoute = jobRoute;
   if (!jobRoute.serves) {
     result.skipped = true;
+    result.skipReason = 'route-non-servie';
     result.ok = true;
     const notice =
       `Cycle /jobs/:id IGNORÉ : la base auditée (${BASE}) ne sert PAS la route backend ` +
@@ -380,6 +409,25 @@ export async function runOgJob200Cycle({
       `local émulant la table de vercel.json. Aucune mission de test créée. ` +
       `(Le cycle est couvert sur les PR par backend/tests/test_job_og_cycle.py et ` +
       `scripts/check-spa-routes.js ; ce script reste celui qui prouve le déploiement réel.)`;
+    notices.push(notice);
+    log(`  ⚠️ ${notice}`);
+    return result;
+  }
+
+  // Le cycle est une ÉCRITURE (POST + DELETE) : elle n'a lieu que dans un
+  // backend contrôlé par le job. Rien n'est écrit chez le client — un garde qui
+  // laisse une trace en production parce qu'il vérifie la production a le
+  // mauvais prix.
+  if (!isControlledBackend(BACKEND)) {
+    result.skipped = true;
+    result.skipReason = 'backend-non-controle';
+    result.ok = true;
+    const notice =
+      `Cycle /jobs/:id IGNORÉ : le backend ciblé (${BACKEND}) n'est pas une adresse ` +
+      `contrôlée par ce job (loopback). Le cycle CRÉE puis SUPPRIME une mission : la CI ` +
+      `n'écrit pas en production. Le chemin 200 reste exercé sur la pile locale du job ` +
+      `(KOJO_BACKEND_URL=127.0.0.1) et en processus par backend/tests/test_job_og_cycle.py ; ` +
+      `ici, seule la lecture (check-og-images.js sur la base auditée) a lieu.`;
     notices.push(notice);
     log(`  ⚠️ ${notice}`);
     return result;
@@ -541,9 +589,10 @@ if (isDirectRun) {
   if (result.ok) {
     console.log(
       result.skipped
-        ? `\n⚠️ Cycle /jobs/:id ignoré : ${result.jobRoute.detail}\n` +
-          '   Chemin 200 exercé sur le déploiement réel (runs de main), et couvert sur les PR par\n' +
-          '   backend/tests/test_job_og_cycle.py + scripts/check-spa-routes.js.'
+        ? `\n⚠️ Cycle /jobs/:id ignoré (${result.skipReason}) : ${result.jobRoute.detail}\n` +
+          '   Chemin 200 exercé sur la pile locale du job (et en processus par\n' +
+          '   backend/tests/test_job_og_cycle.py) ; la mission de test n\'est jamais créée\n' +
+          '   en production.'
         : `\n✅ Chemin 200 de /jobs/:id vérifié sur une mission réelle (${result.jobId}) — puis verrou 404 : ` +
           `fiche 404 + noindex, carte OG 404, absente du sitemap.`
     );

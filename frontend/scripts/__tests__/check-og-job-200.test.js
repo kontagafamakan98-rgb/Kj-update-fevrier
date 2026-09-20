@@ -4,6 +4,7 @@ import {
   runOgJob200Cycle,
   resolveAuthHeader,
   buildTestJobPayload,
+  isControlledBackend,
   TEST_JOB_TITLE_PREFIX,
 } from '../check-og-job-200';
 
@@ -16,10 +17,15 @@ import {
 //   • la suppression a bien lieu même quand la vérification OG échoue,
 //   • aucune suppression n'est tentée si la création a échoué,
 //   • un échec de suppression fait ÉCHOUER le script (mission laissée en base),
-//   • sur base locale, le script ne touche PAS à la production.
+//   • sur base locale, le script ne touche PAS à la production,
+//   • hors d'un backend CONTRÔLÉ par le job, aucune écriture n'est tentée.
 
 const BASE = 'https://stub-frontend.test';
-const BACKEND = 'https://stub-backend.test';
+// Le cycle ÉCRIT (POST puis DELETE) : ces tests exercent donc le seul cas que le
+// script autorise à écrire — un backend contrôlé par le job (loopback). L'API de
+// production est le cas de refus, couvert plus bas.
+const BACKEND = 'http://127.0.0.1:8000';
+const PROD_BACKEND = 'https://api.kojoforafrica.cc.cd';
 const ORIGIN = 'https://stub-origin.test';
 // Identifiant de sonde demandé par le script : la base qui répond 404 +
 // noindex le sert ; les autres (serveur statique nu) ne sont pas jugées.
@@ -204,6 +210,33 @@ afterEach(() => {
     if (originalEnv[key] === undefined) delete process.env[key];
     else process.env[key] = originalEnv[key];
   }
+});
+
+describe('aucune écriture hors d’un backend contrôlé par le job', () => {
+  it('n’écrit RIEN sur le backend de production et le dit', async () => {
+    const stub = makeStub();
+    const result = await runCycle(stub, { backend: PROD_BACKEND });
+
+    // Aucune requête d'écriture n'est partie : ni création, ni suppression.
+    expect(stub.calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    expect(stub.calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);
+    expect(result.created).toBe(false);
+    expect(result.deleted).toBe(false);
+    // Le silence serait un faux vert : le refus est nommé, avec sa raison.
+    expect(result.skipped).toBe(true);
+    expect(result.skipReason).toBe('backend-non-controle');
+    expect(result.notices.join(' | ')).toMatch(/n’écrit pas en production|n'est pas une adresse/);
+    expect(result.notices.join(' | ')).toContain(PROD_BACKEND);
+  });
+
+  it('n’autorise QUE des adresses loopback', () => {
+    for (const ok of ['http://127.0.0.1:8000', 'http://localhost:4174', 'http://[::1]:8000']) {
+      expect(isControlledBackend(ok), ok).toBe(true);
+    }
+    for (const ko of [PROD_BACKEND, 'https://stub-backend.test', 'https://127.0.0.1.evil.test', '']) {
+      expect(isControlledBackend(ko), ko).toBe(false);
+    }
+  });
 });
 
 describe('cycle /jobs/:id — chemin 200', () => {
