@@ -1,5 +1,9 @@
-import contact from './contact.json';
-import socialNetworks from './social-networks.json';
+// Import AVEC attribut : ce module est chargé par Node (vite.config.js écrit les
+// coquilles pré-rendues depuis src/config/page-sections.js, qui l'importe) autant
+// que par le bundle — Node n'exécute plus un import JSON sans
+// `with { type: 'json' }`, et Vite/vitest acceptent la même écriture.
+import contact from './contact.json' with { type: 'json' };
+import socialNetworks from './social-networks.json' with { type: 'json' };
 
 // Source de vérité UNIQUE du contact (N.A.P.) : ce fichier est importé par
 // l'application (footer, page Support) et LU DIRECTEMENT au build par le
