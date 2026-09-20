@@ -183,12 +183,21 @@ const CLS_BUDGETS = {
  * s'hydrata et se peignit, sans qu'une requête de données décide de son LCP.
  */
 const REQUETES_HORS_CONTROLE = {
-  '/api/geolocation/available-countries':
-    'c’est la requête LENTE nommée par les rapports du job rouge du 20/09/2026 (13:54) : ' +
-    'le LCP de /login y valait 3836 / 3781 / 3912 ms pour un FCP de 1 028 ms, sur le même ' +
-    'code que le job vert de 12:29 qui le mesurait à 1 767 ms. Bloquée : 1 112 ms mesuré ' +
-    'le 20/09/2026 contre le serveur de rewrites local (mêmes budgets, chemin de mesure ' +
-    'débarrassé d’un tiers)',
+  '*/api/geolocation/available-countries*':
+    'la requête LENTE nommée par les rapports du job rouge du 20/09/2026 (13:54) : le LCP ' +
+    'de /login y valait 3836 / 3781 / 3912 ms pour un FCP de 1 028 ms, sur le même code ' +
+    'que le job vert de 12:29, qui le mesurait à 1 767 ms. Bloquée : 1 112 ms mesuré contre ' +
+    'le serveur de rewrites local (mêmes budgets, chemin de mesure débarrassé d’un tiers)',
+  '*googletagmanager.com*':
+    'le tag GA4 posé le 20/09/2026 à 12:59 est la requête la plus lente des rapports du job ' +
+    'rouge de 14:31-14:38 (58 à 174 s de temps réseau simulé, sur TOUTES les pages) et le ' +
+    'LCP de la coquille de /login y est passé de ~1,7 s à 4 261 / 4 343 / 4 266 ms — alors ' +
+    'que la même page servie en production, mesurée depuis un poste hors runner, vaut ' +
+    '1 239 ms. Sous bridage 4G, ce tiers occupe une connexion et retarde le chunk critique : ' +
+    'la mesure doit être celle de l’artefact, pas celle de sa portée réseau',
+  '*google-analytics.com*':
+    'la mesure (`/g/collect`) que le tag ci-dessus déclenche : même origine tierce, même ' +
+    'effet sur le chemin critique, et elle n’existe que si le tag a pu se charger',
 };
 
 /**
