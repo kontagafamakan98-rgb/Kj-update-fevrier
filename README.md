@@ -200,7 +200,7 @@ rien n'est activé si elles sont absentes) :**
 
 | Variable | Effet |
 |---|---|
-| `VITE_GA_MEASUREMENT_ID` (`G-XXXXXXX`) | Balise Google Analytics 4 injectée dans le HTML **statique** (donc visible des outils d'audit) + `gtag('config')` depuis `src/utils/analytics.js` (pas de script inline : la CSP est `script-src 'self'`) et événement `page_view` à chaque navigation SPA. Ajoute aussi les domaines GA à la CSP (`googletagmanager.com`, `google-analytics.com`). |
+| `VITE_GA_MEASUREMENT_ID` (`G-XXXXXXX`) | Adresse du tag Google Analytics 4 **déclarée** dans le HTML statique (`data-kojo-ga-src` : visible des outils d'audit, sans être exécutée) ; le script est chargé **après `load`** par `src/utils/analytics.js` (hors du chemin critique, pas de script inline : la CSP est `script-src 'self'`), avec `gtag('config')` et un événement `page_view` à chaque navigation SPA. Ajoute aussi les domaines GA à la CSP (`googletagmanager.com`, `google-analytics.com`). |
 | `VITE_PLAUSIBLE_DOMAIN` | Analytics Plausible (script externe chargé par le bundle). |
 | `VITE_GSC_VERIFICATION` | Jeton `google-site-verification` (Search Console) ajouté au HTML statique. |
 | `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_TIKTOK`, `VITE_SOCIAL_LINKEDIN`, `VITE_SOCIAL_YOUTUBE`, `VITE_SOCIAL_X` | URL complète (`https://…`) du profil : affiché dans le footer **et** dans le `sameAs` du `LocalBusiness`. Un réseau sans valeur n'apparaît nulle part (aucun profil n'est inventé). |

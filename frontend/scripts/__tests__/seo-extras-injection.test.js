@@ -33,7 +33,7 @@
  *   cd frontend
  *   VITE_GA_MEASUREMENT_ID=G-TEST123456 VITE_GSC_VERIFICATION=citest-token \
  *   VITE_SOCIAL_FACEBOOK=https://facebook.com/kojo-test npx vite build
- *   grep -c googletagmanager build/index.html      # 2 (balise + CSP relâchée)
+ *   grep -c googletagmanager build/index.html      # 2 (déclaration data-kojo-ga-src + CSP relâchée)
  *   grep -o '"sameAs": \[[^]]*\]' build/index.html # les profils déclarés
  *
  * NOTE : le plugin lit `src/config/social-networks.json` relativement au
@@ -119,22 +119,31 @@ export async function runCsp(html = indexTemplate()) {
 
 const gaTag = (tags) =>
   tags.find(
-    (tag) => tag.tag === 'script' && String(tag.attrs?.src || '').includes('googletagmanager')
+    (tag) =>
+      tag.tag === 'script' &&
+      String(tag.attrs?.['data-kojo-ga-src'] || '').includes('googletagmanager')
   );
 
 describe('inject-seo-extras — balise Google Analytics 4', () => {
   afterEach(clearSeoEnv);
 
-  it('injecte la balise EXTERNE dans le HTML statique quand un identifiant valide est défini', async () => {
+  it('DÉCLARE l’adresse du tag dans le HTML statique, sans l’exécuter', async () => {
     setSeoEnv({ VITE_GA_MEASUREMENT_ID: GA_ID });
     const { tags } = await runSeoExtras();
 
     const tag = gaTag(tags);
-    expect(tag, 'aucune balise gtag.js injectée').toBeDefined();
-    expect(tag.attrs.src).toBe(`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`);
-    expect(tag.attrs.async).toBe(true);
-    // `head` : la balise doit être dans le HTML SERVI, pas ajoutée par le
-    // bundle — c'est la condition pour qu'un crawler sans JavaScript la voie.
+    expect(tag, 'aucune déclaration gtag.js injectée').toBeDefined();
+    expect(tag.attrs['data-kojo-ga-src']).toBe(
+      `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`
+    );
+    // `type="text/plain"` : le navigateur ne l'exécute pas, donc le tag ne
+    // se charge PAS pendant le chargement de la page (c'est le point : sous
+    // bridage 4G, une balise `async` décidait du LCP).
+    expect(tag.attrs.type).toBe('text/plain');
+    expect(tag.attrs.src).toBeUndefined();
+    // `head` : l'adresse doit être dans le HTML SERVI, pas ajoutée par le
+    // bundle — c'est la condition pour qu'un crawler sans JavaScript la voie
+    // et pour que la sonde SEO la détecte.
     expect(tag.injectTo).toBe('head');
   });
 

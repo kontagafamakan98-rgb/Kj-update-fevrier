@@ -17,18 +17,31 @@ export function injectSeoExtrasPlugin({ env }) {
     transformIndexHtml(html) {
       const tags = [];
 
-      // Google Analytics 4 : la balise EXTERNE est statique (détectable
-      // par les outils d'audit) ; le `gtag('config')` est émis par le
-      // module bundlé src/utils/analytics.js — pas de script inline, qui
-      // serait bloqué par la CSP `script-src 'self'` et afficherait une
-      // erreur console à chaque chargement.
+      // Google Analytics 4 : l'adresse du tag est DÉCLARÉE dans le HTML
+      // statique (`data-kojo-ga-src`) mais le script n'y est PAS exécuté.
+      //
+      // ── Pourquoi pas `<script async src=…>` ────────────────────────────
+      // Une balise `async` se charge PENDANT le chargement de la page : sous
+      // bridage 4G elle occupait une connexion et retardait le chunk critique,
+      // au point d'être la requête la plus lente de chaque page et de décider
+      // du LCP (mesuré le 20/09/2026, cf. CI-COVERAGE.md F6). Le script est
+      // donc chargé APRÈS `load`, au premier temps mort, par le module bundlé
+      // src/utils/analytics.js — qui lit cette déclaration, donc une seule
+      // source pour l'adresse.
+      //
+      // ── Pourquoi une déclaration et pas une injection au runtime ────────
+      // Un `type="text/plain"` n'est PAS exécuté par le navigateur (donc pas
+      // concerné par la CSP `script-src 'self'`), mais l'adresse reste dans le
+      // HTML SERVI : la sonde SEO de production et un audit « no-JS » la
+      // détectent toujours. Le `gtag('config')` et les `page_view` sont émis
+      // par le module bundlé (pas de script inline).
       const gaId = String(env.VITE_GA_MEASUREMENT_ID || '').trim();
       if (/^G-[A-Z0-9]+$/i.test(gaId)) {
         tags.push({
           tag: 'script',
           attrs: {
-            async: true,
-            src: `https://www.googletagmanager.com/gtag/js?id=${gaId}`,
+            type: 'text/plain',
+            'data-kojo-ga-src': `https://www.googletagmanager.com/gtag/js?id=${gaId}`,
           },
           injectTo: 'head',
         });

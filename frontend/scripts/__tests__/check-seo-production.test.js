@@ -133,6 +133,15 @@ describe('analyse du HTML servi', () => {
     expect(analysis.social.present).toBe(false);
   });
 
+  it('détecte le tag GA4 DÉCLARÉ (data-kojo-ga-src) sans qu’il soit exécuté', () => {
+    // Le tag est désormais chargé après `load` : la détection ne doit pas
+    // dépendre d'un `<script src>` exécuté, sinon la sonde deviendrait rouge
+    // pour une raison de chemin de chargement et non de configuration.
+    const html =
+      '<head><script type="text/plain" data-kojo-ga-src="https://www.googletagmanager.com/gtag/js?id=G-DEFER1234"></script></head>';
+    expect(analyzeSeoServedHtml(html).ga4).toEqual({ present: true, value: 'G-DEFER1234' });
+  });
+
   it('ne confond pas le domaine GA de la CSP avec la balise GA4', () => {
     // La CSP relâchée mentionne googletagmanager.com : sans `gtag/js?id=`, ce
     // n'est PAS la balise, et un audit d'analytics ne la verrait pas.
