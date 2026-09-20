@@ -61,9 +61,12 @@ que si un `backend/**` a changé, ou par un `workflow_dispatch` manuel.
 **déployé** (flyctl deploy exécuté sur ce commit) » ou « Backend **NON déployé**
 (aucun changement `backend/**` : le service tourne le déploiement précédent) ».
 Le ✓ ne dit plus une chose ambiguë : il l'écrit dans le run lui-même, sans qu'il
-faille remonter les étapes `skipped` pour le déduire. Ce qui reste ouvert, et
-que ce correctif ne ferme pas : **rien ne vérifie le RÉSULTAT du déploiement**
-(F8) — ni `/health`, ni version servie, ni machine `started`.
+faille remonter les étapes `skipped` pour le déduire.
+
+**F8 est fermé dans la foulée (20/09/2026)** : une déclaration n'était pas une
+preuve. Le service publie désormais la révision de son image et le même job la
+compare au commit attendu — il rougit quand le service tourne autre chose, y
+compris quand le déploiement a été sauté. Détail et limites : F8.
 
 ### F2 — Lighthouse mesure `localhost` au lieu de la production
 
@@ -554,13 +557,39 @@ message. Rejoué à la main le 18/09/2026 : retirer `import asyncio` de
 `from urllib.parse import urlparse` reproduit l'incident à l'identique —
 `undefined name 'urlparse'` (l. 476).
 
-### F8 — Aucun job ne vérifie le résultat du déploiement
+### F8 — Aucun job ne vérifie le résultat du déploiement — **fermé le 20/09/2026**
 
-`deploy-fly` s'arrête au succès de `flyctl deploy`. Rien ne sonde ensuite
-`/api/health`, ni la version servie, ni qu'une machine est bien `started`. Un
-déploiement qui démarre puis plante au boot est donc **vert**. La vérification
-`/health` renvoyant la version (`1.0.2`) a été faite **à la main** lors de sa mise
-en production — c'est précisément le maillon que la CI ne couvre pas.
+`deploy-fly` s'arrêtait au succès de `flyctl deploy` : rien ne sondait ensuite
+`/health`, ni la version servie, ni la révision construite. Un déploiement sauté
+(un push qui ne touche pas `backend/**`) et un déploiement réussi étaient donc
+**indistinguables** — le ✓ ne disait pas laquelle des deux choses venait de se
+produire.
+
+**Ce qui est vérifié désormais** : le service RÉPOND quelle révision il exécute,
+et la CI compare cette réponse au commit qu'elle aurait dû déployer.
+
+- `backend/Dockerfile` reçoit `--build-arg KOJO_GIT_SHA=<sha>` (job `deploy-fly`)
+et la promeut en variable d'environnement de l'image ; `/health` et `/api/health`
+la publient dans le champ `revision` (`kojo_settings.APP_REVISION`). C'est une
+propriété de l'IMAGE, pas du runtime : elle ne peut donc pas mentir sur ce qui a
+été construit.
+- `backend/scripts/check_deployed_revision.py` interroge le domaine servi et
+compare. La révision **attendue** est le commit poussé quand le déploiement a eu
+lieu, et sinon **le dernier commit qui a touché `backend/**` ou ce workflow** :
+c'est l'état que le push laisse en place, et le job rougit si le service en est
+resté à une révision plus ancienne (déploiement précédent échoué, par exemple).
+Il attend jusqu'à ~3 min qu'un déploiement en cours se termine, puis refuse en
+nommant **la révision servie et l'attendue** ; une réponse muette (« inconnue »,
+c'est-à-dire une image construite sans la build-arg) et un service injoignable
+sont deux autres refus, nommés séparément.
+- Preuve d'échec rejouable : `backend/tests/test_deployed_revision.py` (20 cas,
+`fetch` injecté, aucun réseau) et la mutation `deployed-revision: revision
+differente toleree` du registre — neutraliser la comparaison fait rougir le test
+propriétaire, nommé.
+
+Ce qui reste ouvert après ce correctif : la vérification porte sur la RÉVISION,
+pas sur la santé applicative (une image du bon commit qui plante au boot répondrait
+un 503 — refusé, mais sans dire pourquoi) ni sur les machines Fly (`started`).
 
 ### F9 — Les intégrations SEO/analytics n'existent qu'au build : un audit externe a rougi sur du code vert — **fermé le 20/09/2026**
 
@@ -2056,7 +2085,12 @@ chaque PR vers `main` (sauf mention contraire).
 - Les 4 contrôles du méta-test échouent bien sur une régression injectée.
 
 **Déploiement — `main` uniquement, et seulement si `backend/**` a changé**
-- `flyctl deploy --remote-only` réussit (le résultat n'est pas sondé, cf. F8).
+- `flyctl deploy --remote-only --build-arg KOJO_GIT_SHA=<commit>` réussit.
+- **Le service servi tourne bien la révision attendue** : `/health` publie
+  `revision` et elle est comparée au commit poussé — ou, si le déploiement a été
+  sauté, au dernier commit ayant touché `backend/**` ou ce workflow (cf. F8).
+  C'est cette ligne qui fait qu'un `main` vert signifie « le backend déployé est
+  à jour », et plus seulement « flyctl n'a pas échoué ».
 
 ## 6. Dépendances externes : ce qui peut rougir sans rapport avec le code
 
@@ -2092,8 +2126,13 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    **manuellement**, avec les comptes de test du README.
 2. **Aucun seuil de couverture.** `vitest run` et `pytest` sans `--cov` : une
    suite amputée reste verte.
-3. **Aucun garde sur le résultat du déploiement** (F8) : ni `/health`, ni version
-   servie, ni machine `started`.
+3. **CLOS (20/09/2026) — le résultat du déploiement est vérifié** : le service
+   publie la révision dont son image a été construite (`/health`, champ
+   `revision`) et `deploy-fly` refuse quand la réponse n'est pas le commit
+   attendu — y compris quand le déploiement a été SAUTÉ, où l'attendu est le
+   dernier commit ayant touché `backend/**` (cf. F8). Restent hors de cette
+   vérification : la santé applicative (une panne au boot se voit en 503, pas
+   dans ce champ) et l'état des machines Fly.
 4. **`deploy-fly` ne dépend pas du frontend ni du mobile** : un frontend rouge
    n'empêche pas un déploiement backend.
 5. **`timeout-minutes` posé le 20/09/2026** sur les jobs de `ci.yml` (10 depuis le

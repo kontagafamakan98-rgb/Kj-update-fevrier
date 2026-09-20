@@ -1323,7 +1323,13 @@ jobs:
       cancel-in-progress: false
 
     steps:
+      # HISTORIQUE COMPLET : la vérification finale compare la révision servie au
+      # dernier commit qui a touché `backend/**` (déploiement sauté). Sur un clone
+      # superficiel, `git rev-list -1 HEAD -- backend/` ne verrait qu'un commit et
+      # ne pourrait pas répondre — le garde refuserait alors de conclure (code 2).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Filtre les changements : pas de re-déploiement du backend pour un
       # push qui ne touche que le frontend/docs.
@@ -1345,12 +1351,56 @@ jobs:
       # --remote-only : le build se fait sur les builders distants de Fly
       # (Depot), pas de Docker nécessaire sur le runner. fly.toml et
       # Dockerfile sont lus depuis backend/ (working-directory).
+      #
+      # --build-arg KOJO_GIT_SHA : la révision ENTRE DANS L'IMAGE (variable
+      # d'environnement, cf. backend/Dockerfile) et le service la publie sur
+      # /health. C'est elle que la vérification suivante compare au commit
+      # poussé : sans elle, /health répondrait « inconnue » et le déploiement
+      # redeviendrait invérifiable.
       - name: Deploy to Fly.io
         if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: backend
-        run: flyctl deploy --remote-only
+        run: flyctl deploy --remote-only --build-arg KOJO_GIT_SHA=${{ github.sha }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # ── La VÉRIFICATION : quelle révision le service exécute-t-il ? ─────────
+      # L'étape suivante ÉCRIT ce que le job a fait ; celle-ci VÉRIFIE ce que le
+      # service répond — les deux ensemble ferment l'ambiguïté du ✓.
+      #
+      # La révision ATTENDUE n'est pas toujours le commit poussé, et c'est tout
+      # l'intérêt :
+      #   • push qui touche `backend/**` (ou ce workflow) → le déploiement vient
+      #     d'avoir lieu, la révision attendue est CE commit ;
+      #   • push qui n'y touche pas → le déploiement est SAUTÉ, et le service doit
+      #     tourner le DERNIER commit qui y a touché : si le service en est resté
+      #     à une révision plus ancienne (déploiement précédent échoué), le job
+      #     rougit au lieu d'afficher un ✓ vert ;
+      #   • dispatch manuel → déploiement forcé, attendu = ce commit.
+      #
+      # `if: always()` : la vérification dit aussi la vérité quand le déploiement
+      # a échoué (le service tourne alors l'ancienne image, et c'est un échec).
+      # Le garde attend jusqu'à ~3 min qu'un déploiement en cours se termine,
+      # puis refuse en nommant la révision servie ET l'attendue.
+      - name: Le backend servi est-il celui de ce commit ?
+        if: always()
+        env:
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -uo pipefail
+          if [ "$DISPATCH" = "true" ]; then
+            ATTENDU="${{ github.sha }}"
+            ORIGINE="dispatch manuel (déploiement forcé)"
+          else
+            ATTENDU="$(git rev-list -1 HEAD -- backend/ .github/workflows/ci.yml)"
+            ORIGINE="dernier commit ayant touché backend/** (déploiement sauté s'il n'y en a pas de nouveau)"
+          fi
+          if [ -z "$ATTENDU" ]; then
+            echo "::error::aucune révision attendue calculée — la vérification ne peut pas conclure"
+            exit 2
+          fi
+          echo "Révision attendue : $ATTENDU ($ORIGINE)"
+          python3 backend/scripts/check_deployed_revision.py --attendu "$ATTENDU" --tentatives 9 --delai 20
 
       # Un run VERT ne dit pas si le backend déployé correspond à ce commit :
       # quand rien de backend n'a bougé, les deux étapes ci-dessus sont
