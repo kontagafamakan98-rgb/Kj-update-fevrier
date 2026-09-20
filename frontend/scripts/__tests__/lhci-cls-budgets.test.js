@@ -139,6 +139,20 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     expect(motifs.join(' ')).not.toMatch(/auth|users\/me|session/);
   });
 
+  it('ne bloque PLUS le tag GA4, chargé après `load` depuis le 20/09/2026', () => {
+    // Le tag a figuré dans la table quelques heures, tant qu'il était `async`
+    // dans le `<head>` : il était alors la requête la plus lente du chemin
+    // critique. Il est désormais DÉCLARÉ dans le HTML (`data-kojo-ga-src`) et
+    // chargé APRÈS `load` par `src/utils/analytics.js` — et le LCP est finalisé
+    // au `load`, donc le tag ne peut plus le décider. Rebloquer un tiers est un
+    // choix : ce test exige qu'il soit rouvert explicitement (et justifié), au
+    // lieu de revenir sans que rien ne le dise.
+    const motifs = config.ci.collect.settings.blockedUrlPatterns.join(' ');
+    for (const tiers of ['googletagmanager', 'google-analytics']) {
+      expect(motifs, `${tiers} ne doit plus être bloqué`).not.toContain(tiers);
+    }
+  });
+
   it('le LCP n’est retiré que sur les routes déclarées, et jamais sans preuve', () => {
     for (const [route, justification] of Object.entries(LCP_PRODUIT_PAR_UNE_REPONSE)) {
       expect(ROUTES, `${route} déclarée hors LCP mais pas auditée`).toContain(route);
