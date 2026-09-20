@@ -38,12 +38,19 @@ jobs:
           node-version: "24"
 
       # Aucune dépendance à installer : le script n'utilise que des modules
-      # `node:` et `fetch`. Il pose les deux variables sur `production` ET
+      # `node:` et `fetch`. Il pose les variables FOURNIES sur `production` ET
       # `preview` (en `upsert`, donc rejouable), redéploie la production à partir
       # du dernier déploiement, attend `READY`, puis relit le HTML servi avec la
       # MÊME sonde que la CI (`scripts/check-seo-production.js`) — et ÉCHOUE si
-      # les deux balises n'y sont pas. Un déploiement `READY` ne prouve pas que
+      # une balise FOURNIE n'y est pas. Un déploiement `READY` ne prouve pas que
       # la balise est là.
+      #
+      # L'unité d'écriture est la VARIABLE, pas le lot (décision du 20/09/2026,
+      # cf. CI-COVERAGE.md F9) : un secret manquant ne bloque plus sa voisine —
+      # c'est ce couplage qui a laissé la balise Search Console hors de la
+      # production deux jours durant, sa valeur étant pourtant disponible. La
+      # variable laissée de côté est nommée en `::warning` (annotation lisible
+      # sur le run) et la sonde STRICTE quotidienne reste le gate qui rougit.
       #
       # `VERCEL_TEAM_ID` et `VERCEL_PROJECT_NAME` sont optionnels : le script
       # retombe sur le projet `kj-update-fevrier` et sur le compte du jeton.
