@@ -42,11 +42,9 @@
     {
       "chemin": "frontend/scripts/audit_tdz.cjs",
       "role": "garde",
-      "invoque_par": "aucun",
-      "preuve": null,
-      "runner": null,
-      "motif": "audit statique ponctuel (classe TDZ) : ni workflow ni test ne l'exécute — seul garde du dépôt sans exécutant, consigné dans CI-COVERAGE.md §7",
-      "hors_mutation": "aucun exécutant : ni workflow ni test ne le lance, donc aucune preuve ne peut rougir — seul garde du dépôt sans exécutant, consigné dans CI-COVERAGE.md §7"
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/audit-tdz.test.js",
+      "runner": "vitest"
     },
     {
       "chemin": "frontend/scripts/check-api-split.js",
@@ -113,11 +111,11 @@
     },
     {
       "chemin": "frontend/scripts/check-og-reproducible.js",
-      "role": "garde",
+      "role": "outil",
       "invoque_par": "aucun",
       "preuve": null,
       "runner": null,
-      "motif": "script à point d'entrée (process.exit à l'import) : aucun workflow ni test ne l'exécute — son verdict de reproductibilité exige le générateur et ses polices",
+      "motif": "outil de diagnostic, pas un garde : sans un Python avec Pillow et la police de référence il imprime un ::notice et sort sans verdict — un contrôle qui peut se taire hors de son poste ne peut pas être un gate",
       "hors_mutation": "aucune preuve ne peut rougir : le seul test qui le nomme (check-og-assets.test.js) vérifie un texte de renvoi produit par check-og-assets.js et n'importe jamais ce module. Mesuré : neutraliser la comparaison d'empreinte du générateur a laissé la preuve verte"
     },
     {
@@ -905,6 +903,26 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_ci_workflow_pins.py::TestLectureDuWorkflow::test_motif_valide_sur_fixture_rend_exit_zero"
+      ]
+    },
+    {
+      "id": "tdz: classification directe neutralisee",
+      "garde": "frontend/scripts/audit_tdz.cjs",
+      "cible": "frontend/scripts/audit_tdz.cjs",
+      "trouve": "      if (sameFunc) direct.push(entry);",
+      "remplace": "      if (sameFunc) nested.push(entry);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/audit-tdz.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/audit-tdz.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "CARTES"
       ]
     }
   ]

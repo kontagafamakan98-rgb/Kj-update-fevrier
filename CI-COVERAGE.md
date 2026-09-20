@@ -1324,7 +1324,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | Garde | Prouvé qu'il peut échouer par |
 |---|---|
 | `audit_docstrings.py`, `audit_api_returns.cjs`, `py_compile`, `pyflakes` | méta-test CI (`audit-regression-test`) |
-| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-og-reproducible.js` (via `check-og-assets.test.js`), `check-cors-preflight.js` | tests Vitest dédiés |
+| `check-api-split.js`, `check-bundle-size.js`, `check-generated-icons.js`, `check-home-shell.js`, `check-spa-routes.js`, `check-og-images.js`, `check-og-job-200.js`, `check-pwa-manifest.js`, `check-pack2-chunks.js` (via `pack2-size.test.js`), `check-script-deps.js`, `validate-vercel-json.mjs`, `check-cors-preflight.js`, `audit_tdz.cjs` (son CLI lancé par `audit-tdz.test.js`) | tests Vitest dédiés |
 | `check-og-assets.js` | `scripts/__tests__/check-og-assets.test.js` (34 tests mesurés le 19/09/2026 : générateur unique par le nom ET le contenu, dimensions réelles des PNG, orphelins, manifeste, polices de référence, **et le TEXTE dessiné** — lignes recomposées ≠ dictionnaire, manifeste retouché à la main, carte incomplète nommée, aucune carte pour « / », route non absolue, dictionnaire illisible) + mutation rejouée le 18/09/2026 sur le fichier réel : `jobsMetaTitle` renommé sans régénérer les cartes → garde en **1**, message nommé, restauré sans modification résiduelle (§3 F16) ; la reproduction octet pour octet des cartes est prouvée par `check-og-reproducible.js` (7 fichiers, police de référence) |
 | `check-job-og-contract.js` | `scripts/__tests__/check-job-og-contract.test.js` — comparaison PURE prouvée capable d'échouer sur 7 mutations du HTML du module de production (titre, carte, variante carrée absente, découpe de description, canonical divergent, canonical absent, annonce applicative vide) ; le **jeu de référence** (5 missions, frontière des 150 sur un accent, un emoji BMP, un astral et avant un astral) est comparé mission par mission, et la règle de coupe d'AVANT (unités UTF-16) est détectée — mutation rejouée le 18/09/2026 sur le fichier réel : garde en **1** (6 problèmes) et 4 tests rouges, restauré à l'empreinte identique (§3 F15) ; l'absence d'interpréteur Python est un échec en CI sur un dépôt sans `backend/kojo_job_og.py` |
 | `check-workflow-pins.py` | `backend/tests/test_ci_workflow_pins.py` (classement des références + workflow réel) |
@@ -1333,7 +1333,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
 | la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (31 tests mesurés le 19/09/2026 : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
-| `inject-seo-extras` / `inject-production-csp` (plugins de `vite.config.js`, pas des gardes) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
+| `inject-seo-extras` / `inject-production-csp` (plugins du dossier `frontend/vite-plugins/`, pas des gardes — seul `vite.config.js` les monte) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus dérivés de son arbre, chacun rougissant le test qui lui appartient, 3,0 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
 | `check-og-test-mutations.py` | `backend/tests/test_og_mutation_guard.py` (8 cas : **la dérivation lit chaque `raise SystemExit` et signale celui qu'aucun `if` ne porte**, **la neutralisation vise la portion que l'arbre désigne — une autre ligne qui ressemble reste intacte**, **un test qui rougit sous plusieurs refus n'en verrouille aucun**, un refus que personne n'exerce est signalé, une suite déjà rouge arrête tout avant la première mutation, un périmètre incomplet est une erreur ; sur le vrai générateur, la dérivation couvre chaque `raise` et chaque condition est neutralisable ; les décisions se testent sur des verdicts ÉCRITS D'AVANCE — **ces cas n'exécutent jamais pytest** — et le dernier contrôle exige UNE occurrence du commandement, dans le job `backend-tests`, celui qui installe les dépendances de l'étape) ; la partie VERTE du garde n'a qu'un exécutant, l'étape de CI, et **huit mutations, une par cas, rejouées le 19/09/2026 sur une copie du garde (dépôt jamais touché, code 1 et `1 failed` à chaque fois)** montrent que chaque cas sait échouer |
 | `check-privacy-policy.py` | `backend/tests/test_privacy_policy_guard.py` (14 cas mesurés le 19/09/2026, 4,3 s : sur une COPIE du dépôt, une durée changée dans le module, une ligne retirée du document, une cellule éditée à la main, une collection ajoutée au code sans ligne, une ligne publiée que le code ne porte pas, des marqueurs absents, un module absent et `--write` qui répare — chacun rend **1** en nommant la collection et la colonne ; plus les invariants de propriétaire unique : plus aucun `expireAfterSeconds` littéral dans `kojo_core`, chaque règle créant SON index avec son filtre partiel, les mots des durées calculés et non recopiés, aucune durée engendrée recopiée dans la prose du document, et UNE occurrence du commandement, dans le job qui installe `requirements.txt`) ; six mutations rejouées le 19/09/2026 sur les fichiers réels (document, règle, `kojo_settings`, filtre partiel, `kojo_core`), chacune rouge et nommée, restaurées à l'empreinte SHA-1 identique des quatre fichiers — §3 F18 |
@@ -1368,11 +1368,11 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
 * **le registre est EXHAUSTIF** : chaque entrée est soit **mutée**, soit déclarée
   `hors_mutation` **avec son motif**. Un garde ni muté ni justifié est un refus
   (`SpecInvalide`), pas un oubli silencieux — la couverture ne dépend donc plus
-  de la vigilance de celui qui ajoute un garde. Au 19/09/2026 : **30 mutations**
-  couvrent les **28** entrées mutables des **33** déclarées (le harnais en porte
-  trois : ses décisions, son filtre par changement, et le rejeu d'une étape due), et les 5 autres sont des
+  de la vigilance de celui qui ajoute un garde. Au 20/09/2026 : **31 mutations**
+  couvrent les **29** entrées mutables des **33** déclarées (le harnais en porte
+  trois : ses décisions, son filtre par changement, et le rejeu d'une étape due), et les 4 autres sont des
   exclusions motivées —
-  `audit_tdz.cjs` et `check-og-reproducible.js` (sans exécutant, §7),
+  `check-og-reproducible.js` (outil sans verdict reproductible, §7 item 11),
   `resolve-vercel-url.sh` et `bundle-size-report.js` (outils sans verdict : rien
   à neutraliser), et `gen-og-images.py` (déjà muté par
   `check-og-test-mutations.py` : le rejouer ici paierait deux fois la preuve).
@@ -1840,31 +1840,26 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    évite la panne reste : backend (`FRONTEND_APP_URL` / `CORS_ORIGINS`) d'abord,
    frontend ensuite. Les réessais de la sonde (6 × 15 s) absorbent la fenêtre du
    déploiement Fly, qui tourne dans le même run.
-10. **`frontend/scripts/audit_tdz.cjs` n'a AUCUN exécutant** : ni workflow, ni
-    test, ni script npm ne l'appelle. C'est un audit statique ponctuel (classe
-    TDZ), déclaré comme tel dans `.github/scripts/guard-proofs.json`
-    (`invoque_par: "aucun"`) avec son motif :
-    `backend/tests/test_guard_failure_proofs.py` refuse tout autre garde sans
-    preuve rejouable, et exige qu'un garde sans exécutant soit consigné ici
-    même. L'angle mort est donc NOMMÉ plutôt que silencieux ; en sortir demande
-    de l'exécuter quelque part (test ou étape).
-11. **`frontend/scripts/check-og-reproducible.js` est le SECOND garde sans
-    exécutant — et sa capacité à échouer n'est prouvée par rien** (mesuré le
-    19/09/2026). Il se lançait jusqu'ici par `npm run check:og-reproducible`,
-    mais **aucun workflow ne l'appelle et aucun test ne l'importe** : c'est un
-    script à point d'entrée (`process.exit` à l'import), donc écarté du test
-    d'import-santé, et le seul test qui écrit son nom
-    (`scripts/__tests__/check-og-assets.test.js`) vérifie un TEXTE DE RENVOI
-    produit par `check-og-assets.js` (« relancer node
-    scripts/check-og-reproducible.js ») sans jamais charger le module. Le
-    registre déclarait donc une preuve que ce fichier ne pouvait pas faire rougir :
-    neutraliser sa comparaison d'empreinte de générateur laisse la suite VERTE
-    (mesuré, avant correction). `preuve` est désormais `null`,
-    `invoque_par: "aucun"`, et l'entrée porte `hors_mutation` avec ce motif. Son
-    verdict (cartographier les PNG régénérés octet pour octet) exige le
-    générateur **et ses polices** : il ne peut donc pas être rejoué dans la suite
-    hors ligne, et il n'est mesuré nulle part en production — l'angle mort est
-    nommé, pas fermé.
+10. **CLOS (20/09/2026) — `frontend/scripts/audit_tdz.cjs` a un exécutant** : il
+    était le seul garde du dépôt que rien ne lançait. Il est désormais un module
+    (`analyserLeCode` / `analyserLeDepot`, exportés) doublé d'un CLI dont le
+    **code de sortie vaut ce que vaut le verdict** (1 sur un TDZ certain). Son
+    test (`scripts/__tests__/audit-tdz.test.js`) lance le CLI réel sur un arbre
+    de fixture — `KOJO_TDZ_DIR` — et son propre import, donc il rougit à la fois
+    quand la détection casse et quand le refus disparaît ; le registre porte
+    `invoque_par: "test"` **et** une mutation rejouée
+    (« tdz: classification directe neutralisee », rouge nommé `CARTES`).
+    Ce que le garde protège est mesuré : une table lue avant sa déclaration dans
+    le même scope est la classe de bug qui a vidé la page d'accueil.
+11. **`frontend/scripts/check-og-reproducible.js` n'est pas un garde mais un
+    OUTIL — et le registre le dit désormais** (`role: "outil"`, décision du
+    20/09/2026). Un garde doit pouvoir REFUSER ; celui-ci imprime un `::notice`
+    et sort sans verdict dès que l'interpréteur Python n'a pas Pillow ou que la
+    police de référence manque. Un contrôle qui peut se taire hors de son poste
+    ne peut pas être un gate : le registrer comme garde faisait dire à la
+    couverture plus qu'elle ne prouvait. Il reste dans le dépôt (c'est le
+    diagnostic à lancer à la main pour vérifier la régénération octet pour octet
+    des PNG) et garde `hors_mutation`, avec ce motif.
 
 ## 8. Tenir ce document à jour
 
