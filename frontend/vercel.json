@@ -24,10 +24,6 @@
       "destination": "https://api.kojoforafrica.cc.cd/api/sitemap.xml"
     },
     {
-      "source": "/robots.txt",
-      "destination": "https://api.kojoforafrica.cc.cd/api/robots.txt"
-    },
-    {
       "source": "/login",
       "destination": "/login.html"
     },
@@ -113,6 +109,15 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/robots.txt",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=120, stale-while-revalidate=60"
         }
       ]
     },

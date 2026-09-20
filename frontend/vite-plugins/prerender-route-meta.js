@@ -1004,7 +1004,9 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // Les routes sans pré-rendu (/dashboard, /profile, /messages,
       // /create-job, /commission-dashboard…) n'ont AUCUN contenu statique
       // propre — et aucune raison d'être indexées : ce sont des écrans
-      // connectés (noindex par X-Robots-Tag dans vercel.json). Les pages
+      // connectés, privés par la MÊME dérivation que le garde lit pour exiger
+      // leur X-Robots-Tag dans vercel.json (noindex dit ici en plus, dans le
+      // document, et en `Disallow` dans le robots.txt écrit par le build). Les pages
       // PUBLIQUES de contenu (/how-it-works, /support) ont, elles, leur
       // propre shell depuis qu'elles ne doivent plus apparaître vides.
       // Leur servir index.html reviendrait à publier le
@@ -1034,6 +1036,17 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       appHtml = setMeta(appHtml, 'og:description', neutralDescription)
       appHtml = setMeta(appHtml, 'twitter:title', neutralTitle)
       appHtml = setMeta(appHtml, 'twitter:description', neutralDescription)
+      // ── robots : le gabarit ne peut pas se dire indexable ─────────────────
+      // Il sert UNIQUEMENT les routes privées (dérivées du routage par
+      // scripts/check-spa-routes.js, et c'est cette même liste que le garde
+      // exige en X-Robots-Tag dans vercel.json). Le fichier héritait pourtant
+      // du `index, follow` du gabarit d'accueil, par simple recopie : mesuré en
+      // production le 20/09/2026, /dashboard, /messages, /profile,
+      // /photo-debug et /support-admin recevaient donc un en-tête `noindex` ET
+      // un document qui disait `index, follow` — deux verdicts contradictoires
+      // sur les mêmes URL, dont le plus restrictif gagne par chance et non par
+      // construction.
+      appHtml = setMeta(appHtml, 'robots', 'noindex, follow')
       if (appHtml.includes('<link rel="canonical"') || appHtml.includes('application/ld+json')) {
         throw new Error(
           'prerender-route-meta : app.html contient encore un canonical ou un JSON-LD — ' +

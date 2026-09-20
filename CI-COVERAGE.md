@@ -615,8 +615,9 @@ le pré-rendu par route de `vite.config.js` (qui échouent ou sondent faux si le
 build repart sur l'ancienne adresse, tous lisant `SITE_ORIGIN` de
 `scripts/site-meta.js` — l'API qu'il appelle se lit dans le même module, sous
 `API_ORIGIN`), `resolve-vercel-url.sh` (base Lighthouse de `main`), et côté backend
-`DEFAULT_SITE_BASE` — le repli de `_site_base()`, qui construit le sitemap et
-`robots.txt` — déjà pointé sur le domaine.
+`DEFAULT_SITE_BASE` — le repli de `_site_base()`, qui construit le sitemap — déjà
+pointé sur le domaine. `robots.txt` n'est plus servi par le backend (voir §3 F13) :
+il est écrit au BUILD, depuis `SITE_ORIGIN`, par `vite-plugins/write-robots-txt.js`.
 
 **Deux adresses publiques, désormais** (17/09/2026) : le site sur
 `kojoforafrica.cc.cd`, et le backend sur `api.kojoforafrica.cc.cd`, qui remplace
@@ -1063,6 +1064,58 @@ route : un motif qui la capture (`/dashboard/(.*)` pour `/dashboard/:onglet`)
 suffit, mais `/(.*)` ne compte pas — il couvre la racine, donc tout le site, et
 désindexerait les pages publiques au lieu de protéger celle-là.
 
+**Reste du même défaut, fermé le 20/09/2026** : sur les neuf routes privées, le
+noindex n'était dit que par **une** des trois surfaces qui le publient. Mesuré en
+production (HTML et en-têtes réellement servis) :
+
+```
+GET https://kojoforafrica.cc.cd/dashboard   (/messages, /profile, /photo-debug, /support-admin :
+  x-robots-tag: noindex, follow             idem)
+  <meta name="robots" content="index, follow" />      ← le gabarit d'accueil, recopié
+
+GET https://api.kojoforafrica.cc.cd/api/robots.txt   (la liste écrite dans le backend)
+  Disallow: /dashboard, /profile, /messages, /photo-debug, /api/
+  ← 4 routes privées sur 9 : /create-job, /email-verification, /payment-verification,
+    /commission-dashboard et /support-admin restaient CRAWLABLES
+```
+
+Le document disait `index, follow` là où l'en-tête disait `noindex` (le plus
+restrictif gagne, mais par chance, pas par construction), et `robots.txt` —
+servi par le backend avec sa propre liste — ignorait cinq des neuf routes que la
+dérivation connaissait. `robots.txt` est désormais un **artefact du build**, écrit
+depuis `privateRoutesOf` par `vite-plugins/write-robots-txt.js` (le rewrite Vercel
+`/robots.txt → /api/robots.txt` est retiré : il MASQUERAIT le fichier statique), et
+`app.html` porte `<meta name="robots" content="noindex, follow">`. Les trois
+surfaces — l'en-tête de `vercel.json`, le meta du gabarit et le `Disallow` du
+fichier — lisent la MÊME liste, et le garde refuse une liste figée en nommant les
+routes qui manquent ; la route backend, elle, n'existe plus.
+
+**Preuves** (dépôt réel) :
+
+```
+build/robots.txt écrit par le build → les 9 routes privées + /api/, triées
+  → node scripts/check-spa-routes.js : exit 0
+
+la liste FIGÉE d'avant, remise dans build/robots.txt
+  → exit 1 : « il MANQUE /commission-dashboard, /create-job, /email-verification,
+    /payment-verification, /support-admin (routes privées crawlables) »
+
+build/app.html avec « index, follow »
+  → exit 1 : « doit porter <meta name="robots" content="noindex, follow"> : c'est
+    le gabarit des 9 routes privées, et il annonçait « index, follow » quand
+    vercel.json leur envoie X-Robots-Tag noindex »
+
+restauration     → les deux artefacts reviennent identiques (cmp), exit 0
+```
+
+Trois mutations rejouées le 20/09/2026 sur le fichier réel, chacune restaurée à
+l'empreinte SHA-1 identique : refus du meta non-noindex neutralisé → « exige un
+meta robots noindex dans build/app.html » ; comparaison du fichier neutralisée →
+« refuse une liste figée qui a oublié une route privée » ; **dérivation
+neutralisée** (`privateRoutesOf` ne rend plus rien) → « exige X-Robots-Tag noindex
+sur chaque route privée », c'est-à-dire que la liste est bien ce qui porte le
+verdict, et pas un fichier à côté.
+
 ### F14 — Une traduction de page manquante restait invisible au build — **fermé le 18/09/2026**
 
 `src/config/page-meta.js` déclare, par route, un titre et une description en clés
@@ -1482,7 +1535,7 @@ régression et exigent l'échec — c'est équivalent, à une exception près :
 | `check-test-existence-assertions.py` | `backend/tests/test_existence_assertion_guard.py` (cas refusés ET acceptés, périmètre vide refusé, `::error` + code 1, câblage dans `workflow-lint`) |
 | `check-page-meta.js` | `scripts/__tests__/check-page-meta.test.js` (38 tests mesurés le 19/09/2026 : les 7 règles savent échouer — dont un build PÉRIMÉ (texte **et** carte), une table vide, une route déclarée à la fois par une carte et par la table écrite à la main (règle H, injectée), une clé de page absente d'une seule langue, une langue publiée sans dictionnaire et un dictionnaire que personne ne charge —, leurs exemptions) — le passage du garde sur le dépôt réel appartient à l'étape de CI **et** le plugin de build lui-même, `requirePageMeta` : monté sur une arborescence dont la page est muette (`buildStart` doit lever) + `scripts/__tests__/check-page-meta-build-wiring.test.js` (2 tests, environnement Node : le `vite.config.js` RÉEL installe le plugin en `apply: 'build'`, et la config ne le réécrit pas) — mutations automatisées le 18/09/2026 sur les trois maillons (plugin retiré, `apply: 'serve'`, `buildStart` sans appel → la suite rougit) + mutations rejouées à la main : page privée de son `usePageMeta()` (§3 F12) et deux mutations de dictionnaire (§3 F14) → `npm run build` en **1** à chaque fois, tout restauré à l'octet |
 | `deriveRoutes` — la dérivation route → carte de `check-og-images.js` (exécutée au CHARGEMENT, donc `vite build` avec elle) | test qui refuse une carte dédiée hors des pages du projet + mutation rejouée le 18/09/2026 (carte ajoutée au seul manifeste) : **`npm run build` en 1** et les **trois** gardes qui dérivent la table en 1 avant d'avoir rien vérifié |
-| la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (31 tests mesurés le 19/09/2026 : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route) + mutations rejouées le 18/09/2026 (dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
+| la classification publique/privée des routes (`privateRoutesOf` de `check-spa-routes.js`) | `scripts/__tests__/check-spa-routes.test.js` (**40 tests mesurés le 20/09/2026** : dérivation textes/backend/privé, page ni déclarée ni privée refusée, noindex qui doit viser la route, et les trois surfaces du noindex — en-tête de `vercel.json`, meta de `build/app.html`, `Disallow` de `build/robots.txt` — contre la même liste, dont une liste figée, une interdiction hors dérivation, une seconde déclaration `public/robots.txt` et un rewrite de `/robots.txt`) + mutations rejouées (18/09 : dérivation neutralisée → 5 tests rouges, exclusion du noindex `/(.*)` retirée → rouge ; 20/09 : meta indexable, liste figée et dérivation neutralisée → un rouge NOMMÉ chacune, empreinte SHA-1 identique) et le dépôt réel : une page non déclarée passe d'`exit 0` à `exit 1` (§3 F13) |
 | la correspondance route → fichier de coquille (`shellFileFor` de `scripts/site-meta.js`, appelée par le build et les gardes) | `scripts/__tests__/site-meta.test.js` — refuse une source qui la recalcule (périmètre non vide exigé, la reproduction est nommée `fichier:ligne`) et exige un fichier DISTINCT par page de la table ; **six copies** remplacées (le build qui écrit, `check-page-meta`, `check-prerender-shells`, `PRERENDERED_PAGES` désormais dérivée, le routage attendu de `check-spa-routes`, la fixture du test) + mutation rejouée le 18/09/2026 (copie valide réintroduite dans un garde → test rouge, restaurée à l'octet) et build rejoué : les **10 coquilles émises identiques à l'octet** |
 | `inject-seo-extras` / `inject-production-csp` (plugins du dossier `frontend/vite-plugins/`, pas des gardes — seul `vite.config.js` les monte) | `scripts/__tests__/seo-extras-injection.test.js` — échec prouvé par mutation le 17/09/2026 (cf. F9) |
 | `gen-og-images.py` (le générateur, pas un garde) | `backend/tests/test_gen_og_images.py` (22 cas : deux cartes pour la même route nommant les deux fichiers, champ manquant ou blanc, carte incomplète nommée et non sautée, route non absolue, dossier sans carte, clé i18n absente/vide/non textuelle, description vérifiée autant que le titre, mot plus large que la colonne, plus de lignes que réservé, bloc plus haut que la carte — **filet pour la CONSTANTE, jamais un texte** —, **sans police de référence ni image produite**, plus l'invariant qui porte le filet : lignes réservées qui tiennent dans la carte, en wide et en carrée — et, DANS le cas de refus « texte trop long », l'invariant lignes repliées ↔ texte publié) ; la liste des champs exigés, la police du titre, la colonne et les lignes réservées sont LUES sur le générateur, jamais recopiées ; les refus sont neutralisés dans une arborescence temporaire par `.github/scripts/check-og-test-mutations.py`, **seul exécutant de cette preuve** (**9 refus dérivés de son arbre, chacun rougissant le test qui lui appartient, 3,0 s sur le runner, le dépôt jamais modifié**) et une mutation du champ exigé a été rejouée à la main (un sixième champ → collecte 22 → **23 cas**, suite rouge nommant le champ, restauré à l'empreinte identique) — §3 F17 |
@@ -1519,7 +1572,7 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
 * **le registre est EXHAUSTIF** : chaque entrée est soit **mutée**, soit déclarée
   `hors_mutation` **avec son motif**. Un garde ni muté ni justifié est un refus
   (`SpecInvalide`), pas un oubli silencieux — la couverture ne dépend donc plus
-  de la vigilance de celui qui ajoute un garde. Au 20/09/2026 : **31 mutations**
+  de la vigilance de celui qui ajoute un garde. Au 20/09/2026 : **36 mutations**
   couvrent les **29** entrées mutables des **33** déclarées (le harnais en porte
   trois : ses décisions, son filtre par changement, et le rejeu d'une étape due), et les 4 autres sont des
   exclusions motivées —
@@ -1529,15 +1582,17 @@ Ce trou est fermé, et l'inventaire ne dépend plus de la vigilance de personne 
   `check-og-test-mutations.py` : le rejouer ici paierait deux fois la preuve).
 * **le filtre est mesuré, pas supposé** : une entrée n'entre dans la table que si
   sa preuve peut rougir **hors ligne** et **sans artefact de build**. Deux mesures
-  ont servi de critère plutôt qu'une inspection : les 18 mutations Node ont été
-  rejouées avec `frontend/build` **retiré de l'arbre** — **18/18 rouges, 81 s**,
-  chaque preuve montant sa propre fixture dans un répertoire temporaire — et les
+  ont servi de critère plutôt qu'une inspection : les mutations Node ont été
+  rejouées avec `frontend/build` **retiré de l'arbre** — **18/18 rouges, 81 s** le
+  19/09/2026 (24/24 le 20/09/2026, `build/` présent), chaque preuve montant sa
+  propre fixture dans un répertoire temporaire — et les
   trois sondes qui parlent HTTP (`check-cors-preflight`, `check-seo-production`,
   `check-og-job-200`) reçoivent leur `fetch` par injection ; la seule adresse
   réellement appelée est `http://127.0.0.1:1`, où rien n'écoute (le cas qui prouve
   qu'un accueil injoignable ne fait pas conclure « absent »). Coût : mesuré en
   local (Windows, démarrage de `npx` compris, `build/` présent) à **33 à 42 s**
-  pour les 11 mutations Python et **83 à 146 s** pour les 18 Node — et **sur le
+  pour les 11 mutations Python et **1 min 58 s** pour les **24** Node (mesuré le
+  20/09/2026, Windows, `npx` compris) — et **sur le
   runner**, sur le même run (`35457261081`, lu par l'API), à **17 s** pour les 11
   mutations Python (étape « Mutations des gardes — preuve d'échec (runner
   Python) », job `backend-tests`) et **32 s** pour les 18 Node (étape « Mutations
@@ -1821,13 +1876,16 @@ chaque PR vers `main` (sauf mention contraire).
 - Les groupes d'endpoints *lazy* restent hors du chunk d'entrée.
 - Routage complet (`check-spa-routes.js`) : rewrite de la fiche `/jobs/:id` vers
   la route OG déclarée par le backend, même backend que le proxy `/api`,
-  sitemap/robots proxifiés, **chaque route de production de `src/App.js`**
+  sitemap proxifié (son contenu est dynamique : il énumère les fiches vivantes),
+  **chaque route de production de `src/App.js`**
   déclarée dans ses deux formes (`/route` et `/route/`), aucun catch-all (une
   URL inconnue doit répondre **404**, pas 200) et aucune règle exacte masquée
   par un motif placé avant. Contrôle supplémentaire : **chaque route est servie
   par le bon gabarit** — sa page pré-rendue si elle en a une, `app.html` sinon,
   et jamais `index.html` (qui porte le contenu de l'accueil) ; `app.html` doit
   rester nu (pas de `<h1>`, pas de canonical, pas de JSON-LD, `#root` vide) et
+  **porter un meta robots noindex** — il sert les routes privées et les servait
+  en annonçant `index, follow` (voir F13) — et
   toute page `.html` émise par le build doit correspondre à une route de la table
   des textes (`src/config/page-meta.js`) — c'est LÀ qu'une page se déclare, et la
   liste des pages pré-rendues du garde en **DÉRIVE** au lieu d'être recopiée :

@@ -360,7 +360,8 @@ async def get_job_og_html(job_id: str):
         headers={"Cache-Control": _job_og_cache_control(job)},
     )
 
-# Base du site pour le sitemap/robots. En production, FRONTEND_APP_URL doit
+# Base du site pour le SITEMAP (seul reste à être servi par le backend ; le
+# robots.txt, lui, est un fichier du build). En production, FRONTEND_APP_URL doit
 # pointer vers le domaine public (kojoforafrica.cc.cd, alias Vercel) ; repli sur
 # le domaine Fly du backend (utilisateur derrière le proxy /api, jamais pour le
 # vrai crawl).
@@ -467,33 +468,13 @@ async def get_sitemap_xml():
     )
 
 
-@router.get("/robots.txt", include_in_schema=False)
-async def get_robots_txt():
-    """robots.txt servi par le BACKEND (source de vérité) au lieu du fichier
-    statique Vercel : renvoie les mêmes directives que public/robots.txt mais
-    pointe dynamiquement vers le bon domaine pour la balise Sitemap.
-
-    Le rewrite Vercel /robots.txt → /api/robots.txt (transient.json) fait que
-    les crawlers reçoivent cette version. Le fichier statique reste en place
-    comme repli si le proxy /api est désactivé.
-
-    Returns:
-        Response: texte brut (text/plain) — les directives robots.txt.
-    """
-    base = _site_base()
-    body = (
-        f"User-agent: *\n"
-        f"Allow: /\n"
-        f"Allow: /login\n"
-        f"Allow: /register\n"
-        f"Allow: /jobs\n"
-        f"Allow: /how-it-works\n"
-        f"Disallow: /dashboard\n"
-        f"Disallow: /profile\n"
-        f"Disallow: /messages\n"
-        f"Disallow: /api/\n"
-        f"Disallow: /photo-debug\n"
-        f"\n"
-        f"Sitemap: {base}/sitemap.xml\n"
-    )
-    return Response(content=body, media_type="text/plain")
+# robots.txt n'est PLUS servi ici : il est écrit au build par le FRONTEND, depuis
+# la liste des routes privées DÉRIVÉE du routage (scripts/check-spa-routes.js).
+# Cette route portait sa propre liste `Disallow`, écrite à la main, et les deux
+# ne se parlaient pas : mesuré le 20/09/2026, elle interdisait 4 routes privées
+# sur 9 — /create-job, /email-verification, /payment-verification,
+# /commission-dashboard et /support-admin restaient crawlables. Le rewrite
+# Vercel /robots.txt → /api/robots.txt a donc été retiré en même temps : il
+# masquerait le fichier du build (la réécriture passe avant le fichier statique).
+# Le SEUL fichier robots.txt publié est celui du build — voir
+# vite-plugins/write-robots-txt.js et CI-COVERAGE.md.

@@ -964,6 +964,66 @@
       "attend": [
         "CARTES"
       ]
+    },
+    {
+      "id": "robots: app.html indexable tolere",
+      "garde": "frontend/scripts/check-spa-routes.js",
+      "cible": "frontend/scripts/check-spa-routes.js",
+      "trouve": "      if (!appRobots.some((value) => /noindex/i.test(value))) {",
+      "remplace": "      if (false && !appRobots.some((value) => /noindex/i.test(value))) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-spa-routes.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "exige un meta robots noindex dans build/app.html"
+      ]
+    },
+    {
+      "id": "robots: liste figee toleree",
+      "garde": "frontend/scripts/check-spa-routes.js",
+      "cible": "frontend/scripts/check-spa-routes.js",
+      "trouve": "      if (missing.length || extra.length) {",
+      "remplace": "      if (false && (missing.length || extra.length)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-spa-routes.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une liste figée qui a oublié une route privée"
+      ]
+    },
+    {
+      "id": "robots: derivation neutralisee (plus aucune route privee)",
+      "garde": "frontend/scripts/check-spa-routes.js",
+      "cible": "frontend/scripts/check-spa-routes.js",
+      "trouve": "  return routes.filter((route) => !Object.hasOwn(PAGE_META, route) && !servedByServer(route));",
+      "remplace": "  return [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-spa-routes.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "exige X-Robots-Tag noindex sur chaque route privée"
+      ]
     }
   ]
 }

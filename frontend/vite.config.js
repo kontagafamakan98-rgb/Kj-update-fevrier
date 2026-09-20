@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv } from 'vite'
+import { readFileSync } from 'node:fs'
 import react from '@vitejs/plugin-react'
 
 // Les plugins du build vivent chacun dans leur module (dossier vite-plugins/) :
@@ -10,6 +11,7 @@ import { prerenderRouteMetaPlugin } from './vite-plugins/prerender-route-meta.js
 import { preloadHomeChunkPlugin } from './vite-plugins/preload-home-chunk.js'
 import { injectSeoExtrasPlugin } from './vite-plugins/inject-seo-extras.js'
 import { injectProductionCspPlugin } from './vite-plugins/inject-production-csp.js'
+import { writeRobotsTxtPlugin } from './vite-plugins/write-robots-txt.js'
 
 // Correspondance route → carte OG : SOURCE UNIQUE dans scripts/check-og-images.js,
 // qui est aussi le module vérifiant le HTML servi. Le build n'en garde aucune
@@ -22,6 +24,11 @@ import { ROUTES as OG_CARD_ROUTES } from './scripts/check-og-images.js'
 // Une clé absente de src/i18n/fr.json casse le build (T() plus bas) au lieu de
 // publier un titre vide.
 import { PAGE_META } from './src/config/page-meta.js'
+
+// Dérivation des routes privées (voir PRIVATE_ROUTES plus bas) : elle vit dans
+// le garde qui l'applique — `privateRoutesOf` était déjà la seule définition de
+// « ce qu'est une route privée », elle l'est désormais aussi pour le build.
+import { parseAppRoutes, privateRoutesOf } from './scripts/check-spa-routes.js'
 
 // Identité publique du site : origine canonique ET origine de l'API, possédées
 // par scripts/site-meta.js. Le build n'en garde aucune copie — leur PAIRE est ce
@@ -45,6 +52,17 @@ import { PAGE_SECTIONS, pageSectionParts } from './src/config/page-sections.js'
 
 const OG_CARDS = Object.fromEntries(
   OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
+)
+
+// Routes PRIVÉES : SOURCE UNIQUE dans scripts/check-spa-routes.js, qui les
+// DÉRIVE du routage réel (src/App.js) et de la table de rewrites — la même
+// dérivation que celle dont le garde exige ensuite le noindex dans vercel.json.
+// Le build n'en garde aucune copie : c'est cette liste qui écrit le `Disallow`
+// de robots.txt, donc ajouter une page privée au routage l'interdit aux crawlers
+// sans que personne ait à y penser.
+const PRIVATE_ROUTES = privateRoutesOf(
+  parseAppRoutes(readFileSync(new URL('./src/App.js', import.meta.url), 'utf8')).routes,
+  JSON.parse(readFileSync(new URL('./vercel.json', import.meta.url), 'utf8')).rewrites || []
 )
 
 export default defineConfig(({ mode }) => {
@@ -92,6 +110,9 @@ export default defineConfig(({ mode }) => {
         env,
         mode,
       }),
+      // robots.txt est écrit depuis la MÊME liste que l'en-tête X-Robots-Tag et
+      // que le meta de app.html : ce fichier ne recopie aucune route privée.
+      writeRobotsTxtPlugin({ privateRoutes: PRIVATE_ROUTES, siteOrigin: SITE_ORIGIN }),
       preloadHomeChunkPlugin(),
       injectSeoExtrasPlugin({ env }),
       injectProductionCspPlugin({ env, mode, apiOrigin }),

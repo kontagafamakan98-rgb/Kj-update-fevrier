@@ -78,7 +78,6 @@ const CONFORMING_REWRITES = [
   { source: JOB_REWRITE_SOURCE, destination: `https://api.kojoforafrica.cc.cd${JOB_REWRITE_SUFFIX}` },
   { source: '/api/:path*', destination: 'https://api.kojoforafrica.cc.cd/api/:path*' },
   { source: '/sitemap.xml', destination: 'https://api.kojoforafrica.cc.cd/api/sitemap.xml' },
-  { source: '/robots.txt', destination: 'https://api.kojoforafrica.cc.cd/api/robots.txt' },
   { source: '/login', destination: '/login.html' },
   { source: '/login/', destination: '/login.html' },
   { source: '/register', destination: '/register.html' },
@@ -109,8 +108,29 @@ const CONFORMING_HEADERS = [
 /** Gabarit nu de référence (ce que produit le plugin de pré-rendu). */
 const APP_HTML_BODY =
   '<!DOCTYPE html><html lang="fr"><head><title>Kojo</title>' +
+  '<meta name="robots" content="noindex, follow" />' +
   '<meta name="description" content="Kojo met en relation clients et travailleurs." /></head>' +
   '<body><div id="root"></div></body></html>';
+
+/**
+ * robots.txt de référence : les routes privées de CETTE fixture (dérivées de
+ * son App.js : /dashboard, /photo-debug, /profile) plus le proxy /api/.
+ *
+ * Écrit à la main À DESSEIN : c'est ce texte que les cas suivants mutent pour
+ * vérifier que le garde compare bien le fichier publié à la dérivation — et non
+ * une copie du texte.
+ */
+const CONFORMING_ROBOTS = [
+  'User-agent: *',
+  'Allow: /',
+  'Disallow: /api/',
+  'Disallow: /dashboard',
+  'Disallow: /photo-debug',
+  'Disallow: /profile',
+  '',
+  'Sitemap: https://kojoforafrica.cc.cd/sitemap.xml',
+  '',
+].join('\n');
 
 const NOT_FOUND_HTML =
   '<!DOCTYPE html><html lang="fr"><head><meta name="robots" content="noindex, follow" />' +
@@ -126,6 +146,8 @@ function makeProject({
   raw,
   index = true,
   appHtml = APP_HTML_BODY,
+  robots = CONFORMING_ROBOTS,
+  publicRobots = null,
   extraBuildHtml = [],
 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'spa-routes-'));
@@ -142,6 +164,11 @@ function makeProject({
   if (index) fs.writeFileSync(path.join(buildDir, 'index.html'), '<div id="root"></div>');
   if (notFound !== null) fs.writeFileSync(path.join(buildDir, '404.html'), notFound);
   if (appHtml !== null) fs.writeFileSync(path.join(buildDir, 'app.html'), appHtml);
+  if (robots !== null) fs.writeFileSync(path.join(buildDir, 'robots.txt'), robots);
+  if (publicRobots !== null) {
+    fs.mkdirSync(path.join(frontendDir, 'public'), { recursive: true });
+    fs.writeFileSync(path.join(frontendDir, 'public', 'robots.txt'), publicRobots);
+  }
   // Pages pré-rendues attendues par le routage de référence.
   for (const route of [
     'jobs',
@@ -386,15 +413,29 @@ describe('check-spa-routes — la fiche /jobs/:id', () => {
 });
 
 describe('check-spa-routes — découverte et cas dégradés', () => {
-  it('exige sitemap et robots proxifiés', () => {
+  it('exige le sitemap proxifié (il reste dynamique, côté backend)', () => {
     const project = makeProject({
       rewrites: withRewrites((rewrites) =>
-        rewrites.filter((rule) => !['/sitemap.xml', '/robots.txt'].includes(rule.source))
+        rewrites.filter((rule) => rule.source !== '/sitemap.xml')
       ),
     });
+    expect(run(project).errors.join('\n')).toContain('/sitemap.xml');
+  });
+
+  // Le rewrite /robots.txt → /api/robots.txt a été RETIRÉ : la liste `Disallow`
+  // du backend couvrait 4 routes privées sur 9, et un rewrite passe avant le
+  // fichier statique — il masquerait donc le robots.txt écrit par le build, en
+  // plus de réintroduire une seconde liste.
+  it('refuse un rewrite de robots.txt : il masquerait le fichier du build', () => {
+    const project = makeProject({
+      rewrites: withRewrites((rewrites) => [
+        ...rewrites,
+        { source: '/robots.txt', destination: 'https://api.kojoforafrica.cc.cd/api/robots.txt' },
+      ]),
+    });
     const errors = run(project).errors.join('\n');
-    expect(errors).toContain('/sitemap.xml');
     expect(errors).toContain('/robots.txt');
+    expect(errors).toContain('MASQUE');
   });
 
   it('échoue si vercel.json est absent, illisible ou vide', () => {
@@ -406,6 +447,71 @@ describe('check-spa-routes — découverte et cas dégradés', () => {
     expect(
       run(makeProject({ raw: JSON.stringify({ framework: 'vite' }) })).errors.join('\n')
     ).toContain('aucun rewrite');
+  });
+});
+
+// ── robots.txt et le meta du gabarit nu : trois surfaces, une liste ─────────
+// Le noindex d'une route privée est dit par l'en-tête X-Robots-Tag (vercel.json,
+// vérifié plus bas), par le meta de build/app.html et par le Disallow de
+// build/robots.txt. Les trois DÉRIVENT de la même liste : ces cas vérifient que
+// le garde compare bien le fichier PUBLIÉ à cette dérivation — une liste figée
+// dans le fichier, ou recopiée dans public/, est refusée en nommant l'écart.
+describe('check-spa-routes — robots.txt dérive de la même liste', () => {
+  it('accepte le robots.txt de référence (routes privées de la fixture + /api/)', () => {
+    const result = run(makeProject());
+    expect(result.errors).toEqual([]);
+    expect(result.notices.join('\n')).toContain('robots.txt');
+  });
+
+  it('exige un meta robots noindex dans build/app.html', () => {
+    const project = makeProject({
+      appHtml: APP_HTML_BODY.replace('<meta name="robots" content="noindex, follow" />', ''),
+    });
+    expect(run(project).errors.join('\n')).toContain('noindex');
+  });
+
+  it('refuse un app.html qui se dit indexable (la contradiction mesurée)', () => {
+    const project = makeProject({
+      appHtml: APP_HTML_BODY.replace('noindex, follow', 'index, follow'),
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('index, follow');
+    expect(errors).toContain('noindex');
+  });
+
+  it('exige build/robots.txt (il est écrit par le build)', () => {
+    const project = makeProject({ robots: null });
+    expect(run(project).errors.join('\n')).toContain('robots.txt absent');
+  });
+
+  it('refuse une liste figée qui a oublié une route privée, en la nommant', () => {
+    const project = makeProject({
+      robots: CONFORMING_ROBOTS.replace('Disallow: /profile\n', ''),
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('/profile');
+    expect(errors).toContain('MANQUE');
+  });
+
+  it('refuse une interdiction qui ne correspond à aucune route privée dérivée', () => {
+    const project = makeProject({
+      robots: CONFORMING_ROBOTS.replace('Disallow: /api/\n', 'Disallow: /api/\nDisallow: /jobs\n'),
+    });
+    const errors = run(project).errors.join('\n');
+    expect(errors).toContain('/jobs');
+    expect(errors).toContain('aucune route privée');
+  });
+
+  it('refuse une SECONDE déclaration public/robots.txt', () => {
+    const project = makeProject({ publicRobots: 'User-agent: *\nDisallow: /dashboard\n' });
+    expect(run(project).errors.join('\n')).toContain('public/robots.txt');
+  });
+
+  it('exige la balise Sitemap (sans elle, la découverte ne passe que par un lien externe)', () => {
+    const project = makeProject({
+      robots: CONFORMING_ROBOTS.replace('Sitemap: https://kojoforafrica.cc.cd/sitemap.xml\n', ''),
+    });
+    expect(run(project).errors.join('\n')).toContain('Sitemap: https://kojoforafrica.cc.cd/sitemap.xml');
   });
 });
 
