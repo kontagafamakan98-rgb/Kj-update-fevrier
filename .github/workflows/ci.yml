@@ -17,6 +17,10 @@ jobs:
   audit-regression-test:
     name: Audits détectent les régressions
     runs-on: ubuntu-latest
+    # Un job sans plafond patiente 360 min avant que le runner ne l'abandonne :
+    # un blocage (réseau, service) laisserait une PR « en cours » au lieu de
+    # rougir. Plafonds ~3× la durée mesurée (CI-COVERAGE.md, §7).
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -146,6 +150,7 @@ jobs:
   workflow-lint:
     name: Workflow lint (actionlint + shellcheck)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -209,6 +214,7 @@ jobs:
   fly-env-drift:
     name: Fly env doc-prod (drift + secrets)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -272,6 +278,7 @@ jobs:
   backend-tests:
     name: Backend tests (Python + MongoDB)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     # Vrai MongoDB : la suite s'exécute contre une vraie instance (mode
     # TEST_MONGO_URL), ce qui couvre l'atomicité, les indexes et les
@@ -456,6 +463,7 @@ jobs:
   frontend-build:
     name: Frontend tests + build (Node/Vite)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -681,6 +689,7 @@ jobs:
   bundle-size-report:
     name: Bundle size report (PR comment)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: frontend-build
     permissions:
       contents: read
@@ -784,10 +793,15 @@ jobs:
   # dans les secrets, on a depuis ajouté LHCI_TEST_*) :
   #   • pull_request → l'app GitHub « Vercel » poste un commentaire avec
   #     l'URL de preview ; on la lit via l'API GitHub (GITHUB_TOKEN auto).
-  #   • main (push) → URL de production kojoforafrica.cc.cd (alias Vercel :
-  #     kj-update-fevrier.vercel.app redirige vers ce domaine).
+  #   • main (push) → AUCUNE URL : la pile LOCALE du job est la surface
+  #     auditée. Le 20/09/2026, deux runs sur un arbre inchangé sont tombés
+  #     rouges à cause du DÉFI de sécurité de l'edge Vercel servi à un client
+  #     qui le sollicite en rafale depuis une IP de runner (reproduit : 403 +
+  #     `X-Vercel-Mitigated: challenge` dès la ~33e requête d'une rafale) : le
+  #     verdict dépendait d'un quota côté tiers. Détail et compromis assumé
+  #     dans .github/scripts/resolve-vercel-url.sh et CI-COVERAGE.md.
   #   • Sinon → repli sur une pile LOCALE « forme production » : MongoDB +
-  #     backend de la PR + serveur local qui rejoue la table de rewrites de
+  #     backend du dépôt + serveur local qui rejoue la table de rewrites de
   #     vercel.json devant le build (cf. plus bas).
   #
   # ── Le cycle /jobs/:id s'exécute désormais SUR LES PR ──────────────────────
@@ -804,6 +818,9 @@ jobs:
   lighthouse-ci:
     name: Lighthouse performance budgets
     runs-on: ubuntu-latest
+    # ~560 s mesurés le 20/09/2026 (13 pages × 3 runs) ; la pile locale ajoute
+    # la préparation (pip install + provisioning MongoDB), déjà comptée.
+    timeout-minutes: 30
     needs: frontend-build
 
     # MongoDB éphémère du repli local : c'est LUI qui rend le cycle /jobs/:id
@@ -829,12 +846,20 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      # Même env que le job frontend-build : l'app appelle le backend prod
-      # en cross-origin pendant l'audit (les requêtes vers Fly sont réelles).
+      # L'API inlinée est le BACKEND LOCAL du job (port 8000, démarré plus bas).
+      # Ce build n'est servi QUE par la pile locale (le repli depuis le
+      # 20/09/2026) : sur un déploiement réel, c'est Vercel qui sert son propre
+      # build. Pointer l'API locale est ce qui rend les pages PROTÉGÉES
+      # réellement authentifiables ici : le jeton Bearer posé par le job vient
+      # du backend local, il n'est valable que contre lui — avec l'API de
+      # production, /auth/me répondait 401 et /dashboard, /profile et /payment
+      # se rendaient en redirection vers /login (mesures qui ne décrivent
+      # aucune de ces pages, raison pour laquelle le repli n'auditait que
+      # l'accueil).
       - name: Build
         working-directory: frontend
         env:
-          VITE_API_URL: https://api.kojoforafrica.cc.cd/api
+          VITE_API_URL: http://127.0.0.1:8000/api
         run: npm run build
 
       # Résout l'URL du déploiement Vercel à auditer : commentaire Vercel
@@ -1155,11 +1180,12 @@ jobs:
         run: node scripts/check-og-job-200.js
 
       # ubuntu-latest embarque Google Chrome : chrome-launcher le détecte
-      # automatiquement (pas d'action d'installation nécessaire). KOJO_LHCI_BASE_URL
-      # (si définie) fait auditer l'URL Vercel réelle, sinon la pile locale —
-      # adresse LOOPBACK, que lighthouserc.cjs traite comme le repli local (audit
-      # de l'accueil seul, plafond TBT élargi) : les pages protégées n'ont pas
-      # de données réelles derrière un serveur local.
+      # automatiquement (pas d'action d'installation nécessaire).
+      # KOJO_LHCI_BASE_URL dit QUELLE surface est auditée : une preview Vercel
+      # quand elle est résolue (PR), sinon la pile locale de ce job — qui sert
+      # alors TOUTES les pages du projet (KOJO_LHCI_LOCAL_STACK=1), pages
+      # protégées comprises, avec le plafond TBT élargi d'un runner partagé
+      # (lighthouserc.cjs, et son test check-lhci-env.test.js).
       # KOJO_LHCI_AUTH_HEADER authentifie les pages /dashboard,/jobs,/profile.
       - name: Run Lighthouse CI (collect + assert, budgets bloquants)
         working-directory: frontend
@@ -1194,6 +1220,7 @@ jobs:
   mobile-build:
     name: Mobile build (Capacitor + Android)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -1285,6 +1312,7 @@ jobs:
   deploy-fly:
     name: Deploy backend to Fly.io
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: backend-tests
     # Jamais depuis un PR ; déploiement sur main (push auto OU dispatch manuel)
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'

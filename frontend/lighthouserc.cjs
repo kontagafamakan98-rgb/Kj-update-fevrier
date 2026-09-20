@@ -14,9 +14,12 @@
  *     compte est isolé des comptes e2e partagés : jamais touché à la main,
  *     donc des budgets Lighthouse déterministes d'un run à l'autre.
  *
- * Cible (URL de base) : le DÉPLOIEMENT VERCEL réel quand KOJO_LHCI_BASE_URL est fournie
- * (résolue par le job CI depuis le commentaire Vercel de la PR, ou l'URL de
- * prod sur main), sinon le build local servi statiquement (contenu identique).
+ * Cible (URL de base) : le DÉPLOIEMENT VERCEL réel quand KOJO_LHCI_BASE_URL est
+ * fournie (sur une PR, depuis le commentaire Vercel — cf.
+ * .github/scripts/resolve-vercel-url.sh), sinon la pile locale du job. Depuis
+ * le 20/09/2026, `main` audite la pile locale (KOJO_LHCI_LOCAL_STACK=1) : le
+ * domaine de production répond un défi de sécurité à une rafale de requêtes
+ * depuis une IP de runner, donc le verdict y dépendait d'un quota côté tiers.
  *
  * Condition mobile simulée (Slow 4G + CPU 4x, défaut Lighthouse), et BLOQUE
  * le job si un budget est dépassé.
@@ -76,15 +79,17 @@ const localBase = 'http://localhost:4173';
 //    l'accueil, les pages PUBLIQUES (/login, /register, /forgot-password,
 //    /how-it-works, /support, /jobs) et les pages protégées (rendues avec l'état
 //    du compte CI, cf. le jeton Bearer plus bas) ;
-//  • repli local (base absente ou LOOPBACK) → l'accueil SEUL. Le repli local
-//    sert le build hors du déploiement : la table de rewrites y est rejouée par
-//    scripts/vercel-rewrite-server.js, donc les routes existent bien, mais le
-//    build est compilé avec `VITE_API_URL` = backend de PROD. Auditer /jobs,
-//    /login, /register ou /forgot-password y mesurerait autre chose que ces
-//    pages (données absentes, puis redirection vers /login pour les pages
-//    protégées). Les shells de ces routes restent vérifiés, page par page, par
-//    check-prerender-shells.js et par check-og-images.js (qui exécute, lui, la
-//    fiche /jobs/:id quand la base la sert — voir les PR du 17/09/2026).
+//  • PILE LOCALE COMPLÈTE (KOJO_LHCI_LOCAL_STACK=1, ce que fait main depuis le
+//    20/09/2026) → les mêmes pages, servies par le job : le backend local
+//    fournit l'API et le jeton du compte CI provisionné, donc /dashboard,
+//    /profile et /payment se rendent authentifiées (sinon → redirection vers
+//    /login, mesures qui ne décrivent aucune de ces pages) ;
+//  • repli NU (base absente ou LOOPBACK sans pile montée) → l'accueil SEUL. Le
+//    build y est compilé avec l'API de PROD, donc les pages protégées y
+//    redirigeraient vers /login. Les shells de ces routes restent vérifiés,
+//    page par page, par check-prerender-shells.js et par check-og-images.js
+//    (qui exécute, lui, la fiche /jobs/:id quand la base la sert — PR du
+//    17/09/2026).
 //
 // ⚠️ Deux noms, deux significations : `DEPLOYMENT_PATHS` = URLs auditées quand
 // un VRAI déploiement est disponible (le Bearer y est inoffensif sur les pages
@@ -139,14 +144,26 @@ const DEPLOYMENT_PATHS = [
 // 17/09/2026, la CI sert le build depuis une adresse LOOPBACK
 // (`http://127.0.0.1:4174`, le serveur qui rejoue la table de rewrites de
 // vercel.json) pour y exercer le cycle /jobs/:id en vraies requêtes HTTP sur
-// chaque PR — et cette adresse est passée ici via KOJO_LHCI_BASE_URL. Une
-// adresse loopback reste le repli local : le build y est compilé avec
-// `VITE_API_URL` = backend de prod, donc les pages protégées n'ont pas de
-// données réelles à mesurer (elles redirigent vers /login), et le plafond TBT
-// élargi d'un runner partagé doit continuer de s'appliquer.
+// chaque PR — et cette adresse est passée ici via KOJO_LHCI_BASE_URL. Le
+// plafond TBT élargi d'un runner partagé continue de s'appliquer à toute base
+// loopback (le runner reste partagé, la pile locale n'y change rien).
 const targetIsLocal =
   !baseUrl || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(baseUrl);
-const auditedPaths = targetIsLocal ? LOCAL_FALLBACK_PATHS : DEPLOYMENT_PATHS;
+// ── La pile locale COMPLÈTE est une surface auditée à part entière ─────────
+// Le job écrit `KOJO_LHCI_LOCAL_STACK=1` quand il a monté sa pile (build +
+// backend local + serveur de rewrites + compte client provisionné dans une
+// MongoDB jetable) : elle sert ALORS toutes les pages, pages protégées
+// comprises, et l'API inlinée est le backend local — donc le jeton du job
+// authentifie réellement /dashboard, /profile et /payment. Une adresse
+// loopback SANS ce drapeau reste le repli nu (build seul, API de production)
+// qui ne sert pas les pages protégées : il n'audite que l'accueil.
+// Depuis le 20/09/2026, `main` audite cette pile locale (et non plus le domaine
+// de production, qui répond un défi de sécurité à une rafale de requêtes
+// depuis une IP de runner — cf. .github/scripts/resolve-vercel-url.sh et
+// CI-COVERAGE.md).
+const localStack = (process.env.KOJO_LHCI_LOCAL_STACK || '').trim() === '1';
+const auditedPaths =
+  targetIsLocal && !localStack ? LOCAL_FALLBACK_PATHS : DEPLOYMENT_PATHS;
 const urls = auditedPaths.map((p) =>
   p === '/' ? `${baseUrl || localBase}/` : `${baseUrl || localBase}${p}`
 );
