@@ -25,7 +25,13 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { CLS_BUDGETS, clsAssertionMatrix, patternFor } = require('../lhci-cls-budgets.cjs');
+const {
+  CLS_BUDGETS,
+  LCP_PRODUIT_PAR_UN_TIERS,
+  clsAssertionMatrix,
+  patternFor,
+  soclePour,
+} = require('../lhci-cls-budgets.cjs');
 const { getAllAssertionResults } = require('@lhci/utils/src/assertions.js');
 
 // La config est pilotée par l'environnement : on la charge comme le fait un run
@@ -33,6 +39,8 @@ const { getAllAssertionResults } = require('@lhci/utils/src/assertions.js');
 process.env.KOJO_LHCI_BASE_URL = 'https://kojoforafrica.cc.cd';
 const config = require('../../lighthouserc.cjs');
 const ASSERT = config.ci.assert;
+// Le socle tel que la config le déclare (le budget TBT dépend de la surface).
+const SOCLE_GLOBAL = ASSERT.assertMatrix.find((e) => e.aggregationMethod === 'optimistic').assertions;
 
 /** Page auditée → chemin ('/' pour la racine). */
 const cheminDe = (url) => new URL(url).pathname;
@@ -66,42 +74,85 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     }
   });
 
-  it('le socle global ne porte AUCUN plafond CLS, et chaque page a le sien', () => {
-    const globales = ASSERT.assertMatrix.filter((entree) => !entree.matchingUrlPattern);
-    expect(globales).toHaveLength(1);
-    expect(globales[0].assertions).not.toHaveProperty('cumulative-layout-shift');
-    // Le socle (score, FCP, LCP, TBT) se compare au MEILLEUR des 3 runs : le bruit
-    // d'un runner est unilatéral (il ne peut qu'ajouter du temps), donc le
-    // meilleur run décrit le coût propre de l'artefact. Le 20/09/2026, sur deux
-    // jobs de `main` portant le MÊME arbre, la MÉDIANE a rendu deux verdicts
-    // (0,79 sur /login → main rouge, contre 0,97 de pire meilleur-run) sans
-    // qu'un octet du build change. Repasser ce socle sur la médiane ferait
-    // rougir `main` au hasard : c'est verrouillé ici.
-    expect(globales[0].aggregationMethod).toBe('optimistic');
-    // Le socle couvre bien le reste : sans cela, la matrice aurait perdu les
-    // budgets de performance au passage.
-    for (const cle of ['categories:performance', 'largest-contentful-paint', 'total-blocking-time']) {
-      expect(globales[0].assertions).toHaveProperty(cle);
+  it('chaque page porte son socle ET son plafond CLS — sans entrée globale', () => {
+    // Plus d'entrée sans motif : elle appliquait le même jeu de budgets à TOUTES
+    // les pages, donc l'exception justifiée d'UNE page (le LCP de /jobs, produit
+    // par la réponse de son API) aurait affaibli toutes les autres.
+    expect(ASSERT.assertMatrix.filter((entree) => !entree.matchingUrlPattern)).toEqual([]);
+
+    const motifCouvre = (motif) =>
+      ROUTES.filter((route) => new RegExp(motif).test(`https://kojoforafrica.cc.cd${route}`));
+
+    for (const route of ROUTES) {
+      const entrees = ASSERT.assertMatrix.filter((e) => motifCouvre(e.matchingUrlPattern).includes(route));
+      // Deux entrées par page : le socle (meilleur des 3 runs) et le CLS (médiane).
+      expect(entrees, `entrées de ${route}`).toHaveLength(2);
+      for (const entree of entrees) {
+        // Un motif qui couvrirait deux pages ferait lever lhci (« Can only assert
+        // one URL at a time! ») : la matrice est vérifiée sur ce point aussi.
+        expect(motifCouvre(entree.matchingUrlPattern), `motif ${entree.matchingUrlPattern}`).toHaveLength(1);
+      }
+
+      const socle = entrees.find((e) => e.aggregationMethod === 'optimistic');
+      // Le socle se compare au MEILLEUR des 3 runs : le bruit d'un runner est
+      // unilatéral (il ne peut qu'ajouter du temps), donc le meilleur run décrit
+      // le coût propre de l'artefact. Le 20/09/2026, sur deux jobs de `main`
+      // portant le MÊME arbre, la MÉDIANE a rendu deux verdicts (0,79 sur /login
+      // → main rouge, contre 0,97 de pire meilleur-run) sans qu'un octet change.
+      for (const cle of ['first-contentful-paint', 'total-blocking-time']) {
+        expect(socle.assertions, `${route} : ${cle}`).toHaveProperty(cle);
+      }
+
+      const cls = entrees.find((e) => e.aggregationMethod === 'median');
+      expect(cls.assertions['cumulative-layout-shift']).toEqual([
+        'error',
+        { maxNumericValue: CLS_BUDGETS[route].max },
+      ]);
+    }
+  });
+
+  it('le LCP n’est retiré que sur les routes déclarées, et jamais sans preuve', () => {
+    // Toute route déclarée doit dire CE QUI l'établit : une exception muette
+    // serait un budget qu'on ne mesure plus sans le dire.
+    for (const [route, justification] of Object.entries(LCP_PRODUIT_PAR_UN_TIERS)) {
+      expect(ROUTES, `${route} déclarée hors LCP mais pas auditée`).toContain(route);
+      expect(typeof justification, `${route} : justification`).toBe('string');
+      expect(justification.length, `${route} : justification`).toBeGreaterThan(80);
     }
 
-    const parRoute = ASSERT.assertMatrix.filter((entree) => entree.matchingUrlPattern);
-    expect(parRoute).toHaveLength(ROUTES.length);
-    for (const entree of parRoute) {
-      const couvertes = ROUTES.filter((route) => new RegExp(entree.matchingUrlPattern).test(
+    const socleDe = (route) => ASSERT.assertMatrix.find(
+      (e) => e.aggregationMethod === 'optimistic' && new RegExp(e.matchingUrlPattern).test(
         `https://kojoforafrica.cc.cd${route}`
-      ));
-      // Un motif qui couvrirait deux pages ferait lever lhci (« Can only assert
-      // one URL at a time! ») : la matrice est donc vérifiée sur ce point aussi.
-      expect(couvertes, `motif ${entree.matchingUrlPattern}`).toHaveLength(1);
-      expect(entree.assertions['cumulative-layout-shift']).toEqual([
-        'error',
-        { maxNumericValue: CLS_BUDGETS[couvertes[0]].max },
-      ]);
-      // Le CLS, lui, est une propriété du DOM et du CSS : relevé identique d'un
-      // run à l'autre (0 / 0,009 / 0,045 selon la page) — la médiane y est la
-      // statistique la plus stricte ET la plus stable, donc elle y reste.
-      expect(entree.aggregationMethod).toBe('median');
+      )
+    ).assertions;
+    for (const route of ROUTES) {
+      const attendu = !Object.hasOwn(LCP_PRODUIT_PAR_UN_TIERS, route);
+      expect('largest-contentful-paint' in socleDe(route), `${route} : LCP asserté ?`).toBe(attendu);
+      // Le score est une moyenne pondérée qui COMPREND le LCP : l'asserter
+      // réimporterait la grandeur qu'on vient de retirer.
+      expect('categories:performance' in socleDe(route), `${route} : score asserté ?`).toBe(attendu);
     }
+  });
+
+  it('l’exception est bien SCOPÉE : un LCP lent passe sur /jobs et rougit ailleurs', () => {
+    // 4256 ms : la valeur RÉELLE mesurée sur /jobs le 20/09/2026 à 13:34, sur un
+    // FCP meilleur que celui du job vert (988 contre 1 389 ms) — donc du temps
+    // d'API, pas du temps de machine.
+    const lent = (route) => troisRuns(route, 0).map((run, i) => ({ ...run, audits: {
+      ...run.audits, 'largest-contentful-paint': { score: 0, numericValue: 4256 + i },
+    }, categories: { performance: { score: 0.85 } } }));
+
+    expect(echecs(lent('/jobs')), 'le LCP de /jobs ne dépend pas du job').toEqual([]);
+
+    const ailleurs = echecs(lent('/')).map((v) => v.auditId);
+    expect(ailleurs).toContain('largest-contentful-paint');
+    // Le score est asserté avec le même sort que le LCP (il le pèse).
+    expect(ailleurs.some((id) => id.startsWith('categories')), ailleurs.join(',')).toBe(true);
+
+    // Non-vacuité : le plafond lui-même n'a pas bougé pour les autres pages.
+    expect(soclePour('/register', SOCLE_GLOBAL)['largest-contentful-paint']).toEqual(
+      ['error', { maxNumericValue: 3500 }]
+    );
   });
 
   it('refuse d’auditer une page sans budget CLS mesuré', () => {
