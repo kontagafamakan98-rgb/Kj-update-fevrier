@@ -5,6 +5,7 @@ import { useToast } from '../contexts/ToastContext';
 import { safeLog } from '../utils/env';
 import { buildBackendUrl } from '../utils/backendUrl';
 import profilePhotoService from '../services/ProfilePhotoService';
+import { handleApiError } from '../services/api';
 import { compressImage, validateImageFile, formatFileSize } from '../utils/imageOptimization';
 
 const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className = '' }) => {
@@ -133,7 +134,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         setPreviewUrl(null);
       }
       
-      const errorMessage = error.message || t('error');
+      const errorMessage = handleApiError(error, t('error'));
       toast.error(errorMessage);
     } finally {
       setUploading(false);

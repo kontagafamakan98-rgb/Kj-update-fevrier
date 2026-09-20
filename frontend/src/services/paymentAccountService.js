@@ -1,4 +1,4 @@
-import { authAPI, api } from './api';
+import { authAPI, api, handleApiError } from './api';
 import { devLog, safeLog } from '../utils/env';
 
 // Service de gestion des comptes de paiement pour la vérification
@@ -29,7 +29,9 @@ class PaymentAccountService {
       safeLog.error('❌ Erreur inscription finale:', error);
       return {
         success: false,
-        error: error?.response?.data?.detail || error.message
+        // Panne sans message du serveur : pas de repli ici, l'appelant affiche
+        // sa propre copie (voir handleApiError).
+        error: handleApiError(error, '')
       };
     }
   }

@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { detectUserCountry, getPhoneExampleForCountry, getPhonePrefixByCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { devLog, safeLog } from '../utils/env';
-import { api } from '../services/api';
+import { api, handleApiError } from '../services/api';
 import CountryDisplay from './CountryDisplay';
 
 const createDefaultAccounts = (initialAccounts = null) => ({
@@ -241,12 +241,15 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
       safeLog.error('Erreur validation comptes:', error);
       // Erreur backend avec un champ précis (ex: « Numéro Orange Money
       // invalide ») → affichée SOUS le champ concerné, pas en erreur générale.
-      const fieldError = mapPaymentAccountErrorToField(error.message);
+      // La copie du message appartient à handleApiError (une panne sans réponse
+      // n'apporte aucun message du serveur : c'est `t('error')` qui s'affiche).
+      const message = handleApiError(error, t('error'));
+      const fieldError = mapPaymentAccountErrorToField(message);
       setValidationErrors((prev) => ({
         ...prev,
         ...(fieldError
           ? { [fieldError.field]: fieldError.message }
-          : { general: error.message }),
+          : { general: message }),
       }));
     } finally {
       setLoading(false);

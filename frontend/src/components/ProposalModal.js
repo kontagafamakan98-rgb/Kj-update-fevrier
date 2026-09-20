@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { jobsAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
 import {
   buildInitialProposalConversationMessage,
   getCounterpartForWorker,
@@ -33,7 +34,9 @@ const normalizeProposalApiError = (submitError, t) => {
     return detail.msg || detail.message || t('jobUiSubmitError');
   }
 
-  return submitError?.message || t('jobUiSubmitError');
+  // Panne de transport ou réponse sans message utilisable : la copie de la
+  // page, pas celle du navigateur (politique unique : handleApiError).
+  return handleApiError(submitError, t('jobUiSubmitError'));
 };
 
 export default function ProposalModal({ job, onClose, onProposalSubmitted }) {

@@ -14,7 +14,7 @@ import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
 import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
 import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
-import { authAPI } from '../services/api';
+import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
 
 export default function Register() {
@@ -105,7 +105,7 @@ export default function Register() {
       setErrorKey('');
       return true;
     } catch (apiError) {
-      const rawMessage = apiError?.response?.data?.detail || apiError?.message || 'Impossible de vérifier cette adresse email';
+      const rawMessage = handleApiError(apiError, 'Impossible de vérifier cette adresse email');
       const message = translateApiMessage(rawMessage);
 
       if (isEmailAlreadyUsedMessage(rawMessage)) {

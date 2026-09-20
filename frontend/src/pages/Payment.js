@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import CommissionService from '../services/commissionService';
 import { safeLog } from '../utils/env';
+import { handleApiError } from '../services/api';
 // Squelette des cartes de paiement : défini dans SkeletonLoader (et non plus
 // ici) pour que le fallback Suspense de /payment (PaymentSkeleton) et l'état
 // de chargement des données partagent EXACTEMENT les mêmes hauteurs.
@@ -292,7 +293,7 @@ const Payment = () => {
       }
     } catch (err) {
       safeLog.error('Payment page load error', err);
-      setError(err?.response?.data?.detail || err.message || copy.paymentError);
+      setError(handleApiError(err, copy.paymentError));
     } finally {
       setLoading(false);
     }
@@ -316,7 +317,7 @@ const Payment = () => {
         const liveQuote = await CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country });
         if (!cancelled) setQuote(liveQuote);
       } catch (err) {
-        if (!cancelled) setError(err?.response?.data?.detail || err.message || copy.paymentError);
+        if (!cancelled) setError(handleApiError(err, copy.paymentError));
       }
     };
     refreshQuote();
@@ -407,7 +408,7 @@ const Payment = () => {
       });
       window.location.href = checkout.checkout_url;
     } catch (err) {
-      const msg = err?.response?.data?.detail || err.message || copy.paymentError;
+      const msg = handleApiError(err, copy.paymentError);
       setCheckoutError(msg);
       setProcessing(false);
     }
@@ -419,7 +420,7 @@ const Payment = () => {
       const nextStatus = await CommissionService.getPaymentStatus(statusData.id);
       setStatusData(nextStatus);
     } catch (err) {
-      setError(err?.response?.data?.detail || err.message || copy.paymentError);
+      setError(handleApiError(err, copy.paymentError));
     }
   };
 

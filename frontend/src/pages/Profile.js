@@ -9,6 +9,7 @@ import {
   formatPhoneNumber,
   getPhonePrefixByCountry
 } from '../services/geolocationService';
+import { handleApiError } from '../services/api';
 import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import TagInput from '../components/TagInput';
@@ -135,7 +136,7 @@ export default function Profile() {
       toast.success(`${t('profileUpdated')} ✅`);
     } catch (updateError) {
       safeLog.error('Profile update error:', updateError);
-      const errorMsg = updateError.response?.data?.detail || updateError.message || t('error');
+      const errorMsg = handleApiError(updateError, t('error'));
       setError(errorMsg);
       toast.error(errorMsg);
     }
@@ -150,7 +151,7 @@ export default function Profile() {
       await loadProfile();
     } catch (createError) {
       safeLog.error('Worker profile creation error:', createError);
-      setError(createError.message || t('profileCreateError'));
+      setError(handleApiError(createError, t('profileCreateError')));
     }
   };
 
@@ -167,7 +168,7 @@ export default function Profile() {
       setSuccess(t('portfolioAdded'));
     } catch (uploadError) {
       safeLog.error('Portfolio upload error:', uploadError);
-      setError(uploadError?.response?.data?.detail || uploadError?.message || t('portfolioAddError'));
+      setError(handleApiError(uploadError, t('portfolioAddError')));
     } finally {
       setPortfolioUploading(false);
       if (event.target) event.target.value = '';
@@ -184,7 +185,7 @@ export default function Profile() {
       setSuccess(t('portfolioRemoved'));
     } catch (removeError) {
       safeLog.error('Portfolio remove error:', removeError);
-      setError(removeError?.response?.data?.detail || removeError?.message || t('portfolioRemoveError'));
+      setError(handleApiError(removeError, t('portfolioRemoveError')));
     }
   };
 
@@ -365,7 +366,7 @@ export default function Profile() {
                   navigate('/');
                 } catch (deleteError) {
                   safeLog.error('Erreur suppression compte:', deleteError);
-                  setError(deleteError.message || t('error'));
+                  setError(handleApiError(deleteError, t('error')));
                   setDeletingAccount(false);
                 }
               }}

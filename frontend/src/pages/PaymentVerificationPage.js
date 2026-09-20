@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import PaymentAccountSetup from '../components/PaymentAccountSetup';
 import CountryDisplay from '../components/CountryDisplay';
 import PaymentAccountService from '../services/paymentAccountService';
+import { handleApiError } from '../services/api';
 import { detectUserCountry } from '../services/geolocationService';
 import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/paymentVerification';
@@ -180,7 +181,7 @@ const PaymentVerificationPage = () => {
       });
     } catch (registrationError) {
       safeLog.error('❌ Erreur de finalisation du compte:', registrationError);
-      const rawErrorMsg = registrationError.message || pageT('genericError');
+      const rawErrorMsg = handleApiError(registrationError, pageT('genericError'));
       const errorMsg = translateApiMessage(rawErrorMsg);
       const nextErrorKey = isEmailAlreadyUsedMessage(rawErrorMsg) ? 'duplicateEmailError' : '';
 
@@ -226,7 +227,7 @@ const PaymentVerificationPage = () => {
       });
     } catch (completionError) {
       safeLog.error('❌ Erreur finalisation étape 3:', completionError);
-      const message = completionError.message || pageT('genericError');
+      const message = handleApiError(completionError, pageT('genericError'));
       setError(message);
       toast.error(message);
     } finally {

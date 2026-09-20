@@ -1,4 +1,5 @@
 import { jobsAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
 
 const normalizeComparableId = (value) => {
   if (value === null || value === undefined) return '';
@@ -23,7 +24,6 @@ export const deleteJobWithFallbacks = async (job) => {
   try {
     return await jobsAPI.delete(jobId);
   } catch (error) {
-    const detail = error?.response?.data?.detail || error?.message || 'Suppression impossible pour le moment';
-    throw new Error(detail);
+    throw new Error(handleApiError(error, 'Suppression impossible pour le moment'));
   }
 };
