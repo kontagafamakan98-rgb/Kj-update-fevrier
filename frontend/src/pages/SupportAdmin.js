@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { MessageSquareText, RefreshCcw, Phone, Mail } from 'lucide-react';
 import { supportAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const STATUS_OPTIONS = ['Nouveau', 'En cours', 'Résolu'];
@@ -45,7 +46,7 @@ const SupportAdmin = () => {
       const response = await supportAPI.listTickets(statusFilter || undefined);
       setTickets(response.data || []);
     } catch (err) {
-      setError(err?.response?.data?.detail || t('loadSupportError'));
+      setError(handleApiError(err, t('loadSupportError')));
     } finally {
       setLoading(false);
     }
@@ -61,7 +62,7 @@ const SupportAdmin = () => {
       await supportAPI.updateTicketStatus(ticketId, newStatus);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t)));
     } catch (err) {
-      setError(err?.response?.data?.detail || t('updateStatusError'));
+      setError(handleApiError(err, t('updateStatusError')));
     } finally {
       setUpdatingId(null);
     }

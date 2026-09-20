@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { api, handleApiError, TRANSPORT_FAILURE_MESSAGE } from '../api';
+import { api, handleApiError, TRANSPORT_FAILURE_MESSAGE, SERVER_FAILURE_MESSAGE } from '../api';
 import fr from '../../i18n/fr.json';
 
 // api.js doit construire ses URLs via le module unique buildApiUrl : la base
@@ -375,14 +375,24 @@ describe('api — rotation du jeton (X-Kojo-Token)', () => {
   });
 });
 
-// Une coupure de TRANSPORT (hors ligne, DNS, CORS, serveur injoignable) est le
-// moment où l'utilisateur a le MOINS besoin de lire de l'anglais technique :
-// `fetch` rejette alors un TypeError (« Failed to fetch », « Load failed ») que
-// les pages affichaient tel quel dans leur bandeau d'erreur. La frontière de
-// l'API le remplace par un message du produit, et la page qui sait traduire
-// garde la main : elle passe son propre repli à `handleApiError`.
-describe('api — coupure réseau : le texte du navigateur n’atteint pas l’interface', () => {
-  const coupure = (message) => Object.assign(new Error(message), { estCoupureReseau: true });
+// Les pannes qui n'apportent AUCUN message du serveur sont le moment où
+// l'utilisateur a le MOINS besoin de lire du texte technique : `fetch` rejette
+// un TypeError anglais (« Failed to fetch »), et un proxy répond une page
+// d'erreur HTML — du balisage, pas une phrase. La frontière de l'API remplace ce
+// texte par la copie du produit et marque l'erreur (`hasServerMessage = false`),
+// et la page qui sait traduire garde la main en passant son propre repli à
+// `handleApiError`.
+const PAGE_HTML_502 = '<!DOCTYPE html><html><head><title>502 Bad Gateway</title></head><body><center><h1>502 Bad Gateway</h1></center></body></html>';
+
+const reponse = (status, corps) => ({
+  ok: false,
+  status,
+  text: async () => corps,
+  headers: { get: () => null },
+});
+
+describe('api — panne sans message du serveur : aucun texte technique ne passe', () => {
+  const sansMessageServeur = (message) => Object.assign(new Error(message), { hasServerMessage: false });
 
   beforeEach(() => {
     vi.stubEnv('VITE_API_URL', 'https://stub.example');
@@ -394,29 +404,62 @@ describe('api — coupure réseau : le texte du navigateur n’atteint pas l’i
     vi.restoreAllMocks();
   });
 
-  it('le rejet porte le message du produit, pas « Failed to fetch »', async () => {
+  it('la coupure de transport porte le message du produit, pas « Failed to fetch »', async () => {
     const erreur = await api.get('/jobs').catch((error) => error);
     expect(erreur.message).toBe(TRANSPORT_FAILURE_MESSAGE);
-    expect(erreur.estCoupureReseau).toBe(true);
+    expect(erreur.hasServerMessage).toBe(false);
   });
 
-  it('le message du transport est celui que le produit publie déjà (clé i18n networkConnectionError)', () => {
+  it('une page d’erreur HTML d’un proxy (502) n’est jamais publiée comme message', async () => {
+    global.fetch = vi.fn().mockResolvedValue(reponse(502, PAGE_HTML_502));
+    const erreur = await api.get('/jobs').catch((error) => error);
+    expect(erreur.message).toBe(SERVER_FAILURE_MESSAGE);
+    expect(erreur.message).not.toMatch(/<!doctype|<html|<h1|502/i);
+    expect(erreur.hasServerMessage).toBe(false);
+    expect(erreur.response.data.detail).toBeUndefined();
+  });
+
+  it('un corps vide ou un JSON sans detail n’est pas remplacé par le statut brut', async () => {
+    global.fetch = vi.fn().mockResolvedValue(reponse(500, ''));
+    const vide = await api.get('/jobs').catch((error) => error);
+    expect(vide.message).toBe(SERVER_FAILURE_MESSAGE);
+    expect(vide.hasServerMessage).toBe(false);
+
+    global.fetch = vi.fn().mockResolvedValue(reponse(500, '{"status":"error"}'));
+    const sansDetail = await api.get('/jobs').catch((error) => error);
+    expect(sansDetail.message).not.toBe('HTTP 500');
+    expect(sansDetail.message).toBe(SERVER_FAILURE_MESSAGE);
+  });
+
+  it('les deux messages de repli sont ceux que le produit publie déjà (clés i18n)', () => {
     expect(TRANSPORT_FAILURE_MESSAGE).toBe(fr.networkConnectionError);
+    expect(SERVER_FAILURE_MESSAGE).toBe(fr.unexpectedErrorText);
   });
 
-  it('la page qui traduit garde la main : son repli gagne sur le message du transport', () => {
-    expect(handleApiError(coupure(TRANSPORT_FAILURE_MESSAGE), 'Kojo est injoignable')).toBe('Kojo est injoignable');
+  it('la page qui traduit garde la main sur son propre repli', () => {
+    expect(handleApiError(sansMessageServeur(TRANSPORT_FAILURE_MESSAGE), 'Kojo est injoignable')).toBe('Kojo est injoignable');
+    expect(handleApiError(sansMessageServeur(SERVER_FAILURE_MESSAGE), 'Réessayez dans un instant')).toBe('Réessayez dans un instant');
   });
 
-  it('le détail du serveur reste prioritaire, et une erreur levée localement n’est pas maquillée', () => {
+  it('un message du serveur reste prioritaire, et rien d’autre ne change', async () => {
+    global.fetch = vi.fn().mockResolvedValue(reponse(404, '{"detail":"Adresse inconnue"}'));
+    const detail = await api.get('/jobs').catch((error) => error);
+    expect(detail.message).toBe('Adresse inconnue');
+    expect(detail.hasServerMessage).toBeUndefined();
+    expect(handleApiError(detail, 'Repli')).toBe('Adresse inconnue');
+
+    global.fetch = vi.fn().mockResolvedValue(reponse(400, 'Numéro invalide'));
+    const texte = await api.get('/jobs').catch((error) => error);
+    expect(texte.message).toBe('Numéro invalide');
+
     expect(handleApiError({ response: { data: { detail: 'Adresse inconnue' } } }, 'Erreur')).toBe('Adresse inconnue');
     expect(handleApiError(new Error('Le fichier dépasse 5 Mo'), 'Erreur')).toBe('Le fichier dépasse 5 Mo');
   });
 
-  it('une annulation volontaire n’est pas transformée en coupure réseau', async () => {
+  it('une annulation volontaire n’est pas transformée en panne', async () => {
     global.fetch = vi.fn().mockRejectedValue(Object.assign(new Error('The user aborted a request.'), { name: 'AbortError' }));
     const erreur = await api.get('/jobs').catch((error) => error);
     expect(erreur.name).toBe('AbortError');
-    expect(erreur.estCoupureReseau).toBeUndefined();
+    expect(erreur.hasServerMessage).toBeUndefined();
   });
 });

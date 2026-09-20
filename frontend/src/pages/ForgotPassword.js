@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
-import { authAPI } from '../services/api';
+import { authAPI, handleApiError } from '../services/api';
 import { safeLog } from '../utils/env';
 import { usePageMeta } from '../utils/seo';
 
@@ -305,7 +305,7 @@ const ForgotPassword = () => {
 
       toast.success(mode === 'resend' ? copy.codeResent : copy.codeSent);
     } catch (apiError) {
-      const rawMessage = apiError?.response?.data?.detail || apiError?.message || copy.errors.generic;
+      const rawMessage = handleApiError(apiError, copy.errors.generic);
       const message = translateApiMessage(rawMessage);
       setError(message);
       toast.error(message);
@@ -338,7 +338,7 @@ const ForgotPassword = () => {
       setStep('password');
       toast.success(copy.codeVerified);
     } catch (apiError) {
-      const rawMessage = apiError?.response?.data?.detail || apiError?.message || copy.errors.generic;
+      const rawMessage = handleApiError(apiError, copy.errors.generic);
       const message = translateApiMessage(rawMessage);
       setError(message);
       toast.error(message);
@@ -376,7 +376,7 @@ const ForgotPassword = () => {
       toast.success(copy.resetSuccess);
       navigate('/login');
     } catch (apiError) {
-      const rawMessage = apiError?.response?.data?.detail || apiError?.message || copy.errors.generic;
+      const rawMessage = handleApiError(apiError, copy.errors.generic);
       const message = translateApiMessage(rawMessage);
       setError(message);
       toast.error(message);

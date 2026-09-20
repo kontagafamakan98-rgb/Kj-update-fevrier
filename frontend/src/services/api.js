@@ -126,21 +126,39 @@ const extractErrorMessage = (payload, fallback) => {
   return fallback;
 };
 
-// Une coupure de TRANSPORT (hors ligne, DNS, CORS, serveur injoignable) ne
-// passe pas par une réponse HTTP : `fetch` rejette, et son TypeError porte un
-// texte ANGLAIS du navigateur (« Failed to fetch », « Load failed »,
-// « NetworkError when attempting to fetch resource »). Les pages qui affichent
-// `error.message` — une dizaine — montraient donc cette phrase technique au
-// milieu d'un écran français, précisément quand la connexion est mauvaise.
-// On la remplace à la frontière (voir `request`), une fois pour toutes ; les
-// pages qui peuvent traduire passent leur propre repli à `handleApiError`
-// (clé i18n `networkConnectionError`), qui a alors la priorité.
+// Deux pannes n'apportent AUCUN message du serveur à montrer : une coupure de
+// transport (hors ligne, DNS, CORS, serveur injoignable) — `fetch` rejette un
+// TypeError dont le texte est ANGLAIS et technique (« Failed to fetch »,
+// « Load failed ») — et une réponse SANS message utilisable (corps vide, JSON
+// sans detail, ou page d'erreur HTML d'un proxy : du balisage). Dans les deux
+// cas, ce que les pages affichaient était du texte technique — la phrase du
+// navigateur, « HTTP 502 », ou `<!DOCTYPE html>…` — au milieu d'un écran
+// français, précisément quand quelque chose va mal. La frontière remplace donc
+// le texte par la copie du produit (ces deux constantes, dont les tests
+// vérifient qu'elles recopient bien les clés i18n publiées) et marque l'erreur
+// `hasServerMessage = false` : la page qui sait traduire passe son propre repli
+// à `handleApiError`, qui a alors la priorité.
 export const TRANSPORT_FAILURE_MESSAGE = 'Erreur de connexion. Vérifiez votre connexion internet.';
+export const SERVER_FAILURE_MESSAGE = 'Une erreur inattendue s\'est produite. Veuillez rafraîchir la page.';
+
+const HTML_OU_PROLOGUE = /^\s*(<!doctype|<html|<\?xml|<[a-z!/])/i;
+
+// Un corps n'est un message pour l'utilisateur que s'il en est un : une page
+// d'erreur HTML est du balisage, pas une phrase — l'afficher remplissait le
+// bandeau d'erreur de balises.
+const messageUtilisable = (payload) => {
+  if (typeof payload === 'string') {
+    const texte = payload.trim();
+    return !texte || HTML_OU_PROLOGUE.test(texte) ? '' : texte;
+  }
+  if (!payload || typeof payload !== 'object') return '';
+  return extractErrorMessage(payload, '');
+};
 
 export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
-  // Coupure réseau : le texte du navigateur n'est pas un message du produit,
-  // c'est le repli — traduit par la page — qui doit s'afficher.
-  if (error?.estCoupureReseau) return fallback;
+  // Panne sans message du serveur : c'est le repli — traduit par la page — qui
+  // doit s'afficher.
+  if (error?.hasServerMessage === false) return fallback;
 
   if (typeof error?.response?.data?.detail === 'string' && error.response.data.detail.trim()) {
     return error.response.data.detail.trim();
@@ -345,7 +363,7 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
     if (cause?.name === 'AbortError') throw cause;
 
     const error = new Error(TRANSPORT_FAILURE_MESSAGE);
-    error.estCoupureReseau = true;
+    error.hasServerMessage = false;
     error.cause = cause;
     throw error;
   }
@@ -418,14 +436,22 @@ const request = async (method, path, { params, data, headers, signal, skipUnauth
       handleUnauthorized(normalizedPath, { redirect: !skipUnauthorizedRedirect });
     }
 
-    const fallbackMessage = `HTTP ${response.status}`;
-    const errorMessage = typeof payload === 'string'
-      ? payload
-      : extractErrorMessage(payload, fallbackMessage);
-    const error = new Error(errorMessage || fallbackMessage);
+    const messageDuServeur = messageUtilisable(payload);
+
+    if (!messageDuServeur) {
+      // Le statut brut (« HTTP 502 ») n'est pas une phrase du produit : la page
+      // affiche SA copie, et `message` en porte une par défaut pour celles qui
+      // lisent directement `error.message`.
+      const error = new Error(SERVER_FAILURE_MESSAGE);
+      error.hasServerMessage = false;
+      error.response = { status: response.status, data: {} };
+      throw error;
+    }
+
+    const error = new Error(messageDuServeur);
     error.response = {
       status: response.status,
-      data: typeof payload === 'string' ? { detail: payload } : (payload || { detail: fallbackMessage }),
+      data: typeof payload === 'string' ? { detail: messageDuServeur } : payload,
     };
     throw error;
   }

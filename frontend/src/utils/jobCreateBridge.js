@@ -1,4 +1,5 @@
 import { normalizeLocationPayload } from './locationMaps';
+import { handleApiError } from '../services/api';
 
 const cleanText = (value) => (typeof value === 'string' ? value.trim() : '');
 
@@ -108,6 +109,8 @@ export const normalizeApiErrorMessage = (error) => {
 
   if (typeof detail === 'string' && detail.trim()) return detail;
   if (typeof error?.response?.data?.message === 'string' && error.response.data.message.trim()) return error.response.data.message;
-  if (typeof error?.message === 'string' && error.message.trim()) return error.message;
-  return 'Opération impossible pour le moment';
+
+  // Le reste (panne de transport, réponse sans message utilisable, littéral) est
+  // la politique de handleApiError : une seule copie, un seul propriétaire.
+  return handleApiError(error, 'Opération impossible pour le moment');
 };

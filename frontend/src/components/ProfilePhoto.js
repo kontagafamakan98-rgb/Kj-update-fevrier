@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Camera, Edit2, X } from 'lucide-react';
 import ConfirmModal from './ConfirmModal';
 import profilePhotoService from '../services/ProfilePhotoService';
+import { handleApiError } from '../services/api';
 import { devConsole } from '../utils/devLogger';
 import { devLog, safeLog } from '../utils/env';
 import { buildApiUrl } from '../utils/backendUrl';
@@ -158,7 +159,7 @@ const ProfilePhoto = ({
           setPreviewUrl(null);
         }
         
-        const errorMessage = error.message || t('photoSelectError');
+        const errorMessage = handleApiError(error, t('photoSelectError'));
         toast.error(errorMessage);
       } finally {
         setLoading(false);

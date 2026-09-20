@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import ConfirmModal from '../components/ConfirmModal';
 import ProposalModal from '../components/ProposalModal';
 import { jobsAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobDetails';
 import { safeLog } from '../utils/env';
 import { deleteJobWithFallbacks } from '../utils/jobOwnerDeleteRuntime';
@@ -33,24 +34,6 @@ import {
   loadProposalConversationMessages,
   sendProposalConversationMessage,
 } from '../utils/jobProposalWorkflow';
-
-const asTextError = (value, fallback) => {
-  if (typeof value === 'string' && value.trim()) return value.trim();
-  if (Array.isArray(value)) {
-    const text = value
-      .map((item) => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object') return item.msg || item.message || '';
-        return '';
-      })
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    if (text) return text;
-  }
-  if (value && typeof value === 'object') return value.msg || value.message || fallback;
-  return fallback;
-};
 
 const getMessageAuthorId = (message) => normalizeComparableId(
   message?.sender_id || message?.senderId || message?.sender?.id || message?.sender?._id || message?.user_id,
@@ -349,7 +332,7 @@ export default function JobDetails() {
       }
     } catch (jobError) {
       safeLog?.error?.('Error loading job details:', jobError);
-      setError(asTextError(jobError?.response?.data?.detail, jobError?.message || pageT('loadError') || t('loadJobFailed')));
+      setError(handleApiError(jobError, pageT('loadError') || t('loadJobFailed')));
     } finally {
       setLoading(false);
     }
@@ -365,7 +348,7 @@ export default function JobDetails() {
     } catch (messagesLoadError) {
       safeLog?.error?.('Error loading discussion messages:', messagesLoadError);
       setMessages([]);
-      setMessageError(asTextError(messagesLoadError?.response?.data?.detail, messagesLoadError?.message || pageT('loadDiscussionFailed')));
+      setMessageError(handleApiError(messagesLoadError, pageT('loadDiscussionFailed')));
     } finally {
       setMessagesLoading(false);
     }
@@ -379,7 +362,7 @@ export default function JobDetails() {
       toast.success(pageT('jobDeletedSuccess'));
       navigate('/jobs');
     } catch (deleteError) {
-      toast.error(deleteError?.message || pageT('deleteFailed'));
+      toast.error(handleApiError(deleteError, pageT('deleteFailed')));
     } finally {
       setDeleting(false);
     }
@@ -410,7 +393,7 @@ export default function JobDetails() {
       setMessageSuccess(pageT('messageSent'));
       await loadDiscussionMessages(discussionTarget.id);
     } catch (sendError) {
-      setMessageError(asTextError(sendError?.response?.data?.detail, sendError?.message || pageT('sendMessageFailed')));
+      setMessageError(handleApiError(sendError, pageT('sendMessageFailed')));
     } finally {
       setSendingMessage(false);
     }
@@ -494,10 +477,7 @@ export default function JobDetails() {
         navigate(`/payment?${paymentParams.toString()}`);
       }, 1500);
     } catch (acceptError) {
-      setMessageError(asTextError(
-        acceptError?.response?.data?.detail,
-        acceptError?.message || pageT('acceptFailed')
-      ));
+      setMessageError(handleApiError(acceptError, pageT('acceptFailed')));
     } finally {
       setAcceptingProposal(false);
     }
@@ -525,10 +505,7 @@ export default function JobDetails() {
       }
       await refreshPaymentStatus();
     } catch (completeError) {
-      setMessageError(asTextError(
-        completeError?.response?.data?.detail,
-        completeError?.message || pageT('closeMissionFailed')
-      ));
+      setMessageError(handleApiError(completeError, pageT('closeMissionFailed')));
     } finally {
       setCompletingJob(false);
     }

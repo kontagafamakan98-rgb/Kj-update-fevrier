@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, MapPin, MessageCircle, Bot, Send, CheckCircle, ArrowLeft } from 'lucide-react';
 import { supportAPI } from '../services/apiEndpoints';
+import { handleApiError } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
@@ -383,9 +384,7 @@ function RobotChat({ onBack, copy }) {
       }
       setSubmitted(true);
     } catch (err) {
-      setSubmitError(
-        err?.response?.data?.detail ? String(err.response.data.detail) : copy.genericError
-      );
+      setSubmitError(handleApiError(err, copy.genericError));
     } finally {
       setSubmitting(false);
     }

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
-import { authAPI } from '../services/api';
+import { authAPI, handleApiError } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/emailVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
@@ -95,10 +95,6 @@ const EmailVerificationPage = () => {
     };
   }, [cooldownSeconds > 0, expiresInSeconds > 0]);
 
-  const extractErrorMessage = (apiError, fallbackMessage) => {
-    return apiError?.response?.data?.detail || apiError?.message || fallbackMessage;
-  };
-
   const isEmailAlreadyUsedMessage = (message = '') => message.toLowerCase().includes('déjà utilisée') || message.toLowerCase().includes('already used');
   const translateApiMessage = (message = '') => isEmailAlreadyUsedMessage(message) ? pageT('duplicateEmailError') : message;
   const displayedError = errorKey ? pageT(errorKey) : error;
@@ -135,7 +131,7 @@ const EmailVerificationPage = () => {
       toast.success(mode === 'resend' ? pageT('codeResentToast') : pageT('codeSentToast'));
       devLog.info(`📧 Code Gmail ${mode === 'resend' ? 'renvoyé' : 'envoyé'} avec succès`);
     } catch (apiError) {
-      const rawMessage = extractErrorMessage(apiError, pageT('genericError'));
+      const rawMessage = handleApiError(apiError, pageT('genericError'));
       const message = translateApiMessage(rawMessage);
       const nextErrorKey = isEmailAlreadyUsedMessage(rawMessage) ? 'duplicateEmailError' : '';
       setError(message);
@@ -196,7 +192,7 @@ const EmailVerificationPage = () => {
         }
       });
     } catch (apiError) {
-      const rawMessage = extractErrorMessage(apiError, pageT('genericError'));
+      const rawMessage = handleApiError(apiError, pageT('genericError'));
       const message = translateApiMessage(rawMessage);
       const nextErrorKey = isEmailAlreadyUsedMessage(rawMessage) ? 'duplicateEmailError' : '';
       setError(message);
