@@ -54,13 +54,23 @@ const FILLER = Array.from({ length: MIN_WORDS + 100 }, (_, index) => `mot${index
 
 const SHELL_CSS =
   '.min-h-screen{min-height:100vh}.text-3xl{font-size:1.875rem}.mt-8{margin-top:2rem}' +
-  '.md\\:text-5xl{font-size:3rem}.bg-white\\/95{background-color:rgba(255,255,255,.95)}';
+  '.md\\:text-5xl{font-size:3rem}.bg-white\\/95{background-color:rgba(255,255,255,.95)}' +
+  // Classes des cartes pays de la fixture (le garde exige que chaque classe du
+  // shell existe dans le CSS du build).
+  '.font-semibold{font-weight:600}.text-gray-900{color:#111827}.text-sm{font-size:.875rem}' +
+  '.md\\:text-base{font-size:1rem}';
 
-function shellBody({ heroTitle = HERO_TITLE, words = FILLER, extra = '' } = {}) {
+function shellBody({ heroTitle = HERO_TITLE, words = FILLER, extra = '', countries = ['Mali'] } = {}) {
   return (
     '<div class="min-h-screen">' +
     `<h1 class="text-3xl md:text-5xl">${heroTitle}</h1>` +
     '<h2>Services populaires</h2>' +
+    // Chaque pays du référentiel est publié comme TITRE DE CARTE : le garde
+    // exige cette forme-là (une simple mention dans la prose ne prouve pas que
+    // la carte est là).
+    countries
+      .map((name) => `<h3 class="font-semibold text-gray-900 text-sm md:text-base">${name}</h3>`)
+      .join('') +
     `<p>${words}</p>` +
     '<a href="/jobs">Voir les emplois</a>' +
     `<a href="tel:${CONTACT.phone}">${CONTACT.phoneDisplay}</a>` +
@@ -113,8 +123,8 @@ function makeProject({
     body: '<h1>Emplois disponibles</h1>',
   }),
   contact = CONTACT,
-  // « Mali » est présent dans l'adresse du N.A.P. de la fixture : le shell y
-  // fait donc référence sans avoir à répéter chaque pays.
+  // Un pays de la fixture par défaut, publié en carte par `shellBody` : c'est
+  // la forme que le garde cherche (un h3), pas une mention dans la prose.
   countries = ['Mali'],
   localBusiness,
   css,
@@ -133,17 +143,28 @@ function makeProject({
     JSON.stringify({ heroTitle: HERO_TITLE })
   );
   fs.writeFileSync(path.join(frontendDir, CONTACT_JSON), JSON.stringify(contact, null, 2));
+  // Le référentiel partagé que lit le garde (et que le build lit aussi pour
+  // écrire la coquille) : src/config/countries.js.
   fs.writeFileSync(
-    path.join(frontendDir, 'src', 'components', 'CountryDisplay.js'),
-    `export const COUNTRIES = {\n${countries
-      .map((name, index) => `  c${index}: {\n    name: '${name.replace(/'/g, "\\'")}',\n  },`)
-      .join('\n')}\n};\n`
+    path.join(frontendDir, 'src', 'config', 'countries.js'),
+    `export const COUNTRIES = [\n${countries
+      .map(
+        (name, index) =>
+          `  {\n    code: 'c${index}',\n    name: '${name.replace(/'/g, "\\'")}',\n  },`
+      )
+      .join('\n')}\n];\n`
   );
   fs.writeFileSync(
     path.join(buildDir, 'index.html'),
     indexHtml !== undefined
       ? indexHtml
-      : htmlPage({ title, description, body: body === undefined ? shellBody() : body, localBusiness, css })
+      : htmlPage({
+          title,
+          description,
+          body: body === undefined ? shellBody({ countries }) : body,
+          localBusiness,
+          css,
+        })
   );
   fs.writeFileSync(path.join(buildDir, 'jobs.html'), jobsHtml);
   return { root, frontendDir, buildDir, repoRoot: root };
@@ -239,8 +260,26 @@ describe('check-home-shell — liens et contact', () => {
 
 describe('check-home-shell — référentiels partagés', () => {
   it('échoue si un pays du référentiel manque dans le shell', () => {
-    const project = makeProject({ countries: ['Mali', 'Sénégal', 'Côte d\'Ivoire', 'Burkina Faso'] });
+    // Le référentiel en porte quatre, la coquille n'en publie qu'un : chacune
+    // des trois absentes est nommée.
+    const project = makeProject({
+      countries: ['Mali', 'Sénégal', 'Côte d\'Ivoire', 'Burkina Faso'],
+      body: shellBody({ countries: ['Mali'] }),
+    });
     expect(run(project).errors.join('\n')).toContain('Burkina Faso');
+  });
+
+  it('échoue si le pays n\'est plus publié en CARTE (une mention dans la prose ne suffit pas)', () => {
+    // Régression réelle : le sous-titre du hero cite les quatre pays, donc une
+    // simple recherche du nom dans le HTML était satisfaite même section des
+    // pays supprimée du shell. Le garde exige donc un TITRE DE CARTE (un h3).
+    const project = makeProject({
+      countries: ['Mali'],
+      body: shellBody({ countries: [] }),
+    });
+    const result = run(project);
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toContain('carte');
   });
 
   it('gère les apostrophes échappées des noms de pays', () => {
@@ -248,7 +287,9 @@ describe('check-home-shell — référentiels partagés', () => {
     // le garde signalerait un pays absent alors qu'il est bien là.
     const project = makeProject({
       countries: ['Mali', "Côte d'Ivoire"],
-      body: shellBody({ extra: "<span>Côte d'Ivoire</span>" }),
+      body: shellBody({
+        extra: '<h3 class="font-semibold text-gray-900 text-sm md:text-base">Côte d\'Ivoire</h3>',
+      }),
     });
     const result = run(project);
     expect(result.errors.join('\n')).not.toContain('Côte d\\');

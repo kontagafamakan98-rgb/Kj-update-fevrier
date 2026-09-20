@@ -34,6 +34,10 @@ import { requirePageMeta } from './scripts/check-page-meta.js'
 // section ajoutée à une page ne peut plus manquer au HTML que lit un crawler
 // sans JavaScript (le build refuse une coquille incomplète, plus bas).
 import { PAGE_SECTIONS, pageSectionParts } from './src/config/page-sections.js'
+// Les pays couverts : la MÊME donnée que le bundle (src/components/CountryDisplay.js
+// en dérive sa carte, src/pages/Home.js ses cartes) — ce module-là n'importe pas
+// React, il est donc chargeable par Node.
+import { COUNTRIES } from './src/config/countries.js'
 
 const OG_CARDS = Object.fromEntries(
   OG_CARD_ROUTES.map(({ path: routePath, image, imageSquare }) => [routePath, { image, imageSquare }])
@@ -211,18 +215,12 @@ export default defineConfig(({ mode }) => {
           // fichier) : elles sont donc copiées de Home.js / Support.js /
           // App.js, et check-home-shell.js échoue si l'une manque au CSS.
           //
-          // Les 4 pays reprennent COUNTRIES (src/components/CountryDisplay.js) :
-          // le garde CI vérifie que la liste du shell correspond toujours.
-          const HOME_COUNTRIES = [
-            { name: 'Mali', flag: '🇲🇱', color: 'bg-green-100' },
-            { name: 'Sénégal', flag: '🇸🇳', color: 'bg-yellow-100' },
-            { name: 'Burkina Faso', flag: '🇧🇫', color: 'bg-red-100' },
-            { name: "Côte d'Ivoire", flag: '🇨🇮', color: 'bg-orange-100' },
-          ]
-          // Catégories, promesses et étapes : LISES dans la déclaration du corps
-          // de l'accueil (src/config/page-sections.js), que src/pages/Home.js
-          // lit aussi. Elles étaient recopiées ici, liste par liste : ajouter une
-          // catégorie à la page laissait la coquille derrière, en silence.
+          // Pays, catégories, promesses, étapes et chiffres ne sont plus
+          // recopiés ici : la coquille lit les MÊMES listes que la page — les
+          // pays dans src/config/countries.js, le reste dans la déclaration du
+          // corps de l'accueil (src/config/page-sections.js, que lit
+          // src/pages/Home.js). Ajouter un pays, une catégorie ou une promesse
+          // laissait autrefois la coquille derrière, en silence.
           const homePlan = PAGE_SECTIONS['/']
 
           const homeShell = [
@@ -253,7 +251,7 @@ export default defineConfig(({ mode }) => {
             `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('kojoConnectsDescription'))}</p>`,
             `</div>`,
             `<div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">`,
-            ...HOME_COUNTRIES.map(
+            ...COUNTRIES.map(
               (country) =>
                 `<div class="${country.color} rounded-2xl p-6 text-center shadow-md">` +
                 `<div class="flex justify-center mb-3">` +
@@ -352,19 +350,16 @@ export default defineConfig(({ mode }) => {
             `</section>`,
 
             // Chiffres (valeurs de repli de Home.js avant /public/stats, pour
-            // que le remplacement par React ne décale rien).
+            // que le remplacement par React ne décale rien). Le texte publié
+            // ici et le repli que lit Home.js sortent de la MÊME déclaration
+            // (homePlan.stats) : une seule liste, deux rendus.
             `<section class="py-12 bg-gray-50">`,
             `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
             `<div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">`,
-            ...[
-              ['1 000+', 'activeWorkers'],
-              ['500+', 'completedProjects'],
-              ['4', 'countriesCovered'],
-              ['24/7', 'customerSupport'],
-            ].map(
-              ([value, labelKey]) =>
+            ...homePlan.stats.map(
+              ({ labelKey, shellText }) =>
                 `<div>` +
-                `<div class="text-3xl md:text-4xl font-bold text-orange-600 mb-2">${esc(value)}</div>` +
+                `<div class="text-3xl md:text-4xl font-bold text-orange-600 mb-2">${esc(shellText)}</div>` +
                 `<div class="text-sm md:text-base text-gray-600">${esc(T(labelKey))}</div>` +
                 `</div>`
             ),
@@ -486,6 +481,7 @@ export default defineConfig(({ mode }) => {
           const contactPlan = PAGE_SECTIONS['/contact']
           const privacyPlan = PAGE_SECTIONS['/privacy']
           const supportPlan = PAGE_SECTIONS['/support']
+          const howItWorksPlan = PAGE_SECTIONS['/how-it-works']
 
           // Le paragraphe de liens internes en fin de page : même balisage pour
           // chaque coquille, seul l'habillage du paragraphe change.
@@ -756,13 +752,9 @@ export default defineConfig(({ mode }) => {
               + `<section class="py-12 md:py-16 bg-white">`
               + `<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">`
               + `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`
-              + [
-                ['📝', 'howStep1Title', 'howStep1Desc'],
-                ['🛡️', 'howStep2Title', 'howStep2Desc'],
-                ['✅', 'howStep3Title', 'howStep3Desc'],
-              ]
+              + howItWorksPlan.steps
                 .map(
-                  ([icon, titleKey, textKey]) =>
+                  ({ icon, titleKey, descriptionKey: textKey }) =>
                     `<div class="rounded-2xl border border-gray-100 shadow-sm p-6">` +
                     `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${icon}</span></div>` +
                     `<h2 class="text-lg font-semibold text-gray-900 text-center mb-3">${esc(T(titleKey))}</h2>` +
@@ -782,7 +774,7 @@ export default defineConfig(({ mode }) => {
               + `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowWhatTitle'))}</h2>`
               + `<p class="text-emerald-800">${esc(T('escrowWhatText'))}</p>`
               + `<ul class="mt-4 space-y-2 text-emerald-800 text-sm">`
-              + ['escrowGuarantee1', 'escrowGuarantee2', 'escrowGuarantee3', 'escrowGuarantee4']
+              + howItWorksPlan.guaranteeKeys
                 .map((key) => `<li>${esc(T(key))}</li>`)
                 .join('')
               + `</ul>`
@@ -795,15 +787,15 @@ export default defineConfig(({ mode }) => {
               + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">`
               + `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">${esc(T('faqTitle'))}</h2>`
               + `<div class="space-y-4">`
-              + [1, 2, 3, 4, 5]
+              + howItWorksPlan.faq
                 .map(
-                  (index) =>
+                  ({ questionKey, answerKey }) =>
                     `<details class="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 group">` +
                     `<summary class="cursor-pointer font-semibold text-gray-900 list-none flex items-center justify-between gap-4">` +
-                    `${esc(T(`faq${index}q`))}` +
+                    `${esc(T(questionKey))}` +
                     `<span class="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">+</span>` +
                     `</summary>` +
-                    `<p class="mt-3 text-sm text-gray-600">${esc(T(`faq${index}a`))}</p>` +
+                    `<p class="mt-3 text-sm text-gray-600">${esc(T(answerKey))}</p>` +
                     `</details>`
                 )
                 .join('')

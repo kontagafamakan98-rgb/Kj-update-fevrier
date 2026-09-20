@@ -4,21 +4,25 @@
 // JSON sans `with { type: 'json' }`.
 import { CONTACT, mailtoHref, telHref } from './contact.js';
 
-// Plan UNIQUE du corps des pages pré-rendues « de confiance » : /about,
-// /contact, /privacy — celles qu'un moteur (et une régie publicitaire) exige
-// avant de faire crédit au site.
+// Plan UNIQUE du corps des six pages dont la coquille publie une LISTE :
+// / (catégories, promesses, étapes, chiffres), /support (modes et lignes de
+// contact), /how-it-works (étapes, garanties de séquestre, FAQ), et les pages
+// de confiance /about, /contact, /privacy — celles qu'un moteur (et une régie
+// publicitaire) exige avant de faire crédit au site.
 //
 // ── Ce que ce fichier supprime ──────────────────────────────────────────────
-// Le corps de ces trois pages avait DEUX propriétaires : les listes de la page
-// React (`PROMISES` dans About.js, `SECTIONS` dans Privacy.js, les quatre lignes
-// de contact écrites à la main dans Contact.js) et les mêmes listes recopiées en
-// clés littérales dans les coquilles de vite.config.js. Les textes, eux,
-// venaient déjà d'une seule source (src/i18n/*.json) ; ce qui divergeait, c'est
-// l'ENSEMBLE : ajouter une quatrième promesse à /about ne touchait pas la
-// coquille, et un crawler sans JavaScript lisait une page amputée sans qu'aucun
-// test ne rougisse. C'est la classe de défaut que le dépôt a passé des semaines à
-// supprimer (table des textes de page, cartes OG, bloc social) : la voici fermée
-// pour les pages les plus récentes.
+// Le corps de ces pages avait DEUX propriétaires : les listes de la page React
+// (`PROMISES` dans About.js, `SECTIONS` dans Privacy.js, les quatre lignes de
+// contact écrites à la main dans Contact.js, `HOME_COUNTRIES` et les replis de
+// chiffres dans Home.js, les étapes et la FAQ de HowItWorks.js) et les mêmes
+// listes recopiées en clés littérales dans les coquilles de vite.config.js. Les
+// textes, eux, venaient déjà d'une seule source (src/i18n/*.json) ; ce qui
+// divergeait, c'est l'ENSEMBLE : ajouter une quatrième promesse à /about ou une
+// sixième question à /how-it-works ne touchait pas la coquille, et un crawler
+// sans JavaScript lisait une page amputée sans qu'aucun test ne rougisse. C'est
+// la classe de défaut que le dépôt a passé des semaines à supprimer (table des
+// textes de page, cartes OG, bloc social) : elle est fermée ici pour les six
+// pages pré-rendues qui tiennent une liste.
 //
 // Les clés i18n restent la SEULE source de texte (résolues dans
 // src/i18n/fr.json au build, et dans la langue de l'utilisateur au runtime) : ce
@@ -80,6 +84,47 @@ export const PAGE_SECTIONS = {
       { icon: '1️⃣', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
       { icon: '2️⃣', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
       { icon: '3️⃣', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
+    ],
+    // Les quatre chiffres de l'accueil. La coquille les publiait dans sa propre
+    // liste `[['1 000+', 'activeWorkers'], …]`, pendant que la page tenait ses
+    // replis (1000, 500, 4, « 24/7 ») de son côté : deux déclarations du même
+    // bloc. `shellText` est le texte EXACT que la coquille écrit ; `fallback`
+    // est la valeur d'avant /public/stats que la page affiche — les deux, parce
+    // que la page passe par `toLocaleString()` (le séparateur de milliers suit
+    // la locale du navigateur) et qu'aucun texte ne doit changer ici.
+    stats: [
+      { labelKey: 'activeWorkers', fallback: 1000, suffix: '+', shellText: '1 000+' },
+      { labelKey: 'completedProjects', fallback: 500, suffix: '+', shellText: '500+' },
+      { labelKey: 'countriesCovered', fallback: 4, shellText: '4' },
+      { labelKey: 'customerSupport', fallback: '24/7', shellText: '24/7' },
+    ],
+  },
+
+  // /how-it-works : la coquille répliquait TROIS listes de src/pages/HowItWorks.js
+  // — les trois étapes, les quatre garanties de séquestre et les cinq questions
+  // de la FAQ — écrites en littéraux au mauvais endroit. Ajouter une question à
+  // la page laissait la coquille derrière, en silence : le même défaut que les
+  // pages de confiance, sur une page de contenu.
+  '/how-it-works': {
+    steps: [
+      { icon: '📝', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
+      { icon: '🛡️', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
+      { icon: '✅', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
+    ],
+    // Les garanties sont des CLÉS i18n : le nom du champ finit par `Key`, donc
+    // la coquille doit publier leur TEXTE résolu, pas la clé.
+    guaranteeKeys: [
+      'escrowGuarantee1',
+      'escrowGuarantee2',
+      'escrowGuarantee3',
+      'escrowGuarantee4',
+    ],
+    faq: [
+      { questionKey: 'faq1q', answerKey: 'faq1a' },
+      { questionKey: 'faq2q', answerKey: 'faq2a' },
+      { questionKey: 'faq3q', answerKey: 'faq3a' },
+      { questionKey: 'faq4q', answerKey: 'faq4a' },
+      { questionKey: 'faq5q', answerKey: 'faq5a' },
     ],
   },
 
@@ -237,10 +282,10 @@ export const PAGE_SECTIONS = {
  * coquille).
  *
  * La règle est la convention du dépôt : un champ dont le nom finit par `Key`
- * porte une clé i18n ; TOUT autre texte d'un plan est un texte que la coquille
- * doit publier tel quel. Le build s'en sert pour REFUSER une coquille incomplète
- * sans tenir de seconde liste — les attendus se déduisent du plan, jamais d'une
- * table écrite à côté.
+ * porte une clé i18n, `Keys` une LISTE de clés ; TOUT autre texte d'un plan est
+ * un texte que la coquille doit publier tel quel. Le build s'en sert pour
+ * REFUSER une coquille incomplète sans tenir de seconde liste — les attendus se
+ * déduisent du plan, jamais d'une table écrite à côté.
  *
  * Corollaire : un plan ne porte AUCUNE donnée interne. Ce qu'un plan déclare
  * est publié par la coquille, sans exception — y compris la valeur d'un lien.
@@ -251,9 +296,10 @@ export const PAGE_SECTIONS = {
 export function pageSectionParts(plan) {
   const cles = [];
   const textes = [];
+  const porteUneCle = (nom) => Boolean(nom) && /Keys?$/.test(nom);
   const visiter = (valeur, nom) => {
     if (typeof valeur === 'string') {
-      (nom && nom.endsWith('Key') ? cles : textes).push(valeur);
+      (porteUneCle(nom) ? cles : textes).push(valeur);
       return;
     }
     if (Array.isArray(valeur)) {
