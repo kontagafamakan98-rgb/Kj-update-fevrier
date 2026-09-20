@@ -20,7 +20,8 @@
  *   5. un N.A.P. IDENTIQUE à src/config/contact.json (le footer React lit le
  *      même fichier : publier deux adresses serait pire que de n'en publier
  *      aucune) ;
- *   6. les pays du shell sont ceux de CountryDisplay.js (anti-dérive) ;
+ *   6. les pays du shell sont ceux du référentiel partagé
+ *      (src/config/countries.js, que lit aussi la page) ;
  *   7. un `LocalBusiness` complet et une carte intégrée (SEO local) ;
  *   8. chaque classe Tailwind du shell existe bien dans le CSS du build —
  *      Tailwind ne scanne PAS vite.config.js : une classe inventée dans le
@@ -51,7 +52,7 @@ const REPO_ROOT = path.resolve(FRONTEND_DIR, '..');
 
 export const CONTACT_JSON = 'src/config/contact.json';
 export const I18N_FR = 'src/i18n/fr.json';
-export const COUNTRY_DISPLAY = 'src/components/CountryDisplay.js';
+export const COUNTRIES_MODULE = 'src/config/countries.js';
 export const TITLE_MAX = 60;
 export const DESCRIPTION_MAX = 160;
 // Plancher de contenu de l'accueil : 300 mots suffisaient à un crawler pour
@@ -124,6 +125,11 @@ export function visibleText(html) {
 
 export function countWords(text) {
   return text.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length;
+}
+
+/** Échappe un texte pour l'insérer dans un motif RegExp. */
+export function echapperPourRegex(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Échappement d'un nom de classe tel que Tailwind l'écrit dans le CSS. */
@@ -273,10 +279,13 @@ export function runHomeShellCheck(options = {}) {
     }
   }
 
-  // ── 6. Les pays du shell sont ceux de CountryDisplay.js ───────────────────
-  const countryPath = path.join(frontendDir, COUNTRY_DISPLAY);
+  // ── 6. Les pays du shell sont ceux du référentiel partagé ────────────────
+  // Le référentiel vit dans src/config/countries.js, lu par le build ET par la
+  // page : ce contrôle vérifie donc que la coquille n'a pas été vidée de ses
+  // pays, il ne compare plus deux listes qui pouvaient diverger.
+  const countryPath = path.join(frontendDir, COUNTRIES_MODULE);
   if (!existsSync(countryPath)) {
-    errors.push(`${COUNTRY_DISPLAY} introuvable : impossible de vérifier les pays du shell`);
+    errors.push(`${COUNTRIES_MODULE} introuvable : impossible de vérifier les pays du shell`);
   } else {
     const source = readFileSync(countryPath, 'utf8');
     // Gère les apostrophes échappées (« Côte d\'Ivoire ») : un `[^']+` nu
@@ -285,14 +294,23 @@ export function runHomeShellCheck(options = {}) {
       match[1].replace(/\\'/g, "'")
     );
     if (names.length === 0) {
-      errors.push(`${COUNTRY_DISPLAY} : aucune liste de pays extraite — le garde ne prouve rien`);
+      errors.push(`${COUNTRIES_MODULE} : aucune liste de pays extraite — le garde ne prouve rien`);
     }
+    // Le nom doit apparaître comme TITRE DE CARTE, pas seulement dans la prose :
+    // le sous-titre du hero cite les quatre pays (« …au Mali, au Sénégal, au
+    // Burkina Faso et en Côte d'Ivoire »), donc une simple recherche du nom
+    // était satisfaite même section des pays supprimée du shell — le contrôle
+    // ne prouvait plus rien. Il prouve maintenant que la carte est publiée.
     for (const name of names) {
-      if (!rootHtml.includes(name)) {
-        errors.push(`le shell ne mentionne pas le pays « ${name} » (liste de ${COUNTRY_DISPLAY} désynchronisée)`);
+      const titreDeCarte = new RegExp(`<h3[^>]*>${echapperPourRegex(name)}</h3>`);
+      if (!titreDeCarte.test(rootHtml)) {
+        errors.push(
+          `le shell ne publie pas le pays « ${name} » comme une carte (référentiel ${COUNTRIES_MODULE}) — ` +
+            'la section des pays a disparu, ou la coquille ne suit plus le référentiel'
+        );
       }
     }
-    if (names.length) notices.push(`${names.length} pays du référentiel présents dans le shell`);
+    if (names.length) notices.push(`${names.length} pays du référentiel publiés en carte par le shell`);
   }
 
   // ── 7. SEO local : LocalBusiness + carte intégrée ─────────────────────────

@@ -2,24 +2,27 @@ import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
+// Le corps de cette page (étapes, garanties de séquestre, FAQ) est DÉCLARÉ une
+// fois : src/config/page-sections.js, que le build lit pour écrire la coquille
+// pré-rendue. Cette page en DÉRIVE au lieu de tenir ses propres listes — une
+// question ajoutée ici paraît aussi dans le HTML que lit un crawler sans
+// JavaScript, ou dans aucun des deux.
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 export default function HowItWorks() {
   const { t } = useLanguage();
   usePageMeta();
 
-  const STEPS = [
-    { icon: '📝', title: t('howStep1Title'), description: t('howStep1Desc') },
-    { icon: '🛡️', title: t('howStep2Title'), description: t('howStep2Desc') },
-    { icon: '✅', title: t('howStep3Title'), description: t('howStep3Desc') },
-  ];
-
-  const FAQ = [
-    { q: t('faq1q'), a: t('faq1a') },
-    { q: t('faq2q'), a: t('faq2a') },
-    { q: t('faq3q'), a: t('faq3a') },
-    { q: t('faq4q'), a: t('faq4a') },
-    { q: t('faq5q'), a: t('faq5a') },
-  ];
+  const plan = PAGE_SECTIONS['/how-it-works'];
+  const STEPS = plan.steps.map(({ icon, titleKey, descriptionKey }) => ({
+    icon,
+    title: t(titleKey),
+    description: t(descriptionKey),
+  }));
+  const FAQ = plan.faq.map(({ questionKey, answerKey }) => ({
+    q: t(questionKey),
+    a: t(answerKey),
+  }));
 
   // JSON-LD FAQPage injecté dynamiquement (les crawlers qui exécutent le JS,
   // comme Google, peuvent lire les données structurées injectées) — c'est le
@@ -85,10 +88,9 @@ export default function HowItWorks() {
                   {t('escrowWhatText')}
                 </p>
                 <ul className="mt-4 space-y-2 text-emerald-800 text-sm">
-                  <li>{t('escrowGuarantee1')}</li>
-                  <li>{t('escrowGuarantee2')}</li>
-                  <li>{t('escrowGuarantee3')}</li>
-                  <li>{t('escrowGuarantee4')}</li>
+                  {plan.guaranteeKeys.map((key) => (
+                    <li key={key}>{t(key)}</li>
+                  ))}
                 </ul>
               </div>
             </div>

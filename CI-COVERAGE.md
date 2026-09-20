@@ -1597,7 +1597,8 @@ chaque PR vers `main` (sauf mention contraire).
 - Page d'accueil pré-rendue (`check-home-shell.js`) : un h1 unique reprenant
   `heroTitle`, `title` ≤ 60 et description ≤ 160, ≥ 300 mots, des liens
   internes, `tel:`/`mailto:`/WhatsApp, le N.A.P. identique à
-  `src/config/contact.json`, les pays de `CountryDisplay.js`, un `LocalBusiness`
+  `src/config/contact.json`, les pays du référentiel `src/config/countries.js`
+  (le même que lit la page), un `LocalBusiness`
   et une carte intégrée en lazy, **chaque classe Tailwind du shell présente dans
   le CSS du build**, des descriptions **uniques** sur les pages pré-rendues, et
   l'absence du shell d'accueil dans les autres pages (et inversement).

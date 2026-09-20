@@ -2,38 +2,17 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/countryAliases';
 import FlagIcon from './FlagIcon';
+// Le référentiel vit dans src/config/countries.js : le build (vite.config.js)
+// le lit AUSSI pour écrire la coquille pré-rendue de l'accueil. C'est ce qui
+// empêche un pays d'exister pour React et pas pour un crawler sans JavaScript.
+import { COUNTRIES as COUNTRY_LIST } from '../config/countries';
 
-// Country data with flags and proper names
-export const COUNTRIES = {
-  mali: {
-    code: 'mali',
-    name: 'Mali',
-    flag: '🇲🇱',
-    fullName: 'Mali',
-    iso: 'ML'
-  },
-  senegal: {
-    code: 'senegal',
-    name: 'Sénégal',
-    flag: '🇸🇳',
-    fullName: 'Sénégal',
-    iso: 'SN'
-  },
-  burkina_faso: {
-    code: 'burkina_faso',
-    name: 'Burkina Faso',
-    flag: '🇧🇫',
-    fullName: 'Burkina Faso',
-    iso: 'BF'
-  },
-  ivory_coast: {
-    code: 'ivory_coast',
-    name: 'Côte d\'Ivoire',
-    flag: '🇨🇮',
-    fullName: 'Côte d\'Ivoire',
-    iso: 'CI'
-  }
-};
+// Carte indexée par code canonique : `getCountry()` normalise un code (alias,
+// ISO, ancien nom) puis cherche ici. DÉRIVÉE de la liste partagée, jamais une
+// seconde déclaration.
+export const COUNTRIES = Object.fromEntries(
+  COUNTRY_LIST.map((country) => [country.code, country])
+);
 
 export const getCountry = (countryCode) => {
   if (!countryCode) return null;

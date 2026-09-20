@@ -28,23 +28,28 @@ export default function Home() {
     return () => { cancelled = true; };
   }, []);
 
-  const statWorkers = stats?.workers != null ? stats.workers : 1000;
-  const statCompleted = stats?.completed_jobs != null ? stats.completed_jobs : 500;
-  const statCountries = stats?.countries != null ? stats.countries : 4;
+  // Catégories, promesses, étapes et chiffres : lus dans la déclaration du
+  // corps de la page (src/config/page-sections.js) — la MÊME que le build
+  // utilise pour écrire la coquille pré-rendue. Recopiées ici, elles pouvaient
+  // diverger : une promesse ajoutée à la page ne paraissait pas pour un crawler
+  // sans JavaScript, et rien ne rougissait. `labelKey` est aussi le code de
+  // catégorie canonique du backend (kojo_routers_jobs.py) : le libellé affiché
+  // et le filtre de /jobs sortent de la même valeur.
+  const { categories, promises, steps, stats: STATS } = PAGE_SECTIONS['/'];
 
-  // Catégories, promesses et étapes : lues dans la déclaration du corps de la
-  // page (src/config/page-sections.js) — la MÊME que le build utilise pour
-  // écrire la coquille pré-rendue. Recopiées ici, elles pouvaient diverger :
-  // une promesse ajoutée à la page ne paraissait pas pour un crawler sans
-  // JavaScript, et rien ne rougissait. `labelKey` est aussi le code de
-  // catégorie canonique du backend (kojo_routers_jobs.py) : le libellé
-  // affiché et le filtre de /jobs sortent de la même valeur.
-  const { categories, promises, steps } = PAGE_SECTIONS['/'];
+  // Lecture des chiffres par clé de libellé : `fallback` est la valeur affichée
+  // avant /public/stats, `suffix` la marque qui suit le chiffre. Aucune seconde
+  // liste — la déclaration est lue telle quelle. Déclaré AVANT les trois
+  // `statX` ci-dessous, qui le lisent.
+  const STAT = Object.fromEntries(STATS.map((stat) => [stat.labelKey, stat]));
 
-  const countries = getAllCountries().map((country, index) => ({
-    ...country,
-    color: ['bg-green-100', 'bg-yellow-100', 'bg-red-100', 'bg-orange-100'][index]
-  }));
+  const statWorkers = stats?.workers != null ? stats.workers : STAT.activeWorkers.fallback;
+  const statCompleted = stats?.completed_jobs != null ? stats.completed_jobs : STAT.completedProjects.fallback;
+  const statCountries = stats?.countries != null ? stats.countries : STAT.countriesCovered.fallback;
+
+  // Les pays : la liste ET la couleur de carte viennent du référentiel partagé
+  // (src/config/countries.js), que le build lit aussi pour écrire la coquille.
+  const countries = getAllCountries();
 
   return (
     <div className="min-h-screen">
@@ -252,20 +257,20 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statWorkers.toLocaleString()}+</div>
-              <div className="text-sm md:text-base text-gray-600">{t('activeWorkers')}</div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statWorkers.toLocaleString()}{STAT.activeWorkers.suffix}</div>
+              <div className="text-sm md:text-base text-gray-600">{t(STAT.activeWorkers.labelKey)}</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statCompleted.toLocaleString()}+</div>
-              <div className="text-sm md:text-base text-gray-600">{t('completedProjects')}</div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statCompleted.toLocaleString()}{STAT.completedProjects.suffix}</div>
+              <div className="text-sm md:text-base text-gray-600">{t(STAT.completedProjects.labelKey)}</div>
             </div>
             <div>
               <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statCountries}</div>
-              <div className="text-sm md:text-base text-gray-600">{t('countriesCovered')}</div>
+              <div className="text-sm md:text-base text-gray-600">{t(STAT.countriesCovered.labelKey)}</div>
             </div>
             <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">24/7</div>
-              <div className="text-sm md:text-base text-gray-600">{t('customerSupport')}</div>
+              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{STAT.customerSupport.fallback}</div>
+              <div className="text-sm md:text-base text-gray-600">{t(STAT.customerSupport.labelKey)}</div>
             </div>
           </div>
         </div>
