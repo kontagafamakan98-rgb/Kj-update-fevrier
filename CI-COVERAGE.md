@@ -32,7 +32,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict, et le garde des durées publiées (`check-privacy-policy.py`, §3 F18). | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
-| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés, et la requête qui retardait le peintre de `/login` est bloquée pendant le collect (F6, « Ce que le gate vérifie réellement »). |
+| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API ni le coût des tags tiers : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés, et les requêtes qui retardaient le peintre de `/login` (géolocalisation, GA4) sont bloquées pendant le collect — leur coût reste à traiter côté produit (F6, « Ce que le gate vérifie réellement »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
 
@@ -291,7 +291,16 @@ tiers fait au plus grand peintre :
   collect** (`blockedUrlPatterns`, appliqué par Lighthouse via CDP :
   `REQUETES_HORS_CONTROLE` dans `lhci-cls-budgets.cjs`). Mesuré sur le même
   build contre le serveur de rewrites local : `/login` **1 479 ms → 1 112 ms**,
-  et 3 runs bloqués à 944 / 1 112 / 1 711 ms (score 0,99 / 1,00 / 1,00) ;
+  et 3 runs bloqués à 944 / 1 112 / 1 711 ms (score 0,99 / 1,00 / 1,00). Le
+  troisième motif vient du job rouge de 14:31-14:38 : c'est le tag **GA4 posé le
+  20/09 à 12:59** (`googletagmanager.com/gtag/js`, et son `/g/collect`) qui est
+  alors la requête la plus lente de CHAQUE page (58 à 174 s de temps réseau
+  simulé sous bridage 4G), pendant que le LCP de la coquille de `/login` passe
+  de ~1,7 s à 4 261 / 4 343 / 4 266 ms. La même page servie en production vaut
+  **1 239 ms** mesurée depuis un poste hors runner : le coût vient du chemin
+  réseau du runner vers un tiers, pas de l'artefact — et sous 4G réelle, un tag
+  tiers qui occupe une connexion retarde aussi le chunk critique, ce qui est un
+  sujet PRODUIT (charger GA après le `load`, pas avant) plutôt qu'un budget ;
 - la réponse **EST** le peintre (`/jobs`) → bloquée ou non, le LCP reste le
   moment où la réponse est connue : **2 727 ms** avec la liste, **4 256 ms** avec
   l'état vide, **5 177 ms** avec la requête bloquée (les réessais avant l'état

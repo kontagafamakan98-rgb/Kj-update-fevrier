@@ -118,19 +118,20 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     expect(motifs.length).toBeGreaterThan(0);
 
     const declares = Object.keys(REQUETES_HORS_CONTROLE);
-    // Chaque chemin déclaré a son motif, et il vient de la table : une liste
-    // écrite deux fois pourrait oublier l'une des deux (et la requête lente
-    // resterait dans le chemin de mesure sans que rien ne le dise).
-    for (const chemin of declares) {
-      expect(motifs, chemin).toContain(`*${chemin}*`);
-      expect(REQUETES_HORS_CONTROLE[chemin].length, `${chemin} : justification`).toBeGreaterThan(60);
-    }
-    // Motifs sans hôte : le collect tourne sur la production, sur une preview
-    // Vercel et sur le repli loopback — un motif qui nommerait l'hôte de
-    // production ne protégerait pas les deux autres.
-    for (const motif of motifs) {
-      expect(motif, `${motif} ne doit pas nommer un hôte`).not.toMatch(/kojoforafrica|localhost|127\.0\.0\.1/);
+    // Chaque motif déclaré est bien celui qui est bloqué, et il porte sa
+    // justification : une liste écrite deux fois pourrait oublier l'une des
+    // deux (et la requête lente resterait dans le chemin de mesure sans que
+    // rien ne le dise).
+    for (const motif of declares) {
+      expect(motifs, motif).toContain(motif);
+      expect(REQUETES_HORS_CONTROLE[motif].length, `${motif} : justification`).toBeGreaterThan(60);
       expect(motif.startsWith('*') && motif.endsWith('*'), `${motif} doit être un motif large`).toBe(true);
+    }
+    // Les chemins de NOTRE API doivent être sans hôte : le collect tourne sur la
+    // production, sur une preview Vercel et sur le repli loopback, et un motif
+    // qui nommerait l'hôte de production ne protégerait pas les deux autres.
+    for (const motif of declares.filter((m) => m.includes('/api/'))) {
+      expect(motif, `${motif} ne doit pas nommer un hôte`).not.toMatch(/kojoforafrica|localhost|127\.0\.0\.1/);
     }
     // Les chemins d'AUTHENTIFICATION ne sont pas bloqués : les pages protégées
     // doivent continuer d'être rendues avec le compte CI, sinon elles

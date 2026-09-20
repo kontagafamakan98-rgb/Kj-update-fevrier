@@ -58,11 +58,14 @@
 // un test l'éprouve contre le résolveur de @lhci/utils lui-même).
 const { CLS_BUDGETS, REQUETES_HORS_CONTROLE, clsAssertionMatrix } = require('./scripts/lhci-cls-budgets.cjs');
 
-// Les requêtes de DONNÉES bloquées pendant le collect, dérivées de la table qui
-// porte leur justification (scripts/lhci-cls-budgets.cjs) : un motif, pas une
-// liste écrite deux fois. Motifs SANS hôte, donc valables sur la production
-// comme sur une preview Vercel ou le repli loopback.
-const blockedUrlPatterns = Object.keys(REQUETES_HORS_CONTROLE).map((chemin) => `*${chemin}*`);
+// Les requêtes bloquées pendant le collect viennent de la table qui porte leur
+// justification (scripts/lhci-cls-budgets.cjs) : un motif, pas une liste écrite
+// deux fois. Les chemins de NOTRE API sont sans hôte (valables sur la
+// production, une preview Vercel et le repli loopback) ; les origines TIERCES
+// sont nommées, puisqu'elles sont les mêmes partout.
+// Les clés de la table SONT les motifs à bloquer (elles commencent par `*` ou
+// nomment une origine tierce) : une seule liste, donc rien à désynchroniser.
+const blockedUrlPatterns = Object.keys(REQUETES_HORS_CONTROLE);
 
 const baseUrl = (process.env.KOJO_LHCI_BASE_URL || '').trim().replace(/\/$/, '');
 const authHeader = (process.env.KOJO_LHCI_AUTH_HEADER || '').trim();
