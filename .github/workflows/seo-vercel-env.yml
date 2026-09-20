@@ -28,6 +28,7 @@ jobs:
   setup-seo-env:
     name: Poser GA4 + Search Console sur Vercel, redéployer, vérifier
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4

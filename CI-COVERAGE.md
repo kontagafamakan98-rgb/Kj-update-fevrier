@@ -32,7 +32,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict, et le garde des durées publiées (`check-privacy-policy.py`, §3 F18). | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
-| **Lighthouse performance budgets** | Login du compte CI dédié (secrets absents → rouge), assertions LHCI (`error`), `check-og-images.js`, et depuis le 17/09/2026 le **cycle `/jobs/:id` en HTTP** sur une pile locale « forme production » (§3, F3). | **Oui, sur le périmètre performance** : repli silencieux sur un build servi en local (seul l'accueil y est audité — ni CDN, ni cache d'edge, §3, F2), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
+| **Lighthouse performance budgets** | Assertions LHCI (`error`) sur **13 pages**, `check-og-images.js` et le **cycle `/jobs/:id` en HTTP**, les trois sur une pile locale « forme production » (§3, F3) ; sondes de production (`check-seo-production.js`, `check-cors-preflight.js`) sur `main`. | **Oui, sur le périmètre performance** : la surface auditée est un artefact servi par le job (ni CDN, ni cache d'edge — §3, F2ter), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées (§3, F1). |
 
@@ -81,11 +81,70 @@ d'edge, ni latence réseau. Une régression qui n'existe que sur le déploiement
 réel (`s-maxage`, cache distribué, redirections) passe donc au vert. C'est la
 raison d'être du repli « forme production » de F3 : il ferme le trou de
 **comportement** (le cycle HTTP), pas celui de la **latence** — laquelle
-n'existe que sur le déploiement, et reste auditée sur `main`.
+n'existe que sur le déploiement. Depuis le 20/09/2026, `main` n'audite plus le
+déploiement du tout (voir F2ter) : le repli local décrit ici est devenu la SEULE
+surface auditée, et il porte alors les 13 pages et non l'accueil seul.
 
 C'est le faux-vert le plus insidieux du workflow : **le mode de défaillance le
 plus probable (une API externe rate-limitée) est exactement celui qui dégrade
 silencieusement la portée du contrôle.**
+
+### F2ter — Le domaine de production refuse une rafale : la surface auditée est celle que le job contrôle (20/09/2026)
+
+Deux runs de `main` sur un **arbre inchangé** (`c44a02b`, PR #112) sont tombés
+rouges le 20/09/2026, tous les deux sur le seul job Lighthouse, tous les deux avec
+la même erreur à une page DIFFÉRENTE de la matrice :
+
+```
+run 35530100391 (18:45) · /privacy     Run #1...failed!  (Status code: 403)
+relance du même job   · /dashboard     Run #1...failed!  (Status code: 403)
+```
+
+Le code n'était pas en cause : le même arbre passait vert à 17:38 (`6c84c6e`,
+9/9 jobs). La cause a été reproduite à la main depuis un poste, en rejouant le
+profil du client Lighthouse (`HeadlessChrome/152`), contre le domaine public :
+
+```
+45 requêtes d'affilée sur /dashboard → 200 jusqu'à la 33e, puis 403 pour toutes les suivantes
+403 : X-Vercel-Mitigated: challenge · X-Vercel-Challenge-Token: …
+      corps = « Vercel Security Checkpoint »   (Cache-Control: private, no-store)
+```
+
+Ce n'est donc ni un tirage du runner ni une régression : l'edge Vercel oppose un
+**défi de sécurité** à un client qui le sollicite en rafale depuis une IP de
+datacenter, et le collect Lighthouse charge ~39 documents (13 pages × 3 runs)
+plus les sous-ressources — il franchit ce seuil vers la fin de sa matrice. Un gate
+qui rougit au hasard sur `main` apprend surtout à ignorer le rouge.
+
+**Décision** : `main` n'audite plus le domaine de production
+(`resolve-vercel-url.sh` n'y résout plus d'URL) ; le job monte sa pile et audite
+celle-ci. Le repli n'est plus l'audit de l'accueil seul : la pile locale porte un
+**drapeau** (`KOJO_LHCI_LOCAL_STACK=1`), le build est compilé avec l'API du
+backend local, donc le jeton du compte CI provisionné authentifie réellement
+`/dashboard`, `/profile` et `/payment` — les **13 pages** sont auditées, comme
+avant, contre une surface que le job contrôle de bout en bout. Une adresse
+loopback SANS ce drapeau reste le repli nu (accueil seul).
+
+Ce que le gate vérifie désormais réellement : FCP, LCP, TBT, CLS par route et
+score de l'**artefact**, servi par le serveur de rewrites local (qui rejoue
+`vercel.json`) sous bridage Slow 4G + CPU 4×. Ce qu'il ne vérifie plus : le
+comportement du **CDN** (cache d'edge, HTTP/2, TLS, latence réseau), qui n'était
+déjà plus mesuré correctement — le runner mesurait la production par intermittence
+et recevait un défi à la place des pages. Les sondes de production
+(`check-seo-production.js`, `check-cors-preflight.js`, toutes deux sur `main`)
+restent, elles, branchées sur le domaine réel et ne le sollicitent que quelques
+fois — sous le seuil de la rafale.
+
+Deux conséquences à connaître : un `main` vert ne dit plus rien de la performance
+de la production (le dire demanderait un job qui mesure le CDN sans rafale — par
+exemple un échantillon lent, une page par minute) ; et le job `lighthouse-ci`
+paie désormais la préparation de la pile sur `main` comme il la payait déjà sur
+les PR (pip install + provisioning MongoDB, ~1 min).
+
+Preuve de la capacité du nouveau chemin : le drapeau et la règle de sélection des
+pages sont verrouillés par `frontend/scripts/__tests__/check-lhci-env.test.js`
+(11 tests), et le passage complet par la pile locale est celui qui tourne sur
+chaque PR (mêmes steps, même config, mêmes 13 budgets).
 
 ### F3 — Le verrou `/jobs/:id` s'éteignait tout seul — **fermé le 17/09/2026**
 
@@ -614,7 +673,7 @@ OG, Twitter, JSON-LD), les gardes `check-prerender-shells.js` /
 le pré-rendu par route de `vite.config.js` (qui échouent ou sondent faux si le
 build repart sur l'ancienne adresse, tous lisant `SITE_ORIGIN` de
 `scripts/site-meta.js` — l'API qu'il appelle se lit dans le même module, sous
-`API_ORIGIN`), `resolve-vercel-url.sh` (base Lighthouse de `main`), et côté backend
+`API_ORIGIN`), et côté backend
 `DEFAULT_SITE_BASE` — le repli de `_site_base()`, qui construit le sitemap — déjà
 pointé sur le domaine. `robots.txt` n'est plus servi par le backend (voir §3 F13) :
 il est écrit au BUILD, depuis `SITE_ORIGIN`, par `vite-plugins/write-robots-txt.js`.
@@ -2023,9 +2082,11 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    servie, ni machine `started`.
 4. **`deploy-fly` ne dépend pas du frontend ni du mobile** : un frontend rouge
    n'empêche pas un déploiement backend.
-5. **Pas de `timeout-minutes`** sur les jobs (défaut GitHub : 360 min) ni de
-   `concurrency` au niveau du workflow — seul `deploy-fly` a son groupe de
-   concurrence. Un run peut donc patienter très longtemps avant d'échouer.
+5. **`timeout-minutes` posé le 20/09/2026** sur les 9 jobs de `ci.yml` et les 2
+   workflows séparés (5 à 30 min, ≥ 3× la durée mesurée : un blocage rougit au
+   lieu de patienter 360 min). **Reste ouvert : pas de `concurrency`** au niveau
+   du workflow — seul `deploy-fly` a son groupe de concurrence, donc deux push
+   rapprochés sur `main` font tourner deux runs en parallèle.
 6. **`push` sur une branche de travail : aucun run** (§1).
 7. **Pas d'audit de dépendances** (ni `npm audit`, ni job équivalent) : une CVE
    dans les dépendances ne fait pas rougir la CI.
@@ -2072,6 +2133,27 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
     couverture plus qu'elle ne prouvait. Il reste dans le dépôt (c'est le
     diagnostic à lancer à la main pour vérifier la régénération octet pour octet
     des PNG) et garde `hors_mutation`, avec ce motif.
+
+12. **La quasi-totalité des pages n'a aucun test de RENDU.** 52 fichiers de test
+    frontend : 29 pour `scripts/`, 13 pour `utils/`, 3 pour `services/`, 4 pour
+    les pages (Jobs, Payment, ProfileCountryDetection, ProfileEditForm), 1
+    config, 1 contexte, 1 composant. **20 pages sur 23 n'en ont aucun** — et
+    c'est la classe exacte du bug qui a vidé l'accueil le 20/09/2026 : un
+    `ReferenceError` (`statX` lus avant la déclaration de leur table) que le
+    build vert, 5 gardes verts et 638 tests verts n'ont pas vu, seul un
+    navigateur l'a vu. Le harnais existe déjà (`src/pages/__tests__/Jobs.test.jsx`
+    : `vi.mock` des contextes, de `react-router-dom`, de la carte Leaflet et des
+    endpoints) ; la passe suivante est un **test de rendu par route** qui monte
+    chaque page de la liste unique des pages et exige qu'elle rende sans lever.
+13. **Trois outils utiles restent hors du registre des gardes, par omission**
+    (leur nom ne commence ni par `check-` ni par `audit_`, donc l'exhaustivité du
+    registre ne les réclame pas) : `backend/scripts/dmarc_policy.py` (politique
+    DMARC, ses propres tests), `backend/scripts/provision_ci_test_account.py`
+    (provisionne le compte client de la pile locale, appelé par `ci.yml`) et
+    `frontend/scripts/lhci-cls-budgets.cjs` (la table des budgets CLS, éprouvée
+    par `lhci-cls-budgets.test.js`). Aucun des trois ne prononce de verdict sur
+    le dépôt : les trois sont des OUTILS, mais ils ne sont pas DÉCLARÉS comme
+    tels — à trancher explicitement, pas par omission.
 
 ## 8. Tenir ce document à jour
 

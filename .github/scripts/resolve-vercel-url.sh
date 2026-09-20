@@ -2,9 +2,28 @@
 # Résout l'URL du déploiement Vercel à auditer par Lighthouse CI :
 #   - sur pull_request : lit le commentaire posté par l'app Vercel sur la PR
 #     (API GitHub, GITHUB_TOKEN automatique — aucun VERCEL_TOKEN requis)
-#   - sur push vers main : URL de production
+#   - sur push vers main : AUCUNE URL — le job audite la pile locale qu'il
+#     contrôle (voir « Pourquoi main n'audite plus le domaine de production »)
 #   - sinon : chaîne vide (le workflow replie sur le build local)
 #
+# ── Pourquoi main n'audite plus le domaine de production ──────────────────────
+# Le 20/09/2026, deux runs de `main` sur un arbre INCHANGÉ sont tombés rouges
+# avec « Lighthouse was unable to reliably load the page you requested.
+# (Status code: 403) », sur /privacy puis sur /dashboard. La cause n'est pas le
+# code : l'edge Vercel répond un DÉFI de sécurité à un client qui le sollicite
+# en rafale depuis une IP de runner — reproduit à la main le 20/09/2026 :
+#   • 45 requêtes d'affilée sur /dashboard → 200 jusqu'à la 33e, puis 403 ;
+#   • en-têtes du 403 : `X-Vercel-Mitigated: challenge`,
+#     `X-Vercel-Challenge-Token: …`, corps « Vercel Security Checkpoint ».
+# Le collect Lighthouse charge ~39 documents (13 pages × 3 runs) plus les
+# sous-ressources : il franchit ce seuil vers la fin de sa matrice, donc le
+# verdict dépendait d'un quota côté tiers — un rouge au hasard sur main, pire
+# qu'aucun gate. Auditer une surface que le job CONTRÔLE (build servi par le
+# serveur de rewrites local + backend local) rend le même entrée → même verdict,
+# au prix nommé dans CI-COVERAGE.md : le comportement du CDN (cache, HTTP/2,
+# compression) n'est plus mesuré par ce job — il reste observé par les sondes de
+# production (check-seo-production, check-cors-preflight).
+
 # Robustesse : si l'API GitHub échoue (rate-limit HTTP 403, erreur réseau,
 # HTTP != 200) ou renvoie un corps inexploitable (JSON invalide, pas une
 # liste, aucun commentaire Vercel avec URL), on LOGGUE la cause et on RETOMBE
@@ -71,9 +90,11 @@ except Exception:
       fi
     fi
   fi
-elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ "${GITHUB_REF:-}" = "refs/heads/main" ]; then
-  KOJO_LHCI_BASE_URL="https://kojoforafrica.cc.cd"
 fi
+# push vers main : volontairement AUCUNE URL. Le domaine de production répond
+# un défi de sécurité à un client qui le sollicite en rafale depuis une IP de
+# runner (mesuré, cf. l'en-tête) : le job audite donc la pile locale, déterministe
+# et qu'il contrôle de bout en bout.
 
 # ── Détection de la protection de déploiement Vercel (Deployment Protection) ──
 # Sur les PR, l'app Vercel peut être protégée (SSO) : toutes les pages servent

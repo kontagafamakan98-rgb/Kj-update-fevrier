@@ -14,7 +14,9 @@
  * pouvait le voir : un manifeste est du JSON servi tel quel, sans build ni test.
  *
  * ── Ce que ce garde vérifie ──────────────────────────────────────────────────
- *   1. le manifeste existe et se lit (BOM toléré : le fichier en porte un) ;
+ *   1. le manifeste existe et se lit — le BOM que le fichier portait a été
+ *      retiré le 20/09/2026 (tout `JSON.parse` non averti le refusait ; le
+ *      lecteur ci-dessous le tolère encore pour un fichier qui en porterait) ;
  *   2. « background_color » est celui que le générateur d'icônes utilise pour le
  *      fond de ses variantes maskable — une seule source de vérité, croisée ;
  *   3. chaque « src » déclaré reste SOUS public/, existe, est un PNG valide et
@@ -62,7 +64,7 @@ export const readPngSize = (filePath) => {
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 };
 
-/** Le manifeste porte un BOM : JSON.parse le refuse, on le retire. */
+/** Un manifeste peut porter un BOM : JSON.parse le refuse, on le retire. */
 export const parseManifest = (text) => JSON.parse(text.replace(/^\uFEFF/, ''));
 
 /** « 192x192 » → dimensions ; « any » → réservé au vectoriel. */

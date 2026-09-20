@@ -112,22 +112,30 @@ describe('lighthouserc — sélection des pages auditées', () => {
     ]);
   });
 
-  it('limite le repli local à l’accueil (un serveur local ne sert pas les pages protégées)', () => {
+  it('limite le repli NU à l’accueil, mais pas la pile locale complète', () => {
     const source = readConfig();
     expect(pathsOf(source, 'LOCAL_FALLBACK_PATHS')).toEqual(['/']);
     // Le tableau d'URLs doit bien être construit depuis CES deux listes :
     // aucune constante intermédiaire (dont le nom pourrait mentir) n'est lue.
     expect(source).toMatch(/const urls = auditedPaths\.map/);
-    expect(source).toMatch(/const auditedPaths = targetIsLocal \? LOCAL_FALLBACK_PATHS : DEPLOYMENT_PATHS/);
+    // ── Le drapeau qui distingue les deux replis ─────────────────────────
+    // Un loopback NU (build seul, API de production) ne sert pas les pages
+    // protégées → accueil seul. La PILE LOCALE du job (backend + jeton locaux,
+    // KOJO_LHCI_LOCAL_STACK=1) les sert → mêmes pages qu'un déploiement réel.
+    // Sans cette distinction, main auditerait 13 pages contre un repli nu (12
+    // mesures vides) ou l'accueil seul (12 budgets qui ne mesurent plus rien) :
+    // les deux formes d'un gate qui ment.
+    expect(source).toMatch(
+      /const auditedPaths =\s*targetIsLocal && !localStack \? LOCAL_FALLBACK_PATHS : DEPLOYMENT_PATHS/
+    );
+    expect(source).toMatch(/KOJO_LHCI_LOCAL_STACK/);
   });
 
-  it('traite une base LOOPBACK comme le repli local (la CI y sert la table de rewrites)', () => {
+  it('traite une base LOOPBACK comme locale (plafond TBT d’un runner partagé)', () => {
     // Depuis le 17/09/2026 la CI passe une URL loopback à ce config pour y
-    // exercer le cycle /jobs/:id en HTTP. Sans cette règle, Lighthouse y
-    // auditerait les 10 pages prévues pour un VRAI déploiement : /dashboard,
-    // /jobs et /profile y redirigent vers /login (le build est compilé avec
-    // l'API de prod) — des mesures qui ne décrivent aucune page, avec le
-    // plafond TBT strict d'un déploiement au lieu de celui du repli.
+    // exercer le cycle /jobs/:id en HTTP ; depuis le 20/09/2026 c'est aussi la
+    // surface auditée sur main. La base loopback garde le plafond TBT élargi du
+    // repli, parce que le runner reste partagé quelle que soit la surface.
     const source = readConfig();
     const m = /const targetIsLocal =([\s\S]*?);\n/.exec(source);
     expect(m, 'targetIsLocal introuvable dans lighthouserc.cjs').not.toBeNull();

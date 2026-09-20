@@ -31,6 +31,9 @@ jobs:
   probe:
     name: Sonde SEO de la production (stricte)
     runs-on: ubuntu-latest
+    # Plafond : sans lui, un blocage sur la production laisserait le job
+    # patienter jusqu'à l'abandon du runner (360 min) au lieu de rougir.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
