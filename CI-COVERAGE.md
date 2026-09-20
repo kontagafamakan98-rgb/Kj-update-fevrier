@@ -480,7 +480,7 @@ déploiement qui démarre puis plante au boot est donc **vert**. La vérificatio
 `/health` renvoyant la version (`1.0.2`) a été faite **à la main** lors de sa mise
 en production — c'est précisément le maillon que la CI ne couvre pas.
 
-### F9 — Les intégrations SEO/analytics n'existent qu'au build : un audit externe a rougi sur du code vert
+### F9 — Les intégrations SEO/analytics n'existent qu'au build : un audit externe a rougi sur du code vert — **fermé le 20/09/2026**
 
 Un audit SEO « sans JavaScript » a rendu le 17/09/2026 un rapport dont **dix
 erreurs sur treize** décrivaient un état **déjà corrigé**. Mesure du HTML
@@ -643,10 +643,10 @@ mais qu'aucune ancre ne suit dans le HTML servi.
 `VITE_SOCIAL_TIKTOK`, `LINKEDIN` et `YOUTUBE` restent volontairement vides :
 `contact.js` n'affiche aucun profil inventé.
 
-**Ce qui reste, et qui n'est pas dans le dépôt** : deux valeurs, et elles seules
-— `VITE_GA_MEASUREMENT_ID` et `VITE_GSC_VERIFICATION`. Elles se posent dans
-Vercel → Project Settings → Environment Variables, et exigent un redéploiement
-(les `VITE_*` sont inlinées au build). Les marquer « Sensitive » est inutile —
+**Deux valeurs hors dépôt, l'une et l'autre posées le 20/09/2026** —
+`VITE_GA_MEASUREMENT_ID` et `VITE_GSC_VERIFICATION`. Elles se posent dans Vercel →
+Project Settings → Environment Variables, et exigent un redéploiement (les
+`VITE_*` sont inlinées au build) ; le workflow manuel fait les deux. Les marquer « Sensitive » est inutile —
 mesuré : `VITE_GOOGLE_CLIENT_ID`, déclarée `type=sensitive`, apparaît en clair
 dans `/assets/index-*.js` de la production, la valeur n'étant « décryptable que
 pendant les déploiements » (doc Vercel) ; ce que ça coûte, c'est de ne plus
@@ -691,8 +691,28 @@ KOJO_GA_MEASUREMENT_ID=G-… KOJO_GSC_VERIFICATION=… VERCEL_TOKEN=vcp_… \
 # … --dry-run : lectures seules (projet, variables déjà posées, charges utiles)
 ```
 
-Tant qu'elles manquent, l'audit restera rouge sur l'analytics et la vérification
-Search Console, quel que soit l'état du code.
+**État du 20/09/2026, mesuré sur la production servie** : les deux balises sont
+là. Relevé direct (`curl -sS https://kojoforafrica.cc.cd/`) :
+
+```
+googletagmanager                       → 2 occurrences (balise gtag + origine CSP relâchée)
+google-site-verification content=…     → présent (yfa2PfX1…)
+"sameAs"                               → 3 profils (facebook, instagram, x)
+```
+
+La sonde stricte le dit de son côté (run `35512336073`, job `106082298708`,
+**success**) :
+
+```
+::notice  Google Analytics 4 : PRÉSENT — gtag/js?id=G-4HTDD40F4T
+::notice  Search Console (balise meta) : PRÉSENT — jeton yfa2PfX1…
+::notice  Plausible (facultatif) : ABSENT — … FACULTATIF : son absence ne fait pas échouer la sonde stricte.
+::notice  Liens sociaux (sameAs du LocalBusiness) : PRÉSENT — 3 profil(s) dans le sameAs, 6 lien(s) dans le HTML servi
+::notice  3/4 intégration(s) présente(s) sur https://kojoforafrica.cc.cd (dont 3/3 requise(s))
+```
+
+Plausible reste absent, et c'est FACULTATIF : son absence ne fait pas échouer la
+sonde, seule une requise sans valeur le fait.
 
 **Ce que la CI en dit désormais** : `scripts/check-seo-production.js` lit l'accueil
 réellement servi et publie une annotation `::notice` par intégration (présente /
@@ -741,15 +761,16 @@ absente reste publiée avec la mention `FACULTATIF : son absence ne fait pas
 échouer la sonde stricte`. Deux tests tiennent la règle, et la mutation du script
 réel les fait rougir **par leur nom**.
 
-**Ce qui manque encore, nommé et vérifié par l'API GitHub le 19/09/2026** : le
-secret `KOJO_GA_MEASUREMENT_ID` est **absent** des secrets du dépôt
-(`KOJO_GSC_VERIFICATION` y est). Ses **deux** runs — `35370209109` (18/09) et
-`35474512717` (19/09, lancé pour vérifier) — sont en échec sur la même branche,
+**Ce qui manquait, chiffré (19/09/2026, vérifié par l'API GitHub)** : le secret
+`KOJO_GA_MEASUREMENT_ID` était **absent** des secrets du dépôt
+(`KOJO_GSC_VERIFICATION` y était). Ses **deux** runs — `35370209109` (18/09) et
+`35474512717` (19/09, lancé pour vérifier) — étaient en échec sur la même branche,
 code 2 : la configuration d'alors exigeait les deux valeurs et refusait de partir
 à moitié. Coût mesuré de ce couplage : la balise Search Console, **dont la valeur
-existait depuis le 18/09**, n'a jamais atteint la production, faute de GA4 — et
-elle y est encore absente deux jours plus tard. C'est ce que le correctif du
-20/09/2026 supprime (voir le paragraphe suivant).
+existait depuis le 18/09**, n'a pas atteint la production avant le 20/09, faute de
+GA4. C'est ce que le correctif du 20/09/2026 supprime (voir le paragraphe suivant),
+et il a rapporté dans l'heure : le premier dispatch d'après (12:27) a posé la
+balise Search Console **seule**, au lieu d'attendre GA4.
 
 ── **Correctif du 20/09/2026 : l'écriture est par variable** ───────────────────
 Le tout-ou-rien protégeait une propriété réelle, mais **par variable** : ne
@@ -759,8 +780,9 @@ vient d'être observé pendant deux jours. Le script pose donc chaque variable
 **fournie**, nomme en `::warning` chaque variable laissée de côté avec le secret à
 poser, ne tire **jamais** une valeur absente, et n'échoue que sur ce qui était
 fourni (codes ci-dessus). Ce qui reste vrai de l'esprit d'origine : rien n'est
-tu — la sonde STRICTE de production, elle, reste rouge et nomme l'intégration
-manquante, chaque jour.
+tu — la sonde STRICTE quotidienne, elle, refuse toujours une intégration
+**requise** manquante. Depuis le 20/09/2026 elle n'en trouve plus aucune (3/3),
+mais la règle, elle, n'a pas bougé.
 
 Preuves, sur le point d'entrée réel (`runSetup`), réseau stubbé et corps des
 requêtes capturés — 13 vérifications vertes :
@@ -778,14 +800,38 @@ la table `INTEGRATIONS` de `check-seo-production.js` (celles qui sont `required`
 et qu'une variable unique active), jamais recopiées — un libellé de vérification
 qui divergerait du libellé publié est un faux vert qui ne peut plus s'écrire.
 
-La sonde quotidienne restera rouge jusqu'à ce que `KOJO_GA_MEASUREMENT_ID` soit
-posé : c'est le prix, et c'est le but.
+**Le correctif a été rejoué deux fois ; les runs, leurs dates et leurs codes de
+sortie ont été relus dans l'API GitHub le 20/09/2026 :**
+
+| Dispatch (`seo-vercel-env.yml`) | Ce qui était fourni | Sortie | Ce qu'il a écrit | Production |
+|---|---|---|---|---|
+| `35510660129`, 20/09 12:27 | GSC seul | **0** | 1/2 — GA4 nommée en `::warning` et au récapitulatif | 1/4 → **2/4** |
+| `35512164588`, 20/09 12:59 | les deux (secret `KOJO_GA_MEASUREMENT_ID` créé le **20/09 à 12:59:05Z**, une seconde avant le dispatch) | **0** | 2/2 | 2/4 → **3/4**, dont 3/3 requises |
+
+Les deux runs d'**avant** — `35370209109` (18/09) et `35474512717` (19/09) —
+sortaient en **2** (« rien n'a pu être tenté ») sans rien écrire : c'est exactement
+ce que le tout-ou-rien imposait. Le seul code qui n'a pas encore été observé en
+vrai est **1** (« une valeur fournie n'a pas atterri »), et il est couvert par le
+harnais du point d'entrée réel (`runSetup`, 13 vérifications) : le dire ainsi vaut
+mieux que de le supposer observé.
+
+**Ce qui reste à constater** : le run **quotidien** n'a pas encore tourné depuis
+la pose. Les runs antérieurs de la sonde stricte — `35476895792` (19/09 23:43),
+`35477808734` (20/09 00:04) et `35507742695` (20/09 11:24, **planifié**) — sont
+tous rouges ; `35512336073` (20/09 13:02, `workflow_dispatch`) est **vert**. Le
+prochain planifié est à 06:17 UTC. C'est la seule ligne de F9 qui soit encore une
+attente, et elle est vérifiable par le run lui-même.
+
+**Sources de ces chiffres** (relevés le 20/09/2026, rien de recopié) : le HTML
+réellement servi (`curl -sS https://kojoforafrica.cc.cd/`), la liste des secrets et
+les runs via l'API GitHub, et le journal du job `106082298708` — d'où sort la
+ligne citée ci-dessus, mot pour mot.
 
 Rejouer la mesure, sur la production comme sur un build local :
 
 ```bash
 # la production sert-elle les balises ?
-curl -sS https://kojoforafrica.cc.cd/ | grep -c googletagmanager   # 0 = non configuré
+curl -sS https://kojoforafrica.cc.cd/ | grep -c googletagmanager   # 2 = balise + origine CSP (0 = non configuré)
 curl -sS https://kojoforafrica.cc.cd/ | grep -o '"sameAs": \[[^]]*\]'
 
 # l'injection fonctionne-t-elle quand les variables sont posées ?
@@ -1894,15 +1940,14 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
 6. **`push` sur une branche de travail : aucun run** (§1).
 7. **Pas d'audit de dépendances** (ni `npm audit`, ni job équivalent) : une CVE
    dans les dépendances ne fait pas rougir la CI.
-8. **La configuration SEO/analytics de la production est OBSERVÉE, pas
-   imposée** (F9) : `scripts/check-seo-production.js` lit l'accueil réellement
-   servi sur `main` et publie une `::notice` par intégration absente. L'écart
-   n'est donc plus invisible — mais il ne bloque toujours rien : une variable
-   oubliée sur Vercel reste un rouge d'audit externe, pas un rouge de CI.
-   En faire un garde demanderait d'ajouter un mode d'échec au script : il a été
-   volontairement écarté (la demande était de ne pas faire échouer la CI).
-   Deux autres limites : seule l'accueil est sondée en HTML (les autres pages du
-   sitemap et leur `canonical` ne le sont pas — la sonde lit en revanche le
+8. **CLOS (20/09/2026) — la configuration SEO/analytics n'est plus seulement
+   observée** : la sonde garde son mode informatif sur les PR (`::notice` par
+   intégration absente, sur `main` uniquement), mais elle a un mode **strict**
+   (`--strict`) que lance une fois par jour
+   `.github/workflows/seo-production-probe.yml` : une intégration **requise**
+   absente y rougit, une facultative non (cf. F9). Restent deux limites, elles
+   réelles : seule l'accueil est sondée en HTML (les autres pages du sitemap et
+   leur `canonical` ne le sont pas — la sonde lit en revanche le
    `/sitemap.xml` lui-même, pour l'hôte qu'il annonce), et un `Age` de cache non
    nul n'est pas détecté — le
    HTML est servi en `must-revalidate`, donc l'edge revalide, mais la sonde ne
