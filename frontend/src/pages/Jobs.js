@@ -156,8 +156,11 @@ export default function Jobs() {
   // SERVEUR (pagination + requête MongoDB) : un résultat n'est plus tronqué
   // à 50 jobs puis filtré localement — le 51e job d'une catégorie apparaît
   // enfin.
-  const loadJobs = async ({ append = false } = {}) => {
-    const targetPage = append ? page + 1 : 1;
+  // `page`/`append` peuvent être imposés : c'est ce qui permet à « Réessayer »
+  // de rejouer EXACTEMENT la requête qui a échoué (une page suivante qui a
+  // échoué se recharge comme une page suivante, sans repartir de la première).
+  const loadJobs = async ({ append = false, page: pageDemandee = null } = {}) => {
+    const targetPage = pageDemandee ?? (append ? page + 1 : 1);
     if (append) {
       setLoadingMore(true);
     } else {
@@ -226,6 +229,9 @@ export default function Jobs() {
       setLoadError({
         reseau,
         message: handleApiError(error, reseau ? pageT('loadErrorNetwork') : pageT('loadErrorServer')),
+        // La forme de la requête fautive voyage avec l'échec : c'est elle que
+        // « Réessayer » rejoue, pagination comprise.
+        requete: { append, page: targetPage },
       });
       if (!append) setJobs([]);
     } finally {
@@ -256,8 +262,10 @@ export default function Jobs() {
   }, [effectiveTab, filters.search, filters.category, filters.status, user?.id, user?.user_type]);
 
   // Rejouer la requête est une ACTION de la page : l'échec ne se répare plus en
-  // rechargeant l'onglet.
-  const reessayer = () => loadJobs();
+  // rechargeant l'onglet. C'est la requête qui a échoué qui est rejouée, pas
+  // une requête équivalente — un « Afficher plus » en panne reprend la page
+  // suivante et laisse en place les missions déjà affichées.
+  const reessayer = () => loadJobs(loadError?.requete || {});
 
   // Filtres qui expliquent une liste vide (et que l'utilisateur peut lever) :
   // sans eux, « rien à afficher » n'a pas la même prochaine étape.
@@ -470,7 +478,9 @@ export default function Jobs() {
           <p className="font-medium">{loadError.message}</p>
           <button
             onClick={reessayer}
-            disabled={loading}
+            // Un double clic pendant le rejeu d'une page suivante empilerait
+            // deux fois la même page dans la liste.
+            disabled={loading || loadingMore}
             className="mt-3 inline-flex items-center rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
           >
             {loading ? t('loading') : pageT('retry')}
@@ -494,9 +504,11 @@ export default function Jobs() {
         <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
           <JobsMap jobs={filteredJobs} />
         </div>
-      ) : loadError ? (
-        // L'échec est déjà expliqué par le bloc ci-dessus, avec son action :
+      ) : loadError && filteredJobs.length === 0 ? (
+        // L'échec est déjà expliqué par le bandeau ci-dessus, avec son action :
         // afficher ici un état vide ferait passer une panne pour une liste vide.
+        // (Une panne qui laisse des missions déjà chargées — page suivante
+        // injoignable — ne les efface pas : le bandeau explique, la liste reste.)
         null
       ) : filteredJobs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">

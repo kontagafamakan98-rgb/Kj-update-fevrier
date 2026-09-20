@@ -8,6 +8,10 @@
  * Ces cas sont verrouillés ici parce qu'une panne affichée comme « aucune
  * mission » fait croire qu'il n'y a rien à trouver, et qu'un état vide sans
  * action laisse l'utilisateur sans issue.
+ *
+ * Le rejeu, lui, doit porter EXACTEMENT la requête qui a échoué : une panne sur
+ * la page suivante se répare en chargeant cette page-là, sans effacer ce qui
+ * est déjà affiché — sinon « Réessayer » ne répare pas la panne qu'il annonce.
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -58,6 +62,15 @@ import { jobsAPI } from '../../services/apiEndpoints';
 const JOB_A = { id: 'job-1', title: 'Réparation de plomberie', status: 'open', category: 'plumbing' };
 const JOB_B = { id: 'job-2', title: 'Peinture du salon', status: 'open', category: 'painting' };
 
+// Une page pleine (JOBS_PAGE_SIZE = 12) : c'est ce qui fait apparaître
+// « Afficher plus de missions », donc le seul chemin où la pagination existe.
+const PAGE_PLEINE = (prefixe, n) => Array.from({ length: n }, (_, i) => ({
+  id: `${prefixe}-${i}`,
+  title: `${prefixe} mission ${i}`,
+  status: 'open',
+  category: 'plumbing',
+}));
+
 // Formes EXACTES produites par la frontière de l'API (services/api.js) : une
 // panne sans message du serveur arrive marquée `hasServerMessage = false` et
 // porte le message du produit. La page, elle, doit afficher SES mots.
@@ -77,7 +90,9 @@ const VIDE_FILTRE = 'Aucune mission ne correspond à ces filtres.';
 
 beforeEach(() => {
   SEARCH_PARAMS.current = new URLSearchParams();
-  vi.clearAllMocks();
+  // resetAllMocks (et pas clearAllMocks) : un mockResolvedValueOnce non
+  // consommé par un cas fuirait dans le suivant et le ferait mentir.
+  vi.resetAllMocks();
   jobsAPI.getMyProposals.mockResolvedValue([]);
 });
 
@@ -125,6 +140,46 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     expect(await screen.findByText(VIDE)).toBeTruthy();
     expect(screen.getByText('Élargissez votre recherche ou revenez plus tard.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull();
+  });
+
+  it('une panne sur « Afficher plus » garde les missions affichées et Réessayer charge la page manquante', async () => {
+    const page1 = PAGE_PLEINE('page1', 12);
+    const page2 = PAGE_PLEINE('page2', 3);
+    jobsAPI.getAll
+      .mockResolvedValueOnce(page1)
+      .mockRejectedValueOnce(panneReseau())
+      .mockResolvedValueOnce(page2);
+    render(<Jobs />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Afficher plus de missions' }));
+
+    // La panne de la page 2 ne doit pas effacer la page 1 déjà affichée.
+    expect(await screen.findByText(RESEAU)).toBeTruthy();
+    expect(screen.getByText('page1 mission 0')).toBeTruthy();
+    expect(screen.getByText('page1 mission 11')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+
+    // Le rejeu reprend LA PAGE QUI A ÉCHOUÉ, pas la première.
+    await waitFor(() => expect(screen.getByText('page2 mission 0')).toBeTruthy());
+    expect(screen.getByText('page1 mission 0')).toBeTruthy();
+    expect(screen.queryByText(RESEAU)).toBeNull();
+    expect(jobsAPI.getAll).toHaveBeenCalledTimes(3);
+    const pages = jobsAPI.getAll.mock.calls.map(([params]) => params.page);
+    expect(pages).toEqual([1, 2, 2]);
+  });
+
+  it('une panne sur la première page continue de se réparer en rechargeant cette page', async () => {
+    jobsAPI.getAll
+      .mockRejectedValueOnce(panneServeur())
+      .mockResolvedValueOnce([JOB_A]);
+    render(<Jobs />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Réessayer' }));
+
+    expect(await screen.findByText('Réparation de plomberie')).toBeTruthy();
+    const pages = jobsAPI.getAll.mock.calls.map(([params]) => params.page);
+    expect(pages).toEqual([1, 1]);
   });
 
   it('une liste vidée par un filtre propose de l’effacer, et la relance le charge', async () => {
