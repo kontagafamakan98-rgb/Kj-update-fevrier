@@ -1,13 +1,17 @@
-"""Tests SEO/perf : sitemap dynamique, robots.txt backend, Cache-Control.
+"""Tests SEO/perf : sitemap dynamique et Cache-Control.
 
-Couvre les 3 garanties de la découverte publique :
+Couvre les 2 garanties de la découverte publique qui restent au BACKEND :
 - /sitemap.xml énumère les fiches /jobs/:id des missions publiques (open
   + in_progress), en XML valide, avec cache court, et N'inclut pas de job
   supprimé/terminé.
-- /robots.txt sert la balise Sitemap sur le bon domaine et n'interdit plus
-  /jobs (découverte publique crawlabile).
 - GET /api/jobs renvoie Cache-Control public court pour un visiteur anonyme,
   et AUCUN cache pour un utilisateur connecté (données personnelles).
+
+robots.txt n'est plus servi ici : il est écrit au BUILD par le frontend depuis
+la liste des routes privées DÉRIVÉE du routage (la même que l'en-tête
+X-Robots-Tag de vercel.json), et frontend/scripts/check-spa-routes.js compare
+build/robots.txt à cette dérivation. Le backend en portait une seconde liste,
+écrite à la main : elle couvrait 4 routes privées sur 9.
 """
 import pytest
 from httpx import AsyncClient
@@ -64,15 +68,6 @@ class TestSitemapDynamic:
         assert resp.status_code == 200
         assert "deleted-sitemap" not in resp.text
         assert "completed-sitemap" not in resp.text
-
-    async def test_robots_txt_served_and_allows_jobs(self, client: AsyncClient):
-        resp = await client.get("/api/robots.txt")
-        assert resp.status_code == 200
-        body = resp.text
-        assert "Sitemap: https://kojoforafrica.cc.cd/sitemap.xml" in body
-        # La découverte publique ne doit plus être bloquée pour les crawlers.
-        assert "Disallow: /jobs" not in body
-
 
 @pytest.mark.asyncio
 class TestJobOgImage:

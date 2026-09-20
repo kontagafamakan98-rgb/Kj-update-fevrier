@@ -28,11 +28,20 @@
  *    l'accueil (h1, 300+ mots, liens internes) sous une dizaine d'adresses :
  *    du contenu dupliqué, et un canonical statique "/" sur toutes ces routes.
  * 5. Les routes PRIVÉES (dashboard, profil, messages, admin…) ne doivent pas
- *    être indexables : `X-Robots-Tag: noindex` dans vercel.json. Un tableau de
- *    bord indexé par un moteur, c'est une page vide dans les résultats. Ce
- *    qu'est une route privée DÉRIVE du routage réel (voir privateRoutesOf) :
- *    ajouter une page oblige à choisir — ses textes dans
- *    src/config/page-meta.js (publique), ou son noindex (privée).
+ *    être indexables, et le noindex est dit par les TROIS surfaces qui le
+ *    publient — toutes dérivées de la même liste (voir privateRoutesOf) :
+ *      • `X-Robots-Tag: noindex` dans vercel.json (l'en-tête, celui qu'un
+ *        crawler lit sans exécuter la page) ;
+ *      • `<meta name="robots" content="noindex, follow">` dans build/app.html,
+ *        le gabarit qui les sert TOUTES — il disait `index, follow` (hérité du
+ *        gabarit d'accueil) : l'en-tête et le document se contredisaient ;
+ *      • `Disallow` dans build/robots.txt, GÉNÉRÉ au build depuis la même
+ *        liste (voir robotsTxtFor) : la liste écrite à la main dans le backend
+ *        en couvrait 4 sur 9, et manquait silencieusement les cinq autres.
+ *    Ce qu'est une route privée DÉRIVE du routage réel : ajouter une page
+ *    oblige à choisir — ses textes dans src/config/page-meta.js (publique),
+ *    ou son noindex (privée). Un tableau de bord indexé par un moteur, c'est
+ *    une page vide dans les résultats.
  *
  * ── Les pièges vérifiés ──────────────────────────────────────────────────────
  *   • une route React absente de vercel.json → 404 en production (l'app ne la
@@ -52,7 +61,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // La liste des pages pré-rendues se LIT ici, elle ne se recopie pas : c'est la
 // table des textes de route dont le BUILD écrit les coquilles (vite.config.js).
 import { PAGE_META } from '../src/config/page-meta.js';
-import { shellFileFor } from './site-meta.js';
+import { SITE_ORIGIN, metaContents, shellFileFor } from './site-meta.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(__dirname, '..');
@@ -116,6 +125,69 @@ export function privateRoutesOf(routes, rewrites = []) {
     });
   return routes.filter((route) => !Object.hasOwn(PAGE_META, route) && !servedByServer(route));
 }
+
+// ── robots.txt : un ARTEFACT DU BUILD, pas une seconde déclaration ───────────
+// Le fichier était servi par le BACKEND (`/api/robots.txt`, proxifié par un
+// rewrite Vercel), avec sa propre liste `Disallow` écrite à la main dans
+// kojo_routers_public.py. Cette liste et la dérivation ci-dessus ne se
+// parlaient pas : mesuré le 20/09/2026, elle couvrait **4 routes privées sur 9**
+// (`/create-job`, `/email-verification`, `/payment-verification`,
+// `/commission-dashboard`, `/support-admin` étaient donc crawlables), et rien
+// ne pouvait le voir — la seule assertion portait sur la balise `Sitemap`.
+//
+// robots.txt est désormais ÉCRIT PAR LE BUILD depuis `privateRoutesOf`, comme
+// les coquilles pré-rendues : la même source alimente l'en-tête de vercel.json,
+// le meta de app.html et ce fichier, donc une route privée de plus ne peut plus
+// manquer à l'un des trois. Le texte est rendu ici — par le module qui DÉRIVE la
+// liste — pour qu'il n'existe aucune autre définition de ce qu'un robots.txt
+// privé doit contenir.
+export const ROBOTS_TXT = 'robots.txt';
+
+// `/api/` n'est pas une route de l'application : c'est le proxy du backend, et
+// il n'a jamais eu vocation à être crawlé. Il vit donc ici, avec le rendu, et
+// pas dans la liste des pages.
+export const API_DISALLOW = '/api/';
+
+/**
+ * Contenu du robots.txt publié, DÉRIVÉ de la liste des routes privées.
+ *
+ * Le `Allow: /` général suffit : les `Allow:` nominatifs qui l'accompagnaient
+ * (`/login`, `/register`, `/jobs`, `/how-it-works`) étaient une liste de pages
+ * PUBLIQUES tenue à la main de plus, à côté de celle de la dérivation — et
+ * redondante, puisque tout chemin non interdit est autorisé.
+ *
+ * @param {string[]} privateRoutes Routes privées dérivées (voir privateRoutesOf).
+ * @param {string} siteOrigin Origine canonique du site (scripts/site-meta.js).
+ * @returns {string} Le fichier complet, terminateur de ligne final compris.
+ */
+export function robotsTxtFor(privateRoutes, siteOrigin) {
+  const disallow = [API_DISALLOW, ...privateRoutes].sort();
+  return [
+    'User-agent: *',
+    'Allow: /',
+    ...disallow.map((path) => `Disallow: ${path}`),
+    '',
+    `Sitemap: ${siteOrigin}/sitemap.xml`,
+    '',
+  ].join('\n');
+}
+
+/**
+ * Chemins interdits déclarés par un robots.txt — ce que le fichier PUBLIÉ dit,
+ * relu pour être comparé à la liste dérivée (et non à une copie du texte).
+ *
+ * @param {string} body Contenu du fichier.
+ * @returns {string[]} Chemins des lignes `Disallow:`, triés.
+ */
+export function disallowPathsOf(body) {
+  const paths = [];
+  for (const line of String(body).split(/\r?\n/)) {
+    const match = /^\s*Disallow:\s*(\S+)\s*$/.exec(line);
+    if (match) paths.push(match[1]);
+  }
+  return paths.sort();
+}
+
 export const APP_JS = 'src/App.js';
 // Routes volontairement NON routées : elles n'existent qu'en développement
 // (bloc `import.meta.env.DEV` de App.js) — les router en production exposerait
@@ -340,17 +412,25 @@ export function runSpaRoutesCheck(options = {}) {
     }
   }
 
-  // ── 3. Découverte : sitemap et robots servis par le backend ───────────────
-  for (const [source, suffix] of [
-    ['/sitemap.xml', '/api/sitemap.xml'],
-    ['/robots.txt', '/api/robots.txt'],
-  ]) {
-    const rewrite = find(source);
-    if (!rewrite) {
-      errors.push(`aucun rewrite « ${source} » → ${suffix} : le sitemap/robots dynamique du backend n'est plus servi`);
-    } else if (!String(rewrite.destination || '').endsWith(suffix)) {
-      errors.push(`le rewrite « ${source} » devrait mener à « ${suffix} », pas « ${rewrite.destination} »`);
-    }
+  // ── 3. Découverte : sitemap proxifié, robots.txt servi par le build ───────
+  // Le sitemap est DYNAMIQUE (il énumère les fiches /jobs/:id vivantes) : il
+  // reste proxifié vers le backend. robots.txt, lui, est écrit au build depuis
+  // la liste des routes privées — un rewrite le masquerait (la réécriture passe
+  // avant le fichier statique), donc l'ancien rewrite n'est plus une exigence
+  // mais un DÉFAUT : il servirait une liste figée dans le backend.
+  const sitemapRewrite = find('/sitemap.xml');
+  if (!sitemapRewrite) {
+    errors.push("aucun rewrite « /sitemap.xml » → /api/sitemap.xml : le sitemap dynamique du backend n'est plus servi");
+  } else if (!String(sitemapRewrite.destination || '').endsWith('/api/sitemap.xml')) {
+    errors.push(`le rewrite « /sitemap.xml » devrait mener à « /api/sitemap.xml », pas « ${sitemapRewrite.destination} »`);
+  }
+  const robotsRewrite = find('/robots.txt');
+  if (robotsRewrite) {
+    errors.push(
+      `vercel.json réécrit « /robots.txt » vers « ${robotsRewrite.destination} » : ce rewrite MASQUE ` +
+        `le ${ROBOTS_TXT} écrit par le build (la réécriture passe avant le fichier statique) — ` +
+        'supprimer la règle, et avec elle la seconde liste de routes privées qu\'elle servait'
+    );
   }
 
   // ── 4. AUCUN catch-all : sinon toute URL inconnue répond 200 ──────────────
@@ -539,6 +619,21 @@ export function runSpaRoutesCheck(options = {}) {
             'contenu de page (React peint après le boot)'
         );
       }
+      // 7ter-bis. Le gabarit des routes CLIENTES ne peut pas se dire indexable :
+      // il les sert TOUTES, et toutes sont privées. Il héritait du `index,
+      // follow` du gabarit d'accueil par simple recopie : le document et
+      // l'en-tête X-Robots-Tag de vercel.json se contredisaient alors sur les
+      // mêmes URL (mesuré en production le 20/09/2026 sur /dashboard,
+      // /messages, /profile, /photo-debug, /support-admin).
+      const appRobots = metaContents(appHtml, 'robots');
+      if (!appRobots.some((value) => /noindex/i.test(value))) {
+        errors.push(
+          'build/app.html doit porter <meta name="robots" content="noindex, follow"> : ' +
+            `c'est le gabarit des ${privateRoutes.length} routes privées, et il annonçait ` +
+            `« ${appRobots.join(', ') || 'rien'} » quand vercel.json leur envoie X-Robots-Tag noindex — ` +
+            'deux verdicts contradictoires sur les mêmes URL'
+        );
+      }
     }
     // 7quater. Tout fichier .html pré-rendu doit être déclaré : sinon une page
     // est générée par le build mais jamais servie par le routage.
@@ -551,6 +646,51 @@ export function runSpaRoutesCheck(options = {}) {
           `build/${file} est pré-rendu mais AUCUNE route ne le déclare : le routage ne le sert ` +
             'pas (ou le sert au mauvais endroit) — c\'est src/config/page-meta.js qui déclare une ' +
             'page (elle aura alors sa coquille), et frontend/vercel.json qui la route.'
+        );
+      }
+    }
+
+    // 7quinquies. robots.txt : dérivé de la même liste, ou rien.
+    // Ce fichier était servi par le backend avec sa propre liste écrite à la
+    // main (4 routes privées sur 9, mesuré le 20/09/2026) : il est maintenant
+    // écrit par le build, et relu ici. On refuse aussi une SECONDE déclaration
+    // (public/robots.txt), qui serait recopiée dans le build à côté du fichier
+    // généré — le motif « une copie à côté de la source » que ce dépôt supprime.
+    const publicRobots = path.join(frontendDir, 'public', ROBOTS_TXT);
+    if (existsSync(publicRobots)) {
+      errors.push(
+        `public/${ROBOTS_TXT} existe : c'est une seconde déclaration des routes privées, ` +
+          `recopiée dans le build à côté du ${ROBOTS_TXT} généré — la supprimer (le build l'écrit ` +
+          'depuis la dérivation, voir vite-plugins/write-robots-txt.js)'
+      );
+    }
+    const robotsPath = path.join(buildDir, ROBOTS_TXT);
+    if (!existsSync(robotsPath)) {
+      errors.push(
+        `build/${ROBOTS_TXT} absent : les routes privées (${privateRoutes.join(', ')}) ` +
+          'redeviendraient crawlables — ce fichier est écrit par le build'
+      );
+    } else {
+      const robotsBody = readFileSync(robotsPath, 'utf8');
+      const expected = [API_DISALLOW, ...privateRoutes].sort();
+      const declared = disallowPathsOf(robotsBody);
+      const missing = expected.filter((pathname) => !declared.includes(pathname));
+      const extra = declared.filter((pathname) => !expected.includes(pathname));
+      if (missing.length || extra.length) {
+        errors.push(
+          `build/${ROBOTS_TXT} ne dérive pas du routage : ` +
+            (missing.length ? `il MANQUE ${missing.join(', ')} (routes privées crawlables)` : '') +
+            (missing.length && extra.length ? ' ; ' : '') +
+            (extra.length
+              ? `il interdit ${extra.join(', ')}, qui n'est aucune route privée dérivée`
+              : '')
+        );
+      }
+      const sitemapLine = `Sitemap: ${SITE_ORIGIN}/sitemap.xml`;
+      if (!robotsBody.includes(sitemapLine)) {
+        errors.push(
+          `build/${ROBOTS_TXT} doit publier « ${sitemapLine} » — sans elle, la découverte ` +
+            'des pages ne passe plus que par un lien externe'
         );
       }
     }
@@ -581,8 +721,13 @@ export function runSpaRoutesCheck(options = {}) {
 
   if (errors.length === 0) {
     notices.push(
-      `${rewrites.length} rewrites analysés : fiche /jobs/:id → backend, découverte proxifiée, ` +
+      `${rewrites.length} rewrites analysés : fiche /jobs/:id → backend, sitemap proxifié, ` +
         'routes SPA déclarées nommément et aucune règle masquée (URL inconnue → 404)'
+    );
+    notices.push(
+      `${privateRoutes.length} route(s) privée(s) dérivée(s) du routage : X-Robots-Tag dans ` +
+        `vercel.json, meta de build/app.html et Disallow de build/${ROBOTS_TXT} — trois surfaces, ` +
+        'une seule liste'
     );
   }
 
