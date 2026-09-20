@@ -27,7 +27,8 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
   CLS_BUDGETS,
-  LCP_PRODUIT_PAR_UN_TIERS,
+  LCP_PRODUIT_PAR_UNE_REPONSE,
+  REQUETES_HORS_CONTROLE,
   clsAssertionMatrix,
   patternFor,
   soclePour,
@@ -111,46 +112,62 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     }
   });
 
+  it('toutes les requêtes qui décidaient du verdict sont BLOQUÉES, et pas muettes', () => {
+    const motifs = ASSERT.assertMatrix && config.ci.collect.settings.blockedUrlPatterns;
+    expect(Array.isArray(motifs)).toBe(true);
+    expect(motifs.length).toBeGreaterThan(0);
+
+    const declares = Object.keys(REQUETES_HORS_CONTROLE);
+    // Chaque chemin déclaré a son motif, et il vient de la table : une liste
+    // écrite deux fois pourrait oublier l'une des deux (et la requête lente
+    // resterait dans le chemin de mesure sans que rien ne le dise).
+    for (const chemin of declares) {
+      expect(motifs, chemin).toContain(`*${chemin}*`);
+      expect(REQUETES_HORS_CONTROLE[chemin].length, `${chemin} : justification`).toBeGreaterThan(60);
+    }
+    // Motifs sans hôte : le collect tourne sur la production, sur une preview
+    // Vercel et sur le repli loopback — un motif qui nommerait l'hôte de
+    // production ne protégerait pas les deux autres.
+    for (const motif of motifs) {
+      expect(motif, `${motif} ne doit pas nommer un hôte`).not.toMatch(/kojoforafrica|localhost|127\.0\.0\.1/);
+      expect(motif.startsWith('*') && motif.endsWith('*'), `${motif} doit être un motif large`).toBe(true);
+    }
+    // Les chemins d'AUTHENTIFICATION ne sont pas bloqués : les pages protégées
+    // doivent continuer d'être rendues avec le compte CI, sinon elles
+    // redirigeraient vers /login — et deux URLs porteraient le même LHR.
+    expect(motifs.join(' ')).not.toMatch(/auth|users\/me|session/);
+  });
+
   it('le LCP n’est retiré que sur les routes déclarées, et jamais sans preuve', () => {
-    // Toute route déclarée doit dire CE QUI l'établit : une exception muette
-    // serait un budget qu'on ne mesure plus sans le dire.
-    for (const [route, justification] of Object.entries(LCP_PRODUIT_PAR_UN_TIERS)) {
+    for (const [route, justification] of Object.entries(LCP_PRODUIT_PAR_UNE_REPONSE)) {
       expect(ROUTES, `${route} déclarée hors LCP mais pas auditée`).toContain(route);
       expect(typeof justification, `${route} : justification`).toBe('string');
       expect(justification.length, `${route} : justification`).toBeGreaterThan(80);
     }
-
-    const socleDe = (route) => ASSERT.assertMatrix.find(
-      (e) => e.aggregationMethod === 'optimistic' && new RegExp(e.matchingUrlPattern).test(
-        `https://kojoforafrica.cc.cd${route}`
-      )
-    ).assertions;
-    for (const route of ROUTES) {
-      const attendu = !Object.hasOwn(LCP_PRODUIT_PAR_UN_TIERS, route);
-      expect('largest-contentful-paint' in socleDe(route), `${route} : LCP asserté ?`).toBe(attendu);
-      // Le score est une moyenne pondérée qui COMPREND le LCP : l'asserter
-      // réimporterait la grandeur qu'on vient de retirer.
-      expect('categories:performance' in socleDe(route), `${route} : score asserté ?`).toBe(attendu);
-    }
   });
 
-  it('l’exception est bien SCOPÉE : un LCP lent passe sur /jobs et rougit ailleurs', () => {
-    // 4256 ms : la valeur RÉELLE mesurée sur /jobs le 20/09/2026 à 13:34, sur un
-    // FCP meilleur que celui du job vert (988 contre 1 389 ms) — donc du temps
-    // d'API, pas du temps de machine.
-    const lent = (route) => troisRuns(route, 0).map((run, i) => ({ ...run, audits: {
-      ...run.audits, 'largest-contentful-paint': { score: 0, numericValue: 4256 + i },
-    }, categories: { performance: { score: 0.85 } } }));
+  it('un LCP lent rougit sur les 12 autres pages (le plafond est resté vivant)', () => {
+    // 4 256 ms : la valeur RÉELLE mesurée sur /jobs le 20/09/2026 à 13:34, sur un
+    // FCP meilleur que celui du job vert — donc du temps d'API, pas de machine.
+    const lent = (route) => troisRuns(route, 0).map((run, i) => ({
+      ...run,
+      audits: { ...run.audits, 'largest-contentful-paint': { score: 0, numericValue: 4256 + i } },
+      categories: { performance: { score: 0.85 } },
+    }));
 
-    expect(echecs(lent('/jobs')), 'le LCP de /jobs ne dépend pas du job').toEqual([]);
-
-    const ailleurs = echecs(lent('/')).map((v) => v.auditId);
-    expect(ailleurs).toContain('largest-contentful-paint');
-    // Le score est asserté avec le même sort que le LCP (il le pèse).
-    expect(ailleurs.some((id) => id.startsWith('categories')), ailleurs.join(',')).toBe(true);
-
-    // Non-vacuité : le plafond lui-même n'a pas bougé pour les autres pages.
-    expect(soclePour('/register', SOCLE_GLOBAL)['largest-contentful-paint']).toEqual(
+    const assertes = ROUTES.filter((route) => !Object.hasOwn(LCP_PRODUIT_PAR_UNE_REPONSE, route));
+    for (const route of assertes) {
+      const verdicts = echecs(lent(route)).map((v) => v.auditId);
+      expect(verdicts, `${route} : LCP`).toContain('largest-contentful-paint');
+      expect(verdicts.some((id) => id.startsWith('categories')), `${route} : score`).toBe(true);
+    }
+    // Et sur la route déclarée, la MÊME mesure ne rougit pas : c'est la réponse
+    // d'une API, pas l'artefact (les trois issues mesurées le sont : liste, état
+    // vide, requête bloquée).
+    for (const route of Object.keys(LCP_PRODUIT_PAR_UNE_REPONSE)) {
+      expect(echecs(lent(route)), `${route} : exception`).toEqual([]);
+    }
+    expect(soclePour('/login', SOCLE_GLOBAL)['largest-contentful-paint']).toEqual(
       ['error', { maxNumericValue: 3500 }]
     );
   });

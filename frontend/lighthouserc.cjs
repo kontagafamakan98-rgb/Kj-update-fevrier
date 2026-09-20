@@ -56,7 +56,13 @@
 // Les budgets CLS PAR ROUTE et la matrice d'assertions : propriété de
 // scripts/lhci-cls-budgets.cjs (la table mesurée vit avec sa justification, et
 // un test l'éprouve contre le résolveur de @lhci/utils lui-même).
-const { CLS_BUDGETS, clsAssertionMatrix } = require('./scripts/lhci-cls-budgets.cjs');
+const { CLS_BUDGETS, REQUETES_HORS_CONTROLE, clsAssertionMatrix } = require('./scripts/lhci-cls-budgets.cjs');
+
+// Les requêtes de DONNÉES bloquées pendant le collect, dérivées de la table qui
+// porte leur justification (scripts/lhci-cls-budgets.cjs) : un motif, pas une
+// liste écrite deux fois. Motifs SANS hôte, donc valables sur la production
+// comme sur une preview Vercel ou le repli loopback.
+const blockedUrlPatterns = Object.keys(REQUETES_HORS_CONTROLE).map((chemin) => `*${chemin}*`);
 
 const baseUrl = (process.env.KOJO_LHCI_BASE_URL || '').trim().replace(/\/$/, '');
 const authHeader = (process.env.KOJO_LHCI_AUTH_HEADER || '').trim();
@@ -165,6 +171,27 @@ module.exports = {
       settings: {
         chromeFlags: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage',
         extraHeaders,
+        // ── Pourquoi des requêtes sont BLOQUÉES ────────────────────────────
+        // L'audit doit mesurer l'ARTEFACT, or une requête d'API décidait du
+        // verdict : la requête LENTE nommée par le job rouge du 20/09/2026
+        // (13:54) est `GET /api/geolocation/available-countries`, et le LCP de
+        // /login y a valu 3 836 / 3 781 / 3 912 ms pour un FCP de 1 028 ms —
+        // même code que le job vert de 12:29, qui le mesurait à 1 767 ms. Une
+        // grandeur décidée par un tiers ne peut pas bloquer un merge : elle est
+        // retirée du CHEMIN DE MESURE (Lighthouse applique ces motifs via CDP,
+        // la requête échoue immédiatement et la page peint ce que l'artefact
+        // lui donne). Mesuré avec le serveur de rewrites local, même build :
+        // /login 1 479 ms → 1 112 ms. Les budgets sont INCHANGÉS.
+        //
+        // Les requêtes d'AUTHENTIFICATION ne sont pas bloquées : les pages
+        // protégées doivent rester rendues avec le compte CI (sinon elles
+        // redirigeraient vers /login et deux URLs porteraient le même LHR).
+        //
+        // Une page dont la RÉPONSE *est* le plus grand peintre (/jobs : 2 727 ms
+        // avec la liste, 4 256 ms avec l'état vide, 5 177 ms la requête
+        // bloquée) n'est pas corrigée par ce blocage : son LCP et son score ne
+        // sont pas assertés (voir `LCP_PRODUIT_PAR_UNE_REPONSE`).
+        blockedUrlPatterns,
       },
     },
     assert: {
@@ -205,16 +232,15 @@ module.exports = {
       // changé.
         // ── Ce que la matrice porte PAR ROUTE ───────────────────────────────
       // `clsAssertionMatrix` construit une entrée par page : le socle ci-dessous
-      // pour ce qu'une page peut porter, puis son plafond CLS. Deux raisons de
-      // ne pas écrire un socle global (vérifié par
+      // (score, FCP, LCP, TBT) puis son plafond CLS. Deux raisons de ne pas
+      // écrire un socle global (vérifié par
       // scripts/__tests__/lhci-cls-budgets.test.js) :
-      //   • une route dont le LCP vient d'une réponse d'API n'est pas mesurable
-      //     depuis un runner de façon reproductible (preuve mesurée dans
-      //     l'en-tête de lhci-cls-budgets.cjs) : elle ne porte pas ces deux
-      //     grandeurs, et une entrée globale le lui imposerait ;
       //   • lhci refuse un motif qui couvrirait deux URLs (« Can only assert one
-      //     URL at a time! »), donc un socle par route est aussi le seul moyen
-      //     d'attacher une exception à UNE page.
+      //     URL at a time! »), donc un socle par route est le seul moyen
+      //     d'attacher un budget à UNE page (c'est ce qui porte le CLS) ;
+      //   • c'est aussi la seule forme où une exception FUTURE tiendrait sur une
+      //     page sans affaiblir les autres — l'entrée globale rendait toute
+      //     exception contagieuse.
       assertMatrix: clsAssertionMatrix(auditedPaths, {
         // ── Socle commun, mesuré le 16/09/2026 (3 runs par page, médianes) ──
         //   page        score  FCP ms  LCP ms  TBT ms (médiane, détail)
