@@ -94,7 +94,10 @@ export default function Jobs() {
     setFilters,
     searchParams,
     user,
-    pageT,
+    errorMessages: {
+      network: pageT('loadErrorNetwork'),
+      server: pageT('loadErrorServer'),
+    },
     consumePrefetch: consumePublicJobsPrefetch,
   });
 

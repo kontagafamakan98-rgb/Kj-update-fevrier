@@ -184,7 +184,7 @@ describe('publicJobsPrefetch — Jobs.js garde le déclenchement à l’étape m
     expect(JOBS_SRC).not.toMatch(/let publicJobsPrefetch = null/);
   });
 
-  it('consomme le préchargement dans le chargement de la liste', () => {
-    expect(JOBS_SRC).toMatch(/await consumePublicJobsPrefetch\(params\)/);
+  it('expose le consommateur au hook de chargement de la liste', () => {
+    expect(JOBS_SRC).toMatch(/consumePrefetch:\s*consumePublicJobsPrefetch/);
   });
 });

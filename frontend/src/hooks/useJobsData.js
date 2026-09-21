@@ -9,7 +9,7 @@ export const JOB_TAB_APPLICATIONS = 'applications';
 export const JOB_TAB_MISSIONS = 'missions';
 export const JOBS_PAGE_SIZE = 12;
 
-export function useJobsData({ effectiveTab, filters, setFilters, searchParams, user, pageT, consumePrefetch }) {
+export function useJobsData({ effectiveTab, filters, setFilters, searchParams, user, errorMessages, consumePrefetch }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -69,7 +69,7 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
       if (requestId !== requestSequence.current) return;
       safeLog.error('Jobs load error', error);
       const networkFailure = !error?.response;
-      const fallback = networkFailure ? pageT('loadErrorNetwork') : pageT('loadErrorServer');
+      const fallback = networkFailure ? errorMessages.network : errorMessages.server;
       setLoadError({
         reseau: networkFailure,
         message: handleApiError(error, fallback),
