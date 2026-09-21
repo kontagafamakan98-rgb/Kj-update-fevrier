@@ -1,0 +1,145 @@
+[
+  {
+    "methode": "POST",
+    "chemin": "/api/workers/profile",
+    "nom": "create_worker_profile",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/workers/profile",
+    "nom": "get_worker_profile",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "PUT",
+    "chemin": "/api/workers/profile",
+    "nom": "update_worker_profile",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/jobs",
+    "nom": "create_job",
+    "code": null,
+    "response_model": "kojo_models.Job",
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/jobs",
+    "nom": "get_jobs",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user_optional",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/jobs/{job_id}",
+    "nom": "get_job",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user_optional",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "DELETE",
+    "chemin": "/api/jobs/{job_id}",
+    "nom": "delete_job",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/jobs/{job_id}/proposals",
+    "nom": "create_proposal",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/jobs/{job_id}/proposals/{proposal_id}/accept",
+    "nom": "accept_job_proposal",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/jobs/{job_id}/complete",
+    "nom": "complete_job_and_release_payment",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/proposals/mine",
+    "nom": "get_my_proposals",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/jobs/{job_id}/proposals",
+    "nom": "get_job_proposals",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/jobs/{job_id}/payment-status",
+    "nom": "get_job_payment_status",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  }
+]

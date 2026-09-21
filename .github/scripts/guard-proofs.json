@@ -239,6 +239,14 @@
       "runner": "pytest"
     },
     {
+      "chemin": "backend/kojo_routers_jobs.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_job_route_surface.py",
+      "runner": "pytest",
+      "motif": "composeur du routeur des missions : après le découpage, ce qui doit rester vrai n'est pas le fichier mais sa SURFACE (chemins, méthodes, dépendances, ordre de montage), lue sur l'application réellement montée — son seul exécutant est test_job_route_surface.py"
+    },
+    {
       "chemin": "backend/scripts/audit_none_signatures.py",
       "role": "garde",
       "invoque_par": "test",
@@ -409,6 +417,27 @@
       "cwd": "frontend",
       "attend": [
         "WARNING INFRA : verbe interdit"
+      ]
+    },
+    {
+      "id": "split-jobs: groupe d'endpoints non monte",
+      "garde": "backend/kojo_routers_jobs.py",
+      "cible": "backend/kojo_routers_jobs.py",
+      "trouve": "router.include_router(_listing)",
+      "remplace": "pass  # mutation : le groupe de routes n'est plus monte",
+      "runner": "python",
+      "preuve": "backend/tests/test_job_route_surface.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_job_route_surface.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_job_route_surface.py::TestSurfaceDesRoutes::test_la_surface_des_routes_est_inchangee"
       ]
     },
     {

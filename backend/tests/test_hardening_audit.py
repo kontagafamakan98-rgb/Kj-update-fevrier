@@ -365,9 +365,9 @@ class TestAccountDeletion:
             user["user"]["id"], job_id=job_id, payout_status=payout_status
         )
 
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "refund-token-abc", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}):
             resp = await client.delete("/api/users/account", headers=headers)
 
@@ -407,9 +407,9 @@ class TestAccountDeletion:
         headers = {"Authorization": f"Bearer {user['access_token']}"}
         await self._insert_payment(user["user"]["id"], payout_status="held")
 
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "refund-token-fail", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "failed", "response_code": "01", "response_text": "Compte invalide"}):
             resp = await client.delete("/api/users/account", headers=headers)
 
@@ -438,9 +438,9 @@ class TestAccountDeletion:
         )
 
         headers = {"Authorization": f"Bearer {worker['access_token']}"}
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "refund-token-abc", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}):
             resp = await client.delete("/api/users/account", headers=headers)
 
@@ -464,9 +464,9 @@ class TestAccountDeletion:
             headers = {"Authorization": f"Bearer {user['access_token']}"}
             await self._insert_payment(user["user"]["id"], payout_status=payout_status)
 
-            with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+            with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                        return_value={"disburse_token": "should-not-run", "response_code": "00"}) as mock_create, \
-                 patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+                 patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                        return_value={"status": "success", "response_code": "00"}) as mock_submit:
                 resp = await client.delete("/api/users/account", headers=headers)
 
