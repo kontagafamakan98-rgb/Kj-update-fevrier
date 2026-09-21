@@ -226,11 +226,11 @@ class TestCancellationRefund:
         client_user, _, job_id, payment_id = await self._paid_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
 
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "refund-token-abc", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+             patch("kojo_job_effects.notify_user_localized", AsyncMock()):
             resp = await client.delete(f"/api/jobs/{job_id}", headers=headers)
 
         assert resp.status_code == 200
@@ -258,11 +258,11 @@ class TestCancellationRefund:
         client_user, _, job_id, payment_id = await self._paid_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
 
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "refund-token-fail", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "failed", "response_code": "01", "response_text": "Compte invalide"}), \
-             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+             patch("kojo_job_effects.notify_user_localized", AsyncMock()):
             resp = await client.delete(f"/api/jobs/{job_id}", headers=headers)
 
         assert resp.status_code == 200
@@ -345,8 +345,8 @@ class TestProposalAcceptGuards:
             "status": "pending",
         })
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
-        with patch("kojo_routers_jobs.notify_user_localized", AsyncMock()), \
-             patch("kojo_routers_jobs._send_payment_pending_to_worker", AsyncMock()):
+        with patch("kojo_job_effects.notify_user_localized", AsyncMock()), \
+             patch("kojo_job_effects._send_payment_pending_to_worker", AsyncMock()):
             resp = await client.post(
                 f"/api/jobs/{job_id}/proposals/{proposal_id}/accept",
                 headers=headers,

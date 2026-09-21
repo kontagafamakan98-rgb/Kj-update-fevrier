@@ -183,11 +183,11 @@ class TestRefundAmbiguousSubmit:
         client_user, _, job_id, payment_id = await _create_paid_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
 
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "refund-token-ambig", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    side_effect=HTTPException(status_code=502, detail="timeout réseau")), \
-             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+             patch("kojo_job_effects.notify_user_localized", AsyncMock()):
             resp = await client.delete(f"/api/jobs/{job_id}", headers=headers)
 
         assert resp.status_code == 200, resp.text
@@ -208,11 +208,11 @@ class TestWorkerPayoutAmbiguousSubmit:
         client_user, _, job_id, payment_id = await _create_paid_job(client)
         headers = {"Authorization": f"Bearer {client_user['access_token']}"}
 
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "worker-token-ambig", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    side_effect=HTTPException(status_code=502, detail="timeout réseau")), \
-             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+             patch("kojo_job_effects.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/jobs/{job_id}/complete", headers=headers)
 
         assert resp.status_code == 200, resp.text
@@ -287,11 +287,11 @@ class TestOwnerRetryRefund:
 
         with patch("kojo_core.OWNER_EMAIL", owner_user["user"]["email"]), \
              patch("kojo_core.OWNER_USER_ID", owner_user["user"]["id"]), \
-             patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+             patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "retry-token", "response_code": "00"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+             patch("kojo_job_effects.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/owner/payments/{payment_id}/retry-refund", headers=headers)
 
         assert resp.status_code == 200

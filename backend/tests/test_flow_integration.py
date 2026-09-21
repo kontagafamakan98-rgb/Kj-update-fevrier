@@ -165,11 +165,11 @@ class TestFullJobFlow:
         # ------------------------------------------------------------------
         # 8. Clôture de la mission : déclenche le décaissement simulé
         # ------------------------------------------------------------------
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "disburse-token-integration"}), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+             patch("kojo_job_effects.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/jobs/{job_id}/complete", headers=client_headers)
         assert resp.status_code == 200, f"complete failed: {resp.text}"
         data = resp.json()
@@ -299,10 +299,10 @@ class TestCommissionRateEndToEnd:
             captured_disburse["amount"] = kwargs.get("amount")
             return {"disburse_token": "disburse-token-rate"}
 
-        with patch("kojo_routers_jobs.create_paydunya_disburse_invoice", side_effect=_fake_disburse_invoice), \
-             patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+        with patch("kojo_job_effects.create_paydunya_disburse_invoice", side_effect=_fake_disburse_invoice), \
+             patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                    return_value={"status": "success", "response_code": "00"}), \
-             patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+             patch("kojo_job_effects.notify_user_localized", AsyncMock()):
             resp = await client.post(f"/api/jobs/{job_id}/complete", headers=client_headers)
         assert resp.status_code == 200, resp.text
         assert resp.json()["payout_status"] == "released"

@@ -25,11 +25,11 @@ from tests.conftest import (
 async def _complete_job_with_payout(client, client_headers, job_id):
     """Clôture une mission avec décaissement PayDunya simulé (comme le test
     d'intégration). Retourne la réponse de /complete."""
-    with patch("kojo_routers_jobs.create_paydunya_disburse_invoice",
+    with patch("kojo_job_effects.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-referral"}), \
-         patch("kojo_routers_jobs.submit_paydunya_disburse_invoice",
+         patch("kojo_job_effects.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
-         patch("kojo_routers_jobs.notify_user_localized", AsyncMock()):
+         patch("kojo_job_effects.notify_user_localized", AsyncMock()):
         return await client.post(f"/api/jobs/{job_id}/complete", headers=client_headers)
 
 
@@ -874,7 +874,7 @@ async def test_push_matching_notifies_workers_with_matching_specialty(client):
         location={"address": "Dakar Plateau"},
     )
 
-    with patch("kojo_routers_jobs.notify_user_localized", new=AsyncMock()) as mock_notify:
+    with patch("kojo_job_effects.notify_user_localized", new=AsyncMock()) as mock_notify:
         await _notify_matching_workers(job)
         mock_notify.assert_awaited()
         # le travailleur plombier reçoit une notification
