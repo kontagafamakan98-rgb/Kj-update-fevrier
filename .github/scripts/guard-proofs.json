@@ -328,6 +328,15 @@
       "hors_mutation": "outil sans verdict : sa preuve (check-lhci-env.test.js) n'importe que fs/path, elle lit le câblage lighthouserc/CI et n'exécute jamais le script — neutraliser le .sh ne la fait pas rougir"
     },
     {
+      "chemin": "frontend/scripts/playtest-api-server.mjs",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "fixture locale déterministe : elle sert les parcours de playtest Jobs/auth/candidature/création/paiement, mais ne prononce aucun verdict sur le dépôt",
+      "hors_mutation": "outil sans verdict : ses échecs concernent uniquement le démarrage ou les réponses de la fixture locale ; aucune branche n'est un refus d'une propriété du dépôt à neutraliser"
+    },
+    {
       "chemin": "frontend/scripts/bundle-size-report.js",
       "role": "outil",
       "invoque_par": "ci",
