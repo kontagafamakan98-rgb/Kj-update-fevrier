@@ -11,6 +11,7 @@ from kojo_core import (
     get_current_user,
 )
 from kojo_settings import logger
+from kojo_identifiants import identifiant_query
 
 # Champs JAMAIS exposés quand on sérialise un AUTRE utilisateur (PII).
 SENSITIVE_OTHER_USER_FIELDS = {"password_hash", "payment_accounts", "email", "phone"}
@@ -36,7 +37,7 @@ async def send_message(
 
     # Projection {"id": 1} (pas {"_id": 1}) : reste truthy avec la FakeDB de
     # test qui projette vers un dict vide pour _id seul.
-    receiver_exists = await db.users.find_one({"id": message_data.receiver_id}, {"id": 1})
+    receiver_exists = await db.users.find_one({**identifiant_query(message_data.receiver_id)}, {"id": 1})
     if receiver_exists is None:
         raise HTTPException(status_code=404, detail="Destinataire introuvable")
 
@@ -143,7 +144,7 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
 
         # Fetch other user data
         if other_user_id:
-            other_user = await db.users.find_one({"id": other_user_id})
+            other_user = await db.users.find_one({**identifiant_query(other_user_id)})
             if other_user:
                 other_user_dict = {k: v for k, v in other_user.items() if k != "_id"}
                 # SECURITE/PII : on n'expose JAMAIS les comptes de paiement,

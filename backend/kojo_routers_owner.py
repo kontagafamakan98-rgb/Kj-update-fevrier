@@ -22,6 +22,7 @@ from kojo_routers_jobs import execute_paydunya_refund
 # Helpers du sweeper (kojo_scheduler) : source unique de vérité pour les
 # statuts incertains et le calcul de la durée de blocage.
 from kojo_scheduler import _STUCK_PAYOUT_STATUSES, _stuck_for
+from kojo_identifiants import identifiant_query
 
 router = APIRouter()
 
@@ -291,7 +292,7 @@ async def retry_payment_refund(payment_id: str, owner_user = Depends(verify_owne
     Returns:
         dict: {payment_id, job_id, refund_status, refunded_amount}.
     """
-    payment_record = await db.payments.find_one({"id": payment_id})
+    payment_record = await db.payments.find_one({**identifiant_query(payment_id)})
     if not payment_record:
         raise HTTPException(status_code=404, detail="Paiement introuvable")
     if payment_record.get("payout_kind") != "refund":
@@ -304,7 +305,7 @@ async def retry_payment_refund(payment_id: str, owner_user = Depends(verify_owne
 
     # Verrou CAS : relance uniquement depuis refund_failed.
     lock_result = await db.payments.update_one(
-        {"id": payment_id, "payout_status": "refund_failed"},
+        {**identifiant_query(payment_id), "payout_status": "refund_failed"},
         maj_sequestre("refunding", {"updated_at": datetime.now(timezone.utc).isoformat()})
     )
     if lock_result.matched_count == 0:

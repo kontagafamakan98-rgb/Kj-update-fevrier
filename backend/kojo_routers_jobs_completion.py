@@ -22,6 +22,7 @@ from kojo_settings import (
     REFERRAL_SPONSOR_REWARD,
     logger,
 )
+from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -35,7 +36,7 @@ async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, jo
     un code invalide/absent est ignoré silencieusement (non bloquant).
     """
     try:
-        worker = await db.users.find_one({"id": worker_id}, {"referred_by": 1, "referral_first_job_rewarded": 1})
+        worker = await db.users.find_one({**identifiant_query(worker_id)}, {"referred_by": 1, "referral_first_job_rewarded": 1})
         if not worker:
             return
         if worker.get("referral_first_job_rewarded"):
@@ -70,7 +71,7 @@ async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, jo
 
         # Crédit du filleul + pose du flag (même update, atomique)
         await db.users.update_one(
-            {"id": worker_id},
+            {**identifiant_query(worker_id)},
             {
                 "$set": {"referral_first_job_rewarded": True, "updated_at": now},
                 "$inc": {"referral_reward_balance": REFERRAL_FILLEUL_REWARD},
@@ -80,7 +81,7 @@ async def _maybe_award_first_job_referral_reward(worker_id: str, job_id: str, jo
 
         # Crédit du parrain
         await db.users.update_one(
-            {"id": sponsor["id"]},
+            {**identifiant_query(sponsor["id"])},
             {
                 "$inc": {"referral_reward_balance": REFERRAL_SPONSOR_REWARD},
                 "$push": {"referral_rewards": {**reward_record, "role": "parrain", "amount": REFERRAL_SPONSOR_REWARD}},
@@ -131,7 +132,7 @@ async def complete_job_and_release_payment(
         dict: {message, job (modèle complet), payout_status
         (released | release_failed | already_released)}.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -161,9 +162,9 @@ async def complete_job_and_release_payment(
     current_payout_status = payment_record.get("payout_status") or "held"
     if current_payout_status == "released":
         # Deja verse : on se contente de cloturer le job si ce n'est pas fait
-        await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
         await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
-        updated_job = await db.jobs.find_one({"id": job_id})
+        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {"message": "Mission déjà clôturée et paiement déjà versé", "job": Job(**updated_job).model_dump(), "payout_status": "released"}
     if current_payout_status == "releasing":
         raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
@@ -171,13 +172,13 @@ async def complete_job_and_release_payment(
     # Verrou : marquer "releasing" seulement si toujours "held", pour eviter
     # un double-versement en cas de double-clic/appel concurrent.
     lock_result = await db.payments.update_one(
-        {"id": payment_record["id"], "payout_status": current_payout_status},
+        {**identifiant_query(payment_record["id"]), "payout_status": current_payout_status},
         effets.maj_sequestre("releasing", {"updated_at": datetime.now(timezone.utc).isoformat()})
     )
     if lock_result.matched_count == 0:
         raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
 
-    worker = await db.users.find_one({"id": worker_id})
+    worker = await db.users.find_one({**identifiant_query(worker_id)})
     worker_payment_accounts = (worker or {}).get("payment_accounts") or {}
     worker_amount = payment_record.get("worker_amount") or 0
 
@@ -195,15 +196,15 @@ async def complete_job_and_release_payment(
 
     async def _mark_release_failed(reason: str):
         await db.payments.update_one(
-            {"id": payment_record["id"]},
+            {**identifiant_query(payment_record["id"])},
             effets.maj_sequestre("release_failed", {"payout_failure_reason": reason, "updated_at": datetime.now(timezone.utc).isoformat()})
         )
-        await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+        await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
         await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
 
     if not payout_method or not payout_phone:
         await _mark_release_failed("Le travailleur n'a pas de compte Orange Money ou Wave configuré")
-        updated_job = await db.jobs.find_one({"id": job_id})
+        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {
             "message": "Mission clôturée, mais le versement automatique est impossible : le travailleur n'a pas de compte Orange Money ou Wave enregistré. Un versement manuel est nécessaire.",
             "job": Job(**updated_job).model_dump(),
@@ -224,7 +225,7 @@ async def complete_job_and_release_payment(
     except HTTPException as exc:
         # get-invoice REFUSÉ : PayDunya n'a rien exécuté → échec sûr, relançable.
         await _mark_release_failed(str(exc.detail))
-        updated_job = await db.jobs.find_one({"id": job_id})
+        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {
             "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
             "job": Job(**updated_job).model_dump(),
@@ -233,7 +234,7 @@ async def complete_job_and_release_payment(
     except Exception as exc:
         logger.error(f"⚠️ Erreur inattendue lors de la préparation du versement: {exc}")
         await _mark_release_failed("Erreur inattendue lors de la préparation du versement")
-        updated_job = await db.jobs.find_one({"id": job_id})
+        updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {
             "message": "Mission clôturée, mais le versement automatique a échoué. Un versement manuel est nécessaire.",
             "job": Job(**updated_job).model_dump(),
@@ -243,7 +244,7 @@ async def complete_job_and_release_payment(
     # Token persisté AVANT le submit : si le submit lève (timeout réseau), le
     # versement reste identifiable et confirmable via l'IPN ou un check-status.
     await db.payments.update_one(
-        {"id": payment_record["id"]},
+        {**identifiant_query(payment_record["id"])},
         {"$set": {
             "disburse_token": disburse_token,
             "updated_at": datetime.now(timezone.utc).isoformat()
@@ -259,7 +260,7 @@ async def complete_job_and_release_payment(
         # permettrait une relance → risque de DOUBLE versement au travailleur.
         logger.error(f"⚠️ Réponse incertaine du submit PayDunya (versement travailleur): {exc}")
         await db.payments.update_one(
-            {"id": payment_record["id"]},
+            {**identifiant_query(payment_record["id"])},
             effets.maj_sequestre("releasing", {"disburse_error": f"Réponse incertaine du submit: {exc}", "updated_at": datetime.now(timezone.utc).isoformat()})
         )
         final_payout_status = "releasing"
@@ -270,7 +271,7 @@ async def complete_job_and_release_payment(
         ).strip().lower()
 
         await db.payments.update_one(
-            {"id": payment_record["id"]},
+            {**identifiant_query(payment_record["id"])},
             {"$set": {
                 "disburse_provider_response": submit_result,
                 "updated_at": datetime.now(timezone.utc).isoformat()
@@ -288,13 +289,13 @@ async def complete_job_and_release_payment(
         else:
             final_payout_status = "release_failed"
             await db.payments.update_one(
-                {"id": payment_record["id"]},
+                {**identifiant_query(payment_record["id"])},
                 {"$set": {"payout_failure_reason": submit_result.get("response_text") or "Échec du versement PayDunya"}}
             )
 
-        await db.payments.update_one({"id": payment_record["id"]}, effets.maj_sequestre(final_payout_status))
+        await db.payments.update_one({**identifiant_query(payment_record["id"])}, effets.maj_sequestre(final_payout_status))
 
-    await db.jobs.update_one({"id": job_id}, {"$set": {"status": JobStatus.COMPLETED.value}})
+    await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
     await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
 
     # Notifier le travailleur et confirmer au client via le chat (canal
@@ -346,7 +347,7 @@ async def complete_job_and_release_payment(
         job_title=job.get("title") or "",
     ))
 
-    updated_job = await db.jobs.find_one({"id": job_id})
+    updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
     return {
         "message": "Mission clôturée avec succès",
         "job": Job(**updated_job).model_dump(),

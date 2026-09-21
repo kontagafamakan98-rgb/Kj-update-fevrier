@@ -19,6 +19,7 @@ from kojo_core import db, get_current_user
 from kojo_models import NotificationType, Review, ReviewCreate, User
 from kojo_settings import OWNER_EMAIL, logger
 from kojo_shared import notify_user_localized
+from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -29,7 +30,7 @@ async def _recompute_user_rating(user_id: str):
     total = len(reviews)
     rating = round(sum(int(r.get("rating", 0)) for r in reviews) / total, 1) if total else 0.0
     await db.users.update_one(
-        {"id": user_id},
+        {**identifiant_query(user_id)},
         {"$set": {
             "rating": rating,
             "total_reviews": total,
@@ -45,7 +46,7 @@ async def _enrich_reviews(reviews):
     reviewers = {}
     if reviewer_ids:
         cursor = db.users.find(
-            {"id": {"$in": list(reviewer_ids)}},
+            {**identifiant_query({"$in": list(reviewer_ids)})},
             {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "profile_photo": 1},
         )
         async for u in cursor:
@@ -79,7 +80,7 @@ async def create_review(
     Returns:
         dict: {message, review, reviewee_rating, reviewee_total_reviews}.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Mission introuvable")
 
@@ -161,7 +162,7 @@ async def get_job_reviews(job_id: str, current_user: User = Depends(get_current_
     Returns:
         list[dict]: avis enrichis du nom/photo de l'auteur.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Mission introuvable")
 
@@ -186,7 +187,7 @@ async def get_user_reviews(user_id: str, current_user: User = Depends(get_curren
         enrichis du nom/photo de l'auteur.
     """
     user = await db.users.find_one(
-        {"id": user_id},
+        {**identifiant_query(user_id)},
         {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "profile_photo": 1, "rating": 1, "total_reviews": 1},
     )
     if not user:
@@ -208,7 +209,7 @@ async def delete_review(review_id: str, current_user: User = Depends(get_current
     Returns:
         dict: {message: "Avis supprimé", review_id}.
     """
-    review = await db.reviews.find_one({"id": review_id})
+    review = await db.reviews.find_one({**identifiant_query(review_id)})
     if not review:
         raise HTTPException(status_code=404, detail="Avis introuvable")
 
@@ -219,7 +220,7 @@ async def delete_review(review_id: str, current_user: User = Depends(get_current
         )
 
     reviewee_id = review.get("reviewee_id")
-    await db.reviews.delete_one({"id": review_id})
+    await db.reviews.delete_one({**identifiant_query(review_id)})
     if reviewee_id:
         try:
             await _recompute_user_rating(reviewee_id)

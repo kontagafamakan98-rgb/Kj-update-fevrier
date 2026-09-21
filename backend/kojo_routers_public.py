@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException, Response
 from kojo_core import db
 from kojo_job_og import escape_xml, job_og_html, job_og_html_404
 from kojo_settings import FRONTEND_APP_URL, logger
+from kojo_identifiants import identifiant_job_query
 
 router = APIRouter()
 
@@ -287,7 +288,7 @@ async def get_job_og_image_square(job_id: str):
     Returns:
         PNG (image/png) — 404 si la mission n'existe pas.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     try:
@@ -314,7 +315,7 @@ async def get_job_og_image(job_id: str):
     Returns:
         PNG (image/png) — 404 si la mission n'existe pas.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     try:
@@ -345,7 +346,7 @@ async def get_job_og_html(job_id: str):
     Returns:
         Response: HTML (text/html) — 404 noindex si la mission n'existe pas.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     base = _site_base()
     if not job:
         return Response(

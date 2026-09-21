@@ -247,6 +247,22 @@
       "motif": "famille `jobs` : après le découpage, ce qui doit rester vrai n'est pas le fichier mais sa SURFACE (chemins, méthodes, dépendances d'authentification, ordre de montage), lue sur l'application réellement montée et figée dans tests/surface/route_surface_jobs.json — un instantané par famille depuis que le contrat couvre TOUT server.app"
     },
     {
+      "chemin": "backend/kojo_identifiants.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_identifiants_un_proprietaire.py",
+      "runner": "pytest",
+      "motif": "propriétaire de la règle d'identifiant (`id` / `job_id` legacy / `_id`) : un document peut porter son identifiant de trois façons selon son âge, et un filtre qui ne couvre que `id` rend inerte tout document ancien. La preuve dérive du DOSSIER les routeurs qui réécriraient la règle, et établit sur une route réelle qu'un document sans champ `id` reste adressable"
+    },
+    {
+      "chemin": "backend/kojo_routers_users_push.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_identifiants_un_proprietaire.py",
+      "runner": "pytest",
+      "motif": "un routeur qui adresse un document par l'identifiant que le client a reçu : il est le témoin de la règle pour les seize routeurs concernés — le filtre doit venir de `kojo_identifiants`, jamais du routeur (les deux mutations de son registre font rougir cette preuve-là, une par moitié de la règle)"
+    },
+    {
       "chemin": "backend/server.py",
       "role": "garde",
       "invoque_par": "test",
@@ -1344,6 +1360,69 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_route_surface.py::TestSurfaceDesFamilles::test_la_surface_de_la_famille_est_inchangee[server]"
+      ]
+    },
+    {
+      "id": "identifiants: un filtre recopie revient dans un routeur",
+      "garde": "backend/kojo_routers_users_push.py",
+      "cible": "backend/kojo_routers_users_push.py",
+      "trouve": "find_one({**identifiant_query(token_id), \"user_id\": current_user.id})",
+      "remplace": "find_one({\"id\": token_id, \"user_id\": current_user.id})",
+      "runner": "python",
+      "preuve": "backend/tests/test_identifiants_un_proprietaire.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_identifiants_un_proprietaire.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_identifiants_un_proprietaire.py::TestAucunFiltreRecopie::test_aucun_routeur_n_ecrit_son_propre_filtre_d_identifiant"
+      ]
+    },
+    {
+      "id": "identifiants: la copie locale de la regle revient",
+      "garde": "backend/kojo_routers_users_push.py",
+      "cible": "backend/kojo_routers_users_push.py",
+      "trouve": "        token = await db.push_tokens.find_one({**identifiant_query(token_id), \"user_id\": current_user.id})\n        if not token:",
+      "remplace": "        def _copie_identifiant(valeur):\n            return {\"id\": valeur}\n\n        token = await db.push_tokens.find_one(_copie_identifiant(token_id))\n        if not token:",
+      "runner": "python",
+      "preuve": "backend/tests/test_identifiants_un_proprietaire.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_identifiants_un_proprietaire.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_identifiants_un_proprietaire.py::TestAucunFiltreRecopie::test_aucun_routeur_ne_recopie_la_regle"
+      ]
+    },
+    {
+      "id": "identifiants: le repli _id disparait",
+      "garde": "backend/kojo_identifiants.py",
+      "cible": "backend/kojo_identifiants.py",
+      "trouve": "    candidats.append({\"_id\": valeur})\n",
+      "remplace": "    # mutation : le repli _id a disparu\n",
+      "runner": "python",
+      "preuve": "backend/tests/test_identifiants_un_proprietaire.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_identifiants_un_proprietaire.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_identifiants_un_proprietaire.py::TestUnDocumentAncienResteAdressable::test_un_jeton_sans_champ_id_est_desactive_par_son_identifiant_mongo"
       ]
     }
   ]

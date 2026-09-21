@@ -15,6 +15,7 @@ from kojo_core import (
 )
 from kojo_settings import OWNER_EMAIL, OWNER_USER_ID, logger
 from kojo_shared import notify_user_localized
+from kojo_identifiants import identifiant_query
 
 router = APIRouter()
 
@@ -37,7 +38,7 @@ async def get_support_ticket_status(payload: SupportTicketStatusLookup):
     Returns:
         dict: {ticket_id, status, reason, created_at, updated_at, message}.
     """
-    ticket = await db.support_tickets.find_one({"id": payload.ticket_id})
+    ticket = await db.support_tickets.find_one({**identifiant_query(payload.ticket_id)})
     if not ticket or str(ticket.get("email") or "").strip().lower() != payload.email.strip().lower():
         raise HTTPException(status_code=404, detail="Ticket introuvable")
     return {
@@ -129,7 +130,7 @@ async def update_support_ticket_status(
         dict: ticket mis à jour (SupportTicket.model_dump).
     """
     result = await db.support_tickets.update_one(
-        {"id": ticket_id},
+        {**identifiant_query(ticket_id)},
         {"$set": {
             "status": status_update.status.value,
             "updated_at": datetime.now(timezone.utc)
@@ -137,5 +138,5 @@ async def update_support_ticket_status(
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Demande de support introuvable")
-    updated = await db.support_tickets.find_one({"id": ticket_id})
+    updated = await db.support_tickets.find_one({**identifiant_query(ticket_id)})
     return SupportTicket(**updated).model_dump()

@@ -14,6 +14,7 @@ from kojo_core import db
 from kojo_models import PaymentAccount, User
 
 from kojo_core import get_current_user, validate_payment_accounts
+from kojo_identifiants import identifiant_query
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ async def get_user_payment_accounts(current_user: User = Depends(get_current_use
         is_verified, minimum_required}.
     """
     
-    user_data = await db.users.find_one({"id": current_user.id})
+    user_data = await db.users.find_one({**identifiant_query(current_user.id)})
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -54,7 +55,7 @@ async def update_user_payment_accounts(
         required_minimum, is_verified, accounts}}.
     """
     
-    user_data = await db.users.find_one({"id": current_user.id})
+    user_data = await db.users.find_one({**identifiant_query(current_user.id)})
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -69,7 +70,7 @@ async def update_user_payment_accounts(
     
     # Mettre à jour en base de données
     await db.users.update_one(
-        {"id": current_user.id},
+        {**identifiant_query(current_user.id)},
         {
             "$set": {
                 "payment_accounts": payment_validation["account_details"],
@@ -99,7 +100,7 @@ async def verify_payment_access(current_user: User = Depends(get_current_user)):
         user_type, is_verified?}.
     """
     
-    user_data = await db.users.find_one({"id": current_user.id})
+    user_data = await db.users.find_one({**identifiant_query(current_user.id)})
     if not user_data:
         raise HTTPException(status_code=404, detail="User not found")
     

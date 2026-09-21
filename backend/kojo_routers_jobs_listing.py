@@ -3,15 +3,15 @@
 
 Extrait de `kojo_routers_jobs.py` sans changement de comportement (surface
 figée par `tests/surface/route_surface_jobs.json`). La vue publique (`_job_view`) et la
-résolution d'identifiant (`_job_identifier_query`) sont ici parce qu'elles
-n'ont de sens que pour ces trois routes.
+résolution d'identifiant (celle de `kojo_identifiants`, `identifiant_job_query`)
+sont ici parce qu'elles n'ont de sens que pour ces trois routes.
 """
 import asyncio
 import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from kojo_identifiants import identifiant_query
+from kojo_identifiants import identifiant_job_query, identifiant_query
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import ValidationError
 
@@ -25,15 +25,6 @@ from kojo_settings import OWNER_EMAIL, logger
 router = APIRouter()
 
 
-def _job_identifier_query(job_id: str) -> dict:
-    """Find current and legacy jobs regardless of the stored identifier field.
-
-    Couvre : `id` (chaîne uuid, jobs actuels), `job_id` (legacy), et `_id`
-    quand il stocke l'identifiant au lieu d'un ObjectId Mongo (anciens jeux de
-    données importés). La règle elle-même vit dans `kojo_identifiants`, une
-    seule fois pour tout le dépôt : les notifications la partageaient sous une
-    forme recopiée, et l'une des deux copies avait dérivé."""
-    return identifiant_query(job_id, ("id", "job_id"))
 
 # Vue PUBLIQUE des jobs (découverte sans compte) : modélisée par une
 # ALLOWLIST stricte (JobPublic dans kojo_models), pas un denylist — tout champ
@@ -188,7 +179,7 @@ async def get_job(job_id: str, current_user: Optional[User] = Depends(get_curren
         dict: vue du job via _job_view (contient job + relation avec
         l'utilisateur courant).
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -213,7 +204,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     """
     job = await db.jobs.find_one({
         "$and": [
-            _job_identifier_query(job_id),
+            identifiant_job_query(job_id),
             {"deleted": {"$ne": True}},
         ]
     })
@@ -253,7 +244,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
 
         # Verrou atomique (CAS) : "held"/"release_failed" → "refunding".
         lock_result = await db.payments.update_one(
-            {"id": payment_record["id"], "payout_status": payout_status},
+            {**identifiant_query(payment_record["id"]), "payout_status": payout_status},
             effets.maj_sequestre("refunding", {"payout_kind": "refund", "updated_at": now_iso})
         )
         if lock_result.matched_count == 0:
@@ -266,7 +257,7 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
         refunded_amount = payment_record.get("amount")
 
     await db.jobs.update_one(
-        _job_identifier_query(job_id),
+        identifiant_job_query(job_id),
         {
             "$set": {
                 "deleted": True,
