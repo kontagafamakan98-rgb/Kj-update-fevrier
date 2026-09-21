@@ -24,6 +24,18 @@
 export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
 
 /**
+ * Nom de la balise qui publie la RÉVISION dont le frontend a été construit.
+ *
+ * Deux lecteurs, un seul nom : le build l'écrit (`vite-plugins/inject-build-revision.js`),
+ * et `scripts/check-deployed-revision.js` la lit dans le HTML SERVI pour
+ * comparer à ce que `main` aurait dû déployer. Elle vit ici pour la même raison
+ * que `SITE_ORIGIN` : deux modules qui recopient un nom de balise se
+ * désynchronisent au premier renommage, et le garde lirait alors une balise qui
+ * n'existe plus — un vert sur du vide.
+ */
+export const BUILD_REVISION_META = 'kojo-build-revision';
+
+/**
  * Origine de l'API que ce site appelle en direct depuis le navigateur.
  *
  * Elle vit ici, avec `SITE_ORIGIN`, parce que les deux forment UNE paire : le

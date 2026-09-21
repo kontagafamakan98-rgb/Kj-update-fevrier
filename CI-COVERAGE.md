@@ -30,7 +30,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Workflow lint (actionlint + shellcheck)** | YAML/expressions de `ci.yml` invalides ; shellcheck sur `.github/scripts/*.sh` et `backend/scripts/*.sh` (les deux globs résolvent : `resolve-vercel-url.sh`, `loadtest_real_flow.sh`). | Non. Seul `rhysd/actionlint` est **épinglé** (`v1.7.12`). |
 | **Fly env doc-prod (drift + secrets)** | Formats des références du dépôt (`--refs-only`, sans réseau) ; drift `fly.toml` ↔ runtime ; secret obligatoire manquant ; doublon `[env]`↔secret ; secret orphelin ; clé `.env.example` absente de Fly. **Token absent → `exit 2` → job rouge** (échec bruyant, pas de saut). | Partiellement : les formats des **secrets déployés** (via `flyctl ssh`) et le snapshot de digests sont silencieusement inopérants (§3, F4). |
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict, et le garde des durées publiées (`check-privacy-policy.py`, §3 F18). | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
-| **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
+| **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle), et **sur `main`** la vérification que le frontend **SERVI** annonce la révision de ce commit (`check-deployed-revision.js`, §3 F19). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
 | **Lighthouse performance budgets** | Assertions LHCI (`error`) sur **13 pages**, `check-og-images.js` et le **cycle `/jobs/:id` en HTTP**, les trois sur une pile locale « forme production » (§3, F3) ; sondes de production (`check-seo-production.js`, `check-cors-preflight.js`) sur `main`. | **Oui, sur le périmètre performance** : la surface auditée est un artefact servi par le job (ni CDN, ni cache d'edge — §3, F2ter), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
@@ -1613,6 +1613,64 @@ le garde compare la valeur ÉVALUÉE du module, donc une variable d'environnemen
 déplace `EMAIL_OTP_EXPIRY_MINUTES` en production n'est pas vue par la CI, qui tourne
 sans elle — le document le dit à l'endroit où il compte (§3).
 
+### F19 — Le frontend servi pouvait ne pas être celui de `main`, et rien ne le disait — **fermé le 21/09/2026**
+
+Le backend répond quelle révision il exécute et `deploy-fly` refuse quand ce n'est pas le commit
+attendu (F8). Le frontend, lui, ne disait RIEN de ce qu'il était : le déploiement de production est
+fait par Vercel depuis l'app GitHub, aucun job ne le commande, donc **aucune ligne de la CI ne
+lisait le code réellement servi** — les sondes de production qui existaient y regardent le SEO, les
+cartes OG et le CORS, jamais de quel commit l'artefact est fait. Un build Vercel échoué, annulé, ou
+en retard laissait donc `main` vert pendant que le site servait l'ancien bundle.
+
+**Ce qui est vérifié désormais** : le build publie sa révision dans le HTML statique
+(`vite-plugins/inject-build-revision.js` → meta `kojo-build-revision`), et l'étape de
+`frontend-build` sur `main` compare cette réponse à ce que `main` aurait dû déployer
+(`frontend/scripts/check-deployed-revision.js`).
+
+- Les sources de la révision sont, dans l'ordre : `KOJO_GIT_SHA` (l'écrasement explicite, le
+  même nom de fait que côté backend), puis `VERCEL_GIT_COMMIT_SHA` / `GITHUB_SHA` (variables
+  système, quand le projet les expose), puis **le dépôt lui-même** (`git rev-parse HEAD`).
+  Le dépôt est la source qui **ne dépend d'aucun réglage** : les variables système de Vercel
+  ne sont présentes que si le projet expose ses variables système (« Automatically expose
+  System Environment Variables »), tandis que le build tourne toujours dans un clone git —
+  Vercel s'en sert pour sa propre fonction « Ignored Build Step ». Mesuré : sans aucune
+  variable, un build local publie le HEAD du dépôt dans ses **12** fichiers HTML ; avec
+  `VERCEL_GIT_COMMIT_SHA`, c'est cette valeur qui est publiée. Rien n'est inventé : hors
+  dépôt git ET sans variable, le build ne publie rien (`revisionFrom({}, { depot: () => '' })`).
+
+- Ce qui doit être VRAI : aucun changement de `frontend/**` n'est absent de la production. Deux
+  révisions sont donc acceptées — le commit poussé, et le dernier commit ayant touché `frontend/`
+  (l'état que la production laisse en place si le déployeur ignorait un push sans changement de
+  frontend). Accepter une révision PLUS ANCIENNE ne serait pas un relâchement du même genre : ce
+  serait un refus silencieux de la question posée.
+- Ce qui rend cette politique mesurable : chaque commit de `main` a reçu une **production
+  déployée** (12 commits consécutifs, statut `Vercel` `success`), et le déploiement se termine
+  **0,4 à 0,6 min** après le commit (mesuré sur les 6 derniers). La fenêtre d'attente du garde
+  (9 tentatives espacées de 20 s, un appel HTTP séquentiel chacune) absorbe un déploiement en
+  cours sans jamais transformer un refus en succès.
+- Chaque refus NOMME sa cause, et elles demandent trois corrections différentes : aucune révision
+  annoncée (artefact antérieur à ce mécanisme, ou construit sans `VERCEL_GIT_COMMIT_SHA` →
+  redéployer), révision différente (production en retard → regarder le build Vercel), réponse
+  inexploitable (site injoignable — **défi de l'edge Vercel** compris, nommé par
+  `X-Vercel-Mitigated`, pour qu'il ne se lise pas comme un frontend en retard). Une invocation qui
+  ne dit pas quoi comparer sort en **code 2**, jamais en vert.
+- Preuve d'échec rejouable : `frontend/scripts/__tests__/check-deployed-revision.test.js`
+  (18 cas, `fetch` injecté, aucun réseau) pour les refus et l'attente, et
+  `frontend/scripts/__tests__/build-revision-injection.test.js` (5 cas, pilotant le VRAI
+  `vite.config.js`) pour la publication de la balise — sans quoi le garde refuserait TOUTE
+  production, y compris une production correcte. **Deux** mutations du registre font chacune rougir
+  le test propriétaire, nommé : `frontend-revision: la comparaison accepte une autre revision` et
+  `frontend-revision: le refus d'une production muette disparait`.
+
+Mesures de la passe : sur un build local, les **12** HTML produits portent la balise ; la production
+d'avant cette passe n'en annonçait **aucune**, et le garde l'a refusée en la nommant (« antérieur à
+ce mécanisme, ou construit sans révision »).
+
+Ce qui reste ouvert après ce correctif : la preuve porte sur la **révision de l'artefact HTML**,
+pas sur chaque fichier d'actif (ils sont déployés atomiquement par Vercel, mais rien ne le
+re-vérifie) ; les déploiements de **preview** (PR) ne sont pas vérifiés — par construction, la
+production ne dit rien d'une PR — et le mobile n'est pas couvert (l'artefact est un APK).
+
 ## 4. Gardes jamais prouvés
 
 Le job `audit-regression-test` prouve que 4 contrôles savent échouer
@@ -1959,6 +2017,10 @@ chaque PR vers `main` (sauf mention contraire).
   peut pas vérifier, c'est que les valeurs existent sur Vercel** : le test
   prouve le mécanisme, pas la configuration du déploiement (cf. §7).
 - Le build Vite aboutit avec `VITE_API_URL` de production.
+- **Sur `main`**, le frontend SERVI annonce la révision dont il est construit : le build publie la
+  balise `kojo-build-revision` et `check-deployed-revision.js` la compare au commit poussé (ou au
+  dernier commit ayant touché `frontend/`). C'est cette ligne qui fait qu'un `main` vert signifie
+  « le site servi est celui de ce commit », et plus seulement « le build a réussi » (cf. F19).
 - Shells de pré-rendu présents dans **chaque** page pré-rendue (`jobs.html`,
   `login.html`, `register.html`, `forgot-password.html`, `payment.html`,
   `how-it-works.html`, `support.html` — h1, contenu, liens internes et
@@ -2088,6 +2150,15 @@ chaque PR vers `main` (sauf mention contraire).
   sauté, au dernier commit ayant touché `backend/**` ou ce workflow (cf. F8).
   C'est cette ligne qui fait qu'un `main` vert signifie « le backend déployé est
   à jour », et plus seulement « flyctl n'a pas échoué ».
+- **Le frontend servi est vérifié lui aussi, et par un autre moyen** (21/09/2026) :
+  le déploiement de production du frontend n'est pas commandé par la CI (Vercel
+  le fait depuis l'app GitHub), donc c'est l'ARTEFACT qui publie sa révision
+  (`kojo-build-revision`) et `check-deployed-revision.js` qui la compare, sur
+  `main`, au commit poussé ou au dernier commit ayant touché `frontend/`
+  (cf. F19). Restent hors de cette vérification : les actifs un par un (leur
+  déploiement est atomique côté Vercel, mais rien ne le re-vérifie), les
+  déploiements de **preview** des PR, et le mobile (`mobile-build` compile un APK,
+  il ne vérifie rien de ce qui est servi).
 
 ## 6. Dépendances externes : ce qui peut rougir sans rapport avec le code
 
@@ -2102,7 +2173,7 @@ chaque PR vers `main` (sauf mention contraire).
 | API GitHub (commentaires de PR) | `resolve-vercel-url.sh` | **Bascule silencieuse en F2** (repli build local), borné par `--max-time 20 --retry 2` |
 | Vercel (preview + Deployment Protection) | idem | **F2** également : preview protégée ⇒ repli local |
 | Backend de production (`api.kojoforafrica.cc.cd`) | `ci-auth`, `check-og-images`, `check-og-job-200`, `check-cors-preflight` (main only) | Rouge (le login du compte CI échoue ; pour la garde CORS : origine refusée, ou API injoignable après 6 tentatives espacées de 15 s) |
-| Vercel production | `check-og-images`, `check-og-job-200` | Rouge |
+| Vercel production | `check-og-images`, `check-og-job-200`, `check-deployed-revision` (main only) | Rouge (pour la révision : 9 tentatives espacées de 20 s, un appel séquentiel chacune — très en dessous de la rafale qui déclenche le défi de l'edge ; le défi lui-même est **nommé**, cf. F19) |
 | Android SDK / Gradle / AGP | `mobile-build` | Rouge, téléchargements longs |
 | API de commentaires GitHub | `bundle-size-report` | Rouge sur **ce job seulement** — il n'est pas requis, donc aucune fusion n'est bloquée ; les mesures restent dans le résumé du run |
 | Cache Actions (`actions/cache/restore` + `save@v4`) | `bundle-size-report` | Aucune référence disponible ⇒ rapport « première mesure », sans écarts — jamais un écart inventé |

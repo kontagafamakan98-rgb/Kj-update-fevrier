@@ -162,6 +162,14 @@
       "motif": "aucun workflow ne l'appelle : sa preuve est son test Vitest, qui vérifie l'état du dépôt"
     },
     {
+      "chemin": "frontend/scripts/check-deployed-revision.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "runner": "vitest",
+      "motif": "le frontend SERVI annonce la révision dont il a été construit (meta `kojo-build-revision`, publiée par le build) : c'est ce que `main` n'observait pas, le déploiement de production étant fait par Vercel depuis l'app GitHub. Deux révisions sont acceptées (le commit poussé, et le dernier ayant touché frontend/) pour qu'aucun changement de frontend ne puisse manquer à la production sans rougir, et chaque refus nomme sa cause (cf. CI-COVERAGE.md, F10)"
+    },
+    {
       "chemin": "frontend/scripts/check-seo-production.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -1333,6 +1341,46 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_core_surface.py::TestSurfacePubliqueDeKojoCore::test_aucun_nom_du_contrat_n_a_change_de_nature_ni_de_signature"
+      ]
+    },
+    {
+      "id": "frontend-revision: la comparaison accepte une autre revision",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "  if (acceptées.includes(révision)) {\n    return { ok: true, message: `révision servie = attendue (${révision.slice(0, 12)})` };\n  }",
+      "remplace": "  if (révision) {\n    return { ok: true, message: 'mutation : toute révision non vide est acceptée' };\n  }",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une production en retard"
+      ]
+    },
+    {
+      "id": "frontend-revision: le refus d'une production muette disparait",
+      "garde": "frontend/scripts/check-deployed-revision.js",
+      "cible": "frontend/scripts/check-deployed-revision.js",
+      "trouve": "  if (!révision) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-deployed-revision.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-deployed-revision.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une production muette"
       ]
     },
     {
