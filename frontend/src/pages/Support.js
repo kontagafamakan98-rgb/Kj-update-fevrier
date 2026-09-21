@@ -518,6 +518,11 @@ function TicketTracker({ copy }) {
 
   const trackTicket = async () => {
     if (!ticketId.trim() || !ticketEmail.trim()) return;
+    if (!EMAIL_RE.test(ticketEmail.trim())) {
+      setTrackError(copy.errors.email);
+      setTrackResult(null);
+      return;
+    }
     setTracking(true);
     setTrackError('');
     try {
