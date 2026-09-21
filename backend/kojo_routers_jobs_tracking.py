@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from kojo_core import db, get_current_user
 from kojo_models import JobProposal, User, UserType
 from kojo_settings import OWNER_EMAIL
-from kojo_identifiants import identifiant_query, identifiant_job_query
+from kojo_identifiants import dump_stable, identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -69,7 +69,7 @@ async def get_job_proposals(
 
     enriched = []
     for p in proposals:
-        proposal_out = JobProposal(**p).model_dump()
+        proposal_out = dump_stable(JobProposal, p)
         worker = workers_by_id.get(p.get("worker_id"))
         if worker:
             full_name = f"{worker.get('first_name', '')} {worker.get('last_name', '')}".strip()

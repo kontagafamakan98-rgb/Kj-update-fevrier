@@ -60,3 +60,27 @@ def identifiant_public(document: dict) -> str:
     affiché ne désigne plus rien — donc toute action dessus vise à côté.
     """
     return str(document.get("id") or document.get("_id") or "")
+
+
+def dump_stable(modele, document: dict, **options) -> dict:
+    """Sérialise un document stocké en RENDANT l'identifiant DU DOCUMENT.
+
+    Un modèle dont le champ `id` porte un défaut (`uuid4`) en reçoit un NOUVEAU
+    à chaque construction : lu depuis la base sans champ `id`, il rend donc un
+    identifiant différent à chaque requête, qui ne désigne aucun document —
+    l'action du client répond 404 et l'écran ment (le bug des notifications,
+    et le même sur les missions anciennes, qui portent `job_id` au lieu de `id`).
+
+    C'est le SEUL endroit qui décide comment un document stocké devient une
+    réponse. Les sites qui construisaient le modèle à la main recopiaient
+    chacun la même ligne, et la reprise de l'identifiant y manquait.
+
+    Un document qui ne porte NI `id` NI `_id` (une entrée construite depuis la
+    requête, pas encore écrite) garde le défaut du modèle : c'est alors un
+    document neuf, et son identifiant est légitime.
+    """
+    rendu = modele(**document).model_dump(**options)
+    identifiant = identifiant_public(document)
+    if identifiant and "id" in rendu:
+        rendu["id"] = identifiant
+    return rendu

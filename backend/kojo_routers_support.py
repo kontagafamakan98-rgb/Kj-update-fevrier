@@ -15,7 +15,7 @@ from kojo_core import (
 )
 from kojo_settings import OWNER_EMAIL, OWNER_USER_ID, logger
 from kojo_shared import notify_user_localized
-from kojo_identifiants import identifiant_query
+from kojo_identifiants import dump_stable, identifiant_query
 
 router = APIRouter()
 
@@ -116,7 +116,7 @@ async def list_support_tickets(
     if status_filter:
         query["status"] = status_filter
     tickets = await db.support_tickets.find(query).sort("created_at", -1).to_list(500)
-    return [SupportTicket(**t).model_dump() for t in tickets]
+    return [dump_stable(SupportTicket, t) for t in tickets]
 
 @router.patch("/support/tickets/{ticket_id}/status")
 async def update_support_ticket_status(
@@ -139,4 +139,4 @@ async def update_support_ticket_status(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Demande de support introuvable")
     updated = await db.support_tickets.find_one({**identifiant_query(ticket_id)})
-    return SupportTicket(**updated).model_dump()
+    return dump_stable(SupportTicket, updated)

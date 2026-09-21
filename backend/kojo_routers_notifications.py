@@ -11,7 +11,7 @@ from kojo_settings import (
 from kojo_core import (
     get_current_user,
 )
-from kojo_identifiants import identifiant_public, identifiant_query
+from kojo_identifiants import dump_stable, identifiant_query
 
 router = APIRouter()
 
@@ -44,13 +44,11 @@ async def get_notifications(
     notifications = await db.notifications.find(query).sort("created_at", -1).to_list(limit)
     unread_count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
 
-    # L'identifiant rendu est celui du DOCUMENT (kojo_identifiants) : un document
-    # antérieur au champ `id` recevrait sinon un nouvel uuid à chaque lecture, et
-    # l'action de l'utilisateur (marquer lue, supprimer) viserait à côté.
+    # L'identifiant rendu est celui du DOCUMENT (kojo_identifiants.dump_stable) :
+    # un document antérieur au champ `id` recevrait sinon un nouvel uuid à chaque
+    # lecture, et l'action de l'utilisateur (marquer lue, supprimer) viserait à côté.
     return {
-        "notifications": [
-            {**Notification(**n).model_dump(), "id": identifiant_public(n)} for n in notifications
-        ],
+        "notifications": [dump_stable(Notification, n) for n in notifications],
         "unread_count": unread_count,
         "total": len(notifications),
     }

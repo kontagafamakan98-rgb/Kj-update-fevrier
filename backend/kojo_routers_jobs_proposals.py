@@ -19,7 +19,7 @@ from kojo_models import (
 )
 from kojo_settings import OWNER_EMAIL, logger
 from kojo_shared import nom_affiche
-from kojo_identifiants import identifiant_query, identifiant_job_query
+from kojo_identifiants import dump_stable, identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -191,8 +191,14 @@ async def accept_job_proposal(
         {**identifiant_query(proposal_id)},
         {"$set": {"status": "accepted"}}
     )
+    # Rejeter les AUTRES propositions du même job. La négation se fait sur `_id`,
+    # la seule clé unique par construction : la règle d'identifiant accepte
+    # trois champs, donc sa négation (`{"$ne": <valeur>}` sur chacun d'eux) est
+    # vraie pour un document dès que son identifiant vit dans un AUTRE champ —
+    # la proposition qu'on venait d'accepter était donc rejetée juste après, et
+    # un `$or` de négations ne peut pas exprimer « pas ce document ».
     await db.job_proposals.update_many(
-        {"job_id": job_id, **identifiant_query({"$ne": proposal_id})},
+        {"job_id": job_id, "_id": {"$ne": proposal.get("_id")}},
         {"$set": {"status": "rejected"}}
     )
 
@@ -254,5 +260,5 @@ async def accept_job_proposal(
     updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
     return {
         "message": "Proposition acceptée avec succès",
-        "job": Job(**updated_job).model_dump(),
+        "job": dump_stable(Job, updated_job),
     }
