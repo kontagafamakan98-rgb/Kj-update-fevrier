@@ -1314,7 +1314,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: backend-tests
-    # Jamais depuis un PR ; déploiement sur main (push auto OU dispatch manuel)
+    # ─── LA POLITIQUE DE CE JOB — écrite ICI, et nulle part ailleurs ────────
+    # Ce job ne se contente pas de DIRE s'il a déployé : il VÉRIFIE quelle
+    # révision le service exécute. Trois cas, un seul verdict, et c'est le
+    # filtre `backend/**` ci-dessous qui les sépare :
+    #   • push qui touche `backend/**` (ou ce workflow), ou dispatch manuel
+    #     (qui force le déploiement) → le déploiement vient d'avoir lieu, la
+    #     révision attendue est CE commit ;
+    #   • push qui n'y touche pas → les étapes de déploiement sont `skipped`, et
+    #     le service DOIT tourner le DERNIER commit qui a touché `backend/**` :
+    #     si la production est restée en arrière (déploiement précédent échoué),
+    #     le job rougit au lieu d'afficher le ✓ ambigu « rien n'a été déployé ».
+    # La révision comparée est celle que l'IMAGE annonce (`--build-arg
+    # KOJO_GIT_SHA` → /health, cf. backend/Dockerfile) : une propriété du build,
+    # pas de l'environnement d'exécution.
+    # Les étapes qui suivent ne répètent que la mécanique qui leur est propre ;
+    # les documents qui décrivent cette politique pointent ici (CI-COVERAGE.md,
+    # §2 et F1) au lieu de la recopier.
+    #
+    # Jamais depuis un PR ; déploiement sur main (push auto OU dispatch manuel).
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     # Pas d'annulation en plein vol : un déploiement est étatique (machines
     # Fly) ; les pushes successifs attendent leur tour.
@@ -1323,16 +1341,15 @@ jobs:
       cancel-in-progress: false
 
     steps:
-      # HISTORIQUE COMPLET : la vérification finale compare la révision servie au
-      # dernier commit qui a touché `backend/**` (déploiement sauté). Sur un clone
-      # superficiel, `git rev-list -1 HEAD -- backend/` ne verrait qu'un commit et
-      # ne pourrait pas répondre — le garde refuserait alors de conclure (code 2).
+      # HISTORIQUE COMPLET, exigé par la vérification de révision (politique du
+      # job) : sur un clone superficiel, `git rev-list -1 HEAD -- backend/` ne
+      # verrait qu'un commit et le garde refuserait de conclure (code 2).
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Filtre les changements : pas de re-déploiement du backend pour un
-      # push qui ne touche que le frontend/docs.
+      # Le filtre qui sépare les deux cas de la politique du job (ci-dessus) :
+      # rien à redéployer pour un push qui ne touche que le frontend/docs.
       - name: Detect backend changes
         id: changes
         uses: dorny/paths-filter@v3
@@ -1342,8 +1359,6 @@ jobs:
               - 'backend/**'
               - '.github/workflows/ci.yml'
 
-      # Déploiement forcé : un dispatch manuel déploie même sans changement
-      # backend (l'utilisateur a explicitement demandé le run).
       - name: Setup flyctl
         if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
         uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # v1 (node24)
@@ -1351,12 +1366,9 @@ jobs:
       # --remote-only : le build se fait sur les builders distants de Fly
       # (Depot), pas de Docker nécessaire sur le runner. fly.toml et
       # Dockerfile sont lus depuis backend/ (working-directory).
-      #
-      # --build-arg KOJO_GIT_SHA : la révision ENTRE DANS L'IMAGE (variable
-      # d'environnement, cf. backend/Dockerfile) et le service la publie sur
-      # /health. C'est elle que la vérification suivante compare au commit
-      # poussé : sans elle, /health répondrait « inconnue » et le déploiement
-      # redeviendrait invérifiable.
+      # --build-arg KOJO_GIT_SHA : la révision entre dans l'IMAGE et /health la
+      # publie ; sans elle, /health répondrait « inconnue » et le refus nommerait
+      # ce champ (politique du job, ci-dessus).
       - name: Deploy to Fly.io
         if: steps.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
         working-directory: backend
@@ -1364,23 +1376,10 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-      # ── La VÉRIFICATION : quelle révision le service exécute-t-il ? ─────────
-      # L'étape suivante ÉCRIT ce que le job a fait ; celle-ci VÉRIFIE ce que le
-      # service répond — les deux ensemble ferment l'ambiguïté du ✓.
-      #
-      # La révision ATTENDUE n'est pas toujours le commit poussé, et c'est tout
-      # l'intérêt :
-      #   • push qui touche `backend/**` (ou ce workflow) → le déploiement vient
-      #     d'avoir lieu, la révision attendue est CE commit ;
-      #   • push qui n'y touche pas → le déploiement est SAUTÉ, et le service doit
-      #     tourner le DERNIER commit qui y a touché : si le service en est resté
-      #     à une révision plus ancienne (déploiement précédent échoué), le job
-      #     rougit au lieu d'afficher un ✓ vert ;
-      #   • dispatch manuel → déploiement forcé, attendu = ce commit.
-      #
-      # `if: always()` : la vérification dit aussi la vérité quand le déploiement
-      # a échoué (le service tourne alors l'ancienne image, et c'est un échec).
-      # Le garde attend jusqu'à ~3 min qu'un déploiement en cours se termine,
+      # L'étape qui VÉRIFIE (la politique du job est en tête de job : ce n'est
+      # pas ici qu'elle se redéfinit). `if: always()` : elle dit aussi la vérité
+      # quand le déploiement a échoué — le service tourne alors l'ancienne image,
+      # et c'est un échec. Le garde attend ~3 min qu'un déploiement se termine,
       # puis refuse en nommant la révision servie ET l'attendue.
       - name: Le backend servi est-il celui de ce commit ?
         if: always()
@@ -1402,12 +1401,9 @@ jobs:
           echo "Révision attendue : $ATTENDU ($ORIGINE)"
           python3 backend/scripts/check_deployed_revision.py --attendu "$ATTENDU" --tentatives 9 --delai 20
 
-      # Un run VERT ne dit pas si le backend déployé correspond à ce commit :
-      # quand rien de backend n'a bougé, les deux étapes ci-dessus sont
-      # `skipped` et le job passe en quelques secondes. Sans cette étape, « main
-      # est vert » se lisait à tort comme « la production tourne le code de
-      # main » ; le verdict est donc ÉCRIT (notice + résumé du run) au lieu
-      # d'être déduit d'une couleur.
+      # L'autre moitié : ÉCRIRE ce que le job a fait (notice + résumé du run),
+      # pour que « main est vert » ne se lise plus à tort comme « la production
+      # tourne le code de main » (politique du job, en tête).
       - name: Dire si le backend a été déployé
         if: always()
         env:

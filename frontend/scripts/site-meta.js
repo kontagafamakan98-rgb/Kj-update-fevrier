@@ -39,6 +39,53 @@ export const SITE_ORIGIN = 'https://kojoforafrica.cc.cd';
  */
 export const API_ORIGIN = 'https://api.kojoforafrica.cc.cd';
 
+/** Hôtes qui désignent CETTE machine (loopback). */
+export const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1'];
+
+/**
+ * L'adresse désigne-t-elle CETTE machine ?
+ *
+ * Deux gardes posaient séparément la même question, avec deux règles qui
+ * n'étaient pas d'accord : `check-og-job-200.js` (qui ÉCRIT — POST puis DELETE
+ * d'une mission de test) refusait `0.0.0.0`, la casse différente et le moindre
+ * chemin ; `check-seo-production.js` acceptait les trois. Deux définitions pour
+ * une seule question, c'est une divergence qui attend son jour — et le garde qui
+ * écrit est celui qui avait la règle la PLUS stricte, donc rien ne l'aurait dit.
+ *
+ * La règle est ici, et les trois différences sont arbitrées, pas héritées :
+ *   • `0.0.0.0` n'est PAS une adresse locale — c'est l'adresse NON SPÉCIFIÉE,
+ *     une adresse d'ÉCOUTE (c'est ainsi que `vite.config.js` s'y lie). Elle est
+ *     donc écartée : l'ancienne règle permissive la disait « locale » à tort ;
+ *   • la casse ne décide rien : `new URL()` abaisse l'hôte, donc
+ *     `HTTP://LOCALHOST:8000` est reconnu — avant, le garde d'écriture le
+ *     refusait et SAUTAIT un cycle qu'il pouvait légitimement exercer ;
+ *   • le chemin ne décide rien non plus : c'est l'HÔTE qui dit « local »
+ *     (`http://127.0.0.1:8000/api` reste cette machine).
+ *
+ * Elle lit l'URL au lieu d'un motif textuel : `127.0.0.1.evil.test` a bien pour
+ * hôte `127.0.0.1.evil.test`, donc il est refusé par construction — un suffixe
+ * qui imite un hôte local ne passe pas par la forme du motif.
+ *
+ * @param {string} value URL à examiner (schéma `http`/`https` exigé).
+ * @returns {boolean} Vrai si l'URL a un hôte loopback et un schéma http(s).
+ */
+export function isLoopbackUrl(value) {
+  let url;
+  try {
+    url = new URL(String(value || '').trim());
+  } catch (_e) {
+    // Pas une URL absolue : « localhost:8000 » sans schéma est un schéma nommé
+    // « localhost: », pas une adresse — la comparaison d'hôte serait vide.
+    return false;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+  // `URL.hostname` rend un littéral IPv6 ENTRE CROCHETS (« [::1] ») : compare
+  // sans eux, sinon `http://[::1]:8000` — pourtant la même adresse — serait
+  // refusé par un détail de notation.
+  const hote = url.hostname.replace(/^\[|\]$/g, '');
+  return LOOPBACK_HOSTS.includes(hote);
+}
+
 /**
  * Fichier de coquille pré-rendue qui SERT une route — la seule définition de
  * cette correspondance.

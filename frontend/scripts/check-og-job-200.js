@@ -49,7 +49,8 @@
  * montée, KOJO_BACKEND_URL retombait sur son défaut — l'API de PRODUCTION — et
  * la mission de test était créée en base réelle puis supprimée. Le contrôle
  * est désormais fait sur la SEULE adresse que le script écrit :
- * `isControlledBackend()` n'accepte qu'une adresse loopback. Hors de là, le
+ * `isLoopbackUrl()` (scripts/site-meta.js — propriétaire de la règle) n'accepte
+ * qu'une adresse loopback. Hors de là, le
  * script se tait avec un ::notice nommant la raison, plutôt que d'écrire chez
  * le client. Contrepartie assumée et écrite : sur une PR dont la preview est
  * auditée, le chemin 200 n'est plus exercé par la CI (il l'est par la pile
@@ -90,7 +91,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { runOgImageCheck, baseServesJobOgRoute } from './check-og-images.js';
-import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex } from './site-meta.js';
+import { API_ORIGIN, SITE_ORIGIN, declaresNoIndex, isLoopbackUrl } from './site-meta.js';
 
 export const DEFAULT_BASE = SITE_ORIGIN;
 // Origine de l'API : propriété de scripts/site-meta.js (voir DEFAULT_BACKEND
@@ -103,15 +104,12 @@ export const POST_DELETE_LABEL = '/jobs/:id (après suppression)';
 export const TEST_JOB_TITLE_PREFIX = '[CI] Mission de test OG';
 export const TEST_JOB_SKILL = 'ci-og-check';
 
-/**
- * Le backend ciblé est-il CONTRÔLÉ par l'appelant ? Seule une adresse loopback
- * l'est : la mission de test de ce script est une ÉCRITURE (POST puis DELETE),
- * et une CI n'écrit pas chez le client. C'est la seule adresse que le script
- * modifie qui décide — pas l'adresse de la base auditée, qui peut être celle du
- * déploiement réel sans que rien n'y soit créé (voir l'en-tête).
- */
-export const isControlledBackend = (backend) =>
-  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(String(backend || '').trim().replace(/\/+$/, ''));
+// Le backend ciblé est-il CONTRÔLÉ par l'appelant ? La question est posée au
+// propriétaire de la règle (`isLoopbackUrl`, scripts/site-meta.js) : ce script
+// ÉCRIT (POST puis DELETE) une mission de test, et une CI n'écrit pas chez le
+// client. C'est la seule adresse que le script modifie qui décide — pas l'adresse
+// de la base auditée, qui peut être celle du déploiement réel sans que rien n'y
+// soit créé (voir l'en-tête).
 
 const TIMEOUT_MS = 20000;
 const fetchJson = async (res) => {
@@ -418,7 +416,7 @@ export async function runOgJob200Cycle({
   // backend contrôlé par le job. Rien n'est écrit chez le client — un garde qui
   // laisse une trace en production parce qu'il vérifie la production a le
   // mauvais prix.
-  if (!isControlledBackend(BACKEND)) {
+  if (!isLoopbackUrl(BACKEND)) {
     result.skipped = true;
     result.skipReason = 'backend-non-controle';
     result.ok = true;

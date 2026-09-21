@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { createRequire } from 'module';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// `lighthouserc.cjs` est CommonJS : l'exécuter demande `require`, que ce
+// fichier (ESM) n'a pas par défaut.
+const require = createRequire(import.meta.url);
 
 // Garde-fou : les variables d'environnement lues par lighthouserc.cjs (et
 // exportées par le workflow) ne doivent PAS commencer par « LHCI_ ».
@@ -131,27 +136,52 @@ describe('lighthouserc — sélection des pages auditées', () => {
     expect(source).toMatch(/KOJO_LHCI_LOCAL_STACK/);
   });
 
-  it('traite une base LOOPBACK comme locale (plafond TBT d’un runner partagé)', () => {
+  it('traite une base LOOPBACK comme locale en DÉLÉGUANT au propriétaire de la règle', () => {
     // Depuis le 17/09/2026 la CI passe une URL loopback à ce config pour y
     // exercer le cycle /jobs/:id en HTTP ; depuis le 20/09/2026 c'est aussi la
-    // surface auditée sur main. La base loopback garde le plafond TBT élargi du
-    // repli, parce que le runner reste partagé quelle que soit la surface.
+    // surface auditée sur main.
+    //
+    // Ce test portait sa propre copie de la règle : il extrayait le motif
+    // d'hôtes écrit dans `targetIsLocal` et le rejouait sur une liste d'adresses.
+    // C'était une SECONDE définition du même fait — et celle-ci ne voyait pas
+    // les deux autres (le garde d'écriture et la sonde SEO). La règle vit
+    // maintenant dans `scripts/site-meta.js` ; ici on vérifie le CÂBLAGE (la
+    // config pose la question au propriétaire, elle n'y répond pas) et on
+    // EXÉCUTE la config, parce qu'un appel vers la bonne fonction ne prouve pas
+    // que la sélection des pages suit.
     const source = readConfig();
     const m = /const targetIsLocal =([\s\S]*?);\n/.exec(source);
     expect(m, 'targetIsLocal introuvable dans lighthouserc.cjs').not.toBeNull();
     expect(m[1]).toMatch(/!baseUrl/);
-    // La règle est LUE et exécutée, pas recopiée : un motif qui ne
-    // reconnaîtrait pas 127.0.0.1 (l'adresse réellement utilisée par la CI)
-    // ferait échouer ce test, au lieu de laisser passer dix pages auditées.
-    const literal = /(\/\^[\s\S]*?\/)\.test\(baseUrl\)/.exec(m[1]);
-    expect(literal, 'motif loopback introuvable dans targetIsLocal').not.toBeNull();
-    const matcher = new RegExp(literal[1].slice(1, -1));
+    expect(m[1]).toMatch(/isLoopbackUrl\(baseUrl\)/);
+    expect(source).toMatch(/require\(['"]\.\/scripts\/site-meta\.js['"]\)/);
+
+    const urlsFor = (base) => {
+      const saved = process.env.KOJO_LHCI_BASE_URL;
+      if (base === undefined) delete process.env.KOJO_LHCI_BASE_URL;
+      else process.env.KOJO_LHCI_BASE_URL = base;
+      try {
+        delete require.cache[require.resolve(CONFIG)];
+        return require(CONFIG).ci.collect.url;
+      } finally {
+        delete require.cache[require.resolve(CONFIG)];
+        if (saved === undefined) delete process.env.KOJO_LHCI_BASE_URL;
+        else process.env.KOJO_LHCI_BASE_URL = saved;
+      }
+    };
+
+    // Adresse locale → repli NU : l'accueil seul, préfixé par CETTE base (une
+    // URL loopback qui auditerait 13 pages mesurerait 12 redirections).
     for (const base of ['http://127.0.0.1:4174', 'http://localhost:4173', 'http://[::1]:4173']) {
-      expect(matcher.test(base), base).toBe(true);
+      expect(urlsFor(base), base).toEqual([`${base}/`]);
     }
+    // Adresse DISTANTE → les 13 pages.
     for (const base of ['https://kj-update-fevrier.vercel.app', 'https://x.vercel.app']) {
-      expect(matcher.test(base), base).toBe(false);
+      expect(urlsFor(base), base).toHaveLength(13);
     }
+    // Sans base, le repli local reste `localBase` — et c'est un repli, pas un
+    // « oui » par défaut : il ne fait pas passer une base distante pour locale.
+    expect(urlsFor(undefined)).toEqual(['http://localhost:4173/']);
   });
 
   it('applique au repli local un plafond TBT PLUS LARGE qu’au déploiement réel', () => {

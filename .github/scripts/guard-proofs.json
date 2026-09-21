@@ -324,7 +324,7 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/site-meta.test.js",
       "runner": "vitest",
-      "motif": "module de données partagé (origine canonique + lecture des balises du HTML servi) : il n'a aucune branche de refus, les gardes qui le lisent portent le verdict",
+      "motif": "module partagé (origine canonique, lecture des balises du HTML servi, et la règle d'adresse « cette machine » que trois fichiers déclaraient chacun) : il n'a aucune branche de refus, les gardes qui le lisent portent le verdict",
       "hors_mutation": "il n'existe pas de refus à neutraliser dans une table : ce qui est affirmé de son contenu (origine, lecture des balises) est déjà verrouillé par son test"
     },
     {
@@ -1163,6 +1163,26 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_deployed_revision.py::TestRefusSurConsoleNonUtf8::test_la_revision_differente_est_nommee_sans_planter"
+      ]
+    },
+    {
+      "id": "site-meta: la regle d'adresse recopiee dans un garde (divergence toleree)",
+      "garde": "frontend/scripts/check-seo-production.js",
+      "cible": "frontend/scripts/check-seo-production.js",
+      "trouve": "  if (isLoopbackUrl(cleanBase)) {",
+      "remplace": "  if (/^https?:\\/\\/(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1\\])(:\\d+)?(\\/|$)/i.test(cleanBase)) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-seo-production.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-seo-production.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "doit être interrogée, pas excusée comme locale"
       ]
     }
   ]

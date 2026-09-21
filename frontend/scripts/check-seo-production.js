@@ -44,7 +44,7 @@
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { SITE_ORIGIN, canonicalHref, metaContent, titleOf } from './site-meta.js';
+import { SITE_ORIGIN, canonicalHref, isLoopbackUrl, metaContent, titleOf } from './site-meta.js';
 
 // Les quatre intégrations, la variable d'environnement qui les active, et si
 // leur ABSENCE est un défaut (`required`) ou un choix d'exploitation.
@@ -60,8 +60,6 @@ export const INTEGRATIONS = [
   { key: 'plausible', label: 'Plausible (facultatif)', env: 'VITE_PLAUSIBLE_DOMAIN', required: false },
   { key: 'social', label: 'Liens sociaux (sameAs du LocalBusiness)', env: 'VITE_SOCIAL_*', required: true },
 ];
-
-const LOOPBACK = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:\d+)?(\/|$)/i;
 
 // Aucun en-tête `cache-control: no-cache` : le HTML est servi en
 // `public, max-age=0, must-revalidate`, donc l'edge revalide avant de répondre
@@ -426,7 +424,9 @@ export async function runSeoProductionReport({
   strict = false,
 } = {}) {
   const cleanBase = String(base).trim().replace(/\/+$/, '');
-  if (LOOPBACK.test(cleanBase)) {
+  // « Base locale » : la question appartient à `isLoopbackUrl`
+  // (scripts/site-meta.js), posée une seule fois pour tous les gardes.
+  if (isLoopbackUrl(cleanBase)) {
     return {
       skipped: true,
       manquantes: [],

@@ -34,39 +34,29 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
 | **Lighthouse performance budgets** | Assertions LHCI (`error`) sur **13 pages**, `check-og-images.js` et le **cycle `/jobs/:id` en HTTP**, les trois sur une pile locale « forme production » (§3, F3) ; sondes de production (`check-seo-production.js`, `check-cors-preflight.js`) sur `main`. | **Oui, sur le périmètre performance** : la surface auditée est un artefact servi par le job (ni CDN, ni cache d'edge — §3, F2ter), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
-| **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté). | **Oui, sur le déploiement lui-même** : sans changement backend, le job s'affiche ✓ avec **toutes** ses étapes de déploiement sautées — mais il le DIT désormais (`::notice` + résumé du run : « Backend non déployé », §3 F1). |
-| **Dépendances (avis de sécurité)** | Les avis **haut/critique** sur les dépendances de PRODUCTION du frontend (`npm audit --omit=dev`). | **Oui, sur le périmètre Python** : les avis des paquets Python sont CONSTATÉS, pas imposés (§7, point 7) — corriger `starlette`/`pillow` est une mise à jour de dépendances, pas un effet de bord d'un job. |
+| **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté), puis **vérification** que `/health` annonce la révision attendue (`check_deployed_revision.py`). | **Oui, sur le déploiement lui-même** : la politique — quand le job déploie, quelle révision est attendue quand il ne déploie pas, ce qui rougit — est écrite **en tête du job** dans `ci.yml`, seul endroit qui la définisse (§3 F1). |
+| **Dépendances (avis de sécurité)** | Les avis **haut/critique** sur les dépendances de PRODUCTION du frontend (`npm audit --omit=dev`). | **Partiel, et le périmètre n'est écrit qu'une fois** : en tête du job `dependency-audit` de `ci.yml` (production frontend = gate ; paquets Python = avis CONSTATÉS, `::warning`). §7 point 7 y renvoie. |
 
 ## 3. Les faux-verts : réussir sans avoir prouvé
 
 ### F1 — `Deploy backend to Fly.io` vert sans aucun déploiement
 
-`deploy-fly` est un **check requis** de la protection de branche. Il se déclenche
-à chaque push sur `main`, puis `dorny/paths-filter` filtre les chemins
-(`backend/**`, `.github/workflows/ci.yml`). Les étapes `Setup flyctl` et
-`Deploy to Fly.io` portent un `if:` sur ce filtre.
-
-Un push qui ne touche que le frontend ou la documentation produit donc
-**`deploy-fly ✓` alors qu'aucune machine Fly n'a été touchée** — et c'est le cas
-le plus fréquent. Le ✓ est honnête (« rien à faire ») mais il ne signifie jamais
-« le backend déployé correspond à `main` » : cette équivalence n'est vérifiable
-que si un `backend/**` a changé, ou par un `workflow_dispatch` manuel.
+`deploy-fly` est un **check requis** de la protection de branche : un push qui ne
+touche que le frontend ou la documentation affiche donc `deploy-fly ✓` alors
+qu'aucune machine Fly n'a été touchée — et c'est le cas le plus fréquent. Le ✓
+était honnête (« rien à faire ») mais se lisait comme « le backend déployé
+correspond à `main` ».
 
 > Corollaire : `deploy-fly` ne dépend que de `backend-tests` (`needs:`). Un
 > frontend ou un mobile rouge **ne bloque pas** le déploiement backend — c'est
 > délibéré, et il faut le savoir avant de conclure qu'un `main` vert est cohérent.
 
-**Correctif du 20/09/2026 — le job le DIT désormais.** Une dernière étape
-(`if: always()`) publie un `::notice` et une ligne du résumé du run : « Backend
-**déployé** (flyctl deploy exécuté sur ce commit) » ou « Backend **NON déployé**
-(aucun changement `backend/**` : le service tourne le déploiement précédent) ».
-Le ✓ ne dit plus une chose ambiguë : il l'écrit dans le run lui-même, sans qu'il
-faille remonter les étapes `skipped` pour le déduire.
-
-**F8 est fermé dans la foulée (20/09/2026)** : une déclaration n'était pas une
-preuve. Le service publie désormais la révision de son image et le même job la
-compare au commit attendu — il rougit quand le service tourne autre chose, y
-compris quand le déploiement a été sauté. Détail et limites : F8.
+**Ce que le job vérifie désormais, et OÙ c'est écrit.** La politique — les deux
+cas du filtre, la révision attendue dans chacun, ce qui rougit — est **en tête du
+job `deploy-fly` de `ci.yml`**, seul endroit qui la définisse : ce document y
+renvoie au lieu de la recopier. Depuis le 20/09/2026 le job la VÉRIFIE au lieu de
+la déclarer (le service publie la révision de son image, comparée au commit
+attendu, y compris quand le déploiement a été sauté). Détail et limites : F8.
 
 ### F2 — Lighthouse mesure `localhost` au lieu de la production
 
@@ -2154,18 +2144,12 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
    un push de travail n'est donc pas validé, il est seulement sauvegardé. Le
    repoindre ne se tait pas au moins : §1 le dit avant la liste des jobs, là où
    on lit « à chaque push ».
-7. **CLOS (20/09/2026) — la CI a un audit de dépendances**, et son périmètre est
-   écrit plutôt que supposé. Job `dependency-audit` : les dépendances de
-   PRODUCTION du frontend (celles qu'un visiteur télécharge) **sont un gate** —
-   mesuré à 0 avis haut/critique le 20/09/2026, donc exiger « aucun » ne relève
-   pas un seuil, il constate un état. Les dépendances de DÉVELOPPEMENT du
-   frontend et les paquets Python ne le sont **pas encore** : `pip-audit`
-   rapporte des avis réels sur les versions épinglées du dépôt
-   (`starlette`, `pillow`, `pytest`, `black`, mesurés le 20/09/2026), publiés en
-   `::warning` et dans le résumé du run. Les corriger est une mise à jour de
-   dépendances avec ses propres risques de rupture — une décision de
-   maintenance, nommée ici plutôt que noyée dans un gate qui rougirait `main`
-   au premier avis paru.
+7. **CLOS (20/09/2026) — la CI a un audit de dépendances**, et son périmètre
+   n'est écrit qu'une fois : **en tête du job `dependency-audit` de `ci.yml`**,
+   avec le motif qui décide lequel des deux périmètres est un gate et lequel
+   CONSTATE (`::warning` + résumé du run). Ce document y renvoie au lieu de le
+   recopier : deux écritures d'une même politique sont deux politiques, et
+   c'est la seconde qu'on oublie de mettre à jour.
 8. **CLOS (20/09/2026) — la configuration SEO/analytics n'est plus seulement
    observée** : la sonde garde son mode informatif sur les PR (`::notice` par
    intégration absente, sur `main` uniquement), mais elle a un mode **strict**
