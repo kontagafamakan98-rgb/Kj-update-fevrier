@@ -18,6 +18,9 @@ runner. Deux capacités du garde y sont aussi exercées en vrai :
 """
 import importlib.util
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -173,6 +176,45 @@ class TestInvocation:
         assert code == 1
         assert "::error title=Révision déployée ≠ attendue::" in sortie
         assert SHA_SERVI[:12] in sortie and SHA_ATTENDU[:12] in sortie
+
+
+class TestRefusSurConsoleNonUtf8:
+    """Un refus qui plante n'est pas un refus qui NOMME : le garde doit
+    s'entendre dire « servi ≠ attendu » même sur une console qui ne sait pas
+    écrire « ≠ ».
+
+    Sous Windows la console est en cp1252 ; le `≠` du message y levait
+    UnicodeEncodeError, donc le garde mourait en traceback avant d'avoir nommé
+    quoi que ce soit. La CI, en UTF-8 partout, ne voit jamais ce chemin — c'est
+    exactement pourquoi il se prouve ici, l'encodage du tube figé des deux côtés
+    (cf. AGENTS.md) : `cp1252` chez l'enfant, `utf-8`/`replace` chez le parent.
+    """
+
+    @staticmethod
+    def _lancer(revision_servie):
+        code = (
+            "import importlib.util, sys\n"
+            "spec = importlib.util.spec_from_file_location('g', %r)\n"
+            "g = importlib.util.module_from_spec(spec); spec.loader.exec_module(g)\n"
+            "g.interroger = lambda *a, **k: ({'revision': %r}, None)\n"
+            "sys.exit(g.main(['--attendu', %r, '--tentatives', '1', '--delai', '0']))\n"
+            % (str(SCRIPT), revision_servie, SHA_ATTENDU)
+        )
+        return subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            env={**os.environ, "PYTHONIOENCODING": "cp1252"},
+        )
+
+    def test_la_revision_differente_est_nommee_sans_planter(self):
+        resultat = self._lancer(SHA_SERVI)
+        assert resultat.returncode == 1, resultat.stdout + resultat.stderr
+        # Le mode d'échec d'avant le correctif : une traceback au lieu du refus.
+        assert "UnicodeEncodeError" not in resultat.stderr, resultat.stderr
+        assert SHA_SERVI[:12] in resultat.stdout
+        assert SHA_ATTENDU[:12] in resultat.stdout
+        # Le verdict reste lisible même amputé des caractères que la console ignore.
+        assert "::error title=" in resultat.stdout
 
 
 class TestLeServiceAnnonceSaRevision:

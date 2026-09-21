@@ -65,6 +65,18 @@ LONGUEUR_SHA_MIN = 7
 # Valeurs qui ne sont pas une révision : le défaut du Dockerfile, et le vide.
 REVISIONS_ABSENTES = {"", "inconnue", "unknown", "none", "null"}
 
+# Un refus qui plante n'est pas un refus qui NOMME. Sous Windows la console est
+# en cp1252 : les accents et «≠» y lèvent UnicodeEncodeError, donc le message
+# (servi vs attendu) mourait dans une traceback au lieu d'être lu — la CI, en
+# UTF-8 partout, ne le voit jamais (même classe de défaut que test_cors_origins,
+# cf. AGENTS.md). On garde l'encodage de la console et on remplace seulement ce
+# qu'elle ne sait pas écrire : le verdict et les deux SHA, eux, sont ASCII.
+for _flux in (sys.stdout, sys.stderr):
+    try:
+        _flux.reconfigure(errors="replace")
+    except (AttributeError, ValueError):  # flux redirigé/remplacé : rien à faire
+        pass
+
 
 def normaliser(valeur) -> str:
     """La valeur est-elle une RÉVISION ? Vide et « inconnue » ne le sont pas.
