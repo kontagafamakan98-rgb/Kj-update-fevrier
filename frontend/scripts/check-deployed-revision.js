@@ -54,7 +54,7 @@
  *
  * Usage :
  *   cd frontend && node scripts/check-deployed-revision.js \
- *     --attendu "$GITHUB_SHA" --sinon "$(git rev-list -1 HEAD -- frontend/)"
+ *     --attendu "$GITHUB_SHA" --sinon "$(git -C .. rev-list -1 HEAD -- frontend/)"
  * Optionnel :
  *   --base https://kojoforafrica.cc.cd   (défaut : SITE_ORIGIN, scripts/site-meta.js)
  *   --tentatives 9 --delai 20

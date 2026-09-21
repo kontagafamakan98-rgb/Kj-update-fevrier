@@ -700,7 +700,10 @@ jobs:
         run: |
           set -uo pipefail
           ATTENDU="${{ github.sha }}"
-          DERNIER_FRONTEND="$(git rev-list -1 HEAD -- frontend/)"
+          # Le step travaille depuis frontend/ : le chemin `frontend/` serait
+          # alors cherché sous frontend/frontend/ et renverrait vide. Le point
+          # courant représente toute la surface frontend du dépôt.
+          DERNIER_FRONTEND="$(git rev-list -1 HEAD -- .)"
           if [ -z "$DERNIER_FRONTEND" ]; then
             echo "::error::aucune révision attendue calculée — la vérification ne peut pas conclure"
             exit 2
