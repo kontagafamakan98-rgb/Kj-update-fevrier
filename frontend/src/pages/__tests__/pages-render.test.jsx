@@ -28,7 +28,7 @@
  */
 import React from 'react';
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { act, render, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 // Les contextes réels sont conservés ; seuls les HOOKS sont figés (les pages
@@ -70,6 +70,21 @@ vi.mock('../../contexts/CountryContext', async (importOriginal) => {
 
 // Leaflet n'a pas sa place dans jsdom et la carte n'est pas l'objet du test.
 vi.mock('../../components/JobsMap', () => ({ default: () => <div data-testid="carte" /> }));
+
+// La détection de pays est une dépendance d'ENVIRONNEMENT (base géographique,
+// IP, GPS). Plusieurs pages l'appellent au montage et font un `setState` dans
+// leur `finally` : laissée réelle, sa promesse se résout APRÈS la fin du test,
+// et react-dom met alors à jour un `window` déjà démonté —
+// `ReferenceError: window is not defined`, vu en CI le 21/09/2026, jamais en
+// local : ce rouge ne dépendait que de la charge du runner. Le service est donc
+// figé sur son RÉSULTAT D'ÉCHEC (`detected: false`, la convention que le service
+// documente lui-même et que ses appelants traitent), pendant que le rendu des
+// pages, lui, reste réel. La logique de détection garde son propre test :
+// src/services/__tests__/geolocationService.test.js.
+vi.mock('../../services/geolocationService', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, detectUserCountry: vi.fn(async () => ({ detected: false })) };
+});
 
 // Toutes les pages du répertoire, chargées par leur chemin : une page ajoutée
 // entre dans le tour sans qu'on touche à ce fichier.
@@ -113,10 +128,18 @@ describe('rendu de fumée — chaque page', () => {
 
   it.each(pages)('%s se rend sans lever et sans contenu vide', async (chemin) => {
     const { default: Page } = await PAGES[chemin]();
-    const { container } = rendre(Page, URL_PAR_PAGE[nomDe(chemin)] || URL_PAR_DEFAUT);
+    const { container, unmount } = rendre(Page, URL_PAR_PAGE[nomDe(chemin)] || URL_PAR_DEFAUT);
 
     // Aucune exception (le rendu aurait levé) ET quelque chose à l'écran : une
     // page qui monte vide est le symptôme exact de l'incident de l'accueil.
     expect(container.innerHTML.length).toBeGreaterThan(0);
+
+    // Toute mise à jour d'état lancée par le montage (détection de pays,
+    // chargements) doit atterrir MAINTENANT, pendant que jsdom est vivant :
+    // une promesse qui se résout après le démontage fait planter react-dom sur
+    // un `window` disparu (`ReferenceError: window is not defined`) — un rouge
+    // qui ne dépendait que de la charge du runner, vu en CI le 21/09/2026.
+    await act(async () => {});
+    unmount();
   });
 });
