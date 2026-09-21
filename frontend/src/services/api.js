@@ -158,7 +158,7 @@ const messageUtilisable = (payload) => {
 export const handleApiError = (error, fallback = 'Une erreur est survenue') => {
   // Panne sans message du serveur : c'est le repli — traduit par la page — qui
   // doit s'afficher.
-  if (error?.hasServerMessage === false) return fallback;
+  if (error?.hasServerMessage === false || error?.response?.status >= 500) return fallback;
 
   if (typeof error?.response?.data?.detail === 'string' && error.response.data.detail.trim()) {
     return error.response.data.detail.trim();

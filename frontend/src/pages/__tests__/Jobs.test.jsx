@@ -80,7 +80,7 @@ const panneReseau = () => Object.assign(
 );
 const panneServeur = () => Object.assign(
   new Error("Une erreur inattendue s'est produite. Veuillez rafraîchir la page."),
-  { hasServerMessage: false, response: { status: 502, data: {} } }
+  { hasServerMessage: false, response: { status: 502, data: { detail: 'Internal server error retrieving jobs' } } }
 );
 
 const RESEAU = 'Pas de connexion. Vérifiez votre réseau, puis réessayez.';
@@ -115,6 +115,7 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     render(<Jobs />);
 
     expect(await screen.findByText(SERVEUR)).toBeTruthy();
+    expect(screen.queryByText('Internal server error retrieving jobs')).toBeNull();
     expect(screen.queryByText(RESEAU)).toBeNull();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
   });
@@ -153,6 +154,27 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
 
     expect(await screen.findByText(VIDE_FILTRE)).toBeTruthy();
     expect(screen.queryByText('Réparer une fuite dans une cuisine')).toBeNull();
+  });
+
+  it('ignore une réponse ancienne quand un filtre plus récent est déjà chargé', async () => {
+    let resolveFirst;
+    let resolveSecond;
+    jobsAPI.getAll
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+    render(<Jobs />);
+
+    await waitFor(() => expect(resolveFirst).toEqual(expect.any(Function)));
+    const search = screen.getByPlaceholderText('Titre ou description...');
+    fireEvent.change(search, { target: { value: 'récent' } });
+    await waitFor(() => expect(resolveSecond).toEqual(expect.any(Function)));
+
+    resolveSecond([JOB_B]);
+    expect(await screen.findByText('Peinture du salon')).toBeTruthy();
+    resolveFirst([JOB_A]);
+
+    await waitFor(() => expect(screen.queryByText('Réparation de plomberie')).toBeNull());
+    expect(screen.getByText('Peinture du salon')).toBeTruthy();
   });
 
   it('une panne sur « Afficher plus » garde les missions affichées et Réessayer charge la page manquante', async () => {

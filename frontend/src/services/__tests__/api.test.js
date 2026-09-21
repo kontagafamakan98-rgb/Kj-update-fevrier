@@ -453,6 +453,7 @@ describe('api — panne sans message du serveur : aucun texte technique ne passe
     expect(texte.message).toBe('Numéro invalide');
 
     expect(handleApiError({ response: { data: { detail: 'Adresse inconnue' } } }, 'Erreur')).toBe('Adresse inconnue');
+    expect(handleApiError({ response: { status: 500, data: { detail: 'Internal server error' } } }, 'Repli serveur')).toBe('Repli serveur');
     expect(handleApiError(new Error('Le fichier dépasse 5 Mo'), 'Erreur')).toBe('Le fichier dépasse 5 Mo');
   });
 
