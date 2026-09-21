@@ -65,7 +65,12 @@ export default function Jobs() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [filters, setFilters] = useState({ category: '', status: '', search: '' });
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState(() => ({
+    category: searchParams.get('category') || '',
+    status: '',
+    search: '',
+  }));
   const [radiusKm, setRadiusKm] = useState('');
   const [userCoords, setUserCoords] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -83,7 +88,6 @@ export default function Jobs() {
   const toast = useToast();
   const pageT = makeScopedTranslator(currentLanguage, t);
   const jobUi = getJobUiLabel(currentLanguage);
-  const [searchParams] = useSearchParams();
   const locale = getLocaleForLanguage(currentLanguage);
   usePageMeta();
 
