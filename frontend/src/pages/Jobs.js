@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
@@ -11,61 +11,13 @@ import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobs';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
-import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobPageSafeHelpers';
+import { DemoJobsEmptyState, JobCard } from '../components/JobsResults';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
-import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import CountrySelector from '../components/CountrySelector';
 import JobsMap from '../components/JobsMap';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
 import { usePageMeta } from '../utils/seo';
 import { makePublicJobsPrefetch } from '../utils/publicJobsPrefetch';
-
-function JobCard({ job, user, userType, appliedJobIds, t }) {
-  const locationText = job.location_text || t('locationNotSpecified');
-  const jobId = job.id || job._id || job.job_id || job.jobId;
-  // Source de vérité serveur (appliedJobIds) quand disponible ; retombe sur
-  // le marqueur localStorage seulement si le chargement serveur a échoué,
-  // pour ne pas régresser en cas de souci réseau ponctuel.
-  const hasApplied = userType === 'worker' && (
-    appliedJobIds ? appliedJobIds.has(String(jobId)) : Boolean(getRememberedApplication(jobId, user))
-  );
-
-  return (
-    <Link to={`/jobs/${job.id}`} className="block bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-100">
-      <div className="flex justify-between items-start gap-6 flex-wrap">
-        <div className="flex-1 min-w-[240px]">
-          <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
-            <span className="px-2 py-1 text-xs rounded-full bg-orange-50 text-orange-700 border border-orange-200">
-              {formatJobStatus(job.status, t)}
-            </span>
-          </div>
-          <p className="text-gray-600 line-clamp-2 mb-4">{job.description}</p>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-            <span>{formatJobDate(job.posted_at || job.created_at)}</span>
-            <span>{locationText}</span>
-            {job.category && <span>{job.category}</span>}
-          </div>
-        </div>
-
-        <div className="ml-0 md:ml-6 text-right min-w-[170px]">
-          <div className="text-2xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
-          {job.estimated_duration && <div className="text-sm text-gray-500 mt-1">{job.estimated_duration}</div>}
-          {userType === 'worker' && job.status === 'open' && !hasApplied && (
-            <div className="mt-2 inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700 border border-green-200">
-              {t('applyAvailable')}
-            </div>
-          )}
-          {hasApplied && (
-            <div className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-              {t('proposalSent')}
-            </div>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 // Onglets de la liste des emplois :
 // - « Découvrir » (travailleurs) : offres ouvertes du pays, paginées serveur.
@@ -113,7 +65,12 @@ export default function Jobs() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [filters, setFilters] = useState({ category: '', status: '', search: '' });
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState(() => ({
+    category: searchParams.get('category') || '',
+    status: '',
+    search: '',
+  }));
   const [radiusKm, setRadiusKm] = useState('');
   const [userCoords, setUserCoords] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -131,7 +88,6 @@ export default function Jobs() {
   const toast = useToast();
   const pageT = makeScopedTranslator(currentLanguage, t);
   const jobUi = getJobUiLabel(currentLanguage);
-  const [searchParams] = useSearchParams();
   const locale = getLocaleForLanguage(currentLanguage);
   usePageMeta();
 
@@ -511,23 +467,27 @@ export default function Jobs() {
         // injoignable — ne les efface pas : le bandeau explique, la liste reste.)
         null
       ) : filteredJobs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-          {filtresActifs
-            ? pageT('emptyFiltered')
-            : (effectiveTab === JOB_TAB_APPLICATIONS
-              ? (pageT('noApplicationsYet') || 'Vous n\'avez pas encore postulé à une mission.')
-              : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')))}
-          {filtresActifs ? (
-            <button
-              onClick={effacerLesFiltres}
-              className="mt-4 inline-flex items-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              {pageT('clearFilters')}
-            </button>
-          ) : (
-            <p className="mt-2 text-sm text-gray-400">{pageT('emptyHint')}</p>
-          )}
-        </div>
+        !user && effectiveTab === JOB_TAB_DISCOVER && !filtresActifs ? (
+          <DemoJobsEmptyState t={t} />
+        ) : (
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
+            {filtresActifs
+              ? pageT('emptyFiltered')
+              : (effectiveTab === JOB_TAB_APPLICATIONS
+                ? (pageT('noApplicationsYet') || 'Vous n\'avez pas encore postulé à une mission.')
+                : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')))}
+            {filtresActifs ? (
+              <button
+                onClick={effacerLesFiltres}
+                className="mt-4 inline-flex items-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                {pageT('clearFilters')}
+              </button>
+            ) : (
+              <p className="mt-2 text-sm text-gray-400">{pageT('emptyHint')}</p>
+            )}
+          </div>
+        )
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4">

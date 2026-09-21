@@ -133,13 +133,26 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     expect(jobsAPI.getAll).toHaveBeenCalledTimes(2);
   });
 
-  it('une liste vide sans filtre invite à élargir, et ne propose pas de réessai', async () => {
+  it('une liste vide publique montre des exemples crédibles et une invitation structurée', async () => {
     jobsAPI.getAll.mockResolvedValue([]);
     render(<Jobs />);
 
-    expect(await screen.findByText(VIDE)).toBeTruthy();
-    expect(screen.getByText('Élargissez votre recherche ou revenez plus tard.')).toBeTruthy();
+    expect(await screen.findByText('Découvrez le type de missions publiées sur Kojo')).toBeTruthy();
+    expect(screen.getByText('Réparer une fuite dans une cuisine')).toBeTruthy();
+    expect(screen.getByText('Repeindre deux pièces d’un appartement')).toBeTruthy();
+    expect(screen.getByText('Installer des luminaires dans un commerce')).toBeTruthy();
+    expect(screen.getByText('Commencer maintenant')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull();
+    expect(screen.queryByText(VIDE)).toBeNull();
+  });
+
+  it('conserve l’état vide guidant pour une recherche filtrée', async () => {
+    SEARCH_PARAMS.current = new URLSearchParams('category=plumbing');
+    jobsAPI.getAll.mockResolvedValue([]);
+    render(<Jobs />);
+
+    expect(await screen.findByText(VIDE_FILTRE)).toBeTruthy();
+    expect(screen.queryByText('Réparer une fuite dans une cuisine')).toBeNull();
   });
 
   it('une panne sur « Afficher plus » garde les missions affichées et Réessayer charge la page manquante', async () => {
