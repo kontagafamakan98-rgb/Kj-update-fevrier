@@ -42,6 +42,18 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 FREEZE = "KOJO_FREEZE_ROUTE_SURFACE"
 
 
+# La FAÇADE par laquelle les consommateurs importent ces noms.
+#
+# Un appelable a un `__module__` qui dit où il est ÉCRIT — un rangement de
+# fichiers, pas la surface publique. Le figer rendrait le contrat rouge sur un
+# déplacement de code qui ne change RIEN pour un appelant, et un contrat qu'on
+# régénère à chaque déplacement ne mesure plus rien. On nomme donc l'appelable
+# par la façade quand elle le sert : le contrat dit « la route est protégée par
+# `kojo_core.get_current_user` », ce qui est vrai tant que la façade le sert, et
+# devient faux — donc rouge — le jour où elle cesse de le servir.
+FACADE = "kojo_core"
+
+
 def nom(callable_) -> str:
     """Nom STABLE d'une dépendance (« kojo_core.get_current_user »).
 
@@ -52,6 +64,12 @@ def nom(callable_) -> str:
     sa CLASSE, qui est ce qui décide du comportement.
     """
     nom_ = getattr(callable_, "__qualname__", None)
+    if nom_ and "." not in nom_:
+        # Fonction de premier niveau : la façade prime sur le rangement.
+        import kojo_core
+
+        if getattr(kojo_core, nom_, None) is callable_:
+            return "%s.%s" % (FACADE, nom_)
     if not nom_:
         nom_ = type(callable_).__qualname__
         module = getattr(type(callable_), "__module__", "") or ""

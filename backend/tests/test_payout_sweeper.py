@@ -16,6 +16,8 @@ import pytest
 from httpx import AsyncClient
 
 from tests.conftest import BASE_USER, auth_headers, db_find_one, db_insert, db_upsert, register_and_login
+import kojo_cloudinary
+import kojo_owner
 
 
 def _make_payment(
@@ -294,8 +296,8 @@ class TestOwnerStuckPayouts:
         for doc in (alerted_old, recent, old_unalerted):
             await db_insert("payments", doc)
 
-        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
-             patch("kojo_core.OWNER_USER_ID", owner["user"]["id"]):
+        with patch("kojo_owner.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_owner.OWNER_USER_ID", owner["user"]["id"]):
             resp = await client.get("/api/owner/stuck-payouts", headers=headers)
 
         assert resp.status_code == 200, resp.text
@@ -347,8 +349,8 @@ class TestOwnerStuckPayouts:
         paydunya_circuit reste exposé : l'état du circuit breaker global)."""
         owner = await register_and_login(client, BASE_USER)
         headers = {"Authorization": f"Bearer {owner['access_token']}"}
-        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
-             patch("kojo_core.OWNER_USER_ID", owner["user"]["id"]):
+        with patch("kojo_owner.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_owner.OWNER_USER_ID", owner["user"]["id"]):
             resp = await client.get("/api/owner/stuck-payouts", headers=headers)
         assert resp.status_code == 200
         data = resp.json()
@@ -539,8 +541,8 @@ class TestOwnerResolutionByEmail:
         real_id = owner["user"]["id"]
         phantom_id = "phantom-owner-id-2024"
 
-        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
-             patch("kojo_core.OWNER_USER_ID", phantom_id):
+        with patch("kojo_owner.OWNER_EMAIL", owner["user"]["email"]), \
+             patch("kojo_owner.OWNER_USER_ID", phantom_id):
             from kojo_core import resolve_owner_id
             resolved = await resolve_owner_id()
             assert resolved == real_id
@@ -560,9 +562,9 @@ class TestOwnerResolutionByEmail:
         payment = _make_payment(payout_status="refunding", payout_kind="refund", hours_ago=30)
         await db_insert("payments", payment)
 
-        with patch("kojo_core.OWNER_EMAIL", owner["user"]["email"]), \
+        with patch("kojo_owner.OWNER_EMAIL", owner["user"]["email"]), \
              patch("kojo_scheduler.OWNER_EMAIL", owner["user"]["email"]), \
-             patch("kojo_core.OWNER_USER_ID", "phantom-owner-id-2024"), \
+             patch("kojo_owner.OWNER_USER_ID", "phantom-owner-id-2024"), \
              patch("kojo_routers_payments.check_paydunya_disburse_status",
                    return_value={"status": "pending", "response_code": "00"}), \
              patch("kojo_routers_payments.notify_user_localized", AsyncMock()), \
@@ -879,7 +881,7 @@ class TestExternalProviderMonitors:
 
     async def _clear_caches(self):
         import kojo_core, kojo_email
-        kojo_core._cloudinary_health_cache.clear()
+        kojo_cloudinary._cloudinary_health_cache.clear()
         kojo_email._brevo_health_cache.clear()
 
     async def test_brevo_ok(self, client: AsyncClient):
@@ -924,8 +926,8 @@ class TestExternalProviderMonitors:
     async def test_cloudinary_ok(self, client: AsyncClient):
         """Cloudinary configuré et ping officiel ok → 200."""
         await self._clear_caches()
-        with patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping",
+        with patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping",
                    return_value={"status": "ok"}) as ping_mock:
             cfg_mock.return_value.cloud_name = "kojo"
             cfg_mock.return_value.api_key = "key"
@@ -941,8 +943,8 @@ class TestExternalProviderMonitors:
     async def test_cloudinary_transport_error_503(self, client: AsyncClient):
         """Cloudinary injoignable (ping lève) → 503 avec detail transport."""
         await self._clear_caches()
-        with patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping",
+        with patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping",
                    side_effect=Exception("Cloudinary down")):
             cfg_mock.return_value.cloud_name = "kojo"
             cfg_mock.return_value.api_key = "key"
@@ -957,8 +959,8 @@ class TestExternalProviderMonitors:
     async def test_cloudinary_not_configured_503(self, client: AsyncClient):
         """CLOUDINARY_URL absent → 503 config, aucun ping réseau tenté."""
         await self._clear_caches()
-        with patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping") as ping_mock:
+        with patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping") as ping_mock:
             cfg_mock.return_value.cloud_name = None
             cfg_mock.return_value.api_key = None
             cfg_mock.return_value.api_secret = None
@@ -994,7 +996,7 @@ class TestCompositeMonitor:
 
     async def _clear_caches(self):
         import kojo_core, kojo_email
-        kojo_core._cloudinary_health_cache.clear()
+        kojo_cloudinary._cloudinary_health_cache.clear()
         kojo_email._brevo_health_cache.clear()
 
     async def test_composite_all_ok_200(self, client: AsyncClient):
@@ -1002,8 +1004,8 @@ class TestCompositeMonitor:
         await self._clear_caches()
         with patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get") as get_mock, \
-             patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping",
+             patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping",
                    return_value={"status": "ok"}):
             get_mock.return_value.ok = True
             get_mock.return_value.status_code = 200
@@ -1030,8 +1032,8 @@ class TestCompositeMonitor:
         with patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get",
                    side_effect=_requests.ConnectionError("Brevo down")), \
-             patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping",
+             patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping",
                    return_value={"status": "ok"}):
             cfg_mock.return_value.cloud_name = "kojo"
             cfg_mock.return_value.api_key = "key"
@@ -1051,8 +1053,8 @@ class TestCompositeMonitor:
         with patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get",
                    side_effect=_requests.ConnectionError("Brevo down")), \
-             patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping",
+             patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping",
                    side_effect=Exception("Cloudinary down")):
             cfg_mock.return_value.cloud_name = "kojo"
             cfg_mock.return_value.api_key = "key"
@@ -1073,8 +1075,8 @@ class TestCompositeMonitor:
         with patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get",
                    side_effect=_requests.ConnectionError("Brevo down")), \
-             patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping",
+             patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping",
                    return_value={"status": "ok"}):
             cfg_mock.return_value.cloud_name = "kojo"
             cfg_mock.return_value.api_key = "key"
@@ -1098,8 +1100,8 @@ class TestCompositeMonitor:
         await self._clear_caches()
         with patch("kojo_email.brevo_is_configured", return_value=True), \
              patch("kojo_email.requests.get") as get_mock, \
-             patch("kojo_core.cloudinary.config") as cfg_mock, \
-             patch("kojo_core.cloudinary.api.ping",
+             patch("kojo_cloudinary.cloudinary.config") as cfg_mock, \
+             patch("kojo_cloudinary.cloudinary.api.ping",
                    return_value={"status": "ok"}):
             get_mock.return_value.ok = True
             get_mock.return_value.status_code = 200

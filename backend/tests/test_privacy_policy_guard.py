@@ -25,6 +25,7 @@ import textwrap
 from pathlib import Path
 
 import pytest
+import kojo_db
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 BACKEND = REPO_ROOT / "backend"
@@ -279,14 +280,25 @@ class TestRefus:
 class TestUnSeulProprietaire:
     """Les durées vivent à un seul endroit, et c'est vérifiable dans le code."""
 
-    def test_kojo_core_ne_ecrit_plus_aucun_expire_after_seconds(self):
+    def test_le_proprietaire_des_index_ne_ecrit_plus_aucun_expire_after_seconds(self):
         """L'index TTL ET la durée viennent des règles : si un
-        `expireAfterSeconds` littéral revenait dans kojo_core, il y aurait de
-        nouveau deux endroits à tenir d'accord, et ce garde ne le verrait pas.
+        `expireAfterSeconds` littéral revenait dans le module qui crée les
+        index, il y aurait de nouveau deux endroits à tenir d'accord, et ce
+        garde ne le verrait pas.
+
+        Le fichier n'est pas nommé ici, il est DÉRIVÉ de la fonction qui crée
+        réellement les index : ce garde visait `kojo_core.py`, qui n'en est plus
+        que la façade, donc il serait resté vert en ne regardant plus le fichier
+        où le littéral peut revenir.
 
         Les lignes de commentaire sont écartées : elles CITENT le mot pour dire
         qu'il a disparu, ce qui n'est pas l'écrire."""
-        source = (BACKEND / "kojo_core.py").read_text(encoding="utf-8")
+        import inspect
+
+        import kojo_core
+
+        fichier = inspect.getsourcefile(kojo_core.create_database_indexes)
+        source = Path(fichier).read_text(encoding="utf-8")
         code = "\n".join(
             ligne for ligne in source.splitlines()
             if not ligne.strip().startswith("#")
@@ -301,7 +313,6 @@ class TestUnSeulProprietaire:
         est ce que `create_database_indexes` pose réellement. Une règle sans
         index publierait une durée sans effet ; un index sans règle purgerait
         sans être publié."""
-        import kojo_core
         from kojo_retention import RETENTION_RULES
 
         appels = []
@@ -344,10 +355,10 @@ class TestUnSeulProprietaire:
         async def disponible():
             return True
 
-        monkeypatch.setattr(kojo_core, "db", BaseFactice())
-        monkeypatch.setattr(kojo_core, "is_database_available", disponible)
+        monkeypatch.setattr(kojo_db, "db", BaseFactice())
+        monkeypatch.setattr(kojo_db, "is_database_available", disponible)
 
-        await kojo_core.create_database_indexes()
+        await kojo_db.create_database_indexes()
 
         index_ttl = [appel for appel in appels if "expireAfterSeconds" in appel[2]]
         attendus = {

@@ -738,10 +738,21 @@ if USE_REAL_MONGO:
     # Vrai MongoDB : aucun patch Motor, la connexion pointe sur la vraie base.
     import server as _srv
 else:
-    # Mode FakeDB : on importe kojo_core AVANT server et on remplace db par la
-    # fake avant que les routers ne fassent `from kojo_core import db` (sinon
-    # ils garderaient la vraie référence au client Motor patché).
+    # Mode FakeDB : on remplace `db` AVANT que quiconque ne lie le nom.
+    #
+    # Le nom `db` appartient a `kojo_db` (c'est lui qui cree le client Motor),
+    # et ses lecteurs le lient a l'import : les routeurs et les services par
+    # `from kojo_core import db`, les modules extraits de `kojo_core` par
+    # `from kojo_db import db`. La doublure se pose donc LA, avant `import
+    # kojo_core` — sinon ces derniers garderaient la reference au client Motor
+    # patche, qui ne repond a rien. `kojo_core.db` est repose aussi pour que
+    # l'alias de la facade reste coherent avec sa source.
+    #
+    # `tests/test_core_db_seam.py` verifie le resultat : tout module charge qui
+    # expose `db` doit exposer CETTE doublure.
     with patch("motor.motor_asyncio.AsyncIOMotorClient"):
+        import kojo_db as _kojo_db
+        _kojo_db.db = fake_db
         import kojo_core as _core
         _core.db = fake_db
         import server as _srv
