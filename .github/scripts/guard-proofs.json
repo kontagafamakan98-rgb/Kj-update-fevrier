@@ -1143,6 +1143,27 @@
       "attend": [
         "FAILED tests/test_deployed_revision.py::TestVerdict::test_refuse_une_revision_differente_en_nommant_les_deux"
       ]
+    },
+    {
+      "id": "deployed-revision: console non utf-8 laissee planter le refus",
+      "garde": "backend/scripts/check_deployed_revision.py",
+      "cible": "backend/scripts/check_deployed_revision.py",
+      "trouve": "        _flux.reconfigure(errors=\"replace\")",
+      "remplace": "        _flux.reconfigure(errors=\"strict\")",
+      "runner": "python",
+      "preuve": "backend/tests/test_deployed_revision.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_deployed_revision.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_deployed_revision.py::TestRefusSurConsoleNonUtf8::test_la_revision_differente_est_nommee_sans_planter"
+      ]
     }
   ]
 }

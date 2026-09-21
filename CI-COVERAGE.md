@@ -582,10 +582,17 @@ Il attend jusqu'à ~3 min qu'un déploiement en cours se termine, puis refuse en
 nommant **la révision servie et l'attendue** ; une réponse muette (« inconnue »,
 c'est-à-dire une image construite sans la build-arg) et un service injoignable
 sont deux autres refus, nommés séparément.
-- Preuve d'échec rejouable : `backend/tests/test_deployed_revision.py` (20 cas,
-`fetch` injecté, aucun réseau) et la mutation `deployed-revision: revision
-differente toleree` du registre — neutraliser la comparaison fait rougir le test
-propriétaire, nommé.
+- Preuve d'échec rejouable : `backend/tests/test_deployed_revision.py` (21 cas,
+`fetch` injecté, aucun réseau) et **deux** mutations du registre, chacune faisant
+rougir le test propriétaire, nommé : `deployed-revision: revision differente
+toleree` (neutraliser la comparaison) et `deployed-revision: console non utf-8
+laissee planter le refus`.
+- Le refus survit à une console qui n'est pas en UTF-8 : sur une console Windows
+(cp1252) le « ≠ » du message levait `UnicodeEncodeError`, donc le garde mourait
+**en traceback avant d'avoir nommé** quoi que ce soit — la CI, en UTF-8 partout,
+ne voyait jamais ce chemin. Les flux sont donc rendus tolérants
+(`reconfigure(errors="replace")`), et un test le prouve en lançant le garde avec
+l'encodage du tube figé à `cp1252` chez l'enfant (cf. AGENTS.md).
 
 Ce qui reste ouvert après ce correctif : la vérification porte sur la RÉVISION,
 pas sur la santé applicative (une image du bon commit qui plante au boot répondrait
