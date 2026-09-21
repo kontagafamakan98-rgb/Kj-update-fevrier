@@ -1,0 +1,42 @@
+[
+  {
+    "methode": "GET",
+    "chemin": "/api/og/jobs/{job_id}-square.png",
+    "nom": "get_job_og_image_square",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/og/jobs/{job_id}.png",
+    "nom": "get_job_og_image",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/og/jobs/{job_id}",
+    "nom": "get_job_og_html",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/public/stats",
+    "nom": "get_public_stats",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/sitemap.xml",
+    "nom": "get_sitemap_xml",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  }
+]

@@ -2,7 +2,7 @@
 """Candidatures : dépôt (`POST /jobs/{id}/proposals`) et acceptation.
 
 Extrait de `kojo_routers_jobs.py` sans changement de comportement (surface
-figée par `tests/job_route_surface.json`). Les modèles de requête de
+figée par `tests/surface/route_surface_jobs.json`). Les modèles de requête de
 l'acceptation vivent ici, avec la seule route qui les lit.
 """
 import asyncio

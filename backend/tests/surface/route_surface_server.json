@@ -1,0 +1,122 @@
+[
+  {
+    "methode": "GET",
+    "chemin": "/",
+    "nom": "app_root",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/",
+    "nom": "app_root",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/health",
+    "nom": "root_health_check",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/health",
+    "nom": "root_health_check",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/monitor/paydunya",
+    "nom": "monitor_paydunya",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/monitor/paydunya",
+    "nom": "monitor_paydunya",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/monitor/brevo",
+    "nom": "monitor_brevo",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/monitor/brevo",
+    "nom": "monitor_brevo",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/monitor/cloudinary",
+    "nom": "monitor_cloudinary",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/monitor/cloudinary",
+    "nom": "monitor_cloudinary",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/monitor",
+    "nom": "monitor_composite",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "HEAD",
+    "chemin": "/monitor",
+    "nom": "monitor_composite",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/favicon.ico",
+    "nom": "favicon",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/",
+    "nom": "root",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/health",
+    "nom": "health_check",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  }
+]

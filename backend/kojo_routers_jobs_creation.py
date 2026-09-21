@@ -2,7 +2,7 @@
 """Création d'une mission (`POST /jobs`) et push de matching.
 
 Extrait de `kojo_routers_jobs.py` sans changement de comportement (surface
-figée par `tests/job_route_surface.json`). Le push de matching vit ici parce
+figée par `tests/surface/route_surface_jobs.json`). Le push de matching vit ici parce
 qu'il n'a qu'un site d'appel : la création.
 """
 import asyncio

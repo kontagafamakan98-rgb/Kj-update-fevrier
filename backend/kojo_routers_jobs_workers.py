@@ -3,7 +3,7 @@
 
 Extrait de `kojo_routers_jobs.py` sans changement de comportement : la surface
 publique de ces routes (méthode, chemin, dépendances, modèle de réponse) est
-figée par `tests/job_route_surface.json`.
+figée par `tests/surface/route_surface_jobs.json`.
 """
 from fastapi import APIRouter, Depends, HTTPException
 

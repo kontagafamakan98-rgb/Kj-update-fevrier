@@ -11,11 +11,12 @@ L'ORDRE des `include_router` reproduit l'ordre d'enregistrement historique :
 l'ordre décide quelle route gagne quand deux motifs se recouvrent, et ce
 routeur en contient un cas — `/{user_id}/profile-photo` voisine avec les
 chemins littéraux du même préfixe. La surface publique est donc figée route par
-route, DANS L'ORDRE, par `tests/user_route_surface.json`.
+route, DANS L'ORDRE, par `tests/surface/route_surface_users.json`.
 
 Un module de la famille que ce composeur oublierait de monter échapperait aux
-deux listes dérivées du même montage : c'est le rôle de
-`tests/test_decoupage_familles.py`, qui part du dossier.
+deux listes dérivées du même montage : c'est le rôle du contrôle d'orphelin de
+`tests/test_route_surface.py`, qui part des modules du DOSSIER et non des routes
+montées.
 
 Ce module reste la façade : `server.py` continue de prendre `router` ici, et
 les noms déjà importés par les tests sont ré-exportés en bas — la découpe ne

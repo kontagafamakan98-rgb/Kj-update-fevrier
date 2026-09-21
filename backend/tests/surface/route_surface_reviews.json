@@ -1,0 +1,46 @@
+[
+  {
+    "methode": "POST",
+    "chemin": "/api/jobs/{job_id}/reviews",
+    "nom": "create_review",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/jobs/{job_id}/reviews",
+    "nom": "get_job_reviews",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/{user_id}/reviews",
+    "nom": "get_user_reviews",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "DELETE",
+    "chemin": "/api/reviews/{review_id}",
+    "nom": "delete_review",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  }
+]

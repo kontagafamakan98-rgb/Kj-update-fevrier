@@ -242,17 +242,25 @@
       "chemin": "backend/kojo_routers_jobs.py",
       "role": "garde",
       "invoque_par": "test",
-      "preuve": "backend/tests/test_job_route_surface.py",
+      "preuve": "backend/tests/test_route_surface.py",
       "runner": "pytest",
-      "motif": "composeur du routeur des missions : après le découpage, ce qui doit rester vrai n'est pas le fichier mais sa SURFACE (chemins, méthodes, dépendances, ordre de montage), lue sur l'application réellement montée — son seul exécutant est test_job_route_surface.py"
+      "motif": "famille `jobs` : après le découpage, ce qui doit rester vrai n'est pas le fichier mais sa SURFACE (chemins, méthodes, dépendances d'authentification, ordre de montage), lue sur l'application réellement montée et figée dans tests/surface/route_surface_jobs.json — un instantané par famille depuis que le contrat couvre TOUT server.app"
+    },
+    {
+      "chemin": "backend/server.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_route_surface.py",
+      "runner": "pytest",
+      "motif": "la surface COMPLÈTE de l'application (12 familles, 109 routes) est figée famille par famille : server.py est le fichier qui MONTE cette surface, donc son changement invalide toutes les références d'un coup. Un routeur débranché est vu par le contrôle d'orphelin (dérivé du dossier, pas du montage) et un chemin modifié par l'instantané de sa famille"
     },
     {
       "chemin": "backend/kojo_routers_users.py",
       "role": "garde",
       "invoque_par": "test",
-      "preuve": "backend/tests/test_user_route_surface.py",
+      "preuve": "backend/tests/test_route_surface.py",
       "runner": "pytest",
-      "motif": "composeur du routeur des comptes (21 routes, dont la suppression de compte RGPD et l'export des données) : ce qui doit rester vrai est sa SURFACE — chemins, méthodes, dépendances d'authentification, ORDRE de montage — lue sur l'application réellement montée. Le contrôle des modules ORPHELINS, que ni le composeur ni l'application ne peuvent voir, appartient à tests/test_decoupage_familles.py"
+      "motif": "famille `users` (21 routes, dont la suppression de compte RGPD et l'export des données) : ce qui doit rester vrai est sa SURFACE — chemins, méthodes, dépendances d'authentification, ORDRE de montage — figée dans tests/surface/route_surface_users.json. Le contrôle des modules ORPHELINS, que ni le composeur ni l'application ne peuvent voir (les deux viennent du même montage), est dans le même fichier, dérivé du DOSSIER"
     },
     {
       "chemin": "backend/kojo_core.py",
@@ -442,18 +450,19 @@
       "trouve": "router.include_router(_referral)",
       "remplace": "pass  # mutation : le groupe de routes n'est plus monte",
       "runner": "python",
-      "preuve": "backend/tests/test_user_route_surface.py",
+      "preuve": "backend/tests/test_route_surface.py",
       "commande": [
         "{python}",
         "-m",
         "pytest",
-        "tests/test_user_route_surface.py",
+        "tests/test_route_surface.py",
         "-q",
         "--tb=no"
       ],
       "cwd": "backend",
       "attend": [
-        "FAILED tests/test_user_route_surface.py::TestSurfaceDesRoutes::test_la_surface_des_routes_est_inchangee"
+        "FAILED tests/test_route_surface.py::TestLaDerivationEstReelle::test_aucun_porteur_de_routes_n_est_orphelin",
+        "FAILED tests/test_route_surface.py::TestSurfaceDesFamilles::test_la_surface_de_la_famille_est_inchangee[users]"
       ]
     },
     {
@@ -463,18 +472,19 @@
       "trouve": "router.include_router(_listing)",
       "remplace": "pass  # mutation : le groupe de routes n'est plus monte",
       "runner": "python",
-      "preuve": "backend/tests/test_job_route_surface.py",
+      "preuve": "backend/tests/test_route_surface.py",
       "commande": [
         "{python}",
         "-m",
         "pytest",
-        "tests/test_job_route_surface.py",
+        "tests/test_route_surface.py",
         "-q",
         "--tb=no"
       ],
       "cwd": "backend",
       "attend": [
-        "FAILED tests/test_job_route_surface.py::TestSurfaceDesRoutes::test_la_surface_des_routes_est_inchangee"
+        "FAILED tests/test_route_surface.py::TestLaDerivationEstReelle::test_aucun_porteur_de_routes_n_est_orphelin",
+        "FAILED tests/test_route_surface.py::TestSurfaceDesFamilles::test_la_surface_de_la_famille_est_inchangee[jobs]"
       ]
     },
     {
@@ -1291,6 +1301,49 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_core_surface.py::TestSurfacePubliqueDeKojoCore::test_aucun_nom_du_contrat_n_a_change_de_nature_ni_de_signature"
+      ]
+    },
+    {
+      "id": "surface: un routeur de famille n'est plus monte",
+      "garde": "backend/server.py",
+      "cible": "backend/server.py",
+      "trouve": "api_router.include_router(messages_router)\n",
+      "remplace": "# mutation : ce routeur n'est plus monte\n",
+      "runner": "python",
+      "preuve": "backend/tests/test_route_surface.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_route_surface.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_route_surface.py::TestLaDerivationEstReelle::test_aucun_porteur_de_routes_n_est_orphelin",
+        "FAILED tests/test_route_surface.py::TestLaDerivationEstReelle::test_aucun_instantane_orphelin"
+      ]
+    },
+    {
+      "id": "surface: le chemin d'une route change (famille jamais decoupee)",
+      "garde": "backend/server.py",
+      "cible": "backend/server.py",
+      "trouve": "@app.api_route(\"/health\", methods=[\"GET\", \"HEAD\"])",
+      "remplace": "@app.api_route(\"/healthz\", methods=[\"GET\", \"HEAD\"])  # mutation",
+      "runner": "python",
+      "preuve": "backend/tests/test_route_surface.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_route_surface.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_route_surface.py::TestSurfaceDesFamilles::test_la_surface_de_la_famille_est_inchangee[server]"
       ]
     }
   ]

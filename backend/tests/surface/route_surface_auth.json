@@ -1,0 +1,135 @@
+[
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/email/check-availability",
+    "nom": "check_signup_email_availability",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/email/send-otp",
+    "nom": "send_signup_email_otp",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/email/resend-otp",
+    "nom": "resend_signup_email_otp",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/email/verify-otp",
+    "nom": "verify_signup_email_otp",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/password/forgot/request",
+    "nom": "request_password_reset_otp",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/password/forgot/resend",
+    "nom": "resend_password_reset_otp",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/password/forgot/verify",
+    "nom": "verify_password_reset_otp",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/password/reset",
+    "nom": "reset_password_with_verified_token",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/register-verified",
+    "nom": "register_user_verified",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/login",
+    "nom": "login_user",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/google",
+    "nom": "google_auth",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/google/link",
+    "nom": "google_link",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/auth/logout",
+    "nom": "logout_user",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/auth/me",
+    "nom": "get_current_user_auth",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "PATCH",
+    "chemin": "/api/auth/me/country",
+    "nom": "update_user_country",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  }
+]

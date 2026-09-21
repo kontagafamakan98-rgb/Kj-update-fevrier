@@ -1,0 +1,40 @@
+[
+  {
+    "methode": "POST",
+    "chemin": "/api/support/tickets/status",
+    "nom": "get_support_ticket_status",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/support/tickets",
+    "nom": "create_support_ticket",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/support/tickets",
+    "nom": "list_support_tickets",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.verify_owner_access",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "PATCH",
+    "chemin": "/api/support/tickets/{ticket_id}/status",
+    "nom": "update_support_ticket_status",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.verify_owner_access",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  }
+]

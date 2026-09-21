@@ -24,7 +24,7 @@ processus, donc les seuls que les tests substituent).
 L'ORDRE des `include_router` reproduit l'ordre d'enregistrement historique :
 l'ordre décide quelle route gagne quand deux motifs se recouvrent, et la
 surface publique est donc figée route par route, dans l'ordre, par
-`tests/job_route_surface.json`.
+`tests/surface/route_surface_jobs.json`.
 
 Ce module reste la façade : `server.py` continue de prendre `router` ici, et
 les noms déjà importés par d'autres modules ou par les tests sont ré-exportés

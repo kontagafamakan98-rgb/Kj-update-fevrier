@@ -2,7 +2,7 @@
 """Clôture d'une mission (`POST /jobs/{id}/complete`) : versement et bonus.
 
 Extrait de `kojo_routers_jobs.py` sans changement de comportement (surface
-figée par `tests/job_route_surface.json`). L'attribution du bonus de première
+figée par `tests/surface/route_surface_jobs.json`). L'attribution du bonus de première
 mission vit ici : elle n'a qu'un site d'appel, la clôture.
 """
 import asyncio
