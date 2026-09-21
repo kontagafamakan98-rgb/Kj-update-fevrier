@@ -565,7 +565,7 @@ class TestImageMagicBytes:
         """Un vrai PNG passe la validation, puis échoue proprement côté Cloudinary (non configuré)."""
         headers = await auth_headers(client, BASE_USER)
         png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
-        with patch("kojo_routers_users.upload_profile_photo_to_cloudinary",
+        with patch("kojo_routers_users_profile.upload_profile_photo_to_cloudinary",
                    return_value={"photo_url": "https://res.cloudinary.com/test.png", "public_id": "x"}):
             resp = await client.post(
                 "/api/users/profile-photo",

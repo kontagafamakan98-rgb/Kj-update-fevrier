@@ -289,7 +289,7 @@ class TestPasswordVersionRevocation:
 # Contrat RGPD, ÉCRIT ici et non lu sur l'implémentation : ces trois états
 # signifient que PayDunya n'a exécuté AUCUN décaissement, donc que l'argent est
 # encore dû au payeur qui supprime son compte. Une liste dérivée de
-# `kojo_routers_users.REFUNDABLE_PAYOUT_STATES` ne pourrait pas signaler la
+# `kojo_routers_users_account.REFUNDABLE_PAYOUT_STATES` ne pourrait pas signaler la
 # régression : retirer un état du code retirerait aussi le cas qui le vérifie.
 REFUNDABLE_ESCROW_STATES = ("held", "release_failed", "refund_failed")
 
