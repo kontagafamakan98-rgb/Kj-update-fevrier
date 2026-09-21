@@ -255,6 +255,14 @@
       "motif": "composeur du routeur des comptes (21 routes, dont la suppression de compte RGPD et l'export des données) : ce qui doit rester vrai est sa SURFACE — chemins, méthodes, dépendances d'authentification, ORDRE de montage — lue sur l'application réellement montée. Le contrôle des modules ORPHELINS, que ni le composeur ni l'application ne peuvent voir, appartient à tests/test_decoupage_familles.py"
     },
     {
+      "chemin": "backend/kojo_core.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_core_surface.py",
+      "runner": "pytest",
+      "motif": "façade de l'infrastructure (db, Cloudinary, rate-limiting, réseau, auth, middlewares, propriétaire, validation) : après le découpage, ce qui doit rester vrai n'est pas le fichier mais la surface PUBLIQUE qu'il sert — noms, nature, signature, dérivés des importeurs et des cibles de patch du dépôt, puis figés sur l'arbre d'AVANT (tests/core_surface.json). Son seul exécutant est test_core_surface.py"
+    },
+    {
       "chemin": "backend/scripts/audit_none_signatures.py",
       "role": "garde",
       "invoque_par": "test",
@@ -1241,6 +1249,48 @@
       "cwd": "frontend",
       "attend": [
         "doit être interrogée, pas excusée comme locale"
+      ]
+    },
+    {
+      "id": "split-core: la facade sert un AUTRE objet sous un nom",
+      "garde": "backend/kojo_core.py",
+      "cible": "backend/kojo_core.py",
+      "trouve": "from kojo_owner import ensure_owner_exists, get_owner_account, resolve_owner_id, verify_owner_access",
+      "remplace": "from kojo_owner import ensure_owner_exists, get_owner_account, resolve_owner_id\nfrom kojo_owner import ensure_owner_exists as verify_owner_access  # mutation",
+      "runner": "python",
+      "preuve": "backend/tests/test_core_surface.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_core_surface.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_core_surface.py::TestSurfacePubliqueDeKojoCore::test_aucun_nom_du_contrat_n_a_change_de_nature_ni_de_signature"
+      ]
+    },
+    {
+      "id": "split-core: un nom de la facade n'est plus servi",
+      "garde": "backend/kojo_core.py",
+      "cible": "backend/kojo_core.py",
+      "trouve": "import cloudinary\n",
+      "remplace": "# mutation : la facade ne sert plus ce nom\n",
+      "runner": "python",
+      "preuve": "backend/tests/test_core_surface.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_core_surface.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_core_surface.py::TestSurfacePubliqueDeKojoCore::test_aucun_nom_du_contrat_n_a_change_de_nature_ni_de_signature"
       ]
     }
   ]

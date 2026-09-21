@@ -1,0 +1,162 @@
+{
+  "OWNER_EMAIL": {
+    "nature": "valeur",
+    "signature": ""
+  },
+  "OWNER_USER_ID": {
+    "nature": "valeur",
+    "signature": ""
+  },
+  "RateLimitMiddleware": {
+    "nature": "classe",
+    "signature": "(app: 'ASGIApp', dispatch: 'DispatchFunction | None' = None) -> 'None'"
+  },
+  "WestAfricaSecurityMiddleware": {
+    "nature": "classe",
+    "signature": "(app: 'ASGIApp', dispatch: 'DispatchFunction | None' = None) -> 'None'"
+  },
+  "_cloudinary_health_cache": {
+    "nature": "valeur",
+    "signature": ""
+  },
+  "_rate_limit_cleanup_loop": {
+    "nature": "coroutine",
+    "signature": "()"
+  },
+  "_try_init_redis": {
+    "nature": "fonction",
+    "signature": "() -> Optional[Any]"
+  },
+  "build_allowed_origins": {
+    "nature": "fonction",
+    "signature": "(frontend_url: Optional[str] = None, cors_value: Optional[str] = None, env: Optional[Dict[str, str]] = None) -> List[str]"
+  },
+  "build_trusted_hosts": {
+    "nature": "fonction",
+    "signature": "() -> List[str]"
+  },
+  "clear_auth_cookies": {
+    "nature": "fonction",
+    "signature": "(response: starlette.responses.Response) -> None"
+  },
+  "client": {
+    "nature": "valeur",
+    "signature": ""
+  },
+  "cloudinary": {
+    "nature": "module",
+    "signature": ""
+  },
+  "cloudinary_health_probe": {
+    "nature": "fonction",
+    "signature": "() -> dict"
+  },
+  "create_access_token": {
+    "nature": "fonction",
+    "signature": "(data: dict)"
+  },
+  "create_database_indexes": {
+    "nature": "coroutine",
+    "signature": "()"
+  },
+  "db": {
+    "nature": "valeur",
+    "signature": ""
+  },
+  "ensure_owner_exists": {
+    "nature": "coroutine",
+    "signature": "()"
+  },
+  "extract_host_from_url": {
+    "nature": "fonction",
+    "signature": "(raw_url: str) -> Optional[str]"
+  },
+  "get_client_ip": {
+    "nature": "fonction",
+    "signature": "(request: starlette.requests.Request) -> str"
+  },
+  "get_current_user": {
+    "nature": "coroutine",
+    "signature": "(request: starlette.requests.Request, credentials: Optional[fastapi.security.http.HTTPAuthorizationCredentials] = Depends(HTTPBearer))"
+  },
+  "get_current_user_optional": {
+    "nature": "coroutine",
+    "signature": "(request: starlette.requests.Request, credentials: Optional[fastapi.security.http.HTTPAuthorizationCredentials] = Depends(HTTPBearer)) -> Optional[kojo_models.User]"
+  },
+  "hash_password": {
+    "nature": "fonction",
+    "signature": "(password: str) -> str"
+  },
+  "is_database_available": {
+    "nature": "coroutine",
+    "signature": "() -> bool"
+  },
+  "is_token_revoked": {
+    "nature": "coroutine",
+    "signature": "(jti: Optional[str]) -> bool"
+  },
+  "is_valid_image_content": {
+    "nature": "fonction",
+    "signature": "(data: bytes) -> bool"
+  },
+  "log_and_raise_http_exception": {
+    "nature": "fonction",
+    "signature": "(status_code: int, detail: str, logger_instance=None)"
+  },
+  "normalize_origin": {
+    "nature": "fonction",
+    "signature": "(value: str) -> Optional[str]"
+  },
+  "request_counts": {
+    "nature": "valeur",
+    "signature": ""
+  },
+  "resolve_owner_id": {
+    "nature": "coroutine",
+    "signature": "() -> Optional[str]"
+  },
+  "revoke_token": {
+    "nature": "coroutine",
+    "signature": "(jti: str, expire_at: datetime.datetime)"
+  },
+  "sanitize_email": {
+    "nature": "fonction",
+    "signature": "(email: str) -> str"
+  },
+  "security": {
+    "nature": "valeur",
+    "signature": ""
+  },
+  "set_auth_cookies": {
+    "nature": "fonction",
+    "signature": "(response: starlette.responses.Response, access_token: str) -> None"
+  },
+  "upload_image_to_cloudinary": {
+    "nature": "fonction",
+    "signature": "(file_obj, user_identifier: str, folder: str, public_prefix: str)"
+  },
+  "upload_profile_photo_to_cloudinary": {
+    "nature": "fonction",
+    "signature": "(file_obj, user_identifier: str)"
+  },
+  "validate_orange_money_number": {
+    "nature": "fonction",
+    "signature": "(number: str) -> bool"
+  },
+  "validate_payment_accounts": {
+    "nature": "fonction",
+    "signature": "(payment_accounts: kojo_models.PaymentAccount, user_type: str, country: Optional[str] = None) -> dict"
+  },
+  "validate_wave_number": {
+    "nature": "fonction",
+    "signature": "(number: str) -> bool"
+  },
+  "verify_owner_access": {
+    "nature": "coroutine",
+    "signature": "(request: starlette.requests.Request, credentials: Optional[fastapi.security.http.HTTPAuthorizationCredentials] = Depends(HTTPBearer))"
+  },
+  "verify_password": {
+    "nature": "fonction",
+    "signature": "(password: str, hashed: Optional[str]) -> bool"
+  }
+}

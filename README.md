@@ -34,7 +34,15 @@ backend/
 ├── server.py              # Point d'entrée : app, middlewares, routers, lifespan
 ├── kojo_settings.py       # Config (env, logging, secrets, en-têtes sécurité)
 ├── kojo_models.py         # Modèles Pydantic + énumérations
-├── kojo_core.py           # MongoDB, index, rate-limiting, sécurité, auth
+├── kojo_core.py           # Façade de l'infrastructure : que des re-exports
+├── kojo_db.py             # MongoDB, index (dont les index TTL de rétention)
+├── kojo_auth_core.py      # Jeton, CSRF, cookies, mots de passe, get_current_user
+├── kojo_rate_limit.py     # Redis/mémoire, fenêtres et politique par route
+├── kojo_network.py        # IP client, hôtes de confiance, origines CORS
+├── kojo_middlewares.py    # Les deux middlewares ASGI
+├── kojo_owner.py          # Compte propriétaire et accès réservé
+├── kojo_validation.py     # Validation, assainissement, masquage
+├── kojo_cloudinary.py     # Téléversements et sonde Cloudinary
 ├── kojo_email.py          # OTP / vérification email / Brevo / Gmail
 ├── kojo_shared.py         # Notifications (base + push web), adresses mission
 ├── kojo_payments.py       # Intégration PayDunya (factures, statuts, décaissements)
@@ -272,7 +280,7 @@ curl -s https://kojoforafrica.cc.cd/ | grep -c 'href="tel:'        # 2
 - **Données personnelles** : ce qui est conservé, ce qui est effacé à la
   suppression de compte, et pendant combien de temps — `PRIVACY.md`. Les durées
   de ce document sont engendrées depuis `backend/kojo_retention.py`, le module
-  dont `kojo_core` crée ses index TTL, et la CI refuse une divergence.
+  dont `kojo_db` crée ses index TTL, et la CI refuse une divergence.
 
 ## CI
 

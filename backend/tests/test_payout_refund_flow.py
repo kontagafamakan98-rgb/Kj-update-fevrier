@@ -26,6 +26,7 @@ from tests.conftest import (
     BASE_USER, WORKER_USER,
     db_find_one, db_insert, register_and_login,
 )
+import kojo_owner
 
 
 def _payment_doc(payment_id, job_id, payer_id, receiver_id, **overrides):
@@ -285,8 +286,8 @@ class TestOwnerRetryRefund:
         owner_user, payment_id = await self._owner_payment(client)
         headers = {"Authorization": f"Bearer {owner_user['access_token']}"}
 
-        with patch("kojo_core.OWNER_EMAIL", owner_user["user"]["email"]), \
-             patch("kojo_core.OWNER_USER_ID", owner_user["user"]["id"]), \
+        with patch("kojo_owner.OWNER_EMAIL", owner_user["user"]["email"]), \
+             patch("kojo_owner.OWNER_USER_ID", owner_user["user"]["id"]), \
              patch("kojo_job_effects.create_paydunya_disburse_invoice",
                    return_value={"disburse_token": "retry-token", "response_code": "00"}), \
              patch("kojo_job_effects.submit_paydunya_disburse_invoice",
@@ -305,8 +306,8 @@ class TestOwnerRetryRefund:
         owner_user, payment_id = await self._owner_payment(client, payout_status="refunded")
         headers = {"Authorization": f"Bearer {owner_user['access_token']}"}
 
-        with patch("kojo_core.OWNER_EMAIL", owner_user["user"]["email"]), \
-             patch("kojo_core.OWNER_USER_ID", owner_user["user"]["id"]):
+        with patch("kojo_owner.OWNER_EMAIL", owner_user["user"]["email"]), \
+             patch("kojo_owner.OWNER_USER_ID", owner_user["user"]["id"]):
             resp = await client.post(f"/api/owner/payments/{payment_id}/retry-refund", headers=headers)
 
         assert resp.status_code == 409
@@ -315,8 +316,8 @@ class TestOwnerRetryRefund:
         owner_user, payment_id = await self._owner_payment(client, payout_kind=None)
         headers = {"Authorization": f"Bearer {owner_user['access_token']}"}
 
-        with patch("kojo_core.OWNER_EMAIL", owner_user["user"]["email"]), \
-             patch("kojo_core.OWNER_USER_ID", owner_user["user"]["id"]):
+        with patch("kojo_owner.OWNER_EMAIL", owner_user["user"]["email"]), \
+             patch("kojo_owner.OWNER_USER_ID", owner_user["user"]["id"]):
             resp = await client.post(f"/api/owner/payments/{payment_id}/retry-refund", headers=headers)
 
         assert resp.status_code == 400
