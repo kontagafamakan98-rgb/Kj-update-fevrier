@@ -11,6 +11,7 @@ import { prerenderRouteMetaPlugin } from './vite-plugins/prerender-route-meta.js
 import { preloadHomeChunkPlugin } from './vite-plugins/preload-home-chunk.js'
 import { injectSeoExtrasPlugin } from './vite-plugins/inject-seo-extras.js'
 import { injectProductionCspPlugin } from './vite-plugins/inject-production-csp.js'
+import { injectBuildRevisionPlugin } from './vite-plugins/inject-build-revision.js'
 import { writeRobotsTxtPlugin } from './vite-plugins/write-robots-txt.js'
 
 // Correspondance route → carte OG : SOURCE UNIQUE dans scripts/check-og-images.js,
@@ -115,6 +116,10 @@ export default defineConfig(({ mode }) => {
       writeRobotsTxtPlugin({ privateRoutes: PRIVATE_ROUTES, siteOrigin: SITE_ORIGIN }),
       preloadHomeChunkPlugin(),
       injectSeoExtrasPlugin({ env }),
+      // Ce que le déploiement de production ANNONCE de lui-même (meta
+      // `kojo-build-revision`) : c'est ce que lit `scripts/check-deployed-revision.js`
+      // pour refuser un frontend servi qui n'est pas celui de `main`.
+      injectBuildRevisionPlugin({ env }),
       injectProductionCspPlugin({ env, mode, apiOrigin }),
     ],
     // NOTE: l'alias '@' (shadcn/ui) a été supprimé avec les composants ui/

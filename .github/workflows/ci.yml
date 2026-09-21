@@ -466,7 +466,13 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      # HISTORIQUE COMPLET, exigé par la vérification de révision du frontend
+      # (`git rev-list -1 HEAD -- frontend/`, plus bas) : sur un clone
+      # superficiel, ce calcul ne verrait que le commit poussé et la seconde
+      # révision acceptée serait toujours fausse.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -668,6 +674,39 @@ jobs:
           KOJO_MUTATIONS_DEPUIS: ${{ github.event.pull_request.base.sha }}
           KOJO_BRANCHE_DE_BASE: ${{ github.base_ref }}
         run: python3 .github/scripts/check-guard-mutations.py --etape runner-node --rejouer --changed-from
+
+      # ── Le frontend SERVI est-il celui de ce commit ? ──────────────────────
+      # POLITIQUE DU JOB, définie ICI (cf. CI-COVERAGE.md, F10) :
+      #   • le déploiement de production du frontend est fait par VERCEL depuis
+      #     l'app GitHub — aucun job ne le commande, donc rien, dans la CI, ne
+      #     lisait le code réellement servi : un build échoué, annulé, ou en
+      #     retard laissait `main` vert pendant que le site servait l'ancien
+      #     bundle (exactement ce que F8 a fermé côté backend) ;
+      #   • ce qui doit être vrai : aucun changement de `frontend/**` n'est
+      #     absent de la production. Deux révisions sont donc acceptées — le
+      #     commit poussé (Vercel redéploie chaque push de `main` : mesuré sur
+      #     les 12 derniers commits) et le dernier commit ayant touché
+      #     `frontend/` (l'état laissé par un push sans changement de frontend
+      #     si le déployeur en ignorait un) ;
+      #   • la fenêtre d'attente (~3 min) absorbe un déploiement en cours :
+      #     mesuré, Vercel termine 0,4 à 0,6 min après le commit ;
+      #   • un refus nomme sa cause (aucune révision annoncée / révision différente
+      #     / site injoignable — défi de l'edge Vercel compris) ; une invocation
+      #     qui ne dit pas quoi comparer échoue en code 2, jamais en vert.
+      # `main` seulement : sur une PR, la production ne dit rien de la PR.
+      - name: Le frontend servi est-il celui de ce commit ?
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: frontend
+        run: |
+          set -uo pipefail
+          ATTENDU="${{ github.sha }}"
+          DERNIER_FRONTEND="$(git rev-list -1 HEAD -- frontend/)"
+          if [ -z "$DERNIER_FRONTEND" ]; then
+            echo "::error::aucune révision attendue calculée — la vérification ne peut pas conclure"
+            exit 2
+          fi
+          echo "Révisions acceptées : $ATTENDU (commit poussé) ou $DERNIER_FRONTEND (dernier commit ayant touché frontend/)"
+          node scripts/check-deployed-revision.js --attendu "$ATTENDU" --sinon "$DERNIER_FRONTEND" --tentatives 9 --delai 20
 
   # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
   # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou
