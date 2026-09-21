@@ -263,6 +263,22 @@
       "motif": "un routeur qui adresse un document par l'identifiant que le client a reçu : il est le témoin de la règle pour les seize routeurs concernés — le filtre doit venir de `kojo_identifiants`, jamais du routeur (les deux mutations de son registre font rougir cette preuve-là, une par moitié de la règle)"
     },
     {
+      "chemin": "backend/kojo_routers_jobs_tracking.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_identifiants_rendus.py",
+      "runner": "pytest",
+      "motif": "un module qui REND un document stocké : il est le témoin de la seconde moitié de la règle pour les douze rendus du dépôt — un modèle à identifiant par défaut peut être écrit, jamais rendu, donc celui-ci passe par `kojo_identifiants.dump_stable` (les deux mutations de son registre font rougir cette preuve-là, une par moitié de la règle)"
+    },
+    {
+      "chemin": "backend/kojo_routers_jobs_proposals.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_identifiants_rendus.py",
+      "runner": "pytest",
+      "motif": "le chemin d'argent qui accepte une proposition : il rend une mission stockée (donc `dump_stable`) et il rejette les AUTRES propositions du job — dont la sienne, quand la négation passe par la règle d'identifiant au lieu de `_id`. Témoin de la troisième mutation de cette preuve"
+    },
+    {
       "chemin": "backend/server.py",
       "role": "garde",
       "invoque_par": "test",
@@ -1402,6 +1418,69 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_identifiants_un_proprietaire.py::TestAucunFiltreRecopie::test_aucun_routeur_ne_recopie_la_regle"
+      ]
+    },
+    {
+      "id": "identifiants rendus: le rendu nu revient dans un module",
+      "garde": "backend/kojo_routers_jobs_tracking.py",
+      "cible": "backend/kojo_routers_jobs_tracking.py",
+      "trouve": "        proposal_out = dump_stable(JobProposal, p)",
+      "remplace": "        proposal_out = JobProposal(**p).model_dump()",
+      "runner": "python",
+      "preuve": "backend/tests/test_identifiants_rendus.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_identifiants_rendus.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_identifiants_rendus.py::TestAucunRenduNeConstruitSonModele::test_aucun_module_ne_rend_le_dump_nu_d_un_modele_a_identifiant_par_defaut"
+      ]
+    },
+    {
+      "id": "identifiants rendus: le rendu invente un identifiant",
+      "garde": "backend/kojo_routers_jobs_tracking.py",
+      "cible": "backend/kojo_routers_jobs_tracking.py",
+      "trouve": "        proposal_out = dump_stable(JobProposal, p)",
+      "remplace": "        proposal_out = dump_stable(JobProposal, {**p, \"id\": \"identifiant-invente\"})",
+      "runner": "python",
+      "preuve": "backend/tests/test_identifiants_rendus.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_identifiants_rendus.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_identifiants_rendus.py::TestSurLaRouteReelle::test_une_proposition_ancienne_garde_son_identifiant_et_reste_acceptable"
+      ]
+    },
+    {
+      "id": "identifiants rendus: la negation par la regle d'identifiant revient",
+      "garde": "backend/kojo_routers_jobs_proposals.py",
+      "cible": "backend/kojo_routers_jobs_proposals.py",
+      "trouve": "        {\"job_id\": job_id, \"_id\": {\"$ne\": proposal.get(\"_id\")}},",
+      "remplace": "        {\"job_id\": job_id, **identifiant_query({\"$ne\": proposal_id})},",
+      "runner": "python",
+      "preuve": "backend/tests/test_identifiants_rendus.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_identifiants_rendus.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_identifiants_rendus.py::TestSurLaRouteReelle::test_une_proposition_ancienne_garde_son_identifiant_et_reste_acceptable"
       ]
     },
     {

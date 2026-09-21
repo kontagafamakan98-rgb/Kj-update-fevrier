@@ -19,7 +19,7 @@ from kojo_core import db, get_current_user
 from kojo_models import NotificationType, Review, ReviewCreate, User
 from kojo_settings import OWNER_EMAIL, logger
 from kojo_shared import notify_user_localized
-from kojo_identifiants import identifiant_query, identifiant_job_query
+from kojo_identifiants import dump_stable, identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -54,7 +54,7 @@ async def _enrich_reviews(reviews):
 
     result = []
     for r in reviews:
-        out = Review(**r).model_dump()
+        out = dump_stable(Review, r)
         reviewer = reviewers.get(r.get("reviewer_id"))
         if reviewer:
             full_name = f"{reviewer.get('first_name', '')} {reviewer.get('last_name', '')}".strip()

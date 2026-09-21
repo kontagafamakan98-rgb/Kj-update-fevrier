@@ -11,7 +11,7 @@ from kojo_core import (
     get_current_user,
 )
 from kojo_settings import logger
-from kojo_identifiants import identifiant_query
+from kojo_identifiants import dump_stable, identifiant_query
 
 # Champs JAMAIS exposés quand on sérialise un AUTRE utilisateur (PII).
 SENSITIVE_OTHER_USER_FIELDS = {"password_hash", "payment_accounts", "email", "phone"}
@@ -150,8 +150,8 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
                 # SECURITE/PII : on n'expose JAMAIS les comptes de paiement,
                 # l'email ou le téléphone de l'interlocuteur — uniquement
                 # les données utiles à l'affichage (nom, photo, notation).
-                conv["other_user"] = User(**other_user_dict).model_dump(
-                    exclude=SENSITIVE_OTHER_USER_FIELDS
+                conv["other_user"] = dump_stable(
+                    User, other_user_dict, exclude=SENSITIVE_OTHER_USER_FIELDS
                 )
                 first_name = other_user.get("first_name", "").strip()
                 last_name = other_user.get("last_name", "").strip()

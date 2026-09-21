@@ -45,7 +45,7 @@ from kojo_email import (
     create_email_verification_token, hash_email_otp, issue_email_otp,
     verify_email_verification_token, mask_email_address,
 )
-from kojo_identifiants import identifiant_query
+from kojo_identifiants import dump_stable, identifiant_query
 
 router = APIRouter()
 
@@ -750,7 +750,7 @@ async def login_user(credentials: UserLogin, response: Response):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": User(**user).model_dump(exclude={"password_hash", "payment_accounts"})
+        "user": dump_stable(User, user, exclude={"password_hash", "payment_accounts"})
     }
 
 
@@ -799,7 +799,7 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
             "linked": True,
             "access_token": access_token,
             "token_type": "bearer",
-            "user": User(**existing).model_dump(exclude={"password_hash", "payment_accounts"}),
+            "user": dump_stable(User, existing, exclude={"password_hash", "payment_accounts"}),
         }
 
     # 2. Un compte existe avec le même email (mais pas lié à ce sub Google)
@@ -881,7 +881,7 @@ async def google_auth(payload: GoogleAuthRequest, response: Response, request: R
         "created": True,
         "needs_onboarding": True,
         "access_token": access_token,
-        "token_type": "bearer",            "user": User(**user_doc).model_dump(exclude={"password_hash", "payment_accounts"}),
+        "token_type": "bearer",            "user": dump_stable(User, user_doc, exclude={"password_hash", "payment_accounts"}),
     }
 
 

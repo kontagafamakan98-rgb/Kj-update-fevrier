@@ -22,7 +22,7 @@ from kojo_settings import (
     REFERRAL_SPONSOR_REWARD,
     logger,
 )
-from kojo_identifiants import identifiant_query, identifiant_job_query
+from kojo_identifiants import dump_stable, identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -165,7 +165,7 @@ async def complete_job_and_release_payment(
         await db.jobs.update_one({**identifiant_job_query(job_id)}, {"$set": {"status": JobStatus.COMPLETED.value}})
         await _maybe_award_first_job_referral_reward(worker_id, job_id, job.get("title", ""))
         updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
-        return {"message": "Mission déjà clôturée et paiement déjà versé", "job": Job(**updated_job).model_dump(), "payout_status": "released"}
+        return {"message": "Mission déjà clôturée et paiement déjà versé", "job": dump_stable(Job, updated_job), "payout_status": "released"}
     if current_payout_status == "releasing":
         raise HTTPException(status_code=409, detail="Un versement est déjà en cours pour ce paiement, réessayez dans un instant")
 
@@ -207,7 +207,7 @@ async def complete_job_and_release_payment(
         updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {
             "message": "Mission clôturée, mais le versement automatique est impossible : le travailleur n'a pas de compte Orange Money ou Wave enregistré. Un versement manuel est nécessaire.",
-            "job": Job(**updated_job).model_dump(),
+            "job": dump_stable(Job, updated_job),
             "payout_status": "release_failed",
         }
 
@@ -228,7 +228,7 @@ async def complete_job_and_release_payment(
         updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {
             "message": f"Mission clôturée, mais le versement automatique a échoué ({exc.detail}). Un versement manuel est nécessaire.",
-            "job": Job(**updated_job).model_dump(),
+            "job": dump_stable(Job, updated_job),
             "payout_status": "release_failed",
         }
     except Exception as exc:
@@ -237,7 +237,7 @@ async def complete_job_and_release_payment(
         updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
         return {
             "message": "Mission clôturée, mais le versement automatique a échoué. Un versement manuel est nécessaire.",
-            "job": Job(**updated_job).model_dump(),
+            "job": dump_stable(Job, updated_job),
             "payout_status": "release_failed",
         }
 
@@ -350,6 +350,6 @@ async def complete_job_and_release_payment(
     updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
     return {
         "message": "Mission clôturée avec succès",
-        "job": Job(**updated_job).model_dump(),
+        "job": dump_stable(Job, updated_job),
         "payout_status": final_payout_status,
     }
