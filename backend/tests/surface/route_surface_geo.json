@@ -1,0 +1,50 @@
+[
+  {
+    "methode": "GET",
+    "chemin": "/api/geolocation/cities",
+    "nom": "get_cities",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/geolocation/reverse",
+    "nom": "reverse_geocode",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/geolocation/available-countries",
+    "nom": "get_available_countries",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/geolocation/detect",
+    "nom": "detect_geolocation",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/geolocation/countries",
+    "nom": "get_supported_countries",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/geolocation/validate-phone",
+    "nom": "validate_phone_for_country",
+    "code": null,
+    "response_model": null,
+    "dependances": []
+  }
+]

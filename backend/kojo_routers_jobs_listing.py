@@ -2,7 +2,7 @@
 """Collection des missions : recherche (`GET /jobs`), détail, suppression.
 
 Extrait de `kojo_routers_jobs.py` sans changement de comportement (surface
-figée par `tests/job_route_surface.json`). La vue publique (`_job_view`) et la
+figée par `tests/surface/route_surface_jobs.json`). La vue publique (`_job_view`) et la
 résolution d'identifiant (`_job_identifier_query`) sont ici parce qu'elles
 n'ont de sens que pour ces trois routes.
 """

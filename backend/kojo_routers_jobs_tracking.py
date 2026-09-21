@@ -2,7 +2,7 @@
 """Suivi : mes candidatures, celles d'une mission, l'état du paiement.
 
 Extrait de `kojo_routers_jobs.py` sans changement de comportement (surface
-figée par `tests/job_route_surface.json`).
+figée par `tests/surface/route_surface_jobs.json`).
 """
 from fastapi import APIRouter, Depends, HTTPException
 
