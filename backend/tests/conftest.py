@@ -751,11 +751,22 @@ else:
 # ---------------------------------------------------------------------------
 
 async def db_insert(collection: str, doc: Dict):
-    """Insère un document dans la collection donnée (mode indifférent)."""
+    """Insère un document dans la collection donnée (mode indifférent).
+
+    Passe par `insert_one` dans les DEUX modes : c'est ce qui attribue `_id`.
+    En mode FakeDB, l'ancienne version ajoutait le document à `_docs` sans
+    passer par l'insertion, donc sans `_id` — là où Mongo en pose toujours un.
+    Conséquence mesurée le 21/09/2026 : un test de la suppression d'une
+    notification passait sous FakeDB (document sans `_id`) et aurait échoué
+    sous un vrai Mongo (document avec `_id`), donc la doublure ne disait pas la
+    même chose que la base — et la suite qui mesure cet écart
+    (`test_fake_db_fidelity.py`) ne s'exécute qu'avec un Mongo réel. Utiliser
+    l'insertion fait aussi respecter l'unicité de `_id` dans les deux modes.
+    """
     if USE_REAL_MONGO:
         await _srv.db[collection].insert_one(dict(doc))
     else:
-        getattr(fake_db, collection)._docs.append(dict(doc))
+        await getattr(fake_db, collection).insert_one(dict(doc))
 
 
 async def db_upsert(collection: str, query: Dict, update: Dict):

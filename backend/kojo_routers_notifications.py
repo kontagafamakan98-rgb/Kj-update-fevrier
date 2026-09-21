@@ -11,6 +11,7 @@ from kojo_settings import (
 from kojo_core import (
     get_current_user,
 )
+from kojo_identifiants import identifiant_public, identifiant_query
 
 router = APIRouter()
 
@@ -43,8 +44,13 @@ async def get_notifications(
     notifications = await db.notifications.find(query).sort("created_at", -1).to_list(limit)
     unread_count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
 
+    # L'identifiant rendu est celui du DOCUMENT (kojo_identifiants) : un document
+    # antérieur au champ `id` recevrait sinon un nouvel uuid à chaque lecture, et
+    # l'action de l'utilisateur (marquer lue, supprimer) viserait à côté.
     return {
-        "notifications": [Notification(**n).model_dump() for n in notifications],
+        "notifications": [
+            {**Notification(**n).model_dump(), "id": identifiant_public(n)} for n in notifications
+        ],
         "unread_count": unread_count,
         "total": len(notifications),
     }
@@ -70,7 +76,7 @@ async def mark_notification_read(
         dict: {message: "Notification marquée comme lue"}.
     """
     result = await db.notifications.update_one(
-        {"id": notification_id, "user_id": current_user.id},
+        {**identifiant_query(notification_id), "user_id": current_user.id},
         {"$set": {"is_read": True}}
     )
     if result.matched_count == 0:
@@ -100,7 +106,9 @@ async def delete_notification(
     Returns:
         dict: {message: "Notification supprimée"}.
     """
-    result = await db.notifications.delete_one({"id": notification_id, "user_id": current_user.id})
+    result = await db.notifications.delete_one(
+        {**identifiant_query(notification_id), "user_id": current_user.id}
+    )
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Notification introuvable")
     return {"message": "Notification supprimée"}

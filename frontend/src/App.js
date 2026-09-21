@@ -259,8 +259,15 @@ function AppRoutes() {
       const { type, payload } = event.data;
       if (type === 'KOJO_PUSH_FOREGROUND' && payload) {
         // Ajouter dans le centre de notifications sans afficher le toast système
+        // L'identifiant SERVEUR vient avec le push (kojo_shared.notify_user le
+        // joint) : la ligne affichée ici EST celle que le serveur connaît, donc
+        // la supprimer ou la marquer lue aboutit. Sans lui (push plus ancien,
+        // ou stockage échoué côté serveur), l'entrée est purement locale et le
+        // dit : aucune requête ne peut viser un identifiant inventé.
+        const serverId = payload.data?.notification_id || null;
         addLocalNotification({
-          id: `local_${Date.now()}`,
+          id: serverId || `local_${Date.now()}`,
+          local: !serverId,
           title: payload.title || 'Kojo',
           body: payload.body || '',
           type: payload.data?.type || 'general',

@@ -82,17 +82,26 @@ export function NotificationProvider({ children }) {
   }, [isOpen, openPanel, closePanel]);
 
   // ----- Actions -----
+  // Une entrée `local: true` n'a PAS de contrepartie serveur (son identifiant
+  // est inventé côté client). Lui envoyer un PUT/DELETE voué au 404 la laisserait
+  // à l'écran pour toujours — c'est le symptôme « je supprime, ça refuse de
+  // disparaître ». Ces actions s'appliquent donc localement, sans requête.
   const markAsRead = useCallback(async (notificationId) => {
+    const target = notifications.find(n => n.id === notificationId);
     try {
-      await notificationAPI.markRead(notificationId);
+      if (!target?.local) {
+        await notificationAPI.markRead(notificationId);
+      }
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      if (target && !target.is_read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
     } catch (err) {
       safeLog.error('Erreur markAsRead:', err);
     }
-  }, []);
+  }, [notifications]);
 
   const markAllAsRead = useCallback(async () => {
     try {
@@ -108,12 +117,16 @@ export function NotificationProvider({ children }) {
   const deleteNotification = useCallback(async (notificationId) => {
     const target = notifications.find(n => n.id === notificationId);
     try {
-      await notificationAPI.deleteOne(notificationId);
+      if (!target?.local) {
+        await notificationAPI.deleteOne(notificationId);
+      }
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
       if (target && !target.is_read) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
     } catch (err) {
+      // La ligne RESTE si le serveur a refusé : elle est toujours là-bas, la
+      // retirer de l'écran ferait croire à une suppression qui n'a pas eu lieu.
       safeLog.error('Erreur deleteNotification:', err);
     }
   }, [notifications]);
@@ -128,11 +141,26 @@ export function NotificationProvider({ children }) {
     }
   }, []);
 
-  // ----- Ajouter une notification locale (ex: toast foreground push) -----
+  // ----- Ajouter une entrée reçue par push (ex: foreground) -----
+  // Idempotent par identifiant : un push rejoué (ou déjà présent dans la liste
+  // serveur) remplace l'entrée existante au lieu d'en créer une deuxième, sinon
+  // supprimer la ligne en laisserait une copie à l'écran.
   const addLocalNotification = useCallback((notif) => {
-    setNotifications(prev => [notif, ...prev]);
-    if (!notif.is_read) setUnreadCount(prev => prev + 1);
-  }, []);
+    // Le compteur se règle EN DEHORS de l'updater : React exige des updaters
+    // purs (il les rejoue en mode strict), et un état modifié depuis l'un d'eux
+    // compterait deux fois.
+    const existante = notifications.find(n => n.id === notif.id);
+    setNotifications(prev => {
+      const index = prev.findIndex(n => n.id === notif.id);
+      if (index === -1) return [notif, ...prev];
+      const suite = [...prev];
+      suite[index] = { ...suite[index], ...notif };
+      return suite;
+    });
+    if (!notif.is_read && !existante?.is_read) {
+      setUnreadCount(prev => prev + 1);
+    }
+  }, [notifications]);
 
   const value = {
     notifications,
