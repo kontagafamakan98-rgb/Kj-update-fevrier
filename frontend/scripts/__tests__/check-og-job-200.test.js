@@ -4,7 +4,6 @@ import {
   runOgJob200Cycle,
   resolveAuthHeader,
   buildTestJobPayload,
-  isControlledBackend,
   TEST_JOB_TITLE_PREFIX,
 } from '../check-og-job-200';
 
@@ -229,14 +228,11 @@ describe('aucune écriture hors d’un backend contrôlé par le job', () => {
     expect(result.notices.join(' | ')).toContain(PROD_BACKEND);
   });
 
-  it('n’autorise QUE des adresses loopback', () => {
-    for (const ok of ['http://127.0.0.1:8000', 'http://localhost:4174', 'http://[::1]:8000']) {
-      expect(isControlledBackend(ok), ok).toBe(true);
-    }
-    for (const ko of [PROD_BACKEND, 'https://stub-backend.test', 'https://127.0.0.1.evil.test', '']) {
-      expect(isControlledBackend(ko), ko).toBe(false);
-    }
-  });
+  // La RÈGLE d'adresse n'est plus éprouvée ici : elle appartient à
+  // `isLoopbackUrl` (scripts/site-meta.js), et le fichier qui la possède est
+  // celui qui la met à l'épreuve (scripts/__tests__/site-meta.test.js). Ce qui
+  // reste ici est la DÉCISION de ce garde : sur une adresse refusée, aucune
+  // écriture ne part et le refus est nommé.
 });
 
 describe('cycle /jobs/:id — chemin 200', () => {

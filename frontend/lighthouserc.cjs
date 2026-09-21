@@ -60,6 +60,11 @@
 // scripts/lhci-cls-budgets.cjs (la table mesurée vit avec sa justification, et
 // un test l'éprouve contre le résolveur de @lhci/utils lui-même).
 const { CLS_BUDGETS, REQUETES_HORS_CONTROLE, clsAssertionMatrix } = require('./scripts/lhci-cls-budgets.cjs');
+// La règle « cette adresse est-elle la nôtre ? » vit dans scripts/site-meta.js,
+// avec les gardes qui la posent : ce fichier l'importe au lieu d'en garder une
+// troisième copie (`package.json` exige Node >= 20.19.0, la version qui active
+// `require(esm)` par défaut — le module est ESM, pas de top-level await).
+const { isLoopbackUrl } = require('./scripts/site-meta.js');
 
 // Les requêtes bloquées pendant le collect viennent de la table qui porte leur
 // justification (scripts/lhci-cls-budgets.cjs) : un motif, pas une liste écrite
@@ -147,8 +152,7 @@ const DEPLOYMENT_PATHS = [
 // chaque PR — et cette adresse est passée ici via KOJO_LHCI_BASE_URL. Le
 // plafond TBT élargi d'un runner partagé continue de s'appliquer à toute base
 // loopback (le runner reste partagé, la pile locale n'y change rien).
-const targetIsLocal =
-  !baseUrl || /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(baseUrl);
+const targetIsLocal = !baseUrl || isLoopbackUrl(baseUrl);
 // ── La pile locale COMPLÈTE est une surface auditée à part entière ─────────
 // Le job écrit `KOJO_LHCI_LOCAL_STACK=1` quand il a monté sa pile (build +
 // backend local + serveur de rewrites + compte client provisionné dans une

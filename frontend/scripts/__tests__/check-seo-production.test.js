@@ -194,6 +194,26 @@ describe('runSeoProductionReport — ce qu’il conclut, et ce qu’il refuse de
     expect(result.notices.join()).toMatch(/base locale/);
   });
 
+  it('n’excuse pas 0.0.0.0 comme base locale — la décision vient du propriétaire de la règle', async () => {
+    // `0.0.0.0` est l'adresse d'ÉCOUTE (celle sur laquelle un serveur se LIE),
+    // pas une adresse par laquelle on joint cette machine : une base qui la porte
+    // n'est pas le repli local. La règle recopiée ici auparavant l'acceptait, et
+    // c'est précisément cette divergence que la règle unique a supprimée.
+    // Le discriminant est l'APPEL : excusée comme locale, la base n'est jamais
+    // interrogée et les deux cas finissent en `skipped` — seule la tentative
+    // distingue « base locale » de « accueil non lisible ».
+    const appels = [];
+    const result = await runSeoProductionReport({
+      base: 'http://0.0.0.0:4174',
+      fetchImpl: (url) => {
+        appels.push(url);
+        return Promise.reject(new Error('injoignable'));
+      },
+    });
+    expect(appels.length, 'une base 0.0.0.0 doit être interrogée, pas excusée comme locale').toBeGreaterThan(0);
+    expect(result.notices.join()).not.toMatch(/base locale/);
+  });
+
   it('un accueil injoignable ne fait pas conclure « absent »', async () => {
     const result = await runSeoProductionReport({
       base: SITE_ORIGIN,

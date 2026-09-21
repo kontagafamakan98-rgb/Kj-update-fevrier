@@ -50,9 +50,12 @@ HARNAIS = REPO_ROOT / ".github" / "scripts" / "check-guard-mutations.py"
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
 COUVERTURE = REPO_ROOT / "CI-COVERAGE.md"
 
-# Répertoires où vit un garde, et extensions admises. Le périmètre est le
-# RÉPERTOIRE, pas le préfixe du nom : voir le point 1 du docstring.
-DIRS_GARDES = ("frontend/scripts", ".github/scripts", "backend/scripts")
+# Répertoires où vit un script du dépôt (garde OU outil), et extensions admises.
+# Le périmètre est le RÉPERTOIRE, pas le préfixe du nom : voir le point 1 du
+# docstring. Le nom le dit : ce n'est pas « les gardes », c'est TOUT script —
+# l'ancien nom (`DIRS_GARDES`) faisait croire à un filtre par rôle, alors que la
+# règle classe chaque fichier trouvé.
+DIRS_SCRIPTS = ("frontend/scripts", ".github/scripts", "backend/scripts")
 EXTENSIONS = (".js", ".cjs", ".mjs", ".py", ".sh")
 
 
@@ -77,10 +80,10 @@ def registre(harnais):
     return harnais.charger_spec(SPEC)
 
 
-def scripts_gardes():
+def scripts_du_depot():
     """Les scripts du dépôt — la surface à classer (rôle `garde` ou `outil`)."""
     trouves = set()
-    for dossier in DIRS_GARDES:
+    for dossier in DIRS_SCRIPTS:
         racine = REPO_ROOT / dossier
         if not racine.is_dir():
             continue
@@ -112,9 +115,9 @@ def _motif_du_garde(chemin):
 
 
 class TestExhaustivite:
-    def test_chaque_garde_ou_audit_du_depot_est_declare(self, registre):
+    def test_chaque_script_du_depot_est_declare(self, registre):
         declares = {g["chemin"] for g in registre["gardes"]}
-        manquants = sorted(scripts_gardes() - declares)
+        manquants = sorted(scripts_du_depot() - declares)
         assert manquants == [], (
             "garde(s) du dépôt absent(s) du registre de preuves : %s — déclarer "
             "chacun (role, invoque_par, preuve) dans .github/scripts/guard-proofs.json"
@@ -129,9 +132,9 @@ class TestExhaustivite:
     def test_le_perimetre_du_garde_est_non_vide(self):
         # Un périmètre cassé (mauvaise racine, préfixe renommé) rendrait tous les
         # tests ci-dessus verts en ne vérifiant RIEN : c'est la règle du dépôt.
-        trouves = scripts_gardes()
+        trouves = scripts_du_depot()
         assert len(trouves) >= 20, "périmètre suspicieusement petit : %s" % sorted(trouves)
-        for dossier in DIRS_GARDES:
+        for dossier in DIRS_SCRIPTS:
             assert any(c.startswith(dossier) for c in trouves), (
                 "aucun garde trouvé dans %s — le périmètre du test est cassé" % dossier
             )
