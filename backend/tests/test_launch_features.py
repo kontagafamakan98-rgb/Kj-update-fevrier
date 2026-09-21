@@ -161,7 +161,7 @@ async def test_portfolio_upload_get_remove(client):
 
     fake_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
     with patch(
-        "kojo_routers_users.upload_image_to_cloudinary",
+        "kojo_routers_users_portfolio.upload_image_to_cloudinary",
         return_value={"photo_url": "https://res.cloudinary.com/kojo/portfolio_1.png", "public_id": "p1"},
     ):
         resp = await client.post(
@@ -183,7 +183,7 @@ async def test_portfolio_upload_get_remove(client):
     # Un client ne peut pas uploader de portfolio
     client_headers = await auth_headers(client)
     with patch(
-        "kojo_routers_users.upload_image_to_cloudinary",
+        "kojo_routers_users_portfolio.upload_image_to_cloudinary",
         return_value={"photo_url": "https://res.cloudinary.com/x.png", "public_id": "x"},
     ):
         resp = await client.post(
@@ -443,11 +443,11 @@ async def test_referral_withdraw_success(client):
     worker = await db_find_one("users", {"email": worker_email})
     await _credit_referral_balance(client, worker["id"], 1500)
 
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-withdraw"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
-         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+         patch("kojo_routers_users_referral.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
     assert resp.status_code == 200, resp.text
     body = resp.json()
@@ -521,11 +521,11 @@ async def test_referral_withdraw_pending_blocks_second(client):
     worker = await db_find_one("users", {"email": worker_email})
     await _credit_referral_balance(client, worker["id"], 1500)
 
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-pending"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "pending"}), \
-         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+         patch("kojo_routers_users_referral.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "releasing"
@@ -533,9 +533,9 @@ async def test_referral_withdraw_pending_blocks_second(client):
     assert float((await db_find_one("users", {"id": worker["id"]}))["referral_reward_balance"]) == 1500
 
     # Un second retrait est bloqué tant que le premier est en cours
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-2"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "success"}):
         resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
     assert resp2.status_code == 409
@@ -553,11 +553,11 @@ async def test_referral_withdraw_ipn_confirms_and_decrements(client):
     worker = await db_find_one("users", {"email": worker_email})
     await _credit_referral_balance(client, worker["id"], 1500)
 
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-ipn"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "pending"}), \
-         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+         patch("kojo_routers_users_referral.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "releasing"
@@ -627,9 +627,9 @@ async def test_referral_withdraw_success_releases_lock(client):
     worker = await db_find_one("users", {"email": worker_email})
     await _credit_referral_balance(client, worker["id"], 1500)
 
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-lock-1"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
          patch("kojo_shared.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
@@ -642,9 +642,9 @@ async def test_referral_withdraw_success_releases_lock(client):
 
     # Nouveau crédit puis nouveau retrait : PAS de 409 (verrou libéré)
     await _credit_referral_balance(client, worker["id"], 1500)
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-lock-2"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
          patch("kojo_shared.notify_user_localized", AsyncMock()):
         resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
@@ -667,9 +667,9 @@ async def test_referral_withdraw_explicit_failure_releases_lock(client):
     await _credit_referral_balance(client, worker["id"], 1500)
 
     notify_mock = AsyncMock()
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-fail"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "failed", "response_code": "01"}), \
          patch("kojo_shared.notify_user_localized", notify_mock):
         resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
@@ -696,9 +696,9 @@ async def test_referral_withdraw_explicit_failure_releases_lock(client):
     assert payment_after.get("referral_lock_released") is True
 
     # Relance possible : le verrou est libéré
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-fail-2"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
          patch("kojo_shared.notify_user_localized", AsyncMock()):
         resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
@@ -718,11 +718,11 @@ async def test_referral_withdraw_ipn_confirmation_releases_lock(client):
     worker = await db_find_one("users", {"email": worker_email})
     await _credit_referral_balance(client, worker["id"], 1500)
 
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-ipn-lock"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "pending"}), \
-         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+         patch("kojo_routers_users_referral.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "releasing"
@@ -752,9 +752,9 @@ async def test_referral_withdraw_ipn_confirmation_releases_lock(client):
 
     # Nouveau crédit puis nouveau retrait : plus de 409
     await _credit_referral_balance(client, worker["id"], 1500)
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-ipn-lock-2"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
          patch("kojo_shared.notify_user_localized", AsyncMock()):
         resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)
@@ -777,11 +777,11 @@ async def test_referral_withdraw_ipn_failure_releases_lock(client):
     worker = await db_find_one("users", {"email": worker_email})
     await _credit_referral_balance(client, worker["id"], 1500)
 
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-ipn-fail"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "pending"}), \
-         patch("kojo_routers_users.notify_user_localized", AsyncMock()):
+         patch("kojo_routers_users_referral.notify_user_localized", AsyncMock()):
         resp = await client.post("/api/users/referral/withdraw", headers=worker_headers)
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "releasing"
@@ -809,9 +809,9 @@ async def test_referral_withdraw_ipn_failure_releases_lock(client):
     assert float(worker_after["referral_reward_balance"]) == 1500  # solde intact
 
     # Nouveau retrait possible : plus de 409
-    with patch("kojo_routers_users.create_paydunya_disburse_invoice",
+    with patch("kojo_routers_users_referral.create_paydunya_disburse_invoice",
                return_value={"disburse_token": "disburse-token-ipn-fail-2"}), \
-         patch("kojo_routers_users.submit_paydunya_disburse_invoice",
+         patch("kojo_routers_users_referral.submit_paydunya_disburse_invoice",
                return_value={"status": "success", "response_code": "00"}), \
          patch("kojo_shared.notify_user_localized", AsyncMock()):
         resp2 = await client.post("/api/users/referral/withdraw", headers=worker_headers)

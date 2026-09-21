@@ -172,9 +172,11 @@ async def test_export_ne_laisse_sortir_aucun_secret(client: AsyncClient):
 async def test_export_signale_une_collection_plafonnee(client: AsyncClient, monkeypatch):
     """Une collection plus longue que le plafond doit le DIRE : un export
     d'accès incomplet qui se tait ne serait pas un droit d'accès."""
-    import kojo_routers_users
+    # Le plafond est lu par l'endpoint : on patche le module où il est UTILISÉ
+    # (la façade ne fait que ré-exporter le nom, elle ne le lit pas).
+    import kojo_routers_users_account
 
-    monkeypatch.setattr(kojo_routers_users, "EXPORT_LIMIT_PER_COLLECTION", 1)
+    monkeypatch.setattr(kojo_routers_users_account, "EXPORT_LIMIT_PER_COLLECTION", 1)
     user = await register_and_login(client, BASE_USER)
     headers = {"Authorization": f"Bearer {user['access_token']}"}
     uid = user["user"]["id"]

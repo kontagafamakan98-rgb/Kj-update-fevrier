@@ -61,6 +61,16 @@ FAIL_ON_WARNING = "--fail-on-warning"
 DEFAULT_FILES: List[str] = [
     "kojo_routers_auth.py",
     "kojo_routers_users.py",
+    # Les modules d'endpoints montés par kojo_routers_users : même raison que
+    # pour les missions ci-dessous — sans ces lignes, l'audit ne verrait plus
+    # les vingt et une routes du compte (il resterait vert en ne vérifiant
+    # plus rien de ce périmètre).
+    "kojo_routers_users_profile.py",
+    "kojo_routers_users_push.py",
+    "kojo_routers_users_payments.py",
+    "kojo_routers_users_portfolio.py",
+    "kojo_routers_users_referral.py",
+    "kojo_routers_users_account.py",
     # Les modules d'endpoints montés par kojo_routers_jobs : sans ces lignes,
     # l'audit ne verrait plus les treize routes de la découpe (le contrôle
     # resterait vert en ne vérifiant plus rien de ce périmètre).

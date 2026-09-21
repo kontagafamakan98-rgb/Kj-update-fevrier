@@ -247,6 +247,14 @@
       "motif": "composeur du routeur des missions : après le découpage, ce qui doit rester vrai n'est pas le fichier mais sa SURFACE (chemins, méthodes, dépendances, ordre de montage), lue sur l'application réellement montée — son seul exécutant est test_job_route_surface.py"
     },
     {
+      "chemin": "backend/kojo_routers_users.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_user_route_surface.py",
+      "runner": "pytest",
+      "motif": "composeur du routeur des comptes (21 routes, dont la suppression de compte RGPD et l'export des données) : ce qui doit rester vrai est sa SURFACE — chemins, méthodes, dépendances d'authentification, ORDRE de montage — lue sur l'application réellement montée. Le contrôle des modules ORPHELINS, que ni le composeur ni l'application ne peuvent voir, appartient à tests/test_decoupage_familles.py"
+    },
+    {
       "chemin": "backend/scripts/audit_none_signatures.py",
       "role": "garde",
       "invoque_par": "test",
@@ -417,6 +425,27 @@
       "cwd": "frontend",
       "attend": [
         "WARNING INFRA : verbe interdit"
+      ]
+    },
+    {
+      "id": "split-users: groupe d'endpoints non monte",
+      "garde": "backend/kojo_routers_users.py",
+      "cible": "backend/kojo_routers_users.py",
+      "trouve": "router.include_router(_referral)",
+      "remplace": "pass  # mutation : le groupe de routes n'est plus monte",
+      "runner": "python",
+      "preuve": "backend/tests/test_user_route_surface.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_user_route_surface.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_user_route_surface.py::TestSurfaceDesRoutes::test_la_surface_des_routes_est_inchangee"
       ]
     },
     {

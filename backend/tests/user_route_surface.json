@@ -1,0 +1,233 @@
+[
+  {
+    "methode": "GET",
+    "chemin": "/api/users/profile",
+    "nom": "get_profile",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "PUT",
+    "chemin": "/api/users/profile",
+    "nom": "update_profile",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/users/profile-photo",
+    "nom": "upload_profile_photo",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/profile-photo",
+    "nom": "get_current_user_profile_photo",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/{user_id}/profile-photo",
+    "nom": "get_user_profile_photo",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "DELETE",
+    "chemin": "/api/users/profile-photo",
+    "nom": "delete_profile_photo",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/users/push-token",
+    "nom": "register_push_token",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/push-tokens",
+    "nom": "get_user_push_tokens",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "DELETE",
+    "chemin": "/api/users/push-token/{token_id}",
+    "nom": "delete_push_token",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/payment-accounts",
+    "nom": "get_user_payment_accounts",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "PUT",
+    "chemin": "/api/users/payment-accounts",
+    "nom": "update_user_payment_accounts",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/users/verify-payment-access",
+    "nom": "verify_payment_access",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/users/portfolio",
+    "nom": "add_portfolio_image",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/portfolio",
+    "nom": "get_portfolio",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "DELETE",
+    "chemin": "/api/users/portfolio/{index}",
+    "nom": "remove_portfolio_image",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/referral",
+    "nom": "get_referral",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/referral/filleuls",
+    "nom": "get_referral_filleuls",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/users/referral/apply",
+    "nom": "apply_referral",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "POST",
+    "chemin": "/api/users/referral/withdraw",
+    "nom": "withdraw_referral_rewards",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "DELETE",
+    "chemin": "/api/users/account",
+    "nom": "delete_my_account",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  },
+  {
+    "methode": "GET",
+    "chemin": "/api/users/account/export",
+    "nom": "export_my_data",
+    "code": null,
+    "response_model": null,
+    "dependances": [
+      "kojo_core.get_current_user",
+      "fastapi.security.http.HTTPBearer"
+    ]
+  }
+]
