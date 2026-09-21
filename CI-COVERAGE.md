@@ -1641,7 +1641,10 @@ en retard laissait donc `main` vert pendant que le site servait l'ancien bundle.
 - Ce qui doit être VRAI : aucun changement de `frontend/**` n'est absent de la production. Deux
   révisions sont donc acceptées — le commit poussé, et le dernier commit ayant touché `frontend/`
   (l'état que la production laisse en place si le déployeur ignorait un push sans changement de
-  frontend). Accepter une révision PLUS ANCIENNE ne serait pas un relâchement du même genre : ce
+  frontend). Dans `ci.yml`, ce calcul est fait depuis le job `frontend-build` (working-directory
+  `frontend`) en demandant à Git la surface `.` du répertoire courant ; demander `frontend/` à cet
+  endroit chercherait par erreur `frontend/frontend/` et produirait une attente vide. Accepter une
+  révision PLUS ANCIENNE ne serait pas un relâchement du même genre : ce
   serait un refus silencieux de la question posée.
 - Ce qui rend cette politique mesurable : chaque commit de `main` a reçu une **production
   déployée** (12 commits consécutifs, statut `Vercel` `success`), et le déploiement se termine
