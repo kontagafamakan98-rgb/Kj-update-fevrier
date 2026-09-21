@@ -144,8 +144,9 @@ async def notify_user(
         # Jamais bloquant : si la vérification échoue, on notifie quand même.
         pass
 
+    notif: Optional[Notification] = None
     try:
-        await store_notification(
+        notif = await store_notification(
             user_id=user_id,
             title=title,
             body=body,
@@ -156,12 +157,21 @@ async def notify_user(
     except Exception as exc:
         logger.error(f"Erreur stockage notification pour {user_id}: {exc}")
 
+    # L'identifiant SERVEUR voyage avec le push. Sans lui, l'entrée affichée par
+    # le centre de notifications à la réception au premier plan porte un
+    # identifiant inventé côté client (`local_<horodatage>`) : la supprimer
+    # répond 404 et elle reste à l'écran, la marquer lue ne fait rien. Le client
+    # ne peut pas deviner l'identifiant d'une ligne qu'il n'a jamais lue.
+    charge = dict(push_data or ({"job_id": related_id} if related_id else {}))
+    if notif is not None:
+        charge["notification_id"] = notif.id
+
     try:
         await send_web_push_to_user(
             user_id=user_id,
             title=title,
             body=body,
-            data=push_data or ({"job_id": related_id} if related_id else None),
+            data=charge or None,
         )
     except Exception as exc:
         logger.error(f"Erreur envoi push pour {user_id}: {exc}")

@@ -11,7 +11,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from bson import ObjectId
+from kojo_identifiants import identifiant_query
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import ValidationError
 
@@ -30,12 +30,10 @@ def _job_identifier_query(job_id: str) -> dict:
 
     Couvre : `id` (chaîne uuid, jobs actuels), `job_id` (legacy), et `_id`
     quand il stocke l'identifiant au lieu d'un ObjectId Mongo (anciens jeux de
-    données importés). Le candidat `_id` brut (chaîne) est ajouté en plus de la
-    variante ObjectId : les deux formes coexistent selon l'historique du doc."""
-    candidates = [{"id": job_id}, {"job_id": job_id}, {"_id": job_id}]
-    if ObjectId.is_valid(job_id):
-        candidates.append({"_id": ObjectId(job_id)})
-    return {"$or": candidates}
+    données importés). La règle elle-même vit dans `kojo_identifiants`, une
+    seule fois pour tout le dépôt : les notifications la partageaient sous une
+    forme recopiée, et l'une des deux copies avait dérivé."""
+    return identifiant_query(job_id, ("id", "job_id"))
 
 # Vue PUBLIQUE des jobs (découverte sans compte) : modélisée par une
 # ALLOWLIST stricte (JobPublic dans kojo_models), pas un denylist — tout champ
