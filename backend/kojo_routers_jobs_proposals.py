@@ -19,6 +19,7 @@ from kojo_models import (
 )
 from kojo_settings import OWNER_EMAIL, logger
 from kojo_shared import nom_affiche
+from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -38,7 +39,7 @@ async def create_proposal(
         raise HTTPException(status_code=403, detail="Only workers can create proposals")
     
     # Check if job exists (et n'est pas supprimé)
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -111,7 +112,7 @@ async def accept_job_proposal(
         dict: {message, job, proposal_status, worker} — le job mis à jour
         (in_progress, assigned_worker_id) et la proposition acceptée.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -119,12 +120,12 @@ async def accept_job_proposal(
     if job.get("client_id") != current_user.id and not is_owner_user:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    proposal = await db.job_proposals.find_one({"id": proposal_id, "job_id": job_id})
+    proposal = await db.job_proposals.find_one({**identifiant_query(proposal_id), "job_id": job_id})
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
 
     worker_id = proposal.get("worker_id")
-    worker = await db.users.find_one({"id": worker_id})
+    worker = await db.users.find_one({**identifiant_query(worker_id)})
     if not worker:
         raise HTTPException(status_code=404, detail="Worker not found")
 
@@ -170,7 +171,7 @@ async def accept_job_proposal(
     # simple update_one précédent n'était pas conditionnel).
     claim_result = await db.jobs.update_one(
         {
-            "id": job_id,
+            **identifiant_job_query(job_id),
             "status": {"$nin": [JobStatus.COMPLETED.value, JobStatus.CANCELLED.value]},
             "$or": [
                 {"assigned_worker_id": None},
@@ -187,11 +188,11 @@ async def accept_job_proposal(
         )
 
     await db.job_proposals.update_one(
-        {"id": proposal_id},
+        {**identifiant_query(proposal_id)},
         {"$set": {"status": "accepted"}}
     )
     await db.job_proposals.update_many(
-        {"job_id": job_id, "id": {"$ne": proposal_id}},
+        {"job_id": job_id, **identifiant_query({"$ne": proposal_id})},
         {"$set": {"status": "rejected"}}
     )
 
@@ -205,7 +206,7 @@ async def accept_job_proposal(
     })
 
     # Rechargement du job pour avoir shared_location si elle vient d'être ajoutée
-    updated_job = await db.jobs.find_one({"id": job_id}) or {**job, **job_update}
+    updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)}) or {**job, **job_update}
     if shared_location:
         updated_job["shared_location"] = shared_location
 
@@ -250,7 +251,7 @@ async def accept_job_proposal(
         job_title=job.get("title") or "",
     ))
 
-    updated_job = await db.jobs.find_one({"id": job_id})
+    updated_job = await db.jobs.find_one({**identifiant_job_query(job_id)})
     return {
         "message": "Proposition acceptée avec succès",
         "job": Job(**updated_job).model_dump(),

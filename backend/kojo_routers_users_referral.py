@@ -44,6 +44,7 @@ from kojo_payments import (
     submit_paydunya_disburse_invoice,
 
 )
+from kojo_identifiants import identifiant_query
 
 router = APIRouter()
 
@@ -62,7 +63,7 @@ def _generate_referral_code(length: int = 10) -> str:
 async def _ensure_referral_code(user_id: str) -> str:
     """Retourne le code de parrainage de l'utilisateur, en le générant (unique)
     s'il n'en a pas encore."""
-    user_data = await db.users.find_one({"id": user_id}, {"referral_code": 1})
+    user_data = await db.users.find_one({**identifiant_query(user_id)}, {"referral_code": 1})
     existing = (user_data or {}).get("referral_code")
     if existing:
         return existing
@@ -72,7 +73,7 @@ async def _ensure_referral_code(user_id: str) -> str:
         clash = await db.users.find_one({"referral_code": code}, {"id": 1})
         if not clash:
             await db.users.update_one(
-                {"id": user_id},
+                {**identifiant_query(user_id)},
                 {"$set": {"referral_code": code, "updated_at": datetime.now(timezone.utc)}},
             )
             return code
@@ -94,7 +95,7 @@ async def get_referral(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Le parrainage est réservé aux travailleurs")
     code = await _ensure_referral_code(current_user.id)
     user_data = await db.users.find_one(
-        {"id": current_user.id},
+        {**identifiant_query(current_user.id)},
         {"referral_reward_balance": 1, "referral_rewards": 1},
     )
     return {
@@ -188,7 +189,7 @@ async def apply_referral(
         raise HTTPException(status_code=400, detail="Ce code de parrainage n'est plus actif : son propriétaire a déjà été parrainé")
 
     await db.users.update_one(
-        {"id": current_user.id},
+        {**identifiant_query(current_user.id)},
         {"$set": {"referred_by": code, "updated_at": datetime.now(timezone.utc)}},
     )
     return {"message": "Code de parrainage appliqué", "referred_by": code}
@@ -213,7 +214,7 @@ async def _release_referral_withdraw_lock(user_id: str) -> None:
     apply_referral_payout_confirmed (kojo_shared).
     """
     await db.users.update_one(
-        {"id": user_id},
+        {**identifiant_query(user_id)},
         {"$set": {"referral_withdrawal_in_progress": False, "updated_at": datetime.now(timezone.utc)}},
     )
 
@@ -239,7 +240,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     if current_user.user_type != UserType.WORKER:
         raise HTTPException(status_code=403, detail="Le retrait des récompenses est réservé aux travailleurs")
 
-    user = await db.users.find_one({"id": current_user.id})
+    user = await db.users.find_one({**identifiant_query(current_user.id)})
     balance = float((user or {}).get("referral_reward_balance") or 0)
 
     if balance < REFERRAL_WITHDRAW_MINIMUM:
@@ -254,7 +255,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     # release_failed ci-dessous). Tant qu'un retrait est en cours ou en
     # attente de confirmation PayDunya, un nouveau retrait est refusé.
     lock = await db.users.update_one(
-        {"id": current_user.id, "referral_withdrawal_in_progress": {"$ne": True}},
+        {**identifiant_query(current_user.id), "referral_withdrawal_in_progress": {"$ne": True}},
         {"$set": {"referral_withdrawal_in_progress": True, "updated_at": datetime.now(timezone.utc)}},
     )
     if lock.matched_count == 0:
@@ -328,7 +329,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
         # permettrait de relancer → risque de DOUBLE retrait.
         logger.error(f"⚠️ Réponse incertaine du submit PayDunya (retrait récompenses): {exc}")
         await db.payments.update_one(
-            {"id": payment_id},
+            {**identifiant_query(payment_id)},
             {"$set": {
                 "disburse_error": f"Réponse incertaine du submit: {exc}",
                 "updated_at": now_iso,
@@ -359,7 +360,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
         # retrait, notifie ET lève le verrou anti double-retrait
         # (referral_withdrawal_in_progress).
         await db.payments.update_one(
-            {"id": payment_id},
+            {**identifiant_query(payment_id)},
             maj_sequestre("released", {"disburse_provider_response": submit_result, "updated_at": datetime.now(timezone.utc).isoformat()}),
         )
         await apply_referral_payout_confirmed({"id": payment_id})
@@ -372,7 +373,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
 
     if provider_status == "pending":
         await db.payments.update_one(
-            {"id": payment_id},
+            {**identifiant_query(payment_id)},
             maj_sequestre("releasing", {"disburse_provider_response": submit_result}),
         )
         asyncio.create_task(notify_user_localized(
@@ -394,7 +395,7 @@ async def withdraw_referral_rewards(current_user: User = Depends(get_current_use
     # notifie l'échec ET lève le verrou anti double-retrait (idempotent via
     # referral_lock_released) — même chemin que l'IPN / le check-status.
     await db.payments.update_one(
-        {"id": payment_id},
+        {**identifiant_query(payment_id)},
         maj_sequestre("release_failed", {"payout_failure_reason": submit_result.get("response_text") or "Échec du retrait PayDunya", "disburse_provider_response": submit_result, "updated_at": datetime.now(timezone.utc).isoformat()}),
     )
     await apply_referral_payout_confirmed({"id": payment_id})

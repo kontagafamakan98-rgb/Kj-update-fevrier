@@ -41,6 +41,7 @@ from kojo_payments import maj_sequestre
 # Réutilise le remboursement PayDunya de kojo_routers_jobs (point unique de
 # vérité du décaissement de refund, avec verrou CAS et mapping IPN refund-aware).
 from kojo_routers_jobs import execute_paydunya_refund
+from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -226,7 +227,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     for payment in refundable_payments:
         payout_status = payment.get("payout_status") or "held"
         lock_result = await db.payments.update_one(
-            {"id": payment["id"], "payout_status": payout_status},
+            {**identifiant_query(payment["id"]), "payout_status": payout_status},
             maj_sequestre("refunding", {"payout_kind": "refund", "updated_at": now}),
         )
         if lock_result.matched_count == 0:
@@ -270,7 +271,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
             payout_status = job_payment.get("payout_status") or "held"
             if payout_status in REFUNDABLE_PAYOUT_STATES:
                 lock_result = await db.payments.update_one(
-                    {"id": job_payment["id"], "payout_status": payout_status},
+                    {**identifiant_query(job_payment["id"]), "payout_status": payout_status},
                     maj_sequestre("refunding", {"payout_kind": "refund", "updated_at": now}),
                 )
                 if lock_result.matched_count:
@@ -279,7 +280,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
             # ne touche à rien (pas de double remboursement).
 
         await db.jobs.update_one(
-            {"id": job_id},
+            {**identifiant_job_query(job_id)},
             {"$set": {
                 "status": "cancelled",
                 "assigned_worker_id": None,
@@ -306,7 +307,7 @@ async def delete_my_account(current_user: User = Depends(get_current_user)):
     anonymous_email = f"deleted_{uuid.uuid4().hex[:12]}@kojo.deleted"
 
     await db.users.update_one(
-        {"id": user_id},
+        {**identifiant_query(user_id)},
         {"$set": {
             "deleted": True,
             "deleted_at": now,

@@ -45,6 +45,7 @@ from kojo_email import (
     create_email_verification_token, hash_email_otp, issue_email_otp,
     verify_email_verification_token, mask_email_address,
 )
+from kojo_identifiants import identifiant_query
 
 router = APIRouter()
 
@@ -638,7 +639,7 @@ async def register_user_verified(user_data: UserWithPayment, response: Response)
                     and not sponsor.get("referred_by")
                 ):
                     await db.users.update_one(
-                        {"id": user_id},
+                        {**identifiant_query(user_id)},
                         {"$set": {"referred_by": ref_code, "updated_at": datetime.now(timezone.utc)}},
                     )
                     referral_applied = True
@@ -904,14 +905,14 @@ async def google_link(payload: GoogleLinkRequest, request: Request, current_user
         raise HTTPException(status_code=409, detail="Ce compte Google est déjà lié à un autre compte Kojo")
 
     # Vérifier le mot de passe du compte courant (preuve de propriété)
-    user_doc = await db.users.find_one({"id": current_user.id})
+    user_doc = await db.users.find_one({**identifiant_query(current_user.id)})
     if not user_doc or not user_doc.get("password_hash"):
         raise HTTPException(status_code=400, detail="Ce compte n'a pas de mot de passe")
     if not verify_password(payload.password, user_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Mot de passe incorrect")
 
     await db.users.update_one(
-        {"id": current_user.id},
+        {**identifiant_query(current_user.id)},
         {"$set": {"google_sub": sub, "updated_at": datetime.now(timezone.utc)}},
     )
     return {"status": "linked", "message": "Compte Google lié avec succès"}
@@ -1041,7 +1042,7 @@ async def update_user_country(
         return {"message": "Owner accounts have access to all countries. Country change bypassed.", "country": current_user.country}
         
     await db.users.update_one(
-        {"id": current_user.id},
+        {**identifiant_query(current_user.id)},
         {"$set": {"country": country_update.country.value, "updated_at": datetime.now(timezone.utc)}}
     )
     return {"message": "Country updated successfully", "country": country_update.country.value}

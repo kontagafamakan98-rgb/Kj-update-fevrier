@@ -38,6 +38,19 @@ def identifiant_query(valeur: str, champs=("id",)) -> dict:
     return {"$or": candidats}
 
 
+def identifiant_job_query(valeur: str) -> dict:
+    """Le filtre d'un DOCUMENT de la collection `jobs`.
+
+    Une mission a porté son identifiant de deux façons selon son âge : `id`
+    aujourd'hui, `job_id` pour les anciennes — et `_id` pour les jeux importés.
+    C'est un fait de CETTE collection, donc il vit ici, une fois : les six
+    modules de la famille `jobs` s'en servaient chacun de leur côté, et deux
+    d'entre eux avaient déjà perdu l'alias legacy (la mission ancienne n'était
+    plus adressable par l'identifiant que le client avait reçu).
+    """
+    return identifiant_query(valeur, ("id", "job_id"))
+
+
 def identifiant_public(document: dict) -> str:
     """L'identifiant ADRESSABLE d'un document, tel qu'il est rendu au client.
 

@@ -28,6 +28,7 @@ from kojo_core import (
     upload_profile_photo_to_cloudinary,
 
 )
+from kojo_identifiants import identifiant_query
 
 router = APIRouter()
 
@@ -169,7 +170,7 @@ async def update_profile(
     update_data["updated_at"] = datetime.now(timezone.utc)
 
     await db.users.update_one(
-        {"id": current_user.id},
+        {**identifiant_query(current_user.id)},
         {"$set": update_data}
     )
     
@@ -211,7 +212,7 @@ async def upload_profile_photo(
         photo_url = upload_result["photo_url"]
 
         await db.users.update_one(
-            {"id": current_user.id},
+            {**identifiant_query(current_user.id)},
             {"$set": {"profile_photo": photo_url, "updated_at": datetime.now(timezone.utc)}}
         )
 
@@ -257,7 +258,7 @@ async def get_user_profile_photo(user_id: str, current_user: User = Depends(get_
         de photo (état normal).
     """
     try:
-        user = await db.users.find_one({"id": user_id})
+        user = await db.users.find_one({**identifiant_query(user_id)})
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
@@ -281,7 +282,7 @@ async def delete_profile_photo(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="No profile photo to delete")
     
     await db.users.update_one(
-        {"id": current_user.id},
+        {**identifiant_query(current_user.id)},
         {"$set": {"profile_photo": None, "updated_at": datetime.now(timezone.utc)}}
     )
     

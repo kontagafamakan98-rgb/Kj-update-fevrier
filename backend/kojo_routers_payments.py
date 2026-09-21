@@ -37,6 +37,7 @@ from kojo_payments import (
     normalize_payment_country, serialize_payment_record,
     sync_payment_status_with_paydunya,
 )
+from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -202,10 +203,10 @@ async def _maybe_recheck_disburse_status(payment_record: dict) -> dict:
         return payment_record
 
     await db.payments.update_one(
-        {"id": payment_id},
+        {**identifiant_query(payment_id)},
         maj_sequestre(new_status, {"disburse_verified_payload": check_result, "updated_at": datetime.now(timezone.utc).isoformat()})
     )
-    updated = await db.payments.find_one({"id": payment_id})
+    updated = await db.payments.find_one({**identifiant_query(payment_id)})
     if updated:
         await _notify_refund_transition(payment_record, payout_status, new_status)
         # Retrait de récompenses confirmé par check-status → décrémenter le solde
@@ -280,7 +281,7 @@ async def paydunya_disburse_ipn(request: Request):
 
     previous_payout_status = payment_record.get('payout_status')
     await db.payments.update_one(
-        {'id': payment_record['id']},
+        {**identifiant_query(payment_record['id'])},
         maj_sequestre(payout_status, {'disburse_callback_payload': payload, 'disburse_verified_payload': check_result, 'updated_at': datetime.now(timezone.utc).isoformat()})
     )
 
@@ -291,7 +292,7 @@ async def paydunya_disburse_ipn(request: Request):
     # Retrait de récompenses confirmé par l'IPN → décrémenter le solde du
     # travailleur et lever le verrou anti double-retrait (point unique
     # kojo_shared.apply_referral_payout_confirmed, idempotent).
-    updated_record = await db.payments.find_one({'id': payment_record['id']})
+    updated_record = await db.payments.find_one({**identifiant_query(payment_record['id'])})
     if updated_record:
         await apply_referral_payout_confirmed(updated_record)
 
@@ -380,7 +381,7 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
     resolved_amount = request.amount
     resolved_worker_id = request.worker_id or ''
 
-    job = await db.jobs.find_one({"id": request.job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(request.job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Mission introuvable")
 
@@ -417,7 +418,7 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
 
     accepted_proposal_id = job.get("accepted_proposal_id")
     accepted_proposal = (
-        await db.job_proposals.find_one({"id": accepted_proposal_id, "job_id": request.job_id})
+        await db.job_proposals.find_one({**identifiant_query(accepted_proposal_id), "job_id": request.job_id})
         if accepted_proposal_id else None
     )
     # Supporte les deux noms de champ utilisés selon les versions :
@@ -550,7 +551,7 @@ async def create_real_payment_checkout(request: PaymentCheckoutRequest, current_
     checkout_url = invoice_data.get('response_text')
 
     await db.payments.update_one(
-        {'id': payment_record['id']},
+        {**identifiant_query(payment_record['id'])},
         {'$set': {
             'invoice_token': invoice_token,
             'checkout_url': checkout_url,
@@ -580,7 +581,7 @@ async def get_payment_status(payment_id: str, current_user: User = Depends(get_c
     Returns:
         dict: paiement sérialisé (status, payout_status, montants, timestamps…).
     """
-    payment_record = await db.payments.find_one({'id': payment_id})
+    payment_record = await db.payments.find_one({**identifiant_query(payment_id)})
     if not payment_record:
         raise HTTPException(status_code=404, detail='Paiement introuvable')
 
@@ -700,7 +701,7 @@ async def paydunya_payment_ipn(request: Request):
         # Récupérer le titre du job si disponible
         job_title = "la mission"
         if job_id_for_notif:
-            job_doc = await db.jobs.find_one({"id": job_id_for_notif}, {"title": 1})
+            job_doc = await db.jobs.find_one({**identifiant_job_query(job_id_for_notif)}, {"title": 1})
             if job_doc:
                 job_title = job_doc.get("title", "la mission")
 
@@ -730,9 +731,9 @@ async def paydunya_payment_ipn(request: Request):
         # le travailleur a reçu un message "veuillez attendre le paiement" — ici
         # on lui envoie maintenant l'adresse réelle du chantier dans sa langue.
         if job_id_for_notif and receiver_id:
-            job_doc_full = await db.jobs.find_one({"id": job_id_for_notif})
+            job_doc_full = await db.jobs.find_one({**identifiant_job_query(job_id_for_notif)})
             if job_doc_full and job_doc_full.get("assigned_worker_id") == receiver_id:
-                payer_doc = await db.users.find_one({"id": payer_id}, {"id": 1}) if payer_id else None
+                payer_doc = await db.users.find_one({**identifiant_query(payer_id)}, {"id": 1}) if payer_id else None
                 dispatch_sender = (payer_doc or {}).get("id") or payer_id or receiver_id
                 await _dispatch_address_to_worker(
                     job=job_doc_full,

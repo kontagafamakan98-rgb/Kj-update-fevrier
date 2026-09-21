@@ -18,6 +18,7 @@ from kojo_models import PushToken, PushTokenCreate, User
 from kojo_settings import logger
 
 from kojo_core import get_current_user
+from kojo_identifiants import identifiant_query
 
 router = APIRouter()
 
@@ -53,7 +54,7 @@ async def register_push_token(
         if existing_token:
             # Update existing token
             await db.push_tokens.update_one(
-                {"id": existing_token["id"]},
+                {**identifiant_query(existing_token["id"])},
                 {
                     "$set": {
                         "push_token": token_data.push_token,
@@ -149,13 +150,13 @@ async def delete_push_token(
     """
     try:
         # Find token and verify ownership
-        token = await db.push_tokens.find_one({"id": token_id, "user_id": current_user.id})
+        token = await db.push_tokens.find_one({**identifiant_query(token_id), "user_id": current_user.id})
         if not token:
             raise HTTPException(status_code=404, detail="Push token not found")
         
         # Deactivate token instead of deleting (for audit trail)
         await db.push_tokens.update_one(
-            {"id": token_id},
+            {**identifiant_query(token_id)},
             {
                 "$set": {
                     "active": False,

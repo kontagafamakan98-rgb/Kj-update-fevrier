@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from kojo_core import db, get_current_user
 from kojo_models import JobProposal, User, UserType
 from kojo_settings import OWNER_EMAIL
+from kojo_identifiants import identifiant_query, identifiant_job_query
 
 router = APIRouter()
 
@@ -47,7 +48,7 @@ async def get_job_proposals(
         travailleur (worker_name, worker_photo, rating…).
     """
     # Check if user is the job owner
-    job = await db.jobs.find_one({"id": job_id, "client_id": current_user.id})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "client_id": current_user.id})
     if not job:
         raise HTTPException(status_code=403, detail="Access denied")
     
@@ -60,7 +61,7 @@ async def get_job_proposals(
     workers_by_id = {}
     if worker_ids:
         workers_cursor = db.users.find(
-            {"id": {"$in": worker_ids}},
+            {**identifiant_query({"$in": worker_ids})},
             {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "profile_photo": 1, "rating": 1, "total_reviews": 1}
         )
         async for w in workers_cursor:
@@ -102,7 +103,7 @@ async def get_job_payment_status(
         worker_amount, created_at, completed_at} — has_payment false quand
         aucun paiement n'existe.
     """
-    job = await db.jobs.find_one({"id": job_id, "deleted": {"$ne": True}})
+    job = await db.jobs.find_one({**identifiant_job_query(job_id), "deleted": {"$ne": True}})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
