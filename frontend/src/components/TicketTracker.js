@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { supportAPI } from '../services/apiEndpoints';
+import { useLanguage } from '../contexts/LanguageContext';
 
+// Les textes de ce bloc vivent dans les dictionnaires du dépôt
+// (src/i18n/*.json, clés `supportTicket…`) : ils étaient auparavant reçus par
+// une prop `copy` reconstruite par la page, et cinq d'entre eux étaient
+// recopiés en français dans la coquille pré-rendue.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Suivi de ticket : le créateur peut vérifier le statut de sa demande avec
@@ -20,7 +25,8 @@ export const getLastStoredTicket = () => {
   }
 };
 
-export default function TicketTracker({ copy }) {
+export default function TicketTracker() {
+  const { t } = useLanguage();
   const lastTicket = getLastStoredTicket();
   const [ticketId, setTicketId] = useState(lastTicket?.id || '');
   const [ticketEmail, setTicketEmail] = useState(lastTicket?.email || '');
@@ -31,7 +37,7 @@ export default function TicketTracker({ copy }) {
   const trackTicket = async () => {
     if (!ticketId.trim() || !ticketEmail.trim()) return;
     if (!EMAIL_RE.test(ticketEmail.trim())) {
-      setTrackError(copy.errors.email);
+      setTrackError(t('supportErrorEmail'));
       setTrackResult(null);
       return;
     }
@@ -45,7 +51,7 @@ export default function TicketTracker({ copy }) {
       if (status === 404) {
         setTrackResult('not_found');
       } else {
-        setTrackError(copy.genericError);
+        setTrackError(t('supportGenericError'));
       }
     } finally {
       setTracking(false);
@@ -60,24 +66,24 @@ export default function TicketTracker({ copy }) {
 
   return (
     <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">{copy.trackTitle}</h2>
-      <p className="text-sm text-gray-500 mb-4">{copy.trackSubtitle}</p>
+      <h2 className="text-lg font-semibold text-gray-900 mb-1">{t('supportTrackTitle')}</h2>
+      <p className="text-sm text-gray-500 mb-4">{t('supportTrackSubtitle')}</p>
 
       <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="text"
           value={ticketId}
           onChange={(e) => setTicketId(e.target.value)}
-          placeholder={copy.ticketIdPlaceholder}
-          aria-label={copy.ticketIdPlaceholder}
+          placeholder={t('supportTicketIdPlaceholder')}
+          aria-label={t('supportTicketIdPlaceholder')}
           className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
         />
         <input
           type="email"
           value={ticketEmail}
           onChange={(e) => setTicketEmail(e.target.value)}
-          placeholder={copy.ticketEmailPlaceholder}
-          aria-label={copy.ticketEmailPlaceholder}
+          placeholder={t('supportTicketEmailPlaceholder')}
+          aria-label={t('supportTicketEmailPlaceholder')}
           className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
         />
         <button
@@ -85,7 +91,7 @@ export default function TicketTracker({ copy }) {
           disabled={tracking || !ticketId.trim() || !ticketEmail.trim()}
           className="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
         >
-          {tracking ? copy.tracking : copy.trackCta}
+          {tracking ? t('supportTracking') : t('supportTrackCta')}
         </button>
       </div>
 
@@ -93,7 +99,7 @@ export default function TicketTracker({ copy }) {
 
       {trackResult === 'not_found' && (
         <p className="mt-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-          {copy.trackNotFound}
+          {t('supportTrackNotFound')}
         </p>
       )}
 
@@ -103,13 +109,13 @@ export default function TicketTracker({ copy }) {
             <div className="min-w-0">
               <p className="text-sm font-semibold text-gray-900 line-clamp-1">{trackResult.reason}</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                {copy.ticketSentOn}{' '}
+                {t('supportTicketSentOn')}{' '}
                 {trackResult.created_at ? new Date(trackResult.created_at).toLocaleDateString() : ''}
-                {' • '}{copy.ticketIdLabel || 'ID'}: {String(trackResult.ticket_id || trackResult.id || '').slice(0, 8)}…
+                {' • '}{t('supportTicketIdLabel')}: {String(trackResult.ticket_id || trackResult.id || '').slice(0, 8)}…
               </p>
             </div>
             <span className={`inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold ${statusBadgeColor(trackResult.status)}`}>
-              {copy.ticketStatusLabel}: {trackResult.status}
+              {t('supportTicketStatusLabel')}: {trackResult.status}
             </span>
           </div>
         </div>

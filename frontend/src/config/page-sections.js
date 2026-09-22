@@ -30,25 +30,6 @@ import { CONTACT, mailtoHref, telHref } from './contact.js';
 // données non textuelles (icônes, destination d'un lien, accent d'une ligne). Le
 // build refuse une coquille qui ne porte pas tout ce qui est déclaré ici (voir
 // `exigerCorpsDeclare` dans vite.config.js).
-// Textes FRANÇAIS que la coquille de /support publie. Ils vivent ici — et non
-// dans Support.js — parce que le build les écrit, et Support.js les LIT pour son
-// dictionnaire français : un seul exemplaire du texte, donc pas de seconde
-// déclaration à faire suivre. Les quatre autres langues restent dans Support.js.
-export const SUPPORT_COPY_FR = {
-  title: 'Support',
-  subtitle: 'Une question, un problème ? Nous sommes là pour vous aider.',
-  robotTitle: 'Parler avec le robot',
-  robotSubtitle: "L'assistant vous guide en quelques questions",
-  directTitle: 'Contacter directement le support',
-  directSubtitle: 'Appel, e-mail ou WhatsApp',
-  directCardTitle: 'Contacter directement le support',
-  directCardSubtitle: 'Nous sommes joignables aux coordonnées ci-dessous.',
-  call: 'Appeler',
-  whatsapp: 'WhatsApp',
-  sendEmail: 'Envoyer un e-mail',
-  address: 'Adresse',
-};
-
 // Les deux formes de ligne du bloc de contact : une ligne cliquable (avec son
 // survol) et une ligne de simple information. Elles servent aux DEUX canaux.
 const LIGNE_LIEN =
@@ -129,27 +110,50 @@ export const PAGE_SECTIONS = {
   },
 
   // /support : le bloc de contact de la coquille était recopié, libellé par
-  // libellé, face au dictionnaire de src/pages/Support.js.
+  // libellé, face au dictionnaire local de src/pages/Support.js — et cinq
+  // textes du suivi de ticket (titre, sous-titre, deux placeholders, bouton)
+  // étaient écrits EN DUR dans la coquille elle-même. Plus aucun texte ici :
+  // les libellés sont des CLÉS i18n comme pour les cinq autres pages,
+  // src/i18n/*.json en est le seul propriétaire, la page les lit au runtime et
+  // la coquille au build.
   '/support': {
-    texts: SUPPORT_COPY_FR,
+    // Le titre de la page EST le libellé de son lien (même clé que le pied de
+    // page et la page de contact) : un seul texte pour un seul mot.
+    titleKey: 'support',
+    subtitleKey: 'supportSubtitle',
+    // La carte de contact publie le titre du mode « contact direct » — même
+    // texte, donc même clé (elle était écrite deux fois dans le dictionnaire).
+    directCard: {
+      titleKey: 'supportDirectTitle',
+      subtitleKey: 'supportDirectCardSubtitle',
+    },
+    // Le suivi de ticket est PUBLIC et visible avant toute interaction : la
+    // coquille le publie, donc ses textes se déclarent ici comme les autres.
+    tracker: {
+      titleKey: 'supportTrackTitle',
+      subtitleKey: 'supportTrackSubtitle',
+      idPlaceholderKey: 'supportTicketIdPlaceholder',
+      emailPlaceholderKey: 'supportTicketEmailPlaceholder',
+      ctaKey: 'supportTrackCta',
+    },
     modes: [
       {
         shellIcon: '💬',
         badgeClass: 'bg-orange-100 text-orange-600',
-        title: SUPPORT_COPY_FR.robotTitle,
-        subtitle: SUPPORT_COPY_FR.robotSubtitle,
+        titleKey: 'supportRobotTitle',
+        subtitleKey: 'supportRobotSubtitle',
       },
       {
         shellIcon: '📞',
         badgeClass: 'bg-emerald-100 text-emerald-600',
-        title: SUPPORT_COPY_FR.directTitle,
-        subtitle: SUPPORT_COPY_FR.directSubtitle,
+        titleKey: 'supportDirectTitle',
+        subtitleKey: 'supportDirectSubtitle',
       },
     ],
     rows: [
       {
         shellIcon: '📞',
-        label: SUPPORT_COPY_FR.call,
+        labelKey: 'contactCall',
         badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
@@ -157,7 +161,7 @@ export const PAGE_SECTIONS = {
       },
       {
         shellIcon: '💬',
-        label: SUPPORT_COPY_FR.whatsapp,
+        labelKey: 'contactWhatsapp',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
         value: CONTACT.phoneDisplay,
@@ -166,7 +170,7 @@ export const PAGE_SECTIONS = {
       },
       {
         shellIcon: '✉️',
-        label: SUPPORT_COPY_FR.sendEmail,
+        labelKey: 'contactSendEmail',
         badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
         value: CONTACT.email,
@@ -175,7 +179,7 @@ export const PAGE_SECTIONS = {
       },
       {
         shellIcon: '📍',
-        label: SUPPORT_COPY_FR.address,
+        labelKey: 'contactAddress',
         badgeClass: 'bg-gray-100 text-gray-600',
         value: CONTACT.address,
         rowClass: LIGNE_INFO,
@@ -220,17 +224,24 @@ export const PAGE_SECTIONS = {
     // de contact, un e-mail qui se coupe proprement) et non la mise en page de la
     // page : les deux canaux doivent rendre la même ligne, donc ils la lisent ici
     // plutôt que de la réécrire chacun de leur côté.
+    //
+    // Les libellés sont des CLÉS i18n, et les QUATRE MÊMES que les lignes de
+    // /support (`rows` plus haut) : « Appeler », « WhatsApp », « Envoyer un
+    // e-mail », « Adresse » désignent le même moyen de contact sur les deux
+    // pages, donc ils n'ont qu'un texte. Ils étaient écrits ici en français, ce
+    // qui laissait /contact publier quatre libellés français dans les cinq
+    // langues du site pendant que /support les traduisait.
     actions: [
       {
         icon: '📞',
-        label: 'Appeler',
+        labelKey: 'contactCall',
         badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
       },
       {
         icon: '💬',
-        label: 'WhatsApp',
+        labelKey: 'contactWhatsapp',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
         value: CONTACT.phoneDisplay,
@@ -238,7 +249,7 @@ export const PAGE_SECTIONS = {
       },
       {
         icon: '✉️',
-        label: 'Envoyer un e-mail',
+        labelKey: 'contactSendEmail',
         badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
         value: CONTACT.email,
@@ -246,7 +257,7 @@ export const PAGE_SECTIONS = {
       },
       {
         icon: '📍',
-        label: 'Adresse',
+        labelKey: 'contactAddress',
         badgeClass: 'bg-gray-100 text-gray-600',
         href: CONTACT.mapsUrl,
         value: CONTACT.address,

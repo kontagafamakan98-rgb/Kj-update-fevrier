@@ -137,45 +137,15 @@ function MobileLoader() {
 }
 
 function LegalFooter() {
-  const { currentLanguage } = useLanguage();
+  const { t } = useLanguage();
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
-  const copy = {
-    fr: {
-      about: 'À propos',
-      legal: 'Politique de confidentialité',
-      terms: "Conditions d'utilisation",
-      contact: 'Nous contacter',
-      itinerary: 'Itinéraire',
-    },
-    en: {
-      about: 'About',
-      legal: 'Privacy Policy',
-      terms: 'Terms of use',
-      contact: 'Contact us',
-      itinerary: 'Directions',
-    },
-    wo: {
-      about: 'Ci nun',
-      legal: 'Politique de confidentialité',
-      terms: "Conditions d'utilisation",
-      contact: 'Wax ak nun',
-      itinerary: 'Itinéraire',
-    },
-    bm: {
-      about: 'Anw kunnafoni',
-      legal: 'Politique de confidentialité',
-      terms: "Conditions d'utilisation",
-      contact: 'Aw ni ce',
-      itinerary: 'Itinéraire',
-    },
-    mos: {
-      about: 'Tõnd wɛɛngẽ',
-      legal: 'Politique de confidentialité',
-      terms: "Conditions d'utilisation",
-      contact: 'Togs tõnd',
-    }
-  };
-  const labels = copy[currentLanguage] || copy.fr;
+  // Les libellés du pied de page sont des CLÉS i18n (src/i18n/*.json), les
+  // mêmes que celles que publie la coquille statique de l'accueil : cette
+  // carte locale était un troisième domicile pour « Itinéraire », « Conditions
+  // d'utilisation » et « Politique de confidentialité », recopiées de leur côté
+  // par vite-plugins/prerender-route-meta.js. Les clés `footer*` comblent aussi
+  // un trou : `mos` n'avait pas de valeur « itinerary », donc le lien du pied
+  // de page y était rendu SANS texte.
 
   return (
     <footer className="border-t border-orange-100 bg-white/95 backdrop-blur-sm">
@@ -194,10 +164,10 @@ function LegalFooter() {
             {CONTACT.email}
           </a>
           <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-orange-700 underline underline-offset-2">
-            WhatsApp
+            {t('contactWhatsapp')}
           </a>
           <a href={CONTACT.mapsUrl} target="_blank" rel="noreferrer" className="hover:text-orange-700 underline underline-offset-2">
-            {labels.itinerary}
+            {t('footerItinerary')}
           </a>
         </address>
         <div className="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">
@@ -208,16 +178,16 @@ function LegalFooter() {
               contact — et « Politique de confidentialité » à un .docx dont un
               moteur ne lisait rien. */}
           <Link to="/about" className="hover:text-orange-800 underline underline-offset-2">
-            {labels.about}
+            {t('footerAbout')}
           </Link>
           <Link to="/contact" className="hover:text-orange-800 underline underline-offset-2">
-            {labels.contact}
+            {t('contactTitle')}
           </Link>
           <Link to="/privacy" className="hover:text-orange-800 underline underline-offset-2">
-            {labels.legal}
+            {t('footerPrivacy')}
           </Link>
           <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
-            {labels.terms}
+            {t('footerTerms')}
           </a>
           {SOCIAL_LINKS.map((social) => (
             <a

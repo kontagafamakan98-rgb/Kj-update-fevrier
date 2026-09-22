@@ -30,6 +30,15 @@ import { SITE_ORIGIN, shellFileFor } from '../site-meta.js';
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-prerender-shells.js');
 
+// Les textes que le garde exige pour la section contact de l'accueil et pour la
+// page 404 sont LUS dans le dictionnaire global, celui-là même que lit le build :
+// la fixture les matérialise depuis cette source unique au lieu de les recopier,
+// donc elle ne peut pas dériver du garde en silence. Les cas négatifs retirent
+// un texte que les deux canaux lisent au même endroit.
+const fr = JSON.parse(
+  fs.readFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'fr.json'), 'utf8')
+);
+
 // Coquilles émises par le build réel : les routes CLIENTES (/dashboard,
 // /profile) sont servies par app.html et n'ont donc pas de fichier propre —
 // comme en production.
@@ -54,7 +63,14 @@ const pages = () => ({
     '<!doctype html><html><head>' +
     ogTagFor('index.html') +
     '</head><body><div id="root"><h1>Kojo</h1><p>Contenu statique de l\'accueil</p>' +
-    '<a href="/jobs">Emplois</a></div>' +
+    '<a href="/jobs">Emplois</a>' +
+    `<h2>${fr.contactTitle}</h2><p>${fr.homeContactText}</p>` +
+    `<div>${fr.homeContactCall}</div><div>${fr.contactWhatsapp}</div>` +
+    `<div>${fr.contactSendEmail}</div><div>${fr.contactAddress}</div>` +
+    `<h3>${fr.homeContactFollow}</h3>` +
+    `<a href="/carte">${fr.footerItinerary}</a>` +
+    `<a href="/legal">${fr.footerTerms}</a>` +
+    `<a href="https://exemple.test" rel="me noreferrer">Réseau</a></div>` +
     preload('Home') +
     '<script type="module" src="/assets/index.js"></script></body></html>',
   'jobs.html':
@@ -131,7 +147,14 @@ const pages = () => ({
     '</body></html>',
   'app.html':
     '<!doctype html><html><head><title>Kojo</title></head><body><div id="root"></div></body></html>',
-  '404.html': '<!doctype html><html><head><meta name="robots" content="noindex"></head><body></body></html>',
+  '404.html':
+    '<!doctype html><html lang="fr"><head><meta name="robots" content="noindex">' +
+    `<title>${fr.notFoundMetaTitle}</title></head><body><main>` +
+    `<h1>${fr.notFoundTitle}</h1><p>${fr.notFoundText}</p><nav>` +
+    `<a href="/">${fr.home}</a><a href="/jobs">${fr.notFoundJobsLink}</a>` +
+    `<a href="/how-it-works">${fr.howItWorksTitle}</a>` +
+    `<a href="mailto:x@kojo.app">${fr.contactTitle}</a>` +
+    '</nav></main></body></html>',
 });
 
 /** Les rewrites Vercel attendus : chaque page pré-rendue est atteignable. */
@@ -226,6 +249,27 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
         );
       },
       attendu: 'champ de formulaire « exemple@email.com » ABSENT',
+    },
+    {
+      nom: 'ligne de contact retirée du shell d\'accueil (zone sans garde avant)',
+      mutate: ({ html }) => {
+        html['index.html'] = html['index.html'].replace(fr.homeContactCall, '');
+      },
+      attendu: 'absent de la coquille (section contact / pied de page)',
+    },
+    {
+      nom: 'titre du bloc social retiré (bloc émis)',
+      mutate: ({ html }) => {
+        html['index.html'] = html['index.html'].replace(fr.homeContactFollow, '');
+      },
+      attendu: 'bloc social est publié sans son titre',
+    },
+    {
+      nom: 'texte de la page 404 retiré',
+      mutate: ({ html }) => {
+        html['404.html'] = html['404.html'].replace(fr.notFoundJobsLink, '');
+      },
+      attendu: "absent de la page d'une URL inconnue",
     },
     {
       nom: 'og:image d\'une coquille retiré (lu dans la table unique)',

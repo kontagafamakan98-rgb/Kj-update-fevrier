@@ -37,6 +37,17 @@ import { SITE_ORIGIN, shellFileFor } from './site-meta.js';
 // vite.config.js qui écrit ces coquilles : la carte de chaque shell est LUE
 // ici et non recopiée (voir la section « og:image » plus bas).
 import { ROUTES as OG_CARD_ROUTES } from './check-og-images.js';
+// Les TEXTES attendus ne sont pas recopiés ici : ils viennent des mêmes
+// dictionnaires que les coquilles — src/i18n/fr.json pour le dictionnaire
+// global, src/utils/pack2PageI18n/*.js pour les pages qui ont leur propre
+// scope (Register, Jobs). Un libellé recopié dans ce fichier ne comparait rien :
+// corriger la coquille laissait le garde affirmer l'ancien mot.
+import { makeScopedTranslator as makeRegisterTranslator } from '../src/utils/pack2PageI18n/register.js';
+import { makeScopedTranslator as makeJobsTranslator } from '../src/utils/pack2PageI18n/jobs.js';
+
+const fr = JSON.parse(readFileSync(new URL('../src/i18n/fr.json', import.meta.url), 'utf8'));
+const registerT = makeRegisterTranslator('fr', (cle) => fr[cle]);
+const jobsT = makeJobsTranslator('fr', (cle) => fr[cle]);
 
 const buildDir = path.join(process.cwd(), 'build');
 const errors = [];
@@ -81,10 +92,69 @@ if (!homePreload) {
   errors.push('index.html : modulepreload du chunk Home (landing LCP) ABSENT — le plugin preload-home-chunk a-t-il tourné ?');
 }
 
+// 1ter. index.html : la SECTION CONTACT et le PIED DE PAGE publient leurs
+// textes déclarés. Cette zone n'était vérifiée par AUCUN garde : ses libellés
+// étaient recopiés en dur dans le plugin ET dans le pied de page React
+// (src/App.js), donc corriger l'un laissait les autres derrière en silence, et
+// supprimer une ligne de contact ne faisait échouer personne. Les valeurs
+// attendues sont LUES dans le dictionnaire global — ce qui est déclaré ici est
+// la liste des textes que la coquille doit porter, jamais leur contenu.
+if (index) {
+  const sectionContact = [
+    fr.contactTitle,
+    fr.homeContactText,
+    fr.homeContactCall,
+    fr.contactWhatsapp,
+    fr.contactSendEmail,
+    fr.contactAddress,
+    fr.footerItinerary,
+    fr.footerTerms,
+  ];
+  for (const texte of new Set(sectionContact)) {
+    if (!index.includes(texte)) {
+      errors.push(
+        `index.html : « ${texte} » absent de la coquille (section contact / pied de page) — ` +
+          'ce texte appartient au dictionnaire global, que publie aussi le pied de page React'
+      );
+    }
+  }
+  // Le bloc social n'est émis que si des profils sont configurés
+  // (VITE_SOCIAL_*) : son titre est donc exigé SEULEMENT quand le bloc est là
+  // — un bloc livré sans son titre serait un shell amputé, pas une option.
+  if (index.includes('rel="me noreferrer"') && !index.includes(fr.homeContactFollow)) {
+    errors.push(
+      `index.html : le bloc social est publié sans son titre « ${fr.homeContactFollow} » ` +
+        '(texte déclaré dans le dictionnaire global)'
+    );
+  }
+}
+
+// 1quater. 404.html : les textes de la page servie aux URL inconnues.
+// Elle n'appartenait à personne : ses textes n'existaient dans aucun
+// dictionnaire et aucun garde ne les regardait (check-spa-routes.js vérifie sa
+// présence, son noindex et l'absence de script — pas ce qu'elle dit).
+const notFound = read('404.html');
+if (notFound) {
+  const textes404 = [
+    fr.notFoundMetaTitle,
+    fr.notFoundTitle,
+    fr.notFoundText,
+    fr.home,
+    fr.notFoundJobsLink,
+    fr.howItWorksTitle,
+    fr.contactTitle,
+  ];
+  for (const texte of textes404) {
+    if (!notFound.includes(texte)) {
+      errors.push(`404.html : « ${texte} » absent de la page d'une URL inconnue`);
+    }
+  }
+}
+
 // 2. jobs.html : shell h1 statique + og:image dédié.
 const jobs = read('jobs.html');
 if (jobs) {
-  if (!jobs.includes('<h1 class="text-3xl font-bold text-gray-900">Emplois disponibles</h1>')) {
+  if (!jobs.includes(`<h1 class="text-3xl font-bold text-gray-900">${jobsT('availableJobs')}</h1>`)) {
     errors.push('jobs.html : shell h1 « Emplois disponibles » ABSENT de #root');
   }
   if (!jobs.includes('class="h-16 bg-white border-b border-gray-200"')) {
@@ -97,13 +167,13 @@ const login = read('login.html');
 if (login) {
   // Titre de PAGE en h1 (et non h2) : une page doit avoir UN h1, identique
   // pour un crawler sans JavaScript et pour celui qui exécute le bundle.
-  if (!login.includes('<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h1>')) {
+  if (!login.includes(`<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">${fr.login}</h1>`)) {
     errors.push('login.html : h1 « Connexion » absent du shell');
   }
   if (!login.includes('id="email"')) {
     errors.push('login.html : champ e-mail absent du shell');
   }
-  if (!login.includes('bg-orange-600">Connexion</div>')) {
+  if (!login.includes(`bg-orange-600">${fr.login}</div>`)) {
     errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');
   }
   // Le chunk lazy de Login doit être préchargé (modulepreload) dans le HTML
@@ -118,28 +188,28 @@ if (login) {
 // 4. register.html : shell formulaire (mode client) + modulepreload du chunk.
 const register = read('register.html');
 if (register) {
-  if (!register.includes('<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>')) {
+  if (!register.includes(`<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">${registerT('title')}</h1>`)) {
     errors.push('register.html : h1 « Créer un compte » absent du shell');
   }
-  if (!register.includes("S'inscrire avec Google")) {
+  if (!register.includes(registerT('googleSignup'))) {
     errors.push('register.html : bouton Google absent du shell');
   }
-  if (!register.includes('bg-orange-600">Continuer vers la vérification email')) {
+  if (!register.includes(`bg-orange-600">${registerT('continueButton')}`)) {
     errors.push('register.html : bouton submit (bg-orange-600) absent du shell');
   }
   // Champs du formulaire (les LCP/paint du formulaire complet avant React) :
   // prénom/nom, email, téléphone doivent être peints dans le shell statique,
   // pas seulement les boutons — sinon le LCP du formulaire register reste
   // attendu du boot React.
-  for (const field of ['Prénom...', 'Nom...', 'exemple@email.com', '--- XX XXX XX XX']) {
-    if (!register.includes(`placeholder="${field}"`)) {
-      errors.push(`register.html : champ de formulaire « ${field} » ABSENT du shell`);
+  for (const champ of [`${fr.firstName}...`, `${fr.lastName}...`, registerT('emailPlaceholder'), '--- XX XXX XX XX']) {
+    if (!register.includes(`placeholder="${champ}"`)) {
+      errors.push(`register.html : champ de formulaire « ${champ} » ABSENT du shell`);
     }
   }
   // Mentions légales peintes côté HTML (bloc « Informations légales » +
   // case de consentement Politique de confidentialité) : elles font partie
   // du formulaire complet et ne doivent pas dépendre du boot React.
-  if (!register.includes('Informations légales') || !register.includes('Politique de confidentialité')) {
+  if (!register.includes(registerT('legalNoticeTitle')) || !register.includes(fr.privacyTitle)) {
     errors.push('register.html : mentions légales (Informations légales / Politique de confidentialité) absentes du shell');
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Register-[^"]*\.js"/.test(register)) {
@@ -150,7 +220,7 @@ if (register) {
 // 4bis. forgot-password.html : shell formulaire étape email (par défaut).
 const forgot = read('forgot-password.html');
 if (forgot) {
-  if (!forgot.includes('<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>')) {
+  if (!forgot.includes(`<h1 class="mt-6 text-3xl font-extrabold text-gray-900">${fr.forgotPasswordPageTitle}</h1>`)) {
     errors.push('forgot-password.html : h1 « Mot de passe oublié » absent du shell');
   }
   if (!forgot.includes('id="reset-email"')) {
@@ -168,13 +238,13 @@ if (forgot) {
 // (état par défaut, sans contexte de mission).
 const payment = read('payment.html');
 if (payment) {
-  if (!payment.includes('<h1 class="text-3xl font-bold text-gray-900 mb-2">KOJO Paiements réels</h1>')) {
+  if (!payment.includes(`<h1 class="text-3xl font-bold text-gray-900 mb-2">${fr.paymentPageTitle}</h1>`)) {
     errors.push('payment.html : h1 « KOJO Paiements réels » absent du shell');
   }
-  if (!payment.includes('Un paiement doit être rattaché à une mission')) {
+  if (!payment.includes(fr.paymentPageNoJobTitle)) {
     errors.push('payment.html : carte « mission requise » (💼) absente du shell');
   }
-  if (!payment.includes('Voir les missions disponibles')) {
+  if (!payment.includes(fr.paymentPageNoJobCta)) {
     errors.push('payment.html : CTA « Voir les missions disponibles » absent du shell');
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Payment-[^"]*\.js"/.test(payment)) {
@@ -188,7 +258,7 @@ if (payment) {
 // pour un crawler sans JavaScript.
 const howItWorks = read('how-it-works.html');
 if (howItWorks) {
-  if (!howItWorks.includes('<h1 class="text-3xl md:text-4xl font-bold mb-4">Comment ça marche ?</h1>')) {
+  if (!howItWorks.includes(`<h1 class="text-3xl md:text-4xl font-bold mb-4">${fr.howItWorksTitle}</h1>`)) {
     errors.push('how-it-works.html : h1 « Comment ça marche ? » absent du shell');
   }
   if (!howItWorks.includes('<details')) {
@@ -210,10 +280,10 @@ if (howItWorks) {
 // 4quinquies. support.html : page PUBLIQUE (contact + suivi de ticket).
 const support = read('support.html');
 if (support) {
-  if (!support.includes('<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>')) {
+  if (!support.includes(`<h1 class="text-3xl font-bold text-gray-900 mb-2">${fr.support}</h1>`)) {
     errors.push('support.html : h1 « Support » absent du shell');
   }
-  if (!support.includes('Suivre une demande existante')) {
+  if (!support.includes(fr.supportTrackTitle)) {
     errors.push('support.html : carte de suivi (« Suivre une demande existante ») absente du shell');
   }
   for (const anchor of ['href="tel:', 'href="mailto:', 'wa.me', 'href="/how-it-works"']) {
