@@ -47,6 +47,18 @@ const server = http.createServer(async (req, res) => {
   try {
     if (req.method === 'GET' && path === '/health') return send(res, 200, { status: 'ok', fixture: true });
     if (req.method === 'GET' && path === '/geolocation/available-countries') return send(res, 200, { countries: [] });
+    if (req.method === 'GET' && path === '/geolocation/detect') return send(res, 200, { detected: false, country: null });
+    if (req.method === 'GET' && path === '/notifications') return send(res, 200, { notifications: [], unread_count: 0 });
+    if (req.method === 'GET' && path === '/notifications/unread-count') return send(res, 200, { unread_count: 0 });
+    if (req.method === 'GET' && path === '/notifications/vapid-public-key') return send(res, 200, { vapid_public_key: '' });
+    if (req.method === 'GET' && path === '/workers/profile') return send(res, 200, { profile: null });
+    if (req.method === 'GET' && /^\/users\/[^/]+\/reviews$/.test(path)) return send(res, 200, { reviews: [] });
+    if (req.method === 'GET' && path === '/users/referral') return send(res, 200, { referral_code: null, reward_balance: 0 });
+    if (req.method === 'GET' && path === '/users/referral/filleuls') return send(res, 200, { filleuls: [] });
+    if (req.method === 'GET' && path === '/users/portfolio') return send(res, 200, { portfolio_images: [] });
+    if (req.method === 'GET' && path === '/users/profile-photo') return send(res, 200, { photo_url: null });
+    if (req.method === 'GET' && path === '/users/payment-accounts') return send(res, 200, { payment_accounts: [] });
+    if (req.method === 'GET' && path === '/geolocation/cities') return send(res, 200, { cities: [] });
     if (req.method === 'GET' && path === '/jobs') {
       const page = Math.max(1, Number(url.searchParams.get('page') || 1));
       const limit = Math.min(50, Math.max(1, Number(url.searchParams.get('limit') || 12)));
