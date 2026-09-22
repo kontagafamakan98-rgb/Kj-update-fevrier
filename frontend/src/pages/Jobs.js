@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -6,7 +6,6 @@ import { useToast } from '../contexts/ToastContext';
 import JobCreateModal from '../components/JobCreateModal';
 import { ListSkeleton } from '../components/SkeletonLoader';
 import { jobsAPI } from '../services/apiEndpoints';
-import { handleApiError } from '../services/api';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobs';
 import { getJobUiLabel } from '../utils/jobUiLocale';
@@ -24,10 +23,13 @@ import { makePublicJobsPrefetch } from '../utils/publicJobsPrefetch';
 // - « Mes candidatures » (travailleurs) : jobs auxquels j'ai postulé.
 // - « Mes missions » (travailleurs) : missions attribuées ; (clients) : mes
 //   annonces publiées.
-const JOB_TAB_DISCOVER = 'discover';
-const JOB_TAB_APPLICATIONS = 'applications';
-const JOB_TAB_MISSIONS = 'missions';
-const JOBS_PAGE_SIZE = 12;
+import {
+  useJobsData,
+  JOB_TAB_DISCOVER,
+  JOB_TAB_APPLICATIONS,
+  JOB_TAB_MISSIONS,
+  JOBS_PAGE_SIZE,
+} from '../hooks/useJobsData';
 
 // ── Préchargement PARALLÈLE de la liste publique (decouverte) ───────────────
 // Sans lui, la liste n'était demandée qu'APRÈS que le chunk lazy soit chargé,
@@ -61,9 +63,6 @@ const { kick: kickPublicJobsPrefetch, consume: consumePublicJobsPrefetch } =
 kickPublicJobsPrefetch();
 
 export default function Jobs() {
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState(() => ({
@@ -76,13 +75,7 @@ export default function Jobs() {
   const [locating, setLocating] = useState(false);
   const [viewMode, setViewMode] = useState('list');
   const [tab, setTab] = useState(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  // null = pas d'échec ; { message, reseau } = le dernier échec de chargement.
-  const [loadError, setLoadError] = useState(null);
-  // null = pas encore chargé (JobCard retombe alors sur localStorage) ;
-  // Set (même vide) = donnée serveur fiable disponible.
-  const [appliedJobIds, setAppliedJobIds] = useState(null);
+
   const { user } = useAuth();
   const { t, currentLanguage } = useLanguage();
   const toast = useToast();
@@ -95,133 +88,20 @@ export default function Jobs() {
   // missions » (ses annonces), sinon découverte publique.
   const effectiveTab = tab || (user?.user_type === 'client' ? JOB_TAB_MISSIONS : JOB_TAB_DISCOVER);
 
-  const loadAppliedJobIds = async () => {
-    try {
-      const response = await jobsAPI.getMyProposals();
-      const proposals = Array.isArray(response) ? response : response?.data || [];
-      setAppliedJobIds(new Set(proposals.map((p) => String(p.job_id)).filter(Boolean)));
-    } catch (error) {
-      safeLog.error('Failed to load my proposals', error);
-      // On laisse appliedJobIds a null : JobCard retombe alors sur le
-      // marqueur localStorage plutot que d'afficher "Postuler disponible"
-      // partout par erreur.
-    }
-  };
+  const { jobs, loading, loadingMore, hasMore, loadError, appliedJobIds, loadJobs, retry } = useJobsData({
+    effectiveTab,
+    filters,
+    setFilters,
+    searchParams,
+    user,
+    errorMessages: {
+      network: pageT('loadErrorNetwork'),
+      server: pageT('loadErrorServer'),
+    },
+    consumePrefetch: consumePublicJobsPrefetch,
+  });
 
-  // Tous les filtres (recherche, catégorie, statut) sont appliqués CÔTÉ
-  // SERVEUR (pagination + requête MongoDB) : un résultat n'est plus tronqué
-  // à 50 jobs puis filtré localement — le 51e job d'une catégorie apparaît
-  // enfin.
-  // `page`/`append` peuvent être imposés : c'est ce qui permet à « Réessayer »
-  // de rejouer EXACTEMENT la requête qui a échoué (une page suivante qui a
-  // échoué se recharge comme une page suivante, sans repartir de la première).
-  const loadJobs = async ({ append = false, page: pageDemandee = null } = {}) => {
-    const targetPage = pageDemandee ?? (append ? page + 1 : 1);
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
-    setLoadError(null);
-    try {
-      const params = { limit: JOBS_PAGE_SIZE, page: targetPage };
-      if (filters.search.trim()) params.q = filters.search.trim();
-      if (filters.category) params.category = filters.category;
-
-      if (effectiveTab === JOB_TAB_MISSIONS) {
-        // Missions attribuées (travailleur) / annonces publiées (client).
-        params.mine = user?.user_type === 'client' ? 'posted' : 'assigned';
-      } else if (effectiveTab === JOB_TAB_APPLICATIONS) {
-        // Mes candidatures : on interroge le serveur avec la liste de mes
-        // job_id postulés (l'ordre et le statut restent filtrés serveur).
-        const response = await jobsAPI.getMyProposals();
-        const proposals = Array.isArray(response) ? response : response?.data || [];
-        const ids = proposals.map((p) => p.job_id).filter(Boolean);
-        if (ids.length === 0) {
-          setJobs([]);
-          setHasMore(false);
-          return;
-        }
-        params.ids = ids.join(',');
-      } else {
-        // Découverte : uniquement les offres ouvertes (les autres statuts
-        // n'ont rien à faire dans la vitrine publique).
-        params.status = 'open';
-      }
-      // Filtre de statut explicite (onglets « Mes candidatures » / « Mes
-      // missions ») : appliqué en complément de mine= / ids=.
-      if (effectiveTab !== JOB_TAB_DISCOVER && filters.status) {
-        params.status = filters.status;
-      }
-
-      // Vue découverte : réutilise le préchargement parraillèle si la requête
-      // demandée est identique, sinon (premier montage où le préchargement n'a
-      // pas encore servi) lance le fetch normal. L'attente du préchargement
-      // ne marque pas loading=false plus lentement : la promise est déjà en
-      // vol, elle résout dès la réponse réseau.
-      if (!append && effectiveTab === JOB_TAB_DISCOVER) {
-        const prefetched = await consumePublicJobsPrefetch(params);
-        if (prefetched) {
-          setJobs(prefetched.jobs);
-          setPage(1);
-          setHasMore(prefetched.hasMore);
-          return;
-        }
-      }
-
-      const response = await jobsAPI.getAll(params);
-      const jobsData = normalizeJobList(Array.isArray(response) ? response : response?.data || []);
-      setJobs((prev) => (append ? [...prev, ...jobsData] : jobsData));
-      setPage(targetPage);
-      setHasMore(jobsData.length === JOBS_PAGE_SIZE);
-    } catch (error) {
-      safeLog.error('Jobs load error', error);
-      // Le message d'échec appartient à la page (clé i18n), jamais au
-      // navigateur : une coupure réseau affichait « Failed to fetch » en
-      // anglais au milieu d'un écran français. Le TYPE d'échec se lit sur
-      // l'erreur, pas sur sa formulation : sans réponse HTTP, c'est le réseau
-      // qu'il faut vérifier ; avec une réponse, c'est le serveur qui a failli.
-      const reseau = !error?.response;
-      setLoadError({
-        reseau,
-        message: handleApiError(error, reseau ? pageT('loadErrorNetwork') : pageT('loadErrorServer')),
-        // La forme de la requête fautive voyage avec l'échec : c'est elle que
-        // « Réessayer » rejoue, pagination comprise.
-        requete: { append, page: targetPage },
-      });
-      if (!append) setJobs([]);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
-
-  useEffect(() => {
-    const categoryParam = searchParams.get('category');
-    if (categoryParam) {
-      setFilters((prev) => ({ ...prev, category: categoryParam }));
-    }
-    if (user?.user_type === 'worker') {
-      loadAppliedJobIds();
-    } else {
-      setAppliedJobIds(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user?.id, user?.user_type]);
-
-  // Recharger quand l'onglet ou un filtre change (page repart de 1).
-  // filters.status est inclus : sans lui, changer le statut dans les onglets
-  // « Mes candidatures » / « Mes missions » ne redéclenchait jamais loadJobs.
-  useEffect(() => {
-    loadJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveTab, filters.search, filters.category, filters.status, user?.id, user?.user_type]);
-
-  // Rejouer la requête est une ACTION de la page : l'échec ne se répare plus en
-  // rechargeant l'onglet. C'est la requête qui a échoué qui est rejouée, pas
-  // une requête équivalente — un « Afficher plus » en panne reprend la page
-  // suivante et laisse en place les missions déjà affichées.
-  const reessayer = () => loadJobs(loadError?.requete || {});
+  const reessayer = retry;
 
   // Filtres qui expliquent une liste vide (et que l'utilisateur peut lever) :
   // sans eux, « rien à afficher » n'a pas la même prochaine étape.
