@@ -1,6 +1,7 @@
 import http from 'node:http';
 
-const port = Number(process.env.PORT || 8123);
+const rawPort = process.env.PORT;
+const port = rawPort && rawPort !== '0' ? Number(rawPort) : 8123;
 const jobs = Array.from({ length: 25 }, (_, index) => ({
   id: `playtest-job-${index + 1}`,
   title: `Mission de démonstration ${index + 1}`,
@@ -20,11 +21,19 @@ const users = new Map([
 const sessions = new Map();
 const proposals = [];
 const payments = [];
-let currentOrigin = '*';
+let currentOrigin = 'http://127.0.0.1:4173';
 
 const send = (res, status, body, headers = {}) => {
   const payload = JSON.stringify(body);
-  res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': currentOrigin, 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Accept,Content-Type,Authorization,X-CSRFToken', ...headers });
+  const allowOrigin = currentOrigin && currentOrigin !== '*' ? currentOrigin : 'http://127.0.0.1:4173';
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Accept,Content-Type,Authorization,X-CSRFToken',
+    ...headers
+  });
   res.end(payload);
 };
 const readBody = (req) => new Promise((resolve, reject) => {
@@ -40,7 +49,9 @@ const currentUser = (req) => {
 const route = (req) => new URL(req.url, `http://${req.headers.host}`);
 
 const server = http.createServer(async (req, res) => {
-  currentOrigin = req.headers.origin || '*';
+  if (req.headers.origin) {
+    currentOrigin = req.headers.origin;
+  }
   if (req.method === 'OPTIONS') return send(res, 204, {});
   const url = route(req);
   const path = url.pathname.replace(/^\/api/, '') || '/';
