@@ -431,6 +431,13 @@
       "invoque_par": "ci",
       "preuve": "backend/tests/test_deployed_revision.py",
       "runner": "pytest"
+    },
+    {
+      "chemin": "backend/scripts/check_health_probe.py",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "backend/tests/test_health_probe.py",
+      "runner": "pytest"
     }
   ],
   "rejeux": [
@@ -1267,6 +1274,27 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_deployed_revision.py::TestVerdict::test_refuse_une_revision_differente_en_nommant_les_deux"
+      ]
+    },
+    {
+      "id": "health-probe: paydunya open tolere",
+      "garde": "backend/scripts/check_health_probe.py",
+      "cible": "backend/scripts/check_health_probe.py",
+      "trouve": "        if circuit_state == \"open\":",
+      "remplace": "        if False and circuit_state == \"open\":",
+      "runner": "python",
+      "preuve": "backend/tests/test_health_probe.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_health_probe.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_health_probe.py::test_check_health_fails_on_paydunya_open"
       ]
     },
     {

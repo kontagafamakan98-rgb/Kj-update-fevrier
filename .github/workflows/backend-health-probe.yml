@@ -1,0 +1,32 @@
+name: Backend health probe (daily)
+
+# ─── Sonde périodique de santé backend & circuit breaker PayDunya ──────────
+# Surveille en continu l'endpoint public https://api.kojoforafrica.cc.cd/health :
+# 1. Vérifie le statut global (status == healthy).
+# 2. Vérifie la connexion persistante à la base MongoDB (database == connected).
+# 3. Vérifie l'état du circuit breaker PayDunya (paydunya_circuit.state == closed).
+#    Échoue immédiatement et alerte si le circuit est ouvert ('open').
+on:
+  schedule:
+    # 06:30 UTC : après la sonde SEO
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health-probe:
+    name: Sonde de santé backend & circuit PayDunya
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Interroger /health et vérifier MongoDB et PayDunya
+        run: python backend/scripts/check_health_probe.py
