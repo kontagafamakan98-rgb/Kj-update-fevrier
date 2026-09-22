@@ -1,6 +1,10 @@
 import { devLog, safeLog } from '../utils/env';
 import geolocationMonitor from '../utils/geolocationMonitor';
 import { api } from './api';
+import { GeolocationCache } from './geolocation-cache';
+import { getGeolocationPermissionState, getCurrentPositionWithOptions, getBestAvailableGpsPosition, TARGET_GPS_ACCURACY } from './geolocation-gps';
+import { fetchIpGeolocationServices } from './geolocation-network';
+import { loadGeographicDatabase, getDatabase, FALLBACK_COUNTRY_DATA } from './geolocation-database';
 
 /**
  * MODULE DE GÉOLOCALISATION UNIQUE (fusion de geolocationService.js et
@@ -25,48 +29,7 @@ import { api } from './api';
 // Fallback compact (niveau pays) — utilisé uniquement si la base complète
 // n'a pas encore été chargée depuis le backend (premier rendu, hors-ligne).
 // Les villes/quartiers ne vivent que côté backend.
-const FALLBACK_COUNTRY_DATA = {
-  mali: {
-    country: 'Mali',
-    nameFrench: 'Mali',
-    flag: '🇲🇱',
-    phonePrefix: '+223',
-    currency: 'XOF',
-    language: 'fr',
-    bounds: { north: 25.0, south: 10.15997, east: 4.27, west: -12.2422 },
-    majorCities: []
-  },
-  senegal: {
-    country: 'Senegal',
-    nameFrench: 'Sénégal',
-    flag: '🇸🇳',
-    phonePrefix: '+221',
-    currency: 'XOF',
-    language: 'fr',
-    bounds: { north: 16.6917, south: 12.3075, east: -11.3557, west: -17.5354 },
-    majorCities: []
-  },
-  burkina_faso: {
-    country: 'Burkina Faso',
-    nameFrench: 'Burkina Faso',
-    flag: '🇧🇫',
-    phonePrefix: '+226',
-    currency: 'XOF',
-    language: 'fr',
-    bounds: { north: 15.0841, south: 9.4011, east: 2.405, west: -5.5189 },
-    majorCities: []
-  },
-  cote_divoire: {
-    country: 'Ivory Coast',
-    nameFrench: "Côte d'Ivoire",
-    flag: '🇨🇮',
-    phonePrefix: '+225',
-    currency: 'XOF',
-    language: 'fr',
-    bounds: { north: 10.7402, south: 4.3571, east: -2.4947, west: -8.6024 },
-    majorCities: []
-  }
-};
+// FALLBACK_COUNTRY_DATA importé de ./geolocation-database
 
 const COUNTRY_CODE_ALIASES = {
   ivory_coast: 'cote_divoire',
@@ -88,55 +51,9 @@ const normalizeCountryCode = (code = '') => {
 // ---------------------------------------------------------------------------
 // Base géographique chargée depuis le backend (source de vérité)
 // ---------------------------------------------------------------------------
-const DB_CACHE_KEY = 'kojo_geo_db';
-const DB_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 jours
+// Base géographique et hydratation importées de ./geolocation-database
 
-let geographicDatabase = null;
-let databaseLoadPromise = null;
-
-const hydrateDatabaseFromCache = () => {
-  try {
-    const cached = localStorage.getItem(DB_CACHE_KEY);
-    if (!cached) return;
-    const parsed = JSON.parse(cached);
-    if (parsed && parsed.data && parsed.timestamp && (Date.now() - parsed.timestamp) < DB_CACHE_TTL) {
-      geographicDatabase = parsed.data;
-      devLog.info('🗺️ Base géographique chargée depuis le cache local');
-    }
-  } catch (e) {
-    devLog.info('⚠️ Cache base géographique illisible:', e?.message);
-  }
-};
-
-const getDatabase = () => geographicDatabase || FALLBACK_COUNTRY_DATA;
-
-const loadGeographicDatabase = async () => {
-  if (databaseLoadPromise) return databaseLoadPromise;
-  databaseLoadPromise = (async () => {
-    try {
-      // Client central api : cookies + CSRF gérés (GET public, aucune
-      // authentification requise — la session cookie est envoyée quand elle
-      // existe).
-      const data = await api.get('/geolocation/cities');
-      const countries = data?.countries || data?.database;
-      if (countries && typeof countries === 'object' && Object.keys(countries).length > 0) {
-        geographicDatabase = countries;
-        try {
-          localStorage.setItem(DB_CACHE_KEY, JSON.stringify({ data: countries, timestamp: Date.now() }));
-        } catch (e) {
-          devLog.info('⚠️ Impossible de mettre en cache la base géographique:', e?.message);
-        }
-        devLog.info('✅ Base géographique chargée depuis le backend');
-      }
-    } catch (error) {
-      safeLog.error('⚠️ Base géographique indisponible, fallback local:', error);
-    }
-    return getDatabase();
-  })();
-  return databaseLoadPromise;
-};
-
-hydrateDatabaseFromCache();
+// hydrateDatabaseFromCache déjà exécuté dans geolocation-database
 
 // Services de géolocalisation IP — uniquement le backend Kojo (plus d'appels
 // directs à ipapi.co / ipinfo.io depuis le navigateur → CSP réduite).
@@ -181,61 +98,38 @@ class PreciseGeolocationService {
     this.isDetecting = false;
     this.lastKnownLocation = null;
     this.detectionAccuracy = 0;
-    this.cachedLocation = null;
-    this.cacheTimestamp = null;
-    this.CACHE_DURATION = 60 * 1000; // 60 secondes pour éviter les localisations obsolètes
-    this.TARGET_GPS_ACCURACY = 12;
+    this.cache = new GeolocationCache();
+    this.TARGET_GPS_ACCURACY = TARGET_GPS_ACCURACY;
     this.MIN_CACHEABLE_GPS_ACCURACY = 35;
     this.MAX_ACCEPTABLE_GPS_ACCURACY = 120;
-    this.loadCachedLocation();
   }
 
-  // Charger la dernière position depuis localStorage
+  get cachedLocation() {
+    return this.cache.cachedLocation;
+  }
+
+  set cachedLocation(val) {
+    this.cache.cachedLocation = val;
+  }
+
+  get cacheTimestamp() {
+    return this.cache.cacheTimestamp;
+  }
+
+  set cacheTimestamp(val) {
+    this.cache.cacheTimestamp = val;
+  }
+
+  get CACHE_DURATION() {
+    return 60 * 1000;
+  }
+
   loadCachedLocation() {
-    try {
-      const cached = localStorage.getItem('kojo_precise_location');
-      if (cached) {
-        const data = JSON.parse(cached);
-        if (Date.now() - data.timestamp < this.CACHE_DURATION) {
-          this.cachedLocation = data.location;
-          this.cacheTimestamp = data.timestamp;
-          devLog.info('📍 Position précise cachée chargée:', this.cachedLocation);
-        } else {
-          localStorage.removeItem('kojo_precise_location');
-        }
-      }
-    } catch (e) {
-      devLog.info('⚠️ Erreur chargement cache position précise:', e);
-    }
+    this.cache.load();
   }
 
-  // Sauvegarder la position dans le cache
   saveCachedLocation(location) {
-    const gpsAccuracy = Number(location?.gpsAccuracy ?? location?.accuracy);
-    const isCacheableGps = Boolean(
-      location?.coordinates &&
-      Number.isFinite(gpsAccuracy) &&
-      gpsAccuracy > 0 &&
-      gpsAccuracy <= this.MIN_CACHEABLE_GPS_ACCURACY &&
-      !location?.isApproximate
-    );
-
-    if (!isCacheableGps) {
-      devLog.info('ℹ️ Position non assez précise pour le cache persistant');
-      return;
-    }
-
-    try {
-      localStorage.setItem('kojo_precise_location', JSON.stringify({
-        location,
-        timestamp: Date.now()
-      }));
-      this.cachedLocation = location;
-      this.cacheTimestamp = Date.now();
-      devLog.info('✅ Position précise sauvegardée dans le cache');
-    } catch (e) {
-      devLog.info('⚠️ Erreur sauvegarde cache position précise:', e);
-    }
+    this.cache.save(location);
   }
 
   /**
@@ -355,107 +249,15 @@ class PreciseGeolocationService {
    * GÉOLOCALISATION GPS HAUTE PRÉCISION
    */
   async getGeolocationPermissionState() {
-    try {
-      if (!navigator.permissions || !navigator.permissions.query) {
-        return 'unknown';
-      }
-
-      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' });
-      return permissionStatus?.state || 'unknown';
-    } catch (error) {
-      devLog.info('⚠️ Permissions API indisponible:', error.message);
-      return 'unknown';
-    }
+    return await getGeolocationPermissionState();
   }
 
   async getCurrentPositionWithOptions(options = {}) {
-    return await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, options);
-    });
+    return await getCurrentPositionWithOptions(options);
   }
 
   async getBestAvailableGpsPosition() {
-    const permissionState = await this.getGeolocationPermissionState();
-    devLog.info(`🔐 Permission géolocalisation: ${permissionState}`);
-
-    const baseOptions = {
-      enableHighAccuracy: true,
-      timeout: 20000,
-      maximumAge: 0
-    };
-
-    const firstPosition = await this.getCurrentPositionWithOptions(baseOptions);
-    const firstAccuracy = firstPosition?.coords?.accuracy ?? Number.POSITIVE_INFINITY;
-
-    if (!navigator.geolocation?.watchPosition || firstAccuracy <= this.TARGET_GPS_ACCURACY) {
-      return firstPosition;
-    }
-
-    devLog.info(`📡 Premier fix GPS à ${Math.round(firstAccuracy)}m, lancement d'un warm-up précision...`);
-
-    const watchDurationMs = firstAccuracy <= 25 ? 6000 : 10000;
-
-    return await new Promise((resolve) => {
-      let bestPosition = firstPosition;
-      let settled = false;
-      let watchId = null;
-      let timerId = null;
-
-      const finalize = () => {
-        if (settled) return;
-        settled = true;
-
-        if (timerId) {
-          clearTimeout(timerId);
-        }
-
-        if (watchId !== null) {
-          navigator.geolocation.clearWatch(watchId);
-        }
-
-        resolve(bestPosition);
-      };
-
-      const evaluatePosition = (position) => {
-        if (!position?.coords) return;
-
-        const candidateAccuracy = position.coords.accuracy ?? Number.POSITIVE_INFINITY;
-        const currentBestAccuracy = bestPosition?.coords?.accuracy ?? Number.POSITIVE_INFINITY;
-
-        if (candidateAccuracy < currentBestAccuracy) {
-          bestPosition = position;
-        }
-
-        if (candidateAccuracy <= this.TARGET_GPS_ACCURACY) {
-          finalize();
-        }
-      };
-
-      timerId = setTimeout(finalize, watchDurationMs);
-
-      try {
-        watchId = navigator.geolocation.watchPosition(
-          (position) => {
-            evaluatePosition(position);
-          },
-          (error) => {
-            devLog.info('⚠️ Warm-up GPS interrompu:', error.message);
-            finalize();
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: watchDurationMs,
-            maximumAge: 0
-          }
-        );
-      } catch (error) {
-        devLog.info('⚠️ watchPosition indisponible:', error.message);
-        finalize();
-        return;
-      }
-
-      evaluatePosition(firstPosition);
-    });
+    return await getBestAvailableGpsPosition(this.TARGET_GPS_ACCURACY);
   }
 
   // Reverse geocoding via le backend Kojo (plus d'appel direct à Nominatim)
@@ -567,34 +369,8 @@ class PreciseGeolocationService {
 
     const results = [];
 
-    // Tester tous les services IP en parallèle
-    const promises = IP_GEOLOCATION_SERVICES.map(async (service) => {
-      try {
-        devLog.info(`📡 Test service ${service.name}...`);
-
-        // Client central api (GET public). Note : l'ancien `timeout: 5000`
-        // et le header User-Agent étaient ignorés par fetch (option invalide /
-        // header interdit en navigateur) — le timeout réel de reverse geocoding
-        // passe par AbortController via signal.
-        const data = await api.get(service.path);
-        const parsed = service.parser(data);
-
-        devLog.info(`✅ ${service.name} réponse:`, parsed);
-
-        // Accepter toute localisation valide (pas seulement Afrique de l'Ouest)
-        if (parsed && parsed.latitude && parsed.longitude) {
-          results.push({
-            service: service.name,
-            ...parsed
-          });
-        }
-
-      } catch (error) {
-        devLog.info(`⚠️ Service ${service.name} échoué:`, error.message);
-      }
-    });
-
-    await Promise.allSettled(promises);
+    const fetched = await fetchIpGeolocationServices(IP_GEOLOCATION_SERVICES);
+    results.push(...fetched);
 
     if (results.length === 0) {
       devLog.info('❌ Aucun service IP n\'a fourni de localisation valide');
