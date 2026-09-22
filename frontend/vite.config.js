@@ -189,6 +189,7 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/setupTests.js',
       css: true,
+      exclude: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/e2e/**'],
       // Marge sur le délai par défaut (5 s). Plusieurs gardes CI testent des
       // scripts qui LANCENT un sous-processus Node/Python (check-bundle-size,
       // check-script-deps, check-generated-icons, check-spa-routes…) : sous la

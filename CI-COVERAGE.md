@@ -2191,10 +2191,9 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
 
 À connaître avant d'affirmer qu'un changement est validé :
 
-1. **Aucun test de bout en bout en navigateur.** Pas de Playwright/Cypress : le
-   frontend est couvert par Vitest, le build et les gardes d'artefacts. Les
-   parcours réels (connexion, profil, création de mission) sont vérifiés
-   **manuellement**, avec les comptes de test du README.
+1. **Tests de bout en bout en navigateur.** Suite Playwright locale (`frontend/e2e/user-flows.spec.js`)
+   exécutable via `npm run test:e2e` contre la fixture API (`playtest-api-server.mjs`) et le serveur de prévisualisation,
+   couvrant la détection de position, l'assistance support et le parcours travailleur/candidature.
 2. **Aucun seuil de couverture.** `vitest run` et `pytest` sans `--cov` : une
    suite amputée reste verte.
 3. **CLOS (20/09/2026) — le résultat du déploiement est vérifié** : le service
