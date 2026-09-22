@@ -2,7 +2,7 @@
 // traducteur scopé. Les dictionnaires par page vivent dans <scope>.js et
 // sont importés UNIQUEMENT par leur page lazy (plus de chunk partagé de
 // ~60 kB chargé par toutes les pages secondaires).
-import { normalizeCountryCode as normalizeCountryAlias } from '../countryAliases';
+import { normalizeCountryCode as normalizeCountryAlias } from '../countryAliases.js';
 
 export const getLocaleForLanguage = (language) => {
   switch (language) {

@@ -18,6 +18,11 @@ import { PAGE_SECTIONS } from '../config/page-sections';
  * son sujet, WhatsApp, fiche Google) viennent de src/config/contact.js, la source
  * unique du N.A.P. — le site ne peut donc publier ni deux adresses, ni deux liens
  * différents selon le canal qui les rend.
+ *
+ * Les libellés, eux, sont des clés i18n que cette page résout (`t(labelKey)`)
+ * comme les quatre autres pages : les quatre moyens de contact portent les mêmes
+ * clés que les lignes équivalentes de /support. Écrits en français ici, ils
+ * restaient français dans les cinq langues du site.
  */
 export default function Contact() {
   const { t } = useLanguage();
@@ -35,7 +40,7 @@ export default function Contact() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {actions.map((action) => (
             <a
-              key={action.label}
+              key={action.labelKey}
               href={action.href}
               {...(action.external ? { target: '_blank', rel: 'noreferrer' } : {})}
               className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -46,7 +51,7 @@ export default function Contact() {
                 {action.icon}
               </span>
               <div>
-                <div className="text-sm font-semibold text-gray-900">{action.label}</div>
+                <div className="text-sm font-semibold text-gray-900">{t(action.labelKey)}</div>
                 <div className={`text-xs text-gray-500${action.breakAll ? ' break-all' : ''}`}>
                   {action.value}
                 </div>

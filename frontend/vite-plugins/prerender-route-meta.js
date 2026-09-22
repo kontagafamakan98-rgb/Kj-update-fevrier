@@ -7,6 +7,14 @@ import path from 'node:path'
 // en dérive sa carte, src/pages/Home.js ses cartes) — ce module-là n'importe pas
 // React, il est donc chargeable par Node.
 import { COUNTRIES } from '../src/config/countries.js'
+// Les dictionnaires de PAGE (scopes pack2) : ce sont EUX que lisent
+// src/pages/Register.js et src/pages/Jobs.js (pageT), pas le dictionnaire
+// global. Les coquilles pré-rendues publiaient les mêmes mots en littéral,
+// donc corriger une traduction laissait l'autre canal derrière. Le même
+// module est lu par le build et par scripts/check-prerender-shells.js,
+// d'où les extensions explicites dans src/utils/pack2PageI18n/*.js.
+import { makeScopedTranslator as makeRegisterTranslator } from '../src/utils/pack2PageI18n/register.js'
+import { makeScopedTranslator as makeJobsTranslator } from '../src/utils/pack2PageI18n/jobs.js'
 
 // NOTE : le pré-rendu des fiches /jobs/:id (og:image + titre réels de la
 // mission, 404 noindex) est servi par le BACKEND
@@ -87,6 +95,10 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
+      // Le français des dictionnaires de page : même résolution que pageT()
+      // au runtime (la langue du build est le français), même repli global.
+      const registerT = makeRegisterTranslator('fr', T)
+      const jobsT = makeJobsTranslator('fr', T)
 
       const socialLinks = socialNetworks
         .map(({ label, env: envName }) => ({ label, url: String(env[envName] || '').trim() }))
@@ -282,25 +294,25 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         `<section class="py-12 md:py-16 bg-white">`,
         `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
         `<div class="text-center mb-12">`,
-        `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">Nous contacter</h2>`,
-        `<p class="text-gray-600 max-w-2xl mx-auto">L'équipe Kojo vous répond par téléphone, par e-mail ou sur WhatsApp, du lundi au samedi, pour toute question sur une mission, un paiement ou votre compte.</p>`,
+        `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('contactTitle'))}</h2>`,
+        `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeContactText'))}</p>`,
         `</div>`,
         `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">`,
         `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
         `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`,
-        `<div><div class="text-sm font-semibold text-gray-900">Appeler le support</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+        `<div><div class="text-sm font-semibold text-gray-900">${esc(T('homeContactCall'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
         `</a>`,
         `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
         `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`,
-        `<div><div class="text-sm font-semibold text-gray-900">WhatsApp</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+        `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactWhatsapp'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
         `</a>`,
         `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
         `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`,
-        `<div><div class="text-sm font-semibold text-gray-900">Envoyer un e-mail</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
+        `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
         `</a>`,
         `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
         `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`,
-        `<div><div class="text-sm font-semibold text-gray-900">Adresse</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
+        `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactAddress'))}</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
         `</a>`,
         `</div>`,
         // Bloc social : les MÊMES profils que le footer React et que le
@@ -313,7 +325,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         ...(socialLinks.length
           ? [
               `<div class="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">`,
-              `<h3 class="text-lg font-semibold text-gray-900 mb-3">Suivez-nous</h3>`,
+              `<h3 class="text-lg font-semibold text-gray-900 mb-3">${esc(T('homeContactFollow'))}</h3>`,
               `<div class="flex flex-wrap items-center justify-center gap-4 text-sm text-orange-700">`,
               ...socialLinks.map(
                 (social) =>
@@ -339,8 +351,8 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         `<span>${esc(contact.address)}</span>`,
         `<a href="tel:${esc(contact.phone)}" class="hover:text-orange-700 underline underline-offset-2">${esc(contact.phoneDisplay)}</a>`,
         `<a href="mailto:${esc(contact.email)}" class="hover:text-orange-700 underline underline-offset-2 break-all">${esc(contact.email)}</a>`,
-        `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">WhatsApp</a>`,
-        `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">Itinéraire</a>`,
+        `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">${esc(T('contactWhatsapp'))}</a>`,
+        `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">${esc(T('footerItinerary'))}</a>`,
         `</address>`,
         `<div class="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">`,
         // Les trois pages de confiance, liées depuis le corps de page :
@@ -348,7 +360,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         `<a href="/about" class="hover:text-orange-800 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`,
         `<a href="/contact" class="hover:text-orange-800 underline underline-offset-2">${esc(T('contactTitle'))}</a>`,
         `<a href="/privacy" class="hover:text-orange-800 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`,
-        `<a href="/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx" target="_blank" rel="noreferrer" class="hover:text-orange-800 underline underline-offset-2">Conditions d'utilisation</a>`,
+        `<a href="/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx" target="_blank" rel="noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerTerms'))}</a>`,
         ...socialLinks.map(
           (social) =>
             `<a href="${esc(social.url)}" target="_blank" rel="me noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(social.label)}</a>`
@@ -417,7 +429,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">`
           + `<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">`
           + `<div>`
-          + `<h1 class="text-3xl font-bold text-gray-900">Emplois disponibles</h1>`
+          + `<h1 class="text-3xl font-bold text-gray-900">${esc(jobsT('availableJobs'))}</h1>`
           + `<p class="mt-2 text-gray-600">${frDate}</p>`
           + `</div></div></div>`,
         // Login : réplique la PAGE COMPLÈTE (h2 + formulaire : email,
@@ -434,35 +446,35 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">`
           + `<span class="text-white text-xl font-bold">K</span>`
           + `</div>`
-          + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h1>`
+          + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">${esc(T('login'))}</h1>`
           + `</div>`
           + `<form class="mt-8 space-y-6">`
           + `<div class="space-y-4">`
           + `<div>`
-          + `<label for="email" class="block text-sm font-medium text-gray-700">E-mail</label>`
-          + `<input id="email" name="email" type="email" autocomplete="email" readonly placeholder="E-mail" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
+          + `<label for="email" class="block text-sm font-medium text-gray-700">${esc(T('email'))}</label>`
+          + `<input id="email" name="email" type="email" autocomplete="email" readonly placeholder="${esc(T('email'))}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
           + `</div>`
           + `<div>`
           + `<div class="flex items-center justify-between">`
-          + `<label for="password" class="block text-sm font-medium text-gray-700">Mot de passe</label>`
-          + `<span class="text-sm font-medium text-orange-600">Mot de passe oublié ?</span>`
+          + `<label for="password" class="block text-sm font-medium text-gray-700">${esc(T('password'))}</label>`
+          + `<span class="text-sm font-medium text-orange-600">${esc(T('forgotPasswordLink'))}</span>`
           + `</div>`
           + `<div class="relative mt-1">`
-          + `<input id="password" name="password" type="password" autocomplete="current-password" readonly placeholder="Mot de passe" class="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
+          + `<input id="password" name="password" type="password" autocomplete="current-password" readonly placeholder="${esc(T('password'))}" class="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
           + `</div>`
           + `</div>`
           + `</div>`
           + `<div>`
-          + `<div class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">Connexion</div>`
+          + `<div class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">${esc(T('login'))}</div>`
           + `</div>`
-          + `<div class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium">Continuer avec Google</div>`
+          + `<div class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium">${esc(registerT('googleLogin'))}</div>`
           + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">`
-          + `<p class="text-sm font-semibold text-orange-900">📜 Informations légales</p>`
-          + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">Lire la politique de confidentialité</span>`
-          + `<p class="text-xs text-gray-600">Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali</p>`
+          + `<p class="text-sm font-semibold text-orange-900">📜 ${esc(registerT('legalNoticeTitle'))}</p>`
+          + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
+          + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
           + `</div>`
           + `<div class="text-center">`
-          + `<span class="text-sm text-gray-600">Pas de compte ? <span class="font-medium text-orange-600">Inscription</span></span>`
+          + `<span class="text-sm text-gray-600">${esc(T('noAccount'))} <span class="font-medium text-orange-600">${esc(T('register'))}</span></span>`
           + `</div>`
           + `</form>`
           + `</div></div>`,
@@ -482,89 +494,89 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">`
           + `<span class="text-white text-2xl font-bold">K</span>`
           + `</div>`
-          + `<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>`
-          + `<p class="mt-2 text-sm text-gray-600">Rejoignez la communauté Kojo</p>`
+          + `<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">${esc(registerT('title'))}</h1>`
+          + `<p class="mt-2 text-sm text-gray-600">${esc(registerT('subtitle'))}</p>`
           + `<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">`
           + `<div class="flex items-center justify-center py-2">`
           + `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>`
-          + `<span class="text-xs text-blue-700">Détection de votre position...</span>`
+          + `<span class="text-xs text-blue-700">${esc(T('detectingLocation'))}</span>`
           + `</div>`
           + `<div class="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">`
           + `<div class="flex items-center">`
           + `<div class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">1</div>`
-          + `<span class="ml-2 text-orange-600 font-medium whitespace-nowrap">Informations personnelles</span>`
+          + `<span class="ml-2 text-orange-600 font-medium whitespace-nowrap">${esc(T('personalInformation'))}</span>`
           + `</div>`
           + `<div class="w-12 h-1 bg-gray-200"></div>`
           + `<div class="flex items-center">`
           + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">2</div>`
-          + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">Vérification email</span>`
+          + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepEmail'))}</span>`
           + `</div>`
           + `<div class="w-12 h-1 bg-gray-200"></div>`
           + `<div class="flex items-center">`
           + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">3</div>`
-          + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">Paiement</span>`
+          + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepPayments'))}</span>`
           + `</div>`
           + `</div>`
-          + `<p class="text-xs text-blue-700 mt-3">⚠️ Étape suivante : vérifie d'abord ton email, puis tu ajouteras ton moyen de paiement pour régler tes jobs.</p>`
+          + `<p class="text-xs text-blue-700 mt-3">⚠️ ${esc(registerT('clientStepNotice'))}</p>`
           + `</div>`
           + `</div>`
           + `<form class="mt-8 space-y-6 bg-white p-4 sm:p-8 rounded-xl shadow-md">`
-          + `<div class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-700 text-sm font-medium">S'inscrire avec Google</div>`
+          + `<div class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-700 text-sm font-medium">${esc(registerT('googleSignup'))}</div>`
           + `<div class="relative">`
           + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
-          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-gray-400">ou</span></div>`
+          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-gray-400">${esc(registerT('orSeparator'))}</span></div>`
           + `</div>`
           + `<fieldset>`
-          + `<legend class="block text-sm font-medium text-gray-700 mb-3">Type d'utilisateur</legend>`
+          + `<legend class="block text-sm font-medium text-gray-700 mb-3">${esc(T('userType'))}</legend>`
           + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
           + `<div class="relative flex items-center justify-center p-4 border-2 border-orange-500 bg-orange-50 rounded-lg">`
-          + `<div class="text-center"><div class="text-2xl mb-2">👤</div><span class="text-sm font-medium text-gray-700">Client</span><p class="text-xs text-gray-500 mt-1">Je cherche des services</p></div>`
+          + `<div class="text-center"><div class="text-2xl mb-2">👤</div><span class="text-sm font-medium text-gray-700">${esc(T('client'))}</span><p class="text-xs text-gray-500 mt-1">${esc(T('iAmClient'))}</p></div>`
           + `</div>`
           + `<div class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg">`
-          + `<div class="text-center"><div class="text-2xl mb-2">🔧</div><span class="text-sm font-medium text-gray-700">Travailleur</span><p class="text-xs text-gray-500 mt-1">Je propose mes services</p></div>`
+          + `<div class="text-center"><div class="text-2xl mb-2">🔧</div><span class="text-sm font-medium text-gray-700">${esc(T('worker'))}</span><p class="text-xs text-gray-500 mt-1">${esc(T('iAmWorker'))}</p></div>`
           + `</div>`
           + `</div>`
           + `</fieldset>`
           + `<div>`
-          + `<label class="block text-sm font-medium text-gray-700 mb-2">Pays</label>`
-          + `<select readonly class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-gray-50 text-gray-400">Détection...</select>`
+          + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('country'))}</label>`
+          + `<select readonly class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-gray-50 text-gray-400">${esc(`-- ${T('country')} --`)}</select>`
           + `</div>`
           + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">Prénom</label><input readonly placeholder="Prénom..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">Nom</label><input readonly placeholder="Nom..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('firstName'))}</label><input readonly placeholder="${esc(T('firstName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('lastName'))}</label><input readonly placeholder="${esc(T('lastName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
           + `</div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">E-mail</label><input readonly type="email" placeholder="exemple@email.com" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
           + `<div>`
-          + `<label class="block text-sm font-medium text-gray-700 mb-2">Téléphone</label>`
+          + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('phone'))}</label>`
           + `<div class="flex rounded-lg shadow-sm">`
           + `<span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">---</span>`
           + `<input readonly placeholder="--- XX XXX XX XX" class="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg" />`
           + `</div>`
-          + `<p class="mt-1 text-sm text-gray-500">Format téléphone: --- XX XXX XX XX</p>`
+          + `<p class="mt-1 text-sm text-gray-500">${esc(registerT('phoneFormatHint'))}: --- XX XXX XX XX</p>`
           + `</div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">Le mot de passe doit contenir au moins 8 caractères</p></div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">${esc(T('passwordTooShort'))}</p></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
           + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">`
-          + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">📸</span><h3 class="text-lg font-semibold text-gray-900">Photo de Profil (Optionnel)</h3></div>`
-          + `<p class="text-sm text-gray-600 mb-4">Une photo de profil aide à personnaliser votre expérience sur Kojo</p>`
+          + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">📸</span><h3 class="text-lg font-semibold text-gray-900">${esc(T('profilePhotoOptional'))}</h3></div>`
+          + `<p class="text-sm text-gray-600 mb-4">${esc(T('profilePhotoHelps'))}</p>`
           + `<div class="relative border-2 border-dashed rounded-lg p-6 border-gray-300">`
-          + `<div class="text-center"><div class="text-4xl mb-3">📸</div><div class="text-sm text-gray-600"><p class="font-medium">Ajouter une photo de profil</p><p>Cliquez pour choisir une option</p></div><div class="text-xs text-gray-500 mt-2">JPG, PNG jusqu'à 5MB</div></div>`
+          + `<div class="text-center"><div class="text-4xl mb-3">📸</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(T('addProfilePhoto'))}</p><p>${esc(T('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">JPG, PNG ${esc(T('upTo'))} 5MB</div></div>`
           + `</div>`
           + `</div>`
           + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6">`
           + `<div class="flex items-center justify-center">`
           + `<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500 mr-3"></div>`
-          + `<span class="text-gray-600">Détection de votre langue préférée...</span>`
+          + `<span class="text-gray-600">${esc(T('detectingLanguage'))}</span>`
           + `</div>`
           + `</div>`
           + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`
-          + `<div><h3 class="text-sm font-semibold text-orange-900">📜 Informations légales</h3><p class="text-xs text-orange-800 mt-1">Pour créer un compte, vous devez accepter la Politique de confidentialité et les conditions d'utilisation.</p></div>`
-          + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">Lire la politique de confidentialité</span>`
-          + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">J'ai lu et j'accepte la Politique de confidentialité et les conditions d'utilisation de KOJO avant de créer mon compte.</span></label>`
-          + `<p class="text-xs text-gray-600">Contact KOJO : +18193003507 · Email : Kojoapp98@gmail.com · Adresse : Hamdallaye Aci 2000 Bamako Mali</p>`
+          + `<div><h3 class="text-sm font-semibold text-orange-900">📜 ${esc(registerT('legalNoticeTitle'))}</h3><p class="text-xs text-orange-800 mt-1">${esc(registerT('legalConsentHelp'))}</p></div>`
+          + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
+          + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
+          + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
           + `</div>`
-          + `<div><div class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600">Continuer vers la vérification email</div></div>`
-          + `<div class="text-center"><span class="text-sm text-gray-600">Vous avez déjà un compte ? <span class="font-medium text-orange-600">Se connecter</span></span></div>`
+          + `<div><div class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600">${esc(registerT('continueButton'))}</div></div>`
+          + `<div class="text-center"><span class="text-sm text-gray-600">${esc(registerT('signInPrompt'))} <span class="font-medium text-orange-600">${esc(T('signIn'))}</span></span></div>`
           + `</form>`
           + `</div></div>`,
         // ForgotPassword : réplique l'ÉTAPE EMAIL (par défaut) — la page
@@ -579,25 +591,25 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">`
           + `<span class="text-white text-2xl font-bold">✉️</span>`
           + `</div>`
-          + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>`
-          + `<p class="mt-3 text-sm text-gray-600">Recevez un code par email pour sécuriser votre compte et définir un nouveau mot de passe.</p>`
+          + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">${esc(T('forgotPasswordPageTitle'))}</h1>`
+          + `<p class="mt-3 text-sm text-gray-600">${esc(T('forgotPasswordSubtitle'))}</p>`
           + `</div>`
           + `<div class="bg-white rounded-2xl shadow-md p-6 space-y-6">`
           + `<div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">`
-          + `<span class="text-blue-600">1. Email</span>`
-          + `<span class="text-gray-500">2. Code</span>`
-          + `<span class="text-gray-500">3. Nouveau mot de passe</span>`
+          + `<span class="text-blue-600">1. ${esc(T('forgotPasswordStepEmail'))}</span>`
+          + `<span class="text-gray-500">2. ${esc(T('forgotPasswordStepCode'))}</span>`
+          + `<span class="text-gray-500">3. ${esc(T('forgotPasswordStepPassword'))}</span>`
           + `</div>`
           + `<form class="space-y-5">`
           + `<div>`
-          + `<label for="reset-email" class="block text-sm font-medium text-gray-700">Adresse email</label>`
-          + `<input id="reset-email" type="email" autocomplete="email" readonly class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500" placeholder="E-mail" />`
+          + `<label for="reset-email" class="block text-sm font-medium text-gray-700">${esc(T('forgotPasswordEmailLabel'))}</label>`
+          + `<input id="reset-email" type="email" autocomplete="email" readonly class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500" placeholder="${esc(T('email'))}" />`
           + `</div>`
-          + `<p class="text-xs text-gray-500">Si cette adresse email existe, un code de réinitialisation a été envoyé.</p>`
-          + `<div class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Envoyer le code</div>`
+          + `<p class="text-xs text-gray-500">${esc(T('forgotPasswordRequestMessage'))}</p>`
+          + `<div class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">${esc(T('forgotPasswordSendCode'))}</div>`
           + `</form>`
           + `<div class="text-center">`
-          + `<span class="text-sm font-medium text-orange-600 hover:text-orange-500">Retour à la connexion</span>`
+          + `<span class="text-sm font-medium text-orange-600 hover:text-orange-500">${esc(T('forgotPasswordBackToLogin'))}</span>`
           + `</div>`
           + `</div>`
           + `</div></div>`,
@@ -612,14 +624,14 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="min-h-screen bg-gray-50 py-8">`
           + `<div class="max-w-6xl mx-auto px-4 space-y-6">`
           + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">`
-          + `<h1 class="text-3xl font-bold text-gray-900 mb-2">KOJO Paiements réels</h1>`
-          + `<p class="text-gray-600">Payez en toute sécurité par Orange Money, Wave ou carte bancaire.</p>`
+          + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T('paymentPageTitle'))}</h1>`
+          + `<p class="text-gray-600">${esc(T('paymentPageSubtitle'))}</p>`
           + `</div>`
           + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">`
           + `<div class="text-4xl mb-3">💼</div>`
-          + `<h2 class="text-xl font-semibold text-gray-900 mb-2">Un paiement doit être rattaché à une mission</h2>`
-          + `<p class="text-gray-600 max-w-lg mx-auto mb-5">Les paiements libres ne sont plus possibles : ouvrez une mission depuis la liste des emplois pour la payer en toute sécurité (fonds bloqués jusqu'à la livraison).</p>`
-          + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">Voir les missions disponibles</div>`
+          + `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T('paymentPageNoJobTitle'))}</h2>`
+          + `<p class="text-gray-600 max-w-lg mx-auto mb-5">${esc(T('paymentPageNoJobText'))}</p>`
+          + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">${esc(T('paymentPageNoJobCta'))}</div>`
           + `</div>`
           + `</div></div>`,
         // HowItWorks : page PUBLIQUE de contenu, servie jusqu'ici par
@@ -713,42 +725,51 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         // INITIAL de src/pages/Support.js (titre, carte de suivi vide,
         // choix du canal, carte de contact) : même ordre, mêmes classes,
         // mêmes hauteurs — le montage React ne décale rien.
+        //
+        // AUCUN texte en dur : les douze libellés venaient du plan, mais les
+        // cinq de la carte de suivi étaient écrits ici, en français, en double
+        // du dictionnaire de la page (titre, sous-titre, deux placeholders,
+        // bouton) — corriger l'un laissait l'autre derrière. Ils sont
+        // désormais déclarés par le plan et résolus par T(), comme les autres.
+        // Les `aria-label` portent LES MÊMES clés que les placeholders : c'est
+        // ce que fait src/components/TicketTracker.js, donc la coquille et le
+        // runtime ne peuvent plus annoncer deux libellés différents.
         support: `<div class="h-16 bg-white border-b border-gray-200"></div>`
           + `<div class="max-w-2xl mx-auto px-4 py-8">`
           + `<div class="mb-6 text-center">`
-          + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(supportPlan.texts.title)}</h1>`
-          + `<p class="text-gray-600">${esc(supportPlan.texts.subtitle)}</p>`
+          + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T(supportPlan.titleKey))}</h1>`
+          + `<p class="text-gray-600">${esc(T(supportPlan.subtitleKey))}</p>`
           + `</div>`
           + `<div class="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">`
-          + `<h2 class="text-lg font-semibold text-gray-900 mb-1">Suivre une demande existante</h2>`
-          + `<p class="text-sm text-gray-500 mb-4">Entrez votre n° de ticket et l'e-mail utilisé pour voir où en est votre demande.</p>`
+          + `<h2 class="text-lg font-semibold text-gray-900 mb-1">${esc(T(supportPlan.tracker.titleKey))}</h2>`
+          + `<p class="text-sm text-gray-500 mb-4">${esc(T(supportPlan.tracker.subtitleKey))}</p>`
           + `<div class="flex flex-col sm:flex-row gap-2">`
-          + `<input type="text" readonly placeholder="N° de ticket (ex : 3fa85f64…)" aria-label="N° de ticket" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
-          + `<input type="email" readonly placeholder="Votre e-mail" aria-label="Votre e-mail" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
-          + `<div class="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white opacity-50">Vérifier le statut</div>`
+          + `<input type="text" readonly placeholder="${esc(T(supportPlan.tracker.idPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.idPlaceholderKey))}" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
+          + `<input type="email" readonly placeholder="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
+          + `<div class="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white opacity-50">${esc(T(supportPlan.tracker.ctaKey))}</div>`
           + `</div>`
           + `</div>`
           + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`
           + supportPlan.modes
               .map(
-                ({ shellIcon, badgeClass, title, subtitle }) =>
+                ({ shellIcon, badgeClass, titleKey, subtitleKey }) =>
                   `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">` +
                   `<span class="flex h-12 w-12 items-center justify-center rounded-full ${badgeClass}">${shellIcon}</span>` +
-                  `<span class="font-semibold text-gray-900">${esc(title)}</span>` +
-                  `<span class="text-xs text-gray-500">${esc(subtitle)}</span>` +
+                  `<span class="font-semibold text-gray-900">${esc(T(titleKey))}</span>` +
+                  `<span class="text-xs text-gray-500">${esc(T(subtitleKey))}</span>` +
                   `</div>`
               )
               .join('') +
           `</div>`
           + `<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">`
-          + `<h2 class="text-xl font-semibold text-gray-900 mb-1">${esc(supportPlan.texts.directCardTitle)}</h2>`
-          + `<p class="text-sm text-gray-500 mb-5">${esc(supportPlan.texts.directCardSubtitle)}</p>`
+          + `<h2 class="text-xl font-semibold text-gray-900 mb-1">${esc(T(supportPlan.directCard.titleKey))}</h2>`
+          + `<p class="text-sm text-gray-500 mb-5">${esc(T(supportPlan.directCard.subtitleKey))}</p>`
           + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
           + supportPlan.rows
               .map((row) => {
                 const interieur =
                   `<span class="flex h-10 w-10 items-center justify-center rounded-full ${row.badgeClass}">${row.shellIcon}</span>` +
-                  `<div><div class="text-sm font-semibold text-gray-900">${esc(row.label)}</div>` +
+                  `<div><div class="text-sm font-semibold text-gray-900">${esc(T(row.labelKey))}</div>` +
                   `<div class="text-xs text-gray-500${row.breakAll ? ' break-all' : ''}">${esc(row.value)}</div></div>`
                 return row.href
                   ? `<a href="${esc(row.href)}"${row.external ? ' target="_blank" rel="noreferrer"' : ''} class="${row.rowClass}">${interieur}</a>`
@@ -804,12 +825,12 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
           + contactPlan.actions
               .map(
-                ({ icon, label, badgeClass, href, value, external, breakAll }) =>
+                ({ icon, labelKey, badgeClass, href, value, external, breakAll }) =>
                   `<a href="${esc(href)}"` +
                   (external ? ` target="_blank" rel="noreferrer"` : '') +
                   ` class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">` +
                   `<span class="flex h-10 w-10 items-center justify-center rounded-full ${badgeClass}">${icon}</span>` +
-                  `<div><div class="text-sm font-semibold text-gray-900">${esc(label)}</div>` +
+                  `<div><div class="text-sm font-semibold text-gray-900">${esc(T(labelKey))}</div>` +
                   `<div class="text-xs text-gray-500${breakAll ? ' break-all' : ''}">${esc(value)}</div></div>` +
                   `</a>`
               )
@@ -1067,7 +1088,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         '<meta charset="utf-8" />',
         '<meta name="viewport" content="width=device-width, initial-scale=1" />',
         '<meta name="robots" content="noindex, follow" />',
-        '<title>Page introuvable — Kojo</title>',
+        `<title>${T('notFoundMetaTitle')}</title>`,
         '<style>',
         'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#f9fafb;color:#111827}',
         'main{max-width:640px;margin:0 auto;padding:4rem 1.5rem;text-align:center}',
@@ -1079,13 +1100,13 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         '</head>',
         '<body>',
         '<main>',
-        '<h1>Page introuvable</h1>',
-        '<p>Cette adresse n\'existe pas (ou plus) sur Kojo. La mission a peut-être été clôturée, ou le lien est incomplet.</p>',
+        `<h1>${T('notFoundTitle')}</h1>`,
+        `<p>${T('notFoundText')}</p>`,
         '<nav>',
-        '<a href="/">Accueil</a>',
-        '<a href="/jobs">Voir les emplois disponibles</a>',
-        '<a href="/how-it-works">Comment ça marche ?</a>',
-        `<a href="mailto:${contact.email}">Nous contacter</a>`,
+        `<a href="/">${T('home')}</a>`,
+        `<a href="/jobs">${T('notFoundJobsLink')}</a>`,
+        `<a href="/how-it-works">${T('howItWorksTitle')}</a>`,
+        `<a href="mailto:${contact.email}">${T('contactTitle')}</a>`,
         '</nav>',
         `</main></body></html>`,
       ].join('')

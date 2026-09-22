@@ -1,5 +1,5 @@
 // Auto-généré depuis pack2PageI18n.js — dictionnaire du scope 'paymentVerification'.
-import { createScopedTranslator } from './core';
+import { createScopedTranslator } from './core.js';
 const withBase = (base, overrides) => ({ ...base, ...overrides });
 const dict = {
 fr: {

@@ -49,6 +49,19 @@ test.describe('Parcours E2E — Support & Assistance', () => {
     }
   });
 
+  test('Les quatre lignes de contact sont rendues sur /support et sur /contact', async ({ page }) => {
+    // Les libellés viennent des quatre clés partagées (src/i18n/*.json) : les
+    // deux pages rendent la même déclaration, donc les mêmes textes.
+    const libelles = ['Appeler', 'WhatsApp', 'Envoyer un e-mail', 'Adresse'];
+
+    for (const route of ['/support', '/contact']) {
+      await page.goto(route);
+      for (const libelle of libelles) {
+        await expect(page.getByText(libelle, { exact: true }).first()).toBeVisible();
+      }
+    }
+  });
+
   test('Ouverture du dialogue avec le Robot Support', async ({ page }) => {
     await page.goto('/support');
 
