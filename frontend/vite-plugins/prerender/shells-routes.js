@@ -1,13 +1,21 @@
 // Coquilles statiques des routes pré-rendues (hors accueil) : le corps de
 // chaque page, écrit une fois pour le crawler et pour le premier paint.
 //
-import { phoneNumberExample } from '../../src/config/phone-format.js'
+import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../../src/config/phone-format.js'
 import { COUNTRY_PLACEHOLDER } from '../../src/config/country-placeholder.js'
+import { photoFormatsLine } from '../../src/config/photo-formats.js'
 
-// Le TEXTE vient du dictionnaire global (T) et des dictionnaires de page
-// (registerT/jobsT) ; la LISTE des éléments d'une page vient de sa
-// déclaration (src/config/page-sections.js) : la coquille s'en dérive, elle
-// ne peut pas la recopier (le refus est dans declared-body.js).
+// Le TEXTE vient du dictionnaire global (T), des dictionnaires de page
+// (registerT/jobsT) et des configs partagées avec les pages (préfixe et
+// masque du téléphone, placeholder pays, ligne des formats photo) ; la LISTE
+// des éléments d'une page vient de sa déclaration (src/config/page-sections.js)
+// : la coquille s'en dérive, elle ne peut pas la recopier (le refus est dans
+// declared-body.js).
+//
+// Ce qui reste littéral dans une coquille n'est PAS de la copie : le logo
+// (`K`), les numéros d'étape (1/2/3), les emojis et le `+` de la FAQ sont des
+// marqueurs décoratifs, sans équivalent i18n et sans homologue à faire
+// diverger côté page.
 
 export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pageSections }) {
   // ── Le corps des pages de confiance est DÉCLARÉ, pas recopié ────
@@ -101,8 +109,9 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // verticalement (items-center) : une hauteur statique différente
     // décalerait tout le bloc au montage React (CLS) — d'où la
     // réplique intégrale (formulaire de ~1800px). Les inputs sont
-    // readonly (inertes jusqu'au boot), libellés en français
-    // (cohérents avec t()).
+    // readonly (inertes jusqu'au boot) et TOUS les libellés sont résolus
+    // par registerT(T) : le scope de la page, donc la même source que
+    // src/pages/Register.js.
     register: `<div class="h-16 bg-white border-b border-gray-200"></div>`
       + `<div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">`
       + `<div class="max-w-md w-full space-y-8">`
@@ -165,7 +174,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div>`
       + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('phone'))}</label>`
       + `<div class="flex rounded-lg shadow-sm">`
-      + `<span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">---</span>`
+      + `<span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">${esc(PHONE_PREFIX_FALLBACK)}</span>`
       + `<input readonly placeholder="${esc(phoneNumberExample())}" class="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg" />`
       + `</div>`
       + `<p class="mt-1 text-sm text-gray-500">${esc(registerT('phoneFormatHint'))}: ${esc(phoneNumberExample())}</p>`
@@ -176,7 +185,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">📸</span><h3 class="text-lg font-semibold text-gray-900">${esc(registerT('profilePhotoOptional'))}</h3></div>`
       + `<p class="text-sm text-gray-600 mb-4">${esc(registerT('profilePhotoHelps'))}</p>`
       + `<div class="relative border-2 border-dashed rounded-lg p-6 border-gray-300">`
-      + `<div class="text-center"><div class="text-4xl mb-3">📸</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(registerT('addProfilePhoto'))}</p><p>${esc(registerT('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">JPG, PNG ${esc(registerT('upTo'))} 5MB</div></div>`
+      + `<div class="text-center"><div class="text-4xl mb-3">📸</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(registerT('addProfilePhoto'))}</p><p>${esc(registerT('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">${esc(photoFormatsLine(registerT('upTo')))}</div></div>`
       + `</div>`
       + `</div>`
       + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6">`
@@ -342,11 +351,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // choix du canal, carte de contact) : même ordre, mêmes classes,
     // mêmes hauteurs — le montage React ne décale rien.
     //
-    // AUCUN texte en dur : les douze libellés venaient du plan, mais les
-    // cinq de la carte de suivi étaient écrits ici, en français, en double
-    // du dictionnaire de la page (titre, sous-titre, deux placeholders,
-    // bouton) — corriger l'un laissait l'autre derrière. Ils sont
-    // désormais déclarés par le plan et résolus par T(), comme les autres.
+    // Aucun LIBELLÉ en dur : les douze venaient du plan, et les cinq de la
+    // carte de suivi étaient écrits ici, en français, en double du
+    // dictionnaire de la page (titre, sous-titre, deux placeholders, bouton)
+    // — corriger l'un laissait l'autre derrière. Ils sont désormais déclarés
+    // par le plan et résolus par T(), comme les autres. Ce qui reste littéral
+    // ici est décoratif (emoji de la pastille), pas de la copie.
     // Les `aria-label` portent LES MÊMES clés que les placeholders : c'est
     // ce que fait src/components/TicketTracker.js, donc la coquille et le
     // runtime ne peuvent plus annoncer deux libellés différents.

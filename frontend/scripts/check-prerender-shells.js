@@ -33,8 +33,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { SITE_ORIGIN, shellFileFor, titleOf, metaContents } from './site-meta.js';
-import { phoneNumberExample } from '../src/config/phone-format.js';
+import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../src/config/phone-format.js';
 import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
+import { photoFormatsLine } from '../src/config/photo-formats.js';
 import { CONTACT } from '../src/config/contact.js';
 // Table UNIQUE de la correspondance route → carte OG, partagée avec
 // vite.config.js qui écrit ces coquilles : la carte de chaque shell est LUE
@@ -233,9 +234,28 @@ if (register) {
   if (!register.includes(`placeholder="${phoneNumberExample()}"`)) {
     errors.push(`register.html : masque téléphone « ${phoneNumberExample()} » absent (src/config/phone-format.js)`);
   }
+  // Le préfixe affiché avant toute détection : la coquille publiait `---` (le
+  // préfixe du masque) là où la page rend un tiret cadratin, donc le premier
+  // paint contredisait l'hydratation sur le même élément.
+  if (!register.includes(`>${PHONE_PREFIX_FALLBACK}</span>`)) {
+    errors.push(
+      `register.html : préfixe téléphone « ${PHONE_PREFIX_FALLBACK} » absent (src/config/phone-format.js) — ` +
+        'la page le publie au runtime, la coquille doit publier les mêmes octets'
+    );
+  }
   const countryPlaceholder = COUNTRY_PLACEHOLDER(registerT('country'));
   if (!register.includes(`>${countryPlaceholder}</select>`)) {
     errors.push(`register.html : placeholder pays « ${countryPlaceholder} » absent du select`);
+  }
+  // La ligne des formats photo est de la COPIE, partagée avec la page
+  // (src/components/ProfilePhotoUpload.js) : elle était recopiée des deux
+  // côtés, donc un changement de limite laissait le crawler derrière.
+  const formats = photoFormatsLine(registerT('upTo'));
+  if (!register.includes(formats)) {
+    errors.push(
+      `register.html : lignes des formats photo « ${formats} » absente (src/config/photo-formats.js), ` +
+        'que publie aussi src/components/ProfilePhotoUpload.js'
+    );
   }
   // Mentions légales peintes côté HTML (bloc « Informations légales » +
   // case de consentement Politique de confidentialité) : elles font partie
