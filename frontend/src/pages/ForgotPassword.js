@@ -199,7 +199,7 @@ const ForgotPassword = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">
-            <span className="text-white text-2xl font-bold">✉️</span>
+            <span className="text-white text-2xl font-bold">{t(pagePlan.badgeIconKey)}</span>
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (forgot-password.html). Classes inchangées. */}

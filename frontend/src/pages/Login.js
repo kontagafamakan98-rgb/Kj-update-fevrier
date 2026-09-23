@@ -125,7 +125,7 @@ export default function Login() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">
-            <span className="text-white text-xl font-bold">K</span>
+            <span className="text-white text-xl font-bold">{t('brandMark')}</span>
           </div>
           {/* Titre de PAGE en h1 (et non h2) : un audit SEO exige un h1 unique
               par page, et un crawler qui exécute le JavaScript doit voir le même
@@ -209,7 +209,7 @@ export default function Login() {
           <GoogleButton onClick={handleGoogle} label={pageT(pagePlan.googleLoginKey)} />
 
           <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
-            <p className="text-sm font-semibold text-orange-900">📜 {pageT(pagePlan.legalNoticeTitleKey)}</p>
+            <p className="text-sm font-semibold text-orange-900">{t(pagePlan.legalNoticeIconKey)} {pageT(pagePlan.legalNoticeTitleKey)}</p>
             <a
               href={legalDocumentUrl}
               target="_blank"

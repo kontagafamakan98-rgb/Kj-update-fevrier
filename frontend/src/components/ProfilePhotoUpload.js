@@ -100,7 +100,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
       <div className="flex items-center mb-4">
-        <span className="text-2xl mr-3">📸</span>
+        <span className="text-2xl mr-3">{t('iconProfilePhoto')}</span>
         <h3 className="text-lg font-semibold text-gray-900">
           {t('profilePhotoOptional')}
         </h3>
@@ -128,7 +128,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
               onClick={showPhotoOptions}
             >
               <div className="text-center">
-                <div className="text-4xl mb-3">📸</div>
+                <div className="text-4xl mb-3">{t('iconProfilePhoto')}</div>
                 <div className="text-sm text-gray-600">
                   <p className="font-medium">{t('addProfilePhoto')}</p>
                   <p>{t('clickToChooseOption')}</p>

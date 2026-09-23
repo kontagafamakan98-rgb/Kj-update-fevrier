@@ -25,10 +25,19 @@
  * Vercel ne le serve jamais : la route renverrait alors index.html, sans
  * shell, et l'optimisation serait PERDUE EN SILENCE.
  *
+ * Enfin, il vérifie la PROVENANCE des glyphes publiés : aucun module de
+ * vite-plugins/prerender/ ne doit RECOPIER un glyphe du dictionnaire (📜, 🛡️,
+ * 📸…). Ces glyphes se déclarent par une clé i18n nommée par le plan de leur
+ * route (`iconLegalNotice`, `escrowIconKey`…) que la page lit par t() et la
+ * coquille par T() : un littéral dans le plugin rendrait cette déclaration
+ * décorative et laisserait les deux canaux diverger en silence. Les valeurs
+ * interdites sont LUES dans le dictionnaire, jamais listées ici.
+ *
  * Échoue (exit 1) en cas de régression silencieuse : plugin
  * prerender-route-meta désactivé/supprimé, shell perdu, contenu statique
- * ajouté à l'index, ou route pré-rendue non routée par Vercel. Exécuté dans
- * le job CI frontend-build après le build.
+ * ajouté à l'index, route pré-rendue non routée par Vercel, ou glyphe publié
+ * recopié au lieu d'être lu depuis sa clé. Exécuté dans le job CI
+ * frontend-build après le build.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -465,6 +474,56 @@ if (vercelRewrites) {
         'pré-rendues ET ferait répondre 200 aux URL inconnues (soft 404)'
     );
   }
+}
+
+// 7. Les GLYPHES publiés par les coquilles ont UN propriétaire, et ce n'est pas
+// le plugin : le plan de la route dit QUELLE clé (`escrowIconKey`,
+// `step1NumberKey`, `legalNoticeIconKey`…), le dictionnaire global dit la valeur
+// (`icon*`, `brandMark`, `faqMarker`), la page l'affiche par t() et la coquille
+// par T(). Un module qui RECOPIE le glyphe rend cette déclaration décorative :
+// changer la clé laisserait la coquille derrière, en silence — le défaut que ce
+// découpage vient de supprimer. Les valeurs interdites sont LUES dans le
+// dictionnaire, jamais listées ici.
+const GLYPHES_INTERDITS = [...new Set(Object.keys(fr).filter((cle) => cle.startsWith('icon')).map((cle) => fr[cle]))].filter(
+  (valeur) => typeof valeur === 'string' && /[^\x20-\x7E]/.test(valeur)
+);
+const MODULES_PRE_RENDU = [
+  'prerender-route-meta.js',
+  'prerender/app-template.js',
+  'prerender/declared-body.js',
+  'prerender/not-found.js',
+  'prerender/route-meta.js',
+  'prerender/shells-home.js',
+  'prerender/shells-routes.js',
+];
+// Un COMMENTAIRE ne publie rien (le plugin en porte, avec des accents et des
+// emojis d'avertissement) : une ligne dont le premier caractère non blanc ouvre
+// un commentaire est ignorée. Les modules sont lus dans le dépôt courant, comme
+// `build/` et `vercel.json` — le test du garde les fournit en fixture et peut
+// donc y réintroduire un glyphe pour exiger le refus nommé.
+for (const rel of MODULES_PRE_RENDU) {
+  let source;
+  try {
+    source = readFileSync(path.join(process.cwd(), 'vite-plugins', rel), 'utf8');
+  } catch {
+    errors.push(
+      `vite-plugins/${rel} introuvable — le module qui publie une coquille a disparu ` +
+        '(renommé ?) : ce garde ne peut plus vérifier qu\'aucun glyphe n\'y est recopié'
+    );
+    continue;
+  }
+  source.split('\n').forEach((ligne, index) => {
+    const debut = ligne.trim();
+    if (debut.startsWith('//') || debut.startsWith('*') || debut.startsWith('/*')) return;
+    for (const glyphe of GLYPHES_INTERDITS) {
+      if (!ligne.includes(glyphe)) continue;
+      errors.push(
+        `vite-plugins/${rel}:${index + 1} publie « ${glyphe} » en littéral — un glyphe de ` +
+          'coquille se déclare par sa clé i18n (le plan la nomme, la page et la coquille ' +
+          'la lisent), jamais en dur dans le plugin'
+      );
+    }
+  });
 }
 
 if (errors.length) {

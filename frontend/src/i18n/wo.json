@@ -840,5 +840,18 @@
   "notFoundText": "Cette adresse n'existe pas (ou plus) sur Kojo. La mission a peut-être été clôturée, ou le lien est incomplet.",
   "notFoundJobsLink": "Voir les emplois disponibles",
   "neutralTitle": "Kojo",
-  "neutralDescription": "Kojo met en relation clients et travailleurs qualifiés en Afrique de l'Ouest : plomberie, électricité, mécanique, construction, informatique et plus."
+  "neutralDescription": "Kojo met en relation clients et travailleurs qualifiés en Afrique de l'Ouest : plomberie, électricité, mécanique, construction, informatique et plus.",
+  "brandMark": "K",
+  "stepNumber1": "1",
+  "stepNumber2": "2",
+  "stepNumber3": "3",
+  "iconClient": "👤",
+  "iconWorker": "🔧",
+  "iconProfilePhoto": "📸",
+  "iconLegalNotice": "📜",
+  "iconPasswordReset": "✉️",
+  "iconStepNotice": "⚠️",
+  "iconEscrow": "🛡️",
+  "iconPaymentEmpty": "💼",
+  "faqMarker": "+"
 }

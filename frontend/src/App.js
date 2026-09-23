@@ -118,11 +118,12 @@ function OwnerOnlyRoute({ children }) {
 
 // Mobile-optimized loading component
 function MobileLoader() {
+  const { t } = useLanguage();
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-orange-600 to-orange-700">
       <div className="text-center">
         <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <span className="text-3xl font-bold text-orange-600">K</span>
+          <span className="text-3xl font-bold text-orange-600">{t('brandMark')}</span>
         </div>
         <div className="text-white text-2xl font-bold mb-2">Kojo</div>
         <div className="text-orange-200 text-sm mb-6">Afrique de l'Ouest</div>

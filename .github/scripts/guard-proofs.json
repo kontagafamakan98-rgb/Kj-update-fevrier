@@ -1636,6 +1636,26 @@
       "attend": [
         "onglet Preview sans serveur joignable"
       ]
+    },
+    {
+      "id": "prerender-shells: glyphe publie recopie en litteral",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "      if (!ligne.includes(glyphe)) continue;",
+      "remplace": "      if (true) continue;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-prerender-shells.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : glyphe publié recopié dans un module de pré-rendu"
+      ]
     }
   ]
 }
