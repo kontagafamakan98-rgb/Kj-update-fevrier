@@ -8,6 +8,7 @@ import { ListSkeleton } from '../components/SkeletonLoader';
 import { jobsAPI } from '../services/apiEndpoints';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/jobs';
+import { PAGE_SECTIONS } from '../config/page-sections';
 import { getJobUiLabel } from '../utils/jobUiLocale';
 import { safeLog } from '../utils/env';
 import { DemoJobsEmptyState, JobCard } from '../components/JobsResults';
@@ -63,6 +64,7 @@ const { kick: kickPublicJobsPrefetch, consume: consumePublicJobsPrefetch } =
 kickPublicJobsPrefetch();
 
 export default function Jobs() {
+  const pagePlan = PAGE_SECTIONS['/jobs'];
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState(() => ({
@@ -174,7 +176,7 @@ export default function Jobs() {
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {effectiveTab === JOB_TAB_MISSIONS ? (pageT('myMissions') || 'Mes missions') : (pageT('availableJobs') || 'Emplois disponibles')}
+            {effectiveTab === JOB_TAB_MISSIONS ? (pageT('myMissions') || 'Mes missions') : (pageT(pagePlan.titleKey) || 'Emplois disponibles')}
           </h1>
           <p className="mt-2 text-gray-600">{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
         </div>

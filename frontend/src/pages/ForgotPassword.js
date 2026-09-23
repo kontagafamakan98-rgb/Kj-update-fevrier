@@ -6,6 +6,7 @@ import LoadingButton from '../components/LoadingButton';
 import { authAPI, handleApiError } from '../services/api';
 import { safeLog } from '../utils/env';
 import { usePageMeta } from '../utils/seo';
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 const COPY = {
   fr: {
@@ -206,6 +207,7 @@ const ForgotPassword = () => {
   const toast = useToast();
   const navigate = useNavigate();
   const copy = COPY[currentLanguage] || COPY.fr;
+  const pagePlan = PAGE_SECTIONS['/forgot-password'];
 
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -395,15 +397,15 @@ const ForgotPassword = () => {
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (forgot-password.html). Classes inchangées. */}
-          <h1 className="mt-6 text-3xl font-extrabold text-gray-900">{copy.title}</h1>
-          <p className="mt-3 text-sm text-gray-600">{copy.subtitle}</p>
+          <h1 className="mt-6 text-3xl font-extrabold text-gray-900">{t(pagePlan.titleKey)}</h1>
+          <p className="mt-3 text-sm text-gray-600">{t(pagePlan.subtitleKey)}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-md p-6 space-y-6">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <span className={step === 'email' ? 'text-blue-600' : 'text-green-600'}>1. {copy.stepEmail}</span>
-            <span className={step === 'code' ? 'text-blue-600' : step === 'password' ? 'text-green-600' : 'text-gray-500'}>2. {copy.stepCode}</span>
-            <span className={step === 'password' ? 'text-blue-600' : 'text-gray-500'}>3. {copy.stepPassword}</span>
+            <span className={step === 'email' ? 'text-blue-600' : 'text-green-600'}>1. {t(pagePlan.stepEmailKey)}</span>
+            <span className={step === 'code' ? 'text-blue-600' : step === 'password' ? 'text-green-600' : 'text-gray-500'}>2. {t(pagePlan.stepCodeKey)}</span>
+            <span className={step === 'password' ? 'text-blue-600' : 'text-gray-500'}>3. {t(pagePlan.stepPasswordKey)}</span>
           </div>
 
           {displayedEmail && step !== 'email' && (
@@ -434,14 +436,14 @@ const ForgotPassword = () => {
                 />
               </div>
 
-              <p className="text-xs text-gray-500">{copy.genericRequestMessage}</p>
+              <p className="text-xs text-gray-500">{t(pagePlan.requestMessageKey)}</p>
 
               <LoadingButton
                 type="submit"
                 loading={loading}
                 className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                {copy.sendCode}
+                {t(pagePlan.sendCodeKey)}
               </LoadingButton>
             </form>
           )}
@@ -531,7 +533,7 @@ const ForgotPassword = () => {
 
           <div className="text-center">
             <Link to="/login" className="text-sm font-medium text-orange-600 hover:text-orange-500">
-              {copy.backToLogin}
+              {t(pagePlan.backToLoginKey)}
             </Link>
           </div>
         </div>

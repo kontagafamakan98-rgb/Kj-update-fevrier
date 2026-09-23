@@ -16,6 +16,7 @@ import { clearRegistrationFlow, saveRegistrationFlow } from '../utils/registrati
 import { devLog, safeLog } from '../utils/env';
 import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -62,6 +63,7 @@ export default function Register() {
   
   const { register, loginWithGoogle } = useAuth();
   const pageT = makeScopedTranslator(currentLanguage, t);
+  const pagePlan = PAGE_SECTIONS['/register'];
   const toast = useToast();
   const navigate = useNavigate();
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
@@ -384,10 +386,10 @@ export default function Register() {
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (register.html). Classes inchangées. */}
           <h1 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            {pageT('title')}
+            {pageT(pagePlan.titleKey)}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
-            {pageT('subtitle')}
+            {pageT(pagePlan.subtitleKey)}
           </p>
           
           {/* Information sur le processus avec géolocalisation */}
@@ -419,7 +421,7 @@ export default function Register() {
                 <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
                   1
                 </div>
-                <span className="ml-2 text-orange-600 font-medium whitespace-nowrap">{t('personalInformation')}</span>
+                <span className="ml-2 text-orange-600 font-medium whitespace-nowrap">{t(pagePlan.step1TitleKey)}</span>
               </div>
 
               <div className="w-12 h-1 bg-gray-200"></div>
@@ -428,7 +430,7 @@ export default function Register() {
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
                   2
                 </div>
-                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT('stepEmail')}</span>
+                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step2TitleKey)}</span>
               </div>
 
               <div className="w-12 h-1 bg-gray-200"></div>
@@ -437,14 +439,14 @@ export default function Register() {
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
                   3
                 </div>
-                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT('stepPayments')}</span>
+                <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step3TitleKey)}</span>
               </div>
             </div>
             
             <p className="text-xs text-blue-700 mt-3">
               {formData.user_type === 'worker' 
                 ? `⚠️ ${pageT('workerStepNotice')}`
-                : `⚠️ ${pageT('clientStepNotice')}`
+                : `⚠️ ${pageT(pagePlan.stepNoticeKey)}`
               }
             </p>
           </div>

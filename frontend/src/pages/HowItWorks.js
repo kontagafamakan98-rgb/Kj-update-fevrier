@@ -52,9 +52,9 @@ export default function HowItWorks() {
       {/* Hero */}
       <section className="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">{t('howItWorksTitle')}</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-4">{t(plan.titleKey)}</h1>
           <p className="text-lg opacity-90 max-w-2xl mx-auto">
-            {t('howItWorksHero')}
+            {t(plan.heroKey)}
           </p>
         </div>
       </section>
@@ -83,9 +83,9 @@ export default function HowItWorks() {
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div className="text-5xl">🛡️</div>
               <div>
-                <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t('escrowWhatTitle')}</h2>
+                <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t(plan.escrowTitleKey)}</h2>
                 <p className="text-emerald-800">
-                  {t('escrowWhatText')}
+                  {t(plan.escrowTextKey)}
                 </p>
                 <ul className="mt-4 space-y-2 text-emerald-800 text-sm">
                   {plan.guaranteeKeys.map((key) => (
@@ -101,7 +101,7 @@ export default function HowItWorks() {
       {/* FAQ */}
       <section className="py-12 md:py-16 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">{t('faqTitle')}</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">{t(plan.faqTitleKey)}</h2>
           <div className="space-y-4">
             {FAQ.map((item) => (
               <details key={item.q} className="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 group">
@@ -119,13 +119,13 @@ export default function HowItWorks() {
       {/* CTA */}
       <section className="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">{t('readyToStart')}</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4">{t(plan.readyTitleKey)}</h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/register?type=client" className="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transition">
-              {t('lookingForServices')}
+              {t(plan.lookingKey)}
             </Link>
             <Link to="/register?type=worker" className="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">
-              {t('offerServices')}
+              {t(plan.offerKey)}
             </Link>
           </div>
           {/* Maillage interne : depuis cette page de contenu, un crawler (et
@@ -134,11 +134,11 @@ export default function HowItWorks() {
               sinon la ligne disparaîtrait au montage React. */}
           <p className="mt-6 text-sm opacity-90">
             <Link to="/jobs" className="underline underline-offset-2">
-              {t('viewJobs')}
+              {t(plan.links[0].labelKey)}
             </Link>
             {' · '}
             <Link to="/support" className="underline underline-offset-2">
-              {t('support')}
+              {t(plan.links[1].labelKey)}
             </Link>
           </p>
         </div>

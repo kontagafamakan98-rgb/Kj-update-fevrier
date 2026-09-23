@@ -383,6 +383,10 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       const privacyPlan = pageSections['/privacy']
       const supportPlan = pageSections['/support']
       const howItWorksPlan = pageSections['/how-it-works']
+      const jobsPlan = pageSections['/jobs']
+      const loginPlan = pageSections['/login']
+      const forgotPasswordPlan = pageSections['/forgot-password']
+      const paymentPlan = pageSections['/payment']
 
       // Le paragraphe de liens internes en fin de page : même balisage pour
       // chaque coquille, seul l'habillage du paragraphe change.
@@ -412,7 +416,13 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           )
         }
         const { cles, textes } = pageSectionParts(plan)
-        const attendus = [...cles.map((key) => T(key)), ...textes]
+        const traduire = (key) => {
+          if (routePath === '/register') return registerT(key)
+          if (routePath === '/jobs') return jobsT(key)
+          if (routePath === '/login' && (/^(google|legal)/.test(key))) return registerT(key)
+          return T(key)
+        }
+        const attendus = [...cles.map(traduire), ...textes]
         const manquants = attendus.filter((texte) => !corps.includes(esc(texte)))
         if (manquants.length) {
           throw new Error(
@@ -429,7 +439,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">`
           + `<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">`
           + `<div>`
-          + `<h1 class="text-3xl font-bold text-gray-900">${esc(jobsT('availableJobs'))}</h1>`
+          + `<h1 class="text-3xl font-bold text-gray-900">${esc(jobsT(jobsPlan.titleKey))}</h1>`
           + `<p class="mt-2 text-gray-600">${frDate}</p>`
           + `</div></div></div>`,
         // Login : réplique la PAGE COMPLÈTE (h2 + formulaire : email,
@@ -446,35 +456,35 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">`
           + `<span class="text-white text-xl font-bold">K</span>`
           + `</div>`
-          + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">${esc(T('login'))}</h1>`
+          + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">${esc(T(loginPlan.titleKey))}</h1>`
           + `</div>`
           + `<form class="mt-8 space-y-6">`
           + `<div class="space-y-4">`
           + `<div>`
-          + `<label for="email" class="block text-sm font-medium text-gray-700">${esc(T('email'))}</label>`
-          + `<input id="email" name="email" type="email" autocomplete="email" readonly placeholder="${esc(T('email'))}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
+          + `<label for="email" class="block text-sm font-medium text-gray-700">${esc(T(loginPlan.emailLabelKey))}</label>`
+          + `<input id="email" name="email" type="email" autocomplete="email" readonly placeholder="${esc(T(loginPlan.emailLabelKey))}" class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
           + `</div>`
           + `<div>`
           + `<div class="flex items-center justify-between">`
-          + `<label for="password" class="block text-sm font-medium text-gray-700">${esc(T('password'))}</label>`
-          + `<span class="text-sm font-medium text-orange-600">${esc(T('forgotPasswordLink'))}</span>`
+          + `<label for="password" class="block text-sm font-medium text-gray-700">${esc(T(loginPlan.passwordLabelKey))}</label>`
+          + `<span class="text-sm font-medium text-orange-600">${esc(T(loginPlan.forgotPasswordLinkKey))}</span>`
           + `</div>`
           + `<div class="relative mt-1">`
-          + `<input id="password" name="password" type="password" autocomplete="current-password" readonly placeholder="${esc(T('password'))}" class="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
+          + `<input id="password" name="password" type="password" autocomplete="current-password" readonly placeholder="${esc(T(loginPlan.passwordLabelKey))}" class="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md sm:text-sm" />`
           + `</div>`
           + `</div>`
           + `</div>`
           + `<div>`
-          + `<div class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">${esc(T('login'))}</div>`
+          + `<div class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">${esc(T(loginPlan.titleKey))}</div>`
           + `</div>`
-          + `<div class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium">${esc(registerT('googleLogin'))}</div>`
+          + `<div class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium">${esc(registerT(loginPlan.googleLoginKey))}</div>`
           + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">`
           + `<p class="text-sm font-semibold text-orange-900">📜 ${esc(registerT('legalNoticeTitle'))}</p>`
           + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
           + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
           + `</div>`
           + `<div class="text-center">`
-          + `<span class="text-sm text-gray-600">${esc(T('noAccount'))} <span class="font-medium text-orange-600">${esc(T('register'))}</span></span>`
+          + `<span class="text-sm text-gray-600">${esc(T(loginPlan.noAccountKey))} <span class="font-medium text-orange-600">${esc(T(loginPlan.registerKey))}</span></span>`
           + `</div>`
           + `</form>`
           + `</div></div>`,
@@ -504,7 +514,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">`
           + `<div class="flex items-center">`
           + `<div class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">1</div>`
-          + `<span class="ml-2 text-orange-600 font-medium whitespace-nowrap">${esc(T('personalInformation'))}</span>`
+          + `<span class="ml-2 text-orange-600 font-medium whitespace-nowrap">${esc(registerT('personalInformation'))}</span>`
           + `</div>`
           + `<div class="w-12 h-1 bg-gray-200"></div>`
           + `<div class="flex items-center">`
@@ -527,46 +537,46 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-gray-400">${esc(registerT('orSeparator'))}</span></div>`
           + `</div>`
           + `<fieldset>`
-          + `<legend class="block text-sm font-medium text-gray-700 mb-3">${esc(T('userType'))}</legend>`
+          + `<legend class="block text-sm font-medium text-gray-700 mb-3">${esc(registerT('userType'))}</legend>`
           + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
           + `<div class="relative flex items-center justify-center p-4 border-2 border-orange-500 bg-orange-50 rounded-lg">`
-          + `<div class="text-center"><div class="text-2xl mb-2">👤</div><span class="text-sm font-medium text-gray-700">${esc(T('client'))}</span><p class="text-xs text-gray-500 mt-1">${esc(T('iAmClient'))}</p></div>`
+          + `<div class="text-center"><div class="text-2xl mb-2">👤</div><span class="text-sm font-medium text-gray-700">${esc(registerT('client'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmClient'))}</p></div>`
           + `</div>`
           + `<div class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg">`
-          + `<div class="text-center"><div class="text-2xl mb-2">🔧</div><span class="text-sm font-medium text-gray-700">${esc(T('worker'))}</span><p class="text-xs text-gray-500 mt-1">${esc(T('iAmWorker'))}</p></div>`
+          + `<div class="text-center"><div class="text-2xl mb-2">🔧</div><span class="text-sm font-medium text-gray-700">${esc(registerT('worker'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmWorker'))}</p></div>`
           + `</div>`
           + `</div>`
           + `</fieldset>`
           + `<div>`
-          + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('country'))}</label>`
-          + `<select readonly class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-gray-50 text-gray-400">${esc(`-- ${T('country')} --`)}</select>`
+          + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('country'))}</label>`
+          + `<select readonly class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm bg-gray-50 text-gray-400">${esc(`-- ${registerT('country')} --`)}</select>`
           + `</div>`
           + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('firstName'))}</label><input readonly placeholder="${esc(T('firstName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('lastName'))}</label><input readonly placeholder="${esc(T('lastName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('firstName'))}</label><input readonly placeholder="${esc(registerT('firstName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('lastName'))}</label><input readonly placeholder="${esc(registerT('lastName'))}..." class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
           + `</div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('email'))}</label><input readonly type="email" placeholder="${esc(registerT('emailPlaceholder'))}" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
           + `<div>`
-          + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('phone'))}</label>`
+          + `<label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('phone'))}</label>`
           + `<div class="flex rounded-lg shadow-sm">`
           + `<span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">---</span>`
           + `<input readonly placeholder="--- XX XXX XX XX" class="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-r-lg" />`
           + `</div>`
           + `<p class="mt-1 text-sm text-gray-500">${esc(registerT('phoneFormatHint'))}: --- XX XXX XX XX</p>`
           + `</div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">${esc(T('passwordTooShort'))}</p></div>`
-          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(T('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
+          + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
           + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">`
-          + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">📸</span><h3 class="text-lg font-semibold text-gray-900">${esc(T('profilePhotoOptional'))}</h3></div>`
-          + `<p class="text-sm text-gray-600 mb-4">${esc(T('profilePhotoHelps'))}</p>`
+          + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">📸</span><h3 class="text-lg font-semibold text-gray-900">${esc(registerT('profilePhotoOptional'))}</h3></div>`
+          + `<p class="text-sm text-gray-600 mb-4">${esc(registerT('profilePhotoHelps'))}</p>`
           + `<div class="relative border-2 border-dashed rounded-lg p-6 border-gray-300">`
-          + `<div class="text-center"><div class="text-4xl mb-3">📸</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(T('addProfilePhoto'))}</p><p>${esc(T('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">JPG, PNG ${esc(T('upTo'))} 5MB</div></div>`
+          + `<div class="text-center"><div class="text-4xl mb-3">📸</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(registerT('addProfilePhoto'))}</p><p>${esc(registerT('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">JPG, PNG ${esc(registerT('upTo'))} 5MB</div></div>`
           + `</div>`
           + `</div>`
           + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6">`
           + `<div class="flex items-center justify-center">`
           + `<div class="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500 mr-3"></div>`
-          + `<span class="text-gray-600">${esc(T('detectingLanguage'))}</span>`
+          + `<span class="text-gray-600">${esc(registerT('detectingLanguage'))}</span>`
           + `</div>`
           + `</div>`
           + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`
@@ -591,25 +601,25 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">`
           + `<span class="text-white text-2xl font-bold">✉️</span>`
           + `</div>`
-          + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">${esc(T('forgotPasswordPageTitle'))}</h1>`
-          + `<p class="mt-3 text-sm text-gray-600">${esc(T('forgotPasswordSubtitle'))}</p>`
+          + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">${esc(T(forgotPasswordPlan.titleKey))}</h1>`
+          + `<p class="mt-3 text-sm text-gray-600">${esc(T(forgotPasswordPlan.subtitleKey))}</p>`
           + `</div>`
           + `<div class="bg-white rounded-2xl shadow-md p-6 space-y-6">`
           + `<div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">`
-          + `<span class="text-blue-600">1. ${esc(T('forgotPasswordStepEmail'))}</span>`
-          + `<span class="text-gray-500">2. ${esc(T('forgotPasswordStepCode'))}</span>`
-          + `<span class="text-gray-500">3. ${esc(T('forgotPasswordStepPassword'))}</span>`
+          + `<span class="text-blue-600">1. ${esc(T(forgotPasswordPlan.stepEmailKey))}</span>`
+          + `<span class="text-gray-500">2. ${esc(T(forgotPasswordPlan.stepCodeKey))}</span>`
+          + `<span class="text-gray-500">3. ${esc(T(forgotPasswordPlan.stepPasswordKey))}</span>`
           + `</div>`
           + `<form class="space-y-5">`
           + `<div>`
-          + `<label for="reset-email" class="block text-sm font-medium text-gray-700">${esc(T('forgotPasswordEmailLabel'))}</label>`
-          + `<input id="reset-email" type="email" autocomplete="email" readonly class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500" placeholder="${esc(T('email'))}" />`
+          + `<label for="reset-email" class="block text-sm font-medium text-gray-700">${esc(T(forgotPasswordPlan.emailLabelKey))}</label>`
+          + `<input id="reset-email" type="email" autocomplete="email" readonly class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500" placeholder="${esc(T(loginPlan.emailLabelKey))}" />`
           + `</div>`
-          + `<p class="text-xs text-gray-500">${esc(T('forgotPasswordRequestMessage'))}</p>`
-          + `<div class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">${esc(T('forgotPasswordSendCode'))}</div>`
+          + `<p class="text-xs text-gray-500">${esc(T(forgotPasswordPlan.requestMessageKey))}</p>`
+          + `<div class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">${esc(T(forgotPasswordPlan.sendCodeKey))}</div>`
           + `</form>`
           + `<div class="text-center">`
-          + `<span class="text-sm font-medium text-orange-600 hover:text-orange-500">${esc(T('forgotPasswordBackToLogin'))}</span>`
+          + `<span class="text-sm font-medium text-orange-600 hover:text-orange-500">${esc(T(forgotPasswordPlan.backToLoginKey))}</span>`
           + `</div>`
           + `</div>`
           + `</div></div>`,
@@ -624,14 +634,14 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="min-h-screen bg-gray-50 py-8">`
           + `<div class="max-w-6xl mx-auto px-4 space-y-6">`
           + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">`
-          + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T('paymentPageTitle'))}</h1>`
-          + `<p class="text-gray-600">${esc(T('paymentPageSubtitle'))}</p>`
+          + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T(paymentPlan.titleKey))}</h1>`
+          + `<p class="text-gray-600">${esc(T(paymentPlan.subtitleKey))}</p>`
           + `</div>`
           + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">`
           + `<div class="text-4xl mb-3">💼</div>`
-          + `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T('paymentPageNoJobTitle'))}</h2>`
-          + `<p class="text-gray-600 max-w-lg mx-auto mb-5">${esc(T('paymentPageNoJobText'))}</p>`
-          + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">${esc(T('paymentPageNoJobCta'))}</div>`
+          + `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T(paymentPlan.noJobTitleKey))}</h2>`
+          + `<p class="text-gray-600 max-w-lg mx-auto mb-5">${esc(T(paymentPlan.noJobTextKey))}</p>`
+          + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">${esc(T(paymentPlan.noJobCtaKey))}</div>`
           + `</div>`
           + `</div></div>`,
         // HowItWorks : page PUBLIQUE de contenu, servie jusqu'ici par
@@ -646,8 +656,8 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         'how-it-works': `<div class="h-16 bg-white border-b border-gray-200"></div>`
           + `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white">`
           + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center">`
-          + `<h1 class="text-3xl md:text-4xl font-bold mb-4">${esc(T('howItWorksTitle'))}</h1>`
-          + `<p class="text-lg opacity-90 max-w-2xl mx-auto">${esc(T('howItWorksHero'))}</p>`
+          + `<h1 class="text-3xl md:text-4xl font-bold mb-4">${esc(T(howItWorksPlan.titleKey))}</h1>`
+          + `<p class="text-lg opacity-90 max-w-2xl mx-auto">${esc(T(howItWorksPlan.heroKey))}</p>`
           + `</div>`
           + `</section>`
           + `<section class="py-12 md:py-16 bg-white">`
@@ -672,8 +682,8 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `<div class="flex flex-col md:flex-row items-center gap-6">`
           + `<div class="text-5xl">🛡️</div>`
           + `<div>`
-          + `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowWhatTitle'))}</h2>`
-          + `<p class="text-emerald-800">${esc(T('escrowWhatText'))}</p>`
+          + `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T(howItWorksPlan.escrowTitleKey))}</h2>`
+          + `<p class="text-emerald-800">${esc(T(howItWorksPlan.escrowTextKey))}</p>`
           + `<ul class="mt-4 space-y-2 text-emerald-800 text-sm">`
           + howItWorksPlan.guaranteeKeys
             .map((key) => `<li>${esc(T(key))}</li>`)
@@ -686,7 +696,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `</section>`
           + `<section class="py-12 md:py-16 bg-white">`
           + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">`
-          + `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">${esc(T('faqTitle'))}</h2>`
+          + `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">${esc(T(howItWorksPlan.faqTitleKey))}</h2>`
           + `<div class="space-y-4">`
           + howItWorksPlan.faq
             .map(
@@ -705,10 +715,10 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           + `</section>`
           + `<section class="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">`
           + `<div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">`
-          + `<h2 class="text-2xl md:text-3xl font-bold mb-4">${esc(T('readyToStart'))}</h2>`
+          + `<h2 class="text-2xl md:text-3xl font-bold mb-4">${esc(T(howItWorksPlan.readyTitleKey))}</h2>`
           + `<div class="flex flex-col sm:flex-row gap-4 justify-center">`
-          + `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transition">${esc(T('lookingForServices'))}</a>`
-          + `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T('offerServices'))}</a>`
+          + `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transition">${esc(T(howItWorksPlan.lookingKey))}</a>`
+          + `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T(howItWorksPlan.offerKey))}</a>`
           + `</div>`
           // Maillage interne : mêmes liens que ceux ajoutés au composant
           // (HowItWorks.js) — les crawlers atteignent la liste des missions
