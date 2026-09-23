@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { MessageSquareText, RefreshCcw, Phone, Mail } from 'lucide-react';
 import { supportAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
@@ -38,17 +38,25 @@ const SupportAdmin = () => {
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
+  // Une requête partie avant le démontage ne doit plus écrire d'état : c'est
+  // ce qui faisait remonter « window is not defined » (React lit `window`
+  // pour choisir la priorité d'une mise à jour) quand la réponse arrivait
+  // après la fin de la page.
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const response = await supportAPI.listTickets(statusFilter || undefined);
+      if (!aliveRef.current) return;
       setTickets(response.data || []);
     } catch (err) {
+      if (!aliveRef.current) return;
       setError(handleApiError(err, t('loadSupportError')));
     } finally {
-      setLoading(false);
+      if (aliveRef.current) setLoading(false);
     }
   }, [statusFilter]);
 
@@ -60,11 +68,13 @@ const SupportAdmin = () => {
     setUpdatingId(ticketId);
     try {
       await supportAPI.updateTicketStatus(ticketId, newStatus);
+      if (!aliveRef.current) return;
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: newStatus } : t)));
     } catch (err) {
+      if (!aliveRef.current) return;
       setError(handleApiError(err, t('updateStatusError')));
     } finally {
-      setUpdatingId(null);
+      if (aliveRef.current) setUpdatingId(null);
     }
   };
 
