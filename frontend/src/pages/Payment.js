@@ -275,7 +275,7 @@ const Payment = () => {
 
         {!jobPaymentContext && !statusParams ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
-            <div className="text-4xl mb-3">💼</div>
+            <div className="text-4xl mb-3">{t(pagePlan.noJobIconKey)}</div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">{t(pagePlan.noJobTitleKey)}</h2>
             <p className="text-gray-600 max-w-lg mx-auto mb-5">{t(pagePlan.noJobTextKey)}</p>
             <Link to="/jobs" className="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">

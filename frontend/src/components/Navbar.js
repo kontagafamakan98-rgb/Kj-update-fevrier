@@ -51,7 +51,7 @@ export default function Navbar() {
             <Link to="/" className="flex-shrink-0 flex items-center" onClick={closeMobileMenu}>
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-lg font-bold">K</span>
+                  <span className="text-white text-lg font-bold">{t('brandMark')}</span>
                 </div>
                 <div className="text-xl font-bold text-orange-600">Kojo</div>
               </div>

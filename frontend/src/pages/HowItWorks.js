@@ -81,7 +81,7 @@ export default function HowItWorks() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">
             <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="text-5xl">🛡️</div>
+              <div className="text-5xl">{t(plan.escrowIconKey)}</div>
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t(plan.escrowTitleKey)}</h2>
                 <p className="text-emerald-800">
@@ -107,7 +107,7 @@ export default function HowItWorks() {
               <details key={item.q} className="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 group">
                 <summary className="cursor-pointer font-semibold text-gray-900 list-none flex items-center justify-between gap-4">
                   {item.q}
-                  <span className="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">+</span>
+                  <span className="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">{t(plan.faqMarkerKey)}</span>
                 </summary>
                 <p className="mt-3 text-sm text-gray-600">{item.a}</p>
               </details>

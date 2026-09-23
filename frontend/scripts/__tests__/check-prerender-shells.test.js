@@ -210,16 +210,41 @@ const rewritesFor = (files) =>
       ];
     });
 
+// Les modules de pré-rendu qui publient une coquille : le garde exige qu'AUCUN
+// ne recopie un glyphe publié. La fixture les COPIE du dépôt — la règle porte
+// donc sur du vrai code, jamais sur une recopie de la liste — et un cas négatif
+// peut en réécrire un pour exiger le refus nommé.
+const MODULES_PRE_RENDU = [
+  'prerender-route-meta.js',
+  'prerender/app-template.js',
+  'prerender/declared-body.js',
+  'prerender/not-found.js',
+  'prerender/route-meta.js',
+  'prerender/shells-home.js',
+  'prerender/shells-routes.js',
+];
+
+/** Copie les modules de pré-rendu réels dans la racine de la fixture. */
+const copieModules = (dir) => {
+  for (const rel of MODULES_PRE_RENDU) {
+    const cible = path.join(dir, 'vite-plugins', rel);
+    fs.mkdirSync(path.dirname(cible), { recursive: true });
+    fs.copyFileSync(path.join(FRONTEND_DIR, 'vite-plugins', rel), cible);
+  }
+};
+
 /**
  * Écrit une arborescence de build FIXTURE et retourne sa racine.
  * `mutate` reçoit les pages et la config de rewrites ÉCRITS, et peut les altérer
- * (retirer un fichier, vider un shell, réintroduire le catch-all…).
+ * (retirer un fichier, vider un shell, réintroduire le catch-all, réécrire un
+ * module de pré-rendu…).
  */
 const fixture = (mutate) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prerender-shells-'));
   tempDirs.push(dir);
   const build = path.join(dir, 'build');
   fs.mkdirSync(build, { recursive: true });
+  copieModules(dir);
 
   const html = pages();
   const files = [...Object.keys(html), ...CLIENT_PAGES];
@@ -227,7 +252,12 @@ const fixture = (mutate) => {
 
   if (mutate) {
     const out = mutate({ html, files, config });
-    if (out) config = out.config || config;
+    if (out) {
+      config = out.config || config;
+      for (const [rel, contenu] of Object.entries(out.modules || {})) {
+        fs.writeFileSync(path.join(dir, 'vite-plugins', rel), contenu);
+      }
+    }
   }
 
   for (const [name, contenu] of Object.entries(html)) {
@@ -433,6 +463,24 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       mutate: () => ({ config: null }),
       attendu: 'frontend/vercel.json illisible',
     },
+    {
+      // Le motif de ce découpage : un fragment publié recopié au lieu d'être lu
+      // depuis sa clé. Le glyphe interdit est LU dans le dictionnaire par le
+      // garde (iconLegalNotice = 📜), donc ce cas ne peut pas dériver de lui.
+      nom: 'glyphe publié recopié dans un module de pré-rendu',
+      mutate: () => ({
+        modules: {
+          'prerender/shells-routes.js':
+            'export const coquille = `<p class="text-sm">📜 Avis légal</p>`;\n',
+        },
+      }),
+      attendu: 'publie « 📜 » en littéral',
+    },
+    {
+      nom: 'module de pré-rendu renommé',
+      mutate: () => ({ supprimeModule: 'prerender/shells-home.js' }),
+      attendu: 'vite-plugins/prerender/shells-home.js introuvable',
+    },
   ];
 
   for (const { nom, mutate, attendu } of cas) {
@@ -440,6 +488,9 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       const dir = fixture(mutate);
       if (nom === 'vercel.json illisible') {
         fs.writeFileSync(path.join(dir, 'vercel.json'), '{ ce n\'est pas du JSON');
+      }
+      if (nom === 'module de pré-rendu renommé') {
+        fs.rmSync(path.join(dir, 'vite-plugins', 'prerender', 'shells-home.js'));
       }
       const { status, out } = runGuard(dir);
       expect(status).toBe(1);

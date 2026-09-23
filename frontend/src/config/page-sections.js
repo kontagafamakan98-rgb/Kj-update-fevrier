@@ -79,6 +79,13 @@ export const PAGE_SECTIONS = {
       { labelKey: 'countriesCovered', fallback: 4, shellText: '4' },
       { labelKey: 'customerSupport', fallback: '24/7', shellText: '24/7' },
     ],
+    // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
+    // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le
+    // même bouclier, deux domiciles. Comme les icônes des listes, il est
+    // déclaré ici : `escrowIconKey` porte la clé i18n, la page l'affiche par
+    // t() et la coquille par T(), donc les deux canaux ne peuvent pas
+    // publier deux glyphes différents.
+    escrowIconKey: 'iconEscrow',
   },
 
   // /how-it-works : la coquille répliquait TROIS listes de src/pages/HowItWorks.js
@@ -92,6 +99,11 @@ export const PAGE_SECTIONS = {
       { icon: '🛡️', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
       { icon: '✅', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
     ],
+    // Le glyphe du bloc « séquestre détaillé » et le repère du dépliant de la
+    // FAQ : la page les écrivait en littéral et la coquille recopiait les
+    // mêmes octets. Ils sont ici par leur clé i18n, comme le reste.
+    escrowIconKey: 'iconEscrow',
+    faqMarkerKey: 'faqMarker',
     // Les garanties sont des CLÉS i18n : le nom du champ finit par `Key`, donc
     // la coquille doit publier leur TEXTE résolu, pas la clé.
     guaranteeKeys: [
@@ -135,6 +147,7 @@ export const PAGE_SECTIONS = {
     legalNoticeTitleKey: 'legalNoticeTitle',
     legalConsentLinkKey: 'legalConsentLink',
     legalContactLineKey: 'legalContactLine',
+    legalNoticeIconKey: 'iconLegalNotice',
     noAccountKey: 'noAccount',
     registerKey: 'register',
   },
@@ -146,7 +159,18 @@ export const PAGE_SECTIONS = {
     step1TitleKey: 'personalInformation',
     step2TitleKey: 'stepEmail',
     step3TitleKey: 'stepPayments',
+    // Les numéros des trois pastilles de progression : la page les écrivait
+    // « 1 », « 2 », « 3 » et la coquille les recopiait. Le rang d'une étape
+    // est un fragment publié comme un autre, donc une clé i18n.
+    step1NumberKey: 'stepNumber1',
+    step2NumberKey: 'stepNumber2',
+    step3NumberKey: 'stepNumber3',
     stepNoticeKey: 'clientStepNotice',
+    stepNoticeIconKey: 'iconStepNotice',
+    clientIconKey: 'iconClient',
+    workerIconKey: 'iconWorker',
+    photoIconKey: 'iconProfilePhoto',
+    legalNoticeIconKey: 'iconLegalNotice',
     googleSignupKey: 'googleSignup',
     orSeparatorKey: 'orSeparator',
     userTypeKey: 'userType',
@@ -181,6 +205,9 @@ export const PAGE_SECTIONS = {
   },
 
   '/forgot-password': {
+    // La pastille de l'étape e-mail : glyphe publié par la page et par la
+    // coquille, donc déclaré une fois.
+    badgeIconKey: 'iconPasswordReset',
     titleKey: 'forgotPasswordPageTitle',
     subtitleKey: 'forgotPasswordSubtitle',
     stepEmailKey: 'forgotPasswordStepEmail',
@@ -194,6 +221,9 @@ export const PAGE_SECTIONS = {
   },
 
   '/payment': {
+    // Le glyphe de la carte « mission requise » (état par défaut, celui que
+    // publie la coquille).
+    noJobIconKey: 'iconPaymentEmpty',
     titleKey: 'paymentPageTitle',
     subtitleKey: 'paymentPageSubtitle',
     noJobTitleKey: 'paymentPageNoJobTitle',

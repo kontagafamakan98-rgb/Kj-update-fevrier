@@ -383,7 +383,7 @@ export default function Register() {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center mb-8">
           <div className="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">
-            <span className="text-white text-2xl font-bold">K</span>
+            <span className="text-white text-2xl font-bold">{t('brandMark')}</span>
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (register.html). Classes inchangées. */}
@@ -421,7 +421,7 @@ export default function Register() {
             <div className="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
-                  1
+                  {t(pagePlan.step1NumberKey)}
                 </div>
                 <span className="ml-2 text-orange-600 font-medium whitespace-nowrap">{t(pagePlan.step1TitleKey)}</span>
               </div>
@@ -430,7 +430,7 @@ export default function Register() {
 
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
-                  2
+                  {t(pagePlan.step2NumberKey)}
                 </div>
                 <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step2TitleKey)}</span>
               </div>
@@ -439,16 +439,15 @@ export default function Register() {
 
               <div className="flex items-center">
                 <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
-                  3
+                  {t(pagePlan.step3NumberKey)}
                 </div>
                 <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step3TitleKey)}</span>
               </div>
             </div>
             
-            <p className="text-xs text-blue-700 mt-3">
-              {formData.user_type === 'worker' 
-                ? `⚠️ ${pageT('workerStepNotice')}`
-                : `⚠️ ${pageT(pagePlan.stepNoticeKey)}`
+            <p className="text-xs text-blue-700 mt-3">              {formData.user_type === 'worker'
+                ? `${t(pagePlan.stepNoticeIconKey)} ${pageT('workerStepNotice')}`
+                : `${t(pagePlan.stepNoticeIconKey)} ${pageT(pagePlan.stepNoticeKey)}`
               }
             </p>
           </div>
@@ -504,7 +503,7 @@ export default function Register() {
                     className="sr-only"
                   />
                   <div className="text-center">
-                    <div className="text-2xl mb-2">👤</div>
+                    <div className="text-2xl mb-2">{t(pagePlan.clientIconKey)}</div>
                     <span className="text-sm font-medium text-gray-700">{t('client')}</span>
                     <p className="text-xs text-gray-500 mt-1">{t('iAmClient')}</p>
                   </div>
@@ -529,7 +528,7 @@ export default function Register() {
                     className="sr-only"
                   />
                   <div className="text-center">
-                    <div className="text-2xl mb-2">🔧</div>
+                    <div className="text-2xl mb-2">{t(pagePlan.workerIconKey)}</div>
                     <span className="text-sm font-medium text-gray-700">{t('worker')}</span>
                     <p className="text-xs text-gray-500 mt-1">{t('iAmWorker')}</p>
                   </div>
@@ -758,7 +757,7 @@ export default function Register() {
 
           <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
             <div>
-              <h3 className="text-sm font-semibold text-orange-900">📜 {pageT('legalNoticeTitle')}</h3>
+              <h3 className="text-sm font-semibold text-orange-900">{t(pagePlan.legalNoticeIconKey)} {pageT('legalNoticeTitle')}</h3>
               <p className="text-xs text-orange-800 mt-1">{pageT('legalConsentHelp')}</p>
             </div>
             <a

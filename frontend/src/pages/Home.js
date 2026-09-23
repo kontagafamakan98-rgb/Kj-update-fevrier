@@ -35,7 +35,7 @@ export default function Home() {
   // sans JavaScript, et rien ne rougissait. `labelKey` est aussi le code de
   // catégorie canonique du backend (kojo_routers_jobs.py) : le libellé affiché
   // et le filtre de /jobs sortent de la même valeur.
-  const { categories, promises, steps, stats: STATS } = PAGE_SECTIONS['/'];
+  const { categories, promises, steps, stats: STATS, escrowIconKey } = PAGE_SECTIONS['/'];
 
   // Lecture des chiffres par clé de libellé : `fallback` est la valeur affichée
   // avant /public/stats, `suffix` la marque qui suit le chiffre. Aucune seconde
@@ -202,7 +202,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">
             <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="text-5xl">🛡️</div>
+              <div className="text-5xl">{t(escrowIconKey)}</div>
               <div className="text-center md:text-left">
                 <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t('escrowTrustTitle')}</h2>
                 <p className="text-emerald-800">

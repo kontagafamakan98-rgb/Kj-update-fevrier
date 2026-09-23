@@ -12,10 +12,13 @@ import { photoFormatsLine } from '../../src/config/photo-formats.js'
 // : la coquille s'en dérive, elle ne peut pas la recopier (le refus est dans
 // declared-body.js).
 //
-// Ce qui reste littéral dans une coquille n'est PAS de la copie : le logo
-// (`K`), les numéros d'étape (1/2/3), les emojis et le `+` de la FAQ sont des
-// marqueurs décoratifs, sans équivalent i18n et sans homologue à faire
-// diverger côté page.
+// Aucune coquille ne publie plus un fragment en littéral : le logo, les numéros
+// d'étape, les glyphes et le repère de la FAQ sont des clés i18n déclarées par
+// le plan de leur route (`brandMark`, `stepNumber1`…, `iconLegalNotice`,
+// `faqMarker`) — la page les affiche par t() et la coquille par T(), depuis la
+// même clé, donc deux canaux ne peuvent plus publier deux octets différents.
+// Le seul texte encore écrit ici est la PONCTUATION de liaison (` · ` entre les
+// liens d'un paragraphe), qui n'appartient à aucun plan de page.
 
 export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pageSections }) {
   // ── Le corps des pages de confiance est DÉCLARÉ, pas recopié ────
@@ -33,6 +36,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
   const howItWorksPlan = pageSections['/how-it-works']
   const jobsPlan = pageSections['/jobs']
   const loginPlan = pageSections['/login']
+  const registerPlan = pageSections['/register']
   const forgotPasswordPlan = pageSections['/forgot-password']
   const paymentPlan = pageSections['/payment']
 
@@ -68,7 +72,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="max-w-md w-full space-y-8">`
       + `<div>`
       + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">`
-      + `<span class="text-white text-xl font-bold">K</span>`
+      + `<span class="text-white text-xl font-bold">${esc(T('brandMark'))}</span>`
       + `</div>`
       + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">${esc(T(loginPlan.titleKey))}</h1>`
       + `</div>`
@@ -93,7 +97,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `<div class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-md bg-white text-gray-700 text-sm font-medium">${esc(registerT(loginPlan.googleLoginKey))}</div>`
       + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">`
-      + `<p class="text-sm font-semibold text-orange-900">📜 ${esc(registerT('legalNoticeTitle'))}</p>`
+      + `<p class="text-sm font-semibold text-orange-900">${esc(T(loginPlan.legalNoticeIconKey))} ${esc(registerT('legalNoticeTitle'))}</p>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
       + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
       + `</div>`
@@ -117,7 +121,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="max-w-md w-full space-y-8">`
       + `<div class="text-center mb-8">`
       + `<div class="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">`
-      + `<span class="text-white text-2xl font-bold">K</span>`
+      + `<span class="text-white text-2xl font-bold">${esc(T('brandMark'))}</span>`
       + `</div>`
       + `<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">${esc(registerT('title'))}</h1>`
       + `<p class="mt-2 text-sm text-gray-600">${esc(registerT('subtitle'))}</p>`
@@ -128,21 +132,21 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `<div class="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">`
       + `<div class="flex items-center">`
-      + `<div class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">1</div>`
+      + `<div class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step1NumberKey))}</div>`
       + `<span class="ml-2 text-orange-600 font-medium whitespace-nowrap">${esc(registerT('personalInformation'))}</span>`
       + `</div>`
       + `<div class="w-12 h-1 bg-gray-200"></div>`
       + `<div class="flex items-center">`
-      + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">2</div>`
+      + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step2NumberKey))}</div>`
       + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepEmail'))}</span>`
       + `</div>`
       + `<div class="w-12 h-1 bg-gray-200"></div>`
       + `<div class="flex items-center">`
-      + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">3</div>`
+      + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step3NumberKey))}</div>`
       + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepPayments'))}</span>`
       + `</div>`
       + `</div>`
-      + `<p class="text-xs text-blue-700 mt-3">⚠️ ${esc(registerT('clientStepNotice'))}</p>`
+      + `<p class="text-xs text-blue-700 mt-3">${esc(registerT(registerPlan.stepNoticeIconKey))} ${esc(registerT('clientStepNotice'))}</p>`
       + `</div>`
       + `</div>`
       + `<form class="mt-8 space-y-6 bg-white p-4 sm:p-8 rounded-xl shadow-md">`
@@ -155,10 +159,10 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<legend class="block text-sm font-medium text-gray-700 mb-3">${esc(registerT('userType'))}</legend>`
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
       + `<div class="relative flex items-center justify-center p-4 border-2 border-orange-500 bg-orange-50 rounded-lg">`
-      + `<div class="text-center"><div class="text-2xl mb-2">👤</div><span class="text-sm font-medium text-gray-700">${esc(registerT('client'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmClient'))}</p></div>`
+      + `<div class="text-center"><div class="text-2xl mb-2">${esc(registerT(registerPlan.clientIconKey))}</div><span class="text-sm font-medium text-gray-700">${esc(registerT('client'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmClient'))}</p></div>`
       + `</div>`
       + `<div class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg">`
-      + `<div class="text-center"><div class="text-2xl mb-2">🔧</div><span class="text-sm font-medium text-gray-700">${esc(registerT('worker'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmWorker'))}</p></div>`
+      + `<div class="text-center"><div class="text-2xl mb-2">${esc(registerT(registerPlan.workerIconKey))}</div><span class="text-sm font-medium text-gray-700">${esc(registerT('worker'))}</span><p class="text-xs text-gray-500 mt-1">${esc(registerT('iAmWorker'))}</p></div>`
       + `</div>`
       + `</div>`
       + `</fieldset>`
@@ -182,10 +186,10 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
       + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
       + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">`
-      + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">📸</span><h3 class="text-lg font-semibold text-gray-900">${esc(registerT('profilePhotoOptional'))}</h3></div>`
+      + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">${esc(registerT(registerPlan.photoIconKey))}</span><h3 class="text-lg font-semibold text-gray-900">${esc(registerT('profilePhotoOptional'))}</h3></div>`
       + `<p class="text-sm text-gray-600 mb-4">${esc(registerT('profilePhotoHelps'))}</p>`
       + `<div class="relative border-2 border-dashed rounded-lg p-6 border-gray-300">`
-      + `<div class="text-center"><div class="text-4xl mb-3">📸</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(registerT('addProfilePhoto'))}</p><p>${esc(registerT('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">${esc(photoFormatsLine(registerT('upTo')))}</div></div>`
+      + `<div class="text-center"><div class="text-4xl mb-3">${esc(registerT(registerPlan.photoIconKey))}</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(registerT('addProfilePhoto'))}</p><p>${esc(registerT('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">${esc(photoFormatsLine(registerT('upTo')))}</div></div>`
       + `</div>`
       + `</div>`
       + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6">`
@@ -195,7 +199,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `</div>`
       + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`
-      + `<div><h3 class="text-sm font-semibold text-orange-900">📜 ${esc(registerT('legalNoticeTitle'))}</h3><p class="text-xs text-orange-800 mt-1">${esc(registerT('legalConsentHelp'))}</p></div>`
+      + `<div><h3 class="text-sm font-semibold text-orange-900">${esc(registerT(registerPlan.legalNoticeIconKey))} ${esc(registerT('legalNoticeTitle'))}</h3><p class="text-xs text-orange-800 mt-1">${esc(registerT('legalConsentHelp'))}</p></div>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
       + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
       + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
@@ -214,7 +218,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="max-w-md w-full space-y-8">`
       + `<div class="text-center">`
       + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">`
-      + `<span class="text-white text-2xl font-bold">✉️</span>`
+      + `<span class="text-white text-2xl font-bold">${esc(T(forgotPasswordPlan.badgeIconKey))}</span>`
       + `</div>`
       + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">${esc(T(forgotPasswordPlan.titleKey))}</h1>`
       + `<p class="mt-3 text-sm text-gray-600">${esc(T(forgotPasswordPlan.subtitleKey))}</p>`
@@ -253,7 +257,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<p class="text-gray-600">${esc(T(paymentPlan.subtitleKey))}</p>`
       + `</div>`
       + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">`
-      + `<div class="text-4xl mb-3">💼</div>`
+      + `<div class="text-4xl mb-3">${esc(T(paymentPlan.noJobIconKey))}</div>`
       + `<h2 class="text-xl font-semibold text-gray-900 mb-2">${esc(T(paymentPlan.noJobTitleKey))}</h2>`
       + `<p class="text-gray-600 max-w-lg mx-auto mb-5">${esc(T(paymentPlan.noJobTextKey))}</p>`
       + `<div class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white">${esc(T(paymentPlan.noJobCtaKey))}</div>`
@@ -295,7 +299,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`
       + `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">`
       + `<div class="flex flex-col md:flex-row items-center gap-6">`
-      + `<div class="text-5xl">🛡️</div>`
+      + `<div class="text-5xl">${esc(T(howItWorksPlan.escrowIconKey))}</div>`
       + `<div>`
       + `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T(howItWorksPlan.escrowTitleKey))}</h2>`
       + `<p class="text-emerald-800">${esc(T(howItWorksPlan.escrowTextKey))}</p>`
@@ -319,7 +323,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
             `<details class="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 group">` +
             `<summary class="cursor-pointer font-semibold text-gray-900 list-none flex items-center justify-between gap-4">` +
             `${esc(T(questionKey))}` +
-            `<span class="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">+</span>` +
+            `<span class="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">${esc(T(howItWorksPlan.faqMarkerKey))}</span>` +
             `</summary>` +
             `<p class="mt-3 text-sm text-gray-600">${esc(T(answerKey))}</p>` +
             `</details>`

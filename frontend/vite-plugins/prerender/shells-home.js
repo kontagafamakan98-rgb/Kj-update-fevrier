@@ -30,6 +30,26 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // src/pages/Home.js). Ajouter un pays, une catégorie ou une promesse
   // laissait autrefois la coquille derrière, en silence.
   const homePlan = pageSections['/']
+
+  // Les quatre moyens de contact du bloc ci-dessous sont déclarés UNE fois,
+  // par /contact (`actions` de src/config/page-sections.js) — la même
+  // déclaration que lit src/pages/Contact.js. Ce bloc lisait leurs glyphes en
+  // littéral, donc changer l'icône d'un moyen de contact laissait derrière lui
+  // l'appel, WhatsApp, l'e-mail ou l'adresse. La correspondance est explicite
+  // (le libellé de l'accueil dit « Appeler le support », celui de /contact dit
+  // « Appeler ») et une ligne disparue de /contact CASSE le build au lieu de
+  // peindre une pastille vide sans que personne ne le voie.
+  const glypheDeContact = (labelKey) => {
+    const action = pageSections['/contact'].actions.find((a) => a.labelKey === labelKey)
+    if (!action) {
+      throw new Error(
+        `prerender-shells : /contact ne déclare plus la ligne « ${labelKey} » ` +
+          "(src/config/page-sections.js) — le bloc de contact de l'accueil lit ses glyphes là-bas."
+      )
+    }
+    return action.icon
+  }
+
   return [
     // Placeholder navbar (hauteur réelle) — comme les shells /jobs et
     // /login : le marqueur visuel est en place dès le premier paint.
@@ -132,7 +152,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">`,
     `<div class="flex flex-col md:flex-row items-center gap-6">`,
-    `<div class="text-5xl">🛡️</div>`,
+    `<div class="text-5xl">${esc(T(homePlan.escrowIconKey))}</div>`,
     `<div class="text-center md:text-left">`,
     `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`,
     `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`,
@@ -205,19 +225,19 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</div>`,
     `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">`,
     `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">📞</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">${esc(glypheDeContact('contactCall'))}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('homeContactCall'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
     `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">💬</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">${esc(glypheDeContact('contactWhatsapp'))}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactWhatsapp'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
     `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">✉️</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">${esc(glypheDeContact('contactSendEmail'))}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
     `</a>`,
     `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">📍</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">${esc(glypheDeContact('contactAddress'))}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactAddress'))}</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
     `</a>`,
     `</div>`,
