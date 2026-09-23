@@ -22,6 +22,7 @@ import { devLog, safeLog } from '../utils/env';
 import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 import { Skeleton } from '../components/SkeletonLoader';
+import { PHONE_NUMBER_MASK } from '../config/phone-format';
 
 const getLanguageLabel = (languageCode, t) => {
   const languageMap = {
@@ -567,7 +568,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
               className="flex-1 block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500"
             />
           </div>
-          <p className="mt-1 text-sm text-gray-500">{t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} XX XXX XX XX</p>
+          <p className="mt-1 text-sm text-gray-500">{t('phoneFormat')}: {getPhonePrefixByCountry(formData.country.toLowerCase())} {PHONE_NUMBER_MASK}</p>
         </div>
 
         <div>

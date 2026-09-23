@@ -12,216 +12,17 @@ import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
 
-const COPY = {
-  fr: {
-    title: 'KOJO Paiements réels',
-    subtitle: 'Payez en toute sécurité par Orange Money, Wave ou carte bancaire.',
-    setupTitle: 'État du gateway',
-    configured: 'Passerelle configurée',
-    notConfigured: 'Passerelle non configurée',
-    setupHelp: 'Le service de paiement est momentanément indisponible. Merci de réessayer un peu plus tard.',
-    amount: 'Montant',
-    country: 'Pays',
-    method: 'Méthode',
-    loginNeeded: 'Connecte-toi pour lancer un paiement réel.',
-    loginCta: 'Se connecter',
-    payNow: 'Payer maintenant',
-    paying: 'Redirection en cours...',
-    loadingText: 'Chargement...',
-    quoteTitle: 'Répartition automatique',
-    total: 'Total client',
-    commission: 'Commission KOJO',
-    worker: 'Montant travailleur',
-    statusTitle: 'Dernier statut',
-    completed: 'Paiement confirmé',
-    pending: 'Paiement en attente',
-    cancelled: 'Paiement annulé',
-    failed: 'Paiement échoué',
-    unknown: 'Statut inconnu',
-    refreshStatus: 'Actualiser le statut',
-    myPayments: 'Mes paiements récents',
-    noPayments: 'Aucun paiement enregistré pour ce compte.',
-    openCheckout: 'Ouvrir le checkout',
-    minPaymentAmount: 'Le montant minimum pour un paiement est de 200 FCFA.',
-    paymentForMissionDetail: '💼 Paiement pour la mission{jobTitle} — le montant a été rempli automatiquement suite à l’attribution du travailleur.',
-    minPaydunyaAmount: '⚠️ Le montant minimum accepté par PayDunya est de 200 FCFA.',
-    rateChanged: 'Le taux de commission a changé : la répartition a été mise à jour. Cliquez à nouveau pour confirmer et payer.',
-    noJobTitle: 'Un paiement doit être rattaché à une mission',
-    paymentError: 'Erreur paiement',
-    noJobText: 'Les paiements libres ne sont plus possibles : ouvrez une mission depuis la liste des emplois pour la payer en toute sécurité (fonds bloqués jusqu’à la livraison).',
-    noJobCta: 'Voir les missions disponibles',
-    countries: { senegal: 'Sénégal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
-    methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Carte bancaire' }
-  },
-  en: {
-    title: 'KOJO Real Payments',
-    subtitle: 'Pay securely with Orange Money, Wave, or bank card.',
-    setupTitle: 'Gateway status',
-    configured: 'Gateway configured',
-    notConfigured: 'Gateway not configured',
-    setupHelp: 'The payment service is temporarily unavailable. Please try again shortly.',
-    amount: 'Amount',
-    country: 'Country',
-    method: 'Method',
-    loginNeeded: 'Log in to launch a real payment.',
-    loginCta: 'Log in',
-    payNow: 'Pay now',
-    paying: 'Redirecting...',
-    loadingText: 'Loading...',
-    quoteTitle: 'Automatic split',
-    total: 'Client total',
-    commission: 'KOJO commission',
-    worker: 'Worker amount',
-    statusTitle: 'Latest status',
-    completed: 'Payment confirmed',
-    pending: 'Payment pending',
-    cancelled: 'Payment cancelled',
-    failed: 'Payment failed',
-    unknown: 'Unknown status',
-    refreshStatus: 'Refresh status',
-    myPayments: 'My recent payments',
-    noPayments: 'No payments recorded for this account yet.',
-    openCheckout: 'Open checkout',
-    minPaymentAmount: 'The minimum amount for a payment is 200 FCFA.',
-    paymentForMissionDetail: '💼 Payment for the job{jobTitle} — the amount was filled automatically after the worker was assigned.',
-    minPaydunyaAmount: '⚠️ The minimum amount accepted by PayDunya is 200 FCFA.',
-    rateChanged: 'The commission rate has changed: the split has been updated. Click again to confirm and pay.',
-    noJobTitle: 'A payment must be tied to a job',
-    paymentError: 'Payment error',
-    noJobText: 'Free payments are no longer accepted: open a job from the jobs page and pay it securely (funds held in escrow until delivery).',
-    noJobCta: 'See available jobs',
-    countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Ivory Coast' },
-    methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank card' }
-  },
-  wo: {
-    title: 'KOJO Fay yu dëgg',
-    subtitle: 'Fey ci kaaraange ak Orange Money, Wave walla kart bank.',
-    setupTitle: 'Tolluwaay bi',
-    configured: 'Gateway bi set na',
-    notConfigured: 'Gateway bi setuwoonul',
-    setupHelp: 'Service wanewu bii dafa ñàkk ci waxtu bii. Ndeysaan delluwaatal ci kaw.',
-    amount: 'Monto',
-    country: 'Réew',
-    method: 'Yoonu fey',
-    loginNeeded: 'Duggal ngir tàmbali fey gu dëgg.',
-    loginCta: 'Dugg',
-    payNow: 'Tàmbali checkout bu dëgg',
-    paying: 'Mi ngi jëm ci checkout...',
-    loadingText: 'Mi ngi yebbi...',
-    quoteTitle: 'Séddoo otomatik',
-    total: 'Lëppu klient bi',
-    commission: 'Commission KOJO',
-    worker: 'Waalu liggéeykat bi',
-    statusTitle: 'Status bu mujj',
-    completed: 'Fey gi am na',
-    pending: 'Fey gi ngiy xaar',
-    cancelled: 'Fey gi neenal na',
-    failed: 'Fey gi antuwul',
-    unknown: 'Status xamul',
-    refreshStatus: 'Yeesal status',
-    myPayments: 'Samay paiements yu mujj',
-    noPayments: 'Amul paiement bu ñu bindal account bii.',
-    openCheckout: 'Ubbi checkout',
-    rateChanged: 'Fees bi soppi na: séddoo bi ñu ko yeesal. Dellu klik ngir dëggal te fey.',
-    noJobTitle: 'Fey bi xamal na sama mission',
-    paymentError: 'Njuumte ci fey bi',
-    noJobText: 'Fey bu amul mission duñu ko ame: Ubi mission bi ci xët wu emplois bi ngir raxas ko fey (escrow ba ci jëmm bi dellusi).',
-    noJobCta: 'Gis mission yu am',
-    minPaymentAmount: 'Sàntu fey gu digg la: 200 FCFA.',
-    paymentForMissionDetail: '💼 Fey bu mission bi{jobTitle} — sàntu bi ñu ko yombal ci saasi ñu jappale liggéeykat bi.',
-    minPaydunyaAmount: '⚠️ Sàntu gu digg gu PayDunya la: 200 FCFA.',
-    countries: { senegal: 'Senegaal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Kot Divwaar' },
-    methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Kart bank' }
-  },
-  bm: {
-    title: 'KOJO Sariya-faga yatiyalen',
-    subtitle: 'Sara ka lakana ni Orange Money, Wave walima bank karti ye.',
-    setupTitle: 'Gateway jɔyɔrɔ',
-    configured: 'Gateway labɛnnen don',
-    notConfigured: 'Gateway ma labɛnnen tɛ',
-    setupHelp: 'Wari sarali kɛlan tɛ se sisan. I ka segin ka a lajɛ dɔɔni kɔfɛ.',
-    amount: 'Jate',
-    country: 'Jamana',
-    method: 'Sariya-faga fɛɛrɛ',
-    loginNeeded: 'I ka don ka sariya-faga yatiyalen daminɛ.',
-    loginCta: 'Don',
-    payNow: 'Checkout yatiyalen daminɛ',
-    paying: 'Bɛ taa checkout la...',
-    loadingText: 'Bɛ kalan...',
-    quoteTitle: 'Jɛgɛnsira otomatik',
-    total: 'Kiliyan ka bɛɛ',
-    commission: 'KOJO commission',
-    worker: 'Barakɛla jate',
-    statusTitle: 'Status laban',
-    completed: 'Sariya-faga bɛɛlen',
-    pending: 'Sariya-faga bɛ kɔnɔ',
-    cancelled: 'Sariya-faga bali',
-    failed: 'Sariya-faga ma se ka kɛ',
-    unknown: 'Status min tɛ se ka dɔn',
-    refreshStatus: 'Status kura',
-    myPayments: 'Ne ka paiements kura',
-    noPayments: 'Paiement si tɛ account nin kama fɔlɔ.',
-    openCheckout: 'Checkout da yɔrɔ',
-    rateChanged: 'Commission rate yɛlɛma: jɛgɛnsira ladilanen don. I ka klik segin ka a sɔn ka sara.',
-    noJobTitle: 'Sariya-faga dangɛ ka bɛ baara si ma',
-    paymentError: 'Fili bɛ sara na',
-    noJobText: 'Sariya-faga min tɛ baara ma, a tɛ sɔn sisan: yɛlɛ baara kelen kɛnɛ ka na a la sare.',
-    noJobCta: 'Baara nninw yɛlɛma',
-    minPaymentAmount: 'Sariya-fuwu jate min: 200 FCFA.',
-    paymentForMissionDetail: '💼 Sariya-faga baaraw kama{jobTitle} — jate ladilanen ka bɔ otomatik ni barakɛla donnen ye.',
-    minPaydunyaAmount: '⚠️ Jate min PayDunya b’a sɔn: 200 FCFA.',
-    countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
-    methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank karti' }
-  },
-  mos: {
-    title: 'KOJO paoongo yel-kɩɩm',
-    subtitle: 'Yao ne bãane ne Orange Money, Wave bɩ bank carte.',
-    setupTitle: 'Gateway bãngre',
-    configured: 'Gateway sigd n be',
-    notConfigured: 'Gateway sigd ka beoogre',
-    setupHelp: 'Yaool-yaoolem koɛɛg-koɛɛgo ka be zĩ-zãnga. Y sã n maan sõma, y le maane a poore.',
-    amount: 'Sõor',
-    country: 'Tẽng',
-    method: 'Paoongo sõngre',
-    loginNeeded: 'Lʋ yinga n paoongo yel-kɩɩm taaba.',
-    loginCta: 'Lʋ',
-    payNow: 'Checkout yel-kɩɩm taaba',
-    paying: 'Bɛ yiki checkout...',
-    loadingText: 'A kareng...',
-    quoteTitle: 'Yidg otomatik',
-    total: 'Client bɛɛga',
-    commission: 'KOJO commission',
-    worker: 'Barakɛda sõor',
-    statusTitle: 'Status kɩtã',
-    completed: 'Paoongo sõama',
-    pending: 'Paoongo yã yĩnga',
-    cancelled: 'Paoongo ka yẽ',
-    failed: 'Paoongo ka paam',
-    unknown: 'Status ka dɔk ye',
-    refreshStatus: 'Status taaba',
-    myPayments: 'Mam paiements kɩtã',
-    noPayments: 'Paiement baa ka be account yɩnga ye.',
-    openCheckout: 'Checkout yɔk',
-    rateChanged: 'Commission rate togame: yidgã manegame. Leeb n klik n kõ sɩda n yaool.',
-    noJobTitle: 'Paoongo sõmb n naag tʋʋm ne yã',
-    paymentError: 'Yelle n paoongo',
-    noJobText: 'Paoongo sẽn pa tʋʋm ye, bɩ bɩ sõor ka kɩ. Yelg tʋʋmã n ye paoong ne nam ne ligdi-sequ n wa tʋʋo.',
-    noJobCta: 'Tʋʋm sẽn be wã yõk',
-    minPaymentAmount: 'Paoongo sõor sõn n sõmb n yɩ: 200 FCFA.',
-    paymentForMissionDetail: '💼 Paoongo yĩnga tʋʋmã{jobTitle} — sõorã sigla ne a menga sẽn wa n paam barakɛda wã.',
-    minPaydunyaAmount: '⚠️ Sõor sẽn sõmb n yɩ PayDunya: 200 FCFA.',
-    countries: { senegal: 'Senegal', mali: 'Mali', burkina_faso: 'Burkina Faso', ivory_coast: 'Côte d’Ivoire' },
-    methods: { orange_money: 'Orange Money', wave: 'Wave', bank_card: 'Bank carte' }
-  }
-};
-
-const getCopy = (lang) => COPY[lang] || COPY.fr;
+// Pays proposés, statuts de paiement et méthodes : des CODES, jamais du texte.
+// Les libellés appartiennent aux dictionnaires — la clé est le code lui-même
+// pour les pays, et un mapping explicite là où le nom de clé diffère du code.
+const PAYABLE_COUNTRIES = ['senegal', 'mali', 'burkina_faso', 'ivory_coast'];
+const PAYMENT_METHOD_KEYS = { orange_money: 'orangeMoney', wave: 'wave', bank_card: 'bankCard' };
+const PAYMENT_STATUS_KEYS = { completed: 'paymentStatusCompleted', pending: 'paymentStatusPending', cancelled: 'paymentStatusCancelled', failed: 'paymentFailed' };
 
 const Payment = () => {
-  const { currentLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
   const pagePlan = PAGE_SECTIONS['/payment'];
   usePageMeta();
 
@@ -295,7 +96,7 @@ const Payment = () => {
       }
     } catch (err) {
       safeLog.error('Payment page load error', err);
-      setError(handleApiError(err, copy.paymentError));
+      setError(handleApiError(err, t('paymentError')));
     } finally {
       setLoading(false);
     }
@@ -319,7 +120,7 @@ const Payment = () => {
         const liveQuote = await CommissionService.getQuote({ amount: form.amount, paymentMethod: form.method, country: form.country });
         if (!cancelled) setQuote(liveQuote);
       } catch (err) {
-        if (!cancelled) setError(handleApiError(err, copy.paymentError));
+        if (!cancelled) setError(handleApiError(err, t('paymentError')));
       }
     };
     refreshQuote();
@@ -371,7 +172,7 @@ const Payment = () => {
     // Validation client — évite un aller-retour API inutile et donne
     // un retour immédiat si le montant est trop faible.
     if (!form.amount || form.amount < 200) {
-      setCheckoutError(copy.minPaymentAmount);
+      setCheckoutError(t('minPaymentAmount'));
       setProcessing(false);
       return;
     }
@@ -394,7 +195,7 @@ const Payment = () => {
         previousCommission !== undefined &&
         Number(freshQuote?.commission_amount) !== Number(previousCommission)
       ) {
-        setCheckoutError(copy.rateChanged);
+        setCheckoutError(t('paymentRateChanged'));
         setProcessing(false);
         return;
       }
@@ -410,7 +211,7 @@ const Payment = () => {
       });
       window.location.href = checkout.checkout_url;
     } catch (err) {
-      const msg = handleApiError(err, copy.paymentError);
+      const msg = handleApiError(err, t('paymentError'));
       setCheckoutError(msg);
       setProcessing(false);
     }
@@ -422,11 +223,11 @@ const Payment = () => {
       const nextStatus = await CommissionService.getPaymentStatus(statusData.id);
       setStatusData(nextStatus);
     } catch (err) {
-      setError(handleApiError(err, copy.paymentError));
+      setError(handleApiError(err, t('paymentError')));
     }
   };
 
-  const statusLabel = (status) => copy[status] || copy.unknown;
+  const statusLabel = (status) => t(PAYMENT_STATUS_KEYS[status] || 'paymentStatusUnknown');
 
   return (
     <div className="min-h-full bg-gray-50 py-8">
@@ -436,7 +237,7 @@ const Payment = () => {
           <p className="text-gray-600">{t(pagePlan.subtitleKey)}</p>
           {jobPaymentContext && (
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
-              {copy.paymentForMissionDetail.replace('{jobTitle}', jobPaymentContext.jobTitle ? ` « ${jobPaymentContext.jobTitle} »` : '')}
+              {t('paymentForMissionDetail').replace('{jobTitle}', jobPaymentContext.jobTitle ? ` « ${jobPaymentContext.jobTitle} »` : '')}
             </div>
           )}
         </div>
@@ -445,7 +246,7 @@ const Payment = () => {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">{copy.statusTitle}</h2>
+                <h2 className="text-xl font-semibold text-gray-900">{t('paymentStatusTitle')}</h2>
                 <p className="text-sm text-gray-600 mt-1">ID: {statusData.id}</p>
               </div>
               <span className="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold bg-blue-50 text-blue-700">
@@ -454,20 +255,20 @@ const Payment = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-sm">
               <div className="bg-gray-50 rounded-xl p-4">
-                <div className="text-gray-500">{copy.total}</div>
+                <div className="text-gray-500">{t('paymentTotalClient')}</div>
                 <div className="font-semibold text-gray-900">{Number(statusData.amount || 0).toLocaleString()} XOF</div>
               </div>
               <div className="bg-gray-50 rounded-xl p-4">
-                <div className="text-gray-500">{copy.commission}</div>
+                <div className="text-gray-500">{t('paymentCommission')}</div>
                 <div className="font-semibold text-green-700">{Number(statusData.commission_amount || 0).toLocaleString()} XOF</div>
               </div>
               <div className="bg-gray-50 rounded-xl p-4">
-                <div className="text-gray-500">{copy.worker}</div>
+                <div className="text-gray-500">{t('paymentWorkerAmount')}</div>
                 <div className="font-semibold text-blue-700">{Number(statusData.worker_amount || 0).toLocaleString()} XOF</div>
               </div>
             </div>
             <button onClick={refreshStatus} className="mt-4 px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black">
-              {copy.refreshStatus}
+              {t('paymentRefreshStatus')}
             </button>
           </div>
         )}
@@ -485,15 +286,15 @@ const Payment = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
-              <h2 className="text-xl font-semibold text-gray-900">{copy.quoteTitle}</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{t('automaticDistribution')}</h2>
               <span className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold ${providerConfig?.configured ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
-                {providerConfig?.configured ? copy.configured : copy.notConfigured}
+                {providerConfig?.configured ? t('paymentGatewayConfigured') : t('paymentGatewayNotConfigured')}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="block">
-                <label htmlFor="payment_amount" className="text-sm font-medium text-gray-700">{copy.amount}</label>
+                <label htmlFor="payment_amount" className="text-sm font-medium text-gray-700">{t('paymentAmount')}</label>
                 <input
                   id="payment_amount"
                   name="payment_amount"
@@ -511,13 +312,13 @@ const Payment = () => {
                 />
                 {form.amount > 0 && form.amount < 200 && (
                   <p className="mt-1 text-sm text-red-600">
-                    {copy.minPaydunyaAmount}
+                    {t('minPaydunyaAmount')}
                   </p>
                 )}
               </div>
 
               <div className="block">
-                <label htmlFor="payment_country" className="text-sm font-medium text-gray-700">{copy.country}</label>
+                <label htmlFor="payment_country" className="text-sm font-medium text-gray-700">{t('country')}</label>
                 <select
                   id="payment_country"
                   name="payment_country"
@@ -526,14 +327,14 @@ const Payment = () => {
                   onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value }))}
                   className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
-                  {Object.entries(copy.countries).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                  {PAYABLE_COUNTRIES.map((value) => (
+                    <option key={value} value={value}>{t(value)}</option>
                   ))}
                 </select>
               </div>
 
               <div className="block">
-                <label htmlFor="payment_method_select" className="text-sm font-medium text-gray-700">{copy.method}</label>
+                <label htmlFor="payment_method_select" className="text-sm font-medium text-gray-700">{t('paymentMethod')}</label>
                 <select
                   id="payment_method_select"
                   name="payment_method_select"
@@ -542,8 +343,8 @@ const Payment = () => {
                   onChange={(e) => setForm((prev) => ({ ...prev, method: e.target.value }))}
                   className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
-                  {Object.entries(copy.methods).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
+                  {Object.entries(PAYMENT_METHOD_KEYS).map(([value, key]) => (
+                    <option key={value} value={value}>{t(key)}</option>
                   ))}
                 </select>
               </div>
@@ -552,15 +353,15 @@ const Payment = () => {
             {quote && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                 <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="text-sm text-gray-500">{copy.total}</div>
+                  <div className="text-sm text-gray-500">{t('paymentTotalClient')}</div>
                   <div className="text-xl font-bold text-gray-900 mt-1">{Number(quote.total_amount || 0).toLocaleString()} XOF</div>
                 </div>
                 <div className="bg-green-50 rounded-xl p-4">
-                  <div className="text-sm text-green-700">{copy.commission}</div>
+                  <div className="text-sm text-green-700">{t('paymentCommission')}</div>
                   <div className="text-xl font-bold text-green-800 mt-1">{Number(quote.commission_amount || 0).toLocaleString()} XOF</div>
                 </div>
                 <div className="bg-blue-50 rounded-xl p-4">
-                  <div className="text-sm text-blue-700">{copy.worker}</div>
+                  <div className="text-sm text-blue-700">{t('paymentWorkerAmount')}</div>
                   <div className="text-xl font-bold text-blue-800 mt-1">{Number(quote.worker_amount || 0).toLocaleString()} XOF</div>
                 </div>
               </div>
@@ -568,9 +369,9 @@ const Payment = () => {
 
             {!user ? (
               <div className="mt-6 rounded-xl border border-orange-200 bg-orange-50 p-4">
-                <p className="text-orange-800 mb-3">{copy.loginNeeded}</p>
+                <p className="text-orange-800 mb-3">{t('paymentLoginNeeded')}</p>
                 <Link to="/login" className="inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-white hover:bg-orange-700">
-                  {copy.loginCta}
+                  {t('signIn')}
                 </Link>
               </div>
             ) : (
@@ -579,7 +380,7 @@ const Payment = () => {
                 disabled={processing || !providerConfig?.configured || loading}
                 className={`mt-6 inline-flex items-center rounded-xl px-5 py-3 font-semibold text-white ${processing || !providerConfig?.configured ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700'}`}
               >
-                {processing ? copy.paying : copy.payNow}
+                {processing ? t('paymentRedirecting') : t('payNow')}
               </button>
             )}
 
@@ -591,17 +392,17 @@ const Payment = () => {
                     aux clients/travailleurs - ça n'a de sens que pour
                     l'équipe technique, qui a de toute façon accès aux logs
                     et à la config Render directement. */}
-                <h3 className="font-semibold text-amber-900 mb-2">{copy.notConfigured}</h3>
-                <p className="text-sm text-amber-700">{copy.setupHelp}</p>
+                <h3 className="font-semibold text-amber-900 mb-2">{t('paymentGatewayNotConfigured')}</h3>
+                <p className="text-sm text-amber-700">{t('paymentGatewayHelp')}</p>
               </div>
             )}
           </div>
 
           <div className="space-y-6">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">{copy.myPayments}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('paymentMyPayments')}</h3>
               {payments.length === 0 ? (
-                <p className="text-sm text-gray-500">{copy.noPayments}</p>
+                <p className="text-sm text-gray-500">{t('paymentNoPayments')}</p>
               ) : (
                 <div className="space-y-3">
                   {payments.slice(0, 5).map((payment) => (

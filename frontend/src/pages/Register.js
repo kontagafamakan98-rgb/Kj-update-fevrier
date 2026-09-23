@@ -17,6 +17,8 @@ import { devLog, safeLog } from '../utils/env';
 import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { phoneNumberExample } from '../config/phone-format';
+import { COUNTRY_PLACEHOLDER } from '../config/country-placeholder';
 
 export default function Register() {
   const [searchParams] = useSearchParams();
@@ -560,6 +562,7 @@ export default function Register() {
                 value={formData.country}
                 onChange={handleCountryChange}
                 required
+                placeholder={COUNTRY_PLACEHOLDER(t(pagePlan.countryKey))}
                 className="mt-1"
               />
               {detectedCountry && (
@@ -663,7 +666,7 @@ export default function Register() {
                 />
               </div>
               <p className="mt-1 text-sm text-gray-500">
-                {pageT('phoneFormatHint')}: {activePhonePrefix || '---'} XX XXX XX XX
+                {pageT('phoneFormatHint')}: {phoneNumberExample(activePhonePrefix || '---')}
               </p>
             </div>
             

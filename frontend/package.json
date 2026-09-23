@@ -26,6 +26,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "playtest:api": "node scripts/playtest-api-server.mjs",
+    "check:test-environment": "node scripts/check-test-environment.js",
     "test:e2e": "playwright test",
     "test": "vitest run",
     "test:watch": "vitest",

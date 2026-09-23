@@ -32,7 +32,10 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { SITE_ORIGIN, shellFileFor } from './site-meta.js';
+import { SITE_ORIGIN, shellFileFor, titleOf, metaContents } from './site-meta.js';
+import { phoneNumberExample } from '../src/config/phone-format.js';
+import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
+import { CONTACT } from '../src/config/contact.js';
 // Table UNIQUE de la correspondance route → carte OG, partagée avec
 // vite.config.js qui écrit ces coquilles : la carte de chaque shell est LUE
 // ici et non recopiée (voir la section « og:image » plus bas).
@@ -110,6 +113,10 @@ if (index) {
     fr.footerItinerary,
     fr.footerTerms,
   ];
+  const mapTitle = fr.mapIframeTitle.replace('{address}', CONTACT.address);
+  if (!index.includes(`title="${mapTitle}"`)) {
+    errors.push(`index.html : titre d'iframe « ${mapTitle} » absent (clé i18n mapIframeTitle)`);
+  }
   for (const texte of new Set(sectionContact)) {
     if (!index.includes(texte)) {
       errors.push(
@@ -148,6 +155,23 @@ if (notFound) {
     if (!notFound.includes(texte)) {
       errors.push(`404.html : « ${texte} » absent de la page d'une URL inconnue`);
     }
+  }
+}
+
+// 1quinquies. app.html : métadonnées neutres du gabarit privé. Leur contenu
+// vient du dictionnaire global, et les six sorties doivent rester alignées.
+const app = read('app.html');
+if (app) {
+  const metadonnees = [
+    ['titre', titleOf(app), fr.neutralTitle],
+    ['description', metaContents(app, 'description')[0], fr.neutralDescription],
+    ['og:title', metaContents(app, 'og:title')[0], fr.neutralTitle],
+    ['og:description', metaContents(app, 'og:description')[0], fr.neutralDescription],
+    ['twitter:title', metaContents(app, 'twitter:title')[0], fr.neutralTitle],
+    ['twitter:description', metaContents(app, 'twitter:description')[0], fr.neutralDescription],
+  ];
+  for (const [nom, publie, attendu] of metadonnees) {
+    if (publie !== attendu) errors.push(`app.html : ${nom} neutre absent ou différent du dictionnaire`);
   }
 }
 
@@ -201,16 +225,38 @@ if (register) {
   // prénom/nom, email, téléphone doivent être peints dans le shell statique,
   // pas seulement les boutons — sinon le LCP du formulaire register reste
   // attendu du boot React.
-  for (const champ of [`${fr.firstName}...`, `${fr.lastName}...`, registerT('emailPlaceholder'), '--- XX XXX XX XX']) {
+  for (const champ of [`${fr.firstName}...`, `${fr.lastName}...`, registerT('emailPlaceholder')]) {
     if (!register.includes(`placeholder="${champ}"`)) {
       errors.push(`register.html : champ de formulaire « ${champ} » ABSENT du shell`);
     }
+  }
+  if (!register.includes(`placeholder="${phoneNumberExample()}"`)) {
+    errors.push(`register.html : masque téléphone « ${phoneNumberExample()} » absent (src/config/phone-format.js)`);
+  }
+  const countryPlaceholder = COUNTRY_PLACEHOLDER(registerT('country'));
+  if (!register.includes(`>${countryPlaceholder}</select>`)) {
+    errors.push(`register.html : placeholder pays « ${countryPlaceholder} » absent du select`);
   }
   // Mentions légales peintes côté HTML (bloc « Informations légales » +
   // case de consentement Politique de confidentialité) : elles font partie
   // du formulaire complet et ne doivent pas dépendre du boot React.
   if (!register.includes(registerT('legalNoticeTitle')) || !register.includes(fr.privacyTitle)) {
     errors.push('register.html : mentions légales (Informations légales / Politique de confidentialité) absentes du shell');
+  }
+  // Les trois textes que la coquille écrivait AUTREFOIS en propre, avec une
+  // apostrophe droite (') là où la page publiait la typographique (’). Ils
+  // dérivent maintenant de leur source unique — le dictionnaire du scope, celui
+  // que lit aussi Register.js — donc un octet qui diverge entre la vue page et
+  // la vue crawler fait rougir ici, en nommant le texte fautif.
+  for (const cle of ['clientStepNotice', 'legalConsentHelp', 'legalConsentLabel']) {
+    const texte = registerT(cle);
+    if (!register.includes(texte)) {
+      errors.push(
+        `register.html : « ${texte} » absent du shell (notices et consentement de l'étape register) — ` +
+          `ce texte appartient au scope register (clé ${cle}), que lit aussi la page : les deux vues ` +
+          'doivent publier les mêmes octets, apostrophe comprise'
+      );
+    }
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*Register-[^"]*\.js"/.test(register)) {
     errors.push('register.html : modulepreload du chunk Register absent');
@@ -243,6 +289,15 @@ if (payment) {
   }
   if (!payment.includes(fr.paymentPageNoJobTitle)) {
     errors.push('payment.html : carte « mission requise » (💼) absente du shell');
+  }
+  // Le corps de la carte, lui aussi écrit en propre par la coquille avant que
+  // /payment derive ses textes de son plan (apostrophe droite côté coquille,
+  // typographique côté page).
+  if (!payment.includes(fr.paymentPageNoJobText)) {
+    errors.push(
+      'payment.html : texte de la carte « mission requise » absent du shell — il appartient au ' +
+        'dictionnaire global (paymentPageNoJobText), que lit aussi la page'
+    );
   }
   if (!payment.includes(fr.paymentPageNoJobCta)) {
     errors.push('payment.html : CTA « Voir les missions disponibles » absent du shell');
@@ -277,7 +332,15 @@ if (howItWorks) {
   }
 }
 
-// 4quinquies. support.html : page PUBLIQUE (contact + suivi de ticket).
+// 4quinquies. contact.html : le titre de la carte intégrée vient du dictionnaire.
+const contact = read('contact.html');
+if (contact) {
+  const mapTitle = fr.mapIframeTitle.replace('{address}', CONTACT.address);
+  if (!contact.includes(`title="${mapTitle}"`)) {
+    errors.push(`contact.html : titre d'iframe « ${mapTitle} » absent (clé i18n mapIframeTitle)`);
+  }
+}
+
 const support = read('support.html');
 if (support) {
   if (!support.includes(`<h1 class="text-3xl font-bold text-gray-900 mb-2">${fr.support}</h1>`)) {

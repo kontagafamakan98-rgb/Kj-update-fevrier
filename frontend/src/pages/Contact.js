@@ -65,7 +65,7 @@ export default function Contact() {
             sur une page de contact, et elle est servie par la carte ci-dessous. */}
         <iframe
           src={CONTACT.mapsEmbedUrl}
-          title={`Carte — Kojo, ${CONTACT.address}`}
+          title={t('mapIframeTitle').replace('{address}', CONTACT.address)}
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
           className="mt-6 w-full rounded-xl border border-gray-200"

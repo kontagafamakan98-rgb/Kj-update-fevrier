@@ -32,14 +32,7 @@ export default function Login() {
   const { t, currentLanguage } = useLanguage();
   const toast = useToast();
   const navigate = useNavigate();
-  const forgotPasswordLabelMap = {
-    fr: 'Mot de passe oublié ?',
-    en: 'Forgot password?',
-    wo: 'Fàtte nga sa baatu jàll ?',
-    bm: 'I ye mot de passe ɲinɛna wa ?',
-    mos: 'Fo ye mot de passe wã yɩɩda ye?'
-  };
-  const forgotPasswordLabel = forgotPasswordLabelMap[currentLanguage] || forgotPasswordLabelMap.fr;
+  const forgotPasswordLabel = t('forgotPasswordLink');
 
   usePageMeta();
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);

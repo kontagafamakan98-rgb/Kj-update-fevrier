@@ -26,6 +26,12 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ROUTES } from '../check-og-images.js';
 import { SITE_ORIGIN, shellFileFor } from '../site-meta.js';
+// Le scope register, résolu EXACTEMENT comme le fait le garde : la fixture ne
+// peut donc pas dériver des octets que la coquille doit publier.
+import { makeScopedTranslator as makeRegisterTranslator } from '../../src/utils/pack2PageI18n/register.js';
+import { phoneNumberExample } from '../../src/config/phone-format.js';
+import { COUNTRY_PLACEHOLDER } from '../../src/config/country-placeholder.js';
+import { CONTACT } from '../../src/config/contact.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-prerender-shells.js');
@@ -38,6 +44,15 @@ const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-prerender-shells.js');
 const fr = JSON.parse(
   fs.readFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'fr.json'), 'utf8')
 );
+const registerT = makeRegisterTranslator('fr', (cle) => fr[cle]);
+const appMetaMutations = [
+  ['titre', `<title>${fr.neutralTitle}</title>`, '<title>Autre</title>', 'app.html : titre neutre'],
+  ['description', `<meta name="description" content="${fr.neutralDescription}" />`, '<meta name="description" content="Autre" />', 'app.html : description neutre'],
+  ['og:title', `<meta property="og:title" content="${fr.neutralTitle}" />`, '<meta property="og:title" content="Autre" />', 'app.html : og:title neutre'],
+  ['og:description', `<meta property="og:description" content="${fr.neutralDescription}" />`, '<meta property="og:description" content="Autre" />', 'app.html : og:description neutre'],
+  ['twitter:title', `<meta name="twitter:title" content="${fr.neutralTitle}" />`, '<meta name="twitter:title" content="Autre" />', 'app.html : twitter:title neutre'],
+  ['twitter:description', `<meta name="twitter:description" content="${fr.neutralDescription}" />`, '<meta name="twitter:description" content="Autre" />', 'app.html : twitter:description neutre'],
+];
 
 // Coquilles émises par le build réel : les routes CLIENTES (/dashboard,
 // /profile) sont servies par app.html et n'ont donc pas de fichier propre —
@@ -70,6 +85,7 @@ const pages = () => ({
     `<h3>${fr.homeContactFollow}</h3>` +
     `<a href="/carte">${fr.footerItinerary}</a>` +
     `<a href="/legal">${fr.footerTerms}</a>` +
+    `<iframe title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"></iframe>` +
     `<a href="https://exemple.test" rel="me noreferrer">Réseau</a></div>` +
     preload('Home') +
     '<script type="module" src="/assets/index.js"></script></body></html>',
@@ -97,8 +113,13 @@ const pages = () => ({
     '<button>S\'inscrire avec Google</button>' +
     '<div class="bg-orange-600">Continuer vers la vérification email</div>' +
     '<input placeholder="Prénom..." /><input placeholder="Nom..." />' +
-    '<input placeholder="exemple@email.com" /><input placeholder="--- XX XXX XX XX" />' +
+    '<input placeholder="exemple@email.com" />' +
+    `<input placeholder="${phoneNumberExample()}" />` +
+    `<select>${COUNTRY_PLACEHOLDER(fr.country)}</select>` +
     '<p>Informations légales</p><p>Politique de confidentialité</p>' +
+    `<p>${registerT('clientStepNotice')}</p>` +
+    `<p>${registerT('legalConsentHelp')}</p>` +
+    `<label>${registerT('legalConsentLabel')}</label>` +
     '</div>' +
     preload('Register') +
     '</body></html>',
@@ -118,6 +139,7 @@ const pages = () => ({
     '</head><body><div id="root">' +
     '<h1 class="text-3xl font-bold text-gray-900 mb-2">KOJO Paiements réels</h1>' +
     '<p>Un paiement doit être rattaché à une mission</p>' +
+    `<p>${fr.paymentPageNoJobText}</p>` +
     '<a href="/jobs">Voir les missions disponibles</a>' +
     '</div>' +
     preload('Payment') +
@@ -133,6 +155,15 @@ const pages = () => ({
     '</div>' +
     preload('HowItWorks') +
     '</body></html>',
+  'contact.html':
+    '<!doctype html><html><head>' +
+    `<link rel="canonical" href="${SITE_ORIGIN}/contact" />` +
+    ogTagFor('contact.html') +
+    '</head><body><div id="root">' +
+    `<iframe title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"></iframe>` +
+    '</div>' +
+    preload('Contact') +
+    '</body></html>',
   'support.html':
     '<!doctype html><html><head>' +
     `<link rel="canonical" href="${SITE_ORIGIN}/support" />` +
@@ -146,7 +177,14 @@ const pages = () => ({
     preload('Support') +
     '</body></html>',
   'app.html':
-    '<!doctype html><html><head><title>Kojo</title></head><body><div id="root"></div></body></html>',
+    '<!doctype html><html><head>' +
+    `<title>${fr.neutralTitle}</title>` +
+    `<meta name="description" content="${fr.neutralDescription}" />` +
+    `<meta property="og:title" content="${fr.neutralTitle}" />` +
+    `<meta property="og:description" content="${fr.neutralDescription}" />` +
+    `<meta name="twitter:title" content="${fr.neutralTitle}" />` +
+    `<meta name="twitter:description" content="${fr.neutralDescription}" />` +
+    '<meta name="robots" content="noindex, follow" /></head><body><div id="root"></div></body></html>',
   '404.html':
     '<!doctype html><html lang="fr"><head><meta name="robots" content="noindex">' +
     `<title>${fr.notFoundMetaTitle}</title></head><body><main>` +
@@ -251,11 +289,77 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       attendu: 'champ de formulaire « exemple@email.com » ABSENT',
     },
     {
+      nom: 'masque téléphone du register retiré',
+      mutate: ({ html }) => {
+        html['register.html'] = html['register.html'].replace(`placeholder="${phoneNumberExample()}"`, '');
+      },
+      attendu: 'masque téléphone',
+    },
+    {
+      nom: 'placeholder pays du register retiré',
+      mutate: ({ html }) => {
+        html['register.html'] = html['register.html'].replace(COUNTRY_PLACEHOLDER(fr.country), 'Pays');
+      },
+      attendu: 'placeholder pays',
+    },
+    ...appMetaMutations.map(([nom, source, mutation, attendu]) => ({
+      nom: `métadonnée ${nom} d’app.html modifiée`,
+      mutate: ({ html }) => {
+        html['app.html'] = html['app.html'].replace(source, mutation);
+      },
+      attendu,
+    })),
+    {
+      nom: 'titre d’iframe de l’accueil retiré',
+      mutate: ({ html }) => {
+        html['index.html'] = html['index.html'].replace(
+          `title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"`,
+          ''
+        );
+      },
+      attendu: "titre d'iframe",
+    },
+    {
       nom: 'ligne de contact retirée du shell d\'accueil (zone sans garde avant)',
       mutate: ({ html }) => {
         html['index.html'] = html['index.html'].replace(fr.homeContactCall, '');
       },
       attendu: 'absent de la coquille (section contact / pied de page)',
+    },
+    {
+      nom: 'apostrophe droite dans une notice du shell (page vs coquille)',
+      mutate: ({ html }) => {
+        const juste = registerT('legalConsentHelp');
+        html['register.html'] = html['register.html'].replace(juste, juste.replace(/\u2019/g, "'"));
+      },
+      attendu: "absent du shell (notices et consentement de l'étape register)",
+    },
+    {
+      nom: 'texte de la carte « mission requise » retiré',
+      mutate: ({ html }) => {
+        html['payment.html'] = html['payment.html'].replace(fr.paymentPageNoJobText, '');
+      },
+      attendu: 'texte de la carte « mission requise » absent du shell',
+    },
+    {
+      nom: 'titre d’iframe de contact retiré',
+      mutate: ({ html }) => {
+        html['contact.html'] = html['contact.html'].replace(
+          `title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"`,
+          ''
+        );
+      },
+      attendu: 'contact.html : titre d\'iframe',
+    },
+    {
+      nom: 'titre de la carte retiré (gabarit lu dans le dictionnaire)',
+      mutate: ({ html }) => {
+        html['index.html'] = html['index.html'].replace(
+          `title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"`,
+          ''
+        );
+      },
+      attendu: "titre d'iframe",
     },
     {
       nom: 'titre du bloc social retiré (bloc émis)',
