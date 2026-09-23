@@ -33,14 +33,32 @@
  * décorative et laisserait les deux canaux diverger en silence. Les valeurs
  * interdites sont LUES dans le dictionnaire, jamais listées ici.
  *
+ * Et il vérifie l'APOSTROPHE de la copie publiée : un seul caractère, celui que
+ * scripts/published-copy.js nomme, sur les deux vues — les SOURCES
+ * (dictionnaires, scopes, littéraux publiés de src/, index.html), la vue PAGE
+ * (chunks applicatifs du build) et la vue CRAWLER (coquilles HTML). Une page et
+ * sa coquille ne doivent pas publier deux octets différents pour le même mot.
+ *
  * Échoue (exit 1) en cas de régression silencieuse : plugin
  * prerender-route-meta désactivé/supprimé, shell perdu, contenu statique
- * ajouté à l'index, route pré-rendue non routée par Vercel, ou glyphe publié
- * recopié au lieu d'être lu depuis sa clé. Exécuté dans le job CI
+ * ajouté à l'index, route pré-rendue non routée par Vercel, glyphe publié
+ * recopié au lieu d'être lu depuis sa clé, ou copie publiée qui porte
+ * l'apostrophe typographique. Exécuté dans le job CI
  * frontend-build après le build.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+// L'apostrophe publiée — le caractère qui survit, ses surfaces et leur
+// contrôle appartiennent à scripts/published-copy.js : ce garde l'exécute, il
+// ne redéclare ni le caractère ni la liste des fichiers.
+import {
+  APOSTROPHE_PUBLIEE,
+  apostrophesHorsConvention,
+  chunksPublies,
+  coquillesPubliees,
+  fichiersDeCopie,
+} from './published-copy.js';
 import { SITE_ORIGIN, shellFileFor, titleOf, metaContents } from './site-meta.js';
 import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../src/config/phone-format.js';
 import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
@@ -524,6 +542,43 @@ for (const rel of MODULES_PRE_RENDU) {
       );
     }
   });
+}
+
+// 8. L'APOSTROPHE de la copie publiée : un seul caractère, sur les DEUX vues.
+// La page et la coquille d'une même route tiraient leurs mots des mêmes
+// dictionnaires mais l'un des deux canaux publiait U+2019 là où l'autre
+// publiait U+0027 — l'écart d'octet que la migration a fermé. La règle, la
+// liste des surfaces et le caractère survivant appartiennent à
+// scripts/published-copy.js : ce garde ne fait que l'exécuter sur l'arbre réel
+// (les SOURCES, la vue PAGE = les chunks applicatifs, la vue CRAWLER = les
+// coquilles), et son test l'exécute sur des fixtures.
+const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+let surfacesApostrophe = [];
+try {
+  surfacesApostrophe = [
+    ...fichiersDeCopie(frontendDir),
+    ...coquillesPubliees(buildDir),
+    ...chunksPublies(buildDir),
+  ];
+} catch (err) {
+  errors.push(
+    "surfaces de copie publiée illisibles (build absent ?) — le contrôle de " +
+      `l'apostrophe ne comparerait rien : ${err.message}`
+  );
+}
+if (!surfacesApostrophe.length) {
+  errors.push(
+    "aucune surface de copie publiée trouvée — le contrôle de l'apostrophe ne " +
+      'comparerait rien (un vert sans lecture est un faux vert)'
+  );
+}
+for (const violation of apostrophesHorsConvention(surfacesApostrophe)) {
+  const ou = violation.ligne ? `${violation.fichier}:${violation.ligne}` : violation.fichier;
+  errors.push(
+    `${ou} publie l'apostrophe typographique « ’ » — la copie publiée porte UNE seule ` +
+      `apostrophe, « ${APOSTROPHE_PUBLIEE} » (scripts/published-copy.js), et la page comme la ` +
+      `coquille doivent publier les mêmes octets : « …${violation.extrait}… »`
+  );
 }
 
 if (errors.length) {

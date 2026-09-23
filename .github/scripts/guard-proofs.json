@@ -446,6 +446,15 @@
       "invoque_par": "ci",
       "preuve": "backend/tests/test_health_probe.py",
       "runner": "pytest"
+    },
+    {
+      "chemin": "frontend/scripts/published-copy.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "runner": "vitest",
+      "motif": "propriétaire unique de l'apostrophe PUBLIÉE : le caractère qui survit (U+0027), la liste des surfaces (sources, vue page, vue crawler) et la détection des occurrences. Il ne rend pas de verdict — c'est le garde des coquilles qui refuse en nommant le fichier — mais sa détection est la règle elle-même, donc elle est prouvée par mutation comme une règle de garde.",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : la détection de ce module est donc verrouillée par ses cas unitaires directs (occurrence nommée avec sa ligne, commentaire ignoré, plafond par fichier, surface illisible signalée), et la mutation qui prouve le VERDICT porte sur la ligne du garde qui rapporte les violations (`prerender-shells: verdict d'apostrophe non rapporte`)"
     }
   ],
   "rejeux": [
@@ -1655,6 +1664,26 @@
       "cwd": "frontend",
       "attend": [
         "refuse : glyphe publié recopié dans un module de pré-rendu"
+      ]
+    },
+    {
+      "id": "prerender-shells: verdict d'apostrophe non rapporte",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "for (const violation of apostrophesHorsConvention(surfacesApostrophe)) {",
+      "remplace": "for (const violation of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-prerender-shells.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : coquille publiant l'apostrophe typographique"
       ]
     }
   ]

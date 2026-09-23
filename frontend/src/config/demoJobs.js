@@ -2,7 +2,7 @@ export const DEMO_JOBS = [
   {
     id: 'demo-plomberie-bamako',
     title: 'Réparer une fuite dans une cuisine',
-    description: 'Recherche d’un plombier fiable pour réparer une fuite et vérifier les raccords de la cuisine.',
+    description: 'Recherche d\'un plombier fiable pour réparer une fuite et vérifier les raccords de la cuisine.',
     status: 'open',
     category: 'Plomberie',
     location_text: 'Bamako, Mali',
@@ -12,7 +12,7 @@ export const DEMO_JOBS = [
   },
   {
     id: 'demo-peinture-dakar',
-    title: 'Repeindre deux pièces d’un appartement',
+    title: 'Repeindre deux pièces d\'un appartement',
     description: 'Un travail soigné est recherché pour préparer les murs et repeindre deux pièces avant emménagement.',
     status: 'open',
     category: 'Peinture',

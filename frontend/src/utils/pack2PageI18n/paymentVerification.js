@@ -25,7 +25,7 @@ fr: {
   security5: '• Ces informations servent uniquement aux transferts de paiement Kojo',
   autoLoginError: 'Erreur lors de la connexion automatique',
   genericError: 'Erreur lors de la finalisation du compte',
-  emailStepNotice: 'Votre email est déjà vérifié. Il ne reste plus qu’à lier vos moyens de paiement pour finaliser le compte.',
+  emailStepNotice: 'Votre email est déjà vérifié. Il ne reste plus qu\'à lier vos moyens de paiement pour finaliser le compte.',
   welcomeToast: 'Bienvenue {firstName} ! Compte vérifié avec succès 🎉',
   dashboardMessage: 'Bienvenue {firstName} ! Votre compte est vérifié avec {count} moyen(s) de paiement.',
   referralAppliedToast: '🎁 Code de parrainage appliqué avec succès !',
