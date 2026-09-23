@@ -141,7 +141,7 @@ export function validateExperienceYears(years) {
   const numericYears = parseInt(years, 10);
   
   if (isNaN(numericYears) || numericYears < 0 || numericYears > 50) {
-    return { isValid: false, message: 'Les années d\'expérience doivent être entre 0 et 50' };
+    return { isValid: false, message: 'Les années d’expérience doivent être entre 0 et 50' };
   }
   
   return { isValid: true };

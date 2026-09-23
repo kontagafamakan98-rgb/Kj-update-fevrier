@@ -126,7 +126,7 @@ function MobileLoader() {
           <span className="text-3xl font-bold text-orange-600">{t('brandMark')}</span>
         </div>
         <div className="text-white text-2xl font-bold mb-2">Kojo</div>
-        <div className="text-orange-200 text-sm mb-6">Afrique de l'Ouest</div>
+        <div className="text-orange-200 text-sm mb-6">Afrique de l’Ouest</div>
         <div className="flex justify-center space-x-2">
           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
           <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>

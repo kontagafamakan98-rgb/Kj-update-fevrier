@@ -45,26 +45,26 @@ export const PAGE_SECTIONS = {
     categories: [
       // `labelKey` est AUSSI le code de catégorie canonique du backend : le
       // libellé affiché et le filtre de /jobs sortent donc de la même valeur.
-      { labelKey: 'general', icon: '🛠️' },
-      { labelKey: 'plumbing', icon: '🔧' },
-      { labelKey: 'electrical', icon: '⚡' },
-      { labelKey: 'construction', icon: '🏗️' },
-      { labelKey: 'cleaning', icon: '🧽' },
-      { labelKey: 'gardening', icon: '🌱' },
-      { labelKey: 'tutoring', icon: '📚' },
-      { labelKey: 'mechanics', icon: '🔩' },
-      { labelKey: 'carpentry', icon: '🪚' },
-      { labelKey: 'computing', icon: '💻' },
+      { labelKey: 'general', iconKey: 'iconCategoryGeneral' },
+      { labelKey: 'plumbing', iconKey: 'iconCategoryPlumbing' },
+      { labelKey: 'electrical', iconKey: 'iconCategoryElectrical' },
+      { labelKey: 'construction', iconKey: 'iconCategoryConstruction' },
+      { labelKey: 'cleaning', iconKey: 'iconCategoryCleaning' },
+      { labelKey: 'gardening', iconKey: 'iconCategoryGardening' },
+      { labelKey: 'tutoring', iconKey: 'iconCategoryTutoring' },
+      { labelKey: 'mechanics', iconKey: 'iconCategoryMechanics' },
+      { labelKey: 'carpentry', iconKey: 'iconCategoryCarpentry' },
+      { labelKey: 'computing', iconKey: 'iconCategoryComputing' },
     ],
     promises: [
-      { icon: '💼', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
-      { icon: '🤝', titleKey: 'connect', descriptionKey: 'connectDescription' },
-      { icon: '💰', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
+      { iconKey: 'iconPromiseFindWork', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
+      { iconKey: 'iconPromiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
+      { iconKey: 'iconPromiseSecurePayments', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
     ],
     steps: [
-      { icon: '1️⃣', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
-      { icon: '2️⃣', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
-      { icon: '3️⃣', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
+      { iconKey: 'iconHomeStep1', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
+      { iconKey: 'iconHomeStep2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
+      { iconKey: 'iconHomeStep3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
     ],
     // Les quatre chiffres de l'accueil. La coquille les publiait dans sa propre
     // liste `[['1 000+', 'activeWorkers'], …]`, pendant que la page tenait ses
@@ -95,9 +95,16 @@ export const PAGE_SECTIONS = {
   // pages de confiance, sur une page de contenu.
   '/how-it-works': {
     steps: [
-      { icon: '📝', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
-      { icon: '🛡️', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
-      { icon: '✅', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
+      { iconKey: 'iconHowStep1', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
+      // L'étape 2 recopiait le bouclier du séquestre en littéral, alors que la
+      // clé `iconEscrow` le détient déjà pour le bloc de séquestre de CETTE page
+      // (`escrowIconKey`, plus bas) : deux domiciles pour un seul glyphe, sur une
+      // même page — changer la clé aurait laissé l'étape derrière, en silence.
+      // `iconKey` est résolu par les deux canaux (t() dans la page, T() dans la
+      // coquille), comme les autres clés ; les icônes qui n'ont pas de clé
+      // gardent `icon` et appartiennent au plan.
+      { iconKey: 'iconEscrow', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
+      { iconKey: 'iconHowStep3', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
     ],
     // Le glyphe du bloc « séquestre détaillé » et le repère du dépliant de la
     // FAQ : la page les écrivait en littéral et la coquille recopiait les
@@ -260,13 +267,13 @@ export const PAGE_SECTIONS = {
     },
     modes: [
       {
-        shellIcon: '💬',
+        shellIconKey: 'iconSupportRobot',
         badgeClass: 'bg-orange-100 text-orange-600',
         titleKey: 'supportRobotTitle',
         subtitleKey: 'supportRobotSubtitle',
       },
       {
-        shellIcon: '📞',
+        shellIconKey: 'iconSupportDirect',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         titleKey: 'supportDirectTitle',
         subtitleKey: 'supportDirectSubtitle',
@@ -274,7 +281,7 @@ export const PAGE_SECTIONS = {
     ],
     rows: [
       {
-        shellIcon: '📞',
+        shellIconKey: 'iconContactCall',
         labelKey: 'contactCall',
         badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
@@ -282,7 +289,7 @@ export const PAGE_SECTIONS = {
         rowClass: LIGNE_LIEN,
       },
       {
-        shellIcon: '💬',
+        shellIconKey: 'iconContactWhatsapp',
         labelKey: 'contactWhatsapp',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
@@ -291,7 +298,7 @@ export const PAGE_SECTIONS = {
         rowClass: LIGNE_LIEN,
       },
       {
-        shellIcon: '✉️',
+        shellIconKey: 'iconContactSendEmail',
         labelKey: 'contactSendEmail',
         badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
@@ -300,7 +307,7 @@ export const PAGE_SECTIONS = {
         rowClass: LIGNE_LIEN,
       },
       {
-        shellIcon: '📍',
+        shellIconKey: 'iconContactAddress',
         labelKey: 'contactAddress',
         badgeClass: 'bg-gray-100 text-gray-600',
         value: CONTACT.address,
@@ -317,9 +324,9 @@ export const PAGE_SECTIONS = {
     titleKey: 'aboutTitle',
     introKey: 'aboutIntro',
     cards: [
-      { icon: '💼', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
-      { icon: '🤝', titleKey: 'connect', descriptionKey: 'connectDescription' },
-      { icon: '💰', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
+      { iconKey: 'iconPromiseFindWork', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
+      { iconKey: 'iconPromiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
+      { iconKey: 'iconPromiseSecurePayments', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
     ],
     highlight: {
       titleKey: 'escrowTrustTitle',
@@ -355,14 +362,14 @@ export const PAGE_SECTIONS = {
     // langues du site pendant que /support les traduisait.
     actions: [
       {
-        icon: '📞',
+        iconKey: 'iconContactCall',
         labelKey: 'contactCall',
         badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
       },
       {
-        icon: '💬',
+        iconKey: 'iconContactWhatsapp',
         labelKey: 'contactWhatsapp',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
@@ -370,7 +377,7 @@ export const PAGE_SECTIONS = {
         external: true,
       },
       {
-        icon: '✉️',
+        iconKey: 'iconContactSendEmail',
         labelKey: 'contactSendEmail',
         badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
@@ -378,7 +385,7 @@ export const PAGE_SECTIONS = {
         breakAll: true,
       },
       {
-        icon: '📍',
+        iconKey: 'iconContactAddress',
         labelKey: 'contactAddress',
         badgeClass: 'bg-gray-100 text-gray-600',
         href: CONTACT.mapsUrl,

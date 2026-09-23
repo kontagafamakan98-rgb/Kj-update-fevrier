@@ -1,35 +1,35 @@
 {
   "assets": [
     {
-      "bytes": 41409,
+      "bytes": 41507,
       "file": "og-image-1200x630.png",
       "format": "wide",
       "height": 630,
-      "sha256": "070d26dc5b203adaa9c4bf5855c0b8c4518f405b33c17a6b91850419867bc4b7",
+      "sha256": "a01110259403cfa2755fba5a5da5e6554bcb2a52c6928576abf8e2036a017c86",
       "width": 1200
     },
     {
-      "bytes": 48741,
+      "bytes": 48861,
       "file": "og-square-1200x1200.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "028e23aa64f031a3aec51387bf56e26c2eb12f8c34d02775a773d9354724cbfb",
+      "sha256": "30a6b242833c5cc060c7b8e1777ac8e7d34029ecb224fd6d14a2e1736451dbf3",
       "width": 1200
     },
     {
-      "bytes": 34739,
+      "bytes": 34765,
       "file": "og-jobs.png",
       "format": "wide",
       "height": 630,
-      "sha256": "3dc1f378c4796a7139c3de9f1d5e7ded1a0c30133a1dea28ee0ed55c7e2df9a4",
+      "sha256": "1fcf312e46cdf65bac28f978c3150c0daf1e8a554b9903b9aaa8272685b91610",
       "width": 1200
     },
     {
-      "bytes": 40092,
+      "bytes": 40109,
       "file": "og-jobs-square.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "f40f64d2dbe131a1e3e6684c84553cc630299f7957a34e60a41cf900ecce661e",
+      "sha256": "b88da96eabe58b74af2e00ee755ed163face169e4f2c23d41e1f8c7c2f0a9d26",
       "width": 1200
     },
     {
@@ -63,23 +63,23 @@
         "square": {
           "description": [
             "Trouvez un plombier, électricien ou mécanicien vérifié au Mali, au",
-            "Sénégal, au Burkina Faso et en Côte d'Ivoire. Publiez une mission en",
+            "Sénégal, au Burkina Faso et en Côte d’Ivoire. Publiez une mission en",
             "toute sécurité."
           ],
           "title": [
             "Kojo — Services et travailleurs en",
-            "Afrique de l'Ouest"
+            "Afrique de l’Ouest"
           ]
         },
         "wide": {
           "description": [
             "Trouvez un plombier, électricien ou mécanicien vérifié au Mali,",
-            "au Sénégal, au Burkina Faso et en Côte d'Ivoire. Publiez une",
+            "au Sénégal, au Burkina Faso et en Côte d’Ivoire. Publiez une",
             "mission en toute sécurité."
           ],
           "title": [
             "Kojo — Services et travailleurs",
-            "en Afrique de l'Ouest"
+            "en Afrique de l’Ouest"
           ]
         }
       },
@@ -90,7 +90,7 @@
         "square": {
           "description": [
             "Trouvez un travailleur qualifié près de chez vous : emplois, missions",
-            "et talents disponibles dans toute l'Afrique de l'Ouest."
+            "et talents disponibles dans toute l’Afrique de l’Ouest."
           ],
           "title": [
             "Emplois disponibles — Kojo"
@@ -99,7 +99,7 @@
         "wide": {
           "description": [
             "Trouvez un travailleur qualifié près de chez vous : emplois,",
-            "missions et talents disponibles dans toute l'Afrique de l'Ouest."
+            "missions et talents disponibles dans toute l’Afrique de l’Ouest."
           ],
           "title": [
             "Emplois disponibles — Kojo"

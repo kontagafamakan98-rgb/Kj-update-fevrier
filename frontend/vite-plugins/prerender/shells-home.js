@@ -47,7 +47,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
           "(src/config/page-sections.js) — le bloc de contact de l'accueil lit ses glyphes là-bas."
       )
     }
-    return action.icon
+    return esc(T(action.iconKey))
   }
 
   return [
@@ -103,7 +103,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     ...homePlan.categories.map(
       (category) =>
         `<a href="/jobs?category=${category.labelKey}" class="bg-white rounded-2xl shadow-md p-6 text-center hover:shadow-lg transform transition hover:scale-105">` +
-        `<div class="text-3xl md:text-4xl mb-3">${category.icon}</div>` +
+        `<div class="text-3xl md:text-4xl mb-3">${esc(T(category.iconKey))}</div>` +
         `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.labelKey))}</h3>` +
         `</a>`
     ),
@@ -116,9 +116,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">`,
     ...homePlan.promises.map(
-      ({ icon, titleKey, descriptionKey: textKey }) =>
+      ({ iconKey, titleKey, descriptionKey: textKey }) =>
         `<div class="text-center">` +
-        `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><span class="text-2xl">${icon}</span></div>` +
+        `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><span class="text-2xl">${esc(T(iconKey))}</span></div>` +
         `<h3 class="text-xl font-semibold mb-4 text-gray-900">${esc(T(titleKey))}</h3>` +
         `<p class="text-gray-600">${esc(T(textKey))}</p>` +
         `</div>`
@@ -136,9 +136,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</div>`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`,
     ...homePlan.steps.map(
-      ({ icon, titleKey, descriptionKey: textKey }) =>
+      ({ iconKey, titleKey, descriptionKey: textKey }) =>
         `<div class="bg-white rounded-2xl shadow-md p-6 text-center">` +
-        `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${icon}</span></div>` +
+        `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${esc(T(iconKey))}</span></div>` +
         `<h3 class="text-lg font-semibold mb-2 text-gray-900">${esc(T(titleKey))}</h3>` +
         `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
         `</div>`

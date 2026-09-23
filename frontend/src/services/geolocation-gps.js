@@ -42,7 +42,7 @@ export async function getBestAvailableGpsPosition(targetAccuracy = TARGET_GPS_AC
     return firstPosition;
   }
 
-  devLog.info(`📡 Premier fix GPS à ${Math.round(firstAccuracy)}m, lancement d'un warm-up précision...`);
+  devLog.info(`📡 Premier fix GPS à ${Math.round(firstAccuracy)}m, lancement d’un warm-up précision...`);
 
   const watchDurationMs = firstAccuracy <= 25 ? 6000 : 10000;
 

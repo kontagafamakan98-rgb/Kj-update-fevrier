@@ -57,7 +57,7 @@ export async function registerPushSubscription(userId) {
 
   // 1. Demander la permission si besoin
   if (Notification.permission === 'denied') {
-    devLog.info('Permission push refusée par l\'utilisateur');
+    devLog.info('Permission push refusée par l’utilisateur');
     return null;
   }
 

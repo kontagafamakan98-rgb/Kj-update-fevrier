@@ -26,7 +26,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
 
     // Vérifier la taille (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      const errorMessage = t('imageTooLarge') || 'L\'image doit faire moins de 5MB';
+      const errorMessage = t('imageTooLarge') || 'L’image doit faire moins de 5MB';
       toast.error(errorMessage);
       return;
     }
@@ -108,7 +108,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
       
       <p className="text-sm text-gray-600 mb-4">
         {userType === 'worker' 
-          ? t('professionalPhotoHelps') || 'Une photo de profil professionnelle augmente la confiance des clients et améliore vos chances d\'être sélectionné.'
+          ? t('professionalPhotoHelps') || 'Une photo de profil professionnelle augmente la confiance des clients et améliore vos chances d’être sélectionné.'
           : t('profilePhotoHelps')
         }
       </p>
@@ -134,7 +134,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
                   <p>{t('clickToChooseOption')}</p>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  {photoFormatsLine(t('upTo') || 'jusqu\'à')}
+                  {photoFormatsLine(t('upTo') || 'jusqu’à')}
                 </div>
               </div>
             </div>

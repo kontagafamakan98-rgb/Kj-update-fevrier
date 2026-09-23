@@ -356,7 +356,7 @@ export default function Jobs() {
             {filtresActifs
               ? pageT('emptyFiltered')
               : (effectiveTab === JOB_TAB_APPLICATIONS
-                ? (pageT('noApplicationsYet') || 'Vous n\'avez pas encore postulé à une mission.')
+                ? (pageT('noApplicationsYet') || 'Vous n’avez pas encore postulé à une mission.')
                 : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')))}
             {filtresActifs ? (
               <button

@@ -28,7 +28,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 // garde sur l'arbre réel — une seule logique, aucun caractère redéclaré ici.
 import {
   APOSTROPHE_PUBLIEE,
-  APOSTROPHE_TYPOGRAPHIQUE,
+  APOSTROPHE_REFUSEE,
+  apostrophesDeCopie,
   apostrophesHorsConvention,
 } from '../published-copy.js';
 import { ROUTES } from '../check-og-images.js';
@@ -85,7 +86,7 @@ const pages = () => ({
   'index.html':
     '<!doctype html><html><head>' +
     ogTagFor('index.html') +
-    '</head><body><div id="root"><h1>Kojo</h1><p>Contenu statique de l\'accueil</p>' +
+    `</head><body><div id="root"><h1>Kojo</h1><p>Contenu statique de l${APOSTROPHE_PUBLIEE}accueil</p>` +
     '<a href="/jobs">Emplois</a>' +
     `<h2>${fr.contactTitle}</h2><p>${fr.homeContactText}</p>` +
     `<div>${fr.homeContactCall}</div><div>${fr.contactWhatsapp}</div>` +
@@ -118,7 +119,7 @@ const pages = () => ({
     ogTagFor('register.html') +
     '</head><body><div id="root">' +
     '<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>' +
-    '<button>S\'inscrire avec Google</button>' +
+    `<button>${registerT('googleSignup')}</button>` +
     '<div class="bg-orange-600">Continuer vers la vérification email</div>' +
     '<input placeholder="Prénom..." /><input placeholder="Nom..." />' +
     '<input placeholder="exemple@email.com" />' +
@@ -401,14 +402,14 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
     },
     {
       // La page et la coquille lisent le MÊME dictionnaire : si la coquille
-      // publie une apostrophe différente de celle de sa page, l'octet publié
-      // diverge — c'est le cas que la migration de convention a fermé.
-      nom: 'apostrophe typographique dans une notice du shell (page vs coquille)',
+      // publie l'apostrophe droite là où sa page publie la typographique,
+      // l'octet publié diverge — c'est ce que la bascule a fermé.
+      nom: 'apostrophe droite dans une notice du shell (page vs coquille)',
       mutate: ({ html }) => {
         const juste = registerT('legalConsentHelp');
         html['register.html'] = html['register.html'].replace(
           juste,
-          juste.replace(/'/g, APOSTROPHE_TYPOGRAPHIQUE)
+          juste.replace(/\u2019/g, APOSTROPHE_REFUSEE)
         );
       },
       attendu: "absent du shell (notices et consentement de l'étape register)",
@@ -508,23 +509,23 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       attendu: 'vite-plugins/prerender/shells-home.js introuvable',
     },
     {
-      // Vue CRAWLER : la coquille publie l'apostrophe typographique, donc sa
-      // page et elle n'afficheraient pas les mêmes octets pour le même mot.
-      nom: 'coquille publiant l\'apostrophe typographique',
+      // Vue CRAWLER : la coquille publie l'apostrophe droite, donc sa page et
+      // elle n'afficheraient pas les mêmes octets pour le même mot.
+      nom: 'coquille publiant l\'apostrophe droite',
       mutate: ({ html }) => {
         html['login.html'] = html['login.html'].replace(
           '</body>',
-          `<p>Une adresse${APOSTROPHE_TYPOGRAPHIQUE}introuvable</p></body>`
+          `<p>Une adresse${APOSTROPHE_REFUSEE}introuvable</p></body>`
         );
       },
       attendu: 'login.html',
     },
     {
       // Vue PAGE : le chunk applicatif du build publie l'autre convention.
-      nom: 'chunk applicatif publiant l\'apostrophe typographique',
+      nom: 'chunk applicatif publiant l\'apostrophe droite',
       mutate: () => ({
         files: {
-          'assets/app-abc123.js': `export const copie = "Une adresse${APOSTROPHE_TYPOGRAPHIQUE}introuvable";\n`,
+          'assets/app-abc123.js': `export const copie = "Une adresse${APOSTROPHE_REFUSEE}introuvable";\n`,
         },
       }),
       attendu: 'app-abc123.js',
@@ -550,19 +551,19 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
   it('nomme l’apostrophe fautive quand une surface en porte une', () => {
     const { out } = runGuard(
       fixture(() => ({
-        files: { 'assets/app-abc123.js': `export const copie = "d${APOSTROPHE_TYPOGRAPHIQUE}un";\n` },
+        files: { 'assets/app-abc123.js': `export const copie = "d${APOSTROPHE_REFUSEE}un";\n` },
       }))
     );
-    expect(out).toContain('apostrophe typographique');
+    expect(out).toContain('apostrophe de copie');
     expect(out).toContain(`« ${APOSTROPHE_PUBLIEE} »`);
   });
 
   it('laisse un chunk `vendor*` hors surface (la copie publiée vient de l’app)', () => {
     const dir = fixture(() => ({
-      files: { 'assets/vendor-abc123.js': `export const dep = "d${APOSTROPHE_TYPOGRAPHIQUE}un";\n` },
+      files: { 'assets/vendor-abc123.js': `export const dep = "d${APOSTROPHE_REFUSEE}un";\n` },
     }));
     const { status, out } = runGuard(dir);
-    expect(out).not.toContain('apostrophe typographique');
+    expect(out).not.toContain('apostrophe de copie');
     expect(status).toBe(0);
   });
 });
@@ -577,25 +578,74 @@ describe('published-copy — la règle de l’apostrophe publiée', () => {
   };
 
   it('nomme chaque occurrence publiée, avec sa ligne et son extrait', () => {
-    const fichier = ecrire(`const titre = 'd${APOSTROPHE_TYPOGRAPHIQUE}un' ;\n`);
+    const fichier = ecrire(`const titre = "d${APOSTROPHE_REFUSEE}un" ;\n`);
     const violations = apostrophesHorsConvention([fichier]);
     expect(violations).toHaveLength(1);
     expect(violations[0].ligne).toBe(1);
-    expect(violations[0].extrait).toContain(`d${APOSTROPHE_TYPOGRAPHIQUE}un`);
+    expect(violations[0].extrait).toContain(`d${APOSTROPHE_REFUSEE}un`);
   });
 
   it('ignore les commentaires — ils ne publient rien', () => {
     const fichier = ecrire(
-      `// on dit d${APOSTROPHE_TYPOGRAPHIQUE}un texte publié\n` +
-        `/* et l${APOSTROPHE_TYPOGRAPHIQUE}accueil */\n` +
+      `// on dit d${APOSTROPHE_REFUSEE}un texte publié\n` +
+        `/* et l${APOSTROPHE_REFUSEE}accueil */\n` +
         `const a = 1;\n`
     );
     expect(apostrophesHorsConvention([fichier])).toEqual([]);
   });
 
   it('plafonne les occurrences relevées par fichier', () => {
-    const fichier = ecrire(Array.from({ length: 9 }, () => `const a = 'd${APOSTROPHE_TYPOGRAPHIQUE}un';`).join('\n'));
+    const fichier = ecrire(
+      Array.from({ length: 9 }, () => `const a = "d${APOSTROPHE_REFUSEE}un";`).join('\n')
+    );
     expect(apostrophesHorsConvention([fichier], { parFichier: 3 })).toHaveLength(3);
+  });
+
+  // ── Ce que le caractère refusé est PRÉCISÉMENT ──────────────────────────
+  // L'apostrophe de copie joint deux lettres. Partout ailleurs, la même quote
+  // est le DÉLIMITEUR d'une chaîne de code : la refuser rendrait le contrôle
+  // impossible à satisfaire (mesuré sur l'arbre : 350 littéraux signalés pour
+  // 296 occurrences de copie) et ne dirait rien de la copie.
+  it('ne refuse pas la quote qui délimite du code, ni une citation isolée', () => {
+    const fichier = ecrire(
+      `const classe = \`flex \${actif ? 'text-white' : 'text-black'}\`;\n` +
+        `const quote = "'";\n` +
+        `const selecteur = "[data-etat='actif']";\n` +
+        `const style = { flex: \`flex \${actif ? 'a' : 'b'}\` };\n`
+    );
+    expect(apostrophesHorsConvention([fichier])).toEqual([]);
+  });
+
+  it('refuse l’apostrophe qui joint deux lettres, d’un côté comme de l’autre', () => {
+    expect(apostrophesDeCopie(`l${APOSTROPHE_REFUSEE}emploi`)).toHaveLength(1);
+    expect(apostrophesDeCopie(`Kojo${APOSTROPHE_REFUSEE}s secured`)).toHaveLength(1);
+    expect(apostrophesDeCopie(`t${APOSTROPHE_REFUSEE}a (bambara)`)).toHaveLength(1);
+    expect(apostrophesDeCopie(`1${APOSTROPHE_REFUSEE}000`)).toEqual([]);
+    expect(apostrophesDeCopie(`'`)).toEqual([]);
+  });
+
+  // La copie d'un nœud de texte JSX n'est pas un littéral dans les sources : le
+  // contrôle doit la lire LÀ où elle s'écrit, sinon le seul refus tomberait sur
+  // le chunk du build, dont le nom change à chaque build.
+  it('lit la copie des nœuds de texte JSX, hors littéraux', () => {
+    const fichier = ecrire(
+      `export const Carte = () => (\n` +
+        `  <p className="text-sm">\n` +
+        `    Une adresse${APOSTROPHE_REFUSEE}introuvable\n` +
+        `  </p>\n` +
+        `);\n`
+    );
+    const violations = apostrophesHorsConvention([fichier]);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].ligne).toBe(3);
+    expect(violations[0].extrait).toContain(`adresse${APOSTROPHE_REFUSEE}introuvable`);
+  });
+
+  it('accepte la copie JSX qui porte l’apostrophe publiée', () => {
+    const fichier = ecrire(
+      `export const Carte = () => <p>Une adresse${APOSTROPHE_PUBLIEE}introuvable</p>;\n`
+    );
+    expect(apostrophesHorsConvention([fichier])).toEqual([]);
   });
 
   it('signale une surface illisible plutôt que de la sauter en silence', () => {

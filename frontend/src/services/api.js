@@ -139,7 +139,7 @@ const extractErrorMessage = (payload, fallback) => {
 // `hasServerMessage = false` : la page qui sait traduire passe son propre repli
 // à `handleApiError`, qui a alors la priorité.
 export const TRANSPORT_FAILURE_MESSAGE = 'Erreur de connexion. Vérifiez votre connexion internet.';
-export const SERVER_FAILURE_MESSAGE = 'Une erreur inattendue s\'est produite. Veuillez rafraîchir la page.';
+export const SERVER_FAILURE_MESSAGE = 'Une erreur inattendue s’est produite. Veuillez rafraîchir la page.';
 
 const HTML_OU_PROLOGUE = /^\s*(<!doctype|<html|<\?xml|<[a-z!/])/i;
 

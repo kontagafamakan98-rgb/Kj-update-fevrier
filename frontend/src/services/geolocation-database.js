@@ -34,7 +34,7 @@ export const FALLBACK_COUNTRY_DATA = {
   },
   cote_divoire: {
     country: 'Ivory Coast',
-    nameFrench: "Côte d'Ivoire",
+    nameFrench: "Côte d’Ivoire",
     flag: '🇨🇮',
     phonePrefix: '+225',
     currency: 'XOF',

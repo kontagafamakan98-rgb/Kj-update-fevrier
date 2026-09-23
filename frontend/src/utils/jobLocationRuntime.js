@@ -73,7 +73,7 @@ const reverseGeocode = async (latitude, longitude) => {
 
 export const detectCurrentJobLocation = async () => {
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
-    throw new Error('La géolocalisation n\'est pas disponible sur cet appareil');
+    throw new Error('La géolocalisation n’est pas disponible sur cet appareil');
   }
 
   const position = await new Promise((resolve, reject) => {

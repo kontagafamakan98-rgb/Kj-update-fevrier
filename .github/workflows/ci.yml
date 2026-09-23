@@ -508,6 +508,18 @@ jobs:
         working-directory: frontend
         run: node scripts/check-prerender-shells.js
 
+      # Le garde ci-dessus compare les textes que le plan DÉCLARE. Celui-ci
+      # compare TOUT ce que les coquilles publient — chaque fragment visible des
+      # HTML du build — aux textes que la page peut publier : un mot ajouté à la
+      # main dans une coquille, ou une phrase restée dans le plugin après que la
+      # page a changé, n'était ni déclaré ni comparé, donc invisible. Il refuse
+      # en nommant la coquille, le fragment et les textes de page les plus
+      # proches (règle stricte : texte entier, composition de textes entiers, ou
+      # valeur dérivée déclarée).
+      - name: Check shell text provenance (every published fragment ↔ page text)
+        working-directory: frontend
+        run: node scripts/check-shell-text-provenance.js
+
       # Les DEUX canaux qui publient les métadonnées d'une page — la coquille
       # pré-rendue (build) et les pages au runtime — doivent annoncer le même
       # titre, la même description et la même carte, lus dans les tables uniques
