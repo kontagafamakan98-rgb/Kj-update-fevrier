@@ -147,6 +147,14 @@
       "runner": "vitest"
     },
     {
+      "chemin": "frontend/scripts/check-test-environment.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "runner": "vitest",
+      "motif": "refuse un serveur de test encore ouvert et une URL de Preview injoignable en fin de passe; la liste des ports vient de playwright.config.js et du serveur de rewrites"
+    },
+    {
       "chemin": "frontend/scripts/check-pwa-manifest.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -1587,6 +1595,46 @@
       "cwd": "backend",
       "attend": [
         "FAILED tests/test_identifiants_un_proprietaire.py::TestUnDocumentAncienResteAdressable::test_un_jeton_sans_champ_id_est_desactive_par_son_identifiant_mongo"
+      ]
+    },
+    {
+      "id": "environment: serveur de test ouvert ignore",
+      "garde": "frontend/scripts/check-test-environment.js",
+      "cible": "frontend/scripts/check-test-environment.js",
+      "trouve": "return (await isListeningImpl(entry.port))\n      ? `serveur de test encore ouvert sur le port ${entry.port} (${entry.owner})`\n      : null;",
+      "remplace": "return null;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "serveur de test encore ouvert"
+      ]
+    },
+    {
+      "id": "environment: preview morte toleree",
+      "garde": "frontend/scripts/check-test-environment.js",
+      "cible": "frontend/scripts/check-test-environment.js",
+      "trouve": ": `onglet Preview sans serveur joignable : ${url.href}`;",
+      "remplace": ": null;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "onglet Preview sans serveur joignable"
       ]
     }
   ]

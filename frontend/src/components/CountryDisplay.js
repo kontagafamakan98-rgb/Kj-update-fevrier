@@ -6,6 +6,7 @@ import FlagIcon from './FlagIcon';
 // le lit AUSSI pour écrire la coquille pré-rendue de l'accueil. C'est ce qui
 // empêche un pays d'exister pour React et pas pour un crawler sans JavaScript.
 import { COUNTRIES as COUNTRY_LIST } from '../config/countries';
+import { COUNTRY_PLACEHOLDER } from '../config/country-placeholder';
 
 // Carte indexée par code canonique : `getCountry()` normalise un code (alias,
 // ISO, ancien nom) puis cherche ici. DÉRIVÉE de la liste partagée, jamais une
@@ -101,7 +102,7 @@ export function CountrySelect({
 
   const countries = useMemo(() => getAllCountries(), []);
   const activeCountry = getCountry(value);
-  const resolvedPlaceholder = placeholder || `-- ${t('country')} --`;
+  const resolvedPlaceholder = placeholder || COUNTRY_PLACEHOLDER(t('country'));
 
   const filteredCountries = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();

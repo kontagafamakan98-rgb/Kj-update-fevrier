@@ -1075,6 +1075,7 @@ jobs:
             FRONTEND_APP_URL="$LOCAL_BASE" \
             uvicorn server:app --host 127.0.0.1 --port 8000 \
             > /tmp/kojo-local-backend.log 2>&1 &
+          echo $! > /tmp/kojo-local-backend.pid
 
           for _ in $(seq 1 45); do
             curl -sf "$LOCAL_BACKEND/health" >/dev/null 2>&1 && break
@@ -1090,6 +1091,7 @@ jobs:
             --port 4174 --root ../frontend/build \
             --config ../frontend/vercel.json --backend "$LOCAL_BACKEND" \
             > /tmp/kojo-local-rewrites.log 2>&1 &
+          echo $! > /tmp/kojo-local-rewrites.pid
 
           for _ in $(seq 1 30); do
             curl -sf "$LOCAL_BASE/" >/dev/null 2>&1 && break
@@ -1234,6 +1236,32 @@ jobs:
         # KOJO_LHCI_BASE_URL et KOJO_LHCI_AUTH_HEADER sont dans l'env via $GITHUB_ENV (steps
         # précédents) — lhci autorun lit process.env.KOJO_LHCI_AUTH_HEADER.
         run: npx lhci autorun --config=lighthouserc.cjs
+
+      - name: Fermer la pile locale et vérifier l’environnement final
+        if: always()
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          for pidfile in /tmp/kojo-local-rewrites.pid /tmp/kojo-local-backend.pid; do
+            if [ -f "$pidfile" ]; then
+              kill "$(cat "$pidfile")" 2>/dev/null || true
+              rm -f "$pidfile"
+            fi
+          done
+          for _ in $(seq 1 10); do
+            if ! node scripts/check-test-environment.js --no-preview-tabs >/dev/null 2>&1; then
+              sleep 1
+            else
+              break
+            fi
+          done
+          if [ "${KOJO_LHCI_LOCAL_STACK:-}" = "1" ]; then
+            node scripts/check-test-environment.js --no-preview-tabs
+          elif [ -n "${KOJO_LHCI_BASE_URL:-}" ]; then
+            node scripts/check-test-environment.js --preview-url "$KOJO_LHCI_BASE_URL"
+          else
+            node scripts/check-test-environment.js --no-preview-tabs
+          fi
 
       # Rapports consultables dans les artifacts du run (utile pour
       # diagnostiquer un échec de budget). Toujours uploadés, même si le
