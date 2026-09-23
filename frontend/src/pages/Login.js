@@ -9,6 +9,7 @@ import GoogleButton from '../components/GoogleButton';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
 import { usePageMeta } from '../utils/seo';
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
@@ -43,6 +44,7 @@ export default function Login() {
   usePageMeta();
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
   const pageT = makeScopedTranslator(currentLanguage, t);
+  const pagePlan = PAGE_SECTIONS['/login'];
   const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
 
   const handleSubmit = async (e) => {
@@ -138,7 +140,7 @@ export default function Login() {
               Tailwind sont identiques à celles d'origine — le rendu ne change
               pas, seule la sémantique est corrigée. */}
           <h1 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {t('login')}
+            {t(pagePlan.titleKey)}
           </h1>
         </div>
 
@@ -152,7 +154,7 @@ export default function Login() {
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                {t('email')}
+                {t(pagePlan.emailLabelKey)}
               </label>
               <input
                 id="email"
@@ -161,7 +163,7 @@ export default function Login() {
                 autoComplete="email"
                 required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                placeholder={t('email')}
+                placeholder={t(pagePlan.emailLabelKey)}
                 value={formData.email}
                 onChange={handleChange}
               />
@@ -170,7 +172,7 @@ export default function Login() {
             <div>
               <div className="flex items-center justify-between">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  {t('password')}
+                  {t(pagePlan.passwordLabelKey)}
                 </label>
                 <Link to="/forgot-password" className="text-sm font-medium text-orange-600 hover:text-orange-500">
                   {forgotPasswordLabel}
@@ -184,7 +186,7 @@ export default function Login() {
                   autoComplete="current-password"
                   required
                   className="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500 focus:z-10 sm:text-sm"
-                  placeholder={t('password')}
+                  placeholder={t(pagePlan.passwordLabelKey)}
                   value={formData.password}
                   onChange={handleChange}
                 />
@@ -207,30 +209,30 @@ export default function Login() {
               loading={loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50"
             >
-              {t('login')}
+              {t(pagePlan.titleKey)}
             </LoadingButton>
           </div>
 
-          <GoogleButton onClick={handleGoogle} label={pageT('googleLogin')} />
+          <GoogleButton onClick={handleGoogle} label={pageT(pagePlan.googleLoginKey)} />
 
           <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
-            <p className="text-sm font-semibold text-orange-900">📜 {pageT('legalNoticeTitle')}</p>
+            <p className="text-sm font-semibold text-orange-900">📜 {pageT(pagePlan.legalNoticeTitleKey)}</p>
             <a
               href={legalDocumentUrl}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
             >
-              {pageT('legalConsentLink')}
+              {pageT(pagePlan.legalConsentLinkKey)}
             </a>
-            <p className="text-xs text-gray-600">{pageT('legalContactLine')}</p>
+            <p className="text-xs text-gray-600">{pageT(pagePlan.legalContactLineKey)}</p>
           </div>
 
           <div className="text-center">
             <span className="text-sm text-gray-600">
-              {t('noAccount')}{' '}
+              {t(pagePlan.noAccountKey)}{' '}
               <Link to="/register" className="font-medium text-orange-600 hover:text-orange-500">
-                {t('register')}
+                {t(pagePlan.registerKey)}
               </Link>
             </span>
           </div>

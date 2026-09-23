@@ -60,13 +60,36 @@ export const consumerFiles = (srcRoot) => {
   } catch {
     // App.js absent (fixture minimale)
   }
+  const pageSections = path.join(srcRoot, 'config', 'page-sections.js');
+  try {
+    readFileSync(pageSections);
+    out.push(pageSections);
+  } catch {
+    // page-sections.js absent (fixture minimale)
+  }
   return out;
 };
 
 /** Fichiers qui importent RÉELLEMENT ce scope (`pack2PageI18n/<scope>`). */
 export const consumersOf = (srcRoot, scope) => {
   const target = `pack2PageI18n/${scope}`;
-  return consumerFiles(srcRoot).filter((f) => readFileSync(f, 'utf8').includes(target));
+  return consumerFiles(srcRoot).filter((f) => {
+    const source = readFileSync(f, 'utf8');
+    // page-sections.js is a declarative consumer: its *Key values are read by
+    // the page and by the prerender build, even though it does not import the
+    // scope module directly. Keep those declarations visible to this guard.
+    return source.includes(target) || f.endsWith(path.join('config', 'page-sections.js'));
+  });
+};
+
+/** Keys declared by the shared page plans (including arrays such as Keys). */
+export const declaredPagePlanKeys = (src) => {
+  const keys = new Set();
+  for (const match of src.matchAll(/\b\w+Key(?:s)?\s*:\s*'([a-zA-Z_]\w*)'/g)) keys.add(match[1]);
+  for (const match of src.matchAll(/\b\w+Key(?:s)?\s*:\s*\[([\s\S]*?)\]/g)) {
+    for (const key of match[1].matchAll(/'([a-zA-Z_]\w*)'/g)) keys.add(key[1]);
+  }
+  return keys;
 };
 
 // ── Extraction des dictionnaires d'un scope ────────────────────────────────
@@ -149,6 +172,7 @@ export const analyzeScope = ({ scope, pack2Dir, srcRoot }) => {
   for (const consumer of consumersOf(srcRoot, scope)) {
     const csrc = readFileSync(consumer, 'utf8');
     staticPageTCalls(csrc).forEach((k) => used.add(k));
+    declaredPagePlanKeys(csrc).forEach((k) => used.add(k));
     literalErrorKeys(csrc).forEach((k) => dynKeys.add(k));
     dynamicPrefixes(csrc).forEach((p) => prefixes.add(p));
   }

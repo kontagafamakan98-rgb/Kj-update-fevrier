@@ -10,6 +10,7 @@ import { handleApiError } from '../services/api';
 // de chargement des données partagent EXACTEMENT les mêmes hauteurs.
 import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 import { usePageMeta } from '../utils/seo';
+import { PAGE_SECTIONS } from '../config/page-sections';
 
 const COPY = {
   fr: {
@@ -217,10 +218,11 @@ const COPY = {
 const getCopy = (lang) => COPY[lang] || COPY.fr;
 
 const Payment = () => {
-  const { currentLanguage } = useLanguage();
+  const { currentLanguage, t } = useLanguage();
   const { user } = useAuth();
   const navigate = useNavigate();
   const copy = useMemo(() => getCopy(currentLanguage), [currentLanguage]);
+  const pagePlan = PAGE_SECTIONS['/payment'];
   usePageMeta();
 
   // Contexte optionnel transmis depuis la page d'un job (juste apres
@@ -361,7 +363,7 @@ const Payment = () => {
     // escrow, ni chemin de versement : le backend le rejette (400). On garde
     // le même message côté client pour ne pas faire d'aller-retour inutile.
     if (!jobPaymentContext) {
-      setCheckoutError(copy.noJobTitle);
+      setCheckoutError(t(pagePlan.noJobTitleKey));
       setProcessing(false);
       return;
     }
@@ -430,8 +432,8 @@ const Payment = () => {
     <div className="min-h-full bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{copy.title}</h1>
-          <p className="text-gray-600">{copy.subtitle}</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t(pagePlan.titleKey)}</h1>
+          <p className="text-gray-600">{t(pagePlan.subtitleKey)}</p>
           {jobPaymentContext && (
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
               {copy.paymentForMissionDetail.replace('{jobTitle}', jobPaymentContext.jobTitle ? ` « ${jobPaymentContext.jobTitle} »` : '')}
@@ -473,10 +475,10 @@ const Payment = () => {
         {!jobPaymentContext && !statusParams ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
             <div className="text-4xl mb-3">💼</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">{copy.noJobTitle}</h2>
-            <p className="text-gray-600 max-w-lg mx-auto mb-5">{copy.noJobText}</p>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">{t(pagePlan.noJobTitleKey)}</h2>
+            <p className="text-gray-600 max-w-lg mx-auto mb-5">{t(pagePlan.noJobTextKey)}</p>
             <Link to="/jobs" className="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
-              {copy.noJobCta}
+              {t(pagePlan.noJobCtaKey)}
             </Link>
           </div>
         ) : (
