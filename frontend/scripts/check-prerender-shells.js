@@ -43,8 +43,8 @@
  * prerender-route-meta désactivé/supprimé, shell perdu, contenu statique
  * ajouté à l'index, route pré-rendue non routée par Vercel, glyphe publié
  * recopié au lieu d'être lu depuis sa clé, ou copie publiée qui porte
- * l'apostrophe typographique. Exécuté dans le job CI
- * frontend-build après le build.
+ * l'apostrophe droite de sa copie (celle qui joint deux lettres). Exécuté dans
+ * le job CI frontend-build après le build.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -52,6 +52,7 @@ import { fileURLToPath } from 'node:url';
 // L'apostrophe publiée — le caractère qui survit, ses surfaces et leur
 // contrôle appartiennent à scripts/published-copy.js : ce garde l'exécute, il
 // ne redéclare ni le caractère ni la liste des fichiers.
+import { valeursMarqueur } from './shell-text-provenance.js';
 import {
   APOSTROPHE_PUBLIEE,
   apostrophesHorsConvention,
@@ -502,9 +503,15 @@ if (vercelRewrites) {
 // changer la clé laisserait la coquille derrière, en silence — le défaut que ce
 // découpage vient de supprimer. Les valeurs interdites sont LUES dans le
 // dictionnaire, jamais listées ici.
-const GLYPHES_INTERDITS = [...new Set(Object.keys(fr).filter((cle) => cle.startsWith('icon')).map((cle) => fr[cle]))].filter(
-  (valeur) => typeof valeur === 'string' && /[^\x20-\x7E]/.test(valeur)
-);
+// Les valeurs de marqueur appartiennent au module de provenance
+// (`scripts/shell-text-provenance.js`), qui les dérive du même dictionnaire pour
+// la règle des marqueurs : ce garde n'en tient pas une seconde copie. Seuls les
+// glyphes NON ASCII sont interdits en littéral ici — un `K` ou un `+` isolé
+// n'est pas scannable ligne à ligne sans faux positifs (la règle des marqueurs,
+// elle, compare des VALEURS de champ, ce qui les couvre sans ce bruit).
+const GLYPHES_INTERDITS = [
+  ...valeursMarqueur(fileURLToPath(new URL('..', import.meta.url))).keys(),
+].filter((valeur) => /[^\x20-\x7E]/.test(valeur));
 const MODULES_PRE_RENDU = [
   'prerender-route-meta.js',
   'prerender/app-template.js',
@@ -546,12 +553,16 @@ for (const rel of MODULES_PRE_RENDU) {
 
 // 8. L'APOSTROPHE de la copie publiée : un seul caractère, sur les DEUX vues.
 // La page et la coquille d'une même route tiraient leurs mots des mêmes
-// dictionnaires mais l'un des deux canaux publiait U+2019 là où l'autre
-// publiait U+0027 — l'écart d'octet que la migration a fermé. La règle, la
-// liste des surfaces et le caractère survivant appartiennent à
-// scripts/published-copy.js : ce garde ne fait que l'exécuter sur l'arbre réel
-// (les SOURCES, la vue PAGE = les chunks applicatifs, la vue CRAWLER = les
-// coquilles), et son test l'exécute sur des fixtures.
+// dictionnaires mais l'un des deux canaux publiait U+0027 là où l'autre
+// publiait U+2019 — l'écart d'octet que la migration a fermé : c'est
+// l'apostrophe TYPOGRAPHIQUE qui survit. La règle, la liste des surfaces, le
+// caractère survivant et ce qu'est « une apostrophe de copie » (celle qui
+// JOINT DEUX LETTRES, jamais le délimiteur `'` d'une chaîne de code)
+// appartiennent à scripts/published-copy.js : ce garde ne fait que l'exécuter
+// sur l'arbre réel (les SOURCES, la vue PAGE = les chunks applicatifs, la vue
+// CRAWLER = les coquilles), et son test l'exécute sur des fixtures. La règle lit
+// les LITTÉRAUX, jamais les lignes : l'apostrophe droite est le délimiteur de
+// chaîne de JavaScript.
 const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 let surfacesApostrophe = [];
 try {
@@ -575,9 +586,10 @@ if (!surfacesApostrophe.length) {
 for (const violation of apostrophesHorsConvention(surfacesApostrophe)) {
   const ou = violation.ligne ? `${violation.fichier}:${violation.ligne}` : violation.fichier;
   errors.push(
-    `${ou} publie l'apostrophe typographique « ’ » — la copie publiée porte UNE seule ` +
-      `apostrophe, « ${APOSTROPHE_PUBLIEE} » (scripts/published-copy.js), et la page comme la ` +
-      `coquille doivent publier les mêmes octets : « …${violation.extrait}… »`
+    `${ou} publie « ' » comme apostrophe de copie (elle joint deux lettres) — la copie ` +
+      `publiée porte UNE seule apostrophe, la typographique « ${APOSTROPHE_PUBLIEE} » ` +
+      `(scripts/published-copy.js), et la page comme la coquille doivent publier les mêmes ` +
+      `octets : « …${violation.extrait}… »`
   );
 }
 

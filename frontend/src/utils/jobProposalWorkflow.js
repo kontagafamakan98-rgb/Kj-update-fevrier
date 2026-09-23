@@ -343,7 +343,7 @@ export const sendProposalConversationMessage = async ({ receiverId, receiverName
     }
   }
 
-  throw lastError || new Error('Impossible d\'envoyer le message');
+  throw lastError || new Error('Impossible d’envoyer le message');
 };
 
 export const loadProposalConversationMessages = async () => {

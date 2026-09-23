@@ -455,6 +455,23 @@
       "runner": "vitest",
       "motif": "propriétaire unique de l'apostrophe PUBLIÉE : le caractère qui survit (U+0027), la liste des surfaces (sources, vue page, vue crawler) et la détection des occurrences. Il ne rend pas de verdict — c'est le garde des coquilles qui refuse en nommant le fichier — mais sa détection est la règle elle-même, donc elle est prouvée par mutation comme une règle de garde.",
       "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : la détection de ce module est donc verrouillée par ses cas unitaires directs (occurrence nommée avec sa ligne, commentaire ignoré, plafond par fichier, surface illisible signalée), et la mutation qui prouve le VERDICT porte sur la ligne du garde qui rapporte les violations (`prerender-shells: verdict d'apostrophe non rapporte`)"
+    },
+    {
+      "chemin": "frontend/scripts/check-shell-text-provenance.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-shell-text-provenance.test.js",
+      "runner": "vitest",
+      "motif": "trois règles sur ce que les coquilles publient : (1) PROVENANCE — chaque fragment visible d'un HTML pré-rendu vient d'un texte que la page possède (texte entier, composition, ou valeur dérivée déclarée) ; (2) MARQUEURS — chaque glyphe publié a un porteur partagé (une clé i18n nommée par le plan ou un module) ou une exemption documentée, et le plan ne recopie pas la valeur d'une clé ; (3) COPIE EN DUR — aucun module qui fabrique une coquille n'écrit un texte affiché en littéral. Chaque refus nomme le fichier, la ligne et le texte."
+    },
+    {
+      "chemin": "frontend/scripts/shell-text-provenance.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-shell-text-provenance.test.js",
+      "runner": "vitest",
+      "motif": "les trois règles elles-mêmes (lecture des littéraux hors commentaires et expressions régulières avec leur ligne ; corpus des textes de page ; valeurs dérivées déclarées ; marqueurs du dictionnaire, du plan et des coquilles ; copie en dur dans les modules de pré-rendu) : le garde prononce le verdict, ce module fournit les règles",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les règles de ce module sont verrouillées par leurs cas unitaires directs (texte entier, composition, valeur dérivée, mot inventé, texte commenté, recopie d'un glyphe, exemption périmée, clé de glyphe inconnue, marqueur sans porteur, copie en dur, lecteur de littéraux), et la mutation qui prouve le VERDICT porte sur les lignes du garde qui l'énoncent (trois mutations déclarées)"
     }
   ],
   "rejeux": [
@@ -1684,6 +1701,66 @@
       "cwd": "frontend",
       "attend": [
         "refuse : coquille publiant l'apostrophe typographique"
+      ]
+    },
+    {
+      "id": "shell-text-provenance: verdict non prononce",
+      "garde": "frontend/scripts/check-shell-text-provenance.js",
+      "cible": "frontend/scripts/check-shell-text-provenance.js",
+      "trouve": "if (divergences.length) {",
+      "remplace": "if (false && divergences.length) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-shell-text-provenance.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-shell-text-provenance.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : un fragment publié sans source côté page"
+      ]
+    },
+    {
+      "id": "shell-text-provenance: verdict de marqueur neutralise",
+      "garde": "frontend/scripts/check-shell-text-provenance.js",
+      "cible": "frontend/scripts/check-shell-text-provenance.js",
+      "trouve": "const divergencesMarqueur = divergencesDeMarqueur({ frontendDir, coquilles });",
+      "remplace": "const divergencesMarqueur = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-shell-text-provenance.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-shell-text-provenance.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "Marqueurs des coquilles"
+      ]
+    },
+    {
+      "id": "shell-text-provenance: verdict de copie en dur neutralise",
+      "garde": "frontend/scripts/check-shell-text-provenance.js",
+      "cible": "frontend/scripts/check-shell-text-provenance.js",
+      "trouve": "if (copiesEnDur.length) {",
+      "remplace": "if (false && copiesEnDur.length) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-shell-text-provenance.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-shell-text-provenance.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "Copie en dur dans les coquilles"
       ]
     }
   ]

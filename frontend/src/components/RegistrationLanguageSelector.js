@@ -123,7 +123,7 @@ const RegistrationLanguageSelector = ({
       {/* Sélection des langues */}
       <div>
         <p className="text-sm text-gray-700 mb-3">
-          <strong>{t('languageNote') || 'Note :'}</strong> {t('interfaceWillChange') || 'L\'interface changera selon votre choix et cette langue s\'affichera sur votre profil.'}
+          <strong>{t('languageNote') || 'Note :'}</strong> {t('interfaceWillChange') || 'L’interface changera selon votre choix et cette langue s’affichera sur votre profil.'}
         </p>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -204,7 +204,7 @@ const RegistrationLanguageSelector = ({
           <div className="text-xs text-yellow-800">
             <p className="font-medium mb-1">{t('aboutSelection') || 'À propos de votre sélection :'}</p>
             <ul className="space-y-1">
-              <li>• {t('interfaceWillChangeNote') || 'L\'interface Kojo changera selon votre langue choisie'}</li>
+              <li>• {t('interfaceWillChangeNote') || 'L’interface Kojo changera selon votre langue choisie'}</li>
               <li>• {t('languageOnProfile') || 'Votre langue apparaîtra sur votre profil public'}</li>
               <li>• {t('clientsCanSee') || 'Les clients pourront voir quelle langue vous parlez couramment'}</li>
               <li>• {t('canModifyLater') || 'Vous pourrez modifier ce choix plus tard dans vos paramètres'}</li>

@@ -373,7 +373,7 @@ class PreciseGeolocationService {
     results.push(...fetched);
 
     if (results.length === 0) {
-      devLog.info('❌ Aucun service IP n\'a fourni de localisation valide');
+      devLog.info('❌ Aucun service IP n’a fourni de localisation valide');
       return neutralLocation('ip');
     }
 
@@ -408,7 +408,7 @@ class PreciseGeolocationService {
     }
 
     // Hors Afrique de l'Ouest - retourner les vraies données IP
-    devLog.info('📍 IP hors zone Afrique de l\'Ouest - position réelle retournée');
+    devLog.info('📍 IP hors zone Afrique de l’Ouest - position réelle retournée');
     const firstResult = results[0];
     return {
       detected: true,
@@ -512,7 +512,7 @@ class PreciseGeolocationService {
 
     // Vérifier d'abord si c'est en Afrique de l'Ouest
     if (!this.isWestAfricaCoordinates(latitude, longitude)) {
-      devLog.info('⚠️ Coordonnées hors Afrique de l\'Ouest');
+      devLog.info('⚠️ Coordonnées hors Afrique de l’Ouest');
       return null;
     }
 
@@ -1028,11 +1028,11 @@ export const getPopularBanksByCountry = (country) => {
       'Coris Bank International'
     ],
     'cote_divoire': [
-      'Société Générale Côte d\'Ivoire',
-      'Banque Atlantique Côte d\'Ivoire',
-      'Ecobank Côte d\'Ivoire', 
-      'Bank of Africa Côte d\'Ivoire',
-      'UBA Côte d\'Ivoire'
+      'Société Générale Côte d’Ivoire',
+      'Banque Atlantique Côte d’Ivoire',
+      'Ecobank Côte d’Ivoire', 
+      'Bank of Africa Côte d’Ivoire',
+      'UBA Côte d’Ivoire'
     ]
   };
   
@@ -1188,7 +1188,7 @@ export const getLanguageSuggestionMessage = (detectedCountry) => {
       localLang: 'Mooré'
     },
     cote_divoire: {
-      message: "En Côte d'Ivoire, la plupart des utilisateurs préfèrent le Français. L'anglais reste disponible si besoin.",
+      message: "En Côte d’Ivoire, la plupart des utilisateurs préfèrent le Français. L’anglais reste disponible si besoin.",
       primaryLang: 'Français',
       localLang: null
     }

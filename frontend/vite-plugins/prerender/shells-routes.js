@@ -284,9 +284,12 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`
       + howItWorksPlan.steps
         .map(
-          ({ icon, titleKey, descriptionKey: textKey }) =>
+          // `iconKey` (clé i18n) prime sur `icon` (glyphe propre au plan) : le
+          // bouclier du séquestre est le même glyphe que le bloc de séquestre de
+          // cette page, donc il a une seule clé pour les deux canaux.
+          ({ icon, iconKey, titleKey, descriptionKey: textKey }) =>
             `<div class="rounded-2xl border border-gray-100 shadow-sm p-6">` +
-            `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${icon}</span></div>` +
+            `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${iconKey ? esc(T(iconKey)) : icon}</span></div>` +
             `<h2 class="text-lg font-semibold text-gray-900 text-center mb-3">${esc(T(titleKey))}</h2>` +
             `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
             `</div>`
@@ -382,9 +385,9 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`
       + supportPlan.modes
           .map(
-            ({ shellIcon, badgeClass, titleKey, subtitleKey }) =>
+            ({ shellIconKey, badgeClass, titleKey, subtitleKey }) =>
               `<div class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">` +
-              `<span class="flex h-12 w-12 items-center justify-center rounded-full ${badgeClass}">${shellIcon}</span>` +
+              `<span class="flex h-12 w-12 items-center justify-center rounded-full ${badgeClass}">${esc(T(shellIconKey))}</span>` +
               `<span class="font-semibold text-gray-900">${esc(T(titleKey))}</span>` +
               `<span class="text-xs text-gray-500">${esc(T(subtitleKey))}</span>` +
               `</div>`
@@ -398,7 +401,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + supportPlan.rows
           .map((row) => {
             const interieur =
-              `<span class="flex h-10 w-10 items-center justify-center rounded-full ${row.badgeClass}">${row.shellIcon}</span>` +
+              `<span class="flex h-10 w-10 items-center justify-center rounded-full ${row.badgeClass}">${esc(T(row.shellIconKey))}</span>` +
               `<div><div class="text-sm font-semibold text-gray-900">${esc(T(row.labelKey))}</div>` +
               `<div class="text-xs text-gray-500${row.breakAll ? ' break-all' : ''}">${esc(row.value)}</div></div>`
             return row.href
@@ -431,9 +434,9 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">`
       + aboutPlan.cards
           .map(
-            ({ icon, titleKey, descriptionKey }) =>
+            ({ iconKey, titleKey, descriptionKey }) =>
               `<div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">` +
-              `<div class="text-2xl mb-3">${icon}</div>` +
+              `<div class="text-2xl mb-3">${esc(T(iconKey))}</div>` +
               `<h2 class="text-lg font-semibold text-gray-900 mb-2">${esc(T(titleKey))}</h2>` +
               `<p class="text-sm text-gray-600">${esc(T(descriptionKey))}</p>` +
               `</div>`
@@ -455,11 +458,11 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
       + contactPlan.actions
           .map(
-            ({ icon, labelKey, badgeClass, href, value, external, breakAll }) =>
+            ({ iconKey, labelKey, badgeClass, href, value, external, breakAll }) =>
               `<a href="${esc(href)}"` +
               (external ? ` target="_blank" rel="noreferrer"` : '') +
               ` class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">` +
-              `<span class="flex h-10 w-10 items-center justify-center rounded-full ${badgeClass}">${icon}</span>` +
+              `<span class="flex h-10 w-10 items-center justify-center rounded-full ${badgeClass}">${esc(T(iconKey))}</span>` +
               `<div><div class="text-sm font-semibold text-gray-900">${esc(T(labelKey))}</div>` +
               `<div class="text-xs text-gray-500${breakAll ? ' break-all' : ''}">${esc(value)}</div></div>` +
               `</a>`

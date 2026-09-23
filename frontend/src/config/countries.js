@@ -47,9 +47,9 @@ export const COUNTRIES = [
     // `check-home-shell.js` sait lire (il extrait les `name:` du référentiel
     // pour vérifier que la coquille publie bien chaque pays). En guillemets
     // doubles, ce pays sortait de la vérification sans que rien ne le dise.
-    name: 'Côte d\'Ivoire',
+    name: 'Côte d’Ivoire',
     flag: '🇨🇮',
-    fullName: 'Côte d\'Ivoire',
+    fullName: 'Côte d’Ivoire',
     iso: 'CI',
     color: 'bg-orange-100',
   },

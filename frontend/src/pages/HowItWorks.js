@@ -14,8 +14,11 @@ export default function HowItWorks() {
   usePageMeta();
 
   const plan = PAGE_SECTIONS['/how-it-works'];
-  const STEPS = plan.steps.map(({ icon, titleKey, descriptionKey }) => ({
-    icon,
+  const STEPS = plan.steps.map(({ iconKey, titleKey, descriptionKey }) => ({
+    // Le glyphe est une CLÉ i18n, comme le texte : la même clé sert à la page et
+    // à la coquille, donc les deux canaux publient un seul glyphe (voir
+    // `scripts/shell-text-provenance.js`, règle des marqueurs).
+    icon: t(iconKey),
     title: t(titleKey),
     description: t(descriptionKey),
   }));

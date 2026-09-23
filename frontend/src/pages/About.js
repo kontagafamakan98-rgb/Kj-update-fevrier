@@ -36,7 +36,7 @@ export default function About() {
               key={card.titleKey}
               className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
             >
-              <div className="text-2xl mb-3">{card.icon}</div>
+              <div className="text-2xl mb-3">{t(card.iconKey)}</div>
               <h2 className="text-lg font-semibold text-gray-900 mb-2">
                 {t(card.titleKey)}
               </h2>

@@ -175,7 +175,7 @@ export default function Register() {
 
   const detectUserLocationAndSetDefaults = async () => {
     try {
-      devLog.info('🌍 Détection automatique du pays de l\'utilisateur...');
+      devLog.info('🌍 Détection automatique du pays de l’utilisateur...');
       const country = await detectUserCountry();
       
       // detected:false = échec de détection (objet neutre, jamais null) : on

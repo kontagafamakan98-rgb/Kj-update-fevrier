@@ -63,7 +63,7 @@ const MobilePhotoTest = () => {
           borderRadius: '8px',
           color: '#666'
         }}>
-          📱 Cette fonctionnalité sera pleinement disponible sur l'application mobile native.<br/>
+          📱 Cette fonctionnalité sera pleinement disponible sur l’application mobile native.<br/>
           Voici une démonstration de la logique sur web.
         </p>
       </div>
@@ -238,9 +238,9 @@ const MobilePhotoTest = () => {
         backgroundColor: '#f9f9f9',
         borderRadius: '8px'
       }}>
-        <h3 style={{ color: '#EA580C' }}>🚀 Sur l'App Mobile Native :</h3>
+        <h3 style={{ color: '#EA580C' }}>🚀 Sur l’App Mobile Native :</h3>
         <ul style={{ color: '#666', lineHeight: '1.6' }}>
-          <li>📱 Accès direct à l'appareil photo</li>
+          <li>📱 Accès direct à l’appareil photo</li>
           <li>🖼️ Sélection depuis la galerie photos</li>
           <li>✂️ Recadrage automatique en carré</li>
           <li>💾 Sauvegarde persistante</li>

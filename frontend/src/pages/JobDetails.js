@@ -158,10 +158,10 @@ export default function JobDetails() {
   // OG dynamique : un lien /jobs/:id partagé (WhatsApp, Facebook) montre le
   // titre et la description réels de la mission au lieu du texte générique.
   usePageOpenGraph({
-    title: seo.title || 'Kojo — Services en Afrique de l\'Ouest',
+    title: seo.title || 'Kojo — Services en Afrique de l’Ouest',
     description:
       seo.description ||
-      'Trouvez des services et travailleurs en Afrique de l\'Ouest : plomberie, électricité, mécanique, construction.',
+      'Trouvez des services et travailleurs en Afrique de l’Ouest : plomberie, électricité, mécanique, construction.',
     // L'URL partagée EST celle de la fiche (le canonical, la même valeur) :
     // laissée au défaut du hook, elle serait relue à chaque rejeu d'effet — donc
     // juste tant que le titre change d'une mission à l'autre.

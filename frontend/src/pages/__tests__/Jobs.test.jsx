@@ -58,6 +58,13 @@ vi.mock('../../services/apiEndpoints', () => ({
 // Import après les vi.mock (hoistés par Vitest).
 import Jobs from '../Jobs';
 import { jobsAPI } from '../../services/apiEndpoints';
+// Les textes d'état ne sont PAS retapés ici : ils appartiennent au dictionnaire
+// et au scope de la page — les réécrire laisse le test affirmer l'ancien mot.
+import fr from '../../i18n/fr.json';
+import { makeScopedTranslator as makeJobsTranslator } from '../../utils/pack2PageI18n/jobs.js';
+import { DEMO_JOBS } from '../../config/demoJobs.js';
+
+const jobsT = makeJobsTranslator('fr', (cle) => fr[cle]);
 
 const JOB_A = { id: 'job-1', title: 'Réparation de plomberie', status: 'open', category: 'plumbing' };
 const JOB_B = { id: 'job-2', title: 'Peinture du salon', status: 'open', category: 'painting' };
@@ -83,9 +90,9 @@ const panneServeur = () => Object.assign(
   { hasServerMessage: false, response: { status: 502, data: { detail: 'Internal server error retrieving jobs' } } }
 );
 
-const RESEAU = 'Pas de connexion. Vérifiez votre réseau, puis réessayez.';
-const SERVEUR = "Le serveur n'a pas répondu. Réessayez dans un instant.";
-const VIDE = 'Aucun job disponible pour le moment.';
+const RESEAU = jobsT('loadErrorNetwork');
+const SERVEUR = jobsT('loadErrorServer');
+const VIDE = fr.noJobsAvailableNow;
 const VIDE_FILTRE = 'Aucune mission ne correspond à ces filtres.';
 
 beforeEach(() => {
@@ -139,9 +146,9 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     render(<Jobs />);
 
     expect(await screen.findByText('Découvrez le type de missions publiées sur Kojo')).toBeTruthy();
-    expect(screen.getByText('Réparer une fuite dans une cuisine')).toBeTruthy();
-    expect(screen.getByText('Repeindre deux pièces d\'un appartement')).toBeTruthy();
-    expect(screen.getByText('Installer des luminaires dans un commerce')).toBeTruthy();
+    for (const mission of DEMO_JOBS) {
+      expect(screen.getByText(mission.title)).toBeTruthy();
+    }
     expect(screen.getByText('Commencer maintenant')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull();
     expect(screen.queryByText(VIDE)).toBeNull();

@@ -11,7 +11,7 @@ fr: {
   submit: 'Publier mon avis',
   submitting: 'Publication...',
   success: '✅ Avis publié avec succès !',
-  error: 'Impossible de publier l\'avis',
+  error: 'Impossible de publier l’avis',
   ratingRequired: 'Choisissez une note (1 à 5 étoiles)',
   delete: 'Supprimer',
   anonymous: 'Auteur anonyme'

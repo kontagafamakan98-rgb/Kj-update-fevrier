@@ -21,11 +21,12 @@ import { PAGE_SECTIONS } from '../config/page-sections';
 // src/components/TicketTracker.js, qui les résolvent de la même façon.
 //
 // Le glyphe de chaque ligne de contact est, lui, côté PRODUIT : la coquille
-// publie l'emoji du plan (`shellIcon`), un artefact pour un crawler sans
-// JavaScript que le navigateur n'affiche jamais. Une ligne déclarée sans glyphe
-// ici apparaît quand même, avec celui du plan — la liste des lignes n'a donc
-// qu'un propriétaire, src/config/page-sections.js, et une cinquième ligne
-// ajoutée là-bas ne peut plus manquer à cette page.
+// publie l'emoji du plan (`shellIconKey`, résolu par t() ici et par T() dans la
+// coquille), un artefact pour un crawler sans JavaScript que le navigateur
+// n'affiche jamais. Une ligne déclarée sans glyphe ici apparaît quand même, avec
+// celui du plan — la liste des lignes n'a donc qu'un propriétaire,
+// src/config/page-sections.js, et une cinquième ligne ajoutée là-bas ne peut
+// plus manquer à cette page.
 const GLYPHES = {
   contactCall: Phone,
   contactWhatsapp: MessageCircle,
@@ -48,7 +49,7 @@ function DirectContactCard() {
           const interieur = (
             <>
               <span className={`flex h-10 w-10 items-center justify-center rounded-full ${row.badgeClass}`}>
-                {Glyphe ? <Glyphe size={18} /> : row.shellIcon}
+                {Glyphe ? <Glyphe size={18} /> : t(row.shellIconKey)}
               </span>
               <div>
                 <div className="text-sm font-semibold text-gray-900">{t(row.labelKey)}</div>

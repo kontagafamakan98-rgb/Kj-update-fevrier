@@ -48,7 +48,7 @@ export default function Contact() {
               <span
                 className={`flex h-10 w-10 items-center justify-center rounded-full ${action.badgeClass}`}
               >
-                {action.icon}
+                {t(action.iconKey)}
               </span>
               <div>
                 <div className="text-sm font-semibold text-gray-900">{t(action.labelKey)}</div>

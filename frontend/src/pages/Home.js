@@ -145,7 +145,7 @@ export default function Home() {
                 to={`/jobs?category=${category.labelKey}`}
                 className="bg-white rounded-2xl shadow-md p-6 text-center hover:shadow-lg transform transition hover:scale-105"
               >
-                <div className="text-3xl md:text-4xl mb-3">{category.icon}</div>
+                <div className="text-3xl md:text-4xl mb-3">{t(category.iconKey)}</div>
                 <h3 className="font-medium text-gray-900 text-sm md:text-base">{t(category.labelKey)}</h3>
               </Link>
             ))}
@@ -157,10 +157,10 @@ export default function Home() {
       <section className="py-12 md:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-            {promises.map(({ icon, titleKey, descriptionKey }) => (
+            {promises.map(({ iconKey, titleKey, descriptionKey }) => (
               <div key={titleKey} className="text-center">
                 <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-2xl">{icon}</span>
+                  <span className="text-2xl">{t(iconKey)}</span>
                 </div>
                 <h3 className="text-xl font-semibold mb-4 text-gray-900">{t(titleKey)}</h3>
                 <p className="text-gray-600">
@@ -183,10 +183,10 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {steps.map(({ icon, titleKey, descriptionKey }) => (
+            {steps.map(({ iconKey, titleKey, descriptionKey }) => (
               <div key={titleKey} className="bg-white rounded-2xl shadow-md p-6 text-center">
                 <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">{icon}</span>
+                  <span className="text-2xl">{t(iconKey)}</span>
                 </div>
                 <h3 className="text-lg font-semibold mb-2 text-gray-900">{t(titleKey)}</h3>
                 <p className="text-gray-600 text-sm">

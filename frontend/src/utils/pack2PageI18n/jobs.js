@@ -16,12 +16,12 @@ fr: {
   allStatuses: 'Tous les statuts',
   loadingMore: 'Chargement…',
   loadMore: 'Afficher plus de missions',
-  noApplicationsYet: 'Vous n\'avez pas encore postulé à une mission.',
+  noApplicationsYet: 'Vous n’avez pas encore postulé à une mission.',
   // États d'échec et de liste vide : chacun dit quoi faire ensuite (l'écran
   // ne laisse plus une liste vide passer pour une panne, ni l'inverse).
   retry: 'Réessayer',
   loadErrorNetwork: 'Pas de connexion. Vérifiez votre réseau, puis réessayez.',
-  loadErrorServer: 'Le serveur n\'a pas répondu. Réessayez dans un instant.',
+  loadErrorServer: 'Le serveur n’a pas répondu. Réessayez dans un instant.',
   emptyFiltered: 'Aucune mission ne correspond à ces filtres.',
   clearFilters: 'Effacer les filtres',
   emptyHint: 'Élargissez votre recherche ou revenez plus tard.'

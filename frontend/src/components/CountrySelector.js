@@ -6,7 +6,7 @@ import FlagIcon from './FlagIcon';
 const COUNTRIES = [
   { id: 'senegal',      name: 'Sénégal' },
   { id: 'mali',         name: 'Mali' },
-  { id: 'cote_divoire', name: "Côte d'Ivoire" },
+  { id: 'cote_divoire', name: "Côte d’Ivoire" },
   { id: 'burkina_faso', name: 'Burkina Faso' },
 ];
 
