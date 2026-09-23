@@ -29,8 +29,9 @@ import { SITE_ORIGIN, shellFileFor } from '../site-meta.js';
 // Le scope register, résolu EXACTEMENT comme le fait le garde : la fixture ne
 // peut donc pas dériver des octets que la coquille doit publier.
 import { makeScopedTranslator as makeRegisterTranslator } from '../../src/utils/pack2PageI18n/register.js';
-import { phoneNumberExample } from '../../src/config/phone-format.js';
+import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../../src/config/phone-format.js';
 import { COUNTRY_PLACEHOLDER } from '../../src/config/country-placeholder.js';
+import { photoFormatsLine } from '../../src/config/photo-formats.js';
 import { CONTACT } from '../../src/config/contact.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -115,6 +116,8 @@ const pages = () => ({
     '<input placeholder="Prénom..." /><input placeholder="Nom..." />' +
     '<input placeholder="exemple@email.com" />' +
     `<input placeholder="${phoneNumberExample()}" />` +
+    `<span>${PHONE_PREFIX_FALLBACK}</span>` +
+    `<div>${photoFormatsLine(registerT('upTo'))}</div>` +
     `<select>${COUNTRY_PLACEHOLDER(fr.country)}</select>` +
     '<p>Informations légales</p><p>Politique de confidentialité</p>' +
     `<p>${registerT('clientStepNotice')}</p>` +
@@ -294,6 +297,26 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
         html['register.html'] = html['register.html'].replace(`placeholder="${phoneNumberExample()}"`, '');
       },
       attendu: 'masque téléphone',
+    },
+    {
+      nom: 'préfixe téléphone du register remplacé par celui du masque',
+      mutate: ({ html }) => {
+        html['register.html'] = html['register.html'].replace(
+          `>${PHONE_PREFIX_FALLBACK}</span>`,
+          '>---</span>'
+        );
+      },
+      attendu: 'préfixe téléphone',
+    },
+    {
+      nom: 'ligne des formats photo du register modifiée',
+      mutate: ({ html }) => {
+        html['register.html'] = html['register.html'].replace(
+          photoFormatsLine(registerT('upTo')),
+          'JPG 9MB'
+        );
+      },
+      attendu: 'lignes des formats photo',
     },
     {
       nom: 'placeholder pays du register retiré',

@@ -17,7 +17,7 @@ import { devLog, safeLog } from '../utils/env';
 import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { phoneNumberExample } from '../config/phone-format';
+import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../config/phone-format';
 import { COUNTRY_PLACEHOLDER } from '../config/country-placeholder';
 
 export default function Register() {
@@ -646,7 +646,7 @@ export default function Register() {
               </label>
               <div className="flex rounded-lg shadow-sm">
                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                  {activePhonePrefix || '—'}
+                  {activePhonePrefix || PHONE_PREFIX_FALLBACK}
                 </span>
                 <input
                   id="phone"

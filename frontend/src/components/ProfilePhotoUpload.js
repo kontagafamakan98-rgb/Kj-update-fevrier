@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { devLog, safeLog } from '../utils/env';
+import { photoFormatsLine } from '../config/photo-formats';
 
 const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -133,7 +134,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
                   <p>{t('clickToChooseOption')}</p>
                 </div>
                 <div className="text-xs text-gray-500 mt-2">
-                  JPG, PNG {t('upTo') || 'jusqu\'à'} 5MB
+                  {photoFormatsLine(t('upTo') || 'jusqu\'à')}
                 </div>
               </div>
             </div>
