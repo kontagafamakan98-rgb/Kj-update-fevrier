@@ -24,6 +24,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+// La règle de l'apostrophe publiée : le test l'exerce sur des FIXTURES, le
+// garde sur l'arbre réel — une seule logique, aucun caractère redéclaré ici.
+import {
+  APOSTROPHE_PUBLIEE,
+  APOSTROPHE_TYPOGRAPHIQUE,
+  apostrophesHorsConvention,
+} from '../published-copy.js';
 import { ROUTES } from '../check-og-images.js';
 import { SITE_ORIGIN, shellFileFor } from '../site-meta.js';
 // Le scope register, résolu EXACTEMENT comme le fait le garde : la fixture ne
@@ -245,6 +252,12 @@ const fixture = (mutate) => {
   const build = path.join(dir, 'build');
   fs.mkdirSync(build, { recursive: true });
   copieModules(dir);
+  // La vue PAGE du build : un chunk applicatif (les `vendor*` sont hors surface,
+  // donc la fixture en pose un aussi pour prouver l'exclusion). Écrits AVANT
+  // `mutate`, qui peut les réécrire pour exiger un refus nommé.
+  fs.mkdirSync(path.join(build, 'assets'), { recursive: true });
+  fs.writeFileSync(path.join(build, 'assets', 'app-abc123.js'), 'export const copie = "Salut";\n');
+  fs.writeFileSync(path.join(build, 'assets', 'vendor-abc123.js'), 'export const dep = 1;\n');
 
   const html = pages();
   const files = [...Object.keys(html), ...CLIENT_PAGES];
@@ -256,6 +269,13 @@ const fixture = (mutate) => {
       config = out.config || config;
       for (const [rel, contenu] of Object.entries(out.modules || {})) {
         fs.writeFileSync(path.join(dir, 'vite-plugins', rel), contenu);
+      }
+      // Fichiers supplémentaires DANS le build (chunks de la vue page, coquilles
+      // écrites à la main) : le contrôle de l'apostrophe publiée lit le build.
+      for (const [rel, contenu] of Object.entries(out.files || {})) {
+        const cible = path.join(build, rel);
+        fs.mkdirSync(path.dirname(cible), { recursive: true });
+        fs.writeFileSync(cible, contenu);
       }
     }
   }
@@ -380,10 +400,16 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       attendu: 'absent de la coquille (section contact / pied de page)',
     },
     {
-      nom: 'apostrophe droite dans une notice du shell (page vs coquille)',
+      // La page et la coquille lisent le MÊME dictionnaire : si la coquille
+      // publie une apostrophe différente de celle de sa page, l'octet publié
+      // diverge — c'est le cas que la migration de convention a fermé.
+      nom: 'apostrophe typographique dans une notice du shell (page vs coquille)',
       mutate: ({ html }) => {
         const juste = registerT('legalConsentHelp');
-        html['register.html'] = html['register.html'].replace(juste, juste.replace(/\u2019/g, "'"));
+        html['register.html'] = html['register.html'].replace(
+          juste,
+          juste.replace(/'/g, APOSTROPHE_TYPOGRAPHIQUE)
+        );
       },
       attendu: "absent du shell (notices et consentement de l'étape register)",
     },
@@ -481,6 +507,28 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       mutate: () => ({ supprimeModule: 'prerender/shells-home.js' }),
       attendu: 'vite-plugins/prerender/shells-home.js introuvable',
     },
+    {
+      // Vue CRAWLER : la coquille publie l'apostrophe typographique, donc sa
+      // page et elle n'afficheraient pas les mêmes octets pour le même mot.
+      nom: 'coquille publiant l\'apostrophe typographique',
+      mutate: ({ html }) => {
+        html['login.html'] = html['login.html'].replace(
+          '</body>',
+          `<p>Une adresse${APOSTROPHE_TYPOGRAPHIQUE}introuvable</p></body>`
+        );
+      },
+      attendu: 'login.html',
+    },
+    {
+      // Vue PAGE : le chunk applicatif du build publie l'autre convention.
+      nom: 'chunk applicatif publiant l\'apostrophe typographique',
+      mutate: () => ({
+        files: {
+          'assets/app-abc123.js': `export const copie = "Une adresse${APOSTROPHE_TYPOGRAPHIQUE}introuvable";\n`,
+        },
+      }),
+      attendu: 'app-abc123.js',
+    },
   ];
 
   for (const { nom, mutate, attendu } of cas) {
@@ -498,6 +546,63 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       expect(out).toContain('Pré-rendu par route invalide');
     });
   }
+
+  it('nomme l’apostrophe fautive quand une surface en porte une', () => {
+    const { out } = runGuard(
+      fixture(() => ({
+        files: { 'assets/app-abc123.js': `export const copie = "d${APOSTROPHE_TYPOGRAPHIQUE}un";\n` },
+      }))
+    );
+    expect(out).toContain('apostrophe typographique');
+    expect(out).toContain(`« ${APOSTROPHE_PUBLIEE} »`);
+  });
+
+  it('laisse un chunk `vendor*` hors surface (la copie publiée vient de l’app)', () => {
+    const dir = fixture(() => ({
+      files: { 'assets/vendor-abc123.js': `export const dep = "d${APOSTROPHE_TYPOGRAPHIQUE}un";\n` },
+    }));
+    const { status, out } = runGuard(dir);
+    expect(out).not.toContain('apostrophe typographique');
+    expect(status).toBe(0);
+  });
+});
+
+describe('published-copy — la règle de l’apostrophe publiée', () => {
+  const ecrire = (contenu) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'published-copy-'));
+    tempDirs.push(dir);
+    const fichier = path.join(dir, 'extrait.js');
+    fs.writeFileSync(fichier, contenu);
+    return fichier;
+  };
+
+  it('nomme chaque occurrence publiée, avec sa ligne et son extrait', () => {
+    const fichier = ecrire(`const titre = 'd${APOSTROPHE_TYPOGRAPHIQUE}un' ;\n`);
+    const violations = apostrophesHorsConvention([fichier]);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].ligne).toBe(1);
+    expect(violations[0].extrait).toContain(`d${APOSTROPHE_TYPOGRAPHIQUE}un`);
+  });
+
+  it('ignore les commentaires — ils ne publient rien', () => {
+    const fichier = ecrire(
+      `// on dit d${APOSTROPHE_TYPOGRAPHIQUE}un texte publié\n` +
+        `/* et l${APOSTROPHE_TYPOGRAPHIQUE}accueil */\n` +
+        `const a = 1;\n`
+    );
+    expect(apostrophesHorsConvention([fichier])).toEqual([]);
+  });
+
+  it('plafonne les occurrences relevées par fichier', () => {
+    const fichier = ecrire(Array.from({ length: 9 }, () => `const a = 'd${APOSTROPHE_TYPOGRAPHIQUE}un';`).join('\n'));
+    expect(apostrophesHorsConvention([fichier], { parFichier: 3 })).toHaveLength(3);
+  });
+
+  it('signale une surface illisible plutôt que de la sauter en silence', () => {
+    const violations = apostrophesHorsConvention(['/chemin/qui/n/existe/pas.js']);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].extrait).toContain('illisible');
+  });
 });
 
 describe('check-prerender-shells — câblage', () => {

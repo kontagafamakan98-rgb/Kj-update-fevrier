@@ -140,7 +140,7 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
 
     expect(await screen.findByText('Découvrez le type de missions publiées sur Kojo')).toBeTruthy();
     expect(screen.getByText('Réparer une fuite dans une cuisine')).toBeTruthy();
-    expect(screen.getByText('Repeindre deux pièces d’un appartement')).toBeTruthy();
+    expect(screen.getByText('Repeindre deux pièces d\'un appartement')).toBeTruthy();
     expect(screen.getByText('Installer des luminaires dans un commerce')).toBeTruthy();
     expect(screen.getByText('Commencer maintenant')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Réessayer' })).toBeNull();

@@ -404,7 +404,7 @@ class UserRegister(BaseModel):
     user_type: UserType
     country: Country
     preferred_language: Language
-    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité et des conditions d’utilisation")
+    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité et des conditions d'utilisation")
     legal_documents_accepted_at: Optional[datetime] = None
     legal_documents_version: str = Field(min_length=5, max_length=120)
     
@@ -419,7 +419,7 @@ class UserRegister(BaseModel):
     @classmethod
     def legal_documents_must_be_accepted(cls, v):
         if v is not True:
-            raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d’utilisation est obligatoire")
+            raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d'utilisation est obligatoire")
         return v
 
 class PaymentAccount(BaseModel):
@@ -436,7 +436,7 @@ class UserWithPayment(BaseModel):
     user_type: UserType
     country: Country
     preferred_language: Language
-    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité et des conditions d’utilisation")
+    legal_documents_accepted: bool = Field(..., description="Acceptation obligatoire de la Politique de confidentialité et des conditions d'utilisation")
     legal_documents_accepted_at: Optional[datetime] = None
     legal_documents_version: str = Field(min_length=5, max_length=120)
     payment_accounts: PaymentAccount
@@ -455,7 +455,7 @@ class UserWithPayment(BaseModel):
     @classmethod
     def legal_documents_must_be_accepted(cls, v):
         if v is not True:
-            raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d’utilisation est obligatoire")
+            raise ValueError("L'acceptation de la Politique de confidentialité et des conditions d'utilisation est obligatoire")
         return v
     # Informations spécifiques aux travailleurs (optionnelles)
     worker_specialties: Optional[List[str]] = None

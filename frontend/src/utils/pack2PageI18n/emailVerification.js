@@ -5,7 +5,7 @@ const dict = {
 fr: {
   redirecting: 'Préparation de la vérification email...',
   title: 'Vérification Gmail de votre compte',
-  subtitle: 'On confirme d’abord ton email, puis on passe aux moyens de paiement.',
+  subtitle: 'On confirme d\'abord ton email, puis on passe aux moyens de paiement.',
   sentTo: 'Code envoyé à {email}',
   otpLabel: 'Code à 6 chiffres',
   otpHelp: 'Entre le code reçu dans Gmail. Il expire rapidement pour protéger ton compte.',
