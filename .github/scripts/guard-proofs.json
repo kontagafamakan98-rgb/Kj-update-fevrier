@@ -33,6 +33,14 @@
   ],
   "gardes": [
     {
+      "chemin": ".githooks/pre-push",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "runner": "vitest",
+      "motif": "pre-vol de push : bloque un push qui publierait un residu de passe (branche locale fusionnee dont la ref distante a disparu, ref distante qu'aucune branche locale ne porte), laisse passer une suppression seule — le remede que le garde nomme est lui-meme un push — et refuse de se taire quand il ne peut pas lire son sujet ; arme par core.hooksPath, pose par le script prepare de frontend/package.json"
+    },
+    {
       "chemin": "frontend/scripts/audit_api_returns.cjs",
       "role": "garde",
       "invoque_par": "ci",
@@ -152,7 +160,15 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
       "runner": "vitest",
-      "motif": "refuse un serveur de test encore ouvert et une URL de Preview injoignable en fin de passe; la liste des ports vient de playwright.config.js et du serveur de rewrites"
+      "motif": "refuse en fin de passe un serveur de test encore ouvert, une URL de Preview injoignable, et relaie l'hygiene git (branches locales fusionnees, refs distantes orphelines) deleguee a scripts/check-git-branches.js ; la liste des ports vient de playwright.config.js et du serveur de rewrites"
+    },
+    {
+      "chemin": "frontend/scripts/check-git-branches.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "runner": "vitest",
+      "motif": "refuse une branche locale dont la PR est fusionnee ET dont la ref distante a disparu, et une ref distante qu'AUCUNE branche locale ne porte (le contenu livre se mesure par la base — commits deja dedans, ou arbre identique —, pour une ref distante contre la base vue du distant, origin/main)"
     },
     {
       "chemin": "frontend/scripts/check-pwa-manifest.js",
@@ -1661,6 +1677,126 @@
       "cwd": "frontend",
       "attend": [
         "onglet Preview sans serveur joignable"
+      ]
+    },
+    {
+      "id": "environment: branche perimee non nommee",
+      "garde": "frontend/scripts/check-git-branches.js",
+      "cible": "frontend/scripts/check-git-branches.js",
+      "trouve": "    .map((branche) => rapportBranche(branche, base, cwd, lire))\n",
+      "remplace": "    .map(() => null)\n",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "git branch -D refonte"
+      ]
+    },
+    {
+      "id": "environment: branche non livree nommee quand meme",
+      "garde": "frontend/scripts/check-git-branches.js",
+      "cible": "frontend/scripts/check-git-branches.js",
+      "trouve": "  if (!raison) return null;\n",
+      "remplace": "  // mutation : le contenu absent de la base est juge livrable\n",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "laisse une branche dont le contenu"
+      ]
+    },
+    {
+      "id": "pre-push: verdict ignore, le push passe",
+      "garde": ".githooks/pre-push",
+      "cible": ".githooks/pre-push",
+      "trouve": "if node \"$script\" --avant-push; then",
+      "remplace": "if true; then",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un push qui publierait un résidu de passe"
+      ]
+    },
+    {
+      "id": "pre-push: suppression seule bloquee, le remede est refuse",
+      "garde": ".githooks/pre-push",
+      "cible": ".githooks/pre-push",
+      "trouve": "if [ \"$lignes\" -gt 0 ] && [ \"$publication\" = 0 ]; then",
+      "remplace": "if false; then",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "laisse passer le nettoyage qu’il réclame"
+      ]
+    },
+    {
+      "id": "environment: ref distante orpheline non nommee",
+      "garde": "frontend/scripts/check-git-branches.js",
+      "cible": "frontend/scripts/check-git-branches.js",
+      "trouve": "  const raison = raisonDuContenu(ref.ref, base, cwd, lire);\n",
+      "remplace": "  const raison = null; // mutation : la ref distante orpheline n'est plus jugee\n",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "git push origin --delete refonte"
+      ]
+    },
+    {
+      "id": "environment: ref distante non livree nommee quand meme",
+      "garde": "frontend/scripts/check-git-branches.js",
+      "cible": "frontend/scripts/check-git-branches.js",
+      "trouve": "  return raison\n    ? `réf distante",
+      "remplace": "  return raison ?? true // mutation : une ref non livree est nommee quand meme\n    ? `réf distante",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "distante dont le contenu"
       ]
     },
     {

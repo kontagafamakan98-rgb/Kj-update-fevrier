@@ -1,0 +1,75 @@
+#!/bin/sh
+# Pré-vol de push — le contrôle de fin de passe, AVANT que quoi que ce soit parte.
+#
+# Ce qu'il refuse, et rien d'autre : les RÉSIDUS DE PASSE, c'est-à-dire l'état git
+# que le push s'apprête à publier — une branche locale fusionnée dont la réf
+# distante a disparu, une réf distante qu'aucune branche locale ne porte. Le
+# partage « ce qui bloque / ce qui est seulement rappelé » appartient au garde
+# (`verdictDeLaPasse` dans frontend/scripts/check-test-environment.js) : ce fichier
+# ne fait que propager son code de sortie, sinon la politique aurait deux domiciles.
+#
+# Comment il est armé : `git config core.hooksPath .githooks`, posé par le script
+# `prepare` de frontend/package.json à chaque `npm install`. Deux faits à savoir
+# plutôt qu'à découvrir : un clone où ce réglage n'est pas posé n'a pas de pré-vol,
+# et `git push --no-verify` le contourne. Un garde qu'on peut ignorer en le sachant
+# vaut mieux qu'un garde qu'on croit armé et qui ne l'est pas.
+set -u
+
+# Le SCRIPT vient du dépôt qui porte ce hook — il est versionné avec lui. L'ÉTAT
+# lu, lui, est celui du dépôt qui pousse : c'est le répertoire de travail où git
+# pose le hook. Les deux diffèrent dès qu'un clone pointe ses hooks ailleurs (et
+# c'est ce qui rend cette paire éprouvable hors du dépôt).
+#
+# Le répertoire du hook est découpé en PUR shell, jamais par `dirname` dans une
+# sous-couche `$(… && pwd)` : MESURÉ, ce sont ces deux processus externes qui
+# meurent quand MSYS n'a plus de quoi `fork()` — « child_copy: cygheap read copy
+# failed », « dofork: forked process died unexpectedly », et le push échoue par
+# un « failed to push some refs » que le pré-vol n'a jamais prononcé. Un pré-vol
+# qui ne démarre pas fait exactement ce qu'un garde déteste : il se tait. Deux
+# processus en moins, c'est aussi deux démarrages en moins par push.
+case "$0" in
+  */*) hooks=${0%/*} ;;
+  *\\*) hooks=${0%\\*} ;;
+  *) hooks=. ;;
+esac
+script="$hooks/../frontend/scripts/check-test-environment.js"
+
+if [ ! -f "$script" ]; then
+  echo "pré-vol de push : $script introuvable — push REFUSÉ (un pré-vol qui ne peut pas lire son sujet n'est pas un pré-vol)" >&2
+  exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "pré-vol de push : node introuvable — push REFUSÉ (le pré-vol ne peut pas tourner)" >&2
+  exit 1
+fi
+
+# Ce qu'il laisse passer : une SUPPRESSION seule. Le remède que le garde nomme
+# (« git push origin --delete <branche> ») est lui-même un push : un pré-vol qui
+# le refuse oblige à le contourner pour pouvoir se nettoyer, et enseigne
+# exactement ce qu'il ne faut pas — pousser avec --no-verify. Or une suppression
+# ne publie rien : c'est la publication des résidus que ce hook intercepte.
+# git passe sur l'entrée standard « <réf locale> <oid local> <réf distante> <oid
+# distante> » : un oid local fait de zéros = une suppression.
+publication=0
+lignes=0
+while read -r _ref_locale oid_local _ref_distante _oid_distante; do
+  lignes=$((lignes + 1))
+  case "${oid_local:-}" in
+    *[!0]*) publication=1 ;;
+  esac
+done
+
+if [ "$lignes" -gt 0 ] && [ "$publication" = 0 ]; then
+  echo "pré-vol de push : suppression seule, rien n'est publié — contrôle ignoré."
+  exit 0
+fi
+
+if node "$script" --avant-push; then
+  exit 0
+fi
+
+echo "" >&2
+echo "push ANNULÉ par le pré-vol : les résidus ci-dessus seraient publiés." >&2
+echo "Corriger l'état, puis relancer le push — ou pousser en le sachant : git push --no-verify" >&2
+exit 1

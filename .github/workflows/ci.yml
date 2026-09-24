@@ -653,6 +653,12 @@ jobs:
         working-directory: frontend
         run: node scripts/check-bundle-size.js
 
+      # Hygiène des branches locales et des réfs distantes : refuse en CI une branche
+      # fusionnée périmée ou une réf distante orpheline.
+      - name: Check git branches hygiene
+        working-directory: frontend
+        run: node scripts/check-git-branches.js
+
       # Même harnais que dans backend-tests, runner Node (Vitest) : les mutations
       # des gardes frontend sont rejouées ici, seul job qui a `node_modules`.
       # Aucun `working-directory` : le harnais résout la racine du dépôt depuis
@@ -816,6 +822,72 @@ jobs:
         with:
           path: frontend/.bundle-size
           key: bundle-size-baseline-${{ github.sha }}
+
+  # ─── Tests E2E Playwright : parcours utilisateurs sous navigateur réel ──────
+  # Exécute la suite Playwright (frontend/e2e/user-flows.spec.js) sous Chromium.
+  # Complète les tests unitaires jsdom et les vérifications statiques de build :
+  #   1. Moteur réel : exécute le bundle JS compilé dans un vrai Chromium headless,
+  #      garantissant le rendu DOM, l'exécution CSS et l'absence de runtime error.
+  #   2. Contrôle CSP en condition réelle : vérifie que la Content Security Policy
+  #      autorise les requêtes réseau, iframes, styles et images sans blocage.
+  #   3. Parcours complets multi-pages : géolocalisation & permissions GPS,
+  #      assistance/support (formulaires, validation email, dialogue robot) et
+  #      authentification complète travailleur avec redirection /dashboard et /jobs.
+  #   4. Couplage client/serveur : dialogue HTTP réel avec la fixture locale
+  #      scripts/playtest-api-server.mjs (port 8123) et Vite preview (port 4173).
+  e2e-playwright:
+    name: E2E Playwright tests (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: frontend-build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Cache Playwright Chromium binaries
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright Chromium dependencies (and binary if cache miss)
+        working-directory: frontend
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Build frontend for E2E (fixture API URL)
+        working-directory: frontend
+        env:
+          VITE_API_URL: http://127.0.0.1:8123/api
+        run: npm run build
+
+      - name: Run Playwright E2E tests
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
 
   # ─── Performance : budgets Lighthouse CI (10 pages : publiques, protégées) ──
   # Audite le DÉPLOIEMENT VERCEL RÉEL en condition mobile simulée (Slow 4G

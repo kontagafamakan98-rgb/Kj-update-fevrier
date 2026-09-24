@@ -17,7 +17,7 @@
  * littéraux suivants (`'24/7'`, `'📝'`), ce qui faisait passer du texte légitime
  * pour orphelin. Ce test tient la ligne.
  */
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -72,11 +72,24 @@ const coquille = (dir, nom, html) => {
   return fichier;
 };
 
-/** Exécute le VRAI garde, avec `cwd` sur la fixture. */
-const runGuard = (cwd) => {
-  const result = spawnSync(process.execPath, [SCRIPT], { cwd, encoding: 'utf8' });
-  return { status: result.status, out: `${result.stdout}${result.stderr}` };
-};
+/**
+ * Exécute le VRAI garde, avec `cwd` sur la fixture, SANS bloquer la boucle
+ * d'événements du worker : `spawnSync` enchaîne les lancements dans un seul tour
+ * de boucle (les `await` de vitest ne cèdent que des micro-tâches). Le fichier
+ * voisin `check-prerender-shells.test.js` en a été mesuré à 62 000 ms de famine —
+ * au-delà du délai RPC de vitest (60 s), qui sort alors la suite en 1 sur un
+ * timeout étranger au code.
+ */
+const runGuard = (cwd) =>
+  new Promise((resolve) => {
+    const enfant = spawn(process.execPath, [SCRIPT], { cwd });
+    let out = '';
+    enfant.stdout.setEncoding('utf8');
+    enfant.stderr.setEncoding('utf8');
+    enfant.stdout.on('data', (bloc) => (out += bloc));
+    enfant.stderr.on('data', (bloc) => (out += bloc));
+    enfant.on('close', (status) => resolve({ status, out }));
+  });
 
 describe('shell-text-provenance — lire les littéraux d’un fichier source', () => {
   it('ignore les commentaires, sans perdre les littéraux qui suivent', () => {
@@ -204,11 +217,25 @@ describe('shell-text-provenance — la règle de provenance', () => {
     expect(trouvees[0].fragment).toBe('Annonce réservée aux membres');
   });
 
-  it('accepte la date DÉCLARÉE, refuse la même date précédée d’un texte non déclaré', () => {
-    expect(divergences('<p>23 septembre 2026</p>', { derivees: valeursDerivees(FRONTEND_DIR) })).toEqual([]);
-    const trouvees = divergences('<p>Le 23 septembre 2026</p>', { derivees: valeursDerivees(FRONTEND_DIR) });
-    expect(trouvees).toHaveLength(1);
-    expect(trouvees[0].fragment).toBe('Le 23 septembre 2026');
+  it('accepte les dates que la page DÉCLARE, refuse la même précédée d’un texte non déclaré', () => {
+    // La date publiée n'est pas un texte de la page : c'est le JOUR, que
+    // `prerender-route-meta.js` et `Jobs.js` formatent chacun de leur côté. Un
+    // littéral tapé ici (« 23 septembre 2026 ») ne rendait ce cas vrai qu'un
+    // seul jour — le 24 au matin, il rougissait sans qu'aucune ligne ait bougé.
+    // Le test demande donc la date à la même source que la page : l'horloge.
+    const derivees = valeursDerivees(FRONTEND_DIR);
+    for (const jour of ['numeric', '2-digit']) {
+      for (const mois of ['long', 'short']) {
+        const date = new Intl.DateTimeFormat('fr-FR', { day: jour, month: mois, year: 'numeric' }).format(
+          new Date()
+        );
+        expect(derivees.has(normaliser(date))).toBe(true);
+        expect(divergences(`<p>${date}</p>`, { derivees })).toEqual([]);
+        const trouvees = divergences(`<p>Le ${date}</p>`, { derivees });
+        expect(trouvees).toHaveLength(1);
+        expect(trouvees[0].fragment).toBe(`Le ${date}`);
+      }
+    }
   });
 });
 
@@ -444,36 +471,36 @@ describe('shell-text-provenance — la règle des marqueurs', () => {
 });
 
 describe('check-shell-text-provenance — le garde exécuté', () => {
-  it('sort en 0 sur une coquille fixture qui ne publie que du texte de la page', () => {
+  it('sort en 0 sur une coquille fixture qui ne publie que du texte de la page', async () => {
     const dir = tmp();
     coquille(dir, 'login.html', '<div id="root"><h1>Connexion</h1></div>');
-    const { status, out } = runGuard(dir);
+    const { status, out } = await runGuard(dir);
     expect(status).toBe(0);
     expect(out).toContain('Provenance du texte des coquilles intacte');
   });
 
-  it('refuse : un fragment publié sans source côté page, en le nommant', () => {
+  it('refuse : un fragment publié sans source côté page, en le nommant', async () => {
     const dir = tmp();
     coquille(
       dir,
       'login.html',
       '<div id="root"><h1>Connexion</h1><p>Une phrase que la page ne possède pas</p></div>'
     );
-    const { status, out } = runGuard(dir);
+    const { status, out } = await runGuard(dir);
     expect(status).toBe(1);
     expect(out).toContain('login.html publie « Une phrase que la page ne possède pas »');
     expect(out).toContain('sans source côté page');
   });
 
-  it('refuse : un build sans coquille (vert sans lecture)', () => {
+  it('refuse : un build sans coquille (vert sans lecture)', async () => {
     const dir = tmp();
     fs.mkdirSync(path.join(dir, 'build'), { recursive: true });
-    const { status, out } = runGuard(dir);
+    const { status, out } = await runGuard(dir);
     expect(status).toBe(1);
     expect(out).toContain('aucune coquille dans build/');
   });
 
-  it('refuse : un texte affiché écrit en dur dans un module, en le nommant', () => {
+  it('refuse : un texte affiché écrit en dur dans un module, en le nommant', async () => {
     const dir = tmp();
     coquille(dir, 'login.html', '<div id="root"><h1>Connexion</h1></div>');
     // La réintroduction exacte que la règle doit attraper : la coquille écrit
@@ -482,28 +509,28 @@ describe('check-shell-text-provenance — le garde exécuté', () => {
       path.join(dir, 'vite-plugins', 'prerender', 'copie-en-dur.js'),
       "export const titre = '<h1>Connexion</h1>';\n"
     );
-    const { status, out } = runGuard(dir);
+    const { status, out } = await runGuard(dir);
     expect(out).toContain('Copie en dur dans les coquilles');
     expect(out).toContain('vite-plugins/prerender/copie-en-dur.js:1 écrit « Connexion »');
     expect(status).toBe(1);
   });
 
-  it('refuse : un dossier de modules absent (vert sans lecture)', () => {
+  it('refuse : un dossier de modules absent (vert sans lecture)', async () => {
     const dir = tmp();
     fs.mkdirSync(path.join(dir, 'build'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'build', 'login.html'), '<div id="root"><h1>Connexion</h1></div>');
-    const { status, out } = runGuard(dir);
+    const { status, out } = await runGuard(dir);
     expect(out).toContain('aucun module dans');
     expect(status).toBe(1);
   });
 
-  it('refuse : un marqueur publié que personne ne détient, en le nommant', () => {
+  it('refuse : un marqueur publié que personne ne détient, en le nommant', async () => {
     // Le garde lit le plan et le dictionnaire RÉELS (son propre dossier) et la
     // coquille de la fixture : le marqueur `★` n'appartient à rien, donc le
     // verdict doit tomber ici, pas seulement dans la règle.
     const dir = tmp();
     coquille(dir, 'index.html', '<div id="root"><h1>Connexion</h1><span>★</span></div>');
-    const { status, out } = runGuard(dir);
+    const { status, out } = await runGuard(dir);
     // La première assertion nomme la RÈGLE : c'est elle qui doit apparaître dans
     // la sortie si la ligne du verdict est neutralisée (preuve de mutation).
     expect(out).toContain('Marqueurs des coquilles');
