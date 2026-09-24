@@ -180,35 +180,52 @@ export default function Jobs() {
           </h1>
           <p className="mt-2 text-gray-600">{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Sélecteur de pays — visible uniquement sur cette page, pour
               les utilisateurs connectés (le changement de pays exige une
               session) */}
           {user && <CountrySelector />}
-          {/* Bascule liste / carte */}
-          <div className="flex rounded-xl border border-gray-200 bg-white p-1">
+          {/* Bascule liste / carte. Les deux vues sont des boutons d'un même
+              groupe : `aria-pressed` dit laquelle est active (les emoji ☰/🗺️
+              ne le disaient qu'à l'œil, et différemment selon la plateforme). */}
+          <div className="flex rounded-xl border border-gray-200 bg-white p-1" role="group" aria-label={`${t('listView')} / ${t('mapView')}`}>
             <button
+              type="button"
               onClick={() => setViewMode('list')}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              aria-pressed={viewMode === 'list'}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'list' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
             >
-              ☰ {t('listView')}
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              {t('listView')}
             </button>
             <button
+              type="button"
               onClick={() => setViewMode('map')}
-              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              aria-pressed={viewMode === 'map'}
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${viewMode === 'map' ? 'bg-orange-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
             >
-              🗺️ {t('mapView')}
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 4 3.5 6.5v13L9 17l6 2.5 5.5-2.5v-13L15 6.5 9 4z" />
+                <path strokeLinecap="round" d="M9 4v13M15 6.5v13" />
+              </svg>
+              {t('mapView')}
             </button>
           </div>
           {user?.user_type === 'client' && (
-            <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
+            <button onClick={() => setShowCreateModal(true)} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2">
               {jobUi.createJob}
             </button>
           )}
         </div>
       </div>
 
-      {/* Onglets : découverte / candidatures / missions */}
+      {/* Onglets : découverte / candidatures / missions. Présentés comme un
+          sélecteur unique quand il y en a plusieurs : c'est le même contrôle
+          (un jeu d'options dont une seule est active), pas trois boutons
+          indépendants. Le visiteur anonyme n'a qu'une vue → une étiquette
+          inerte, qui décrit l'onglet courant sans promettre un clic. */}
       <div className="mb-6 flex flex-wrap gap-2">
         {user?.user_type === 'worker' && (
           <>
@@ -247,68 +264,131 @@ export default function Jobs() {
         )}
       </div>
 
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <input
-          value={filters.search}
-          onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
-          placeholder={pageT('searchPlaceholder') || 'Rechercher un job'}
-          className="rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-        />
-        <select
-          value={filters.category}
-          onChange={(e) => setFilters((prev) => ({ ...prev, category: e.target.value }))}
-          className="rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-        >
-          {categories.map((category) => (
-            <option key={category.value} value={category.value}>{category.label}</option>
-          ))}
-        </select>
-        {effectiveTab !== JOB_TAB_DISCOVER && (
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-            className="rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-          >
-            {statuses.map((status) => (
-              <option key={status.value} value={status.value}>{status.label}</option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {/* Recherche par rayon : trouve les jobs proches de toi (uniquement
-          les jobs portant des coordonnées GPS — les autres sont exclus quand
-          le filtre est actif). */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4">
-        <span className="text-sm font-semibold text-gray-700">{t('nearMe')}</span>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min="1"
-            value={radiusKm}
-            onChange={(e) => setRadiusKm(e.target.value)}
-            placeholder={t('radiusKmPlaceholder')}
-            className="w-32 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-          />
-          <button
-            onClick={locateMe}
-            disabled={locating}
-            className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60"
-          >
-            {locating ? t('locating') : (userCoords ? t('myPosition') : t('useMyPosition'))}
-          </button>
-          {radiusKm && (
-            <button
-              onClick={() => { setRadiusKm(''); setUserCoords(null); }}
-              className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+      {/* ── Recherche et filtres : UNE carte, lisible d'un coup d'œil ───────
+          Trois contrôles empilés dans la page (champ, catégorie, rayon) se
+          lisaient comme trois blocs sans lien. Ils sont ici dans un seul
+          panneau, dans l'ordre où on s'en sert : on écrit une recherche, on
+          choisit une catégorie, puis on resserre autour de soi. */}
+      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <label htmlFor="jobs-recherche" className="sr-only">{t('search')}</label>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="6.5" />
+                <path strokeLinecap="round" d="m16 16 4.5 4.5" />
+              </svg>
+            </span>
+            <input
+              id="jobs-recherche"
+              type="search"
+              value={filters.search}
+              onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+              placeholder={pageT('searchPlaceholder') || 'Rechercher un job'}
+              // `type="search"` allume le clavier de recherche sur mobile ;
+              // WebKit y ajoute AUSSI sa propre croix d'effacement, qui ferait
+              // doublon avec celle ci-dessus — elle est donc masquée.
+              className="w-full rounded-xl border border-gray-200 py-3 pl-11 pr-11 outline-none transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-100 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {Boolean(filters.search) && (
+              <button
+                type="button"
+                onClick={() => setFilters((prev) => ({ ...prev, search: '' }))}
+                aria-label={t('clear')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {effectiveTab !== JOB_TAB_DISCOVER && (
+            <select
+              value={filters.status}
+              onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+              className="rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 sm:w-56"
             >
-              {t('clear')}
+              {statuses.map((status) => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+          )}
+          {filtresActifs && (
+            <button
+              type="button"
+              onClick={effacerLesFiltres}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+              </svg>
+              {pageT('clearFilters')}
             </button>
           )}
         </div>
-        {radiusKm && !userCoords && (
-          <span className="text-xs text-gray-500">{t('radiusActivateHint')}</span>
-        )}
+
+        {/* Catégories en puces : la catégorie active reste VISIBLE sans
+            déplier un menu natif, et sur mobile un appui suffit. Le menu
+            déroulant précédent demandait d'ouvrir, parcourir puis valider. */}
+        <div className="mt-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label={pageT('allCategories') || t('allCategories')}>
+          {categories.map((category) => {
+            const actif = filters.category === category.value;
+            return (
+              <button
+                key={category.value || 'toutes'}
+                type="button"
+                onClick={() => setFilters((prev) => ({ ...prev, category: category.value }))}
+                aria-pressed={actif}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${actif ? 'border-orange-600 bg-orange-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700'}`}
+              >
+                {category.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Recherche par rayon : trouve les jobs proches de toi (uniquement
+            les jobs portant des coordonnées GPS — les autres sont exclus quand
+            le filtre est actif). */}
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+            <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 1 1 13 0C18.5 15.4 12 21 12 21z" />
+              <circle cx="12" cy="10.5" r="2.2" />
+            </svg>
+            {t('nearMe')}
+          </span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="1"
+              value={radiusKm}
+              onChange={(e) => setRadiusKm(e.target.value)}
+              aria-label={t('nearMe')}
+              placeholder={t('radiusKmPlaceholder')}
+              className="w-32 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+            />
+            <button
+              onClick={locateMe}
+              disabled={locating}
+              className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700 disabled:opacity-60"
+            >
+              {locating ? t('locating') : (userCoords ? t('myPosition') : t('useMyPosition'))}
+            </button>
+            {radiusKm && (
+              <button
+                onClick={() => { setRadiusKm(''); setUserCoords(null); }}
+                className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                {t('clear')}
+              </button>
+            )}
+          </div>
+          {radiusKm && !userCoords && (
+            <span className="text-xs text-gray-500">{t('radiusActivateHint')}</span>
+          )}
+        </div>
       </div>
 
       {loadError && (
@@ -353,15 +433,26 @@ export default function Jobs() {
           <DemoJobsEmptyState t={t} />
         ) : (
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-            {filtresActifs
-              ? pageT('emptyFiltered')
-              : (effectiveTab === JOB_TAB_APPLICATIONS
-                ? (pageT('noApplicationsYet') || 'Vous n’avez pas encore postulé à une mission.')
-                : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')))}
+            {/* Un état vide a besoin d'un VISAGE avant d'avoir une phrase :
+                le pictogramme dit en une seconde qu'il n'y a rien à lire, et
+                l'action est juste en dessous. */}
+            <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400" aria-hidden="true">
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="11" cy="11" r="6.5" />
+                <path strokeLinecap="round" d="m16 16 4.5 4.5" />
+              </svg>
+            </span>
+            <p className="font-medium text-gray-600">
+              {filtresActifs
+                ? pageT('emptyFiltered')
+                : (effectiveTab === JOB_TAB_APPLICATIONS
+                  ? (pageT('noApplicationsYet') || 'Vous n’avez pas encore postulé à une mission.')
+                  : (user?.user_type === 'client' ? t('noJobsForAccount') : t('noJobsAvailableNow')))}
+            </p>
             {filtresActifs ? (
               <button
                 onClick={effacerLesFiltres}
-                className="mt-4 inline-flex items-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="mt-4 inline-flex items-center rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
               >
                 {pageT('clearFilters')}
               </button>
