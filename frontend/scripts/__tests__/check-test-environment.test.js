@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -471,7 +471,13 @@ describe('check-test-environment — le pré-vol de push', () => {
     const hooks = path.join(racine, 'hooks-sans-script');
     try {
       mkdirSync(hooks, { recursive: true });
-      copyFileSync(PRE_PUSH, path.join(hooks, 'pre-push'));
+      const hookDest = path.join(hooks, 'pre-push');
+      copyFileSync(PRE_PUSH, hookDest);
+      try {
+        chmodSync(hookDest, 0o755);
+      } catch {
+        // Sous Windows non supporté, pas bloquant
+      }
       await git(travail, 'config', 'core.hooksPath', hooks.replaceAll(path.sep, '/'));
       writeFileSync(path.join(travail, 'depart.txt'), 'suite\n');
       await git(travail, 'commit', '-am', 'suite');
