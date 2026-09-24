@@ -27,6 +27,7 @@
     "preview": "vite preview",
     "playtest:api": "node scripts/playtest-api-server.mjs",
     "check:test-environment": "node scripts/check-test-environment.js",
+    "check:git-branches": "node scripts/check-git-branches.js",
     "test:e2e": "playwright test",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -35,7 +36,8 @@
     "check:icons": "node scripts/check-generated-icons.js",
     "check:pwa": "node scripts/check-pwa-manifest.js",
     "report:bundle": "node scripts/bundle-size-report.js",
-    "predeploy": "npm run validate:vercel"
+    "predeploy": "npm run validate:vercel",
+    "prepare": "git config core.hooksPath .githooks || echo pre-vol de push non arme, voir AGENTS.md"
   },
   "browserslist": {
     "production": [

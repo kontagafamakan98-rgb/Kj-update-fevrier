@@ -18,7 +18,7 @@
  * garde — sinon les cas négatifs rougiraient pour la mauvaise raison, ce qui est
  * exactement le faux vert que ce genre de test doit éviter.
  */
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -288,15 +288,33 @@ const fixture = (mutate) => {
   return dir;
 };
 
-/** Exécute le VRAI garde, avec `cwd` sur la fixture. */
-const runGuard = (cwd) => {
-  const result = spawnSync(process.execPath, [SCRIPT], { cwd, encoding: 'utf8' });
-  return { status: result.status, out: `${result.stdout}${result.stderr}` };
-};
+/**
+ * Exécute le VRAI garde, avec `cwd` sur la fixture, SANS bloquer la boucle
+ * d'événements du worker.
+ *
+ * `spawnSync` rendait ce fichier muet pour la machine qui l'exécute : les 43 cas
+ * lancent chacun un Node (~1,4 s) et s'enchaînaient dans un seul tour de boucle
+ * — les `await` de vitest ne cèdent que des micro-tâches — mesuré à **62 000 ms
+ * de famine** sur un worker. Au-delà du délai RPC de vitest (60 s), l'horloge
+ * expirée de `onTaskUpdate` se déclenchait à la reprise : la suite sortait en 1
+ * sur un timeout qui ne disait rien du code, et seulement sur un poste assez
+ * lent pour que 43 lancements franchissent la minute. Un `spawn` asynchrone
+ * rend la main entre les cas : le worker reste joignable, la mesure est la même.
+ */
+const runGuard = (cwd) =>
+  new Promise((resolve) => {
+    const enfant = spawn(process.execPath, [SCRIPT], { cwd });
+    let out = '';
+    enfant.stdout.setEncoding('utf8');
+    enfant.stderr.setEncoding('utf8');
+    enfant.stdout.on('data', (bloc) => (out += bloc));
+    enfant.stderr.on('data', (bloc) => (out += bloc));
+    enfant.on('close', (status) => resolve({ status, out }));
+  });
 
 describe('check-prerender-shells — la fixture conforme passe', () => {
-  it('sort en 0 et nomme les pages pré-rendues routées', () => {
-    const { status, out } = runGuard(fixture());
+  it('sort en 0 et nomme les pages pré-rendues routées', async () => {
+    const { status, out } = await runGuard(fixture());
     expect(out).not.toContain('❌');
     expect(status).toBe(0);
     expect(out).toContain('Pré-rendu par route intact');
@@ -533,7 +551,7 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
   ];
 
   for (const { nom, mutate, attendu } of cas) {
-    it(`refuse : ${nom}`, () => {
+    it(`refuse : ${nom}`, async () => {
       const dir = fixture(mutate);
       if (nom === 'vercel.json illisible') {
         fs.writeFileSync(path.join(dir, 'vercel.json'), '{ ce n\'est pas du JSON');
@@ -541,15 +559,15 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       if (nom === 'module de pré-rendu renommé') {
         fs.rmSync(path.join(dir, 'vite-plugins', 'prerender', 'shells-home.js'));
       }
-      const { status, out } = runGuard(dir);
+      const { status, out } = await runGuard(dir);
       expect(status).toBe(1);
       expect(out).toContain(attendu);
       expect(out).toContain('Pré-rendu par route invalide');
     });
   }
 
-  it('nomme l’apostrophe fautive quand une surface en porte une', () => {
-    const { out } = runGuard(
+  it('nomme l’apostrophe fautive quand une surface en porte une', async () => {
+    const { out } = await runGuard(
       fixture(() => ({
         files: { 'assets/app-abc123.js': `export const copie = "d${APOSTROPHE_REFUSEE}un";\n` },
       }))
@@ -558,11 +576,11 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
     expect(out).toContain(`« ${APOSTROPHE_PUBLIEE} »`);
   });
 
-  it('laisse un chunk `vendor*` hors surface (la copie publiée vient de l’app)', () => {
+  it('laisse un chunk `vendor*` hors surface (la copie publiée vient de l’app)', async () => {
     const dir = fixture(() => ({
       files: { 'assets/vendor-abc123.js': `export const dep = "d${APOSTROPHE_REFUSEE}un";\n` },
     }));
-    const { status, out } = runGuard(dir);
+    const { status, out } = await runGuard(dir);
     expect(out).not.toContain('apostrophe de copie');
     expect(status).toBe(0);
   });

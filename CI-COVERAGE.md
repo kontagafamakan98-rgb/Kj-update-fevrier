@@ -13,8 +13,8 @@
 
 | Événement | CI |
 |---|---|
-| `push` sur `main` | **oui**, 10 jobs |
-| `pull_request` vers `main` | **oui**, 10 jobs (dont `deploy-fly` *skipped*) |
+| `push` sur `main` | **oui**, 11 jobs |
+| `pull_request` vers `main` | **oui**, 11 jobs (dont `deploy-fly` *skipped*) |
 | `workflow_dispatch` (manuel) | **oui** ; `deploy-fly` déploie même sans changement backend |
 | `push` sur une branche de travail | **non** — aucun run n'est déclenché |
 
@@ -22,7 +22,7 @@ Conséquence directe : « à chaque push » signifie en réalité **à chaque pu
 `main` et à chaque PR vers `main`**. Une branche de travail peut accumuler
 plusieurs commits entre deux validations ; le premier signal vient de la PR.
 
-## 2. Les 10 jobs, et ce qui les fait réellement échouer
+## 2. Les 11 jobs, et ce qui les fait réellement échouer
 
 | Job (nom affiché) | Échoue réellement sur | Peut réussir sans rien vérifier |
 |---|---|---|
@@ -32,12 +32,37 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Backend tests (Python + MongoDB)** | `pytest` complet contre un **vrai** MongoDB (`mongo:7` en service container), `py_compile`, `audit_docstrings.py` strict, et le garde des durées publiées (`check-privacy-policy.py`, §3 F18). | Partiellement : Redis et `TrustedHostMiddleware` sont désactivés dans ce job (§3, F7). |
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle), et **sur `main`** la vérification que le frontend **SERVI** annonce la révision de ce commit (`check-deployed-revision.js`, §3 F19). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
+| **E2E Playwright tests (Chromium)** | Régressions des 6 parcours interactifs sous Chromium headless (géoloc/GPS, support, formulaires, auth travailleur), blocage CSP au runtime, plantage du build compilé dans un vrai navigateur. | Non — exécute la suite E2E réelle contre la fixture API locale (`playtest-api-server.mjs`) et Vite preview. |
 | **Lighthouse performance budgets** | Assertions LHCI (`error`) sur **13 pages**, `check-og-images.js` et le **cycle `/jobs/:id` en HTTP**, les trois sur une pile locale « forme production » (§3, F3) ; sondes de production (`check-seo-production.js`, `check-cors-preflight.js`) sur `main`. | **Oui, sur le périmètre performance** : la surface auditée est un artefact servi par le job (ni CDN, ni cache d'edge — §3, F2ter), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté), puis **vérification** que `/health` annonce la révision attendue (`check_deployed_revision.py`). | **Oui, sur le déploiement lui-même** : la politique — quand le job déploie, quelle révision est attendue quand il ne déploie pas, ce qui rougit — est écrite **en tête du job** dans `ci.yml`, seul endroit qui la définisse (§3 F1). |
 | **Dépendances (avis de sécurité)** | Les avis **haut/critique** sur les dépendances de PRODUCTION du frontend (`npm audit --omit=dev`). | **Partiel, et le périmètre n'est écrit qu'une fois** : en tête du job `dependency-audit` de `ci.yml` (production frontend = gate ; paquets Python = avis CONSTATÉS, `::warning`). §7 point 7 y renvoie. |
 
 ## 3. Les faux-verts : réussir sans avoir prouvé
+
+### Synthèse : état des faux-verts (vivants vs clos)
+
+| Statut | Réf | Intitulé | Portée du faux-vert |
+|---|---|---|---|
+| ⚠️ **Vivant** | F1 | `deploy-fly` sauté sur push frontend/doc | Le backend déployé n'est pas recompilé si seul le frontend a bougé. |
+| ⚠️ **Vivant** | F2 / F2ter | Lighthouse mesure la pile locale au lieu du CDN | Ne teste ni le cache edge Vercel ni la latence réseau réelle. |
+| ⚠️ **Vivant** | F4 | `fly-env-drift` : deux contrôles SSH inopérants | Les secrets en mémoire ne sont pas inspectés sans session SSH active. |
+| ⚠️ **Vivant** | F5 | `mobile-build` prouve la compilation, pas l'exécution | L'APK compile sans tester son exécution sur appareil réel. |
+| ⚠️ **Vivant** | F6 / F6bis | Budgets Lighthouse sans latence d'API | Le gate évalue l'artefact sous bridage local sans dépendance réseau API. |
+| ⚠️ **Vivant** | F7 | `backend-tests` : Redis et TrustedHost désactivés | L'environnement de test bypass le middleware d'hôte et le cache Redis. |
+| ✅ **Clos** | F3 | Le verrou `/jobs/:id` s'éteignait tout seul | Résolu (17/09) : pile locale « forme production » avec MongoDB et rewrites. |
+| ✅ **Clos** | F8 | Aucun job ne vérifie le résultat du déploiement | Résolu (20/09) : vérification de `/health` avec révision Git attendue. |
+| ✅ **Clos** | F9 | Intégrations SEO/analytics absentes du build | Résolu (20/09) : sonde quotidienne stricte (`seo-production-probe.yml`). |
+| ✅ **Clos** | F10 | Contrat OG `/jobs/:id` vérifié hors app | Résolu (18/09) : comparaison directe app ↔ pré-rendu offline. |
+| ✅ **Clos** | F11 | `canonical` figé sur la fiche précédente | Résolu (18/09) : canonical dynamique par ID. |
+| ✅ **Clos** | F12 | Métadonnées de page refusées après le build | Résolu (18/09) : plugin `requirePageMeta` bloquant dès `vite build`. |
+| ✅ **Clos** | F13 | Route ni publique ni privée ignorée | Résolu (18/09) : classification exhaustive dérivée de `App.js`. |
+| ✅ **Clos** | F14 | Traduction de page manquante invisible au build | Résolu (18/09) : contrôle de parité des clés i18n par route. |
+| ✅ **Clos** | F15 | Découpe description 150 caractères divergente | Résolu (18/09) : décompte Unicode unifié. |
+| ✅ **Clos** | F16 | Carte de partage et page désynchronisées | Résolu (18/09) : table unique `page-meta.js` partagée. |
+| ✅ **Clos** | F17 | Refus du générateur de cartes non prouvés | Résolu (19/09) : méta-test par mutation sur `gen-og-images.py`. |
+| ✅ **Clos** | F18 | Dérive des durées de rétention publiées | Résolu (19/09) : test de conformité `check-privacy-policy.py`. |
+| ✅ **Clos** | F19 | Frontend servi divergent de `main` | Résolu (21/09) : `check-deployed-revision.js` vérifie `kojo-build-revision`. |
 
 ### F1 — `Deploy backend to Fly.io` vert sans aucun déploiement
 
@@ -2189,121 +2214,36 @@ protection de branche avec 8 checks requis et exigence de branche à jour.
 
 ## 7. Angles morts assumés
 
-À connaître avant d'affirmer qu'un changement est validé :
+### 7.1 Angles morts ouverts (vivants) — à connaître avant de valider
 
-1. **Tests de bout en bout en navigateur.** Suite Playwright locale (`frontend/e2e/user-flows.spec.js`)
-   exécutable via `npm run test:e2e` contre la fixture API (`playtest-api-server.mjs`) et le serveur de prévisualisation,
-   couvrant la détection de position, l'assistance support et le parcours travailleur/candidature.
-2. **Aucun seuil de couverture.** `vitest run` et `pytest` sans `--cov` : une
-   suite amputée reste verte.
-3. **CLOS (20/09/2026) — le résultat du déploiement est vérifié** : le service
-   publie la révision dont son image a été construite (`/health`, champ
-   `revision`) et `deploy-fly` refuse quand la réponse n'est pas le commit
-   attendu — y compris quand le déploiement a été SAUTÉ, où l'attendu est le
-   dernier commit ayant touché `backend/**` (cf. F8). Restent hors de cette
-   vérification : la santé applicative (une panne au boot se voit en 503, pas
-   dans ce champ) et l'état des machines Fly.
-4. **`deploy-fly` ne dépend pas du frontend ni du mobile** : un frontend rouge
-   n'empêche pas un déploiement backend.
-5. **`timeout-minutes` posé le 20/09/2026** sur les jobs de `ci.yml` (10 depuis le
-   20/09/2026) et les 2
-   workflows séparés (5 à 30 min, ≥ 3× la durée mesurée : un blocage rougit au
-   lieu de patienter 360 min). **Reste ouvert : pas de `concurrency`** au niveau
-   du workflow — seul `deploy-fly` a son groupe de concurrence, donc deux push
-   rapprochés sur `main` font tourner deux runs en parallèle.
-6. **`push` sur une branche de travail : aucun run** (§1). C'est un CHOIX de
-   coût, pas un oubli : les 10 jobs rejouent ~13 min par push (Lighthouse, suite
-   backend contre MongoDB, build mobile), et le premier signal vient de la PR —
-   un push de travail n'est donc pas validé, il est seulement sauvegardé. Le
-   repoindre ne se tait pas au moins : §1 le dit avant la liste des jobs, là où
-   on lit « à chaque push ».
-7. **CLOS (20/09/2026) — la CI a un audit de dépendances**, et son périmètre
-   n'est écrit qu'une fois : **en tête du job `dependency-audit` de `ci.yml`**,
-   avec le motif qui décide lequel des deux périmètres est un gate et lequel
-   CONSTATE (`::warning` + résumé du run). Ce document y renvoie au lieu de le
-   recopier : deux écritures d'une même politique sont deux politiques, et
-   c'est la seconde qu'on oublie de mettre à jour.
-8. **CLOS (20/09/2026) — la configuration SEO/analytics n'est plus seulement
-   observée** : la sonde garde son mode informatif sur les PR (`::notice` par
-   intégration absente, sur `main` uniquement), mais elle a un mode **strict**
-   (`--strict`) que lance une fois par jour
-   `.github/workflows/seo-production-probe.yml` : une intégration **requise**
-   absente y rougit, une facultative non (cf. F9). Chaque page du sitemap est
-   lue (canonical, title, description), et un échantillon borné
-   (`MAX_JOB_PAGES` = 3) des fiches `/jobs/:id` est jugé sur ces trois mêmes
-   métadonnées. Restent trois limites, elles réelles : l'échantillon des fiches
-   ne couvre que jusqu'à 3 fiches sur un sitemap qui en admet 9 000 (et seulement
-   celles listées au moment de la lecture ; carte OG et verrou 404 restent à
-   `check-og-job-200.js`), le contrôle des pages du site ne suit que jusqu'à
-   `MAX_PAGES` (20), et un `Age` de cache non
-   nul n'est pas détecté — le
-   HTML est servi en `must-revalidate`, donc l'edge revalide, mais la sonde ne
-   le PROUVE pas (mesuré : `HIT` + `Age: 1` avec et sans `cache-control`).
-9. **La garde CORS ne tourne que sur `main`** : elle mesure la paire
-   DÉPLOYÉE (origine du site ↔ API), donc une PR de migration de domaine n'est
-   pas arrêtée avant fusion — la bascule peut casser la production, et c'est le
-   run de `main` qui le dit ensuite (en rouge, pas en `::notice`). L'ordre qui
-   évite la panne reste : backend (`FRONTEND_APP_URL` / `CORS_ORIGINS`) d'abord,
-   frontend ensuite. Les réessais de la sonde (6 × 15 s) absorbent la fenêtre du
-   déploiement Fly, qui tourne dans le même run.
-10. **CLOS (20/09/2026) — `frontend/scripts/audit_tdz.cjs` a un exécutant** : il
-    était le seul garde du dépôt que rien ne lançait. Il est désormais un module
-    (`analyserLeCode` / `analyserLeDepot`, exportés) doublé d'un CLI dont le
-    **code de sortie vaut ce que vaut le verdict** (1 sur un TDZ certain). Son
-    test (`scripts/__tests__/audit-tdz.test.js`) lance le CLI réel sur un arbre
-    de fixture — `KOJO_TDZ_DIR` — et son propre import, donc il rougit à la fois
-    quand la détection casse et quand le refus disparaît ; le registre porte
-    `invoque_par: "test"` **et** une mutation rejouée
-    (« tdz: classification directe neutralisee », rouge nommé `CARTES`).
-    Ce que le garde protège est mesuré : une table lue avant sa déclaration dans
-    le même scope est la classe de bug qui a vidé la page d'accueil.
-11. **`frontend/scripts/check-og-reproducible.js` n'est pas un garde mais un
-    OUTIL — et le registre le dit désormais** (`role: "outil"`, décision du
-    20/09/2026). Un garde doit pouvoir REFUSER ; celui-ci imprime un `::notice`
-    et sort sans verdict dès que l'interpréteur Python n'a pas Pillow ou que la
-    police de référence manque. Un contrôle qui peut se taire hors de son poste
-    ne peut pas être un gate : le registrer comme garde faisait dire à la
-    couverture plus qu'elle ne prouvait. Il reste dans le dépôt (c'est le
-    diagnostic à lancer à la main pour vérifier la régénération octet pour octet
-    des PNG) et garde `hors_mutation`, avec ce motif.
+Les angles morts ci-dessous restent **actifs et assumés** : un vert en CI ne préjuge pas de ces situations.
 
-12. **CLOS (20/09/2026) — chaque page a un test de RENDU.**
-    `src/pages/__tests__/pages-render.test.jsx` monte chaque page et exige
-    qu'elle se rende sans lever, avec un contenu non vide. La liste des pages est
-    **dérivée** (`import.meta.glob('../*.js')`) : une page ajoutée entre dans le
-    tour sans que personne touche au fichier — une liste recopiée aurait
-    reproduit le défaut qu'elle surveille. Son premier run a trouvé un vrai
-    défaut du même genre que l'incident de l'accueil : `Profile.js` lisait
-    `user.first_name` alors que `user` peut redevenir nul le temps d'une
-    déconnexion (écran blanc attrapé par l'ErrorBoundary) — la page rend
-    maintenant son squelette dans ce cas. Ce que ce fichier est : un test de
-    FUMÉE. Il ne remplace pas les tests de comportement (4 fichiers), et il ne
-    remplace pas un navigateur : les parcours restent vérifiés à la main (§7.1).
-13. **CLOS (20/09/2026) — le registre des gardes classe TOUT script du dépôt.**
-    Le périmètre de l'exhaustivité était déduit du NOM (`check-`, `audit_`) : un
-    outil nommé `dmarc_policy.py`, `setup-seo-env.js` ou `lhci-cls-budgets.cjs`
-    échappait donc à la règle, et la décision « est-ce un garde ? » se prenait en
-    choisissant un nom de fichier. Le périmètre est désormais le RÉPERTOIRE
-    (`frontend/scripts`, `.github/scripts`, `backend/scripts`) : tout script est
-    déclaré avec son rôle, `garde` ou `outil`, et un outil porte son motif. Les
-    huit scripts que ce changement fait apparaître sont classés — dont
-    `frontend/scripts/validate-vercel-json.mjs`, déclaré **garde** (il sort en 1
-    sur un `vercel.json` que Vercel refuserait) et prouvé par une mutation
-    rejouée (`validate-vercel-json: propriete interdite dans un item rewrites
-    toleree` → le test propriétaire rougit, nommé).
-14. **CLOS (20/09/2026) — la CI n'écrit plus en production.** Le cycle
-    `/jobs/:id` de `check-og-job-200.js` CRÉE puis SUPPRIME une mission : sa
-    capacité était déduite de l'adresse de la BASE servie (`localhost`), pas du
-    BACKEND écrit. Sur une PR dont la preview Vercel était résolue, la pile locale
-    n'était pas montée, `KOJO_BACKEND_URL` retombait sur son défaut — l'API de
-    PRODUCTION — et la mission de test était créée en base réelle puis supprimée
-    (un échec de nettoyage y laissait une annonce visible). Le contrôle porte
-    maintenant sur la seule adresse que le script écrit (`isControlledBackend` :
-    loopback uniquement) ; hors de là il se tait avec un `::notice` nommant la
-    raison. Contrepartie assumée : sur une PR dont la preview est auditée, le
-    chemin 200 n'est plus exercé par ce script (il l'est sur la pile locale — ce
-    que `main` monte depuis le 20/09/2026 — et en processus par
-    `backend/tests/test_job_og_cycle.py`).
+| Angle mort vivant | Risque réel | Atténuation / État |
+|---|---|---|
+| **1. Aucun seuil de couverture** | `vitest` et `pytest` tournent sans `--cov` : supprimer ou vider des tests laisse la suite verte. | Les gardes critiques sont protégés par le registre de mutations (`guard-proofs.json`), pas par la couverture globale. |
+| **2. `deploy-fly` découplé du frontend et mobile** | Un échec dans `frontend-build`, `lighthouse-ci` ou `mobile-build` ne bloque pas le déploiement du backend. | Délibéré : `deploy-fly` ne dépend que de `backend-tests` pour permettre les livraisons backend indépendantes. |
+| **3. Pas de `concurrency` globale sur CI** | Deux pushs rapprochés sur `main` lancent deux runs complets en parallèle qui peuvent se chevaucher. | Seul `deploy-fly` possède son propre groupe de concurrence (`concurrency: deploy-fly`) pour sérialiser les machines Fly. |
+| **4. Aucun run sur branche de travail** | Pousser sur une branche locale ne déclenche aucun run GitHub Actions (§1) ; le code n'est validé qu'à la PR. | Choix de coût assumé : la suite complète (~13 min) est réservée à `main` et aux PRs vers `main`. |
+| **5. Garde CORS exécutée sur `main` uniquement** | La sonde CORS teste l'interaction en ligne du site avec l'API déployée : une rupture introduite sur une PR n'est visible qu'après merge. | Mesuré sur la production réelle : les réessais (6 × 15 s) absorbent le déploiement Fly simultané. |
+| **6. Périmètre navigateur Playwright E2E** | La suite E2E tourne sous Chromium headless uniquement ; elle ne couvre ni WebKit/Safari, ni Firefox, ni les terminaux mobiles physiques. | Valide 6 parcours clés (GPS, formulaires, auth) et la CSP réelle sous Chromium ; les spécificités Safari/iOS restent manuelles. |
+| **7. Limites de la sonde SEO quotidienne** | La sonde stricte quotidienne n'échantillonne que 3 fiches `/jobs/:id` (sur ~9 000) et 20 pages max ; l'`Age` du cache edge n'est pas prouvé. | Un sitemap valide et 3 fiches représentatives suffisent pour bloquer les dérives globales sans saturer Vercel. |
+| **8. `check-og-reproducible.js` est un outil local** | Le diagnostic de reproductibilité octet pour octet des cartes OG sort en notice sans Pillow ou sans la police de référence. | Classé `role: "outil"` dans `guard-proofs.json` : diagnostic d'atelier manuel, pas un gate bloquant de CI. |
+
+### 7.2 Angles morts fermés (historique des résolutions)
+
+Ces angles morts historiques ont été **fermés et vérifiés par des gardes automatisés** :
+
+| Sujet fermé | Date | Solution pérenne apportée |
+|---|---|---|
+| **E2E Playwright en CI** | 24/09/2026 | Job `e2e-playwright` ajouté dans `ci.yml` : exécute les 6 parcours utilisateurs contre l'API mock et Vite preview sous Chromium. |
+| **Vérification du déploiement backend (F8)** | 20/09/2026 | `deploy-fly` interroge `/health` et compare la révision de l'image déployée au commit attendu (même quand le build est sauté). |
+| **Sonde SEO stricte (F9)** | 20/09/2026 | Workflow quotidien `.github/workflows/seo-production-probe.yml` en `--strict` sur sitemap, titres, descriptions et cartes. |
+| **Audit des dépendances (F20)** | 20/09/2026 | Job `dependency-audit` dans `ci.yml` : bloque sur les avis hauts/critiques en production frontend. |
+| **Garde TDZ (`audit_tdz.cjs`)** | 20/09/2026 | Exporté en module + CLI avec code de sortie strict, testé sur fixture et prouvé par mutation dans `guard-proofs.json`. |
+| **Tests de rendu de fumée frontend** | 20/09/2026 | `pages-render.test.jsx` monte automatiquement chaque page (`import.meta.glob`) sans plantage ni contenu vide. |
+| **Registre exhaustif des gardes** | 20/09/2026 | `.github/scripts/guard-proofs.json` classe chaque script (`garde` vs `outil`) ; test d'exhaustivité et rejeu de mutations. |
+| **Fin des écritures CI en production** | 20/09/2026 | `check-og-job-200.js` restreint aux backends contrôlés locaux (`isControlledBackend`) ; aucun appel d'écriture vers Fly en PR. |
+| **Frontend servi conforme à `main` (F19)** | 21/09/2026 | `check-deployed-revision.js` vérifie la balise meta `kojo-build-revision` sur la production après déploiement. |
 
 ## 8. Tenir ce document à jour
 
