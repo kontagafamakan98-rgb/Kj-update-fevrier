@@ -241,3 +241,23 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     await waitFor(() => expect(screen.queryByText(VIDE_FILTRE)).toBeNull());
   });
 });
+
+describe('Jobs — la carte n’est chargée qu’à son ouverture', () => {
+  // Leaflet pèse 48,6 Ko gzip (bundle UMD ES5 non élagable) et sa vue n’est pas
+  // celle par défaut : le chunk doit rester derrière un `import()` dynamique.
+  // Ce cas verrouille les DEUX moitiés de la règle — absente tant qu’on ne
+  // l’ouvre pas, rendue quand on l’ouvre — parce que supprimer le rendu de la
+  // carte ferait aussi passer un test qui ne vérifierait que son absence.
+  it('n’affiche pas la carte en vue liste, et la rend une fois la vue carte ouverte', async () => {
+    jobsAPI.getAll.mockResolvedValue([JOB_A]);
+    render(<Jobs />);
+
+    expect(await screen.findByText('Réparation de plomberie')).toBeTruthy();
+    expect(screen.queryByTestId('carte')).toBeNull();
+
+    // Le libellé vient du dictionnaire publié, pas d’un littéral recopié.
+    fireEvent.click(screen.getByRole('button', { name: fr.mapView }));
+
+    expect(await screen.findByTestId('carte')).toBeTruthy();
+  });
+});

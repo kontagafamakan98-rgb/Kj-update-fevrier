@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -14,7 +14,6 @@ import { safeLog } from '../utils/env';
 import { DemoJobsEmptyState, JobCard } from '../components/JobsResults';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
 import CountrySelector from '../components/CountrySelector';
-import JobsMap from '../components/JobsMap';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
 import { usePageMeta } from '../utils/seo';
 import { makePublicJobsPrefetch } from '../utils/publicJobsPrefetch';
@@ -31,6 +30,28 @@ import {
   JOB_TAB_MISSIONS,
   JOBS_PAGE_SIZE,
 } from '../hooks/useJobsData';
+
+// ── La carte (Leaflet) n'est téléchargée QUE si on l'ouvre ─────────────────
+// `leaflet` ne publie qu'un bundle UMD ES5 (`dist/leaflet-src.js` : ni champ
+// `module`, ni `exports`), donc Rollup ne peut rien élaguer et la
+// bibliothèque entière part dans son chunk — 155,7 Ko brut / 48,6 Ko gzip, le
+// plus gros chunk du build. `JobsMap` était pourtant importé STATIQUEMENT ici :
+// le chunk partait à chaque chargement de /jobs, dont la vue par défaut est la
+// LISTE. Mesure Lighthouse sur le build de production : 38 des 48 Ko gzip
+// étaient téléchargés sans être exécutés (`unused-javascript` 0,5 — la seule
+// page du site dans ce cas). `React.lazy` fait passer l'import en `import()` :
+// le JS et le CSS de Leaflet ne partent plus qu'au premier clic sur « Carte ».
+// Vérifié par le garde scripts/check-bundle-size.js (chunks à la demande).
+const JobsMap = lazy(() => import('../components/JobsMap'));
+
+// Placeholder de la carte, à la hauteur exacte de son conteneur (60vh) : le
+// swap placeholder → carte ne décale rien (même principe que le skeleton de
+// liste ci-dessous, calibré sur JOBS_PAGE_SIZE cartes). Il sert AUSSI de
+// repli au suspens de la carte lazy : le chunk arrive derrière une boîte
+// déjà à la bonne taille, donc le budget CLS de /jobs (0,01) tient.
+const CarteEnChargement = () => (
+  <div className="h-full w-full animate-pulse bg-gray-200" aria-hidden="true" />
+);
 
 // ── Préchargement PARALLÈLE de la liste publique (decouverte) ───────────────
 // Sans lui, la liste n'était demandée qu'APRÈS que le chunk lazy soit chargé,
@@ -411,7 +432,9 @@ export default function Jobs() {
           // Placeholder à la hauteur exacte de la carte (60vh) : le swap
           // skeleton → carte ne décale rien (anti-CLS, même principe que
           // le skeleton de liste ci-dessous).
-          <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm animate-pulse bg-gray-200" style={{ height: '60vh' }} />
+          <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
+            <CarteEnChargement />
+          </div>
         ) : (
           // Skeleton à la hauteur de la liste RÉELLE (JOBS_PAGE_SIZE cartes) :
           // le défaut (3 cartes) laissait le footer ancré (flex-1) remonter de
@@ -420,7 +443,9 @@ export default function Jobs() {
         )
       ) : viewMode === 'map' ? (
         <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
-          <JobsMap jobs={filteredJobs} />
+          <Suspense fallback={<CarteEnChargement />}>
+            <JobsMap jobs={filteredJobs} />
+          </Suspense>
         </div>
       ) : loadError && filteredJobs.length === 0 ? (
         // L'échec est déjà expliqué par le bandeau ci-dessus, avec son action :

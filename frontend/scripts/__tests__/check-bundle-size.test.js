@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { randomBytes } from 'crypto';
-import { checkBundleSize, BUDGETS } from '../check-bundle-size';
+import { checkBundleSize, estChunkALaDemande, BUDGETS } from '../check-bundle-size';
 
 // Tests du garde-fou « budget de taille du bundle » (scripts/check-bundle-size.js).
 //
@@ -18,14 +18,48 @@ import { checkBundleSize, BUDGETS } from '../check-bundle-size';
 
 const tempDirs = [];
 
-const makeBuild = ({ chunks = {}, initial, extraFiles = {}, indexHtml } = {}) => {
+// L'unité paresseuse de la carte, telle que le build la produit : son entrée
+// (`JobsMap-*`) importe STATIQUEMENT Leaflet — c'est sa dépendance — et elle
+// n'est atteinte QUE par un `import()`, depuis le chunk de la page /jobs.
+//
+// Elle fait partie de TOUTE arborescence de test : le garde refuse un build où
+// elle est absente (un préfixe déclaré qui ne correspond à aucun chunk ne
+// surveille plus rien). `sansUniteParesseuse: true` la retire, pour le cas qui
+// éprouve ce refus-là.
+const uniteParesseuse = () => ({
+  chunks: { 'vendor-leaflet-carte.js': 2 * 1024, 'JobsMap-carte.js': 1024, 'Jobs-page.js': 1024 },
+  sources: {
+    'JobsMap-carte.js': 'import"./vendor-leaflet-carte.js";export default 1;',
+    'Jobs-page.js': 'const m=await import("./JobsMap-carte.js");export default m;',
+  },
+});
+
+const makeBuild = ({
+  chunks = {},
+  initial,
+  extraFiles = {},
+  indexHtml,
+  sources = {},
+  sansUniteParesseuse = false,
+} = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bundle-size-'));
   tempDirs.push(root);
   const assets = path.join(root, 'build', 'assets');
   fs.mkdirSync(assets, { recursive: true });
 
-  for (const [name, size] of Object.entries(chunks)) {
+  const unite = sansUniteParesseuse ? { chunks: {}, sources: {} } : uniteParesseuse();
+  // L'entrée du shell est TOUJOURS référencée par le gabarit d'index.html :
+  // elle fait donc partie de toute arborescence décrite ici.
+  const tousLesChunks = { 'index-entry.js': 40 * 1024, ...unite.chunks, ...chunks };
+  const toutesLesSources = { ...unite.sources, ...sources };
+
+  for (const [name, size] of Object.entries(tousLesChunks)) {
     fs.writeFileSync(path.join(assets, name), randomBytes(size));
+  }
+  // Chunks dont le CONTENU compte (arêtes d'imports) : écrits après les octets
+  // aléatoires, donc ils remplacent la taille de `chunks`.
+  for (const [name, source] of Object.entries(toutesLesSources)) {
+    fs.writeFileSync(path.join(assets, name), source);
   }
   for (const [rel, size] of Object.entries(extraFiles)) {
     const full = path.join(root, 'build', rel);
@@ -35,8 +69,10 @@ const makeBuild = ({ chunks = {}, initial, extraFiles = {}, indexHtml } = {}) =>
 
   // Par défaut tous les chunks sont préchargés ; `initial` permet de ne
   // précharger QUE le chemin critique (les autres restent des chunks lazy,
-  // présents dans le build mais absents d'index.html).
-  const preloaded = initial ?? Object.keys(chunks);
+  // présents dans le build mais absents d'index.html). Ce que Vite émettrait
+  // réellement n'est jamais préchargé : un chunk à la demande.
+  const preloaded =
+    initial ?? Object.keys(tousLesChunks).filter((name) => !estChunkALaDemande(name));
   const html =
     indexHtml ??
     `<!DOCTYPE html><html><head>
@@ -144,6 +180,81 @@ describe('check-bundle-size — un build absent est une erreur, pas un vert', ()
     expect(result.ok).toBe(false);
     expect(result.stats).toBeNull();
     expect(result.errors.join('\n')).toMatch(/index\.html introuvable[\s\S]*npm run build/);
+  });
+});
+
+describe('check-bundle-size — l’unité paresseuse reste paresseuse', () => {
+  it('accepte l’unité atteinte par import() — ses membres s’importent entre eux', () => {
+    const result = checkBundleSize({ root: makeBuild({ initial: ['index-entry.js'] }), quiet: true });
+
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
+    expect(result.stats.ecartsALaDemande).toEqual([]);
+    // Leaflet reste dans le build, simplement hors du chemin critique.
+    expect(result.stats.initialChunks.map((c) => c.file)).toEqual(['index-entry.js']);
+  });
+
+  it('échoue si un chunk ordinaire importe STATIQUEMENT un membre de l’unité', () => {
+    // C'est exactement ce que faisait `import JobsMap from '../components/JobsMap'`
+    // dans src/pages/Jobs.js : l'unité repassait dans le chargement de la page.
+    const root = makeBuild({
+      initial: ['index-entry.js'],
+      sources: { 'filtres-extra.js': 'import{L as z}from"./JobsMap-carte.js";export default z;' },
+    });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /filtres-extra\.js importe STATIQUEMENT JobsMap-carte\.js/
+    );
+  });
+
+  it('échoue si index.html précharge un membre de l’unité', () => {
+    const root = makeBuild({ initial: ['index-entry.js', 'vendor-leaflet-carte.js'] });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /index\.html précharge \/assets\/vendor-leaflet-carte\.js/
+    );
+  });
+
+  it('échoue si plus aucun import() ne mène à l’unité (garde devenu aveugle)', () => {
+    // Refus symétrique du précédent : sans lui, supprimer le React.lazy ferait
+    // passer le garde par DISPARITION de ce qu'il surveille.
+    const root = makeBuild({
+      initial: ['index-entry.js'],
+      sources: { 'Jobs-page.js': 'export default 1;' },
+    });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/aucun `import\(\)` ne mène à [\s\S]*JobsMap-carte\.js/);
+  });
+
+  it('échoue si l’unité déclarée n’existe plus dans le build', () => {
+    const root = makeBuild({ initial: ['index-entry.js'], sansUniteParesseuse: true });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/aucun chunk vendor-leaflet \/ JobsMap dans le build/);
+  });
+
+  it('ne confond pas le CSS homonyme de Leaflet avec un membre de l’unité', () => {
+    // Le CSS de Leaflet fait quelques Ko et n'entre dans aucun budget de JS :
+    // seuls les chunks .js sont surveillés.
+    const root = makeBuild({
+      initial: ['index-entry.js'],
+      chunks: { 'vendor-leaflet-carte.css': 2 * 1024 },
+      sources: {
+        'Jobs-page.js':
+          'import"./vendor-leaflet-carte.css";const m=await import("./JobsMap-carte.js");export default m;',
+      },
+    });
+    const result = checkBundleSize({ root, quiet: true });
+
+    expect(result.errors).toEqual([]);
+    expect(result.ok).toBe(true);
   });
 });
 

@@ -154,6 +154,22 @@ export default defineConfig(({ mode }) => {
       // `minify: false` localement, jamais en prod.
       minify: 'esbuild',
       cssMinify: true,
+      // Cible de transpilation ÉCRITE EXPLICITEMENT. Vite 7 utilise déjà ce jeu
+      // par défaut, mais l'écrire ici est ce qui empêche un changement de défaut
+      // (ou une option posée ailleurs) de faire redescendre silencieusement le
+      // code sous le niveau « Baseline Widely Available ». C'est exactement ce
+      // que mesure Lighthouse dans `legacy-javascript` : du code downlevelé, des
+      // helpers de transpilation (`__spreadArray`, `_objectSpread`, `_typeof`)
+      // ou des polyfills qui partent au navigateur sans lui servir. Mesure du
+      // 24/09/2026 sur le build de production : `legacy-javascript` = 1 (rien
+      // signalé) sur les 13 pages auditées, aucun helper dans build/assets/*.js,
+      // et la syntaxe moderne survit (`??` présent dans les chunks).
+      //
+      // NE PAS se fier au champ `browserslist` de package.json pour ceci : Vite
+      // ne le lit PAS pour le JS (il vient de react-scripts, il ne sert plus
+      // qu'à PostCSS/autoprefixer, donc au CSS). Baisser la cible JS se fait ICI,
+      // et nulle part ailleurs.
+      target: 'baseline-widely-available',
       rollupOptions: {
         output: {
           manualChunks(id) {
