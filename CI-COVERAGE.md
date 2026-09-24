@@ -33,7 +33,7 @@ plusieurs commits entre deux validations ; le premier signal vient de la PR.
 | **Frontend tests + build (Node/Vite)** | `vitest run`, `audit_api_returns.cjs` strict, `vite build` — **qui refuse déjà une page de route publique sans métadonnées** (plugin `require-page-meta`, §3 F12), donc avant même d'écrire un artefact —, puis **9 gardes sur les artefacts** (shells de pré-rendu, routage SPA, shell d'accueil/SEO, descriptions par page, split pack2, split `services/api`, cartes OG, famille d'icônes, manifeste PWA, budgets de bundle), et **sur `main`** la vérification que le frontend **SERVI** annonce la révision de ce commit (`check-deployed-revision.js`, §3 F19). | Non, sur son périmètre. Aucun seuil de couverture : supprimer des tests reste vert (§7). |
 | **Bundle size report (PR comment)** | Presque rien : c'est un **rapport**, pas un garde. Il échoue si le build est introuvable ou si le commentaire ne peut pas être publié. | **Oui, par conception** — il ne vise pas à bloquer quoi que ce soit (job **non requis**). Le garde de taille, lui, reste `check-bundle-size.js` dans `frontend-build`. |
 | **E2E Playwright tests (Chromium)** | Régressions des 6 parcours interactifs sous Chromium headless (géoloc/GPS, support, formulaires, auth travailleur), blocage CSP au runtime, plantage du build compilé dans un vrai navigateur. | Non — exécute la suite E2E réelle contre la fixture API locale (`playtest-api-server.mjs`) et Vite preview. |
-| **Lighthouse performance budgets** | Assertions LHCI (`error`) sur **13 pages**, `check-og-images.js` et le **cycle `/jobs/:id` en HTTP**, les trois sur une pile locale « forme production » (§3, F3) ; sondes de production (`check-seo-production.js`, `check-cors-preflight.js`) sur `main`. | **Oui, sur le périmètre performance** : la surface auditée est un artefact servi par le job (ni CDN, ni cache d'edge — §3, F2ter), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
+| **Lighthouse performance budgets** | Assertions LHCI (`error`) sur **13 pages**, `check-og-images.js` et le **cycle `/jobs/:id` en HTTP**, les trois sur une pile locale « forme production » (§3, F3) ; sondes de production (`check-seo-production.js`, `check-cors-preflight.js`) sur `main`. | **Oui, sur le périmètre performance** : la surface auditée est un artefact servi par le job (ni CDN, ni cache d'edge — §3, F2ter), budgets calés sur des mesures réelles, portés **par route** (§3, F6). Le cycle `/jobs/:id` et les pages auth, eux, sont désormais mesurés/vérifiés sur chaque PR. Le gate ne vérifie **pas** la latence de l'API : sur `/jobs`, dont le LCP est le moment où la réponse de `GET /api/jobs` est connue, le LCP et le score ne sont plus assertés. S'y ajoute, dans le même job, une passe **desktop** qui garde le TBT de l'accueil à ≤ 200 ms (§F6) — le socle mobile ne mesurait pas la condition de l'audit. Les requêtes qui décidaient du verdict sont traitées selon ce qu'elles font au peintre : la géolocalisation (qui retardait un peintre de `/login`) est bloquée pendant le collect, et le tag GA4 — qui occupait le chemin critique — a d'abord été **déplacé après `load`** côté produit, puis **retiré** du blocage (F6, « Ce que le gate vérifie réellement »). |
 | **Mobile build (Capacitor + Android)** | Contrôle des bits exécutables (`check-exec-bits.py`, premier step, 0,17 s), `cap sync android`, `gradlew assembleDebug` (Java 21, SDK 36). | Sur `sdkmanager --licenses` et la preuve finale : le job prouve que **ça compile**, pas que ça fonctionne, et ne publie aucun artefact (§3, F5). |
 | **Deploy backend to Fly.io** | `flyctl deploy --remote-only` (si un changement `backend/**` ou `ci.yml` est détecté), puis **vérification** que `/health` annonce la révision attendue (`check_deployed_revision.py`). | **Oui, sur le déploiement lui-même** : la politique — quand le job déploie, quelle révision est attendue quand il ne déploie pas, ce qui rougit — est écrite **en tête du job** dans `ci.yml`, seul endroit qui la définisse (§3 F1). |
 | **Dépendances (avis de sécurité)** | Les avis **haut/critique** sur les dépendances de PRODUCTION du frontend (`npm audit --omit=dev`). | **Partiel, et le périmètre n'est écrit qu'une fois** : en tête du job `dependency-audit` de `ci.yml` (production frontend = gate ; paquets Python = avis CONSTATÉS, `::warning`). §7 point 7 y renvoie. |
@@ -297,6 +297,24 @@ grandeurs y valent le moment où la réponse de `GET /api/jobs` est connue, pas 
 choix de l'artefact ; la requête qui *retardait* le peintre de `/login` est, elle,
 bloquée pendant le collect. Mesures et décision dans « Ce que le gate vérifie
 réellement », plus bas. Les seuils des 12 autres pages sont **inchangés**.
+
+**Depuis le 24/09/2026, l'accueil porte aussi un budget TBT DESKTOP** (≤ 200 ms,
+meilleur des 3 runs), dans une passe séparée — `frontend/lighthouserc.desktop.cjs`,
+exécutée par le même job. Le socle ci-dessus ne dit rien de l'interactivité sur un
+poste de bureau : il est mesuré en condition **mobile** simulée (CPU ×4 + 4G), et
+ses plafonds TBT (1 200 / 1 600 ms) sont dimensionnés pour un runner partagé, pas
+pour un seuil d'audit. Or les `settings` d'un collect valent pour **toutes** ses
+URLs : une même passe ne peut pas être mobile pour 13 pages et desktop pour une.
+La passe desktop n'audite donc que l'accueil, et n'asserte que deux choses : le
+TBT desktop et le plafond CLS **mesuré** de la route (table partagée, qui refuse
+une page sans mesure — le chargement de la config échoue alors). Mesures qui
+adossent le plafond : 0 / 0 / 0 ms sur le déploiement réel (score 96-98), 0 / 0 /
+0 ms en repli local au repos, **0 / 0 / 15 ms en repli local avec 4 boucles CPU
+sur 8 cœurs** (tâche la plus longue 92 à 154 ms) — soit plus de 13× la pire
+mesure relevée. Preuve d'échec :
+`frontend/scripts/__tests__/lhci-desktop-tbt.test.js`, qui rejoue les verdicts sur
+le moteur d'assertions de lhci : 477 ms (la valeur de l'audit) et 201 ms
+rougissent, `[250, 10, 10]` passe — c'est le meilleur des 3 runs qui décide.
 
 Deux points que ces chiffres imposent :
 
@@ -2101,7 +2119,13 @@ chaque PR vers `main` (sauf mention contraire).
   rejoué, `favicon.ico` réellement décodable.
 - Manifeste PWA : chaque icône déclarée existe, dimensions et `purpose` exacts,
   « maskable » **prouvé par la mesure** (zone de sécurité + opacité).
-- Budgets de bundle (JS initial, plus gros chunk, poids total du build).
+- Budgets de bundle (JS initial, plus gros chunk, poids total du build) **et
+  unité paresseuse restée paresseuse** : aucun chunk ordinaire n'importe
+  statiquement un membre de `CHUNKS_A_LA_DEMANDE` (la carte de /jobs — Leaflet
+  plus `JobsMap`), et un `import()` mène toujours à elle (sinon elle ne serait
+  plus « à la demande » mais « plus atteignable »). Un budget de taille ne peut
+  pas porter ce refus : le chunk existe et pèse pareil dans les deux cas, seul
+  le type d'arête qui le référence change.
 - Dépendances des **scripts de CI** : chaque module importé par un fichier de
   `scripts/` est déclaré en direct dans `package.json` (et le lock reproduit
   `package.json` à l'identique, sans quoi `npm ci` refuse d'installer) —
