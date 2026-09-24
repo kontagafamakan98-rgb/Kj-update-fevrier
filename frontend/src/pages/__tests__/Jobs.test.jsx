@@ -15,7 +15,7 @@
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 // Paramètres d'URL mutables d'un cas à l'autre (hoistés : les fabriques de
 // vi.mock s'exécutent avant le corps du module).
@@ -229,9 +229,13 @@ describe('Jobs — une panne se répare, une liste vide se dit', () => {
     jobsAPI.getAll.mockResolvedValue([]);
     render(<Jobs />);
 
-    expect(await screen.findByText(VIDE_FILTRE)).toBeTruthy();
+    const messageVide = await screen.findByText(VIDE_FILTRE);
     jobsAPI.getAll.mockResolvedValue([JOB_A]);
-    fireEvent.click(screen.getByRole('button', { name: 'Effacer les filtres' }));
+    // Deux boutons portent ce libellé depuis que la barre de filtres a le sien
+    // (celui de la barre efface les filtres depuis n'importe quel état, celui-ci
+    // est l'issue proposée PAR l'état vide) : on vise celui de la carte vide,
+    // qui est le seul dont ce cas parle.
+    fireEvent.click(within(messageVide.closest('div')).getByRole('button', { name: 'Effacer les filtres' }));
 
     expect(await screen.findByText('Réparation de plomberie')).toBeTruthy();
     await waitFor(() => expect(screen.queryByText(VIDE_FILTRE)).toBeNull());
