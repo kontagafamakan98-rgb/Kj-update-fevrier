@@ -305,16 +305,27 @@ poste de bureau : il est mesuré en condition **mobile** simulée (CPU ×4 + 4G)
 ses plafonds TBT (1 200 / 1 600 ms) sont dimensionnés pour un runner partagé, pas
 pour un seuil d'audit. Or les `settings` d'un collect valent pour **toutes** ses
 URLs : une même passe ne peut pas être mobile pour 13 pages et desktop pour une.
-La passe desktop n'audite donc que l'accueil, et n'asserte que deux choses : le
-TBT desktop et le plafond CLS **mesuré** de la route (table partagée, qui refuse
-une page sans mesure — le chargement de la config échoue alors). Mesures qui
-adossent le plafond : 0 / 0 / 0 ms sur le déploiement réel (score 96-98), 0 / 0 /
-0 ms en repli local au repos, **0 / 0 / 15 ms en repli local avec 4 boucles CPU
-sur 8 cœurs** (tâche la plus longue 92 à 154 ms) — soit plus de 13× la pire
-mesure relevée. Preuve d'échec :
+La passe desktop n'audite donc que les deux pages dont un TBT desktop est MESURÉ —
+l'accueil et `/jobs` — et n'asserte, par page, que deux choses : le TBT desktop et
+le plafond CLS **mesuré** de la route (table partagée, qui refuse une page sans
+mesure — le chargement de la config échoue alors, ce qui est le refus éprouvé pour
+l'ajout de `/jobs`). Mesures qui adossent le plafond : 0 / 0 / 0 ms sur le
+déploiement réel (score 96-98), 0 / 0 / 0 ms en repli local au repos, **0 / 0 /
+15 ms en repli local avec 4 boucles CPU sur 8 cœurs** (tâche la plus longue 92 à
+154 ms) — soit plus de 13× la pire mesure relevée. Pour `/jobs`, ajouté le
+24/09/2026 : 0 ms sur les 9 runs de production à chaud (pire run chaud 8 ms),
+0 / 0 / 0 ms sous 4 boucles CPU sur 8 cœurs, et **un seul run hors norme : le
+premier, à froid, à 1076 ms**, dont la tâche de 888 ms est du `Style & Layout`
+attribuée au chunk `jobs` (évaluation de script : 5 ms ; aucun tiers en cause) —
+la liste se met en page pendant que ses images arrivent encore. C'est le MEILLEUR
+des 3 runs qui est comparé, donc ce mode à froid ne fait pas un rouge : les trois
+runs partagent la même instance de navigateur et la même arête de cache, et une
+régression de l'artefact monte dans les trois. Preuve d'échec :
 `frontend/scripts/__tests__/lhci-desktop-tbt.test.js`, qui rejoue les verdicts sur
 le moteur d'assertions de lhci : 477 ms (la valeur de l'audit) et 201 ms
-rougissent, `[250, 10, 10]` passe — c'est le meilleur des 3 runs qui décide.
+rougissent **sur les deux routes**, les valeurs mesurées passent, et
+`[1076, 10, 10]` comme `[250, 10, 10]` passent — c'est le meilleur des 3 runs qui
+décide.
 
 Deux points que ces chiffres imposent :
 
