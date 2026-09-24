@@ -35,6 +35,35 @@
  * conservé tel quel plutôt que traduit en marge : c'est lui qui sera relu le
  * jour où quelqu'un se demandera pourquoi la CI a rougi.
  *
+ * ── /jobs, ajouté le 24/09/2026 ────────────────────────────────────────────
+ * Même plafond et même statistique, et là encore une mesure avant le seuil :
+ *
+ *   surface                                runs   TBT desktop        Style & Layout
+ *   production, runs suivants                 9    0 ms (8 ms ×1)     83 à 130 ms
+ *   production, 1er run à froid               1    1076 ms            2397 ms
+ *   production, 4 boucles CPU sur 8 cœurs     3    0 / 0 / 0 ms       133 à 163 ms
+ *   repli local (la pile du job)              3    0 / 0 / 0 ms       —
+ *
+ * Le mode « mauvais » n'est pas un coût de la page : c'est le PREMIER run, à
+ * froid. Sa tâche de 888 ms est du `Style & Layout` (2397 ms sur le run)
+ * attribuée au chunk `jobs` dont l'évaluation de script ne fait que 5 ms, et
+ * aucun tiers n'y contribue (`third-party-summary` vide) : la liste se met en
+ * page pendant que ses images arrivent encore. Sur les 9 runs suivants, 0 ms —
+ * et sous saturation CPU, 0 ms aussi.
+ *
+ * C'est le MEILLEUR des 3 runs qui est comparé, donc ce mode à froid ne fait pas
+ * un rouge : les trois runs d'un job partagent la même instance de navigateur et
+ * la même arête de cache, et une régression de l'artefact, elle, monte dans les
+ * trois. C'est la règle déjà appliquée au socle mobile, où un runner affamé a
+ * valu 1397 ms pour un arbre vert. Et c'est aussi ce qui interdit de descendre le
+ * plafond sous le bruit : 200 ms laisse 25× la pire mesure à chaud (8 ms).
+ *
+ * SURFACE : cette passe est ANONYME, et /jobs n'est pas une route privée
+ * (`scripts/check-spa-routes.js` la classe publique) : rien ne redirige, donc
+ * l'URL auditée est bien celle qui est assertée. La passe mobile, elle, envoie
+ * le jeton du compte CI et couvre donc AUSSI le rendu connecté de /jobs — les
+ * deux rendus sont ainsi mesurés, chacun par la passe qui l'exerce.
+ *
  * ── Ce qui est ASSERTÉ, et rien de plus ───────────────────────────────────
  * Le TBT, au MEILLEUR des 3 runs (comme le socle mobile : le bruit d'un runner
  * ne peut qu'AJOUTER du temps, donc le meilleur run décrit le coût propre de
@@ -45,9 +74,11 @@
  * fichier, donc la passe entière.
  *
  * Le score, le FCP et le LCP ne sont PAS réassertés ici : ils le sont déjà, sur
- * 13 pages, par la passe mobile, avec les mesures qui les justifient. Les
- * dupliquer en desktop, sans relevé desktop qui les adosse, multiplierait les
- * refus sans rien mesurer de plus.
+ * 13 pages, par la passe mobile, avec les mesures qui les justifient — et pour
+ * /jobs le socle mobile les exclut lui-même (son LCP est le moment où la réponse
+ * de `GET /api/jobs` est connue, son score le pèse). Les dupliquer en desktop,
+ * sans relevé desktop qui les adosse, multiplierait les refus sans rien mesurer
+ * de plus.
  *
  * ── Variables d'env ───────────────────────────────────────────────────────
  * `KOJO_LHCI_BASE_URL` (comme lighthouserc.cjs) : déploiement réel, preview
@@ -63,11 +94,13 @@ const {
 // Plafond de TBT desktop, en millisecondes. Justifié par la mesure ci-dessus.
 const TBT_DESKTOP_MAX = 200;
 
-// PÉRIMÈTRE : l'accueil, et lui seul. C'est la page sur laquelle l'audit a
-// relevé 477 ms, et la seule dont on ait un TBT desktop mesuré — sur les pages
-// protégées, la grandeur dépend de l'état du compte CI, donc un plafond y
-// manquerait de mesure pour l'adosser.
-const ROUTES_DESKTOP = ['/'];
+// PÉRIMÈTRE : les deux pages dont on a un TBT desktop MESURÉ. L'accueil est la
+// page sur laquelle l'audit a relevé 477 ms ; /jobs est la plus lourde du site
+// (liste de missions, images) et la seule autre page publique dont l'audit
+// signalait du JavaScript inutilisé. Aucune page PROTÉGÉE n'est ici : leur
+// grandeur dépend de l'état du compte CI, donc un plafond y manquerait de mesure
+// pour l'adosser.
+const ROUTES_DESKTOP = ['/', '/jobs'];
 
 const baseUrl = (process.env.KOJO_LHCI_BASE_URL || '').trim().replace(/\/$/, '');
 const localBase = 'http://localhost:4173';
