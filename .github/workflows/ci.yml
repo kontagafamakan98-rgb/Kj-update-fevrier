@@ -1321,6 +1321,25 @@ jobs:
         # précédents) — lhci autorun lit process.env.KOJO_LHCI_AUTH_HEADER.
         run: npx lhci autorun --config=lighthouserc.cjs
 
+      # Passe DESKTOP, séparée : le socle ci-dessus est mesuré en condition
+      # mobile (CPU ×4 + 4G simulée) et plafonne le TBT à 1200/1600 ms — des
+      # plafonds de runner partagé, pas des seuils d'audit. Or les `settings`
+      # d'un collect valent pour TOUTES ses URLs : une même passe ne peut pas
+      # être mobile pour 13 pages et desktop pour une. C'est pourtant la
+      # condition de l'audit qui a relevé 477 ms sur l'accueil desktop
+      # (« should be < 200 ms »), et une page peut très bien satisfaire le
+      # plafond mobile en le dépassant en desktop.
+      # Cette passe n'audite QUE l'accueil, et n'asserte QUE deux choses : le TBT
+      # desktop (≤ 200 ms, meilleur des 3 runs) et le plafond CLS mesuré de la
+      # route. Le plafond, sa mesure et son adossement (0 / 0 / 15 ms, dont 3
+      # runs avec 4 boucles CPU sur 8 cœurs) sont dans
+      # frontend/lighthouserc.desktop.cjs ; sa preuve d'échec est
+      # frontend/scripts/__tests__/lhci-desktop-tbt.test.js, rejouée par la suite
+      # Vitest du job frontend — ici, on exécute la passe réelle.
+      - name: Run Lighthouse CI desktop (TBT de l'accueil, budget bloquant)
+        working-directory: frontend
+        run: npx lhci autorun --config=lighthouserc.desktop.cjs
+
       - name: Fermer la pile locale et vérifier l’environnement final
         if: always()
         working-directory: frontend
