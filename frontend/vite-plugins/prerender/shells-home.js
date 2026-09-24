@@ -58,13 +58,23 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
 
     // Hero : le h1 est l'élément LCP de l'accueil.
     `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white relative overflow-hidden">`,
-    `<div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">`,
+    `<div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-24">`,
     `<div class="text-center">`,
-    `<h1 class="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight">${esc(T('heroTitle'))}</h1>`,
+    `<span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs sm:text-sm font-medium text-white ring-1 ring-inset ring-white/25 mb-6">`,
+    `<span aria-hidden="true">${esc(T('iconEscrow'))}</span>`,
+    `${esc(T('escrowBannerTitle'))}`,
+    `</span>`,
+    `<h1 class="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto">${esc(T('heroTitle'))}</h1>`,
     `<p class="text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto">${esc(T('heroSubtitle'))}</p>`,
     `<div class="flex flex-col sm:flex-row gap-4 justify-center items-center">`,
-    `<a href="/register" class="w-full sm:w-auto bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold text-lg shadow-lg transform transition hover:scale-105">${esc(T('getStarted'))}</a>`,
+    `<a href="/register" class="w-full sm:w-auto bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-semibold text-lg shadow-xl transform transition hover:-translate-y-0.5">${esc(T('getStarted'))}</a>`,
     `<a href="/jobs" class="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold text-lg transition">${esc(T('viewJobs'))}</a>`,
+    `</div>`,
+    // Bandeau de confiance (mêmes clés i18n que src/pages/Home.js).
+    `<div class="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-white/90">`,
+    `<span class="inline-flex items-center gap-2"><span aria-hidden="true">${esc(T('iconEscrow'))}</span>${esc(T('escrowTrustTitle'))}</span>`,
+    `<span class="inline-flex items-center gap-2"><span aria-hidden="true">${esc(T('iconPromiseSecurePayments'))}</span>${esc(T('securePayments'))}</span>`,
+    `<a href="/how-it-works" class="font-semibold text-white underline underline-offset-4 hover:text-orange-100">${esc(T('howItWorksLink'))}</a>`,
     `</div>`,
     `</div>`,
     `</div>`,
@@ -80,7 +90,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">`,
     ...COUNTRIES.map(
       (country) =>
-        `<div class="${country.color} rounded-2xl p-6 text-center shadow-md">` +
+        `<div class="${country.color} rounded-2xl p-6 text-center shadow-md ring-1 ring-inset ring-black/5">` +
         `<div class="flex justify-center mb-3">` +
         `<div class="w-14 h-10 md:w-20 md:h-14 rounded shadow-sm flex items-center justify-center text-3xl">${country.flag}</div>` +
         `</div>` +
@@ -102,8 +112,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">`,
     ...homePlan.categories.map(
       (category) =>
-        `<a href="/jobs?category=${category.labelKey}" class="bg-white rounded-2xl shadow-md p-6 text-center hover:shadow-lg transform transition hover:scale-105">` +
-        `<div class="text-3xl md:text-4xl mb-3">${esc(T(category.iconKey))}</div>` +
+        `<a href="/jobs?category=${category.labelKey}" class="group bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 text-center transition hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">` +
+        `<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-3xl md:text-4xl transition group-hover:scale-110" aria-hidden="true">${esc(T(category.iconKey))}</div>` +
         `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.labelKey))}</h3>` +
         `</a>`
     ),
@@ -114,11 +124,11 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // Trois promesses
     `<section class="py-12 md:py-16 bg-white">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">`,
+    `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.promises.map(
       ({ iconKey, titleKey, descriptionKey: textKey }) =>
-        `<div class="text-center">` +
-        `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><span class="text-2xl">${esc(T(iconKey))}</span></div>` +
+        `<div class="rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center shadow-sm transition hover:shadow-md hover:bg-white">` +
+        `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><span class="text-2xl" aria-hidden="true">${esc(T(iconKey))}</span></div>` +
         `<h3 class="text-xl font-semibold mb-4 text-gray-900">${esc(T(titleKey))}</h3>` +
         `<p class="text-gray-600">${esc(T(textKey))}</p>` +
         `</div>`
@@ -134,11 +144,12 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('howItWorksTitle'))}</h2>`,
     `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeHowItWorksSubtitle'))}</p>`,
     `</div>`,
-    `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`,
+    `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.steps.map(
-      ({ iconKey, titleKey, descriptionKey: textKey }) =>
-        `<div class="bg-white rounded-2xl shadow-md p-6 text-center">` +
-        `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl">${esc(T(iconKey))}</span></div>` +
+      ({ iconKey, numberKey, titleKey, descriptionKey: textKey }) =>
+        `<div class="relative bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 pt-8 text-center">` +
+        `<span class="absolute -top-4 left-1/2 -translate-x-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white shadow-md">${esc(T(numberKey))}</span>` +
+        `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl" aria-hidden="true">${esc(T(iconKey))}</span></div>` +
         `<h3 class="text-lg font-semibold mb-2 text-gray-900">${esc(T(titleKey))}</h3>` +
         `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
         `</div>`
@@ -150,9 +161,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // Séquestre (confiance)
     `<section class="py-12 md:py-16 bg-white">`,
     `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">`,
+    `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10 shadow-sm">`,
     `<div class="flex flex-col md:flex-row items-center gap-6">`,
-    `<div class="text-5xl">${esc(T(homePlan.escrowIconKey))}</div>`,
+    `<div class="text-5xl" aria-hidden="true">${esc(T(homePlan.escrowIconKey))}</div>`,
     `<div class="text-center md:text-left">`,
     `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`,
     `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`,
@@ -170,7 +181,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<h2 class="text-2xl md:text-3xl lg:text-4xl font-bold mb-6">${esc(T('joinThousands'))}</h2>`,
     `<p class="text-lg md:text-xl mb-8 opacity-90">${esc(T('startConnectingToday'))}</p>`,
     `<div class="flex flex-col sm:flex-row gap-4 justify-center">`,
-    `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transform transition hover:scale-105">${esc(T('lookingForServices'))}</a>`,
+    `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-semibold shadow-xl transform transition hover:-translate-y-0.5">${esc(T('lookingForServices'))}</a>`,
     `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T('offerServices'))}</a>`,
     `</div>`,
     `</div>`,
@@ -180,9 +191,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // que le remplacement par React ne décale rien). Le texte publié
     // ici et le repli que lit Home.js sortent de la MÊME déclaration
     // (homePlan.stats) : une seule liste, deux rendus.
-    `<section class="py-12 bg-gray-50">`,
+    `<section class="py-12 md:py-16 bg-gray-50">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">`,
+    `<div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">`,
     ...homePlan.stats.map(
       ({ labelKey, shellText }) =>
         `<div>` +
@@ -236,7 +247,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">${esc(glypheDeContact('contactSendEmail'))}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
     `</a>`,
-    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">${esc(glypheDeContact('contactAddress'))}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactAddress'))}</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
     `</a>`,
@@ -278,7 +289,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<a href="tel:${esc(contact.phone)}" class="hover:text-orange-700 underline underline-offset-2">${esc(contact.phoneDisplay)}</a>`,
     `<a href="mailto:${esc(contact.email)}" class="hover:text-orange-700 underline underline-offset-2 break-all">${esc(contact.email)}</a>`,
     `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">${esc(T('contactWhatsapp'))}</a>`,
-    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">${esc(T('footerItinerary'))}</a>`,
+    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="hover:text-orange-700 underline underline-offset-2">${esc(T('footerItinerary'))}</a>`,
     `</address>`,
     `<div class="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">`,
     // Les trois pages de confiance, liées depuis le corps de page :

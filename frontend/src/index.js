@@ -23,14 +23,23 @@ root.render(
 // Disable service worker for now to avoid production cache/runtime issues
 serviceWorkerRegistration.unregister();
 
-// Filet de securite : purge aussi le Cache Storage directement.
+// Filet de securite : purge aussi le Cache Storage directement, differe hors
+// du chemin critique (temps mort ou setTimeout) pour ne pas bloquer le main thread au boot.
 // Utile pour les navigateurs qui gardent des caches "kojo-*" orphelins
 // (crees par d'anciennes versions du service worker) meme une fois
 // celui-ci desinscrit. Sans effet si aucun cache n'existe.
 if (typeof window !== 'undefined' && window.caches && window.caches.keys) {
-  window.caches
-    .keys()
-    .then((names) => Promise.all(names.map((name) => window.caches.delete(name))))
-    .catch(() => {});
+  const purgeCaches = () => {
+    window.caches
+      .keys()
+      .then((names) => Promise.all(names.map((name) => window.caches.delete(name))))
+      .catch(() => {});
+  };
+
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(purgeCaches, { timeout: 3000 });
+  } else {
+    window.setTimeout(purgeCaches, 1500);
+  }
 }
 

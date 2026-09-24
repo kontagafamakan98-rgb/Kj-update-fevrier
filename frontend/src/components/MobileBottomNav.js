@@ -9,11 +9,55 @@ export default function MobileBottomNav() {
   const { t } = useLanguage();
   const location = useLocation();
 
-  if (!user || HIDDEN_PATHS.includes(location.pathname)) {
+  if (HIDDEN_PATHS.includes(location.pathname)) {
     return null;
   }
 
-  const navItems = [
+  // VISITEUR ANONYME : la barre du bas sert la DÉCOUVERTE. Avant, elle
+  // disparaissait complètement pour un visiteur non connecté : sur mobile — le
+  // support principal du site — il ne restait que le menu ☰ pour atteindre les
+  // emplois, le contact ou la connexion. Les libellés sont courts et sortent du
+  // dictionnaire existant (pas de clé nouvelle à traduire dans cinq langues).
+  const navItems = !user
+    ? [
+        {
+          path: '/',
+          icon: (active) => (
+            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 11l9-8 9 8M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" />
+            </svg>
+          ),
+          label: t('home'),
+        },
+        {
+          path: '/jobs',
+          icon: (active) => (
+            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8"></path>
+            </svg>
+          ),
+          label: t('jobs'),
+        },
+        {
+          path: '/support',
+          icon: (active) => (
+            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 10a6 6 0 10-12 0v4a3 3 0 003 3h1v-7H8m10 0v4a3 3 0 01-3 3h-1v-7h4" />
+            </svg>
+          ),
+          label: t('support'),
+        },
+        {
+          path: '/login',
+          icon: (active) => (
+            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+          label: t('login'),
+        },
+      ]
+    : [
     {
       path: '/dashboard',
       icon: (active) => (
@@ -53,8 +97,8 @@ export default function MobileBottomNav() {
   ];
 
   const isActivePath = (path) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/dashboard';
+    if (path === '/dashboard' || path === '/') {
+      return location.pathname === path;
     }
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };

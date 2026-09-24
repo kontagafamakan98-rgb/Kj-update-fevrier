@@ -61,10 +61,14 @@ export const PAGE_SECTIONS = {
       { iconKey: 'iconPromiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
       { iconKey: 'iconPromiseSecurePayments', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
     ],
+    // `numberKey` porte le NUMÉRO de l'étape (« 1 », « 2 », « 3 » du
+    // dictionnaire) : la pastille qui en fait une marche à suivre est publiée
+    // par la page ET par sa coquille, donc le numéro a un propriétaire unique
+    // au lieu d'être recompté par `index + 1` de chaque côté.
     steps: [
-      { iconKey: 'iconHomeStep1', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
-      { iconKey: 'iconHomeStep2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
-      { iconKey: 'iconHomeStep3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
+      { iconKey: 'iconHomeStep1', numberKey: 'stepNumber1', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
+      { iconKey: 'iconHomeStep2', numberKey: 'stepNumber2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
+      { iconKey: 'iconHomeStep3', numberKey: 'stepNumber3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
     ],
     // Les quatre chiffres de l'accueil. La coquille les publiait dans sa propre
     // liste `[['1 000+', 'activeWorkers'], …]`, pendant que la page tenait ses

@@ -167,7 +167,14 @@ function LegalFooter() {
           <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className="hover:text-orange-700 underline underline-offset-2">
             {t('contactWhatsapp')}
           </a>
-          <a href={CONTACT.mapsUrl} target="_blank" rel="noreferrer" className="hover:text-orange-700 underline underline-offset-2">
+          <a
+            href={CONTACT.mapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Google Maps"
+            title="Google Maps"
+            className="hover:text-orange-700 underline underline-offset-2"
+          >
             {t('footerItinerary')}
           </a>
         </address>
@@ -208,6 +215,24 @@ function LegalFooter() {
 }
 
 function AppRoutes() {
+  // ── Pourquoi `false`, alors que le drapeau pourrait naître à `true` ────────
+  // Naître à `true` supprimerait un rendu complet de l'arbre au démarrage
+  // (MobileLoader → page), ce qui allait dans le sens du TBT réclamé par
+  // l'audit. Mesuré, puis REFUSÉ : avec `true`, la coquille de l'application
+  // (navbar + main + pied de page) est peinte un cran plus tôt, donc le pied
+  // de page part de 984 px (hors écran, état « contrôle d'authentification »,
+  // spinner min-h-screen) AU LIEU d'apparaître directement à sa place de
+  // squelette : il bouge alors DEUX fois au lieu d'une.
+  //
+  // Sondes CDP (viewport 412×823, bridage 4× CPU + Slow 4G, serveur de
+  // rewrites de vercel.json, compte de démonstration) sur /dashboard,
+  // /profile et /payment — les trois pages que le job Lighthouse marque :
+  //   `false` (cette ligne)   CLS 0,0296   1 déplacement (baseline de `main`)
+  //   `true`                  CLS 0,0924   2 déplacements (0,0629 + 0,0296)
+  // Le budget CLS de ces routes est 0,06 : `true` fait échouer la CI. Le gain
+  // TBT espéré, lui, ne se voit pas (meilleur run sur 3 : accueil 14 ms sur
+  // `main`, TBT bien en deçà du plafond) : la régression de mise en page est
+  // réelle et mesurée, le gain est du bruit — la ligne reste donc telle quelle.
   const [pwaReady, setPwaReady] = useState(false);
   const { user } = useAuth();
   const { t } = useLanguage();

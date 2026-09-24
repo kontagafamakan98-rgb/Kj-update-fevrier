@@ -43,6 +43,16 @@ export default function Navbar() {
     ? 'sticky top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur pt-safe-area-inset-top'
     : 'sticky top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur';
 
+  // L'entrée de menu est SOULIGNÉE quand on est déjà dessus : sans ce repère, un
+  // visiteur qui navigue ne sait pas où il se trouve. Le soulignement reprend la
+  // règle de survol des liens (même épaisseur, même couleur).
+  const estActif = (chemin) =>
+    chemin === '/' ? location.pathname === '/' : location.pathname.startsWith(chemin);
+  const lienDesktop = (chemin) =>
+    `text-gray-700 hover:text-orange-600 px-3 py-2 text-sm font-medium transition-colors border-b-2 ${
+      estActif(chemin) ? 'border-orange-600 text-orange-600' : 'border-transparent'
+    }`;
+
   return (
     <nav className={navbarClass}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -58,20 +68,39 @@ export default function Navbar() {
             </Link>
           </div>
 
-          <div className="hidden md:flex items-center space-x-8">
-            {user && (
+          <div className="hidden md:flex items-center space-x-6">
+            {user ? (
               <>
-                <Link to="/dashboard" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/dashboard" className={lienDesktop('/dashboard')}>
                   {t('dashboard')}
                 </Link>
-                <Link to="/jobs" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/jobs" className={lienDesktop('/jobs')}>
                   {t('jobs')}
                 </Link>
-                <Link to="/messages" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/messages" className={lienDesktop('/messages')}>
                   {t('messages')}
                 </Link>
-                <Link to="/support" className="text-gray-700 hover:text-orange-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                <Link to="/support" className={lienDesktop('/support')}>
                   {t('support')}
+                </Link>
+              </>
+            ) : (
+              /* Visiteur NON connecté : la navigation publique. Sans elle, un
+                 premier visiteur ne voyait que « Connexion » / « Inscription »
+                 et ne pouvait atteindre les emplois, la page « Comment ça
+                 marche ? » ou le contact que par le bas de page. */
+              <>
+                <Link to="/jobs" className={lienDesktop('/jobs')}>
+                  {t('jobs')}
+                </Link>
+                <Link to="/how-it-works" className={lienDesktop('/how-it-works')}>
+                  {t('howItWorksTitle')}
+                </Link>
+                <Link to="/about" className={lienDesktop('/about')}>
+                  {t('aboutTitle')}
+                </Link>
+                <Link to="/contact" className={lienDesktop('/contact')}>
+                  {t('contactTitle')}
                 </Link>
               </>
             )}
@@ -177,6 +206,24 @@ export default function Navbar() {
                 </>
               ) : (
                 <>
+                  {/* Les mêmes entrées publiques que sur grand écran : le menu
+                      mobile d'un visiteur non connecté ne doit pas être plus
+                      pauvre que la barre du haut. */}
+                  <Link to="/jobs" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                    {t('jobs')}
+                  </Link>
+                  <Link to="/how-it-works" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                    {t('howItWorksTitle')}
+                  </Link>
+                  <Link to="/about" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                    {t('aboutTitle')}
+                  </Link>
+                  <Link to="/contact" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                    {t('contactTitle')}
+                  </Link>
+                  <Link to="/privacy" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                    {t('privacyTitle')}
+                  </Link>
                   <Link to="/login" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('login')}
                   </Link>
