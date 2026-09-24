@@ -9,14 +9,33 @@
 //    STATIQUE au build (plugin inject-seo-extras de vite.config.js) dès que
 //    VITE_GA_MEASUREMENT_ID est défini — un crawler sans JavaScript la voit
 //    donc, et la sonde SEO de production la détecte. Le script lui-même n'est
-//    pas exécuté au chargement : c'est ICI, après `load` ou au premier temps
-//    mort, qu'il est injecté depuis cette déclaration. Sous bridage 4G, une
-//    balise `async` dans le `<head>` retardait le chunk critique et décidait du
-//    LCP (mesuré le 20/09/2026) ; la file `dataLayer`, elle, est prête
-//    immédiatement, donc les `gtag('config')`/`page_view` émis entre-temps sont
-//    traités à l'arrivée du script. Le `gtag('config')` est émis ici (pas
-//    d'inline) et un événement page_view est renvoyé à chaque navigation SPA
-//    (sinon GA ne verrait que l'accueil : react-router ne recharge pas la page).
+//    pas exécuté au chargement : c'est ICI, après `load` PUIS le délai de
+//    publication ci-dessous, qu'il est injecté depuis cette déclaration. Sous
+//    bridage 4G, une balise `async` dans le `<head>` retardait le chunk
+//    critique et décidait du LCP (mesuré le 20/09/2026) ; la file `dataLayer`,
+//    elle, est prête immédiatement, donc les `gtag('config')`/`page_view` émis
+//    entre-temps sont traités à l'arrivée du script. Le `gtag('config')` est
+//    émis ici (pas d'inline) et un événement page_view est renvoyé à chaque
+//    navigation SPA (sinon GA ne verrait que l'accueil : react-router ne
+//    recharge pas la page).
+//
+// ── Pourquoi un DÉLAI, et pas « après load ou au premier temps mort » ──────
+// « Après `load` » suffisait tant que seul le LCP comptait : le tag ne pouvait
+// plus retarder le plus grand peintre. Il restait néanmoins chargé PENDANT la
+// fenêtre de blocage (FCP → TTI), et là il en décidait : mesuré le 24/09/2026
+// sous le preset mobile (4× CPU + 4G simulés) sur le build de production, le
+// tag produit DEUX tâches longues, ~190 ms puis ~123 ms, soit 213 des 260 ms de
+// TBT — 82 % du « Poor interactivity » réclamé par l'audit, pour un script qui
+// n'a AUCUNE fonction dans la page. Le plancher les place après l'instant où la
+// page devient interactive (TTI mesuré 4 480-4 610 ms sur mobile bridé, ~750 ms
+// sur desktop), donc hors de la fenêtre ; le temps mort est demandé ENSUITE,
+// jamais avant, pour que le tag ne saisisse pas le premier trou de la fenêtre.
+//
+// Ce que ce délai coûte, dit franchement : une visite qui se termine avant lui
+// ne publie pas sa page vue (les commandes restent dans `dataLayer` sans script
+// pour les envoyer). Il est donc court — une seule seconde de plus que l'instant
+// où la page devient interactive sur le matériel le plus lent mesuré — et il ne
+// concerne que les rebonds de quelques secondes.
 //
 // Aucun identifiant n'est codé en dur : sans variable d'environnement, ces
 // fonctions sont des no-op stricts (aucune requête, aucune erreur console).
@@ -76,15 +95,29 @@ const injectGaScript = (src) => {
   document.head.appendChild(script);
 };
 
-// Hors du chemin critique : après `load`, ou au premier temps mort s'il vient
-// plus tôt. `requestIdleCallback` absent (Safari) → `setTimeout`, jamais un
-// chargement synchrone.
+/**
+ * Délai minimal entre `load` et la publication du tag GA4 (voir l'en-tête).
+ *
+ * Une valeur exportée, pas un nombre écrit ici et retapé ailleurs : c'est le
+ * seul endroit qui décide QUAND le tag part, et le test l'importe au lieu de le
+ * recopier — une constante recopiée finit par diverger de celle qui décide.
+ */
+export const GA_PUBLICATION_DELAY_MS = 6000;
+
+// Hors du chemin critique : après `load`, PUIS `GA_PUBLICATION_DELAY_MS`, puis
+// le premier temps mort (`requestIdleCallback` absent — Safari — → chargement
+// direct dans le minuteur). Jamais un chargement synchrone.
 const loadGaScriptAfterLoad = (src) => {
   const charger = () => injectGaScript(src);
-  const planifier = () =>
-    typeof window.requestIdleCallback === 'function'
-      ? window.requestIdleCallback(charger, { timeout: 3000 })
-      : window.setTimeout(charger, 0);
+  const planifier = () => {
+    window.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        window.requestIdleCallback(charger, { timeout: 2000 });
+        return;
+      }
+      charger();
+    }, GA_PUBLICATION_DELAY_MS);
+  };
   if (document.readyState === 'complete') planifier();
   else window.addEventListener('load', planifier, { once: true });
 };
