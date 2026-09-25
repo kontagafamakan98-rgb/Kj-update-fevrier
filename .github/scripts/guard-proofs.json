@@ -547,7 +547,7 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/style-layout-budgets.test.js",
       "runner": "vitest",
-      "motif": "la TABLE du coût du DOCUMENT pré-rendu : « Style & Layout » par route, et rien d'autre. Elle est mesurée, pas déduite — minima de 5 runs par case, lus au CDP (`RecalcStyleDuration` + `LayoutDuration` de `Performance.getMetrics`, sur une page NEUVE dont le bundle d'entrée est bloqué : c'est le document qui est mesuré, jamais React), le 25/09/2026, dans les deux conditions de la CI. Le verdict est prononcé par la sonde `frontend/e2e/style-layout-document.spec.js` (22 cases + la couverture exacte des routes), qui n'entre PAS dans le périmètre de ce registre — le périmètre est `frontend/scripts/`, `.github/scripts/`, `backend/scripts/` — et qui roule dans le job e2e de la CI via `npm run test:e2e`. Ce module n'est donc pas un garde : il ne lit pas le dépôt et ne sort jamais en 1, il fournit le relevé, la dérivation et les bornes. Ce que la mesure a FERMÉ : le STYLE pèse 2 à 6 % du total (1,3 à 51,8 ms contre 28,6 à 676,1 ms de layout), donc l'élagage du CSS n'était pas le coût du document — ne pas rouvrir ce chantier-là pour la performance. Ce qu'elle a appris : le coût est dans le HAUT du document et il y a une PART FIXE de 250 à 300 ms sur l'accueil mobile (balayage 1→10 sections : 339 / 366 / 494 / 558 / 558 / 569 / 618 / 628 / 622 / 650 ms, les quatre premières portant 86 % du coût), et le contenu ajouté est quasi GRATUIT (+6 000 px vides en tête = 0 ms, tout `<main>` republié = ×0,99, héros publié trois fois = +3 %) : l'ancienne lecture « le coût suit les pixels ou les nœuds » est réfutée, et c'est pourquoi la borne haute est écrite comme un garde-fou de CATASTROPHE, pas comme un détecteur de dérive fine. Relevé : / 662/126 ms, /register 452/86, /how-it-works 344/61, /contact 278/46, /support 261/51, /forgot-password 255/46, /about 245/47, /login 230/45, /payment 220/43, /privacy 169/33, /jobs 155/30 (mobile cpu×4 / desktop cpu×1) — 11 routes, 22 cases. Seul levier systématique mesuré : `content-visibility: auto` sur les sections 2 à 10, −172 ms sur l'accueil mobile (659 → 487) mais la hauteur de défilement devient fausse (9 415 px au lieu de 7 075) — levier réel, prix réel, décision produit."
+      "motif": "la TABLE de la STRUCTURE du document pré-rendu, et le COÛT qu'elle publie. Ce module n'est pas un garde : il ne lit pas le dépôt et ne sort jamais en 1 — il fournit la structure de RÉFÉRENCE (nœuds par route, hauteur par route et par condition), le plancher DÉRIVÉ de cette structure (0,8), et les deux relevés de coût avec leur hôte. Le verdict est prononcé par la sonde frontend/e2e/style-layout-document.spec.js (22 cases + la couverture exacte des routes), qui n'entre PAS dans le périmètre de ce registre — le périmètre est frontend/scripts/, .github/scripts/, backend/scripts/ — et qui roule dans le job e2e de la CI via `npm run test:e2e`. CE QUE LE PREMIER VERDICT A COÛTÉ, ET C'EST LA MESURE QUI L'A CORRIGÉ : il portait sur le TEMPS (0,6 × à 1,5 × le relevé d'un poste partagé) et le premier passage du runner Linux a rendu 18 des 22 cases rouges sur le MÊME artefact (run 36188879161 : 18 failed, 123 passed) — / mobile 662 ms sur le poste contre 80,4 ms dans la CI (×8,2), /contact desktop 46 contre 23,3, /jobs mobile 155 contre 45,9, /register mobile 452 contre 74,6 — toutes sur la borne basse, aucune borne haute franchie. Une borne en millisecondes n'y borne pas une régression, elle borne la MACHINE : le même artefact coûte de 1,85 à 8,2 fois moins cher selon l'hôte, et aucune marge ne couvre les deux. Le verdict porte donc sur la STRUCTURE, qui est une propriété de l'artefact : les NŒUDS sont mesurés IDENTIQUES sur les deux hôtes, sur les 11 routes (279, 112, 120, 108, 157, 103, 114, 98, 106, 203, 135), et la HAUTEUR s'accorde à 0,9 % près là où les deux hôtes l'ont imprimée (7 075 → 7 107 px sur l'accueil mobile, 4 782 → 4 807 en desktop, 2 957 → 2 982 sur /how-it-works, 926 → 926 sur /forgot-password). La marge est de 20 points, soit 22 fois cet écart, et la mutation la franchit deux fois et demie : accueil amputé de ses neuf dernières sections → 279 → 105 nœuds et 7 075 → 1 125 px (shell bâti 94 329 o / SHA-1 997b3d3c… → 75 601 o / dbb86205…, restauré à l'identique), les DEUX cases de l'accueil rouges, en nommant « 105 nœuds peints, sous le plancher de 223 ». Ce que la mesure du coût a appris reste PUBLIÉ, table comprise : le STYLE n'est jamais le sujet (2 à 6 % du total — l'élagage du CSS était justifié, poids mort et sources menteuses, mais il n'était PAS le coût du document), le coût est dans le HAUT du document avec une PART FIXE de 250 à 300 ms sur l'accueil mobile (balayage 1→10 sections : 339 / 366 / 494 / 558 / 558 / 569 / 618 / 628 / 622 / 650 ms), et le contenu AJOUTÉ est quasi gratuit (+6 000 px vides en tête = 0 ms, tout <main> republié = ×0,99, héros publié trois fois = +3 %). CONSÉQUENCE ASSUMÉE : le coût du document n'est plus un gate de PR — il est couvert là où il se voit vraiment, par les budgets Lighthouse du déploiement (job lighthouse-ci, `lighthouserc*.cjs`) et par les gardes de POIDS (`check-bundle-size.js`, `check-home-shell.js`), dont la grandeur ne dépend pas de la machine qui les lit. La sonde garde ses deux refus de faux vert (React monté = blocage du bundle cassé ; relevé nul), et la table comme le verdict sont éprouvés à l'unité par frontend/scripts/__tests__/style-layout-budgets.test.js (8 cas : couverture exacte de `src/config/page-meta.js`, plancher dérivé et strictement ordonné, mutation mesurée qui franchit la borne, non-portabilité du temps verrouillée sur les deux relevés) et par deux mutations du registre."
     }
   ],
   "rejeux": [
@@ -2123,11 +2123,11 @@
       ]
     },
     {
-      "id": "style-layout-budgets: marge neutralisee (le budget devient la mesure)",
+      "id": "style-layout-budgets: borne au niveau de la structure mesuree (le document intact serait refuse)",
       "garde": "frontend/scripts/style-layout-budgets.cjs",
       "cible": "frontend/scripts/style-layout-budgets.cjs",
-      "trouve": "return Math.ceil(Math.max(mesure * marge.ratio, mesure + marge.absolue) / 5) * 5;",
-      "remplace": "return mesure;",
+      "trouve": "const BORNE_STRUCTURE = 0.8;",
+      "remplace": "const BORNE_STRUCTURE = 1;",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/style-layout-budgets.test.js",
       "commande": [
@@ -2139,16 +2139,16 @@
       ],
       "cwd": "frontend",
       "attend": [
-        "la marge absolue et le ratio décident du budget, jamais la mesure seule",
-        "le budget est un multiple de 5 STRICTEMENT au-dessus de sa mesure de référence"
+        "le plancher est DÉRIVÉ de la structure — jamais la structure elle-même",
+        "la borne est STRICTEMENT sous la structure de référence, route par route"
       ]
     },
     {
-      "id": "style-layout-budgets: borne basse au-dessus du releve",
+      "id": "style-layout-budgets: plancher neutralise (une coquille vide passerait)",
       "garde": "frontend/scripts/style-layout-budgets.cjs",
       "cible": "frontend/scripts/style-layout-budgets.cjs",
-      "trouve": "const BORNE_BASSE_RATIO = 0.6;",
-      "remplace": "const BORNE_BASSE_RATIO = 1;",
+      "trouve": "const plancherNoeudsDe = (noeuds) => Math.floor(noeuds * BORNE_STRUCTURE);",
+      "remplace": "const plancherNoeudsDe = () => 0;",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/style-layout-budgets.test.js",
       "commande": [
@@ -2160,7 +2160,8 @@
       ],
       "cwd": "frontend",
       "attend": [
-        "la borne basse est strictement sous la mesure de référence ET sous le budget"
+        "le plancher est DÉRIVÉ de la structure — jamais la structure elle-même",
+        "la mutation qui doit franchir la borne la franchit VRAIMENT (mesurée)"
       ]
     }
   ]
