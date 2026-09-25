@@ -21,6 +21,24 @@ const users = new Map([
 const sessions = new Map();
 const proposals = [];
 const payments = [];
+// Centre de notifications de la fixture : une ligne NON LUE par compte, servie
+// à la connexion. C'est ce que le parcours e2e « notifications » supprime — une
+// vraie fixture serveur, donc une vraie requête HTTP, pas une doublure.
+const notifications = new Map();
+const notifierLeCompte = (user) => {
+  if (notifications.has(user.id)) return;
+  notifications.set(user.id, [{
+    id: 'notif-fixture-1',
+    user_id: user.id,
+    title: 'Nouvelle proposition reçue',
+    body: 'Famakan Kontaga a soumis une proposition pour « Test postulation »',
+    type: 'proposal_received',
+    related_id: 'playtest-job-1',
+    related_type: 'job',
+    is_read: false,
+    created_at: new Date().toISOString(),
+  }]);
+};
 let currentOrigin = 'http://127.0.0.1:4173';
 
 const send = (res, status, body, headers = {}) => {
@@ -59,8 +77,42 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/health') return send(res, 200, { status: 'ok', fixture: true });
     if (req.method === 'GET' && path === '/geolocation/available-countries') return send(res, 200, { countries: [] });
     if (req.method === 'GET' && path === '/geolocation/detect') return send(res, 200, { detected: false, country: null });
-    if (req.method === 'GET' && path === '/notifications') return send(res, 200, { notifications: [], unread_count: 0 });
-    if (req.method === 'GET' && path === '/notifications/unread-count') return send(res, 200, { unread_count: 0 });
+    if (req.method === 'GET' && path === '/notifications') {
+      const lignes = notifications.get(currentUser(req)?.id) || [];
+      return send(res, 200, {
+        notifications: lignes,
+        unread_count: lignes.filter((item) => !item.is_read).length,
+        total: lignes.length,
+      });
+    }
+    if (req.method === 'GET' && path === '/notifications/unread-count') {
+      const lignes = notifications.get(currentUser(req)?.id) || [];
+      return send(res, 200, { unread_count: lignes.filter((item) => !item.is_read).length });
+    }
+    if (req.method === 'PUT' && path === '/notifications/mark-all-read') {
+      const lignes = notifications.get(currentUser(req)?.id) || [];
+      lignes.forEach((item) => { item.is_read = true; });
+      return send(res, 200, { message: 'Toutes les notifications marquées comme lues', updated: lignes.length });
+    }
+    if (req.method === 'PUT' && /^\/notifications\/[^/]+\/read$/.test(path)) {
+      const lignes = notifications.get(currentUser(req)?.id) || [];
+      const ligne = lignes.find((item) => item.id === path.split('/')[2]);
+      if (!ligne) return send(res, 404, { detail: 'Notification introuvable' });
+      ligne.is_read = true;
+      return send(res, 200, { message: 'Notification marquée comme lue' });
+    }
+    if (req.method === 'DELETE' && path === '/notifications') {
+      const lignes = notifications.get(currentUser(req)?.id) || [];
+      notifications.set(currentUser(req)?.id, []);
+      return send(res, 200, { message: `${lignes.length} notification(s) supprimée(s)`, deleted: lignes.length });
+    }
+    if (req.method === 'DELETE' && /^\/notifications\/[^/]+$/.test(path)) {
+      const lignes = notifications.get(currentUser(req)?.id) || [];
+      const index = lignes.findIndex((item) => item.id === path.split('/').pop());
+      if (index === -1) return send(res, 404, { detail: 'Notification introuvable' });
+      lignes.splice(index, 1);
+      return send(res, 200, { message: 'Notification supprimée' });
+    }
     if (req.method === 'GET' && path === '/notifications/vapid-public-key') return send(res, 200, { vapid_public_key: '' });
     if (req.method === 'GET' && path === '/workers/profile') return send(res, 200, { profile: null });
     if (req.method === 'GET' && /^\/users\/[^/]+\/reviews$/.test(path)) return send(res, 200, { reviews: [] });
@@ -86,7 +138,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && path === '/auth/login') {
       const body = await readBody(req); const user = users.get(body.email);
       if (!user || user.password !== body.password) return send(res, 401, { detail: 'Identifiants invalides' });
-      const token = `fixture-${user.id}`; sessions.set(token, user);
+      const token = `fixture-${user.id}`; sessions.set(token, user); notifierLeCompte(user);
       return send(res, 200, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 });
     }
     if (req.method === 'POST' && path === '/auth/register-verified') {
