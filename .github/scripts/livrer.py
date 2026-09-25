@@ -169,25 +169,36 @@ def verifier_prevol_local():
     log_succes("Pré-vol local conforme.")
 
 
-def pousser_branche(branche: str, jeton: str):
+def pousser_branche(branche: str, jeton: str, max_tentatives: int = 3):
     log(f"Push de la branche '{branche}' vers origin (sans persister le jeton)...")
     url_distante = f"https://x-access-token:{jeton}@github.com/{REPO_OWNER}/{REPO_NAME}.git"
     env_git = {"GIT_TERMINAL_PROMPT": "0"}
     cmd = ["git", "-c", "credential.helper=", "push", "-u", url_distante, branche]
     try:
-        res = subprocess.run(
-            cmd,
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env_git,
-        )
-        if res.returncode != 0:
-            err = res.stderr or res.stdout
-            # Masquer le token s'il apparaît dans l'erreur
-            err_nettoyee = err.replace(jeton, "***")
+        succes = False
+        dernier_err = ""
+        for i in range(1, max_tentatives + 1):
+            res = subprocess.run(
+                cmd,
+                cwd=str(REPO_ROOT),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env_git,
+            )
+            if res.returncode == 0:
+                succes = True
+                break
+            dernier_err = res.stderr or res.stdout
+            if "Could not resolve host" in dernier_err or "unable to access" in dernier_err:
+                log(f"Échec réseau intermittent lors du push (tentative {i}/{max_tentatives}), nouvel essai dans 3s...")
+                time.sleep(3)
+            else:
+                break
+
+        if not succes:
+            err_nettoyee = dernier_err.replace(jeton, "***")
             raise RuntimeError(f"Échec git push :\n{err_nettoyee}")
         log_succes(f"Branche '{branche}' poussée avec succès.")
     finally:
