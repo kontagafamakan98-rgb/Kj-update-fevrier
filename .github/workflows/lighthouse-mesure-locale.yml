@@ -1,0 +1,122 @@
+name: Lighthouse mesure locale (manuel)
+
+# ─── Pourquoi une passe MANUELLE, et dispatch-only ──────────────────────────
+# Elle exécute `frontend/scripts/mesure-lighthouse-locale.mjs` : la pile locale
+# COMPLÈTE (build avec l'API même-origine, fixture derrière le serveur de
+# rewrites, exactement comme les parcours e2e), puis la mesure Lighthouse sur
+# les trois routes — et elle publie les LHR COMPLETS en artifact.
+#
+# ─── AUCUN BUDGET ICI, ET C'EST LE POINT ────────────────────────────────────
+# Les budgets de performance sont ceux de `lighthouserc.cjs` /
+# `lighthouserc.desktop.cjs`, exécutés par le job `lighthouse-ci` de `ci.yml` à
+# chaque push et à chaque PR : c'est eux qui bloquent. Cette passe-ci sert ce
+# qu'un budget ne peut PAS dire, et qui manque le jour où un chiffre surprend :
+#   • la DISPERSION du même artefact (n runs sans rebuild intermédiaire — un
+#     minimum et une médiane ne se distinguent pas d'un effet réel sans elle) ;
+#   • les requêtes `/api/` réellement observées (une page peut avoir un excellent
+#     Speed Index et décrire un ÉTAT D'ERREUR) ;
+#   • les LHR run par run, qu'on relit pour expliquer un chiffre.
+# Elle reste donc un OUTIL (`role: "outil"` au registre des preuves, sans
+# verdict) : son échec ne dit qu'une chose — la mesure n'a pas eu lieu (build
+# rouge, port déjà occupé, audit absent du rapport).
+#
+# ─── Pourquoi un fichier SÉPARÉ, et pas un job de `ci.yml` ──────────────────
+# Le bouton « Run workflow » de la CI déploie le backend Fly : une mesure ne
+# doit pas partir du même clic qu'une écriture en production (même raison que
+# `seo-vercel-env.yml`). Ici `workflow_dispatch` est le SEUL déclencheur, donc
+# aucune PR ne paie ces minutes.
+#
+# Ce que cette passe NE fait PAS : elle ne rend pas la dispersion bloquante, et
+# elle ne remplace pas les budgets. Tant qu'elle n'est lancée que par un humain,
+# une dérive qu'elle seule pourrait montrer reste invisible sur une PR — c'est
+# écrit comme tel dans CI-COVERAGE.md (§7.1, angle mort du budget du document,
+# et §1 pour le déclencheur).
+on:
+  workflow_dispatch:
+    inputs:
+      preset:
+        description: "Condition d'audit (mobile = 412×823 cpu×4, celle de la CI)"
+        type: choice
+        options:
+          - mobile
+          - desktop
+        default: mobile
+      runs:
+        description: "Runs PAR route (3 = le défaut de l'outil ; au-delà, on mesure la dispersion)"
+        type: string
+        default: "3"
+      routes:
+        description: "Routes à mesurer, séparées par des virgules"
+        type: string
+        default: "/,/jobs,/contact"
+
+permissions:
+  contents: read
+
+jobs:
+  mesure-locale:
+    name: Mesure Lighthouse locale (LHR en artifact)
+    runs-on: ubuntu-latest
+    # L'outil sort en 1 dès qu'il ne peut pas mesurer (build rouge, port occupé,
+    # audit absent), donc ce plafond n'attrape que l'inattendu — un blocage
+    # laisserait sinon le run patienter jusqu'à l'abandon du runner (360 min).
+    # Ordre de grandeur mesuré ailleurs dans ce dépôt : le job `lighthouse-ci`
+    # audite 13 pages × 3 runs en ~560 s, soit ~14 s par run ; 3 routes × 3 runs
+    # tiennent donc largement ici, alors qu'un `--runs 30` demandé à la main
+    # (90 runs) ne tiendrait pas : augmenter le plafond dans ce cas.
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Chrome : `ubuntu-latest` embarque Google Chrome, `chrome-launcher` le
+      # détecte — et c'est LUI qui apporte les drapeaux par défaut qui rendent le
+      # Speed Index comparable à celui de `lhci` (un Chrome lancé à la main
+      # mesure autre chose, avec l'air d'être la même chose).
+      #
+      # Pas de `npm run build` ici : l'outil construit lui-même l'artefact qu'il
+      # sert (`VITE_API_URL=http://127.0.0.1:4174/api`, API même-origine comme en
+      # production). Un second build donnerait deux artefacts pour un relevé.
+      #
+      # Les entrées passent par l'ENVIRONNEMENT, jamais concaténées dans le
+      # script : une entrée de dispatch est publiée dans les logs du run, donc
+      # elle est traitée comme une donnée, pas comme du code. L'outil valide ce
+      # qu'il reçoit (preset inconnu, route qui n'est pas un chemin de site =
+      # sortie 1), il n'y a donc pas de seconde validation à tenir à jour ici.
+      - name: Mesurer (pile locale complète, puis Lighthouse)
+        working-directory: frontend
+        env:
+          PRESET: ${{ inputs.preset }}
+          RUNS: ${{ inputs.runs }}
+          ROUTES: ${{ inputs.routes }}
+          SORTIE: ${{ runner.temp }}/lhr-locaux
+        run: |
+          node scripts/mesure-lighthouse-locale.mjs \
+            --preset "$PRESET" \
+            --runs "$RUNS" \
+            --routes "$ROUTES" \
+            --out "$SORTIE"
+
+      # Les LHR complets ET la distribution du Speed Index, publiés MÊME quand la
+      # mesure échoue : c'est précisément quand un chiffre surprend qu'on veut le
+      # LHR run par run. `lhr-locaux` porte un fichier par run
+      # (`<route>-<preset>-<i>.json`) plus `distribution-speed-index.json`.
+      - name: Publier les LHR et la distribution
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lhr-locaux
+          if-no-files-found: ignore
+          retention-days: 14
+          path: ${{ runner.temp }}/lhr-locaux

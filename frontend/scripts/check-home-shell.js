@@ -22,7 +22,9 @@
  *      aucune) ;
  *   6. les pays du shell sont ceux du référentiel partagé
  *      (src/config/countries.js, que lit aussi la page) ;
- *   7. un `LocalBusiness` complet et une carte intégrée (SEO local) ;
+ *   7. un `LocalBusiness` complet et le CONTRÔLE de la carte (SEO local) — la
+ *      carte ne se charge plus au premier écran (une iframe Google y entre
+ *      dès qu'elle approche du viewport, `loading="lazy"` ou pas) ;
  *   8. chaque classe Tailwind du shell existe bien dans le CSS du build —
  *      Tailwind ne scanne PAS vite.config.js : une classe inventée dans le
  *      shell ne serait jamais stylée, et le premier rendu « sauterait » au
@@ -138,10 +140,81 @@ export function cssEscapedClass(token) {
 }
 
 /**
+ * Classes publiées par le shell qui sont VOLONTAIREMENT sans règle CSS.
+ *
+ * La règle 8 de ce garde refuse une classe publiée qu'aucune règle ne stylerait :
+ * une classe non stylée peut faire diverger l'écran au montage de React. Elle a
+ * une exception, et une seule famille : les HOOKS DE STRUCTURE, qu'aucun style ne
+ * doit porter.
+ *
+ * `App` est le conteneur des fournisseurs React (`src/App.js`) et son équivalent
+ * dans le chrome des coquilles (`vite-plugins/prerender/app-chrome.js`) : il
+ * existe pour que les deux canaux publient le MÊME contexte de cascade, pas pour
+ * peindre quoi que ce soit — ses enfants gèrent leur mise en page. Il n'avait de
+ * règle que par COÏNCIDENCE : `.App { text-align: center }`, retirée le
+ * 25/09/2026 avec la refonte d'alignement (le site est à gauche par défaut, chaque
+ * bloc centré le déclare). Depuis, la règle 8 le signalait à chaque build — un
+ * vrai rouge, mais qui accusait un hook d'un défaut qu'il n'a pas, et qui
+ * poussait à réintroduire une déclaration d'alignement qu'on venait de retirer
+ * pour de bonnes raisons.
+ *
+ * Une exemption n'est admise que MOTIVÉE, ENCORE PUBLIÉE et ENCORE NON STYLÉE :
+ * une classe qui disparaît du shell, ou qui reçoit une règle, la laisse périmée,
+ * et une exemption qu'on n'ose plus retirer est une exemption qui mente (voir
+ * `exemptionsPerimees`, qui refuse les deux cas).
+ */
+export const CLASSES_SANS_STYLE = {
+  App:
+    'hook de structure (conteneur des fournisseurs React, publié aussi par le chrome des coquilles) : ' +
+    'aucun style propre, ses enfants gèrent leur mise en page',
+};
+
+/**
+ * Les exemptions de `CLASSES_SANS_STYLE` qui ne tiennent plus.
+ *
+ * Deux cas, et ils ne se confondent pas : la classe n'est plus PUBLIÉE (l'entrée
+ * ne protège plus rien), ou le CSS lui donne désormais une RÈGLE (l'exemption
+ * contredit la feuille livrée). Le second est celui qui compte : une classe « non
+ * stylée » devenue stylée est exactement ce que la règle 8 doit voir, et une
+ * exemption oubliée le masquerait.
+ *
+ * @param {string} html Contenu du shell de l'accueil.
+ * @param {string} css Feuille inlinée du build.
+ * @param {Record<string, string>} exemptions Table motivée.
+ * @returns {string[]}
+ */
+export function exemptionsPerimees(html, css, exemptions = CLASSES_SANS_STYLE) {
+  const refus = [];
+  for (const [classe, motif] of Object.entries(exemptions)) {
+    const publiee = new RegExp(`class="[^"]*\\b${echapperPourRegex(classe)}\\b`).test(html);
+    if (!publiee) {
+      refus.push(
+        `exemption PÉRIMÉE pour la classe « ${classe} » : le shell ne la publie plus — la retirer de ` +
+          'CLASSES_SANS_STYLE (motif déclaré : ' +
+          motif +
+          ')'
+      );
+      continue;
+    }
+    if (css.includes(`.${cssEscapedClass(classe)}`)) {
+      refus.push(
+        `l'exemption de la classe « ${classe} » n'est plus justifiée : le CSS du build porte désormais une ` +
+          'règle pour elle — la règle 8 doit s\'y appliquer, retirer l\'exemption (motif déclaré : ' +
+          motif +
+          ')'
+      );
+    }
+  }
+  return refus;
+}
+
+/**
  * Classes du HTML absentes du CSS fourni.
  *
  * `group` et `peer` sont des marqueurs de variantes Tailwind : ils n'ont pas de
- * règle propre, on les ignore.
+ * règle propre, on les ignore. Les hooks de structure publiés par le shell
+ * (`CLASSES_SANS_STYLE`) s'ajoutent à la liste des ignorés — jamais en silence :
+ * leur exemption est motivée, publiée, et refusée dès qu'elle ne tient plus.
  */
 export function missingClasses(html, css, { ignore = ['group', 'peer'] } = {}) {
   const used = new Set();
@@ -342,10 +415,50 @@ export function runHomeShellCheck(options = {}) {
       errors.push('LocalBusiness.sameAs ne doit contenir que des URL absolues https');
     }
   }
-  if (!/google\.com\/maps[^"]*output=embed/.test(html)) {
-    errors.push('aucune carte Google Maps intégrée (iframe output=embed) — SEO local incomplet');
-  } else if (!/loading="lazy"/.test(html)) {
-    errors.push('la carte intégrée doit être en loading="lazy" (sinon elle concurrence le LCP de l\'accueil)');
+  // ── 7bis. La carte : un CONTRÔLE, pas un embed au premier écran ───────────
+  // Le garde exigeait l'IFRAME `output=embed` en `loading="lazy"` — et ce
+  // contrôle ne prouvait pas ce qu'il croyait : `loading="lazy"` n'empêche pas
+  // le navigateur de charger une iframe dès qu'elle approche du viewport, et
+  // sur desktop elle y est déjà. Mesuré sur /contact (Lighthouse 12.6.1, pile
+  // de la CI, Chrome 152, mobile, 3 runs) : l'embed du premier écran repoussait
+  // le LCP de 4143-4399 ms simulés (scores 81-85) alors que l'élément LCP de la
+  // page est NOTRE texte. La coquille de l'accueil publie donc le MÊME contrôle
+  // que /contact — un lien vers la fiche Google, qui mène au bon endroit même
+  // sans JavaScript — et l'iframe n'a plus le droit de paraître ici. C'est le
+  // contrôle que le parcours de l'accueil monté (src/pages/__tests__/
+  // home-local-seo.test.jsx) transformera en carte intégrée à l'appui.
+  if (contact) {
+    const titreCarte = fr ? String(fr.mapIframeTitle || '').replace('{address}', contact.address) : '';
+    // Le href publié est ÉCHAPPÉ pour l'HTML (`&` → `&amp;`, mesuré sur le build) :
+    // on le compare donc sous la forme où le navigateur le reçoit, pas sous
+    // l'URL brute — une comparaison brute échouerait sur un shell pourtant
+    // conforme, et le garde deviendrait un faux rouge qu'on apprend à ignorer.
+    const hrefPublie = `href="${contact.mapsUrl.replace(/&/g, '&amp;')}"`;
+    if (!rootHtml.includes(hrefPublie)) {
+      errors.push(
+        `le shell ne publie pas le contrôle de la carte (lien vers « ${contact.mapsUrl} », ` +
+          'href de contact.json) — un crawler sans JavaScript n\'a plus de chemin vers la fiche Google'
+      );
+    }
+    if (titreCarte && !rootHtml.includes(`title="${titreCarte}"`)) {
+      errors.push(
+        `le shell ne publie pas le titre de la carte « ${titreCarte} » (clé i18n mapIframeTitle) — ` +
+          'le contrôle doit porter le libellé du dictionnaire, comme la page'
+      );
+    }
+    if (fr && fr.mapShowMap && !rootHtml.includes(fr.mapShowMap)) {
+      errors.push(
+        `le shell ne publie pas le libellé du contrôle de carte (« ${fr.mapShowMap} », clé i18n mapShowMap)`
+      );
+    }
+    if (/output=embed/.test(rootHtml)) {
+      errors.push(
+        'le shell publie l\'iframe Google (output=embed) au premier écran — ' +
+          'elle charge ~300 Ko de tiers et repousse le LCP de l\'accueil ; ' +
+          'publier le contrôle déclaré par le plan (mapButtonKey / mapIconKey / ' +
+          'mapFrameClass / mapControlClass dans src/config/page-sections.js)'
+      );
+    }
   }
 
   // ── 8. Chaque classe du shell est stylée par le CSS du build ───────────────
@@ -353,7 +466,9 @@ export function runHomeShellCheck(options = {}) {
   if (!cssMatch) {
     errors.push('aucun CSS inliné dans index.html : le plugin inline-critical-css a-t-il tourné ?');
   } else {
-    const missing = missingClasses(rootHtml, cssMatch[1]);
+    const missing = missingClasses(rootHtml, cssMatch[1], {
+      ignore: ['group', 'peer', ...Object.keys(CLASSES_SANS_STYLE)],
+    });
     if (missing.length > 0) {
       errors.push(
         `classes du shell ABSENTES du CSS du build (non stylées, layout instable au montage React) : ` +
@@ -361,6 +476,7 @@ export function runHomeShellCheck(options = {}) {
           (missing.length > 12 ? ` (+${missing.length - 12})` : '')
       );
     }
+    errors.push(...exemptionsPerimees(rootHtml, cssMatch[1]));
   }
 
   // ── 9. Le shell de l'accueil ne fuit pas dans les autres pages ────────────

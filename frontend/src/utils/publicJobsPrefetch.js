@@ -39,7 +39,7 @@ export const canUseNetworkPrefetch = () =>
  * @param {{warn: Function}} deps.safeLog    Logger non bloquant.
  * @param {number} deps.pageSize             Taille de page de la liste (JOBS_PAGE_SIZE).
  * @param {boolean} [deps.enabled]           Force/neutralise le préchargement (tests).
- * @returns {{kick: Function, consume: Function, matches: Function, params: object, pending: object|null}}
+ * @returns {{kick: Function, consume: Function, snapshot: Function, matches: Function, params: object, pending: object|null}}
  */
 export const makePublicJobsPrefetch = ({
   jobsAPI,
@@ -83,8 +83,46 @@ export const makePublicJobsPrefetch = ({
         safeLog.warn('Public jobs prefetch failed (component will reload)', error);
         return null;
       });
-    pending = { requestParams: params, promise };
+    pending = { requestParams: params, promise, settled: false, value: null };
+    promise.then((jobs) => {
+      // Ne renseigne l'état QUE pour la requête encore en cours : `consume`
+      // remet `pending` à null, une réponse tardive ne doit pas ressusciter un
+      // résultat déjà consommé.
+      if (pending && pending.promise === promise) {
+        pending.settled = true;
+        pending.value = jobs;
+      }
+    });
     return pending;
+  };
+
+  // ── Lecture PENDANT LE RENDU (React) ──────────────────────────────────────
+  // `kick` a lancé la requête à l'évaluation du chunk ; `consume` ne peut la
+  // reprendre que depuis un effet, donc APRÈS le premier rendu de la page. Entre
+  // les deux, `snapshot` rend l'état lisible SANS consommer, ce qui permet à la
+  // page de démarrer SEEDÉE quand la réponse est déjà arrivée :
+  //   { applicable: false }             → requête hors préchargement
+  //   { applicable: true, value: null } → rien à seeder (en vol, ou en échec) :
+  //                                       la page peint son propre écran de
+  //                                       chargement et attend la réponse
+  //   { applicable: true, value }       → liste déjà en main, aucun squelette
+  //
+  // `snapshot` a aussi servi à SUSPENDRE : la promesse en vol était jetée pour
+  // garder le fallback Suspense de la route monté. Le calcul ne portait que sur
+  // le TRAVAIL de rendu, pas sur la peinture, et la mesure a tranché contre lui
+  // (Chrome 152, /jobs desktop, 3 runs) : le fallback remplaçait le titre, la
+  // date et le paragraphe d'intro — l'élément LCP — par des barres grises de
+  // 377 ms à 2487 ms, soit 2,1 s de plus grand texte absent le temps de l'API ;
+  // Render Delay du LCP 1156 à 2345 ms, `observedLastVisualChange` jusqu'à
+  // 9,6 s et Speed Index 3008 / 5246 / 4573, seule note sous 1,00 du profil.
+  // La page peint donc son premier écran immédiatement (texte réel + squelette
+  // de liste) et seule la liste attend la réponse. Le champ `pending` (la
+  // promesse à jeter) est RETIRÉ plutôt que laissé inerte : personne ne doit
+  // croire la page suspendue par un état que plus aucun appelant ne consomme.
+  const snapshot = (requestParams = {}) => {
+    if (!isEnabled || !matches(requestParams)) return { applicable: false };
+    if (!pending || !pending.promise || !pending.settled) return { applicable: true, value: null };
+    return { applicable: true, value: pending.value };
   };
 
   // Consomme le préchargement depuis le chargement de la liste : si la requête
@@ -102,6 +140,7 @@ export const makePublicJobsPrefetch = ({
   return {
     kick,
     consume,
+    snapshot,
     matches,
     params,
     get pending() {

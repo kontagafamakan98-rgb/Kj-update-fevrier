@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
 import { CONTACT } from '../config/contact';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import MapEmbed from '../components/MapEmbed';
 
 /**
  * Page « Nous contacter ».
@@ -28,14 +29,27 @@ export default function Contact() {
   const { t } = useLanguage();
   usePageMeta();
 
-  const { titleKey, introKey, noteKey, actions, links } = PAGE_SECTIONS['/contact'];
+  const {
+    titleKey, introKey, noteKey, actions, links,
+    // La carte : un contrôle, pas un embed au premier écran (voir le commentaire
+    // du plan). La page et la coquille publient les mêmes classes, donc la
+    // bascule shell → React ne déplace rien.
+    mapButtonKey, mapIconKey, mapFrameClass, mapControlClass,
+    // La géométrie du plus grand texte peint — le paragraphe d'introduction,
+    // élément LCP de cette page — et de son cadre. Deux propriétaires rendraient
+    // les deux peintures divergentes, et une seconde peinture PLUS GRANDE que
+    // celle de la coquille devient un nouvel élément LCP : toute la chaîne
+    // JavaScript entrerait alors dans le LCP (voir le plan).
+    frameClass, titleClass, introClass, noteClass,
+  } = PAGE_SECTIONS['/contact'];
+  const titreDeLaCarte = t('mapIframeTitle').replace('{address}', CONTACT.address);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{t(titleKey)}</h1>
-        <p className="text-gray-600 mb-3">{t(introKey)}</p>
-        <p className="text-sm text-gray-500 mb-6">{t(noteKey)}</p>
+      <div className={frameClass}>
+        <h1 className={titleClass}>{t(titleKey)}</h1>
+        <p className={introClass}>{t(introKey)}</p>
+        <p className={noteClass}>{t(noteKey)}</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {actions.map((action) => (
@@ -62,14 +76,18 @@ export default function Contact() {
 
         {/* La fiche Google (adresse + itinéraire) est aussi le lien de présence
             locale : c'est elle qu'un audit « Google Business Profile » cherche
-            sur une page de contact, et elle est servie par la carte ci-dessous. */}
-        <iframe
+            sur une page de contact. Le contrôle ci-dessous y mène même sans
+            JavaScript, et ne monte la carte intégrée qu'à l'appui — l'embed
+            tiers (~300 Ko) n'entre donc ni dans le premier écran ni dans le
+            chemin critique du LCP. */}
+        <MapEmbed
           src={CONTACT.mapsEmbedUrl}
-          title={t('mapIframeTitle').replace('{address}', CONTACT.address)}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          className="mt-6 w-full rounded-xl border border-gray-200"
-          style={{ height: 320, border: 0 }}
+          href={CONTACT.mapsUrl}
+          title={titreDeLaCarte}
+          label={t(mapButtonKey)}
+          icon={t(mapIconKey)}
+          frameClass={mapFrameClass}
+          controlClass={mapControlClass}
         />
 
         <p className="mt-6 text-sm text-gray-500">

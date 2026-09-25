@@ -10,13 +10,33 @@
     touch-action: manipulation;
   }
 
+  /* ── LA TYPOGRAPHIE DE BASE A UN SEUL PROPRIÉTAIRE : `src/index.css` ──────
+
+     Ce bloc ouvrait sur les quatre déclarations du gabarit — `margin: 0`, la
+     pile `-apple-system…`, les deux lissages — recopiées de `index.css`. Elles
+     sont RETIRÉES ici, et c'est une décision, pas un nettoyage : dans la
+     feuille livrée d'une page (relevé du 25/09/2026), `body` était déclaré NEUF
+     fois, et ces quatre déclarations l'étaient DEUX fois — règle #53
+     (`index.css`) et règle #96 (celle-ci), valeurs identiques, seule la forme
+     des guillemets différant. Or c'est la PLUS TARDIVE qui s'appliquait (#96) :
+     éditer `index.css`, le fichier de base, n'aurait donc RIEN changé, et rien
+     ne l'aurait dit. Une duplication n'est pas juste du poids : elle déplace le
+     propriétaire en silence.
+
+     Mesuré après retrait : `font-family` n'a plus qu'un porteur, `index.css`,
+     et c'est de nouveau celui qu'on croit lire ; `margin: 0` et les deux
+     lissages restent fournis par `index.css` ET par le préflight Tailwind
+     (`body{margin:0;line-height:inherit}`) et les packs (`body{…
+     -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}`),
+     donc valeurs calculées inchangées — vérifié par les 22 relevés de géométrie
+     coquille/React, qui portent sur les deux canaux à la fois.
+
+     Ce qui reste ci-dessous est ce qu'App.css apporte VRAIMENT à `body` :
+     `overscroll-behavior`, `position` et `min-height` n'ont aucun autre porteur,
+     et `background-color: #f9fafb` passe devant le `hsl(var(--background))` du
+     thème (règle #52, antérieure) — le fond des pages est ce gris-là, pas le
+     blanc du thème. */
   body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-      sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
     position: relative;
     min-height: 100vh;
@@ -35,20 +55,9 @@
   }
 
   /* Safe area support for iOS */
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .safe-area-padding-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
-  }
 
   .pt-safe-area-inset-top {
     padding-top: env(safe-area-inset-top);
-  }
-
-  .h-safe-area-inset-bottom {
-    height: env(safe-area-inset-bottom);
   }
 
   /* Input optimizations for mobile */
@@ -57,7 +66,7 @@
   }
 
   /* Touch-friendly buttons */
-  button, .btn {
+  button {
     min-height: 44px;
     min-width: 44px;
     touch-action: manipulation;
@@ -81,106 +90,105 @@
   }
 }
 
-/* App-specific styles */
-.App {
-  text-align: center;
-}
+/* ── L'ALIGNEMENT DU SITE EST EXPLICITE, PLUS HÉRITÉ (refonte du 25/09/2026) ──
 
-.App-header {
-  background-color: #f9fafb;
-  padding: 20px;
-  color: #374151;
-  min-height: 50vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
+   `text-align: center` a été RETIRÉ de `.App`. Le site est aligné à GAUCHE par
+   défaut, et chaque bloc qui doit être centré le DIT (`text-center`), au lieu de
+   s'en remettre à l'enveloppe. `<div className="App">` reste : c'est
+   l'enveloppe de l'app (src/App.js) et celle que publient les coquilles
+   pré-rendues (vite-plugins/prerender/app-chrome.js) — elle n'a plus de règle
+   d'alignement, et c'est le but.
 
-.App-link {
-  color: #ea580c;
-  text-decoration: none;
-}
+   Ce que la règle coûtait, MESURÉ avant de la retirer (Chromium, 11 routes
+   pré-rendues, 412×823 et 1350×940, 25/09/2026 — 22 relevés, 231 déplacements
+   d'encre, `node scripts/mesure-alignement-app.mjs`) : elle centrait en
+   silence 2 à 28 porteurs de texte par route (7 % à 43 % d'entre eux), jusqu'à
+   543,89 px d'écart, élément LCP compris — sur /jobs desktop le paragraphe
+   d'intro passait de x=68,59 à x=833,39. C'est cette mesure qui a servi de
+   matière à la refonte, et non l'inverse.
 
-.App-link:hover {
-  color: #c2410c;
-}
+   Ce qui décide maintenant, bloc par bloc (relevé du même jour, sonde
+   d'inventaire) :
+     • l'ACCUEIL est centré par le dessin, et il le DISAIT déjà — `Home.js`
+       porte `text-center` 13 fois, la coquille de l'accueil le publie bloc par
+       bloc (vite-plugins/prerender/shells-home.js). Un seul de ses blocs
+       s'en remettait encore à l'héritage : il est désormais écrit.
+     • les pages de CONTENU (about, privacy, contact, jobs, support,
+       how-it-works) ne déclaraient RIEN (`About.js`, `Privacy.js`,
+       `Contact.js` : 0 `text-center`) — leur centure ne venait que de la
+       règle retirée : titres, paragraphes, corps de cartes et de missions,
+       items de listes, labels de formulaires sont maintenant à gauche, ce qui
+       est le dessin qu'elles décrivaient.
+     • les formulaires d'authentification et de paiement gardent uniquement
+       leurs déclarations existantes (Login.js 2, Register.js 7, Payment.js 1).
 
-/* Mobile-specific improvements */
-@media (max-width: 768px) {
-  /* Larger touch targets on mobile */
-  .mobile-touch-target {
-    min-height: 48px;
-    min-width: 48px;
-  }
+   L'invariant à tenir est donc : **un bloc dont la centure était héritée doit
+   la DÉCLARER**. Il est vérifié dans le navigateur, sur les DEUX peintures à
+   la fois : `e2e/lcp-geometrie.spec.js` (11 routes × 2 tailles) exige une encre
+   IDENTIQUE entre la coquille et React et une seule candidate LCP. Un garde
+   statique ne pouvait pas le faire (il faudrait recopier les classes de deux
+   canaux) : c'est la même raison qui a fait de la géométrie une preuve
+   navigateur. Le garde de `scripts/check-prerender-shells.js` exige, lui, que
+   la règle RETIRÉE ne soit pas republiée : une page qui recentrerait par
+   héritage repasserait par un canal que la sonde ne compare plus.
 
-  /* Mobile-optimized spacing */
-  .mobile-padding {
-    padding: 1rem;
-  }
+   La mesure qui a précédé ce retrait est REJOUABLE depuis le dépôt —
+   `cd frontend && npm run build && node scripts/mesure-alignement-app.mjs`
+   (outil déclaré `role: "outil"` dans .github/scripts/guard-proofs.json : il
+   imprime la table route par route et ne prononce aucun verdict). C'est elle
+   qui a fourni la matière de la refonte, et non l'inverse — et c'est pourquoi
+   le garde de `scripts/check-prerender-shells.js` exige désormais que la règle
+   RETIRÉE ne soit pas republiée : une page qui recentrerait par héritage
+   repasserait par un canal que la sonde navigateur ne compare plus.
 
-  /* Full-width mobile cards */
-  .mobile-card {
-    border-radius: 0;
-    margin-left: -1rem;
-    margin-right: -1rem;
-  }
+   Deux pages ne publient pas `.App` du tout, et c'est structurel : `404.html`
+   (servie sans aucun script ni feuille du site — elle porte sa PROPRE règle
+   d'alignement) et `app.html` (`#root` vide : l'enveloppe y vient de React au
+   montage). */
 
-  /* Mobile navigation optimizations */
-  .mobile-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: white;
-    border-top: 1px solid #e5e7eb;
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-}
+/* ── LES DEUX AUTRES RÈGLES DU GABARIT : `.App-header` et `.App-link` ────────
 
-/* PWA Loading animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+   RETIRÉES le 25/09/2026, et c'est le même examen que `.App` ci-dessus, avec
+   l'autre verdict. Le gabarit Vite (lignée Create React App) apportait trois
+   règles ensemble : `.App`, `.App-header`, `.App-link` (+ `:hover`). Contrairement
+   à `.App`, ces deux-là n'avaient AUCUN porteur — ni un composant, ni une page,
+   ni une coquille pré-rendue, ni un dictionnaire.
 
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+   Ce que dit la mesure (corpus de l'artefact livré : 74 fichiers, 37 820 jetons,
+   jugés avec le découpage du critère d'élagage lui-même, `nomUtilise`) :
+     • `App-header` : 1 règle, 192 o de source, posée 0 fois ;
+     • `App-link`  : 2 règles (`:hover` comprise), 93 o de source, posées 0 fois.
 
-.fade-in {
-  animation: fadeIn 0.3s ease-in;
-}
+   Elles n'étaient donc pas SERVIES : l'élagage au build les retirait à chaque
+   fois — `vite-plugins/purge-css-mort.js`, remplacé le 25/09/2026 par le garde
+   `scripts/check-css-selecteurs-morts.js`, qui refuse à la SOURCE. C'est
+   précisément ce qui rendait le mensonge supportable — le dépôt déclarait un
+   en-tête `.App-header` et une classe de lien que rien ne publiait, et le seul
+   endroit où on pouvait le lire sans douter (la feuille livrée) ne les portait
+   déjà plus : 285 o de source qui décrivaient un site qui n'existe pas.
 
-.slide-up {
-  animation: slideUp 0.4s ease-out;
-}
+   Ce que le retrait ne fait PAS : il ne change pas un octet livré (le critère
+   les ôtait déjà). Aucune mesure de performance n'est attendue ni annoncée ici.
+   Les autres règles du gabarit Vite — `#root { max-width: 1280px; … }`,
+   `.logo`, `.card`, `@keyframes logo-spin`, `.read-the-docs` — ne sont
+   déclarées NULLE PART dans src/, index.html et public/ (0 règle `#root`,
+   0 pose de `.card`/`.logo`/`.read-the-docs`) : il n'y avait rien à trancher
+   de ce côté. Les surfaces qui doivent rester d'accord avec ces verdicts sont
+   tenues par scripts/__tests__/check-app-chrome.test.js. */
 
-/* PWA Install prompt animations */
-.pwa-install-prompt {
-  animation: slideUp 0.5s ease-out;
-}
-
-/* Offline indicator */
-.offline-indicator {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: #f59e0b;
-  color: white;
-  text-align: center;
-  padding: 0.5rem;
-  font-size: 0.875rem;
-  z-index: 9999;
-}
+/* Ce qui a été retiré ici le 25/09/2026, et pourquoi (relevé de la feuille
+   livrée, pas d'inventaire à vue) :
+     • les familles d'alias mortes de la section mobile (`.mobile-touch-target`,
+       `.mobile-padding`, `.mobile-card`, `.mobile-nav`, `.job-card-mobile`,
+       `.category-icon`, `.rating-stars`, `.skeleton`, `.message-*`, `.fade-in`,
+       `.slide-up`, `.pwa-install-prompt`, `.offline-indicator`, `.no-print`…) ;
+     • les deux `@keyframes` que ces classes étaient SEULES à animer (`fadeIn`,
+       `slideUp`) et le troisième (`loading`) : leurs noms n'apparaissent dans
+       AUCUNE déclaration `animation` de la feuille livrée ni dans le JavaScript
+       livré — la vérification porte sur les DEUX, parce qu'un style React peut
+       piloter un `@keyframes` (le toast le fait avec `slideInRight`).
+   `scripts/check-css-selecteurs-morts.js` interdit d'en réécrire : une classe ou
+   un id nommé par un sélecteur doit être POSÉ par le livré. */
 
 /* Custom scrollbar for webkit browsers */
 ::-webkit-scrollbar {
@@ -210,93 +218,6 @@ a:focus {
   outline-offset: 2px;
 }
 
-/* Loading states */
-.skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: loading 1.5s infinite;
-}
-
-@keyframes loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* Message bubbles for chat */
-.message-bubble {
-  max-width: 80%;
-  word-wrap: break-word;
-  border-radius: 18px;
-  padding: 8px 12px;
-  margin: 4px 0;
-}
-
-.message-sent {
-  background: #ea580c;
-  color: white;
-  margin-left: auto;
-  border-bottom-right-radius: 4px;
-}
-
-.message-received {
-  background: #f3f4f6;
-  color: #374151;
-  margin-right: auto;
-  border-bottom-left-radius: 4px;
-}
-
-/* Job cards mobile optimization */
-.job-card-mobile {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  background: white;
-  border: 1px solid #e5e7eb;
-}
-
-.job-card-mobile:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
-  transition: all 0.2s ease;
-}
-
-/* Category icons */
-.category-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 12px;
-  background: #fff7ed;
-  font-size: 1.5rem;
-  margin-bottom: 0.75rem;
-}
-
-/* Rating stars */
-.rating-stars {
-  color: #fbbf24;
-  font-size: 1.25rem;
-}
-
-/* Utility classes for mobile */
-.touch-manipulation {
-  touch-action: manipulation;
-}
-
-.no-select {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-/* Dark mode support (future enhancement) */
-@media (prefers-color-scheme: dark) {
-  /* Will be implemented later if needed */
-}
-
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   .bg-orange-600 {
@@ -316,14 +237,6 @@ a:focus {
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* Print styles */
-@media print {
-  .no-print {
-    display: none;
+    animation-iteration-count: 1 !important;    transition-duration: 0.01ms !important;
   }
 }

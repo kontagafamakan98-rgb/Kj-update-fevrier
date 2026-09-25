@@ -4,7 +4,24 @@
 // amputée — le défaut exact que la déclaration unique supprime.
 // Les textes attendus se DÉDUISENT du plan (pageSectionParts) : aucune
 // seconde liste n'est tenue ici.
-export function makeDeclaredBodyGuard({ esc, T, registerT, jobsT, pageSections, pageSectionParts }) {
+//
+// Deux clés du plan ne sont attendues que sous CONDITION DE BUILD : le bouton
+// Google n'existe que si `VITE_GOOGLE_CLIENT_ID` est configuré —
+// src/components/GoogleButton.js retourne `null` sinon. La coquille suit la
+// MÊME condition (`googleAuth`, calculé sur le même `env` par
+// prerender-route-meta.js). L'exiger quand elle est fausse faisait publier à
+// la coquille un bouton que React retirait : mesuré, 56 px de remontée de tout
+// le bas du formulaire de connexion au montage.
+// (`cles` porte les CLÉS DE DICTIONNAIRE — les valeurs des champs `*Key` —,
+// pas les noms de champs : c'est `traduire` qui les résout.)
+const CLES_CONDITIONNELLES = {
+  googleLogin: 'google-auth',
+  googleSignup: 'google-auth',
+}
+
+export function makeDeclaredBodyGuard({
+  esc, T, registerT, jobsT, pageSections, pageSectionParts, conditions = new Set(),
+}) {
   const exigerCorpsDeclare = (routePath, route, corps) => {
     const plan = pageSections[routePath]
     if (!plan) return
@@ -21,7 +38,10 @@ export function makeDeclaredBodyGuard({ esc, T, registerT, jobsT, pageSections, 
       if (routePath === '/login' && (/^(google|legal)/.test(key))) return registerT(key)
       return T(key)
     }
-    const attendus = [...cles.map(traduire), ...textes]
+    const requises = cles.filter(
+      (cle) => !CLES_CONDITIONNELLES[cle] || conditions.has(CLES_CONDITIONNELLES[cle])
+    )
+    const attendus = [...requises.map(traduire), ...textes]
     const manquants = attendus.filter((texte) => !corps.includes(esc(texte)))
     if (manquants.length) {
       throw new Error(

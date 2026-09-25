@@ -520,6 +520,39 @@ jobs:
         working-directory: frontend
         run: node scripts/check-shell-text-provenance.js
 
+      # Ce qu'une coquille déclare comme RESSOURCE est demandé au premier
+      # affichage, par le préchargeur, avant React : une origine tierce y est un
+      # transfert d'adresse IP vers un domaine qu'on n'exploite pas, et un point
+      # de panne sur la route critique du premier rendu. Le parcours e2e de la
+      # carte différée prouve le COMPORTEMENT (à l'appui, iframe montée au clic)
+      # mais ne lit pas ce que le build publie : un <script src> distant ajouté
+      # au plugin de pré-rendu, un @font-face sur un CDN ou un preconnect vers
+      # une régie ne feraient rougir aucun test de comportement. Les origines
+      # autorisées viennent de scripts/site-meta.js, et la règle (ce qui
+      # télécharge, ce qui est distant, le sort des rel) du module
+      # scripts/shell-remote-resources.js.
+      - name: Check shell remote resources (no third-party in the first screen)
+        working-directory: frontend
+        run: node scripts/check-shell-remote-resources.js
+
+      # AUCUN SÉLECTEUR SANS PORTEUR. Il remplace l'élagage au build
+      # (`vite-plugins/purge-css-mort.js`, supprimé) qui retirait silencieusement
+      # les règles mortes de la feuille inlinée : une suppression au build masque
+      # la dette (les sources décrivaient un site qui n'existait plus) et ne
+      # jugeait qu'à la RÈGLE ENTIÈRE, donc un nom mort écrit à côté d'un
+      # sélecteur vivant lui échappait — mesuré le 25/09/2026 : 105 noms de
+      # classes, 4 769 o = 6,85 % de la feuille servie. La règle (ce qu'est un
+      # porteur, le corpus des poseurs, les décodeurs de sélecteur) vit dans
+      # scripts/css-selecteurs-morts.js ; le garde rend DEUX verdicts — les
+      # feuilles source (fichier, ligne, nom, sélecteur : actionnable) et la
+      # feuille livrée (une règle servie sans porteur, c'est-à-dire l'utilitaire
+      # qu'un composant éliminé du bundle fait générer à Tailwind) — après avoir
+      # REFUSÉ de juger si son corpus, ses feuilles ou ses pages sont sous les
+      # planchers de lecture.
+      - name: Check no CSS selector without a poser (source and shipped sheets)
+        working-directory: frontend
+        run: node scripts/check-css-selecteurs-morts.js
+
       # Les DEUX canaux qui publient les métadonnées d'une page — la coquille
       # pré-rendue (build) et les pages au runtime — doivent annoncer le même
       # titre, la même description et la même carte, lus dans les tables uniques
@@ -824,7 +857,8 @@ jobs:
           key: bundle-size-baseline-${{ github.sha }}
 
   # ─── Tests E2E Playwright : parcours utilisateurs sous navigateur réel ──────
-  # Exécute la suite Playwright (frontend/e2e/user-flows.spec.js) sous Chromium.
+  # Exécute la suite Playwright (frontend/e2e/*.spec.js : user-flows, notifications,
+  # LCP de /contact, et la géométrie du LCP de chaque route pré-rendue) sous Chromium.
   # Complète les tests unitaires jsdom et les vérifications statiques de build :
   #   1. Moteur réel : exécute le bundle JS compilé dans un vrai Chromium headless,
   #      garantissant le rendu DOM, l'exécution CSS et l'absence de runtime error.
@@ -835,6 +869,22 @@ jobs:
   #      authentification complète travailleur avec redirection /dashboard et /jobs.
   #   4. Couplage client/serveur : dialogue HTTP réel avec la fixture locale
   #      scripts/playtest-api-server.mjs (port 8123) et Vite preview (port 4173).
+  #   5. LCP pré-rendu : la géométrie de l'élément LCP est comparée, route par
+  #      route et à deux tailles, entre la peinture de la COQUILLE (bundle
+  #      d'entrée bloqué) et celle de React — une peinture plus grande côté React
+  #      ré-élit l'élément LCP et fait entrer le JavaScript dans le LCP simulé
+  #      (voir frontend/e2e/lcp-geometrie.spec.js).
+  #   6. Coût du DOCUMENT pré-rendu : « Style & Layout » (RecalcStyleDuration +
+  #      LayoutDuration du renderer, lus au CDP) mesuré route par route et à deux
+  #      conditions, sur une page neuve dont le bundle d'entrée est bloqué — donc
+  #      le document seul, jamais React. Le budget vient d'un RELEVÉ (minima de
+  #      5 runs, table dans frontend/scripts/style-layout-budgets.cjs) et le
+  #      verdict est bidirectionnel : au-dessus il nomme le budget, en dessous
+  #      (×0,6 du relevé) il refuse un document qui a perdu sa matière — une
+  #      coquille qui cesse de publier son corps est une régression du contrat
+  #      SEO / sans-JavaScript (voir frontend/e2e/style-layout-document.spec.js).
+  #      Aucun job ni budget Lighthouse ajouté : c'est le job e2e existant qui la
+  #      porte, ~1 min de plus.
   e2e-playwright:
     name: E2E Playwright tests (Chromium)
     runs-on: ubuntu-latest
@@ -1331,15 +1381,18 @@ jobs:
       # plafond mobile en le dépassant en desktop.
       # Cette passe n'audite QUE les deux pages dont on a un TBT desktop MESURÉ
       # (/ et /jobs), et n'asserte QUE deux choses par page : le TBT desktop
-      # (≤ 200 ms, meilleur des 3 runs) et le plafond CLS mesuré de la route. Les
-      # mesures qui adossent le plafond — accueil 0 / 0 / 15 ms (dont 3 runs avec
-      # 4 boucles CPU sur 8 cœurs), /jobs 0 ms sur 9 runs à chaud comme sous
-      # charge, avec un pire run chaud à 8 ms et un premier run à froid à
-      # 1076 ms que le meilleur des 3 absorbe — sont dans
-      # frontend/lighthouserc.desktop.cjs. Sa preuve d'échec est
+      # (meilleur des 3 runs) et le plafond CLS mesuré de la route. Le plafond de
+      # TBT est PAR ROUTE — 200 ms sur l'accueil (0 / 0 / 15 ms mesurés, dont 3
+      # runs avec 4 boucles CPU sur 8 cœurs), 150 ms sur /jobs (27 runs desktop à
+      # 0 ms, dans quatre conditions : pile de la CI, 4 boucles CPU, bord de CDN
+      # froid, 7 boucles CPU) — chacun adossé à une borne haute du coût de SA
+      # page. Les deux tables refusent une route sans mesure : sans valeur
+      # mesurée, la page serait auditée sans plafond. Les relevés sont dans
+      # frontend/scripts/lhci-cls-budgets.cjs (TBT_DESKTOP_BUDGETS / CLS_BUDGETS)
+      # et l'en-tête de frontend/lighthouserc.desktop.cjs. Preuve d'échec :
       # frontend/scripts/__tests__/lhci-desktop-tbt.test.js, rejouée par la suite
       # Vitest du job frontend ; ici, on exécute la passe réelle.
-      - name: Run Lighthouse CI desktop (TBT de l'accueil et de /jobs, budget bloquant)
+      - name: Run Lighthouse CI desktop (TBT par route — / et /jobs, budget bloquant)
         working-directory: frontend
         run: npx lhci autorun --config=lighthouserc.desktop.cjs
 

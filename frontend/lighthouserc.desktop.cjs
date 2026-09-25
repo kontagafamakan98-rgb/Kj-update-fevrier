@@ -1,5 +1,5 @@
 /**
- * Garde TBT DESKTOP de l'accueil — le seuil de l'AUDIT, pas un second socle.
+ * Garde TBT DESKTOP — un plafond PAR ROUTE, chacun adossé à SA mesure.
  *
  * ── Pourquoi une SECONDE config, et pas une entrée de plus ─────────────────
  * `lighthouserc.cjs` audite 13 pages en condition MOBILE simulée (CPU ×4 + 4G
@@ -17,46 +17,52 @@
  * run de runner affamé la ferait rougir au hasard (1397 ms déjà mesurés pour un
  * commit vert, voir lighthouserc.cjs).
  *
- * ── Le seuil : 200 ms, MESURÉ ──────────────────────────────────────────────
- * C'est le seuil de l'audit qui a ouvert le chantier (« TBT (Desktop) 477 ms —
- * should be < 200 ms »). Relevé après correctif, Lighthouse 12.6.1 :
+ * ── Les plafonds : par route, et MESURÉS ───────────────────────────────────
+ * Ils vivent dans `scripts/lhci-cls-budgets.cjs`, chacun avec son relevé.
+ * L'accueil garde le seuil de l'audit qui a ouvert le chantier (« TBT
+ * (Desktop) 477 ms — should be < 200 ms ») : 200 ms, soit 13× sa pire mesure
+ * (15 ms sous saturation CPU sur 8 cœurs). /jobs porte désormais le SIEN.
  *
- *   surface                        runs   TBT mesuré        tâche la plus longue
- *   production (CDN Vercel)          3    0 / 0 / 0 ms      78 à 92 ms
- *   repli local, machine au repos    3    0 / 0 / 0 ms      81 à 92 ms
- *   repli local, 8 cœurs saturés     3    0 / 0 / 15 ms     92 à 154 ms
- *   (4 boucles CPU, 8 cœurs — le pire cas qu'un runner partagé imite)
+ * ── /jobs : 27 runs, 0 ms, quatre conditions ───────────────────────────────
+ * Mesure desktop reprise le 24/09/2026 après le correctif de la première visite
+ * (le squelette n'y est plus monté deux fois) : Lighthouse 12.6.1, Chrome NEUF à
+ * chaque run, même machine, même session —
  *
- * La dernière ligne est celle qui autorise ce plafond : même sous contention
- * CPU, le desktop reste à 15 ms au pire, avec une tâche la plus longue à 154 ms
- * — sous le seuil de « tâche longue ». 200 ms laisse donc plus de 13× la pire
- * mesure, et c'est précisément ce qui la distingue des plafonds du socle mobile,
- * où un runner affamé a valu 1397 ms pour le même arbre. Le seuil de l'audit est
- * conservé tel quel plutôt que traduit en marge : c'est lui qui sera relu le
- * jour où quelqu'un se demandera pourquoi la CI a rougi.
+ *   condition                              runs   TBT      plus longue tâche   Style & Layout
+ *   pile de la CI (serveur de rewrites)       6   0 ms     0 ms                73–76 ms
+ *   + 4 boucles CPU sur 8 cœurs               6   0 ms     0 ms                93–119 ms
+ *   + bord de CDN froid (+120 ms/actif)       5   0 ms     0 ms                73–76 ms
+ *   + 7 boucles CPU sur 8 cœurs (famine)      4   0 ms     0 ms                105–149 ms
+ *   production, 9 runs à chaud (avant fix)         0 ms ×8, 8 ms au pire        83–130 ms
+ *   production, 1er run à froid (avant fix)        1076 ms                 2397 ms
  *
- * ── /jobs, ajouté le 24/09/2026 ────────────────────────────────────────────
- * Même plafond et même statistique, et là encore une mesure avant le seuil :
+ * Le mode « mauvais » n'était pas un coût de la page : c'est le PREMIER run à
+ * froid d'un déploiement frais, dont la tâche de 888 ms était du `Style &
+ * Layout` attribué au chunk `jobs` (dont l'évaluation de script ne faisait que
+ * 5 ms), sans aucun tiers (`third-party-summary` vide). C'est ce mode que le
+ * correctif de la première visite a supprimé, et la colonne « bord de CDN
+ * froid » est là pour l'éprouver sans déployer : +120 ms sur chaque actif, et le
+ * TBT reste à 0 ms avec un Style & Layout identique à celui d'une machine au
+ * repos (73–76 ms). Le plafond de 150 ms est choisi sur une BORNE HAUTE du coût
+ * de la page (149 ms de travail de style et de mise en page sous famine, donc
+ * ~99 ms de blocage si tout coalesait en une tâche) et reste 7× SOUS le mode
+ * froid mesuré — c'est-à-dire qu'il continue de l'attraper s'il redevenait
+ * permanent. Le détail du raisonnement est dans `TBT_DESKTOP_BUDGETS`.
  *
- *   surface                                runs   TBT desktop        Style & Layout
- *   production, runs suivants                 9    0 ms (8 ms ×1)     83 à 130 ms
- *   production, 1er run à froid               1    1076 ms            2397 ms
- *   production, 4 boucles CPU sur 8 cœurs     3    0 / 0 / 0 ms       133 à 163 ms
- *   repli local (la pile du job)              3    0 / 0 / 0 ms       —
+ * ── Aucun élargissement par SURFACE, contrairement au socle mobile ──────────
+ * `lighthouserc.cjs` élargit ses plafonds sur une base loopback (1600 au lieu de
+ * 1200) parce que le runner y reste partagé. Ici la mesure dit l'inverse, et
+ * c'est elle qui tranche : le preset desktop n'applique AUCUN bridage CPU, donc
+ * un runner affamé allonge le travail de la page (Style & Layout de 73 à 149 ms)
+ * sans jamais créer de tâche longue — 0 ms de TBT sur les 27 runs, famine
+ * comprise. Un plafond élargi sur la pile locale n'aurait donc rien à couvrir, et
+ * il masquerait la seule surface où la mesure est stable aujourd'hui (celle que
+ * le job exécute réellement depuis le 20/09/2026).
  *
- * Le mode « mauvais » n'est pas un coût de la page : c'est le PREMIER run, à
- * froid. Sa tâche de 888 ms est du `Style & Layout` (2397 ms sur le run)
- * attribuée au chunk `jobs` dont l'évaluation de script ne fait que 5 ms, et
- * aucun tiers n'y contribue (`third-party-summary` vide) : la liste se met en
- * page pendant que ses images arrivent encore. Sur les 9 runs suivants, 0 ms —
- * et sous saturation CPU, 0 ms aussi.
- *
- * C'est le MEILLEUR des 3 runs qui est comparé, donc ce mode à froid ne fait pas
- * un rouge : les trois runs d'un job partagent la même instance de navigateur et
- * la même arête de cache, et une régression de l'artefact, elle, monte dans les
- * trois. C'est la règle déjà appliquée au socle mobile, où un runner affamé a
- * valu 1397 ms pour un arbre vert. Et c'est aussi ce qui interdit de descendre le
- * plafond sous le bruit : 200 ms laisse 25× la pire mesure à chaud (8 ms).
+ * C'est le MEILLEUR des 3 runs qui est comparé : les trois runs d'un job
+ * partagent la même arborescence et la même arête de cache, et une régression de
+ * l'artefact monte dans les trois — c'est la même règle que le socle mobile, où
+ * un runner affamé a valu 1397 ms pour un arbre vert.
  *
  * SURFACE : cette passe est ANONYME, et /jobs n'est pas une route privée
  * (`scripts/check-spa-routes.js` la classe publique) : rien ne redirige, donc
@@ -89,10 +95,9 @@
 const {
   REQUETES_HORS_CONTROLE,
   clsAssertionMatrix,
+  TBT_DESKTOP_BUDGETS,
+  plafondTbtDesktop,
 } = require('./scripts/lhci-cls-budgets.cjs');
-
-// Plafond de TBT desktop, en millisecondes. Justifié par la mesure ci-dessus.
-const TBT_DESKTOP_MAX = 200;
 
 // PÉRIMÈTRE : les deux pages dont on a un TBT desktop MESURÉ. L'accueil est la
 // page sur laquelle l'audit a relevé 477 ms ; /jobs est la plus lourde du site
@@ -121,12 +126,15 @@ module.exports = {
       },
     },
     assert: {
-      // Le TBT (meilleur des 3 runs) ET le plafond CLS de la route : les deux
-      // passent par la table partagée, donc une page sans CLS mesuré ne peut pas
-      // être auditée ici non plus.
-      assertMatrix: clsAssertionMatrix(ROUTES_DESKTOP, {
-        'total-blocking-time': ['error', { maxNumericValue: TBT_DESKTOP_MAX }],
-      }),
+      // Le TBT (meilleur des 3 runs) ET le plafond CLS de la route : l'un et
+      // l'autre passent par une table de valeurs MESURÉES, donc une page sans
+      // CLS mesuré — comme une page sans plafond TBT desktop — fait échouer le
+      // chargement de cette config, et la passe entière avec elle.
+      // Le socle est une FONCTION de la route : chaque page porte le plafond que
+      // sa propre mesure supporte (cf. TBT_DESKTOP_BUDGETS).
+      assertMatrix: clsAssertionMatrix(ROUTES_DESKTOP, (route) => ({
+        'total-blocking-time': ['error', { maxNumericValue: plafondTbtDesktop(route) }],
+      })),
     },
     upload: {
       // SOUS-DOSSIER, pas le dossier de la passe mobile : les deux passes

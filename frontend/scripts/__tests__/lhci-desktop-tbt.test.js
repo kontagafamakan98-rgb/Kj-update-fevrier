@@ -1,13 +1,15 @@
 /**
- * Garde TBT DESKTOP de l'accueil et de /jobs — éprouvé contre le moteur
+ * Garde TBT DESKTOP — un plafond PAR ROUTE, éprouvé contre le moteur
  * d'assertions de lhci.
  *
  * ── Ce que ce test vérifie, et pourquoi ainsi ───────────────────────────────
- * Le plafond (200 ms) est le seuil de l'audit qui a ouvert le chantier. Trois
- * façons de le poser de travers, toutes SILENCIEUSES en CI :
+ * Chaque route porte SON plafond, adossé à SA mesure : 200 ms pour l'accueil
+ * (le seuil de l'audit, 13× sa pire mesure), 150 ms pour /jobs (27 runs desktop
+ * à 0 ms répartis en quatre conditions — cf. TBT_DESKTOP_BUDGETS). Quatre façons
+ * de le poser de travers, toutes SILENCIEUSES en CI :
  *
  *   1. mesurer la mauvaise condition : sans `preset: 'desktop'`, cette passe
- *      mesurerait un TBT MOBILE (CPU ×4 + 4G) sous un plafond de 200 ms, et un
+ *      mesurerait un TBT MOBILE (CPU ×4 + 4G) sous ce plafond, et un
  *      runner affamé la ferait rougir au hasard — 1397 ms déjà mesurés pour un
  *      arbre vert (voir lighthouserc.cjs). Le preset est donc vérifié ;
  *   2. asserter la mauvaise STATISTIQUE : sur trois runs à [250, 10, 10], la
@@ -18,7 +20,12 @@
  *      (ou deux) ferait passer la passe sans rien asserter, et un plafond que
  *      rien ne peut atteindre ne protégerait rien. Chaque route est donc
  *      vérifiée séparément, motif compris, et l'ajout de /jobs a exigé que sa
- *      route ait un plafond CLS MESURÉ — le refus est éprouvé en la retirant.
+ *      route ait un plafond CLS MESURÉ — le refus est éprouvé en la retirant ;
+ *   4. porter le plafond d'UNE page sur les autres : c'est ce que faisait le
+ *      seuil commun, recopié de l'accueil (la page de l'audit, qui porte en plus
+ *      le cadre Maps) sur /jobs qui n'a ni la même structure ni le même pire cas.
+ *      Le plafond vient donc d'une table mesurée, route par route, et un
+ *      littéral dans la config ferait rougir ce test.
  *
  * Les verdicts ne sont pas ré-implémentés : ils sont demandés à
  * `getAllAssertionResults` de @lhci/utils, le MÊME code que `lhci assert`
@@ -31,9 +38,15 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const require = createRequire(import.meta.url);
-const { CLS_BUDGETS } = require('../lhci-cls-budgets.cjs');
+const {
+  CLS_BUDGETS,
+  TBT_DESKTOP_BUDGETS,
+  plafondTbtDesktop,
+} = require('../lhci-cls-budgets.cjs');
 const { getAllAssertionResults } = require('@lhci/utils/src/assertions.js');
 
 // Comme la passe mobile : la config est pilotée par l'environnement. Ici la base
@@ -43,15 +56,17 @@ process.env.KOJO_LHCI_BASE_URL = 'https://kojoforafrica.cc.cd';
 const config = require('../../lighthouserc.desktop.cjs');
 const ASSERT = config.ci.assert;
 
-// Le seuil demandé, écrit ici en clair : le jour où quelqu'un le relèvera dans la
-// config, ce test devra être modifié — donc relu.
-const PLAFOND_MS = 200;
+// Les plafonds demandés, écrits ici EN CLAIR : le jour où quelqu'un en relèvera
+// un dans la table mesurée, ce test devra être modifié — donc relu. Chaque route
+// porte le sien, et le test vérifie que la table est bien la source.
+const PLAFONDS = { '/': 200, '/jobs': 150 };
 
 // Pages auditées par cette passe, et le TBT réellement mesuré pour chacune (voir
-// l'en-tête de la config) : l'accueil 0 ms en production et 15 ms sous
-// saturation CPU ; /jobs 0 ms sur 9 runs à chaud comme sous charge, avec un pire
-// run chaud à 8 ms. Ces valeurs DOIVENT passer — un plafond né rouge serait un
-// plafond qu'on relèverait à l'aveugle.
+// l'en-tête de TBT_DESKTOP_BUDGETS) : l'accueil 0 ms en production et 15 ms sous
+// saturation CPU ; /jobs 0 ms sur 27 runs desktop répartis en quatre conditions
+// (pile de la CI, 4 boucles CPU, bord de CDN froid, 7 boucles CPU) et 8 ms au
+// pire sur un déploiement à chaud. Ces valeurs DOIVENT passer — un plafond né
+// rouge serait un plafond qu'on relèverait à l'aveugle.
 const MESURES = { '/': [0, 15], '/jobs': [0, 8] };
 const ROUTES = Object.keys(MESURES);
 
@@ -94,7 +109,7 @@ describe('lighthouserc.desktop — TBT desktop (plafond 200 ms)', () => {
     expect(config.ci.collect.settings.preset).toBe('desktop');
   });
 
-  it('porte le plafond de 200 ms sur CHAQUE route, et n’ajoute pas de socle non mesuré', () => {
+  it('porte SON plafond sur chaque route, et n’ajoute pas de socle non mesuré', () => {
     // Une matrice, sans les options que lhci interdit à côté (il refuse la
     // config, mais seulement au moment du job : la structure est vérifiée ici).
     expect(Array.isArray(ASSERT.assertMatrix)).toBe(true);
@@ -108,8 +123,10 @@ describe('lighthouserc.desktop — TBT desktop (plafond 200 ms)', () => {
       const socle = entreePour(route, 'optimistic');
       expect(socle.assertions['total-blocking-time'], route).toEqual([
         'error',
-        { maxNumericValue: PLAFOND_MS },
+        { maxNumericValue: PLAFONDS[route] },
       ]);
+      // La table mesurée est la SOURCE du nombre, pas un commentaire à côté.
+      expect(TBT_DESKTOP_BUDGETS[route].max, `${route} : table mesurée`).toBe(PLAFONDS[route]);
       // Le score, le FCP et le LCP restent à la passe mobile (13 pages, mesures à
       // l'appui) — et pour /jobs elle les exclut elle-même, son LCP étant le
       // moment où la réponse de son API est connue. Les réasserter ici sans
@@ -148,7 +165,7 @@ describe('lighthouserc.desktop — TBT desktop (plafond 200 ms)', () => {
     expect(auditsEnEchec(troisRuns('/', 250, 250, 250))).toContain('total-blocking-time');
   });
 
-  it('REFUSE un TBT desktop au-dessus du plafond, sur les DEUX routes', () => {
+  it('REFUSE un TBT desktop au-dessus du plafond de SA route', () => {
     for (const route of ROUTES) {
       // La mesure qui a ouvert le chantier : 477 ms — exactement ce qu'un retour
       // de l'audit doit casser.
@@ -156,7 +173,7 @@ describe('lighthouserc.desktop — TBT desktop (plafond 200 ms)', () => {
         'total-blocking-time'
       );
       // Et juste au-dessus du plafond : la marge est d'un millimètre, à dessein.
-      expect(auditsEnEchec(troisRuns(route, PLAFOND_MS + 1)), `${route} à 201 ms`).toContain(
+      expect(auditsEnEchec(troisRuns(route, PLAFONDS[route] + 1)), `${route} au-dessus`).toContain(
         'total-blocking-time'
       );
       // Les valeurs réellement mesurées passent, elles.
@@ -165,6 +182,49 @@ describe('lighthouserc.desktop — TBT desktop (plafond 200 ms)', () => {
           []
         );
       }
+    }
+  });
+
+  it('le plafond de /jobs tient au-dessus de sa BORNE HAUTE mesurée, et sous le mode froid', () => {
+    // La borne haute qui justifie les 150 ms : sous famine CPU (7 boucles sur
+    // 8 cœurs), la TOTALITÉ du travail de style et de mise en page de /jobs vaut
+    // 149 ms — donc ~99 ms de blocage même si tout coalesçait en une seule tâche.
+    // Ce cas doit PASSER : il est la raison d'être du plafond, pas un accident.
+    expect(echecs(troisRuns('/jobs', 99, 99, 99)), 'borne haute').toEqual([]);
+    // Et le plafond reste SOUS le mode froid mesuré avant correctif (1076 ms),
+    // c'est-à-dire qu'il continue de l'attraper s'il redevenait permanent.
+    expect(auditsEnEchec(troisRuns('/jobs', 1076, 1076, 1076)), 'mode froid').toContain(
+      'total-blocking-time'
+    );
+  });
+
+  it('refuse un plafond TBT pour une route qui n’a pas été mesurée', () => {
+    expect(() => plafondTbtDesktop('/dashboard')).toThrow(/plafond TBT desktop manquant/);
+    expect(plafondTbtDesktop('/jobs')).toBe(PLAFONDS['/jobs']);
+  });
+
+  it('délègue le plafond TBT à la table MESURÉE, route par route', () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../lighthouserc.desktop.cjs'),
+      'utf8'
+    );
+    // Un littéral en dur dans la config rendrait le plafond non adossé à une
+    // mesure et invisible à ce test : c'est exactement ce que la route /jobs
+    // portait avant (le seuil de l'accueil, recopié).
+    expect(source).toMatch(/plafondTbtDesktop\(route\)/);
+    expect(source).not.toMatch(/maxNumericValue:\s*\d+/);
+  });
+
+  it('refuse de se charger si une route auditée n’a PLUS de plafond TBT mesuré', () => {
+    const cheminConfig = require.resolve('../../lighthouserc.desktop.cjs');
+    const sauvegarde = TBT_DESKTOP_BUDGETS['/jobs'];
+    delete TBT_DESKTOP_BUDGETS['/jobs'];
+    delete require.cache[cheminConfig];
+    try {
+      expect(() => require(cheminConfig)).toThrow(/plafond TBT desktop manquant pour \/jobs/);
+    } finally {
+      TBT_DESKTOP_BUDGETS['/jobs'] = sauvegarde;
+      delete require.cache[cheminConfig];
     }
   });
 

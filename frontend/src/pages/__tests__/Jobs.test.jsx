@@ -261,3 +261,22 @@ describe('Jobs — la carte n’est chargée qu’à son ouverture', () => {
     expect(await screen.findByTestId('carte')).toBeTruthy();
   });
 });
+
+describe('Jobs — le premier paint ne dépend pas de la réponse de l’API', () => {
+  // Le plus grand texte de la page est son paragraphe d'intro : c'est lui
+  // l'élément LCP. Il est déclaré par le plan, peint par la coquille
+  // pré-rendue et rendu ici — donc il doit tenir dès le PREMIER rendu, la
+  // requête encore en vol. Sinon le plus grand texte peint redevient celui de
+  // l'état vide, qui n'existe qu'après la réponse, et le LCP recopie le temps
+  // de réponse du backend (mesuré : 3,1 s de LCP mobile, dont 2,66 s de
+  // `Render Delay` = l'attente de /api/jobs).
+  it('affiche le paragraphe d’intro alors que la requête n’a pas encore répondu', () => {
+    // Une requête qui ne se règle jamais : c'est l'état « en vol » que le
+    // premier paint doit traverser.
+    jobsAPI.getAll.mockReturnValue(new Promise(() => {}));
+    render(<Jobs />);
+
+    // Le texte vient du scope de la page, jamais d'un littéral recopié.
+    expect(screen.getByText(jobsT('intro'))).toBeTruthy();
+  });
+});

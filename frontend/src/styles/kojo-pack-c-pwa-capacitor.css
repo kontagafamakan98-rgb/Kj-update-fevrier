@@ -19,28 +19,11 @@ body {
 }
 
 @supports (padding-top: env(safe-area-inset-top)) {
-  .app-header,
-  .header,
-  .topbar,
-  .navbar,
-  .mobile-header {
+  .header {
     padding-top: max(10px, env(safe-area-inset-top));
   }
 
-  .bottom-nav,
-  .tabbar,
-  .mobile-tabbar,
-  .mobile-nav,
-  .footer-nav {
-    padding-bottom: max(8px, env(safe-area-inset-bottom));
-  }
-
-  main,
-  .main-content,
-  .page-content,
-  .screen-content,
-  .content-shell,
-  .page-shell {
+  main {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 }
@@ -51,51 +34,8 @@ body {
     overscroll-behavior-y: none;
   }
 
-  .app-header,
-  .header,
-  .topbar,
-  .navbar,
-  .mobile-header {
+  .header {
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
-}
-
-.install-banner,
-.pwa-install-banner,
-.update-banner,
-.app-update-banner,
-.offline-banner,
-.network-banner,
-.sw-update-banner {
-  border-radius: var(--kojo-c-radius);
-  border: 1px solid var(--kojo-c-stroke);
-  background: var(--kojo-c-surface-soft);
-  color: var(--kojo-c-text);
-  box-shadow: var(--kojo-c-shadow);
-}
-
-.install-banner button,
-.pwa-install-banner button,
-.update-banner button,
-.app-update-banner button,
-.offline-banner button,
-.network-banner button,
-.sw-update-banner button,
-.install-banner .btn,
-.pwa-install-banner .btn,
-.update-banner .btn,
-.app-update-banner .btn,
-.offline-banner .btn,
-.network-banner .btn,
-.sw-update-banner .btn {
-  border-radius: 14px;
-}
-
-.splash-shell,
-.splash-screen,
-.launch-screen,
-.app-splash {
-  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
-  color: var(--kojo-c-text-light);
 }
