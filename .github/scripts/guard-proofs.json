@@ -273,6 +273,15 @@
       "runner": "pytest"
     },
     {
+      "chemin": ".github/scripts/livrer.py",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "outil d'orchestration de livraison complète : pousse la branche de travail, ouvre/détecte la PR, attend les checks CI, fusionne via l'API GitHub, synchronise localement et confirme formellement que Vercel et Fly.io servent la révision",
+      "hors_mutation": "outil d'ops sans verdict interne sur le dépôt : orchestre des commandes git et les gardes check-deployed-revision.js et check_deployed_revision.py déjà mutés et éprouvés"
+    },
+    {
       "chemin": "backend/scripts/audit_docstrings.py",
       "role": "garde",
       "invoque_par": "ci",
