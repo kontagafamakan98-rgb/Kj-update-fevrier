@@ -20,6 +20,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
+from bson import ObjectId
 from httpx import AsyncClient
 
 import kojo_shared
@@ -122,6 +123,76 @@ async def test_un_document_sans_id_rend_un_identifiant_STABLE_et_supprimable(
     assert premiere[0]["id"], "aucun identifiant rendu : rien n'est adressable"
 
     suppr = await client.delete("%s/%s" % (LISTE, premiere[0]["id"]), headers=headers)
+    assert suppr.status_code == 200, suppr.text
+    assert (await client.get(LISTE, headers=headers)).json()["notifications"] == []
+
+
+@pytest.mark.asyncio
+async def test_un_id_numerique_importe_reste_supprimable(client: AsyncClient):
+    """Un `id` stocké en NOMBRE ne rend pas la ligne insupprimable.
+
+    `identifiant_public` rend TOUJOURS une chaîne (`str(id or _id)`) : le client
+    renvoie donc "2" pour un document qui stocke `2` (entier). La requête ne
+    testait que la forme CHAÎNE, aucun candidat ne pouvait correspondre, le
+    DELETE répondait 404 — et comme le serveur gardait la ligne, elle revenait à
+    l'écran au rafraîchissement suivant et la cloche gardait son compteur.
+    C'est le cas rapporté en production : « la notification montre toujours 1 et
+    refuse de disparaître ». Ces documents viennent d'un jeu IMPORTÉ (l'app,
+    elle, crée toujours un uuid) — et un renommage de type ne doit pas rendre
+    une ligne définitive.
+    """
+    user, headers = await _preparer(client)
+    doc = _notification(user["user"]["id"])
+    doc["id"] = 2
+    await db_insert("notifications", doc)
+
+    rendues = (await client.get(LISTE, headers=headers)).json()["notifications"]
+    assert [n["id"] for n in rendues] == ["2"], rendues
+
+    suppr = await client.delete(f"{LISTE}/{rendues[0]['id']}", headers=headers)
+    assert suppr.status_code == 200, suppr.text
+    assert (await client.get(LISTE, headers=headers)).json()["notifications"] == []
+
+
+@pytest.mark.asyncio
+async def test_marquer_lue_un_id_numerique_importe(client: AsyncClient):
+    """Le marquage comme lue partage la même règle que la suppression.
+
+    Sans elle, la pastille « non lu » revient dans les 30 s (le polling du
+    compteur relit le serveur, qui n'a rien changé) — le second visage du même
+    symptôme.
+    """
+    user, headers = await _preparer(client)
+    doc = _notification(user["user"]["id"])
+    doc["id"] = 7
+    await db_insert("notifications", doc)
+
+    rendue = (await client.get(LISTE, headers=headers)).json()["notifications"][0]
+    resp = await client.put(f"{LISTE}/{rendue['id']}/read", headers=headers)
+    assert resp.status_code == 200, resp.text
+    assert (await client.get(LISTE, headers=headers)).json()["unread_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_un_id_stocke_en_ObjectId_reste_supprimable(client: AsyncClient):
+    """Un `id` stocké en ObjectId (et non en chaîne) reste adressable.
+
+    Même asymétrie que le nombre : le document porte un ObjectId, la liste en
+    rend la forme hexadécimale, et la requête ne testait la forme ObjectId que
+    sur `_id` — jamais sur le champ applicatif `id`. La ligne était donc
+    définitivement insupprimable, tout en étant affichée avec un identifiant
+    stable.
+    """
+    user, headers = await _preparer(client)
+    doc = _notification(user["user"]["id"])
+    identifiant = ObjectId()
+    doc["id"] = identifiant
+    await db_insert("notifications", doc)
+
+    rendue = (await client.get(LISTE, headers=headers)).json()["notifications"][0]
+    assert rendue["id"] == str(identifiant), rendue
+
+    suppr = await client.delete(f"{LISTE}/{rendue['id']}", headers=headers)
     assert suppr.status_code == 200, suppr.text
     assert (await client.get(LISTE, headers=headers)).json()["notifications"] == []
 

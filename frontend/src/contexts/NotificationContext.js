@@ -8,6 +8,21 @@ const NotificationContext = createContext();
 // Intervalle de polling pour le compteur non-lus (en ms)
 const POLL_INTERVAL_MS = 30_000; // 30 secondes
 
+/**
+ * Le serveur dit-il « je n'ai pas cette ligne » (404) ?
+ *
+ * C'est la distinction qui décide si une notification est SUPPRIMABLE. Une
+ * panne (5xx, 403, réseau) est une demande refusée : la ligne existe encore
+ * là-bas, la retirer de l'écran mentirait — elle reste, et l'utilisateur la
+ * voit échouer (voir `actionError`). Un 404 dit l'inverse : il n'y a PLUS de
+ * ligne serveur à atteindre, donc réessayer ne peut pas réussir — c'est
+ * exactement la ligne qui « refuse de disparaître » (identifiant d'un push dont
+ * l'enregistrement a échoué, document d'un ancien compte, ligne déjà supprimée
+ * depuis un autre appareil). La garder à l'écran la rendrait insupprimable à
+ * vie : on l'enlève, et un rafraîchissement de la liste ne la ramènera pas.
+ */
+const ligneAbsenteDuServeur = (erreur) => erreur?.response?.status === 404;
+
 export function useNotifications() {
   const ctx = useContext(NotificationContext);
   if (!ctx) throw new Error('useNotifications must be used within NotificationProvider');
@@ -20,6 +35,11 @@ export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  // La DERNIÈRE action refusée par le serveur, telle qu'elle sera montrée :
+  // quelle action, sur quelle ligne, et de quoi la rejouer. Une action qui
+  // échoue en silence laissait l'utilisateur devant une liste qui ne bouge
+  // pas, sans savoir s'il a mal visé ou si le serveur a refusé.
+  const [actionError, setActionError] = useState(null);
   const pollRef = useRef(null);
 
   // ----- Chargement de toutes les notifications -----
@@ -88,18 +108,28 @@ export function NotificationProvider({ children }) {
   // disparaître ». Ces actions s'appliquent donc localement, sans requête.
   const markAsRead = useCallback(async (notificationId) => {
     const target = notifications.find(n => n.id === notificationId);
-    try {
-      if (!target?.local) {
-        await notificationAPI.markRead(notificationId);
-      }
+    const marquerLue = () => {
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, is_read: true } : n)
       );
       if (target && !target.is_read) {
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
+    };
+    try {
+      if (!target?.local) {
+        await notificationAPI.markRead(notificationId);
+      }
+      marquerLue();
     } catch (err) {
-      safeLog.error('Erreur markAsRead:', err);
+      // Même règle que la suppression : rien à marquer côté serveur (404) →
+      // l'état local suit. Autrement la demande a échoué pour de vrai, et le
+      // « non lu » reste affiché plutôt que de mentir.
+      if (ligneAbsenteDuServeur(err)) {
+        marquerLue();
+      } else {
+        safeLog.error('Erreur markAsRead:', err);
+      }
     }
   }, [notifications]);
 
@@ -108,11 +138,24 @@ export function NotificationProvider({ children }) {
       await notificationAPI.markAllRead();
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
+      setActionError(null);
       devLog.info('Toutes les notifications marquées comme lues');
     } catch (err) {
       safeLog.error('Erreur markAllAsRead:', err);
+      setActionError({ action: 'markAllRead' });
     }
   }, []);
+
+  // Retire la ligne de l'écran, et décrémente le compteur SEULEMENT si elle
+  // était non lue — le compteur est recalculé à chaque lecture de liste, mais
+  // il doit rester juste entre deux rafraîchissements.
+  const retirerDeLEcran = useCallback((notificationId) => {
+    const target = notifications.find(n => n.id === notificationId);
+    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    if (target && !target.is_read) {
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+  }, [notifications]);
 
   const deleteNotification = useCallback(async (notificationId) => {
     const target = notifications.find(n => n.id === notificationId);
@@ -120,26 +163,53 @@ export function NotificationProvider({ children }) {
       if (!target?.local) {
         await notificationAPI.deleteOne(notificationId);
       }
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      if (target && !target.is_read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
+      retirerDeLEcran(notificationId);
+      setActionError(null);
     } catch (err) {
-      // La ligne RESTE si le serveur a refusé : elle est toujours là-bas, la
-      // retirer de l'écran ferait croire à une suppression qui n'a pas eu lieu.
+      if (ligneAbsenteDuServeur(err)) {
+        // Il n'y a plus rien à supprimer là-bas : la ligne part pour de bon.
+        retirerDeLEcran(notificationId);
+        setActionError(null);
+        // …et on RELIT la liste : c'est la seule façon de savoir si la ligne a
+        // vraiment disparu du serveur. Si elle y est encore (l'identifiant
+        // affiché ne désigne pas la bonne ligne — un `id` numérique importé,
+        // par exemple), elle revient à l'écran : l'affichage suit le serveur,
+        // il ne prétend pas avoir supprimé ce qui existe toujours.
+        fetchNotifications();
+        return;
+      }
+      // Le serveur a REFUSÉ : la ligne est toujours là-bas, la retirer ferait
+      // croire à une suppression qui n'a pas eu lieu. Elle reste, et l'échec
+      // devient visible avec de quoi le rejouer.
       safeLog.error('Erreur deleteNotification:', err);
+      setActionError({ action: 'delete', notificationId });
     }
-  }, [notifications]);
+  }, [notifications, retirerDeLEcran, fetchNotifications]);
 
   const deleteAll = useCallback(async () => {
     try {
       await notificationAPI.deleteAll();
       setNotifications([]);
       setUnreadCount(0);
+      setActionError(null);
     } catch (err) {
       safeLog.error('Erreur deleteAll:', err);
+      setActionError({ action: 'deleteAll' });
     }
   }, []);
+
+  const clearActionError = useCallback(() => setActionError(null), []);
+
+  /** Rejoue la dernière action refusée — c'est le bouton « Réessayer ». */
+  const retryLastAction = useCallback(async () => {
+    const echec = actionError;
+    if (!echec) return;
+    setActionError(null);
+    if (echec.action === 'delete') return deleteNotification(echec.notificationId);
+    if (echec.action === 'deleteAll') return deleteAll();
+    if (echec.action === 'markAllRead') return markAllAsRead();
+    return undefined;
+  }, [actionError, deleteNotification, deleteAll, markAllAsRead]);
 
   // ----- Ajouter une entrée reçue par push (ex: foreground) -----
   // Idempotent par identifiant : un push rejoué (ou déjà présent dans la liste
@@ -167,6 +237,9 @@ export function NotificationProvider({ children }) {
     unreadCount,
     loading,
     isOpen,
+    actionError,
+    clearActionError,
+    retryLastAction,
     openPanel,
     closePanel,
     togglePanel,

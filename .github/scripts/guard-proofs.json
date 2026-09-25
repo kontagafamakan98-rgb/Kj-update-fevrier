@@ -1622,7 +1622,7 @@
       "id": "identifiants: le repli _id disparait",
       "garde": "backend/kojo_identifiants.py",
       "cible": "backend/kojo_identifiants.py",
-      "trouve": "    candidats.append({\"_id\": valeur})\n",
+      "trouve": "    candidats.extend({\"_id\": forme} for forme in formes)\n",
       "remplace": "    # mutation : le repli _id a disparu\n",
       "runner": "python",
       "preuve": "backend/tests/test_identifiants_un_proprietaire.py",

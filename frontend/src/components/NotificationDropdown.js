@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -24,11 +24,20 @@ const TrashIcon = () => (
   </svg>
 );
 
-const XIcon = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+const XIcon = ({ className = 'w-4 h-4' }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
+
+// Le message d'un échec d'action, par action : la copie du produit, jamais le
+// statut brut du serveur. Une action qui échoue doit se VOIR — c'est la moitié
+// du défaut signalé (« ça refuse de supprimer » sans rien dire).
+const MESSAGE_ECHEC = {
+  delete: 'notifDeleteFailed',
+  deleteAll: 'notifDeleteAllFailed',
+  markAllRead: 'notifMarkAllFailed',
+};
 
 // Icône selon le type de notification
 const typeIcon = (type) => {
@@ -69,31 +78,65 @@ export default function NotificationDropdown() {
     markAllAsRead,
     deleteNotification,
     deleteAll,
+    actionError,
+    clearActionError,
+    retryLastAction,
   } = useNotifications();
 
   const navigate = useNavigate();
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
   const { t } = useLanguage();
+  // « Tout supprimer » est destructeur et sans retour : le premier appui ARME,
+  // le second exécute. L'état retombe dès que le panneau se ferme ou change de
+  // contenu, pour qu'un appui armé ne survive pas à un autre écran.
+  const [confirmeToutSupprimer, setConfirmeToutSupprimer] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) setConfirmeToutSupprimer(false);
+  }, [isOpen]);
+
+  // Le panneau s'annonce comme un dialogue : on lui donne le focus à
+  // l'ouverture, sinon la tabulation suivante repart de la cloche et traverse
+  // la page \"derrière\" un contenu qui vient de s'ouvrir.
+  useEffect(() => {
+    if (isOpen) panelRef.current?.focus();
+  }, [isOpen]);
 
   // Fermer en cliquant en dehors
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e) => {
       // La Navbar rend DEUX instances du dropdown (desktop + mobile, l'une
-      // masquée par CSS). Chaque instance écoute mousedown sur le document :
-      // quand on clique la cloche de l'instance VISIBLE, le mousedown de
-      // l'instance CACHÉE considérait la cible comme extérieure et fermait
-      // le panneau (isOpen=false), puis le click de l'instance visible
-      // exécutait togglePanel avec isOpen désormais false → réouverture
-      // immédiate : impossible de fermer le panneau. On ignore donc tout
-      // clic dont la cible est une cloche de notifications, quelle que soit
-      // l'instance.
+      // masquée par CSS) et l'ouverture est un état PARTAGÉ : les deux
+      // instances rendent donc leur panneau, dans des conteneurs dont un seul
+      // est affiché. Chaque instance écoute mousedown sur le document :
+      //
+      //  1. quand on clique la cloche de l'instance VISIBLE, le mousedown de
+      //     l'instance CACHÉE considérait la cible comme extérieure et fermait
+      //     le panneau (isOpen=false), puis le click de l'instance visible
+      //     exécutait togglePanel avec isOpen désormais false → réouverture
+      //     immédiate : impossible de fermer le panneau ;
+      //  2. un appui DANS le panneau VISIBLE n'était « à l'intérieur » que pour
+      //     cette instance-là : pour l'autre, sa propre référence ne contenait
+      //     pas la cible → elle refermait le panneau PENDANT l'appui. Le booléen
+      //     `isOpen` passant à false démonte le panneau, l'élément appuyé sort
+      //     du DOM, et le `click` qui suit n'atteint plus son bouton : supprimer
+      //     une notification ou « tout marquer comme lu » ne partait JAMAIS
+      //     (symptôme mesuré : « la notification montre toujours 1 et refuse de
+      //     disparaître » — aucune requête, aucun message).
+      //
+      // On reconnaît donc l'intérieur du panneau par le DOM — un marqueur porté
+      // par chaque panneau, comme on reconnaît déjà une cloche par son
+      // aria-label — et non par la référence d'UNE instance.
+      const dansUnPanneau = !!(
+        e.target && e.target.closest && e.target.closest('[data-notification-panel]')
+      );
       const isBellClick = !!(
         e.target && e.target.closest && e.target.closest('button[aria-label^="Notifications"]')
       );
       if (
-        !isBellClick &&
+        !isBellClick && !dansUnPanneau &&
         panelRef.current && !panelRef.current.contains(e.target) &&
         buttonRef.current && !buttonRef.current.contains(e.target)
       ) {
@@ -132,6 +175,11 @@ export default function NotificationDropdown() {
         className="relative p-2 rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"
       >
         <BellIcon />
+        {/* Le compteur change tout seul (polling, push) : annoncé aux lecteurs
+            d'écran, qui ne voient pas le badge apparaître. */}
+        <span className="sr-only" aria-live="polite">
+          {unreadCount > 0 ? t('notifUnreadCount').replace('{count}', String(unreadCount)) : ''}
+        </span>
         {unreadCount > 0 && (
           <span
             aria-hidden="true"
@@ -147,8 +195,10 @@ export default function NotificationDropdown() {
         <div
           ref={panelRef}
           role="dialog"
+          tabIndex={-1}
+          data-notification-panel="true"
           aria-label={t('notifCenterAria')}
-          className="absolute right-0 mt-2 w-[340px] sm:w-[380px] max-h-[520px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden"
+          className="absolute right-0 mt-2 w-[340px] sm:w-[380px] max-h-[520px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden outline-none"
           style={{ maxHeight: 'calc(100vh - 80px)' }}
         >
           {/* En-tête */}
@@ -174,11 +224,24 @@ export default function NotificationDropdown() {
               )}
               {notifications.length > 0 && (
                 <button
-                  onClick={deleteAll}
-                  title={t('deleteAll')}
-                  className="p-1.5 rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  onClick={() => {
+                    if (confirmeToutSupprimer) {
+                      setConfirmeToutSupprimer(false);
+                      deleteAll();
+                      return;
+                    }
+                    setConfirmeToutSupprimer(true);
+                  }}
+                  title={confirmeToutSupprimer ? t('confirmDeleteAll') : t('deleteAll')}
+                  aria-label={confirmeToutSupprimer ? t('confirmDeleteAll') : t('deleteAll')}
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    confirmeToutSupprimer
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
+                  }`}
                 >
                   <TrashIcon />
+                  {confirmeToutSupprimer && <span>{t('confirmDeleteAll')}</span>}
                 </button>
               )}
               <button
@@ -193,6 +256,29 @@ export default function NotificationDropdown() {
 
           {/* Corps — liste */}
           <div className="flex-1 overflow-y-auto">
+            {actionError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 px-4 py-3 bg-red-50 border-b border-red-100 text-red-700"
+              >
+                <span className="text-sm flex-1">
+                  {t(MESSAGE_ECHEC[actionError.action] || 'notifDeleteFailed')}
+                </span>
+                <button
+                  onClick={retryLastAction}
+                  className="text-sm font-semibold underline decoration-red-300 hover:decoration-red-600 whitespace-nowrap"
+                >
+                  {t('retry')}
+                </button>
+                <button
+                  onClick={clearActionError}
+                  aria-label={t('closeNotif')}
+                  className="p-1 rounded-lg text-red-400 hover:text-red-700 hover:bg-red-100 transition-colors"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             {loading && notifications.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
@@ -247,13 +333,19 @@ export default function NotificationDropdown() {
                         </p>
                       </div>
 
-                      {/* Bouton supprimer */}
+                      {/* Bouton supprimer.
+                          Il était `opacity-0` jusqu'au survol : sur un écran
+                          TACTILE il n'existe pas — le doigt ne survole pas, et
+                          une cible de 24 px est hors de portée. Il est donc
+                          toujours visible sous `sm`, où il fait 44 px ; au-delà
+                          il garde l'apparition au survol (souris) sans jamais
+                          être inaccessible au clavier (`focus:opacity-100`). */}
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
                         aria-label={t('deleteNotification')}
-                        className="flex-shrink-0 p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100"
+                        className="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                       >
-                        <XIcon />
+                        <XIcon className="w-5 h-5 sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   </li>
