@@ -47,7 +47,7 @@ Historique (mesures, incidents) : `git log -p -- AGENTS.md`.
 - Liens de navigation : `frontend/src/components/LienVue.js`, jamais le `Link` de React Router. Garde : `frontend/src/components/__tests__/LienVue.test.jsx`.
 - Notifications : un panneau, monté dans `frontend/src/App.js`. Cloches sans état : barre du haut en desktop (`hidden md:flex`), barre du bas (`MobileBottomNav.js`) sur mobile. Côté d'ouverture : `notificationPanelPlacement.js`. Garde : `NotificationCenter.test.jsx`, sonde `frontend/e2e/notifications.spec.js`.
 - Menu mobile : fermé quand la barre disparaît (rotation au-delà de 768 px). Sonde : `frontend/e2e/barres-rupture.spec.js`.
-- Langues listées une seule fois, dans le composant. Aucun `<option>` en dur.
+- Langues : liste unique (`frontend/src/config/languages.js`) ET un seul contrôle (`LanguageSelector`), monté par les DEUX barres. Aucun `<option>` en dur.
 - Un filtre visible doit fonctionner. Une couleur d'état lit `data-statut` (`frontend/src/components/JobsResults.js`).
 
 ## Coquilles pré-rendues

@@ -43,13 +43,14 @@ import {
  * et le CONTRÔLE DE LANGUE — et, en creux, la réponse à « combien d'instances
  * sont affichées à la fois ».
  *
- * ── Le CONTRÔLE DE LANGUE est indemne, et voici pourquoi plutôt que « on a regardé » ──
- * Il n'est monté QU'UNE fois : le seul `<LanguageSelector>` de `src/` est dans
- * la barre desktop, dont le sous-arbre est `hidden md:flex`. La barre mobile
- * publie, elle, un `<select id="mobile_language_selector">` DANS son menu, qui
- * n'existe que menu ouvert. Les deux dispositions ne peuvent donc pas peindre
- * deux contrôles à la fois — c'est le compte du cas 3, à trois états différents,
- * et c'est ce compte qui échouerait le jour où l'on ajouterait le second. Trois
+ * ── Le MENU DE LANGUE est PARTAGÉ, et jamais peint deux fois ────────────────
+ * Les deux barres montent le MÊME composant (`LanguageSelector`) : le tiroir
+ * mobile n'a plus de `<select>` natif à lui, donc plus deux formes de contrôle
+ * pour un seul choix, ni deux comportements d'appui extérieur à tenir d'accord.
+ * Le sous-arbre de la barre du haut est `hidden md:flex`, et celui du tiroir
+ * n'existe que menu ouvert : les deux dispositions ne peuvent pas peindre deux
+ * contrôles à la fois — c'est le compte du cas 3, à trois états différents, et
+ * c'est ce compte qui échouerait le jour où l'on en ajouterait un second. Trois
  * autres raisons, lues dans la source : il ne pose AUCUN `id` (rien à dupliquer
  * dans le document), il ne pose aucun verrou global, et son écouteur d'appui
  * extérieur n'existe que tant que SA liste est ouverte (`e2e/appuis-exterieurs.spec.js`
@@ -97,14 +98,16 @@ const attendreLeMontage = async (page) => {
 /** Le menu mobile tel que le visiteur le voit : ouvert par un seul appui. */
 const ouvrirLeMenuMobile = async (page) => {
   await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
-  await expect(page.locator('#mobile_language_selector')).toBeVisible();
+  await expect(page.locator('#mobile_menu')).toBeVisible();
 };
 
 /**
- * Les contrôles de LANGUE affichés : celui de la barre du haut (un `<button>`
- * qui porte le nom de la langue courante) et celui du menu mobile (un
- * `<select>` natif). La question de l'instance dupliquée se répond par ce
- * compte : jamais deux à l'écran.
+ * Les contrôles de LANGUE affichés : les DEUX barres montent le même composant,
+ * dont le déclencheur est un `<button>` portant le nom de la langue courante
+ * (« Français »). La question de l'instance dupliquée se répond par ce compte :
+ * jamais deux à l'écran. La case `select` compte les `<select>` NATIFS de la
+ * barre — le tiroir en portait un, et ce compte est ce qui dit qu'il n'en
+ * revient pas.
  */
 const controlesDeLangue = (page) =>
   page.evaluate(() => {
@@ -112,7 +115,7 @@ const controlesDeLangue = (page) =>
     const barre = [...document.querySelectorAll('nav button')].filter(
       (b) => b.textContent.includes('Français') && affiche(b)
     ).length;
-    const select = [...document.querySelectorAll('#mobile_language_selector')].filter(affiche).length;
+    const select = [...document.querySelectorAll('nav select')].filter(affiche).length;
     return { barre, select, total: barre + select };
   });
 
@@ -172,7 +175,7 @@ test.describe('les barres et le point de rupture', () => {
     // `isMobileMenuOpen`, donc la commande doit être l'OUVERTURE, pas la
     // fermeture d'un tiroir que personne ne voit.
     await expect(page.getByRole('button', { name: 'Ouvrir le menu' })).toBeVisible();
-    await expect(page.locator('#mobile_language_selector')).toHaveCount(0);
+    await expect(page.locator('#mobile_menu')).toHaveCount(0);
     expect((await etatDeLaPage(page)).verrouDeDefilement).toBe('');
   });
 
@@ -190,7 +193,7 @@ test.describe('les barres et le point de rupture', () => {
     expect(await controlesDeLangue(page), 'menu fermé sur mobile').toEqual({ barre: 0, select: 0, total: 0 });
 
     await ouvrirLeMenuMobile(page);
-    expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toEqual({ barre: 0, select: 1, total: 1 });
+    expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toEqual({ barre: 1, select: 0, total: 1 });
 
     await page.setViewportSize(DESKTOP);
     await attendreLeRenduApresRedimensionnement(page);
