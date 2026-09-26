@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 /**
  * Page « À propos » — qui édite le site, et pourquoi il existe.
@@ -41,7 +42,9 @@ export default function About() {
               key={card.titleKey}
               className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
             >
-              <div className="text-2xl mb-3">{t(card.iconKey)}</div>
+              <div className="mb-3">
+                <IconePage nom={card.icone} classe={CLASSES_ICONE.carte} />
+              </div>
               <h2 className="text-lg font-semibold text-gray-900 mb-2">
                 {t(card.titleKey)}
               </h2>

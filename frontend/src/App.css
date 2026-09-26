@@ -233,6 +233,80 @@ a:focus {
   }
 }
 
+/* ── MISE EN PAGE DIFFÉRÉE des sections sous la ligne de flottaison ────────
+   L'accueil pré-rendu publie dix sections, dont une seule (le héros) tient dans
+   le premier écran. Les neuf autres étaient mises en page AVANT que le visiteur
+   les regarde. Mesuré le 26/09/2026 (minima entrelacés, 412×823 cpu×4, sondes
+   `_sonde-cv.mjs`) : `content-visibility: auto` sur ces neuf sections retire
+   **−100,5 ms** de « Style & Layout » (419,8 → 319,3 ms, −24 %).
+
+   LE PRIX, MESURÉ AUSSI : sans taille intrinsèque, le navigateur ne connaît pas
+   la hauteur d'une section non rendue et le document annonce une hauteur FAUSSE
+   — avec un repli UNIFORME de 1 000 px, il passe de 7 079 à 10 119 px (+3 040),
+   ce qui casse le défilement et tout repère de position. Les tailles ci-dessous
+   sont donc EXACTES SUR LE POSTE DE MESURE : la hauteur de CONTENU mesurée de
+   chaque section (hauteur rendue moins les 96 px de `py-12` en mobile, 128 px de
+   `py-16` en desktop), section par section. Le document mesure alors de nouveau
+   7 079 px (mobile) et 4 782 px (desktop), comme sans la règle — sur cet hôte-là
+   (ce qui se passe sur un autre hôte est mesuré juste en dessous).
+
+   POURQUOI PAR SECTION : les hauteurs de contenu vont de 216 à 866 px — un repli
+   unique se trompe de plusieurs centaines de px sur chacune.
+
+   CE SONT DES VALEURS D'UN POSTE, ET C'EST ASSUMÉ (mesuré le 26/09/2026) : la
+   hauteur d'un bloc de texte suit les POLICES de l'hôte, et le nombre de lignes
+   repliées n'est pas connaissable avant la mise en page. Sous une police
+   étrangère (Verdana, sonde d'atelier `_sonde-carte-police.spec.js`), le
+   document gagne de la hauteur au moment où les sections se posent et le bloc de
+   carte se déplace de 99,1 px (1350×940) / 135,3 px (412×823) ; sur le runner
+   Linux de la CI, de 25,5 px (run 36254013043). AUCUNE constante CSS ne peut
+   fermer cet écart — c'est le prix du levier, et il est PUBLIÉ par les sondes
+   plutôt que caché. Ce qui est VÉRIFIÉ, c'est la STRUCTURE que la coquille doit
+   garder : les nœuds et la hauteur du document, à 20 % près (`BORNE_STRUCTURE`),
+   par `e2e/style-layout-document.spec.js`, et la position du bloc de carte dans
+   une mise en page POSÉE (`e2e/carte-accueil.spec.js`, qui amène le bloc dans la
+   vue avant de mesurer l'appui). Un repli OUBLIÉ, lui, n'est pas un écart de
+   quelques dizaines de px : c'est un document qui s'effondre de 3 040 px sur le
+   repli uniforme, et cette sonde-là le refuse.
+
+   LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : il est
+   peint au premier écran, donc jamais « différé » — mesuré, la règle ne change
+   ni l'élément élu ni son horodatage.
+
+   UN SEUL PROPRIÉTAIRE : les deux canaux posent la MÊME classe sur le conteneur
+   des sections (`sections-differees`), dans src/pages/Home.js comme dans
+   vite-plugins/prerender/shells-home.js. Une section AJOUTÉE à l'accueil doit
+   donc porter un `contain-intrinsic-size` de plus : sans lui, elle retombe sur
+   la taille de repli par défaut (0) et la hauteur du document s'effondre —
+   c'est ce que la sonde du document mesure. */
+.sections-differees > section:not(:first-of-type) {
+  content-visibility: auto;
+}
+.sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 442.2px; }
+.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 865.1px; }
+.sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 744.6px; }
+.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 866.2px; }
+.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 462.6px; }
+.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 276px; }
+.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 216px; }
+.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 554.6px; }
+.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 841.4px; }
+
+/* Au-delà de 768 px, `py-12` devient `py-16` (128 px) et les contenus prennent
+   une autre forme : les tailles de contenu sont donc déclarées À PART, jamais
+   déduites de celles du mobile. */
+@media (min-width: 768px) {
+  .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 285.6px; }
+  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 429.6px; }
+  .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 233.2px; }
+  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 349.6px; }
+  .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 296.8px; }
+  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 184px; }
+  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 136px; }
+  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 316.8px; }
+  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 640.2px; }
+}
+
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   * {

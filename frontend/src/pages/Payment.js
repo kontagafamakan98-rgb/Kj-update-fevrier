@@ -11,6 +11,7 @@ import { handleApiError } from '../services/api';
 import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 // Pays proposés, statuts de paiement et méthodes : des CODES, jamais du texte.
 // Les libellés appartiennent aux dictionnaires — la clé est le code lui-même
@@ -275,7 +276,7 @@ const Payment = () => {
 
         {!jobPaymentContext && !statusParams ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
-            <div className="text-4xl mb-3">{t(pagePlan.noJobIconKey)}</div>
+            <div className="text-4xl mb-3"><IconePage nom={pagePlan.noJobIcon} classe={CLASSES_ICONE.carteVide} /></div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">{t(pagePlan.noJobTitleKey)}</h2>
             <p className="text-gray-600 max-w-lg mx-auto mb-5">{t(pagePlan.noJobTextKey)}</p>
             <Link to="/jobs" className="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">

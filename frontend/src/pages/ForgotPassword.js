@@ -7,6 +7,7 @@ import { authAPI, handleApiError } from '../services/api';
 import { safeLog } from '../utils/env';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 const ForgotPassword = () => {
   const { t } = useLanguage();
@@ -199,12 +200,12 @@ const ForgotPassword = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">
-            <span className="text-white text-2xl font-bold">{t(pagePlan.badgeIconKey)}</span>
+            <span className="text-white text-2xl font-bold"><IconePage nom={pagePlan.badgeIcon} classe={CLASSES_ICONE.badge} /></span>
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (forgot-password.html). Classes inchangées. */}
           <h1 className="mt-6 text-3xl font-extrabold text-gray-900">{t(pagePlan.titleKey)}</h1>
-          <p className="mt-3 text-sm text-gray-600">{t(pagePlan.subtitleKey)}</p>
+          <p className={pagePlan.subtitleClass}>{t(pagePlan.subtitleKey)}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-md p-6 space-y-6">

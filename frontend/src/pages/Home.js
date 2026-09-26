@@ -13,6 +13,18 @@ import { safeLog } from '../utils/env';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from '../config/contact';
 import MapEmbed from '../components/MapEmbed';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
+
+// Les quatre moyens de contact du bloc N.A.P. ci-dessous sont déclarés UNE
+// fois, par /contact (`actions` de src/config/page-sections.js) — la même
+// correspondance que la coquille de l'accueil
+// (`glypheDeContact`, vite-plugins/prerender/shells-home.js) : le nom d'icône
+// est LU dans la déclaration, jamais recopié ici. Une ligne disparue de
+// /contact fait lever `IconePage` au montage au lieu de peindre une pastille
+// vide en silence.
+const ICONE_DE_CONTACT = Object.fromEntries(
+  PAGE_SECTIONS['/contact'].actions.map(({ labelKey, icone }) => [labelKey, icone])
+);
 
 export default function Home() {
   const { t } = useLanguage();
@@ -38,7 +50,7 @@ export default function Home() {
   // catégorie canonique du backend (kojo_routers_jobs.py) : le libellé affiché
   // et le filtre de /jobs sortent de la même valeur.
   const {
-    categories, promises, steps, stats: STATS, escrowIconKey,
+    categories, promises, steps, stats: STATS, icone: iconeSequestre,
     // Le héros : même clé i18n et mêmes classes que la coquille pré-rendue
     // (src/config/page-sections.js). Le titre de ce héros est l'élément LCP de
     // « / » : la coquille le peint avant le JavaScript, et React reconstruit
@@ -62,7 +74,7 @@ export default function Home() {
   // peintures) est repoussé, l'`elementRenderDelay` entrant dans le graphe LCP
   // simulé de Lantern. Le contrôle ci-dessous ne monte l'iframe qu'à l'appui.
   const {
-    mapButtonKey, mapIconKey, mapFrameClass, mapControlClass,
+    mapButtonKey, icone: iconeDeLaCarte, mapFrameClass, mapControlClass,
   } = PAGE_SECTIONS['/contact'];
 
   // Le titre de l'iframe montée à l'appui (même clé que /contact).
@@ -83,14 +95,18 @@ export default function Home() {
   const countries = getAllCountries();
 
   return (
-    <div className="min-h-screen">
+    // `sections-differees` : les neuf sections sous la ligne de flottaison
+    // passent en `content-visibility: auto` (src/App.css, tailles intrinsèques
+    // exactes). Le héros est exclu par la règle elle-même (`:not(:first-of-type)`),
+    // et la coquille porte la MÊME classe sur le même conteneur.
+    <div className="min-h-screen sections-differees">
       {/* Hero Section - Mobile Optimized */}
       <section className="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-black bg-opacity-10"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-24">
           <div className="text-center">
             <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs sm:text-sm font-medium text-white ring-1 ring-inset ring-white/25 mb-6">
-              <span aria-hidden="true">{t('iconEscrow')}</span>
+              <IconePage nom="escrow" classe={CLASSES_ICONE.heros} />
               {t('escrowBannerTitle')}
             </span>
             <h1 className={heroTitleClass}>
@@ -131,11 +147,11 @@ export default function Home() {
                 comme le reste de l'accueil. */}
             <div className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-white/90">
               <span className="inline-flex items-center gap-2">
-                <span aria-hidden="true">{t('iconEscrow')}</span>
+                <IconePage nom="escrow" classe={CLASSES_ICONE.heros} />
                 {t('escrowTrustTitle')}
               </span>
               <span className="inline-flex items-center gap-2">
-                <span aria-hidden="true">{t('iconPromiseSecurePayments')}</span>
+                <IconePage nom="promiseSecurePayments" classe={CLASSES_ICONE.heros} />
                 {t('securePayments')}
               </span>
               <Link
@@ -204,11 +220,8 @@ export default function Home() {
                 to={`/jobs?category=${category.labelKey}`}
                 className="group bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 text-center transition hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
               >
-                <div
-                  className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-3xl md:text-4xl transition group-hover:scale-110"
-                  aria-hidden="true"
-                >
-                  {t(category.iconKey)}
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 transition group-hover:scale-110">
+                  <IconePage nom={category.icone} classe={CLASSES_ICONE.categorie} />
                 </div>
                 <h3 className="font-medium text-gray-900 text-sm md:text-base">{t(category.labelKey)}</h3>
               </Link>
@@ -221,13 +234,13 @@ export default function Home() {
       <section className="py-12 md:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {promises.map(({ iconKey, titleKey, descriptionKey }) => (
+            {promises.map(({ icone, titleKey, descriptionKey }) => (
               <div
                 key={titleKey}
                 className="rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center shadow-sm transition hover:shadow-md hover:bg-white"
               >
                 <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-2xl" aria-hidden="true">{t(iconKey)}</span>
+                  <IconePage nom={icone} classe={CLASSES_ICONE.promesse} />
                 </div>
                 <h3 className="text-xl font-semibold mb-4 text-gray-900">{t(titleKey)}</h3>
                 <p className="text-gray-600">
@@ -254,7 +267,7 @@ export default function Home() {
               numéro vient du dictionnaire (stepNumber1…), comme sa pastille,
               donc les deux canaux publient le même chiffre. */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {steps.map(({ iconKey, numberKey, titleKey, descriptionKey }) => (
+            {steps.map(({ icone, numberKey, titleKey, descriptionKey }) => (
               <div
                 key={titleKey}
                 className="relative bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 pt-8 text-center"
@@ -263,7 +276,7 @@ export default function Home() {
                   {t(numberKey)}
                 </span>
                 <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl" aria-hidden="true">{t(iconKey)}</span>
+                  <IconePage nom={icone} classe={CLASSES_ICONE.etape} />
                 </div>
                 <h3 className="text-lg font-semibold mb-2 text-gray-900">{t(titleKey)}</h3>
                 <p className="text-gray-600 text-sm">
@@ -279,7 +292,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10 shadow-sm">
             <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="text-5xl" aria-hidden="true">{t(escrowIconKey)}</div>
+              <div><IconePage nom={iconeSequestre} classe={CLASSES_ICONE.sequestre} /></div>
               <div className="text-center md:text-left">
                 <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t('escrowTrustTitle')}</h2>
                 <p className="text-emerald-800">
@@ -392,7 +405,7 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">
             <a href={telHref} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">
-                {t('iconContactCall')}
+                <IconePage nom={ICONE_DE_CONTACT.contactCall} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
                 <div className="text-sm font-semibold text-gray-900">{t('homeContactCall')}</div>
@@ -401,7 +414,7 @@ export default function Home() {
             </a>
             <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                {t('iconContactWhatsapp')}
+                <IconePage nom={ICONE_DE_CONTACT.contactWhatsapp} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
                 <div className="text-sm font-semibold text-gray-900">{t('contactWhatsapp')}</div>
@@ -410,7 +423,7 @@ export default function Home() {
             </a>
             <a href={mailtoHref} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                {t('iconContactSendEmail')}
+                <IconePage nom={ICONE_DE_CONTACT.contactSendEmail} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
                 <div className="text-sm font-semibold text-gray-900">{t('contactSendEmail')}</div>
@@ -426,7 +439,7 @@ export default function Home() {
               className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">
-                {t('iconContactAddress')}
+                <IconePage nom={ICONE_DE_CONTACT.contactAddress} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
                 <div className="text-sm font-semibold text-gray-900">{t('contactAddress')}</div>
@@ -465,7 +478,8 @@ export default function Home() {
             href={CONTACT.mapsUrl}
             title={titreDeLaCarte}
             label={t(mapButtonKey)}
-            icon={t(mapIconKey)}
+            icone={iconeDeLaCarte}
+            classeIcone={CLASSES_ICONE.carteContact}
             frameClass={mapFrameClass}
             controlClass={mapControlClass}
           />

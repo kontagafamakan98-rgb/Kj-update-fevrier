@@ -3,8 +3,19 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { devLog, safeLog } from '../utils/env';
 import { photoFormatsLine } from '../config/photo-formats';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
-const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) => {
+// Les deux glyphes sont DESSINÉS (icônes SVG) : leur nom est passé par la page,
+// qui le lit de son plan (`PAGE_SECTIONS['/register'].photoIcon` / `.photoTipsIcon`),
+// pour que les deux canaux publient le MÊME dessin. Les valeurs par défaut
+// couvrent un montage hors de /register.
+const ProfilePhotoUpload = ({
+  photoData,
+  setPhotoData,
+  userType = 'client',
+  iconePhoto = 'profilePhoto',
+  iconeConseils = 'photoTips',
+}) => {
   const [dragActive, setDragActive] = useState(false);
   const [showCameraOptions, setShowCameraOptions] = useState(false);
   
@@ -100,7 +111,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
   return (
     <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
       <div className="flex items-center mb-4">
-        <span className="text-2xl mr-3">{t('iconProfilePhoto')}</span>
+        <span className="text-2xl mr-3"><IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoTitre} /></span>
         <h3 className="text-lg font-semibold text-gray-900">
           {t('profilePhotoOptional')}
         </h3>
@@ -128,7 +139,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
               onClick={showPhotoOptions}
             >
               <div className="text-center">
-                <div className="text-4xl mb-3">{t('iconProfilePhoto')}</div>
+                <div className="text-4xl mb-3"><IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoZone} /></div>
                 <div className="text-sm text-gray-600">
                   <p className="font-medium">{t('addProfilePhoto')}</p>
                   <p>{t('clickToChooseOption')}</p>
@@ -298,7 +309,7 @@ const ProfilePhotoUpload = ({ photoData, setPhotoData, userType = 'client' }) =>
 
       {/* Conseils pour une bonne photo */}
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 className="font-medium text-yellow-800 mb-1">💡 {t('tipsGoodPhoto')}</h4>
+        <h4 className="font-medium text-yellow-800 mb-1"><IconePage nom={iconeConseils} classe={CLASSES_ICONE.notice} /> {t('tipsGoodPhoto')}</h4>
         <ul className="text-xs text-yellow-700 space-y-1">
           <li>• {t('useRecentPhoto')}</li>
           <li>• {t('lookCamera')}</li>
