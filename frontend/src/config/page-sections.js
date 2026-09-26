@@ -387,6 +387,12 @@ export const PAGE_SECTIONS = {
       emailPlaceholderKey: 'supportTicketEmailPlaceholder',
       ctaKey: 'supportTrackCta',
     },
+    // Le SENS de chaque mode décide son glyphe, jamais l'inverse : la première
+    // carte ouvre un agent conversationnel, et React y peint un robot
+    // (`<Bot>`, src/pages/Support.js) ; son emoji de coquille était pourtant
+    // « 💬 », celui qu'utilise DÉJÀ WhatsApp plus bas — la coquille annonçait
+    // donc un autre service que la page, dans cinq dictionnaires sur cinq. Les
+    // cinq disent maintenant « 🤖 » (26/09/2026).
     modes: [
       {
         shellIconKey: 'iconSupportRobot',
