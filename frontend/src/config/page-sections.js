@@ -255,6 +255,20 @@ export const PAGE_SECTIONS = {
     titleKey: 'title',
     subtitleKey: 'subtitle',
     detectingLocationKey: 'detectingLocation',
+    // ── La hauteur RÉSERVÉE du bloc d'état de géolocalisation ───────────────
+    // Les trois états ont des hauteurs NATURELLES différentes (mesuré à 412 ET
+    // 1350 px : 32 / 42,5 / 16 px de contenu) et le bloc des états FINAUX
+    // portait en plus un `mb-3` (12 px) que l'état de chargement n'avait pas :
+    // quand la détection se terminait, les pastilles d'étape et tout le
+    // formulaire descendaient de 14 px — CLS 0,0088 sur /register mobile et
+    // 0,0021 en desktop (sonde e2e/cls-coquille-react.spec.js, 26/09/2026).
+    // La coquille ET la page réservent donc la hauteur du PLUS HAUT (l'état
+    // « pays détecté », 42,5 px de contenu) : la boîte mesure 60,5 px dans les
+    // TROIS états, et plus rien ne bouge. Valeur DÉCLARÉE ici, lue par les deux
+    // canaux (`vite-plugins/prerender/shells-routes.js` et
+    // `src/pages/Register.js`) — les couleurs restent locales à chaque état.
+    geoStatusBoxClass:
+      'mb-3 p-2 border rounded text-center min-h-[60.5px] flex flex-col items-center justify-center',
     step1TitleKey: 'personalInformation',
     step2TitleKey: 'stepEmail',
     step3TitleKey: 'stepPayments',

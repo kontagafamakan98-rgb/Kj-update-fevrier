@@ -214,9 +214,17 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">${esc(registerT('title'))}</h1>`
       + `<p class="mt-2 text-sm text-gray-600">${esc(registerT('subtitle'))}</p>`
       + `<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">`
+      // La MÊME boîte que les états finaux de src/pages/Register.js (classe LUE
+      // dans le plan) : elle réserve la hauteur du plus haut des trois états, si
+      // bien que le passage « détection en cours » → « pays détecté / non
+      // détecté » ne déplace plus les pastilles ni le formulaire. Le
+      // `border-transparent` garde l'aspect d'origine (pas de cadre pendant
+      // l'attente) tout en occupant la même place qu'un état final encadré.
+      + `<div class="${registerPlan.geoStatusBoxClass} border-transparent">`
       + `<div class="flex items-center justify-center py-2">`
       + `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>`
       + `<span class="text-xs text-blue-700">${esc(T('detectingLocation'))}</span>`
+      + `</div>`
       + `</div>`
       + `<div class="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">`
       + `<div class="flex items-center">`

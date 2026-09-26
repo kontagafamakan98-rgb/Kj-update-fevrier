@@ -394,15 +394,24 @@ export default function Register() {
             {pageT(pagePlan.subtitleKey)}
           </p>
           
-          {/* Information sur le processus avec géolocalisation */}
+          {/* Information sur le processus avec géolocalisation.
+              Les TROIS états partagent la boîte DÉCLARÉE au plan
+              (`geoStatusBoxClass`, lue aussi par la coquille
+              vite-plugins/prerender/shells-routes.js) : elle réserve la hauteur
+              du plus haut des trois, si bien que le passage « détection en
+              cours » → « pays détecté / non détecté » ne déplace plus les
+              pastilles d'étape ni le formulaire (mesuré : 14 px, CLS 0,0088).
+              Seules les COULEURS restent propres à chaque état. */}
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
             {geoLoading ? (
-              <div className="flex items-center justify-center py-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
-                <span className="text-xs text-blue-700">{t('detectingLocation')}</span>
+              <div className={`${pagePlan.geoStatusBoxClass} border-transparent`}>
+                <div className="flex items-center justify-center py-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                  <span className="text-xs text-blue-700">{t('detectingLocation')}</span>
+                </div>
               </div>
             ) : detectedCountry ? (
-              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-center">
+              <div className={`${pagePlan.geoStatusBoxClass} bg-green-50 border-green-200`}>
                 <p className="text-sm text-green-800">
                   <span className="font-medium">📍 {pageT('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
                 </p>
@@ -411,7 +420,7 @@ export default function Register() {
                 </p>
               </div>
             ) : (
-              <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-center">
+              <div className={`${pagePlan.geoStatusBoxClass} bg-yellow-50 border-yellow-200`}>
                 <p className="text-xs text-yellow-700">
                   📍 {pageT('positionNotDetected')}
                 </p>
