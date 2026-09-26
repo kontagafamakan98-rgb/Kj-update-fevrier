@@ -41,7 +41,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 import Navbar from '../Navbar';
 import { LANGUAGES } from '../../config/languages';
 
-const MENU = () => document.querySelector('#mobile_language_selector');
+const MENU = () => document.querySelector('#mobile_menu');
 const ouvrir = () => {
   fireEvent.click(screen.getByRole('button', { name: 'openMenu' }));
 };
@@ -132,31 +132,49 @@ describe('menu mobile — il se ferme quand sa barre cesse d’être affichée',
 });
 
 /**
- * LES DEUX CONTRÔLES DE LANGUE OFFRENT LA MÊME LISTE, ET ELLE A UN SEUL
- * PROPRIÉTAIRE.
+ * LE TIROIR MOBILE MONTE LE MÊME MENU QUE LA BARRE DU HAUT, ET LA LISTE A UN
+ * SEUL PROPRIÉTAIRE.
  *
- * C'est le second visage du même défaut d'instance dupliquée : la liste des
- * langues vivait à TROIS endroits — `LANGUAGES` du menu de la barre du haut, les
- * cinq `<option>` ÉCRITS EN DUR dans le tiroir mobile (« Français » … « Mooré »)
- * et les codes nus du contexte. Une langue ajoutée au menu haut n'arrivait donc
- * jamais dans le tiroir, et rien ne rougissait : c'est exactement ce que
+ * Deux duplications se referment ici. D'abord la FORME : le tiroir portait son
+ * propre `<select>` natif pendant que la barre du haut portait un menu déroulant
+ * (`LanguageSelector`) — deux contrôles différents pour un seul choix, avec
+ * deux comportements d'appui extérieur à maintenir. Le tiroir monte désormais le
+ * MÊME composant, donc le même menu. Ensuite la LISTE : elle vivait à TROIS
+ * endroits — `LANGUAGES` du menu de la barre du haut, les cinq `<option>` ÉCRITS
+ * EN DUR dans le tiroir mobile (« Français » … « Mooré ») et les codes nus du
+ * contexte. Une langue ajoutée au menu haut n'arrivait donc jamais dans le
+ * tiroir, et rien ne rougissait : c'est exactement ce que
  * `src/config/countries.js` a fermé pour les pays, et pour la même raison — on
  * ne surveille pas une copie, on la supprime. Le premier cas lit le RENDU (le
- * tiroir publie la table, dans l'ordre) ; le second tient la FORME sur `src/`
- * (aucun autre fichier ne la re-déclare).
+ * menu du tiroir offre chaque langue du propriétaire, et plus aucun `<select>`) ;
+ * le second tient la FORME sur `src/` (aucun autre fichier ne la re-déclare).
  */
-describe('la liste des langues, d’un seul propriétaire', () => {
-  it('le tiroir mobile publie EXACTEMENT la liste du propriétaire', () => {
+describe('le menu de langue, partagé et d’un seul propriétaire', () => {
+  it('le tiroir mobile monte le MÊME menu que la barre du haut, et non un sélecteur à lui', () => {
     render(<MemoryRouter><Navbar /></MemoryRouter>);
     ouvrir();
 
-    const options = [...document.querySelectorAll('#mobile_language_selector option')];
-    // Plancher de lecture : un sélecteur qui ne trouverait rien passerait sans
-    // rien comparer, et un rendu vide a le compte d'un rendu juste.
-    expect(options.length, 'les options du tiroir n’ont pas été lues').toBe(LANGUAGES.length);
-    expect(options.map((o) => [o.value, o.textContent])).toEqual(
-      LANGUAGES.map(({ code, name }) => [code, name])
+    // Le tiroir ne publie plus de sélecteur natif : un seul rendu pour la liste.
+    expect(
+      document.querySelector('#mobile_language_selector'),
+      'le tiroir mobile ne doit plus publier son propre <select>'
+    ).toBeNull();
+
+    const boutonsTiroir = () => [...document.querySelectorAll('#mobile_menu button')];
+    const declencheur = boutonsTiroir().find((b) => b.textContent.includes(LANGUAGES[0].nativeName));
+    expect(declencheur, 'le déclencheur de langue du tiroir est introuvable').toBeTruthy();
+
+    fireEvent.click(declencheur);
+    const ouverts = boutonsTiroir();
+    // Plancher de lecture : un menu qui ne rendrait rien passerait sans rien
+    // comparer (le seul déclencheur ne suffit pas à prouver la liste).
+    expect(ouverts.length, 'le menu déroulant du tiroir n’a pas été lu').toBeGreaterThanOrEqual(
+      LANGUAGES.length + 1
     );
+    expect(
+      LANGUAGES.filter((l) => ouverts.some((b) => b.textContent.includes(l.nativeName))).length,
+      'chaque langue du propriétaire doit être offerte par le menu du tiroir'
+    ).toBe(LANGUAGES.length);
   });
 
   it('aucun autre fichier de src/ ne re-déclare la liste', () => {

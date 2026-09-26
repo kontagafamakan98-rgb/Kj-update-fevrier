@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+// Le harnais partagé : la mise en page doit s'être STABILISÉE, pas seulement
+// avoir changé d'URL (voir `connexion` ci-dessous).
+import { attendreLaStabilite } from './helpers/geometrie.js';
 
 /**
  * Le centre de notifications : UN panneau pour tout le site, et une suppression
@@ -51,6 +54,11 @@ async function connexion(page, email = 'demo@example.com') {
   await page.locator('input[type="password"]').fill('password');
   await page.locator('button[type="submit"]').click();
   await expect(page).toHaveURL(/.*dashboard.*/, { timeout: 10000 });
+  // L'URL a changé, la barre se réinstalle encore : un geste parti pendant cette
+  // réinstallation est perdu (mesuré le 26/09/2026 — appui sur « Emplois » sans
+  // navigation en WebKit, `NS_BINDING_ABORTED` sur un `goto` en Firefox). On
+  // attend donc la STABILITÉ de la mise en page, harnais partagé.
+  await attendreLaStabilite(page);
 }
 
 test.describe('Parcours E2E — le centre de notifications se vide', () => {
@@ -185,6 +193,64 @@ test.describe('Parcours E2E mobile — au doigt, la barre mobile gagne', () => {
   // Le profil de référence du dépôt pour un téléphone (le même que la sonde de
   // géométrie du LCP), avec un vrai écran tactile.
   test.use({ viewport: { width: 412, height: 823 }, hasTouch: true, isMobile: true });
+
+  /**
+   * LA SÉQUENCE D'ÉVÉNEMENTS D'UN APPUI, publiée moteur par moteur.
+   *
+   * ── Pourquoi ce cas existe, alors que les autres passent ───────────────────
+   * Le panneau se ferme sur `mousedown` et AGIT sur `click` : tout ce fichier
+   * repose donc sur l'ordre et sur la présence des événements de COMPATIBILITÉ
+   * qu'un moteur émet après un appui tactile. Cette séquence est un fait de
+   * MOTEUR, pas de l'application — et jusqu'ici elle n'était ni mesurée ni
+   * publiée, seulement décrite en commentaire.
+   *
+   * Relevé du 26/09/2026, à 412×823 avec `hasTouch`, sur les trois moteurs
+   * rejoués par cette suite (Chromium, Firefox, WebKit) : les trois émettent
+   * EXACTEMENT `pointerdown → touchstart → pointerup → touchend → mousedown →
+   * mouseup → click`. Le cas est donc un PIN, et sa valeur est là : le jour où
+   * un moteur cesse d'émettre les événements de compatibilité — ou les émet
+   * dans un autre ordre — le panneau se fermerait AVANT que le `click` n'arrive
+   * (la panne historique, « l'appui ne supprime jamais »), et c'est ici que le
+   * rouge nommerait le moteur ET la séquence, au lieu de laisser le lecteur la
+   * déduire d'un timeout ailleurs.
+   *
+   * Le relevé est PUBLIÉ avant de conclure : un vert sans chiffre ne prouve rien.
+   */
+  test("la séquence d'événements d'un appui est celle que le panneau suppose", async ({ page }) => {
+    await connexion(page, 'client@example.com');
+
+    const clocheMobile = page.locator('button[aria-label^="Notifications"]:visible');
+    await expect(clocheMobile).toContainText('1', { timeout: 10000 });
+
+    // L'espion est posé APRÈS la connexion (la page ne navigue plus, un
+    // écouteur posé avant serait perdu au remplacement du document) et il
+    // écoute en phase de CAPTURE : ce qui est relevé est ce que le document
+    // voit passer, dans l'ordre, avant que React n'y réagisse.
+    await page.evaluate(() => {
+      window.__sequenceAppui = [];
+      for (const type of ['pointerdown', 'touchstart', 'pointerup', 'touchend', 'mousedown', 'mouseup', 'click']) {
+        document.addEventListener(type, () => window.__sequenceAppui.push(type), true);
+      }
+    });
+
+    await clocheMobile.tap();
+    // Le panneau est ouvert : le `click` de l'appui a donc été traité, la
+    // séquence est complète quand on la lit.
+    await expect(page.locator('[data-notification-panel]')).toHaveCount(1);
+    const sequence = await page.evaluate(() => window.__sequenceAppui.slice());
+
+    console.log(
+      `ℹ️  Séquence d'appui (${test.info().project.name}, 412×823 tactile) : ${sequence.join(' → ') || '(aucun événement)'}`
+    );
+
+    expect(
+      sequence,
+      `séquence d'appui du moteur ${test.info().project.name} : ${sequence.join(' → ') || '(aucun événement)'} — ` +
+        "le panneau se ferme sur `mousedown` et supprime sur `click` : sans les événements de " +
+        'compatibilité, dans cet ordre, l\'appui est perdu (panne historique). Relever la séquence ' +
+        'du moteur, puis décider : la corriger si le moteur est en tort, adapter le panneau sinon.'
+    ).toEqual(['pointerdown', 'touchstart', 'pointerup', 'touchend', 'mousedown', 'mouseup', 'click']);
+  });
 
   test("la cloche mobile ouvre le panneau unique, et la croix se laisse toucher", async ({ page }) => {
     await connexion(page, 'client@example.com');

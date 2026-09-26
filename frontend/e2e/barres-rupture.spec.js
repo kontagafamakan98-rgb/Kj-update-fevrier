@@ -35,20 +35,20 @@ import { MARQUEUR_DE_MONTAGE } from './helpers/geometrie.js';
  * et le CONTRÔLE DE LANGUE — et, en creux, la réponse à « combien d'instances
  * sont affichées à la fois ».
  *
- * ── Le CONTRÔLE DE LANGUE est indemne, et voici pourquoi plutôt que « on a regardé » ──
- * Il n'est monté QU'UNE fois : le seul `<LanguageSelector>` de `src/` est dans
- * la barre desktop, dont le sous-arbre est `hidden md:flex`. La barre mobile
- * publie, elle, un `<select id="mobile_language_selector">` DANS son menu, qui
- * n'existe que menu ouvert. Les deux dispositions ne peuvent donc pas peindre
- * deux contrôles à la fois — c'est le compte du cas 3, à trois états différents,
- * et c'est ce compte qui échouerait le jour où l'on ajouterait le second. Trois
- * autres raisons, lues dans la source : il ne pose AUCUN `id` (rien à dupliquer
- * dans le document), il ne pose aucun verrou global, et son écouteur d'appui
- * extérieur n'existe que tant que SA liste est ouverte (`e2e/appuis-exterieurs.spec.js`
- * prouve l'autre moitié : un seul appui suit sa cible). Une surface laissée
- * ouverte dans la barre masquée ne peut RIEN avaler : son sous-arbre entier est
- * `display:none`, donc ni peint ni captant — le nombre de contrôles affichés
- * tombe à zéro, et c'est encore le cas 3 qui le dit.
+ * ── LE MENU DE LANGUE EST PARTAGÉ, ET JAMAIS PEINT DEUX FOIS ────────────────
+ * Les deux barres montent le MÊME composant (`LanguageSelector`) : le tiroir
+ * mobile n'a plus de `<select>` à lui, donc un seul menu — mêmes libellés, même
+ * comportement d'appui extérieur — pour les deux dispositions. Elles ne peuvent
+ * pas pour autant peindre deux contrôles à la fois : le sous-arbre desktop est
+ * `hidden md:flex`, et celui du tiroir n'existe que menu ouvert (`md:hidden`).
+ * C'est le compte du cas 3, à trois états : mobile fermé 0, mobile ouvert 1,
+ * desktop 1. Le composant ne pose AUCUN `id` (rien à dupliquer dans le
+ * document), aucun verrou global, et son écouteur d'appui extérieur n'existe que
+ * tant que SA liste est ouverte (`e2e/appuis-exterieurs.spec.js` prouve l'autre
+ * moitié : un seul appui suit sa cible). Une surface laissée ouverte dans la
+ * barre masquée ne peut RIEN avaler : son sous-arbre entier est `display:none`,
+ * donc ni peint ni captant — le nombre de contrôles affichés tombe à zéro, et
+ * c'est encore le cas 3 qui le dit.
  *
  * ── La frontière jsdom / Chromium ───────────────────────────────────────────
  * jsdom ne calcule aucune mise en page : il ne verra jamais le défaut
@@ -89,24 +89,21 @@ const attendreLeMontage = async (page) => {
 /** Le menu mobile tel que le visiteur le voit : ouvert par un seul appui. */
 const ouvrirLeMenuMobile = async (page) => {
   await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
-  await expect(page.locator('#mobile_language_selector')).toBeVisible();
+  await expect(page.locator('#mobile_menu')).toBeVisible();
 };
 
 /**
- * Les contrôles de LANGUE affichés : celui de la barre du haut (un `<button>`
- * qui porte le nom de la langue courante) et celui du menu mobile (un
- * `<select>` natif). La question de l'instance dupliquée se répond par ce
- * compte : jamais deux à l'écran.
+ * Les contrôles de LANGUE AFFICHÉS : les deux barres montent le même composant,
+ * dont le déclencheur est un `<button>` portant le nom de la langue courante
+ * (« Français »). La question de l'instance dupliquée se répond par ce compte :
+ * jamais deux à l'écran, quelle que soit la disposition.
  */
 const controlesDeLangue = (page) =>
-  page.evaluate(() => {
-    const affiche = (el) => el.getClientRects().length > 0;
-    const barre = [...document.querySelectorAll('nav button')].filter(
-      (b) => b.textContent.includes('Français') && affiche(b)
-    ).length;
-    const select = [...document.querySelectorAll('#mobile_language_selector')].filter(affiche).length;
-    return { barre, select, total: barre + select };
-  });
+  page.evaluate(() =>
+    [...document.querySelectorAll('nav button')].filter(
+      (b) => b.textContent.includes('Français') && b.getClientRects().length > 0
+    ).length
+  );
 
 test.describe('les barres et le point de rupture', () => {
   test("le menu mobile se ferme quand sa barre cesse d'être affichée (et la page défile à nouveau)", async ({ page }) => {
@@ -160,7 +157,7 @@ test.describe('les barres et le point de rupture', () => {
     // `isMobileMenuOpen`, donc la commande doit être l'OUVERTURE, pas la
     // fermeture d'un tiroir que personne ne voit.
     await expect(page.getByRole('button', { name: 'Ouvrir le menu' })).toBeVisible();
-    await expect(page.locator('#mobile_language_selector')).toHaveCount(0);
+    await expect(page.locator('#mobile_menu')).toHaveCount(0);
     expect((await etatDeLaPage(page)).verrouDeDefilement).toBe('');
   });
 
@@ -175,14 +172,14 @@ test.describe('les barres et le point de rupture', () => {
     // Mobile fermé : la langue n'est atteignable qu'en ouvrant le menu — le
     // compte est donc 0, et le contrôle de la barre desktop ne doit pas être
     // affiché « en plus » (c'est la forme du doublon).
-    expect(await controlesDeLangue(page), 'menu fermé sur mobile').toEqual({ barre: 0, select: 0, total: 0 });
+    expect(await controlesDeLangue(page), 'menu fermé sur mobile').toBe(0);
 
     await ouvrirLeMenuMobile(page);
-    expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toEqual({ barre: 0, select: 1, total: 1 });
+    expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toBe(1);
 
     await page.setViewportSize(DESKTOP);
     await page.waitForTimeout(100);
-    expect(await controlesDeLangue(page), 'barre desktop').toEqual({ barre: 1, select: 0, total: 1 });
+    expect(await controlesDeLangue(page), 'barre desktop').toBe(1);
   });
 
   test("un menu de langue laissé ouvert dans la barre masquée ne peint plus rien et n'avale rien", async ({ page }) => {
@@ -194,15 +191,11 @@ test.describe('les barres et le point de rupture', () => {
     // rétrécissant : son état reste « ouvert » dans un conteneur `display:none`.
     await page.locator('nav button', { hasText: 'Français' }).first().click();
     await expect(page.getByRole('button', { name: /Wolof/ })).toBeVisible();
-    expect((await controlesDeLangue(page)).barre).toBeGreaterThan(1); // déclencheur + la liste
+    expect(await controlesDeLangue(page), 'déclencheur + la liste ouverte').toBeGreaterThan(1);
 
     await page.setViewportSize(MOBILE);
     await page.waitForTimeout(150);
-    expect(await controlesDeLangue(page), 'la barre masquée ne doit plus rien peindre').toEqual({
-      barre: 0,
-      select: 0,
-      total: 0,
-    });
+    expect(await controlesDeLangue(page), 'la barre masquée ne doit plus rien peindre').toBe(0);
 
     // L'appui suit sa cible au PREMIER geste (le menu de langue resté ouvert
     // ferme par effet de bord, sans rien capturer) et le tiroir s'ouvre. Ce
