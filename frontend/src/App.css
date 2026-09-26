@@ -244,16 +244,30 @@ a:focus {
    la hauteur d'une section non rendue et le document annonce une hauteur FAUSSE
    — avec un repli UNIFORME de 1 000 px, il passe de 7 079 à 10 119 px (+3 040),
    ce qui casse le défilement et tout repère de position. Les tailles ci-dessous
-   sont donc EXACTES : la hauteur de CONTENU mesurée de chaque section (hauteur
-   rendue moins les 96 px de `py-12` en mobile, 128 px de `py-16` en desktop),
-   section par section. Le document mesure alors de nouveau 7 079 px (mobile) et
-   4 782 px (desktop), exactement comme sans la règle.
+   sont donc EXACTES SUR LE POSTE DE MESURE : la hauteur de CONTENU mesurée de
+   chaque section (hauteur rendue moins les 96 px de `py-12` en mobile, 128 px de
+   `py-16` en desktop), section par section. Le document mesure alors de nouveau
+   7 079 px (mobile) et 4 782 px (desktop), comme sans la règle — sur cet hôte-là
+   (ce qui se passe sur un autre hôte est mesuré juste en dessous).
 
    POURQUOI PAR SECTION : les hauteurs de contenu vont de 216 à 866 px — un repli
-   unique se trompe de plusieurs centaines de px sur chacune. Ce sont des valeurs
-   du POSTE de mesure (polices incluses) ; elles sont VÉRIFIÉES, section par
-   section, par la sonde `e2e/style-layout-document.spec.js`, qui refuse qu'elles
-   dérivent.
+   unique se trompe de plusieurs centaines de px sur chacune.
+
+   CE SONT DES VALEURS D'UN POSTE, ET C'EST ASSUMÉ (mesuré le 26/09/2026) : la
+   hauteur d'un bloc de texte suit les POLICES de l'hôte, et le nombre de lignes
+   repliées n'est pas connaissable avant la mise en page. Sous une police
+   étrangère (Verdana, sonde d'atelier `_sonde-carte-police.spec.js`), le
+   document gagne de la hauteur au moment où les sections se posent et le bloc de
+   carte se déplace de 99,1 px (1350×940) / 135,3 px (412×823) ; sur le runner
+   Linux de la CI, de 25,5 px (run 36254013043). AUCUNE constante CSS ne peut
+   fermer cet écart — c'est le prix du levier, et il est PUBLIÉ par les sondes
+   plutôt que caché. Ce qui est VÉRIFIÉ, c'est la STRUCTURE que la coquille doit
+   garder : les nœuds et la hauteur du document, à 20 % près (`BORNE_STRUCTURE`),
+   par `e2e/style-layout-document.spec.js`, et la position du bloc de carte dans
+   une mise en page POSÉE (`e2e/carte-accueil.spec.js`, qui amène le bloc dans la
+   vue avant de mesurer l'appui). Un repli OUBLIÉ, lui, n'est pas un écart de
+   quelques dizaines de px : c'est un document qui s'effondre de 3 040 px sur le
+   repli uniforme, et cette sonde-là le refuse.
 
    LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : il est
    peint au premier écran, donc jamais « différé » — mesuré, la règle ne change

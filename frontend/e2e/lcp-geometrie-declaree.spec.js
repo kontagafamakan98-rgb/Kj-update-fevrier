@@ -36,11 +36,41 @@ import { PAGE_SECTIONS } from '../src/config/page-sections.js';
  * Même sonde, navigation RÉELLE : l'élément élu y est un paragraphe SECONDAIRE
  * (ligne légale, notice d'étape, sous-titres), mesuré sur 412×823 et 1350×940 :
  * /login (10 848 / 12 448 px²), /register (10 048 / 12 544), /forgot-password
- * (14 001 / 16 458) et /support (16 468 / 9 324). Les planchers déclarés
- * ci-dessous sont la PLUS PETITE des deux tailles mesurées, diminuée d'un cran.
+ * (14 001 / 16 458) et /support (16 468 / 9 324).
  * (La notice d'étape de /register est passée de 10 560 à 10 048 px² mobile le
  * 26/09/2026 : son ⚠️ emoji est devenu un SVG, et la ligne se replie un cran
  * plus bas — même élément élu, aire légèrement plus petite.)
+ *
+ * ── POURQUOI LES PLANCHERS ONT ÉTÉ RECALIBRÉS (26/09/2026) ─────────────────
+ * L'aire de l'ENCRE d'un texte n'est pas portable : elle suit les polices de
+ * l'hôte. Le MÊME document, mêmes classes, même élément élu, mesuré sur le
+ * runner Linux de la CI (run 36254013043, Chrome 152) : /jobs 35 055 / 30 874,
+ * /about 73 340 / 78 208, /privacy 83 058 / 83 400, /how-it-works 27 056 /
+ * 30 240, /login 10 290 / 12 120, /register 9 796 / 12 183, /forgot-password
+ * 13 104 / 15 336 et /support 15 120 / 7 616 — jusqu'à −18 % de ce poste-ci,
+ * alors que la BOÎTE de l'élément, elle, ne bouge pas (16 380 px² pour le
+ * sous-titre de /support des deux côtés : c'est l'encre qui change, pas le
+ * cadre). Des planchers calés à 1 ou 3 % sous le relevé d'UN SEUL hôte
+ * (/forgot-password mobile : 13 000 pour 13 104 mesurés ici ; /support desktop :
+ * 9 000 pour 7 616 là-bas) ne bornaient donc pas la page, ils bornaient la
+ * MACHINE — la leçon que la sonde du document a déjà apprise sur le temps (une
+ * borne en millisecondes borne la machine, pas une régression).
+ *
+ * Chaque plancher vaut désormais ≈ 70 % de la PLUS PETITE des quatre mesures
+ * connues (deux tailles × deux hôtes) ; les quatre mesures de chaque route sont
+ * en commentaire de sa ligne.
+ *
+ * CE QUE CE PLANCHER EST, ET CE QU'IL N'EST PAS (mesuré le 26/09/2026) : une
+ * borne de SANITY, pas le discriminateur de l'identité. Sonde d'atelier
+ * (`_sonde-plancher.spec.js` : feuille injectée dans le <head> servi, avant le
+ * premier paint) — quand l'élément DÉCLARÉ est rendu minuscule, le plus grand
+ * texte qui reste vaut encore 12 285 px² (/support mobile), 9 025 (/support
+ * desktop) et 11 480 (/forgot-password) : aucun plancher ne peut donc trancher
+ * « le bloc déclaré est là » de « un autre texte a pris sa place ». Ce qui
+ * tranche, c'est l'IDENTITÉ ci-dessous — l'élément élu doit porter l'ensemble de
+ * classes du plan — et `e2e/lcp-geometrie.spec.js` (une seule candidate, de la
+ * géométrie de la coquille). Le plancher, lui, refuse un premier paint vidé de
+ * sa matière : c'est pour ça qu'il peut être bas sans être un faux vert.
  *
  * UNE SEULE candidate dans les deux canaux, au premier paint, d'aire IDENTIQUE :
  * la peinture de la coquille reste celle que Chrome retient, et rien du
@@ -49,19 +79,22 @@ import { PAGE_SECTIONS } from '../src/config/page-sections.js';
  * `elementRenderDelay` de 1156 à 2345 ms, score desktop 92 au lieu de 100).
  */
 const ROUTES_DECLAREES = [
-  { route: '/jobs', champ: 'introClass', plancher: 30000 },
-  { route: '/about', champ: 'introClass', plancher: 60000 },
+  // Plancher ≈ 0,7 × la plus petite des quatre mesures ; relevés en commentaire
+  // dans l'ordre « ce poste (mobile / desktop) · runner de la CI (mobile /
+  // desktop) », en px².
+  { route: '/jobs', champ: 'introClass', plancher: 21000 }, // 35 640 / 36 002 · 35 055 / 30 874
+  { route: '/about', champ: 'introClass', plancher: 51000 }, // 74 466 / 80 262 · 73 340 / 78 208
   // Sur cette page, le plus grand texte peint est un CORPS de section : c'est
   // `sectionBodyClass` qui porte l'élément élu, pas l'introduction.
-  { route: '/privacy', champ: 'sectionBodyClass', plancher: 70000 },
-  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 25000 },
+  { route: '/privacy', champ: 'sectionBodyClass', plancher: 58000 }, // 84 360 / 86 676 · 83 058 / 83 400
+  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 30 320 / 32 656 · 27 056 / 30 240
   // Le plus grand texte peint de ces quatre pages est un paragraphe secondaire,
   // pas le titre : ligne légale de /login, notice d'étape de /register,
   // sous-titres de /forgot-password et de /support (voir la mesure en tête).
-  { route: '/login', champ: 'legalContactClass', plancher: 10000 },
-  { route: '/register', champ: 'stepNoticeClass', plancher: 9000 },
-  { route: '/forgot-password', champ: 'subtitleClass', plancher: 13000 },
-  { route: '/support', champ: 'subtitleClass', plancher: 9000 },
+  { route: '/login', champ: 'legalContactClass', plancher: 7000 }, // 10 848 / 12 448 · 10 290 / 12 120
+  { route: '/register', champ: 'stepNoticeClass', plancher: 6800 }, // 10 048 / 12 544 · 9 796 / 12 183
+  { route: '/forgot-password', champ: 'subtitleClass', plancher: 9000 }, // 14 001 / 16 458 · 13 104 / 15 336
+  { route: '/support', champ: 'subtitleClass', plancher: 5300 }, // 16 468 / 9 324 · 15 120 / 7 616
 ];
 
 /**
@@ -157,7 +190,7 @@ test.describe('Parcours E2E — le LCP déclaré de chaque route reste la peintu
           expect(
             candidate.taille,
             `${route} (${taille}) : l'élément LCP déclaré est trop petit pour être le plus grand texte peint `
-              + `(${candidate.taille} px² pour un plancher mesuré de ${plancher}) — la page n'a plus de bloc `
+              + `(${candidate.taille} px² pour un plancher de ${plancher}) — la page n'a plus de bloc `
               + 'assez grand au premier paint, et le plus grand texte devient celui d\'un état asynchrone'
           ).toBeGreaterThan(plancher);
 

@@ -43,6 +43,18 @@ import fr from '../src/i18n/fr.json' with { type: 'json' };
  *      doivent au pixel, et c'est ce qui empêche l'appui de créer un décalage
  *      (la sonde CLS, `e2e/cls-coquille-react.spec.js`, le mesurerait).
  *
+ *      ── Ce relevé se prend APRÈS avoir amené le bloc dans la vue ────────
+ *      L'accueil diffère la mise en page de ses neuf sections basses
+ *      (`content-visibility: auto` + une hauteur de repli par section,
+ *      src/App.css) : au chargement, le bas du document est mis en page avec
+ *      des CONSTANTES mesurées sur un poste, et il se pose à une autre hauteur
+ *      dès qu'on y descend. Ce décalage est le prix du levier, il dépend de
+ *      l'hôte (polices) et il est PUBLIÉ par le parcours ; il n'est pas celui
+ *      de l'appui. Amener le bloc dans la vue avant de mesurer met les deux
+ *      relevés dans la même mise en page — sans quoi ce parcours comparerait
+ *      « sections non posées » à « sections posées » et nommerait l'appui pour
+ *      un décalage qui n'est pas le sien (mesuré sur la CI : +25,5 px).
+ *
  * ── Ce qui est intercepté, et pourquoi ────────────────────────────────────
  * La requête vers Google Maps est REMPLACÉE (une réponse minimale de la sonde)
  * dès qu'elle part : ce qui est prouvé est qu'elle PART au bon moment, pas que
@@ -151,6 +163,30 @@ test.describe('Parcours E2E — la carte de l’accueil ne part qu’à l’appu
         ).toHaveCount(1);
         expect(await controle.getAttribute('href')).toBe(CONTACT.mapsUrl);
         const cadre = controle.locator('xpath=..');
+        const boiteAuChargement = await cadre.evaluate(BOITE_EN_DOCUMENT);
+        expect(boiteAuChargement.hauteur, 'le contrôle n’a pas de hauteur : il n’est pas peint').toBeGreaterThan(0);
+
+        // ── LA MISE EN PAGE DIFFÉRÉE EST POSÉE AVANT DE MESURER L'APPUI ────
+        // Les neuf sections sous la ligne de flottaison de l'accueil sont en
+        // `content-visibility: auto` avec une hauteur de repli PAR SECTION
+        // (src/App.css) : tant qu'elles ne sont pas rendues, le document est mis
+        // en page avec des CONSTANTES de contenu mesurées sur un poste. Sur un
+        // autre hôte — autres polices, donc un autre nombre de lignes repliées —
+        // ces sections se posent à une autre hauteur, et TOUT ce qui suit se
+        // déplace : mesuré le 26/09/2026 sous une police étrangère (Verdana,
+        // sonde d'atelier `_sonde-carte-police.spec.js`), le bloc de carte bouge
+        // de 99,1 px (desktop) / 135,3 px (mobile) au moment où les sections se
+        // posent ; sur le runner Linux de la CI, de 25,5 px.
+        //
+        // Ce décalage-là n'est PAS celui de l'appui : c'est le prix, documenté
+        // et publié ci-dessous, du levier de mise en page différée. La propriété
+        // mesurée ici est l'APPUI — « le bloc ne bouge pas en devenant une carte »
+        // — et pour la mesurer il faut deux relevés pris dans la MÊME mise en
+        // page. On amène donc le bloc dans la vue avant de mesurer, comme le fait
+        // tout visiteur qui appuie dessus, et on attend que la mise en page ne
+        // bouge plus.
+        await cadre.scrollIntoViewIfNeeded();
+        await attendreLaStabilite(page);
         const boiteAvant = await cadre.evaluate(BOITE_EN_DOCUMENT);
         expect(boiteAvant.hauteur, 'le contrôle n’a pas de hauteur : il n’est pas peint').toBeGreaterThan(0);
 
@@ -208,7 +244,9 @@ test.describe('Parcours E2E — la carte de l’accueil ne part qu’à l’appu
             `l’appui, 0 de carte ; à l’appui, iframe ${boiteApres.largeur.toFixed(0)}×${boiteApres.hauteur.toFixed(0)} px ` +
             `au document y=${boiteApres.hautDocument.toFixed(1)} — identique au contrôle ` +
             `(${boiteAvant.largeur.toFixed(0)}×${boiteAvant.hauteur.toFixed(0)} à y=${boiteAvant.hautDocument.toFixed(1)}) ` +
-            `· ${requetesDeCarte} requête(s) de carte partie(s) après l’appui`
+            `· ${requetesDeCarte} requête(s) de carte partie(s) après l’appui · mise en page différée posée AVANT ` +
+            `l’appui : ${(boiteAvant.hautDocument - boiteAuChargement.hautDocument).toFixed(1)} px de décalage au ` +
+            'chargement (constantes de src/App.css contre les polices de cet hôte — publié, pas jugé)'
         );
       } finally {
         await page.close();

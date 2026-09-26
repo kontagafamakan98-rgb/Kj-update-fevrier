@@ -257,6 +257,12 @@ export const PAGE_SECTIONS = {
     //   /register          notice d'étape (`stepNoticeClass`)   10 048 / 12 544
     //   /forgot-password   sous-titre (`subtitleClass`)         14 001 / 16 458
     //   /support           sous-titre (`subtitleClass`)         16 468 / 9 324
+    // L'AIRE DE L'ENCRE SUIT LES POLICES DE L'HÔTE, pas la déclaration : la
+    // même page sur le runner Linux de la CI (26/09/2026) donne 10 290 / 12 120
+    // (/login), 9 796 / 12 183 (/register), 13 104 / 15 336 (/forgot-password)
+    // et 15 120 / 7 616 (/support), à boîte d'élément identique — jusqu'à −18 %.
+    // Les planchers de `e2e/lcp-geometrie-declaree.spec.js` sont calés sur la
+    // plus petite des quatre mesures, jamais sur un seul poste.
     // La chaîne était recopiée face à face dans src/pages/Login.js et
     // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
     // faisait diverger les deux peintures en silence, et une seconde peinture
@@ -395,7 +401,8 @@ export const PAGE_SECTIONS = {
     titleKey: 'support',
     subtitleKey: 'supportSubtitle',
     // Le sous-titre est l'élément LCP de la page (mesuré : 16 468 px² mobile /
-    // 9 324 desktop, UNE candidate au premier paint) — voir /login. La chaîne
+    // 9 324 desktop ici, 15 120 / 7 616 sur le runner Linux de la CI — même
+    // élément, encre −18 %, voir /login) — UNE candidate au premier paint. La chaîne
     // est courte (`text-gray-600`) mais elle n'apparaît plus ailleurs dans
     // Support.js ni dans le corps de sa coquille : elle a bien un propriétaire
     // unique.
