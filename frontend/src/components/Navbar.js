@@ -5,11 +5,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { isPWA } from '../utils/pwa';
 import LanguageSelector from './LanguageSelector';
 import NotificationBell from './NotificationBell';
-import { LANGUAGES } from '../config/languages';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
-  const { t, changeLanguage, currentLanguage } = useLanguage();
+  const { t } = useLanguage();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const navigate = useNavigate();
@@ -199,30 +198,24 @@ export default function Navbar() {
       {isMobileMenuOpen && (
         <>
           <button type="button" aria-label={t('closeMenu')} className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={closeMobileMenu} />
-          <div ref={menuRef} className="relative z-50 md:hidden border-t border-gray-200 bg-white shadow-xl">
+          <div ref={menuRef} id="mobile_menu" className="relative z-50 md:hidden border-t border-gray-200 bg-white shadow-xl">
             <div className="max-h-[calc(100vh-4rem)] overflow-y-auto px-3 pt-3 pb-6 space-y-2">
               <div className="rounded-2xl border border-gray-200 px-3 py-3">
-                <label htmlFor="mobile_language_selector" className="block text-xs font-medium text-gray-500 mb-2">{t('languageLabel')}</label>
-                <select
-                  id="mobile_language_selector"
-                  name="mobile_language_selector"
-                  autoComplete="off"
-                  value={currentLanguage}
-                  onChange={(e) => changeLanguage(e.target.value)}
-                  className="w-full min-h-[44px] text-sm border border-gray-300 rounded-xl px-3 py-2 bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                >
-                  {/* Les options viennent du propriétaire unique de la liste
-                      (`src/config/languages`), le MÊME que celui du menu de la
-                      barre du haut : cinq `<option>` écrits ici en dur
-                      faisaient de la liste un fait à deux endroits, dont un
-                      seul était vivant — une langue ajoutée au menu de la
-                      barre du haut n'arrivait jamais dans ce tiroir. */}
-                  {LANGUAGES.map((langue) => (
-                    <option key={langue.code} value={langue.code}>
-                      {langue.name}
-                    </option>
-                  ))}
-                </select>
+                {/* Le tiroir mobile ne porte PLUS son propre sélecteur : il monte
+                    le MÊME composant que la barre du haut (`LanguageSelector`),
+                    donc le même menu, la même liste et le même comportement
+                    d'appui extérieur. Un `<select>` natif d'un côté et un menu
+                    déroulant de l'autre donnaient deux contrôles de formes
+                    différentes pour un seul choix, et la liste du `<select>` a
+                    été un fait à deux endroits jusqu'à son unification dans
+                    `src/config/languages.js`. */}
+                <span className="block text-xs font-medium text-gray-500 mb-2">{t('languageLabel')}</span>
+                <LanguageSelector
+                  showDropdown={true}
+                  showFlags={true}
+                  className="w-full"
+                  buttonClassName="w-full min-h-[44px]"
+                />
               </div>
 
               {user ? (
