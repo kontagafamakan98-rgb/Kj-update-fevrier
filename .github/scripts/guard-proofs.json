@@ -164,6 +164,23 @@
       "runner": "vitest"
     },
     {
+      "chemin": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "runner": "vitest",
+      "motif": "fermeture de la classe de bug du panneau de notifications : détecte et refuse tout composant à état partagé (useContext, useNotifications, etc.) dont un écouteur global (document/window) dépend d'une référence locale d'instance (ref.current) pour déclencher une action partagée, provoquant le démontage ou l'écrasement intempestif en cas d'instances multiples"
+    },
+    {
+      "chemin": "frontend/scripts/composants-etat-partage-ecouteurs.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (analyse AST Babel des déclarations de refs locales, setters locaux, hooks d'état partagé et écouteurs d'événements globaux) : le garde prononce le verdict, ce module fournit l'analyse statique et le comptage des montages",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (cible = garde) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (détection du cas bugué historique, tolérance de l'état local, tolérance de l'ancrage partagé), et les mutations portent sur le garde"
+    },
+    {
       "chemin": "frontend/scripts/check-test-environment.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -2171,6 +2188,46 @@
       "attend": [
         "le plancher est DÉRIVÉ de la structure — jamais la structure elle-même",
         "la mutation qui doit franchir la borne la franchit VRAIMENT (mesurée)"
+      ]
+    },
+    {
+      "id": "composants-etat-partage: detection neutralisee (le composant bugue passerait)",
+      "garde": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "cible": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "trouve": "  if (resultats.length > 0) {",
+      "remplace": "  if (false && resultats.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme le fichier et l’action sur un composant bugué"
+      ]
+    },
+    {
+      "id": "composants-etat-partage: plancher neutralise (un repertoire vide passerait)",
+      "garde": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "cible": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "trouve": "  if (fichiersLus < MIN_FICHIERS_LUS) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse de juger si le nombre de fichiers est sous le plancher (< MIN_FICHIERS_LUS)"
       ]
     }
   ]

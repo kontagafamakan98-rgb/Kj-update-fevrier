@@ -692,6 +692,12 @@ jobs:
         working-directory: frontend
         run: node scripts/check-git-branches.js
 
+      # Fermeture de la classe de bug du panneau de notifications : détecte et refuse
+      # tout composant à état partagé dont un écouteur global dépend d'une ref locale.
+      - name: Check no shared-state component listener depends on local ref
+        working-directory: frontend
+        run: node scripts/check-composants-etat-partage-ecouteurs.js
+
       # Même harnais que dans backend-tests, runner Node (Vitest) : les mutations
       # des gardes frontend sont rejouées ici, seul job qui a `node_modules`.
       # Aucun `working-directory` : le harnais résout la racine du dépôt depuis
