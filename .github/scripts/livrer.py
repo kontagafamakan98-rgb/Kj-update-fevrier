@@ -172,7 +172,13 @@ def verifier_prevol_local():
 def pousser_branche(branche: str, jeton: str, max_tentatives: int = 3):
     log(f"Push de la branche '{branche}' vers origin (sans persister le jeton)...")
     url_distante = f"https://x-access-token:{jeton}@github.com/{REPO_OWNER}/{REPO_NAME}.git"
-    env_git = {"GIT_TERMINAL_PROMPT": "0"}
+    # HÉRITER de l'environnement, puis poser le drapeau : un `env=` qui ne contient
+    # QUE cette variable prive le git enfant de PATH, HOME, SystemRoot, etc. Sous
+    # Windows/MSYS, la résolution DNS du sous-processus échoue alors par un
+    # « Could not resolve host: github.com » — le push refusait avant même de partir.
+    # C'est le motif déjà en place dans `exec_cmd` (copie de os.environ puis ajout).
+    env_git = os.environ.copy()
+    env_git["GIT_TERMINAL_PROMPT"] = "0"
     cmd = ["git", "-c", "credential.helper=", "push", "-u", url_distante, branche]
     try:
         succes = False
