@@ -116,7 +116,19 @@ export function CountrySelect({
     });
   }, [countries, searchTerm, t]);
 
+  // Fermer en appuyant dehors : un écouteur sur `document` — jamais une surface
+  // plein écran, qui capturerait l'appui au lieu de le laisser atteindre sa
+  // cible — et SEULEMENT tant que la liste est ouverte (elle seule a quelque
+  // chose à fermer). Enregistré en permanence (`[]`), il faisait tourner ce
+  // contrôle à CHAQUE appui de la page sur /register et /profile, où le
+  // composant est monté, pour ne jamais rien fermer : la condition d'entrée
+  // donnait déjà le comportement voulu, elle ne dispensait pas du travail.
+  // « Dedans » se lit sur le conteneur du composant, donc l'appui sur le
+  // déclencheur ou dans la liste ne ferme pas ici — le `click` qui suit le
+  // ROUVRIRAIT ou n'atteindrait plus son option.
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleOutsideClick = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
         setIsOpen(false);
@@ -130,7 +142,7 @@ export function CountrySelect({
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
     };
-  }, []);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {

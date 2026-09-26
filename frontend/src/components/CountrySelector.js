@@ -19,7 +19,19 @@ export default function CountrySelector({ className = '' }) {
 
   const current = COUNTRIES.find(c => c.id === currentCountry) || COUNTRIES[0];
 
-  // Fermer en cliquant dehors
+  // Fermer en appuyant dehors — par un écouteur sur `document`, et par LUI SEUL.
+  //
+  // Une surface plein écran (`fixed inset-0 z-10`) faisait le même travail, et
+  // elle CAPTURAIT l'appui : tant que le menu était ouvert, le premier appui sur
+  // la page — un filtre, une bascule liste/carte, une carte de mission —
+  // n'atteignait pas sa cible, il ne fermait le menu que pour lui-même. Même
+  // défaut de fond que le panneau de notifications : un appui visant une
+  // commande doit atteindre cette commande. Un écouteur ne capture rien :
+  // l'appui poursuit vers sa cible, et le menu se ferme par effet de bord — le
+  // comportement d'un menu natif du navigateur. « Dedans » se lit sur le
+  // conteneur du composant (le déclencheur et la liste y sont tous deux), donc
+  // un appui sur le déclencheur ne ferme pas ici : le `click` qui suit le
+  // ROUVRIRAIT (c'est le second défaut que cette lecture évite).
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e) => {
@@ -78,29 +90,26 @@ export default function CountrySelector({ className = '' }) {
 
       {/* Dropdown — même structure que LanguageSelector */}
       {isOpen && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-            <div className="py-1">
-              {COUNTRIES.map((country) => (
-                <button
-                  key={country.id}
-                  onClick={() => handleSelect(country.id)}
-                  className={`
-                    w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-3
-                    ${currentCountry === country.id ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}
-                  `}
-                >
-                  <FlagIcon country={country.id} className="w-5 h-4" showEmoji={false} />
-                  <span className="font-medium">{country.name}</span>
-                  {currentCountry === country.id && (
-                    <span className="ml-auto text-orange-600">✓</span>
-                  )}
-                </button>
-              ))}
-            </div>
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+          <div className="py-1">
+            {COUNTRIES.map((country) => (
+              <button
+                key={country.id}
+                onClick={() => handleSelect(country.id)}
+                className={`
+                  w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center space-x-3
+                  ${currentCountry === country.id ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}
+                `}
+              >
+                <FlagIcon country={country.id} className="w-5 h-4" showEmoji={false} />
+                <span className="font-medium">{country.name}</span>
+                {currentCountry === country.id && (
+                  <span className="ml-auto text-orange-600">✓</span>
+                )}
+              </button>
+            ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

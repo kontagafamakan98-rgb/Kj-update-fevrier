@@ -31,6 +31,36 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // laissait autrefois la coquille derrière, en silence.
   const homePlan = pageSections['/']
 
+  // Le titre du héros, son sous-titre et leurs CLASSES DE GÉOMÉTRIE sortent du
+  // plan (src/config/page-sections.js) : la coquille les lisait en littéral,
+  // donc le texte que le premier paint publie et l'élément LCP que React
+  // reconstruit pouvaient diverger — de texte comme de taille — sans que rien
+  // ne rougisse. Même classes d'un côté et de l'autre : mesuré, un
+  // remplacement de même taille ne ré-élit pas d'élément LCP (la peinture de la
+  // coquille reste celle du navigateur), un remplacement plus grand si.
+  const { titleKey, subtitleKey, heroTitleClass, heroSubtitleClass } = homePlan
+  if (!titleKey || !subtitleKey || !heroTitleClass || !heroSubtitleClass) {
+    throw new Error(
+      "prerender-shells : / ne déclare plus son héros (titleKey, subtitleKey, heroTitleClass, " +
+        "heroSubtitleClass dans src/config/page-sections.js) — la coquille de l'accueil ne peut pas " +
+        "le publier, et l'élément LCP de « / » repasserait au JavaScript."
+    )
+  }
+
+  // La façade de la carte du bloc de contact est déclarée UNE fois, par
+  // /contact (`mapFrameClass` / `mapControlClass` / `mapButtonKey` /
+  // `mapIconKey`) : la coquille de l'accueil la recopiait en littéral, donc
+  // rétrécir ou déplacer la boîte d'un côté faisait sauter le bloc au montage
+  // de React (CLS), et une coquille vidée de son contrôle ne rougissait
+  // nulle part. Une déclaration disparue de /contact CASSE le build ici.
+  const { mapButtonKey, mapIconKey, mapFrameClass, mapControlClass } = pageSections['/contact']
+  if (!mapButtonKey || !mapIconKey || !mapFrameClass || !mapControlClass) {
+    throw new Error(
+      "prerender-shells : /contact ne déclare plus sa carte (mapButtonKey, mapIconKey, mapFrameClass, " +
+        "mapControlClass dans src/config/page-sections.js) — le bloc de contact de l'accueil publie la même façade."
+    )
+  }
+
   // Les quatre moyens de contact du bloc ci-dessous sont déclarés UNE fois,
   // par /contact (`actions` de src/config/page-sections.js) — la même
   // déclaration que lit src/pages/Contact.js. Ce bloc lisait leurs glyphes en
@@ -39,8 +69,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // (le libellé de l'accueil dit « Appeler le support », celui de /contact dit
   // « Appeler ») et une ligne disparue de /contact CASSE le build au lieu de
   // peindre une pastille vide sans que personne ne le voie.
+  const contactPlan = pageSections['/contact']
   const glypheDeContact = (labelKey) => {
-    const action = pageSections['/contact'].actions.find((a) => a.labelKey === labelKey)
+    const action = contactPlan.actions.find((a) => a.labelKey === labelKey)
     if (!action) {
       throw new Error(
         `prerender-shells : /contact ne déclare plus la ligne « ${labelKey} » ` +
@@ -51,9 +82,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   }
 
   return [
-    // Placeholder navbar (hauteur réelle) — comme les shells /jobs et
-    // /login : le marqueur visuel est en place dès le premier paint.
-    `<div class="h-16 bg-white border-b border-gray-200"></div>`,
+    // La navbar et les conteneurs de l'app (`.App`, `.min-h-screen`,
+    // `main.flex-1`) viennent de chromeDePage() : le corps commence ici.
     `<div class="min-h-screen">`,
 
     // Hero : le h1 est l'élément LCP de l'accueil.
@@ -64,8 +94,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<span aria-hidden="true">${esc(T('iconEscrow'))}</span>`,
     `${esc(T('escrowBannerTitle'))}`,
     `</span>`,
-    `<h1 class="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto">${esc(T('heroTitle'))}</h1>`,
-    `<p class="text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto">${esc(T('heroSubtitle'))}</p>`,
+    `<h1 class="${heroTitleClass}">${esc(T(titleKey))}</h1>`,
+    `<p class="${heroSubtitleClass}">${esc(T(subtitleKey))}</p>`,
     `<div class="flex flex-col sm:flex-row gap-4 justify-center items-center">`,
     `<a href="/register" class="w-full sm:w-auto bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-semibold text-lg shadow-xl transform transition hover:-translate-y-0.5">${esc(T('getStarted'))}</a>`,
     `<a href="/jobs" class="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold text-lg transition">${esc(T('viewJobs'))}</a>`,
@@ -228,7 +258,16 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // Contact (N.A.P. + liens cliquables) : section réelle, pas un
     // bloc caché — elle est aussi dans le footer React, donc elle
     // survit au montage.
-    `<section class="py-12 md:py-16 bg-white">`,
+    //
+    // `border-t border-gray-100` : la classe EXACTE de Home.js. Le `border-t`
+    // vaut 1 px, et c'est 1 px de trop peu dans une page mise en boîte
+    // (border-box) : sans lui, TOUT ce qui suit cette section était 1 px trop
+    // haut dans la coquille (mesuré par la sonde de géométrie sur / et /contact
+    // avant correction : le titre de la section « Nous contacter » à
+    // y=5948,69 côté coquille contre 5949,69 côté React, puis les 60 textes
+    // suivants au même écart). Une classe d'un seul token suffisait à décaler
+    // la moitié basse de la page.
+    `<section class="py-12 md:py-16 bg-white border-t border-gray-100">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="text-center mb-12">`,
     `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('contactTitle'))}</h2>`,
@@ -272,39 +311,31 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
           `</div>`,
         ]
       : []),
-    // Carte intégrée (SEO local). loading=lazy : l'iframe ne concurrence
-    // pas le LCP, et pour un utilisateur avec JavaScript elle est
-    // remplacée par React avant même de se charger.
-    `<iframe src="${esc(contact.mapsEmbedUrl)}" title="${esc(T('mapIframeTitle').replace('{address}', contact.address))}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" class="mt-8 w-full rounded-xl border border-gray-200" style="height:320px;border:0;"></iframe>`,
+    // La carte : un CONTRÔLE, pas un embed au premier écran — le MÊME que
+    // /contact, lu dans la MÊME déclaration (mapButtonKey / mapIconKey /
+    // mapFrameClass / mapControlClass de src/config/page-sections.js). La
+    // coquille publiait l'iframe `output=embed` elle-même, en `loading="lazy"`
+    // — et cela n'a rien empêché : mesuré (Lighthouse 12.6.1, pile de la CI,
+    // Chrome 152), le navigateur charge une iframe dès qu'elle approche du
+    // viewport, et sur desktop elle y est déjà. Le contrôle est un lien réel
+    // vers la fiche Google (il fonctionne sans JavaScript, et c'est lui qu'un
+    // audit « Google Business Profile » cherche), que React transforme en carte
+    // intégrée à l'appui. Les deux canaux publiant les mêmes classes, la
+    // bascule coquille → React ne déplace rien.
+    `<div class="${contactPlan.mapFrameClass}">`,
+    `<span class="text-2xl" aria-hidden="true">${esc(T(contactPlan.mapIconKey))}</span>`,
+    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" title="${esc(T('mapIframeTitle').replace('{address}', contact.address))}" class="${contactPlan.mapControlClass}">${esc(T(contactPlan.mapButtonKey))}</a>`,
+    `</div>`,
     `</div>`,
     `</section>`,
     `</div>`,
 
-    // Pied de page (mêmes liens que le footer React : légaux, contact,
-    // supports sociaux déclarés).
-    `<footer class="border-t border-orange-100 bg-white/95 backdrop-blur-sm">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-3">`,
-    `<address class="not-italic flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs text-gray-600">`,
-    `<span>${esc(contact.address)}</span>`,
-    `<a href="tel:${esc(contact.phone)}" class="hover:text-orange-700 underline underline-offset-2">${esc(contact.phoneDisplay)}</a>`,
-    `<a href="mailto:${esc(contact.email)}" class="hover:text-orange-700 underline underline-offset-2 break-all">${esc(contact.email)}</a>`,
-    `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="hover:text-orange-700 underline underline-offset-2">${esc(T('contactWhatsapp'))}</a>`,
-    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="hover:text-orange-700 underline underline-offset-2">${esc(T('footerItinerary'))}</a>`,
-    `</address>`,
-    `<div class="flex flex-wrap items-center justify-center md:justify-end gap-4 text-sm text-orange-700">`,
-    // Les trois pages de confiance, liées depuis le corps de page :
-    // c'est par ces liens qu'un crawler sans JavaScript les DÉCOUVRE.
-    `<a href="/about" class="hover:text-orange-800 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`,
-    `<a href="/contact" class="hover:text-orange-800 underline underline-offset-2">${esc(T('contactTitle'))}</a>`,
-    `<a href="/privacy" class="hover:text-orange-800 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`,
-    `<a href="/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx" target="_blank" rel="noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerTerms'))}</a>`,
-    ...socialLinks.map(
-      (social) =>
-        `<a href="${esc(social.url)}" target="_blank" rel="me noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(social.label)}</a>`
-    ),
-    `</div>`,
-    `</div>`,
-    `</footer>`,
+    // Le PIED DE PAGE n'est PAS ici : il appartient au CHROME de
+    // l'application (`piedDePage` d'app-chrome.js), qui le publie après
+    // `</main>` pour toutes les routes — l'endroit exact où React le rend.
+    // Écrit ici, il vivait DANS `main`, donc au-dessus du `pb-24` mobile :
+    // mesuré à 412×823, ses liens étaient 97 px trop haut et son rang de
+    // liens se répartissait autrement que celui de React.
   ].join('')
 }
 

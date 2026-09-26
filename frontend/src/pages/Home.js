@@ -12,6 +12,7 @@ import { safeLog } from '../utils/env';
 // pré-rendue. Ce composant en DÉRIVE au lieu de tenir sa propre liste.
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from '../config/contact';
+import MapEmbed from '../components/MapEmbed';
 
 export default function Home() {
   const { t } = useLanguage();
@@ -36,7 +37,36 @@ export default function Home() {
   // sans JavaScript, et rien ne rougissait. `labelKey` est aussi le code de
   // catégorie canonique du backend (kojo_routers_jobs.py) : le libellé affiché
   // et le filtre de /jobs sortent de la même valeur.
-  const { categories, promises, steps, stats: STATS, escrowIconKey } = PAGE_SECTIONS['/'];
+  const {
+    categories, promises, steps, stats: STATS, escrowIconKey,
+    // Le héros : même clé i18n et mêmes classes que la coquille pré-rendue
+    // (src/config/page-sections.js). Le titre de ce héros est l'élément LCP de
+    // « / » : la coquille le peint avant le JavaScript, et React reconstruit
+    // ensuite EXACTEMENT la même boîte — c'est cette égalité qui fait que
+    // Chrome garde pour LCP la peinture de la coquille au lieu d'en enregistrer
+    // une seconde, plus tardive, déclenchée par le JavaScript.
+    titleKey: heroTitleKey,
+    subtitleKey: heroSubtitleKey,
+    heroTitleClass,
+    heroSubtitleClass,
+  } = PAGE_SECTIONS['/'];
+
+  // La FAÇADE de la carte : le MÊME contrôle que /contact, lu dans la MÊME
+  // déclaration (les classes, le libellé et le glyphe de la carte n'ont qu'un
+  // propriétaire, comme les glyphes du bloc de contact plus bas, qui viennent
+  // déjà des `actions` de /contact). L'accueil publiait l'iframe
+  // `output=embed` en `loading="lazy"` : mesuré (Lighthouse 12.6.1, pile de la
+  // CI, Chrome 152), `loading="lazy"` n'empêche rien — le navigateur charge une
+  // iframe dès qu'elle approche du viewport, et sur desktop elle y est déjà. Le
+  // premier écran tire alors ~300 Ko de tiers et le LCP de la page (une de NOS
+  // peintures) est repoussé, l'`elementRenderDelay` entrant dans le graphe LCP
+  // simulé de Lantern. Le contrôle ci-dessous ne monte l'iframe qu'à l'appui.
+  const {
+    mapButtonKey, mapIconKey, mapFrameClass, mapControlClass,
+  } = PAGE_SECTIONS['/contact'];
+
+  // Le titre de l'iframe montée à l'appui (même clé que /contact).
+  const titreDeLaCarte = t('mapIframeTitle').replace('{address}', CONTACT.address);
 
   // Lecture des chiffres par clé de libellé : `fallback` est la valeur affichée
   // avant /public/stats, `suffix` la marque qui suit le chiffre. Aucune seconde
@@ -63,11 +93,11 @@ export default function Home() {
               <span aria-hidden="true">{t('iconEscrow')}</span>
               {t('escrowBannerTitle')}
             </span>
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto">
-              {t('heroTitle')}
+            <h1 className={heroTitleClass}>
+              {t(heroTitleKey)}
             </h1>
-            <p className="text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto">
-              {t('heroSubtitle')}
+            <p className={heroSubtitleClass}>
+              {t(heroSubtitleKey)}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               {!user ? (
@@ -424,13 +454,20 @@ export default function Home() {
             </div>
           )}
 
-          <iframe
+          {/* La carte : un CONTRÔLE d'abord, l'iframe à l'appui — le MÊME
+              composant et les MÊMES classes que /contact, lues dans la même
+              déclaration. Le feu vert d'un audit « carte intégrée » est
+              préservé (le contrôle mène à la fiche Google, et l'iframe
+              `output=embed` est montée à l'appui), mais aucun octet tiers
+              n'entre plus dans le premier écran ni dans le LCP de l'accueil. */}
+          <MapEmbed
             src={CONTACT.mapsEmbedUrl}
-            title={t('mapIframeTitle').replace('{address}', CONTACT.address)}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            className="mt-8 w-full rounded-xl border border-gray-200"
-            style={{ height: 320, border: 0 }}
+            href={CONTACT.mapsUrl}
+            title={titreDeLaCarte}
+            label={t(mapButtonKey)}
+            icon={t(mapIconKey)}
+            frameClass={mapFrameClass}
+            controlClass={mapControlClass}
           />
         </div>
       </section>

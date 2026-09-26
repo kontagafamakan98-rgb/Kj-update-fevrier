@@ -238,12 +238,21 @@ const LCP_PRODUIT_PAR_UNE_REPONSE = {
     '1 389 ms qui, lui, reste asserté',
 };
 
-/** Le socle d'une route : ce qu'elle peut porter, pas ce que le job aimerait. */
+/**
+ * Le socle d'une route : ce qu'elle peut porter, pas ce que le job aimerait.
+ *
+ * `socle` peut être un OBJET (un jeu de budgets commun, cas de la passe mobile)
+ * ou une FONCTION de la route (cas de la passe desktop, dont le TBT a un
+ * plafond mesuré PAR route — cf. TBT_DESKTOP_BUDGETS). La forme fonctionnelle
+ * évite qu'un plafond propre à une page soit recopié pour toutes les autres par
+ * simple commodité d'appel.
+ */
 const soclePour = (route, socle) => {
-  if (!Object.hasOwn(LCP_PRODUIT_PAR_UNE_REPONSE, route)) return socle;
+  const base = typeof socle === 'function' ? socle(route) : socle;
+  if (!Object.hasOwn(LCP_PRODUIT_PAR_UNE_REPONSE, route)) return base;
   // Le score est une moyenne pondérée qui COMPREND le LCP : l'asserter
   // réimporterait exactement la grandeur qu'on vient de retirer.
-  const { 'largest-contentful-paint': _lcp, 'categories:performance': _score, ...reste } = socle;
+  const { 'largest-contentful-paint': _lcp, 'categories:performance': _score, ...reste } = base;
   return reste;
 };
 
@@ -253,7 +262,8 @@ const soclePour = (route, socle) => {
  * sur UNE page au lieu d'affaiblir tout le monde.
  *
  * @param {string[]} routes Pages réellement auditées par ce run.
- * @param {object} socle Budgets communs (score, FCP, LCP, TBT).
+ * @param {object|Function} socle Budgets communs (score, FCP, LCP, TBT), ou une
+ *   fonction `(route) => budgets` quand ils diffèrent d'une page à l'autre.
  * @returns {Array<{matchingUrlPattern?: string, aggregationMethod: string,
  *   assertions: object}>} `ci.assert.assertMatrix`.
  * @throws {Error} Une page auditée n'a pas de budget CLS mesuré.
@@ -291,9 +301,89 @@ const clsAssertionMatrix = (routes, socle) => {
   ];
 };
 
+/**
+ * Plafond de TBT en DESKTOP, PAR ROUTE — la seule grandeur que la passe
+ * `lighthouserc.desktop.cjs` asserte avec le CLS.
+ *
+ * ── Pourquoi un plafond PAR ROUTE ici, et pas un seuil commun ──────────────
+ * Le seuil commun venait de l'audit (« TBT (Desktop) 477 ms — should be
+ * < 200 ms ») : il décrit l'ACCUEIL, la page où l'audit l'a relevé. /jobs a une
+ * autre distribution, et surtout un autre pire cas : l'accueil porte l'iframe
+ * Google Maps, dont le document se met en page dans le même processus (relevé
+ * de trace : 674–728 ms de `Layout` sur cette page à 4× CPU, la plus grosse
+ * passe du site), là où /jobs n'embarque aucun cadre tiers. Recopier le seuil de
+ * l'accueil sur /jobs n'aurait donc rien adossé : chaque route porte désormais
+ * le plafond que SA mesure supporte.
+ *
+ * ── La mesure de /jobs (24/09/2026, Lighthouse 12.6.1, preset desktop) ─────
+ * 27 runs, quatre conditions, Chrome NEUF à chaque run (cache navigateur vide),
+ * même machine, même session — et 0 ms de TBT à chaque fois, aucune tâche au-
+ * dessus du seuil de « tâche longue » (50 ms) :
+ *
+ *   condition                                runs   TBT      plus longue tâche   Style & Layout
+ *   pile de la CI (serveur de rewrites)         6   0 ms     0 ms                73–76 ms
+ *   + 4 boucles CPU sur 8 cœurs                 6   0 ms     0 ms                93–119 ms
+ *   + bord de CDN froid (+120 ms par actif)     5   0 ms     0 ms                73–76 ms
+ *   + 7 boucles CPU sur 8 cœurs (famine)        4   0 ms     0 ms                105–149 ms
+ *   production, 9 runs à chaud (avant correctif)   0 ms ×8, 8 ms au pire        83–130 ms
+ *   production, 1er run à froid (avant correctif)  1076 ms                  2397 ms
+ *
+ * ── Comment 150 ms est choisi ──────────────────────────────────────────
+ * Pas par marge sur la valeur courante (0 ms : toute valeur donnerait une marge
+ * infinie, donc n'importe quel nombre serait « justifié »), mais par une borne
+ * HAUTE de ce que la page peut coûter : sous famine CPU, la totalité du travail
+ * de mise en page et de style de /jobs atteint 149 ms. Même si un run
+ * pathologique coalesait tout ce travail dans UNE tâche, le blocage vaudrait
+ * ~99 ms (la tâche moins les 50 ms non bloquantes) — 150 ms couvre donc cette
+ * borne avec 1,5× de marge, tout en restant 7× SOUS le mode froid mesuré avant
+ * correctif (1076 ms), c'est-à-dire un mode que la garde doit continuer
+ * d'attraper. Un plafond plus serré (le seuil de tâche longue, 50 ms) ne serait
+ * pas adossé à une mesure mais au bruit d'un runner affamé — exactement ce que
+ * les plafonds élargis du socle mobile existent pour éviter (1397 ms mesurés
+ * pour un arbre vert).
+ *
+ * L'ACCUEIL garde 200 ms : c'est le seuil de l'audit (13× sa pire mesure,
+ * 15 ms sous saturation) et sa pire passe de mise en page est bornée par le
+ * cadre Maps, donc sa borne haute n'est pas comparable à celle de /jobs.
+ *
+ * Le TBT est asserté au MEILLEUR des 3 runs (`aggregationMethod: 'optimistic'`) :
+ * les trois runs d'un job partagent la même arborescence et la même arête de
+ * cache, et une régression de l'artefact monte dans les trois — c'est ce qui
+ * rend le mode froid de /jobs non bloquant tout en le rendant détectable s'il
+ * devenait permanent.
+ */
+const TBT_DESKTOP_BUDGETS = {
+  '/': { max: 200, pire: 15, mesure: '0 ms ×3 production, 0/0/15 ms repli local saturé' },
+  '/jobs': { max: 150, pire: 8, mesure: '0 ms sur 27 runs (4 conditions), 8 ms au pire à chaud' },
+};
+
+/**
+ * Plafond de TBT desktop d'une route, ou REFUS explicite.
+ *
+ * Une page auditée sans valeur mesurée serait mesurée SANS plafond : la
+ * régression qu'on veut attraper passerait, et rien ne le dirait. Même
+ * convention que le budget CLS, donc même refus au chargement de la config.
+ *
+ * @param {string} route Chemin audité (par exemple `/jobs`).
+ * @returns {number} Plafond en millisecondes.
+ * @throws {Error} La route n'a pas de plafond mesuré.
+ */
+const plafondTbtDesktop = (route) => {
+  if (!Object.hasOwn(TBT_DESKTOP_BUDGETS, route)) {
+    throw new Error(
+      `plafond TBT desktop manquant pour ${route} : mesurer la page (trace CDP, plusieurs ` +
+        'conditions, cf. l’en-tête de TBT_DESKTOP_BUDGETS) puis l’ajouter ici. Sans valeur ' +
+        'mesurée, la page serait auditée en desktop SANS plafond de TBT.'
+    );
+  }
+  return TBT_DESKTOP_BUDGETS[route].max;
+};
+
 module.exports = {
   CLS_BUDGETS,
   LCP_PRODUIT_PAR_UNE_REPONSE,
+  TBT_DESKTOP_BUDGETS,
+  plafondTbtDesktop,
   REQUETES_HORS_CONTROLE,
   clsAssertionMatrix,
   patternFor,

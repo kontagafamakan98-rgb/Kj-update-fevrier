@@ -10,8 +10,20 @@
  *     React remplace ce contenu au montage (createRoot efface #root), comme
  *     pour les pages ci-dessous.
  *   • build/jobs.html   → #root contient le shell h1 statique « Emplois
- *     disponibles » + placeholder navbar (LCP avant boot React) + og:image
- *     spécifique (og-jobs.png).
+ *     disponibles » (LCP avant boot React), enveloppé du chrome de l'app, +
+ *     og:image spécifique (og-jobs.png).
+ *
+ * Le CHROME de l'app (navbar + `.App` + `main.flex-1`, app-chrome.js) doit
+ * envelopper le corps de #root sur TOUTES les pages pré-rendues : ces
+ * conteneurs portent la STRUCTURE (les 65 px de la navbar, `main.flex-1`), donc
+ * une coquille qui les omet publie une autre géométrie que la page qu'elle
+ * pré-rend — c'est par là que l'alignement hérité de `.App` déplaçait l'encre,
+ * avant que la refonte du 25/09/2026 ne le retire. Mesuré sur /jobs (Chrome 152,
+ * 1350×940) : la 2e ligne du paragraphe d'intro passait de x=67.000 à
+ * x=218.578 et l'aire LCP du MÊME texte de 36 002 à 36 049 px² (+0,13 %) —
+ * Chrome n'élit un candidat LCP que pour une aire STRICTEMENT plus grande,
+ * donc ce +0,13 % suffisait à ré-élire la peinture de React à 2,5 s (3 runs
+ * sur 3 en desktop, score 92 au lieu de 100).
  *   • build/login.html  → #root contient le shell formulaire (h2, champs,
  *     bouton) + og:image og-login.png.
  *
@@ -61,6 +73,10 @@ import {
   fichiersDeCopie,
 } from './published-copy.js';
 import { SITE_ORIGIN, shellFileFor, titleOf, metaContents } from './site-meta.js';
+// Le chrome des coquilles (navbar + conteneurs de l'app) est lu à sa source
+// unique : la fabrique qui l'injecte et le contrôle qui l'exige ne peuvent
+// pas diverger.
+import { CHROME_OUVERTURE, NAV_PLACEHOLDER } from '../vite-plugins/prerender/app-chrome.js';
 import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../src/config/phone-format.js';
 import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
 import { photoFormatsLine } from '../src/config/photo-formats.js';
@@ -76,6 +92,22 @@ import { ROUTES as OG_CARD_ROUTES } from './check-og-images.js';
 // corriger la coquille laissait le garde affirmer l'ancien mot.
 import { makeScopedTranslator as makeRegisterTranslator } from '../src/utils/pack2PageI18n/register.js';
 import { makeScopedTranslator as makeJobsTranslator } from '../src/utils/pack2PageI18n/jobs.js';
+
+// ── L'ALIGNEMENT NE SE CENTRE PLUS PAR HÉRITAGE : c'est la refonte ──────────
+// `.App { text-align: center }` a été RETIRÉE de src/App.css le 25/09/2026 : le
+// site est aligné à gauche par défaut, et chaque bloc qui doit être centré le
+// DÉCLARE (`text-center`). La règle centrait en silence 2 à 28 porteurs de texte
+// par route (231 déplacements d'encre relevés sur 11 routes × 2 tailles,
+// jusqu'à 543,89 px, élément LCP compris) — c'est cette mesure qui a servi de
+// matière à la refonte.
+//
+// Ce garde vérifie donc l'INVERSE d'avant : plus AUCUNE page pré-rendue ne doit
+// republier une centure par héritage. C'est vérifié ICI, statiquement, et pas
+// seulement dans le navigateur, parce que les DEUX canaux lisent la même
+// feuille : une règle réintroduite centrerait la coquille ET React ensemble,
+// donc `e2e/lcp-geometrie.spec.js` resterait vert (il compare les deux peintures
+// entre elles) pendant que la moitié du site se recentrerait en silence.
+const CSS_CENTRE_PAR_HERITAGE = /\.App\s*\{[^}]*text-align\s*:\s*center/;
 
 const fr = JSON.parse(readFileSync(new URL('../src/i18n/fr.json', import.meta.url), 'utf8'));
 const registerT = makeRegisterTranslator('fr', (cle) => fr[cle]);
@@ -210,8 +242,8 @@ if (jobs) {
   if (!jobs.includes(`<h1 class="text-3xl font-bold text-gray-900">${jobsT('availableJobs')}</h1>`)) {
     errors.push('jobs.html : shell h1 « Emplois disponibles » ABSENT de #root');
   }
-  if (!jobs.includes('class="h-16 bg-white border-b border-gray-200"')) {
-    errors.push('jobs.html : placeholder navbar (h-16) absent du shell');
+  if (!jobs.includes(NAV_PLACEHOLDER)) {
+    errors.push('jobs.html : navbar du chrome de l\'app absente du shell');
   }
 }
 
@@ -226,7 +258,10 @@ if (login) {
   if (!login.includes('id="email"')) {
     errors.push('login.html : champ e-mail absent du shell');
   }
-  if (!login.includes(`bg-orange-600">${fr.login}</div>`)) {
+  // Le bouton est un `<button>` : `[type="submit"]` (src/styles/
+  // kojo-pack-f-readability-no-color.css) porte `min-height: 48px` quand un
+  // `<div>` s'arrêtait à 36-40 px — la sonde de géométrie refusait l'écart.
+  if (!login.includes(`bg-orange-600">${fr.login}</button>`)) {
     errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');
   }
   // Le chunk lazy de Login doit être préchargé (modulepreload) dans le HTML
@@ -244,10 +279,21 @@ if (register) {
   if (!register.includes(`<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">${registerT('title')}</h1>`)) {
     errors.push('register.html : h1 « Créer un compte » absent du shell');
   }
-  if (!register.includes(registerT('googleSignup'))) {
-    errors.push('register.html : bouton Google absent du shell');
+  // Le bouton Google est CONDITIONNEL : il n'est publié que si le client_id
+  // est configuré au build (React le masque sinon, cf. `googleAuth` dans
+  // prerender-route-meta.js et CLES_CONDITIONNELLES dans declared-body.js).
+  // Le garde suit la même condition — ici, celle du build de la CI.
+  const googleAuth = Boolean(String(process.env.VITE_GOOGLE_CLIENT_ID || '').trim());
+  if (googleAuth && !register.includes(registerT('googleSignup'))) {
+    errors.push('register.html : bouton Google absent du shell (client_id Google configuré)');
   }
-  if (!register.includes(`bg-orange-600">${registerT('continueButton')}`)) {
+  if (register.includes(registerT('googleSignup')) !== googleAuth) {
+    errors.push(
+      'register.html : le bouton Google est publié alors que le client_id Google n\'est pas configuré ' +
+        '— React ne le peint pas, la coquille en peindrait un que le montage retire'
+    );
+  }
+  if (!register.includes(`bg-orange-600">${registerT('continueButton')}</button>`)) {
     errors.push('register.html : bouton submit (bg-orange-600) absent du shell');
   }
   // Champs du formulaire (les LCP/paint du formulaire complet avant React) :
@@ -271,9 +317,19 @@ if (register) {
         'la page le publie au runtime, la coquille doit publier les mêmes octets'
     );
   }
+  // Le contrôle de pays est celui de la PAGE (src/components/CountryDisplay.js :
+  // un `<button>` + un input caché), pas un `<select>` : la coquille en
+  // publiait un, et ce `<select>` mesurait 1 px de moins que le vrai contrôle
+  // — mesuré, les 47 textes du bas du formulaire étaient 1 px trop haut.
   const countryPlaceholder = COUNTRY_PLACEHOLDER(registerT('country'));
-  if (!register.includes(`>${countryPlaceholder}</select>`)) {
-    errors.push(`register.html : placeholder pays « ${countryPlaceholder} » absent du select`);
+  if (!register.includes(`truncate text-gray-400">${countryPlaceholder}</span>`)) {
+    errors.push(`register.html : placeholder pays « ${countryPlaceholder} » absent du contrôle de pays`);
+  }
+  if (register.includes('<select')) {
+    errors.push(
+      'register.html : la coquille publie encore un <select> pour le pays — ' +
+        'le contrôle de la page est un <button> (CountryDisplay.js), et les deux ne mesurent pas la même hauteur'
+    );
   }
   // La ligne des formats photo est de la COPIE, partagée avec la page
   // (src/components/ProfilePhotoUpload.js) : elle était recopiée des deux
@@ -380,12 +436,35 @@ if (howItWorks) {
   }
 }
 
-// 4quinquies. contact.html : le titre de la carte intégrée vient du dictionnaire.
+// 4quinquies. contact.html : le titre de la carte vient du dictionnaire, et la
+// carte ne doit PAS se charger au premier écran.
+//
+// La coquille publiait l'iframe `output=embed` elle-même, en `loading="lazy"` —
+// et cela n'a rien empêché : mesuré (Lighthouse 12.6.1, pile de la CI, Chrome
+// 152, mobile, 3 runs), l'embed tiers du premier écran repoussait le LCP de
+// /contact à 4143 / 4143 / 4397 ms simulés (scores 81 / 85 / 84) alors que
+// l'élément LCP de cette page est NOTRE paragraphe d'introduction, et le
+// navigateur charge une iframe dès qu'elle approche du viewport — sur desktop
+// elle y est déjà. La coquille publie donc le contrôle déclaré par le plan
+// (lien vers la fiche Google, qui fonctionne sans JavaScript) : le titre exigé
+// ci-dessous est celui de ce contrôle, et l'iframe n'a plus le droit de
+// paraître ici.
 const contact = read('contact.html');
 if (contact) {
   const mapTitle = fr.mapIframeTitle.replace('{address}', CONTACT.address);
   if (!contact.includes(`title="${mapTitle}"`)) {
-    errors.push(`contact.html : titre d'iframe « ${mapTitle} » absent (clé i18n mapIframeTitle)`);
+    errors.push(
+      `contact.html : titre « ${mapTitle} » absent (clé i18n mapIframeTitle) — le contrôle de la ` +
+        'carte doit porter le libellé du dictionnaire, comme la page'
+    );
+  }
+  if (/output=embed/.test(contact)) {
+    errors.push(
+      'contact.html : la carte Google (output=embed) est publiée en IFRAME par la coquille — ' +
+        'le premier écran charge alors ~300 Ko de tiers qui repoussent le LCP de la page ; ' +
+        'publier le contrôle déclaré par le plan dans src/config/page-sections.js ' +
+        '(mapButtonKey / mapIconKey / mapFrameClass / mapControlClass)'
+    );
   }
 }
 
@@ -423,6 +502,38 @@ for (const route of OG_CARD_ROUTES) {
   const name = shellFileFor(route.path);
   const html = shells[name];
   if (!html) continue;
+  // ── Le CHROME de l'app autour du corps ────────────────────────────
+  // Une coquille sans ces conteneurs n'hérite pas des styles du document
+  // comme React : mesuré sur /jobs (Chrome 152, 1350×940), le `.App` de
+  // App.css centre le texte, la coquille le publiait aligné à gauche, la 2e
+  // ligne de l'intro passait de x=67.000 à x=218.578 et l'aire LCP du MÊME
+  // paragraphe de 36 002 à 36 049 px². Chrome n'élit un candidat LCP que
+  // pour une aire strictement plus grande : ce +0,13 % suffisait à ré-élire
+  // la peinture de React à 2,5 s (3 runs sur 3 en desktop), en facturant
+  // toute la chaîne JavaScript au LCP. Le corps doit donc commencer par le
+  // chrome, dans #root, sur TOUTES les pages pré-rendues.
+  if (!html.includes(`<div id="root">${CHROME_OUVERTURE}`)) {
+    errors.push(
+      `${name} : #root ne commence pas par le chrome de l’app (app-chrome.js — navbar + .App + ` +
+        'main.flex-1) : la coquille hérite alors d’autres styles que la page'
+    );
+  }
+  // ── La centure par héritage, ABSENTE du CSS RÉELLEMENT PUBLIÉ ─────
+  // La règle est cherchée dans le CSS publié de la page (identifiants
+  // volontairement tolérants aux espaces, le build minifiant) : d'où qu'elle
+  // vienne — App.css ou une coquille qui l'écrirait à la main — c'est le même
+  // verdict. La refonte est une décision MESURÉE ; la défaire par une ligne de
+  // CSS doit demander de rouvrir ce fichier.
+  const cssPublie = (html.match(/<style>([\s\S]*?)<\/style>/) || [])[1] || '';
+  if (CSS_CENTRE_PAR_HERITAGE.test(cssPublie)) {
+    errors.push(
+      `${name} : le CSS publié recentre par HÉRITAGE (« .App { text-align: center } ») — ` +
+        'la refonte du 25/09/2026 a rendu l’alignement EXPLICITE (chaque bloc centré porte ' +
+        '`text-center`), et cette règle recentrerait en silence tout ce qui ne la déclare pas. ' +
+        'La refaire est possible, mais c’est une refonte : elle se mesure ' +
+        '(node scripts/mesure-alignement-app.mjs) avant d’être écrite ici.'
+    );
+  }
   if (!html.includes(`${SITE_ORIGIN}${route.image}`)) {
     errors.push(
       `${name} : og:image ${route.image} manquant (carte déclarée pour ${route.path} ` +
@@ -514,6 +625,10 @@ const GLYPHES_INTERDITS = [
 ].filter((valeur) => /[^\x20-\x7E]/.test(valeur));
 const MODULES_PRE_RENDU = [
   'prerender-route-meta.js',
+  // Le chrome (navbar + conteneurs de l'app) est un module de coquille comme
+  // les autres : sa navbar publiée doit venir du dictionnaire, jamais d'un
+  // glyphe recopié.
+  'prerender/app-chrome.js',
   'prerender/app-template.js',
   'prerender/declared-body.js',
   'prerender/not-found.js',

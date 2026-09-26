@@ -52,11 +52,13 @@ export default function HowItWorks() {
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
+      {/* Hero — la géométrie est LUE dans le plan, jamais recopiée : le
+          sous-titre est le plus grand texte peint de la page, donc son élément
+          LCP (voir le commentaire du plan, mesures à l'appui). */}
       <section className="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">{t(plan.titleKey)}</h1>
-          <p className="text-lg opacity-90 max-w-2xl mx-auto">
+        <div className={plan.heroFrameClass}>
+          <h1 className={plan.heroTitleClass}>{t(plan.titleKey)}</h1>
+          <p className={plan.heroSubtitleClass}>
             {t(plan.heroKey)}
           </p>
         </div>

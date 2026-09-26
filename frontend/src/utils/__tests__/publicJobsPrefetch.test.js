@@ -184,7 +184,107 @@ describe('publicJobsPrefetch — Jobs.js garde le déclenchement à l’étape m
     expect(JOBS_SRC).not.toMatch(/let publicJobsPrefetch = null/);
   });
 
-  it('expose le consommateur au hook de chargement de la liste', () => {
-    expect(JOBS_SRC).toMatch(/consumePrefetch:\s*consumePublicJobsPrefetch/);
+  it('expose le préchargement ENTIER au hook de chargement de la liste', () => {
+    // L'objet, pas seulement `consume` : le hook lit `snapshot` pendant le
+    // rendu pour démarrer la page SEEDÉE quand la liste est déjà en main (la
+    // requête part à l'évaluation du chunk, l'effet arrive après le commit).
+    expect(JOBS_SRC).toMatch(/prefetch:\s*publicJobsPrefetch/);
+    expect(JOBS_SRC).not.toMatch(/consumePrefetch:\s*consumePublicJobsPrefetch/);
+  });
+});
+
+describe('publicJobsPrefetch — lecture pendant le rendu (snapshot)', () => {
+  it('requête EN VOL : rien à seeder, la page peint son propre écran de chargement', async () => {
+    const { prefetch } = setup();
+    prefetch.kick();
+
+    // Une requête en vol ne donne AUCUNE liste : la page part en chargement et
+    // peint tout de suite son texte réel (titre, intro) + son squelette de
+    // liste, au lieu d'être suspendue le temps de la réponse (mesuré : 2,1 s
+    // sans le plus grand texte de la page sur /jobs desktop).
+    expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({ applicable: true, value: null });
+    await prefetch.pending.promise;
+  });
+
+  it('n’expose PLUS la promesse en vol : aucun appelant ne peut suspendre la page', async () => {
+    const { prefetch } = setup();
+    prefetch.kick();
+
+    const state = prefetch.snapshot(DEFAULT_PARAMS);
+
+    // Le contrat « je jette la promesse » a été retiré avec son appelant : ni
+    // `pending`, ni `promise` — un champ inerte laisserait croire à une
+    // suspension que plus personne ne fait.
+    expect(state).not.toHaveProperty('pending');
+    expect(state).not.toHaveProperty('promise');
+    await prefetch.pending.promise;
+  });
+
+  it('ne consomme RIEN : la liste peut se seeder au rendu puis consommer dans l’effet', async () => {
+    const { prefetch, jobsAPI } = setup({ items: jobsOf(2) });
+    prefetch.kick();
+    await prefetch.pending.promise;
+
+    const state = prefetch.snapshot(DEFAULT_PARAMS);
+
+    expect(state).toEqual({
+      applicable: true,
+      value: expect.any(Array),
+    });
+    expect(state.value).toHaveLength(2);
+    expect(prefetch.pending).not.toBeNull();
+    // Le seed au rendu PUIS la consommation dans l'effet = une seule requête.
+    const consumed = await prefetch.consume(DEFAULT_PARAMS);
+    expect(consumed.jobs).toHaveLength(2);
+    expect(jobsAPI.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('ne s’applique pas à une requête que le préchargement ne couvre pas', () => {
+    const { prefetch } = setup();
+    prefetch.kick();
+
+    // Toute divergence doit renvoyer `applicable: false` : sans cela la page se
+    // seederait avec le résultat d'une AUTRE requête.
+    for (const divergent of [
+      { ...DEFAULT_PARAMS, q: 'plombier' },
+      { ...DEFAULT_PARAMS, category: 'btp' },
+      { ...DEFAULT_PARAMS, status: 'closed' },
+      { ...DEFAULT_PARAMS, page: 2 },
+      { ...DEFAULT_PARAMS, mine: 'posted' },
+      { ...DEFAULT_PARAMS, ids: 'applications' },
+      { limit: PAGE_SIZE - 1, page: 1, status: 'open' },
+    ]) {
+      expect(prefetch.snapshot(divergent).applicable, JSON.stringify(divergent)).toBe(false);
+    }
+  });
+
+  it('désactivé (jsdom, pré-rendu, SSR) : jamais applicable, donc aucun seed', () => {
+    const { prefetch } = setup({ enabled: false });
+    prefetch.kick();
+
+    expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({ applicable: false });
+  });
+
+  it('un échec est bénin : valeur nulle, la page recharge par son propre chemin', async () => {
+    const { prefetch, safeLog } = setup({ fail: true });
+    prefetch.kick();
+    await prefetch.pending.promise;
+
+    expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({
+      applicable: true,
+      value: null,
+    });
+    expect(safeLog.warn).toHaveBeenCalled();
+  });
+
+  it('après consommation, plus rien à lire (aucun résultat périmé resservi)', async () => {
+    const { prefetch } = setup();
+    prefetch.kick();
+    await prefetch.consume(DEFAULT_PARAMS);
+
+    expect(prefetch.snapshot(DEFAULT_PARAMS)).toEqual({
+      applicable: true,
+      value: null,
+    });
   });
 });

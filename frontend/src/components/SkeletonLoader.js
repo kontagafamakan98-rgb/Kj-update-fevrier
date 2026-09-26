@@ -1,14 +1,22 @@
 import React from 'react';
 
-// Composant de base Skeleton
-export const Skeleton = ({ className = '', width, height }) => {
+// Composant de base Skeleton.
+//
+// `pulse` permet à un bloc de renoncer à sa PROPRE animation quand un ancêtre
+// la porte déjà. Sur la liste de /jobs (12 cartes × 9 blocs) cela fait passer
+// 108 animations d'opacité à 12 : chacune maintenait son élément en recalcul de
+// style à chaque image (trace CDP : StyleRecalcInvalidationTracking,
+// reason=Animation, 24 relevés par bloc sur un seul chargement), alors que le
+// rendu est identique à l'œil — les blocs pulsaient déjà en phase, ayant été
+// montés au même instant.
+export const Skeleton = ({ className = '', width, height, pulse = true }) => {
   const style = {};
   if (width) style.width = width;
   if (height) style.height = height;
 
   return (
     <div
-      className={`animate-pulse bg-gray-200 rounded ${className}`}
+      className={`${pulse ? 'animate-pulse ' : ''}bg-gray-200 rounded ${className}`}
       style={style}
     />
   );
@@ -29,30 +37,33 @@ export const Skeleton = ({ className = '', width, height }) => {
 export const JobCardSkeleton = () => {
   return (
     <div className="block bg-white rounded-2xl border border-gray-100 p-6 min-h-[277px] md:min-h-0">
-      <div className="flex justify-between items-start gap-6 flex-wrap">
+      {/* Une SEULE animation pour toute la carte : le fond blanc et la bordure
+          (portés par la racine) restent fixes, et les 9 barres pulsent en phase
+          comme avant — mais sans 9 recalcs de style par image. */}
+      <div className="animate-pulse flex justify-between items-start gap-6 flex-wrap">
         <div className="flex-1 min-w-[240px]">
           {/* Titre + badge statut (line-heights réels : text-lg 28px / badge 22px) */}
           <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <Skeleton className="h-7 w-48" />
-            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="h-7 w-48" pulse={false} />
+            <Skeleton className="h-6 w-16 rounded-full" pulse={false} />
           </div>
           {/* Description line-clamp-2 (2 × 24px) */}
           <div className="mb-4 space-y-2">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-5/6" />
+            <Skeleton className="h-6 w-full" pulse={false} />
+            <Skeleton className="h-6 w-5/6" pulse={false} />
           </div>
           {/* Rangée méta (text-sm 20px) */}
           <div className="flex flex-wrap gap-4">
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-5 w-24" />
-            <Skeleton className="h-5 w-16" />
+            <Skeleton className="h-5 w-20" pulse={false} />
+            <Skeleton className="h-5 w-24" pulse={false} />
+            <Skeleton className="h-5 w-16" pulse={false} />
           </div>
         </div>
 
         {/* Budget (text-2xl 32px) + durée (text-sm 20px) */}
         <div className="ml-0 md:ml-6 text-right min-w-[170px]">
-          <Skeleton className="ml-auto h-8 w-28" />
-          <Skeleton className="ml-auto mt-1 h-5 w-20" />
+          <Skeleton className="ml-auto h-8 w-28" pulse={false} />
+          <Skeleton className="ml-auto mt-1 h-5 w-20" pulse={false} />
         </div>
       </div>
     </div>
@@ -223,6 +234,24 @@ export const JobsSkeleton = () => {
           <Skeleton className="h-11 w-28 rounded-xl" />
           <Skeleton className="h-12 w-40 rounded-xl" />
         </div>
+      </div>
+
+      {/* Paragraphe d'intro : la même hauteur RÉSERVÉE que le paragraphe réel
+          (`min-h-[104px] md:min-h-[52px]`, soit 4 lignes mobiles / 2 lignes
+          bureau — la mesure du rendu réel à 412 et 1350 px de large). Les
+          barres tiennent en 40 px, donc c'est le `min-h` qui décide de la
+          hauteur, aux deux points de rupture : la boîte du squelette et celle
+          du paragraphe sont ainsi la MÊME, et l'intro qui disparaît pendant le
+          chargement ne déplace pas la liste (même dispositif que la coquille).
+
+          Le texte n'est pas ici, et c'est volontaire : il vit dans le
+          dictionnaire du scope `jobs`, chargé avec le chunk de la page. Le
+          faire remonter jusqu'à ce squelette — monté par App.js — le mettrait
+          dans le bundle initial (voir scripts/check-pack2-chunks.js), pour
+          réserver une place qu'on peut réserver sans lui. */}
+      <div className="mb-6 max-w-3xl space-y-2 min-h-[104px] md:min-h-[52px]">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-11/12" />
       </div>
 
       {/* Onglets (découverte / candidatures / missions) */}

@@ -26,18 +26,33 @@ export default function Privacy() {
   const { t } = useLanguage();
   usePageMeta();
 
-  const { titleKey, introKey, sections, links } = PAGE_SECTIONS['/privacy'];
+  const {
+    titleKey,
+    introKey,
+    frameClass,
+    titleClass,
+    introClass,
+    sectionTitleClass,
+    sectionBodyClass,
+    sections,
+    links,
+  } = PAGE_SECTIONS['/privacy'];
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">{t(titleKey)}</h1>
-        <p className="text-gray-600 mb-8">{t(introKey)}</p>
+      {/* La géométrie est LUE dans le plan, jamais recopiée. Sur cette page le
+          plus grand texte peint n'est pas l'introduction mais le CORPS d'une
+          section : c'est `sectionBodyClass` qui porte l'élément LCP, et
+          `frameClass` qui décide de son retour à la ligne — voir le
+          commentaire du plan, mesures à l'appui. */}
+      <div className={frameClass}>
+        <h1 className={titleClass}>{t(titleKey)}</h1>
+        <p className={introClass}>{t(introKey)}</p>
 
         {sections.map((section) => (
           <section key={section.titleKey} className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">{t(section.titleKey)}</h2>
-            <p className="text-gray-600">{t(section.bodyKey)}</p>
+            <h2 className={sectionTitleClass}>{t(section.titleKey)}</h2>
+            <p className={sectionBodyClass}>{t(section.bodyKey)}</p>
           </section>
         ))}
 

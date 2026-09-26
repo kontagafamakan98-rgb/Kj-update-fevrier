@@ -127,6 +127,15 @@
       "hors_mutation": "aucune preuve ne peut rougir : le seul test qui le nomme (check-og-assets.test.js) vérifie un texte de renvoi produit par check-og-assets.js et n'importe jamais ce module. Mesuré : neutraliser la comparaison d'empreinte du générateur a laissé la preuve verte"
     },
     {
+      "chemin": "frontend/scripts/mesure-alignement-app.mjs",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "outil de MESURE, pas un garde : il chiffre ce que coûterait le retrait de `.App { text-align: center }` (encre déplacée par route et par taille) et n'imprime aucun verdict. La décision qu'il documente — garder la règle — est vérifiée par des gardes : scripts/__tests__/check-app-chrome.test.js et scripts/check-prerender-shells.js",
+      "hors_mutation": "le retirer ne fait rien rougir : aucun garde ne l'importe, et le seul test qui pourrait le nommer serait un test de lui-même — ce qui ne prouverait rien du dépôt. Sa vérité est mesurée à l'exécution (relevé du 25/09/2026 : 11 routes × 2 tailles, 231 déplacements d'encre), pas par mutation"
+    },
+    {
       "chemin": "frontend/scripts/check-pack2-chunks.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -153,6 +162,40 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
       "runner": "vitest"
+    },
+    {
+      "chemin": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "runner": "vitest",
+      "motif": "fermeture de la classe de bug du panneau de notifications : détecte et refuse tout composant à état partagé (useContext, useNotifications, etc.) dont un écouteur global (document/window) dépend d'une référence locale d'instance (ref.current) pour déclencher une action partagée, provoquant le démontage ou l'écrasement intempestif en cas d'instances multiples"
+    },
+    {
+      "chemin": "frontend/scripts/composants-etat-partage-ecouteurs.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (analyse AST Babel des déclarations de refs locales, setters locaux, hooks d'état partagé et écouteurs d'événements globaux) : le garde prononce le verdict, ce module fournit l'analyse statique et le comptage des montages",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (cible = garde) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (détection du cas bugué historique, tolérance de l'état local, tolérance de l'ancrage partagé), et les mutations portent sur le garde"
+    },
+    {
+      "chemin": "frontend/scripts/check-appui-demontage-controles.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "runner": "vitest",
+      "motif": "autre moitié de la classe de bug du panneau de notifications : balaie TOUS les contrôles interactifs de src/ et refuse tout contrôle qu'un changement d'état déclenché pendant l'appui (onMouseDown/onPointerDown/onTouchStart), porté par le contrôle lui-même ou un ancêtre (bouillonnement), démonte avant que le `click` n'arrive — rendu conditionnel ou retour anticipé gouverné par un état local écrit par le gestionnaire d'appui"
+    },
+    {
+      "chemin": "frontend/scripts/appui-demontage-controles.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (analyse AST Babel : appariement setters/états useState, résolution des gestionnaires d'appui et des fonctions locales qu'ils appellent, tests des rendus conditionnels et des retours anticipés enveloppant le contrôle) : le garde prononce le verdict, ce module fournit l'analyse statique et le comptage des contrôles interactifs",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (cible = garde) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (appui direct, appui d'ancêtre par bouillonnement, retour anticipé, tolérance de l'état non lié, tolérance de la fermeture par prop), et les mutations portent sur le garde"
     },
     {
       "chemin": "frontend/scripts/check-test-environment.js",
@@ -262,6 +305,15 @@
       "invoque_par": "ci",
       "preuve": "backend/tests/test_ci_workflow_pins.py",
       "runner": "pytest"
+    },
+    {
+      "chemin": ".github/scripts/livrer.py",
+      "role": "outil",
+      "invoque_par": "aucun",
+      "preuve": null,
+      "runner": null,
+      "motif": "outil d'orchestration de livraison complète : pousse la branche de travail, ouvre/détecte la PR, attend les checks CI, fusionne via l'API GitHub, synchronise localement et confirme formellement que Vercel et Fly.io servent la révision",
+      "hors_mutation": "outil d'ops sans verdict interne sur le dépôt : orchestre des commandes git et les gardes check-deployed-revision.js et check_deployed_revision.py déjà mutés et éprouvés"
     },
     {
       "chemin": "backend/scripts/audit_docstrings.py",
@@ -473,6 +525,40 @@
       "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : la détection de ce module est donc verrouillée par ses cas unitaires directs (occurrence nommée avec sa ligne, commentaire ignoré, plafond par fichier, surface illisible signalée), et la mutation qui prouve le VERDICT porte sur la ligne du garde qui rapporte les violations (`prerender-shells: verdict d'apostrophe non rapporte`)"
     },
     {
+      "chemin": "frontend/scripts/check-shell-remote-resources.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-shell-remote-resources.test.js",
+      "runner": "vitest",
+      "motif": "une règle sur ce que les coquilles DÉCLARENT comme ressources : aucune origine tierce dans le premier écran — ni <iframe>, <script>, <img>, <link rel=…> de ressource, ni url()/@import du CSS publié (bloc en ligne ET feuilles liées mêmes-origine, @import suivis). Les origines autorisées sont lues dans scripts/site-meta.js (SITE_ORIGIN, API_ORIGIN), un rel inconnu est REFUSÉ plutôt que supposé inoffensif, et un plancher de lecture (100 ressources ; 224 mesurées le 25/09/2026) empêche un lecteur cassé de passer pour un vert. Chaque refus nomme la coquille, la balise et l'URL."
+    },
+    {
+      "chemin": "frontend/scripts/shell-remote-resources.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-shell-remote-resources.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (balises et attributs qui téléchargent, sort des rel, lecture des url()/@import/image-set() du CSS, comparaison d'origine, suivi des feuilles liées) : le garde prononce le verdict, ce module fournit le classement — d'où deux mutations qui portent sur les lignes du GARDE qui l'énoncent, et non sur ce module",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : le classement de ce module est verrouillé par ses cas unitaires directs (cinq familles de balises, srcset candidat par candidat, rel à deux mots, rel inconnu refusé, navigation et JSON-LD ignorés, entités résolues, origines relatives/absolues/sans protocole, url()/@import/image-set(), feuille relais suivie), et les mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict neutralisé, plancher neutralisé)"
+    },
+    {
+      "chemin": "frontend/scripts/check-css-selecteurs-morts.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "runner": "vitest",
+      "motif": "une classe ou un id nommé par un sélecteur doit être POSÉ par l'artefact livré — les littéraux de className du JavaScript du build, ou le HTML des coquilles pré-rendues ; sinon le sélecteur ne peut rien peindre et la feuille décrit un site qui n'existe pas. Le garde remplace l'ÉLAGAGE AU BUILD (`vite-plugins/purge-css-mort.js`, supprimé) et rend DEUX verdicts : les feuilles SOURCE (fichier, ligne, nom mort, sélecteur, et position obligatoire vs alternative de :is()/:where()) et la feuille LIVRÉE (une règle servie dont aucun sélecteur n'a de porteur — l'utilitaire qu'un composant éliminé du bundle, une branche import.meta.env.DEV, fait générer à Tailwind ; mesuré le 25/09/2026 : 2 utilitaires, 199 o par page). Le corpus des POSEURS exclut délibérément les feuilles du build : une feuille ne peut que se justifier elle-même. Mesures du 25/09/2026 : 36 règles mortes, 131 sélecteurs inapplicables et 148 arguments morts de :is()/:where() retirés des sources (six feuilles touchées : 30 676 → 19 636 o ; sept feuilles source : 33 215 → 22 175 o, mesuré contre HEAD), 105 noms morts (4 769 o, 6,85 % de la feuille servie) que l'élagage laissait passer, feuille servie 69 432 → 60 929 o, 7 feuilles source et 13 pages jugées, 0 divergence."
+    },
+    {
+      "chemin": "frontend/scripts/css-selecteurs-morts.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (ce qu'est un nom de classe dans un sélecteur — échappements CSS résolus par un SCANNER, pas par une expression régulière dont le motif hérité déclarait sans porteur la classe que le JavaScript livre pourtant, valeurs arbitraires, chaînes entre guillemets ignorées ; ce qu'est un PORTEUR — ensemble de jetons ET revérification en texte avec bornes de nom, pour que `container` ne compte pas dans `containerRef` ; le corpus des poseurs ; les planchers de lecture) : le garde prononce le verdict, ce module fournit le classement",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (valeur arbitraire échappée, nom à crochets et deux-points, variantes hover:/md:, id, liste de sélecteurs, point entre guillemets, crochet nu, bornes de nom, corpus vide, ligne et sélecteur du nom mort, position obligatoire vs alternative, règle livrée sans porteur, règle livrée gardée par UN porteur), et les cinq mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict, lecture des feuilles source, trois planchers de lecture)"
+    },
+    {
       "chemin": "frontend/scripts/check-shell-text-provenance.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -488,6 +574,23 @@
       "runner": "vitest",
       "motif": "les trois règles elles-mêmes (lecture des littéraux hors commentaires et expressions régulières avec leur ligne ; corpus des textes de page ; valeurs dérivées déclarées ; marqueurs du dictionnaire, du plan et des coquilles ; copie en dur dans les modules de pré-rendu) : le garde prononce le verdict, ce module fournit les règles",
       "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les règles de ce module sont verrouillées par leurs cas unitaires directs (texte entier, composition, valeur dérivée, mot inventé, texte commenté, recopie d'un glyphe, exemption périmée, clé de glyphe inconnue, marqueur sans porteur, copie en dur, lecteur de littéraux), et la mutation qui prouve le VERDICT porte sur les lignes du garde qui l'énoncent (trois mutations déclarées)"
+    },
+    {
+      "chemin": "frontend/scripts/mesure-lighthouse-locale.mjs",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": null,
+      "runner": null,
+      "motif": "outil de MESURE, pas un garde : il monte la pile locale fidèle (build à API même-origine, fixture derrière le serveur de rewrites) et imprime le Speed Index, la condition LUE dans les LHR et les requêtes /api/ observées. Il ne prononce aucun verdict : les budgets de performance sont dans lighthouserc.cjs / lighthouserc.desktop.cjs, exécutés par le job de CI. Un plafond de Speed Index mesuré par un outil local n'existerait sur aucune surface de gate. Pour un même artefact il imprime aussi la DISTRIBUTION du Speed Index (n, min, p25, médiane, p75, p90, max, étendue, écart-type d'échantillon) et la PERSISTE dans distribution-speed-index.json à côté des LHR : sans dispersion, un minimum et une médiane ne se distinguent pas d'un effet réel, et un run isolé se lirait comme une propriété de l'artefact Il est exécuté par `.github/workflows/lighthouse-mesure-locale.yml` — `workflow_dispatch` UNIQUEMENT, SANS budget bloquant : les budgets restent ceux de `lighthouserc.cjs` / `lighthouserc.desktop.cjs` (job `lighthouse-ci`), et cette passe ne sert que ce qu'un budget ne dit pas (la dispersion, le journal `/api/`, les LHR run par run).",
+      "hors_mutation": "aucune mutation ne peut le prouver, et c'est structurel : le retirer ne ferait rougir aucun garde de PR — il n'est appelé que par le workflow MANUEL `.github/workflows/lighthouse-mesure-locale.yml` (`workflow_dispatch`, sans budget), et son échec ne dit qu'une chose, « la mesure n'a pas eu lieu ». Sa vérité est mesurée à l'exécution : relevé du 25/09/2026 (3 routes × 3 runs × 2 conditions, 18 LHR, zéro requête `/api/` en échec), puis mesure de variance du même artefact (30 runs sur `/` mobile, 20 sur `/contact`, 12 en desktop, 62 LHR, zéro échec), et la commande EXACTE du workflow rejouée le 25/09/2026 en desktop — 3 routes × 1 run en 1 min 16 s build compris, 3 LHR et la distribution écrits dans `--out`."
+    },
+    {
+      "chemin": "frontend/scripts/style-layout-budgets.cjs",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/style-layout-budgets.test.js",
+      "runner": "vitest",
+      "motif": "la TABLE de la STRUCTURE du document pré-rendu, et le COÛT qu'elle publie. Ce module n'est pas un garde : il ne lit pas le dépôt et ne sort jamais en 1 — il fournit la structure de RÉFÉRENCE (nœuds par route, hauteur par route et par condition), le plancher DÉRIVÉ de cette structure (0,8), et les deux relevés de coût avec leur hôte. Le verdict est prononcé par la sonde frontend/e2e/style-layout-document.spec.js (22 cases + la couverture exacte des routes), qui n'entre PAS dans le périmètre de ce registre — le périmètre est frontend/scripts/, .github/scripts/, backend/scripts/ — et qui roule dans le job e2e de la CI via `npm run test:e2e`. CE QUE LE PREMIER VERDICT A COÛTÉ, ET C'EST LA MESURE QUI L'A CORRIGÉ : il portait sur le TEMPS (0,6 × à 1,5 × le relevé d'un poste partagé) et le premier passage du runner Linux a rendu 18 des 22 cases rouges sur le MÊME artefact (run 36188879161 : 18 failed, 123 passed) — / mobile 662 ms sur le poste contre 80,4 ms dans la CI (×8,2), /contact desktop 46 contre 23,3, /jobs mobile 155 contre 45,9, /register mobile 452 contre 74,6 — toutes sur la borne basse, aucune borne haute franchie. Une borne en millisecondes n'y borne pas une régression, elle borne la MACHINE : le même artefact coûte de 1,85 à 8,2 fois moins cher selon l'hôte, et aucune marge ne couvre les deux. Le verdict porte donc sur la STRUCTURE, qui est une propriété de l'artefact : les NŒUDS sont mesurés IDENTIQUES sur les deux hôtes, sur les 11 routes (279, 112, 120, 108, 157, 103, 114, 98, 106, 203, 135), et la HAUTEUR s'accorde à 0,9 % près là où les deux hôtes l'ont imprimée (7 075 → 7 107 px sur l'accueil mobile, 4 782 → 4 807 en desktop, 2 957 → 2 982 sur /how-it-works, 926 → 926 sur /forgot-password). La marge est de 20 points, soit 22 fois cet écart, et la mutation la franchit deux fois et demie : accueil amputé de ses neuf dernières sections → 279 → 105 nœuds et 7 075 → 1 125 px (shell bâti 94 329 o / SHA-1 997b3d3c… → 75 601 o / dbb86205…, restauré à l'identique), les DEUX cases de l'accueil rouges, en nommant « 105 nœuds peints, sous le plancher de 223 ». Ce que la mesure du coût a appris reste PUBLIÉ, table comprise : le STYLE n'est jamais le sujet (2 à 6 % du total — l'élagage du CSS était justifié, poids mort et sources menteuses, mais il n'était PAS le coût du document), le coût est dans le HAUT du document avec une PART FIXE de 250 à 300 ms sur l'accueil mobile (balayage 1→10 sections : 339 / 366 / 494 / 558 / 558 / 569 / 618 / 628 / 622 / 650 ms), et le contenu AJOUTÉ est quasi gratuit (+6 000 px vides en tête = 0 ms, tout <main> republié = ×0,99, héros publié trois fois = +3 %). CONSÉQUENCE ASSUMÉE : le coût du document n'est plus un gate de PR — il est couvert là où il se voit vraiment, par les budgets Lighthouse du déploiement (job lighthouse-ci, `lighthouserc*.cjs`) et par les gardes de POIDS (`check-bundle-size.js`, `check-home-shell.js`), dont la grandeur ne dépend pas de la machine qui les lit. La sonde garde ses deux refus de faux vert (React monté = blocage du bundle cassé ; relevé nul), et la table comme le verdict sont éprouvés à l'unité par frontend/scripts/__tests__/style-layout-budgets.test.js (8 cas : couverture exacte de `src/config/page-meta.js`, plancher dérivé et strictement ordonné, mutation mesurée qui franchit la borne, non-portabilité du temps verrouillée sur les deux relevés) et par deux mutations du registre."
     }
   ],
   "rejeux": [
@@ -1840,6 +1943,169 @@
       ]
     },
     {
+      "id": "shell-remote-resources: verdict non prononce",
+      "garde": "frontend/scripts/check-shell-remote-resources.js",
+      "cible": "frontend/scripts/check-shell-remote-resources.js",
+      "trouve": "if (divergences.length) {",
+      "remplace": "if (false && divergences.length) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-shell-remote-resources.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-shell-remote-resources.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : une iframe tierce",
+        "refuse : un @font-face tiers dans le CSS publié",
+        "refuse : un rel non classé"
+      ]
+    },
+    {
+      "id": "shell-remote-resources: lecture des ressources neutralisee",
+      "garde": "frontend/scripts/check-shell-remote-resources.js",
+      "cible": "frontend/scripts/check-shell-remote-resources.js",
+      "trouve": "const divergences = divergencesDeRessources({ coquilles, origines, buildDir, lire });",
+      "remplace": "const divergences = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-shell-remote-resources.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-shell-remote-resources.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : une iframe tierce"
+      ]
+    },
+    {
+      "id": "shell-remote-resources: plancher de lecture neutralise",
+      "garde": "frontend/scripts/check-shell-remote-resources.js",
+      "cible": "frontend/scripts/check-shell-remote-resources.js",
+      "trouve": "if (lues < PLANCHER_DE_RESSOURCES) {",
+      "remplace": "if (false && lues < PLANCHER_DE_RESSOURCES) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-shell-remote-resources.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-shell-remote-resources.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : un plancher de lecture non atteint"
+      ]
+    },
+    {
+      "id": "css-selecteurs-morts: verdict non prononce",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "if (!divergencesSource.length && !divergencesLivrees.length) {",
+      "remplace": "if (divergencesSource.length >= 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme fichier, ligne, nom et sélecteur quand une feuille SOURCE écrit un nom mort",
+        "sort 1 quand la feuille LIVRÉE garde une règle sans porteur (utilitaire généré)"
+      ]
+    },
+    {
+      "id": "css-selecteurs-morts: lecture des feuilles source neutralisee",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "for (const divergence of nomsMortsDeLaFeuille(css, corpus)) {",
+      "remplace": "for (const divergence of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme fichier, ligne, nom et sélecteur quand une feuille SOURCE écrit un nom mort"
+      ]
+    },
+    {
+      "id": "css-selecteurs-morts: plancher du corpus neutralise",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "if (corpus.fichiers.length < MIN_FICHIERS_CORPUS || corpus.jetons.size < MIN_JETONS_CORPUS) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger un corpus de poseurs illisible (plancher de fichiers)"
+      ]
+    },
+    {
+      "id": "css-selecteurs-morts: plancher des feuilles source neutralise",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "if (feuilles.length < MIN_FEUILLES_SOURCE || reglesLues < MIN_REGLES_LUES) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger des feuilles source illisibles (plancher de règles)"
+      ]
+    },
+    {
+      "id": "css-selecteurs-morts: plancher des pages livrees neutralise",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "if (pages.length < MIN_PAGES_LIVREES) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger un livré sans pages (plancher de pages)"
+      ]
+    },
+    {
       "id": "shell-text-provenance: verdict non prononce",
       "garde": "frontend/scripts/check-shell-text-provenance.js",
       "cible": "frontend/scripts/check-shell-text-provenance.js",
@@ -1897,6 +2163,128 @@
       "cwd": "frontend",
       "attend": [
         "Copie en dur dans les coquilles"
+      ]
+    },
+    {
+      "id": "style-layout-budgets: borne au niveau de la structure mesuree (le document intact serait refuse)",
+      "garde": "frontend/scripts/style-layout-budgets.cjs",
+      "cible": "frontend/scripts/style-layout-budgets.cjs",
+      "trouve": "const BORNE_STRUCTURE = 0.8;",
+      "remplace": "const BORNE_STRUCTURE = 1;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/style-layout-budgets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/style-layout-budgets.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le plancher est DÉRIVÉ de la structure — jamais la structure elle-même",
+        "la borne est STRICTEMENT sous la structure de référence, route par route"
+      ]
+    },
+    {
+      "id": "style-layout-budgets: plancher neutralise (une coquille vide passerait)",
+      "garde": "frontend/scripts/style-layout-budgets.cjs",
+      "cible": "frontend/scripts/style-layout-budgets.cjs",
+      "trouve": "const plancherNoeudsDe = (noeuds) => Math.floor(noeuds * BORNE_STRUCTURE);",
+      "remplace": "const plancherNoeudsDe = () => 0;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/style-layout-budgets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/style-layout-budgets.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le plancher est DÉRIVÉ de la structure — jamais la structure elle-même",
+        "la mutation qui doit franchir la borne la franchit VRAIMENT (mesurée)"
+      ]
+    },
+    {
+      "id": "composants-etat-partage: detection neutralisee (le composant bugue passerait)",
+      "garde": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "cible": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "trouve": "  if (resultats.length > 0) {",
+      "remplace": "  if (false && resultats.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme le fichier et l’action sur un composant bugué"
+      ]
+    },
+    {
+      "id": "composants-etat-partage: plancher neutralise (un repertoire vide passerait)",
+      "garde": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "cible": "frontend/scripts/check-composants-etat-partage-ecouteurs.js",
+      "trouve": "  if (fichiersLus < MIN_FICHIERS_LUS) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-composants-etat-partage-ecouteurs.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse de juger si le nombre de fichiers est sous le plancher (< MIN_FICHIERS_LUS)"
+      ]
+    },
+    {
+      "id": "appui-demontage: detection neutralisee (le controle demonte passerait)",
+      "garde": "frontend/scripts/check-appui-demontage-controles.js",
+      "cible": "frontend/scripts/check-appui-demontage-controles.js",
+      "trouve": "  if (resultats.length > 0) {",
+      "remplace": "  if (false && resultats.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-appui-demontage-controles.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme le fichier, le contrôle, l’événement et l’état sur une fixture buguée"
+      ]
+    },
+    {
+      "id": "appui-demontage: plancher de controles neutralise (un arbre sans controle passerait)",
+      "garde": "frontend/scripts/check-appui-demontage-controles.js",
+      "cible": "frontend/scripts/check-appui-demontage-controles.js",
+      "trouve": "  if (controlesAnalyses < MIN_CONTROLES_ANALYSES) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-appui-demontage-controles.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse de juger si le nombre de contrôles analysés est sous le plancher"
       ]
     }
   ]

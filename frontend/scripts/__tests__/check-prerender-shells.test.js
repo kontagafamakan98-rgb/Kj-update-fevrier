@@ -17,6 +17,15 @@
  * La fixture « propre » est construite pour satisfaire TOUTES les attentes du
  * garde — sinon les cas négatifs rougiraient pour la mauvaise raison, ce qui est
  * exactement le faux vert que ce genre de test doit éviter.
+ *
+ * Et elle les satisfait depuis les SOURCES du build, jamais par recopie : le
+ * chrome vient d'app-chrome.js, les coquilles /login et /register du module
+ * shells-routes.js, les textes du dictionnaire, les formats de photo et de
+ * téléphone de src/config. La recopie a DÉJÀ dérivé une fois (25/09/2026) :
+ * quatre refus du garde portaient sur la fixture — un `<div>` au lieu du
+ * `<button type="submit">` réel, un `<select>` de pays que la page a remplacé
+ * par un `<button>`, un bouton Google publié sans client_id, un placeholder lu
+ * dans le mauvais scope. Le rouge accusait le garde, il accusait la fixture.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -41,6 +50,15 @@ import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../../src/config/phon
 import { COUNTRY_PLACEHOLDER } from '../../src/config/country-placeholder.js';
 import { photoFormatsLine } from '../../src/config/photo-formats.js';
 import { CONTACT } from '../../src/config/contact.js';
+// Le chrome de l'app (navbar + .App + main.flex-1) : la fixture des coquilles
+// le matérialise depuis SA source, comme le garde l'exige — une chaîne
+// recopiée ici pourrait diverger du build sans que rien ne rougisse.
+import { CHROME_OUVERTURE } from '../../vite-plugins/prerender/app-chrome.js';
+// Les coquilles /login et /register : elles aussi matérialisées depuis LEUR
+// source (le module que le build appelle), jamais recopiées.
+import { buildRouteShells } from '../../vite-plugins/prerender/shells-routes.js';
+import { makeScopedTranslator as makeJobsTranslator } from '../../src/utils/pack2PageI18n/jobs.js';
+import { PAGE_SECTIONS } from '../../src/config/page-sections.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-prerender-shells.js');
@@ -54,6 +72,37 @@ const fr = JSON.parse(
   fs.readFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'fr.json'), 'utf8')
 );
 const registerT = makeRegisterTranslator('fr', (cle) => fr[cle]);
+
+/**
+ * Les coquilles /login et /register de la fixture, TELLES QUE LE BUILD les
+ * compose.
+ *
+ * Elles étaient recopiées à la main — et la recopie a dérivé du build, en
+ * silence : quatre refus du garde portaient sur la FIXTURE, pas sur le build
+ * (un `<div>` là où le bouton est un `<button type="submit">`, dont le
+ * `min-height: 48px` de `[type="submit"]` décide la hauteur ; un `<select>` là
+ * où le contrôle de pays est le `<button>` de `CountryDisplay.js` ; un bouton
+ * Google publié alors qu'aucun client_id n'est configuré ; le placeholder pays
+ * lu dans le mauvais scope de traduction). Le module du build est donc appelé
+ * ici avec les MÊMES entrées que son propriétaire,
+ * `vite-plugins/prerender-route-meta.js` — une source unique ne peut pas
+dériver de son build, une recopie le peut toujours.
+ */
+const COQUILLES_ROUTES = buildRouteShells({
+  esc: (valeur) =>
+    String(valeur)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;'),
+  T: (cle) => fr[cle],
+  registerT,
+  jobsT: makeJobsTranslator('fr', (cle) => fr[cle]),
+  contact: CONTACT,
+  frDate: new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date()),
+  pageSections: PAGE_SECTIONS,
+  googleAuth: Boolean(String(process.env.VITE_GOOGLE_CLIENT_ID || '').trim()),
+});
 const appMetaMutations = [
   ['titre', `<title>${fr.neutralTitle}</title>`, '<title>Autre</title>', 'app.html : titre neutre'],
   ['description', `<meta name="description" content="${fr.neutralDescription}" />`, '<meta name="description" content="Autre" />', 'app.html : description neutre'],
@@ -81,12 +130,24 @@ const ogTagFor = (file) => {
 
 const preload = (chunk) => `<link rel="modulepreload" crossorigin href="/assets/${chunk}-abc123.js">`;
 
+/**
+ * Tête commune des pages de la fixture : le `<style>` que porte chaque page du
+ * build. Elle ne porte PAS la centure par héritage — la refonte du 25/09/2026 a
+ * rendu l'alignement explicite, et le garde refuse désormais qu'une page
+ * republie `.App { text-align: center }` (une règle réintroduite recentrerait la
+ * coquille ET React ensemble, donc la sonde de géométrie resterait verte pendant
+ * que le site se recentrerait en silence). Le cas « conforme » de ce fichier est
+ * donc une page SANS cette règle, et le refus correspondant a son cas de
+ * mutation plus bas.
+ */
+const TETE_SHELL = '<!doctype html><html><head><style>.App{display:block}</style>';
+
 /** HTML minimal mais CONFORME à chaque attente du garde. */
 const pages = () => ({
   'index.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     ogTagFor('index.html') +
-    `</head><body><div id="root"><h1>Kojo</h1><p>Contenu statique de l${APOSTROPHE_PUBLIEE}accueil</p>` +
+    `</head><body><div id="root">${CHROME_OUVERTURE}<h1>Kojo</h1><p>Contenu statique de l${APOSTROPHE_PUBLIEE}accueil</p>` +
     '<a href="/jobs">Emplois</a>' +
     `<h2>${fr.contactTitle}</h2><p>${fr.homeContactText}</p>` +
     `<div>${fr.homeContactCall}</div><div>${fr.contactWhatsapp}</div>` +
@@ -99,45 +160,31 @@ const pages = () => ({
     preload('Home') +
     '<script type="module" src="/assets/index.js"></script></body></html>',
   'jobs.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     ogTagFor('jobs.html') +
-    '</head><body><div id="root">' +
-    '<div class="h-16 bg-white border-b border-gray-200"></div>' +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
     '<h1 class="text-3xl font-bold text-gray-900">Emplois disponibles</h1>' +
     '</div></body></html>',
   'login.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     ogTagFor('login.html') +
-    '</head><body><div id="root">' +
-    '<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Connexion</h1>' +
-    '<input id="email" /><div class="bg-orange-600">Connexion</div>' +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
+    COQUILLES_ROUTES.login +
     '</div>' +
     preload('Login') +
     '</body></html>',
   'register.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     ogTagFor('register.html') +
-    '</head><body><div id="root">' +
-    '<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">Créer un compte</h1>' +
-    `<button>${registerT('googleSignup')}</button>` +
-    '<div class="bg-orange-600">Continuer vers la vérification email</div>' +
-    '<input placeholder="Prénom..." /><input placeholder="Nom..." />' +
-    '<input placeholder="exemple@email.com" />' +
-    `<input placeholder="${phoneNumberExample()}" />` +
-    `<span>${PHONE_PREFIX_FALLBACK}</span>` +
-    `<div>${photoFormatsLine(registerT('upTo'))}</div>` +
-    `<select>${COUNTRY_PLACEHOLDER(fr.country)}</select>` +
-    '<p>Informations légales</p><p>Politique de confidentialité</p>' +
-    `<p>${registerT('clientStepNotice')}</p>` +
-    `<p>${registerT('legalConsentHelp')}</p>` +
-    `<label>${registerT('legalConsentLabel')}</label>` +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
+    COQUILLES_ROUTES.register +
     '</div>' +
     preload('Register') +
     '</body></html>',
   'forgot-password.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     ogTagFor('forgot-password.html') +
-    '</head><body><div id="root">' +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
     '<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>' +
     '<input id="reset-email" />' +
     '<div class="bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Envoyer le code</div>' +
@@ -145,9 +192,9 @@ const pages = () => ({
     preload('ForgotPassword') +
     '</body></html>',
   'payment.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     ogTagFor('payment.html') +
-    '</head><body><div id="root">' +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
     '<h1 class="text-3xl font-bold text-gray-900 mb-2">KOJO Paiements réels</h1>' +
     '<p>Un paiement doit être rattaché à une mission</p>' +
     `<p>${fr.paymentPageNoJobText}</p>` +
@@ -156,10 +203,10 @@ const pages = () => ({
     preload('Payment') +
     '</body></html>',
   'how-it-works.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     `<link rel="canonical" href="${SITE_ORIGIN}/how-it-works" />` +
     ogTagFor('how-it-works.html') +
-    '</head><body><div id="root">' +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
     '<h1 class="text-3xl md:text-4xl font-bold mb-4">Comment ça marche ?</h1>' +
     '<details><summary>FAQ</summary>Réponse</details>' +
     '<a href="/jobs">Missions</a><a href="/support">Support</a>' +
@@ -167,19 +214,25 @@ const pages = () => ({
     preload('HowItWorks') +
     '</body></html>',
   'contact.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     `<link rel="canonical" href="${SITE_ORIGIN}/contact" />` +
     ogTagFor('contact.html') +
-    '</head><body><div id="root">' +
-    `<iframe title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"></iframe>` +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
+    // La coquille de /contact publie un CONTRÔLE de carte (lien vers la fiche
+    // Google + le titre du dictionnaire), pas une iframe : le premier écran ne
+    // doit pas charger l'embed tiers. La fixture reproduit donc la forme réelle
+    // — sinon les cas négatifs rougiraient pour la mauvaise raison.
+    '<div class="mt-6 w-full rounded-xl border border-gray-200 bg-white">' +
+    `<a href="${CONTACT.mapsUrl}" title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}">${fr.mapShowMap}</a>` +
+    '</div>' +
     '</div>' +
     preload('Contact') +
     '</body></html>',
   'support.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     `<link rel="canonical" href="${SITE_ORIGIN}/support" />` +
     ogTagFor('support.html') +
-    '</head><body><div id="root">' +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
     '<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>' +
     '<p>Suivre une demande existante</p>' +
     '<a href="tel:+221000000000">Appeler</a><a href="mailto:x@kojo.app">Écrire</a>' +
@@ -188,7 +241,7 @@ const pages = () => ({
     preload('Support') +
     '</body></html>',
   'app.html':
-    '<!doctype html><html><head>' +
+    TETE_SHELL +
     `<title>${fr.neutralTitle}</title>` +
     `<meta name="description" content="${fr.neutralDescription}" />` +
     `<meta property="og:title" content="${fr.neutralTitle}" />` +
@@ -224,6 +277,7 @@ const rewritesFor = (files) =>
 // peut en réécrire un pour exiger le refus nommé.
 const MODULES_PRE_RENDU = [
   'prerender-route-meta.js',
+  'prerender/app-chrome.js',
   'prerender/app-template.js',
   'prerender/declared-body.js',
   'prerender/not-found.js',
@@ -337,6 +391,33 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       attendu: 'est VIDE',
     },
     {
+      // LA REFONTE DÉFAITE : une page qui remet la centure par héritage. C'est
+      // le refus qui protège la décision du 25/09/2026 — et il ne peut PAS être
+      // vu par la sonde navigateur, puisque la règle centrerait les deux canaux
+      // ensemble (elle ne compare que leurs peintures entre elles).
+      nom: 'centure par héritage réintroduite dans le CSS publié',
+      mutate: ({ html }) => {
+        html['jobs.html'] = html['jobs.html'].replace(
+          '.App{display:block}',
+          '.App{display:block;text-align:center}'
+        );
+      },
+      attendu: 'recentre par HÉRITAGE',
+    },
+    {
+      // Sans le chrome (`.App` + `main.flex-1` + navbar), la coquille n'hérite
+      // pas des styles du document comme React : mesuré sur /jobs, le
+      // `text-align` hérité déplaçait les bornes d'encre du texte LCP et faisait
+      // ré-élire la peinture de React (cf. vite-plugins/prerender/app-chrome.js).
+      // L'alignement par défaut est désormais la gauche des deux côtés, mais le
+      // chrome reste indispensable : il porte aussi la navbar et `main.flex-1`.
+      nom: 'chrome de l’app retiré de la coquille /jobs',
+      mutate: ({ html }) => {
+        html['jobs.html'] = html['jobs.html'].replace(CHROME_OUVERTURE, '');
+      },
+      attendu: 'chrome de l’app',
+    },
+    {
       nom: 'modulepreload du chunk Home retiré',
       mutate: ({ html }) => {
         html['index.html'] = html['index.html'].replace(/<link rel="modulepreload"[^>]*>/, '');
@@ -440,14 +521,30 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       attendu: 'texte de la carte « mission requise » absent du shell',
     },
     {
-      nom: 'titre d’iframe de contact retiré',
+      nom: 'titre du contrôle de carte de contact retiré',
       mutate: ({ html }) => {
         html['contact.html'] = html['contact.html'].replace(
           `title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"`,
           ''
         );
       },
-      attendu: 'contact.html : titre d\'iframe',
+      // Le libellé a changé avec la coquille : /contact ne publie plus une
+      // iframe (le premier écran ne charge plus le tiers), mais un CONTRÔLE qui
+      // porte le même titre du dictionnaire — l'attente suit le message réel.
+      attendu: 'contact.html : titre «',
+    },
+    {
+      // La carte ne doit pas revenir en iframe dans le premier écran :
+      // mesuré, l'embed tiers publié d'emblée coûtait ~13 points de score
+      // mobile (81-85) et repoussait le LCP de la page à ~4400 ms simulés.
+      nom: 'carte Google republiée en iframe par la coquille de contact',
+      mutate: ({ html }) => {
+        html['contact.html'] = html['contact.html'].replace(
+          '<div class="mt-6 w-full',
+          '<iframe src="https://www.google.com/maps?q=Bamako&output=embed"></iframe><div class="mt-6 w-full'
+        );
+      },
+      attendu: 'la carte Google (output=embed) est publiée en IFRAME par la coquille',
     },
     {
       nom: 'titre de la carte retiré (gabarit lu dans le dictionnaire)',

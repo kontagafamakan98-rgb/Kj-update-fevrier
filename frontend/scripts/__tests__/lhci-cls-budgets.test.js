@@ -266,3 +266,46 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     expect(pessimiste.map((v) => v.auditId)).toEqual(['cumulative-layout-shift']);
   });
 });
+
+describe('clsAssertionMatrix — socle commun OU socle par route', () => {
+  it('accepte un OBJET (passe mobile) : même socle pour toutes les pages', () => {
+    const socle = { 'total-blocking-time': ['error', { maxNumericValue: 1600 }] };
+    const matrice = clsAssertionMatrix(['/', '/jobs'], socle);
+
+    // Deux entrées par page : le socle (optimiste) et le CLS (médiane).
+    expect(matrice).toHaveLength(4);
+    for (const entree of matrice.filter((e) => e.aggregationMethod === 'optimistic')) {
+      expect(entree.assertions['total-blocking-time']).toEqual(['error', { maxNumericValue: 1600 }]);
+    }
+  });
+
+  it('accepte une FONCTION de la route (passe desktop) : un plafond par page', () => {
+    // C'est la forme qui empêche un plafond de /jobs d'être celui de l'accueil par
+    // simple commodité d'appel : la matrice est construite route par route.
+    const matrice = clsAssertionMatrix(['/', '/jobs'], (route) => ({
+      'total-blocking-time': ['error', { maxNumericValue: route === '/' ? 200 : 150 }],
+    }));
+    const plafondDe = (motif) =>
+      matrice
+        .find((e) => e.aggregationMethod === 'optimistic' && e.matchingUrlPattern === patternFor(motif))
+        .assertions['total-blocking-time'][1].maxNumericValue;
+
+    expect(plafondDe('/')).toBe(200);
+    expect(plafondDe('/jobs')).toBe(150);
+  });
+
+  it('retire le score et le LCP aussi quand le socle est une FONCTION', () => {
+    // L'exception documentée (/jobs : son LCP est le moment où la réponse de son
+    // API est connue) doit survivre au changement de forme du socle.
+    const matrice = clsAssertionMatrix(['/jobs'], (route) => ({
+      'total-blocking-time': ['error', { maxNumericValue: 150 }],
+      'largest-contentful-paint': ['error', { maxNumericValue: 2500 }],
+      'categories:performance': ['error', { minScore: 0.9 }],
+    }));
+    const socle = matrice.find((e) => e.aggregationMethod === 'optimistic');
+
+    expect(socle.assertions['total-blocking-time']).toBeDefined();
+    expect(socle.assertions['largest-contentful-paint']).toBeUndefined();
+    expect(socle.assertions['categories:performance']).toBeUndefined();
+  });
+});

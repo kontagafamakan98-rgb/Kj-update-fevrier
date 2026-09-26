@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { notificationAPI } from '../services/api';
 import { useAuth } from './AuthContext';
 import { devLog, safeLog } from '../utils/env';
+import { VERS_LE_BAS } from '../components/notificationPanelPlacement';
 
 const NotificationContext = createContext();
 
@@ -35,6 +36,21 @@ export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  // Le CONTENEUR de la cloche qui a ouvert le panneau. Le centre de
+  // notifications est UN pour tout le site (monté dans App.js) alors qu'il
+  // existe deux cloches (barres desktop et mobile) : le panneau doit donc
+  // savoir SOUS LAQUELLE s'afficher. C'est cette ancre que le portail de
+  // NotificationPanel.js prend pour cible, ce qui garde son ancrage CSS
+  // (`absolute right-0 mt-2`) sans mesurer un seul pixel. Nulle quand rien
+  // n'est ouvert — le panneau n'a alors pas de domicile, donc pas de rendu.
+  const [ancre, setAncre] = useState(null);
+  // Le SENS dans lequel le panneau s'ouvre, déclaré par la cloche qui l'a
+  // ouvert (barre du haut → vers le bas, barre du bas → vers le haut). Le
+  // contexte le transporte comme il transporte l'ancre : le panneau est UN et
+  // ne sait pas quelle barre l'héberge, donc la cloche le lui DIT au lieu de le
+  // lui faire mesurer. Défaut : la disposition historique (ouverture vers le
+  // bas), pour qu'une cloche qui ne déclare rien garde le dessin d'origine.
+  const [sens, setSens] = useState(VERS_LE_BAS);
   // La DERNIÈRE action refusée par le serveur, telle qu'elle sera montrée :
   // quelle action, sur quelle ligne, et de quoi la rejouer. Une action qui
   // échoue en silence laissait l'utilisateur devant une liste qui ne bouge
@@ -86,18 +102,26 @@ export function NotificationProvider({ children }) {
   }, [user, fetchNotifications, pollUnreadCount]);
 
   // ----- Ouvrir le panneau → marquer le fetch comme frais -----
-  const openPanel = useCallback(() => {
+  const openPanel = useCallback((conteneur, sensDeclare) => {
     setIsOpen(true);
+    setAncre(conteneur || null);
+    // Le sens suit l'ancre : c'est la même cloche qui donne les deux, donc un
+    // panneau ouvert par la barre du bas ne peut pas s'ouvrir vers le bas même
+    // si la cloche précédente avait déclaré l'inverse.
+    setSens(sensDeclare || VERS_LE_BAS);
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const closePanel = useCallback(() => setIsOpen(false), []);
+  const closePanel = useCallback(() => {
+    setIsOpen(false);
+    setAncre(null);
+  }, []);
 
-  const togglePanel = useCallback(() => {
+  const togglePanel = useCallback((conteneur, sensDeclare) => {
     if (isOpen) {
       closePanel();
     } else {
-      openPanel();
+      openPanel(conteneur, sensDeclare);
     }
   }, [isOpen, openPanel, closePanel]);
 
@@ -237,6 +261,8 @@ export function NotificationProvider({ children }) {
     unreadCount,
     loading,
     isOpen,
+    ancre,
+    sens,
     actionError,
     clearActionError,
     retryLastAction,

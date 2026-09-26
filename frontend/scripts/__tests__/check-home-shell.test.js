@@ -8,7 +8,9 @@ import {
   MIN_WORDS,
   TITLE_MAX,
   countWords,
+  CLASSES_SANS_STYLE,
   cssEscapedClass,
+  exemptionsPerimees,
   extractRootHtml,
   missingClasses,
   runHomeShellCheck,
@@ -46,6 +48,13 @@ const CONTACT = {
   mapsEmbedUrl: 'https://www.google.com/maps?q=Bamako&output=embed',
 };
 
+// La clé du dictionnaire (avec son gabarit) et le libellé du CONTRÔLE de carte :
+// la fixture les publie comme le fait la vraie coquille, et le garde les lit
+// dans fr.json — c'est ce qui rend le contrôle rejouable sur une fixture.
+const CARTE_TITRE_MODELE = 'Carte — {address}';
+const CARTE_TITRE = CARTE_TITRE_MODELE.replace('{address}', CONTACT.address);
+const CARTE_LIBELLE = 'Afficher la carte';
+
 // Le rembourrage DÉRIVE du plancher du garde : quand le seuil est passé de 300
 // à 500 mots (audit SEO), la fixture recopiée à 320 mots a fait rougir trois
 // tests qui n'avaient rien à voir avec la question. Une marge de 100 mots garde
@@ -58,7 +67,19 @@ const SHELL_CSS =
   // Classes des cartes pays de la fixture (le garde exige que chaque classe du
   // shell existe dans le CSS du build).
   '.font-semibold{font-weight:600}.text-gray-900{color:#111827}.text-sm{font-size:.875rem}' +
-  '.md\\:text-base{font-size:1rem}';
+  '.md\\:text-base{font-size:1rem}' +
+  // Classes de la FAÇADE DE CARTE de la fixture — les mêmes que publie la
+  // coquille de /contact : le garde refuse toute classe du shell absente du CSS
+  // (Tailwind ne scanne pas le module qui écrit la coquille).
+  '.mt-6{margin-top:1.5rem}.w-full{width:100%}.rounded-xl{border-radius:.75rem}' +
+  '.border{border-width:1px}.border-gray-200{border-color:#e5e7eb}.bg-white{background-color:#fff}' +
+  '.flex{display:flex}.h-80{height:20rem}.flex-col{flex-direction:column}' +
+  '.items-center{align-items:center}.justify-center{justify-content:center}.gap-3{gap:.75rem}' +
+  '.px-4{padding-left:1rem;padding-right:1rem}.text-center{text-align:center}' +
+  '.text-2xl{font-size:1.5rem}.inline-flex{display:inline-flex}' +
+  '.px-5{padding-left:1.25rem;padding-right:1.25rem}.py-2\\.5{padding:.625rem 1.25rem}' +
+  '.text-white{color:#fff}.bg-orange-600{background-color:#ea580c}' +
+  '.hover\\:bg-orange-700:hover{background-color:#c2410c}';
 
 function shellBody({ heroTitle = HERO_TITLE, words = FILLER, extra = '', countries = ['Mali'] } = {}) {
   return (
@@ -77,7 +98,16 @@ function shellBody({ heroTitle = HERO_TITLE, words = FILLER, extra = '', countri
     `<a href="mailto:${CONTACT.email}">${CONTACT.email}</a>` +
     '<a href="https://wa.me/18193003507">WhatsApp</a>' +
     `<span>${CONTACT.address}</span>` +
-    '<iframe class="mt-8" src="https://www.google.com/maps?q=Bamako&output=embed" loading="lazy"></iframe>' +
+    // La carte est un CONTRÔLE (un lien vers la fiche Google), pas une iframe :
+    // c'est la forme que le garde exige depuis que l'embed du premier écran a
+    // été mesuré comme un coût sur le LCP de l'accueil (loading="lazy" n'empêche
+    // pas le navigateur de le charger dès qu'il approche du viewport).
+    '<div class="mt-6 w-full rounded-xl border border-gray-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center">' +
+    '<span class="text-2xl" aria-hidden="true">📍</span>' +
+    // Le href est échappé comme le fait le build (`&` → `&amp;`) : le garde
+    // compare la forme publiée, et la fixture doit donc publier la même.
+    `<a href="${CONTACT.mapsUrl.replace(/&/g, '&amp;')}" target="_blank" rel="noreferrer" title="${CARTE_TITRE}" class="inline-flex items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700">${CARTE_LIBELLE}</a>` +
+    '</div>' +
     extra +
     '</div>'
   );
@@ -105,7 +135,14 @@ function htmlPage({ title, description, body, localBusiness = true, css = SHELL_
     '<meta name="twitter:title" content="Kojo" />' +
     structured +
     `<style>${css}</style>` +
-    `</head><body><div id="root">${body}</div><script type="module" src="/assets/index.js"></script></body></html>`
+    // La fixture publie le CHROME de la coquille, comme le build réel : le
+    // conteneur `.App` (hook de structure, sans règle CSS, exempté de la règle 8
+    // avec son motif). Sans lui, une fixture « conforme » ferait rougir le refus
+    // des exemptions périmées — et ce refus doit viser le build, pas un manque
+    // dans la fixture.
+    // (Le chrome n'est publié que si le corps existe : la fixture dont le corps
+    // est VIDE doit laisser `#root` vide, pour que ce refus-là reste éprouvable.)
+    `</head><body><div id="root">${body ? `<div class="App">${body}</div>` : ''}</div><script type="module" src="/assets/index.js"></script></body></html>`
   );
 }
 
@@ -140,7 +177,14 @@ function makeProject({
 
   fs.writeFileSync(
     path.join(frontendDir, 'src', 'i18n', 'fr.json'),
-    JSON.stringify({ heroTitle: HERO_TITLE })
+    JSON.stringify({
+      heroTitle: HERO_TITLE,
+      // Les clés du contrôle de carte : le garde les lit pour exiger le titre et
+      // le libellé que la coquille doit publier (c'est le dictionnaire qui les
+      // détient, ici comme en vrai).
+      mapIframeTitle: CARTE_TITRE_MODELE,
+      mapShowMap: CARTE_LIBELLE,
+    })
   );
   fs.writeFileSync(path.join(frontendDir, CONTACT_JSON), JSON.stringify(contact, null, 2));
   // Le référentiel partagé que lit le garde (et que le build lit aussi pour
@@ -311,12 +355,28 @@ describe('check-home-shell — SEO local', () => {
     expect(run(project).errors.join('\n')).toContain('contact.json');
   });
 
-  it('exige une carte intégrée en lazy', () => {
-    const noMap = run(makeProject({ body: shellBody().replace(/<iframe[\s\S]*?<\/iframe>/, '') }));
-    expect(noMap.errors.join('\n')).toContain('Google Maps');
+  it('exige le CONTRÔLE de la carte, et refuse l’iframe `output=embed` au premier écran', () => {
+    // Façade disparue : plus aucun chemin vers la fiche Google (le lien du
+    // contrôle était le seul `href` vers mapsUrl du shell).
+    const sansControle = run(
+      makeProject({ body: shellBody().replace(/<div class="mt-6[\s\S]*?<\/div>/, '') })
+    );
+    expect(sansControle.errors.join('\n')).toContain('contrôle de la carte');
 
-    const eager = run(makeProject({ body: shellBody().replace(' loading="lazy"', '') }));
-    expect(eager.errors.join('\n')).toContain('loading="lazy"');
+    // Libellé recopié en littéral : le dictionnaire n'est plus la source.
+    const sansLibelle = run(makeProject({ body: shellBody().replace(CARTE_LIBELLE, 'Ouvrir') }));
+    expect(sansLibelle.errors.join('\n')).toContain('mapShowMap');
+
+    // Régression fermée : la coquille republie l'iframe `output=embed` (elle
+    // tirait ~300 Ko de tiers dans le premier écran et repoussait le LCP).
+    const embed = run(
+      makeProject({
+        body: shellBody({
+          extra: '<iframe src="https://www.google.com/maps?q=Bamako&output=embed" loading="lazy"></iframe>',
+        }),
+      })
+    );
+    expect(embed.errors.join('\n')).toContain('output=embed');
   });
 });
 
@@ -389,5 +449,39 @@ describe('helpers du shell', () => {
   it('cssEscapedClass échappe ce que Tailwind échappe', () => {
     expect(cssEscapedClass('bg-white/95')).toBe('bg-white\\/95');
     expect(cssEscapedClass('md:text-5xl')).toBe('md\\:text-5xl');
+  });
+
+  // ── Les exemptions de la règle 8 (classes sans style par DESSEIN) ────────
+  // `App` est un hook de structure : le shell le publie, aucune règle ne le
+  // style, et c'est voulu. Sans exemption, la règle 8 le signalait à chaque
+  // build depuis que `.App { text-align: center }` a été retirée (25/09/2026) —
+  // et poussait donc à réintroduire une déclaration d'alignement qu'on venait de
+  // retirer pour de bonnes raisons.
+  const EXEMPTIONS = { App: 'hook de structure (cas de test)' };
+
+  it('accepte une classe publiée, sans règle, et exemptée avec son motif', () => {
+    expect(exemptionsPerimees('<div class="App min-h-screen"></div>', '.min-h-screen{height:100vh}')).toEqual(
+      []
+    );
+    expect(missingClasses('<div class="App"></div>', '.x{}', { ignore: ['App'] })).toEqual([]);
+  });
+
+  it('refuse une exemption dont la classe n’est plus publiée', () => {
+    const refus = exemptionsPerimees('<div class="autre"></div>', '.autre{}', EXEMPTIONS);
+    expect(refus.join('\n')).toContain('exemption PÉRIMÉE pour la classe « App »');
+  });
+
+  it('refuse une exemption que le CSS rend fausse (la classe est désormais stylée)', () => {
+    const refus = exemptionsPerimees('<div class="App"></div>', '.App{text-align:center}', EXEMPTIONS);
+    expect(refus.join('\n')).toContain("l'exemption de la classe « App » n'est plus justifiée");
+  });
+
+  it('l’exemption réelle du dépôt porte un motif, et elle est encore valable', () => {
+    // Sans motif, l'entrée serait une liste d'ignorés déguisée ; la règle du
+    // dépôt veut qu'une exemption dise POURQUOI.
+    for (const [classe, motif] of Object.entries(CLASSES_SANS_STYLE)) {
+      expect(`${classe} : ${motif}`.length).toBeGreaterThan(40);
+    }
+    expect(Object.keys(CLASSES_SANS_STYLE)).toContain('App');
   });
 });

@@ -231,3 +231,60 @@ describe('anti-CLS — wrappers de page ancrés sur le shell flex-1 (min-h-full)
     expect(offenders, offenders.join('\n')).toEqual([]);
   });
 });
+
+// ── L'intro de /jobs : un bloc, trois canaux, UNE hauteur ──────────────────
+// Le plus grand texte de /jobs est son paragraphe d'intro, donc son élément
+// LCP. Trois canaux le publient et doivent rester d'accord : la coquille
+// pré-rendue le peint (avant tout JavaScript, donc indépendamment de l'API), la
+// page le rend dès son premier rendu — requête encore en vol —, et le squelette
+// de Suspense lui RÉSERVE sa hauteur pendant le chargement.
+//
+// Une hauteur qui diverge d'un côté déplace la liste au remplacement du
+// squelette (CLS) ; une copie écrite d'un seul côté laisse les autres derrière,
+// en silence. C'est pourquoi les trois lisent la MÊME clé déclarée par le plan
+// (que le build exige dans la coquille, cf. exigerCorpsDeclare) et la MÊME
+// hauteur réservée — calibrée sur le rendu réel (412 px : 4 lignes = 104 px ;
+// 1350 px : 2 lignes = 52 px), mesurée à CLS 0,0000 sur les deux surfaces et
+// vérifiée sur les trois largeurs 412 / 800 / 1350.
+describe('anti-CLS — l’intro de /jobs : même clé et même hauteur pour les trois canaux', () => {
+  const lire = (rel) => fs.readFileSync(path.resolve(__dirname, rel), 'utf8');
+  const HAUTEUR_RESERVEE = 'min-h-[104px] md:min-h-[52px]';
+
+  it('la page et sa coquille publient l’intro par la clé déclarée par le plan', () => {
+    const plan = lire('../../config/page-sections.js');
+    expect(plan).toMatch(/['"]\/jobs['"]\s*:\s*\{[\s\S]{0,200}?introKey:\s*'intro'/);
+    expect(lire('../../pages/Jobs.js')).toContain('pageT(pagePlan.introKey)');
+    expect(lire('../../../vite-plugins/prerender/shells-routes.js')).toContain(
+      'jobsT(jobsPlan.introKey)'
+    );
+  });
+
+  it('la hauteur réservée est DÉCLARÉE une fois, et le squelette la réserve à l’identique', () => {
+    // Depuis le 25/09/2026, la hauteur de l'intro n'est plus écrite dans la
+    // page NI dans la coquille : elle est déclarée par le plan (`introClass`),
+    // que les deux canaux lisent — c'est ce qui empêche une retouche d'un seul
+    // côté de ré-élire un élément LCP. Le squelette, lui, n'est pas l'élément
+    // LCP : il lui RÉSERVE sa hauteur, donc il porte encore la valeur, et
+    // c'est la seule surface qui doive encore la contenir en clair.
+    const plan = lire('../../config/page-sections.js');
+    expect(
+      plan,
+      `le plan ne déclare plus la hauteur réservée « ${HAUTEUR_RESERVEE} » de l'intro de /jobs`
+    ).toContain(HAUTEUR_RESERVEE);
+    expect(
+      lire('../SkeletonLoader.js'),
+      `squelette (SkeletonLoader.js) : hauteur réservée « ${HAUTEUR_RESERVEE} » absente — le swap déplacera la liste`
+    ).toContain(HAUTEUR_RESERVEE);
+    // Les deux canaux LISENT cette déclaration au lieu de la recopier.
+    expect(lire('../../pages/Jobs.js')).toContain('className={pagePlan.introClass}');
+    expect(lire('../../../vite-plugins/prerender/shells-routes.js')).toContain(
+      'class="${jobsPlan.introClass}"'
+    );
+  });
+
+  it('le dictionnaire du scope fournit l’intro en français et en anglais', () => {
+    const scope = lire('../../utils/pack2PageI18n/jobs.js');
+    expect(scope).toMatch(/intro:\s*\n?\s*'Retrouvez/);
+    expect(scope).toMatch(/intro:\s*\n?\s*'Find every mission/);
+  });
+});

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "npm --prefix frontend run build",
-    "vercel-build": "npm --prefix frontend run build"
+    "vercel-build": "npm --prefix frontend run build",
+    "livrer": "python .github/scripts/livrer.py"
   }
 }

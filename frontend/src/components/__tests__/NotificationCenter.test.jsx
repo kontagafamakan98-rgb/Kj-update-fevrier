@@ -1,5 +1,6 @@
 /**
- * Le centre de notifications : supprimer une ligne la fait DISPARAÎTRE.
+ * Le centre de notifications : UN panneau pour tout le site, et une suppression
+ * qui fait VRAIMENT disparaître la ligne.
  *
  * RÉGRESSION COUVERTE — signalée par l'utilisateur le 21/09/2026 : « la
  * notification apparaît mais quand je supprime, ça refuse de disparaître et
@@ -18,6 +19,17 @@
  * 3. Le panneau retire la ligne AVANT de savoir si le serveur a accepté : une
  *    suppression refusée disparaissait de l'écran alors que la notification
  *    existait toujours. Elle reste maintenant affichée — l'écran ne ment pas.
+ *
+ * QUATRIÈME CHEMIN, celui du lot suivant : la barre de navigation existe en DEUX
+ * dispositions (desktop et mobile) et montait donc DEUX panneaux, chacun avec
+ * son écouteur `mousedown`. L'instance dont le conteneur était masqué recevait
+ * l'appui fait dans l'autre, ne le reconnaissait pas comme « intérieur », et
+ * refermait le panneau PENDANT l'appui : le bouton démonté, le `click` qui suit
+ * n'atteignait plus rien — supprimer ou marquer lu ne partait JAMAIS. Le
+ * panneau est donc unique et rendu par portail dans le conteneur de la cloche
+ * qui l'ouvre ; ces tests mesurent les deux propriétés qui en découlent (une
+ * seule instance, hébergée par la barre qui l'a ouverte) et la séquence
+ * d'événements réelle (`mousedown` PUIS `click`).
  */
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -62,7 +74,10 @@ vi.mock('../../contexts/LanguageContext', () => ({
 }));
 
 import { NotificationProvider, useNotifications } from '../../contexts/NotificationContext';
-import NotificationDropdown from '../NotificationDropdown';
+import NotificationBell from '../NotificationBell';
+import NotificationPanel from '../NotificationPanel';
+import MobileBottomNav from '../MobileBottomNav';
+import { VERS_LE_HAUT } from '../notificationPanelPlacement';
 
 // Sonde : atteint les actions du contexte par la vraie API du provider.
 let contexte;
@@ -71,14 +86,37 @@ function Sonde() {
   return null;
 }
 
+/**
+ * La composition de l'application, réduite à ce qui compte ici : les DEUX
+ * cloches du site (desktop puis barre du bas, dans cet ordre — le même partage
+ * que `Navbar.js` et `MobileBottomNav.js` : la barre du haut ne porte plus sa
+ * cloche que dans sa disposition desktop, la barre du BAS la porte sous le
+ * pouce, et c'est elle qui déclare une ouverture VERS LE HAUT) et le panneau
+ * UNIQUE monté à côté, comme dans `AppRoutes`.
+ *
+ * Le nom du composant importé ne dit pas combien de panneaux le site en monte :
+ * c'est cette composition qui le dit, et c'est donc elle que les tests doivent
+ * monter. Elle doit aussi dire la VÉRITÉ du partage des barres : une doublure
+ * qui recopierait une cloche de header mobile ferait passer les tests pour ce
+ * que le site ne fait plus.
+ */
 const rendu = () => render(
   <MemoryRouter>
     <NotificationProvider>
       <Sonde />
-      <NotificationDropdown />
+      <nav>
+        <div className="hidden md:flex"><NotificationBell /></div>
+      </nav>
+      <div data-mobile-bottom-nav="true">
+        <NotificationBell sens={VERS_LE_HAUT} />
+      </div>
+      <NotificationPanel />
     </NotificationProvider>
   </MemoryRouter>,
 );
+
+const cloches = () => screen.getAllByRole('button', { name: /notificationsTitle/ });
+const panneaux = () => document.querySelectorAll('[data-notification-panel]');
 
 const NOTIF_SERVEUR = {
   id: '68b0a1f0c3d2e4f5a6b7c8d9',
@@ -104,17 +142,18 @@ beforeEach(() => {
 afterEach(() => {
   contexte = undefined;
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
-/** Ouvre le panneau et attend la ligne chargée depuis le serveur. */
+/** Ouvre le panneau (par la PREMIÈRE cloche) et attend la ligne du serveur. */
 const ouvrirAvecLaLigneServeur = async () => {
   rendu();
   await waitFor(() => expect(getAll).toHaveBeenCalled());
-  fireEvent.click(screen.getByRole('button', { name: /notificationsTitle/ }));
+  fireEvent.click(cloches()[0]);
   await waitFor(() => expect(screen.getByText(NOTIF_SERVEUR.title)).toBeTruthy());
 };
 
-describe('NotificationDropdown — supprimer une notification la retire de l\'écran', () => {
+describe('centre de notifications — supprimer une notification la retire de l\'écran', () => {
   it("une notification du serveur : le serveur est appelé, puis la ligne disparaît", async () => {
     await ouvrirAvecLaLigneServeur();
 
@@ -206,7 +245,7 @@ describe('NotificationDropdown — supprimer une notification la retire de l\'é
 
     // On referme le panneau : l'armement ne survit pas à un changement d'écran.
     fireEvent.click(screen.getByRole('button', { name: 'closeNotif' }));
-    fireEvent.click(screen.getByRole('button', { name: /notificationsTitle/ }));
+    fireEvent.click(cloches()[0]);
     await waitFor(() => expect(screen.getByText(NOTIF_SERVEUR.title)).toBeTruthy());
 
     expect(deleteAll).not.toHaveBeenCalled();
@@ -222,7 +261,7 @@ describe('NotificationDropdown — supprimer une notification la retire de l\'é
 //             l'identifiant d'un push dont l'enregistrement a échoué, une ligne
 //             déjà supprimée d'un autre appareil. La garder la rendait
 //             insupprimable à vie.
-describe('NotificationDropdown — un échec se voit, et un 404 ne bloque plus la ligne', () => {
+describe('centre de notifications — un échec se voit, et un 404 ne bloque plus la ligne', () => {
   const erreur = (status) => {
     const e = new Error(status === 404 ? 'Notification introuvable' : 'Erreur serveur');
     e.response = { status, data: { detail: e.message } };
@@ -251,7 +290,7 @@ describe('NotificationDropdown — un échec se voit, et un 404 ne bloque plus l
     await waitFor(() => expect(screen.queryByText(NOTIF_SERVEUR.title)).toBeNull());
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByText('noNotifications')).toBeTruthy();
-    // La suppression est VÉRIFIÉE, pas supposée : le server a été relu.
+    // La suppression est VÉRIFIÉE, pas supposée : le serveur a été relu.
     await waitFor(() => expect(getAll).toHaveBeenCalled());
   });
 
@@ -299,70 +338,197 @@ describe('NotificationDropdown — un échec se voit, et un 404 ne bloque plus l
 });
 
 /**
- * LA BARRE DE NAVIGATION MONTE DEUX FOIS LE PANNEAU, et l'instance cachée
- * fermait celui de l'autre : aucun clic DANS le panneau n'atteignait son bouton.
+ * UN PANNEAU, DEUX CLOCHES — et l'appui qui va jusqu'au bout.
  *
- * `Navbar.js` rend `<NotificationDropdown />` deux fois — barre desktop
- * (`hidden md:flex`) et barre mobile (`md:hidden`) — parce que la cloche doit
- * exister dans deux dispositions. L'ouverture est un état PARTAGÉ (le contexte),
- * donc les DEUX instances rendent leur panneau ; l'une des deux vit dans un
- * conteneur `display:none`.
+ * La barre de navigation existe en deux dispositions parce que la cloche doit
+ * exister dans les deux ; le panneau, lui, n'a aucune raison d'être dupliqué, et
+ * l'être était le défaut : chaque instance écoutait `mousedown` sur le document,
+ * donc un appui dans le panneau visible n'était « à l'intérieur » que pour UNE
+ * instance — l'autre appelait `closePanel()`, le panneau se démontait PENDANT
+ * l'appui, et le `click` n'atteignait plus le bouton. `page.click()` et un doigt
+ * envoient `mousedown` PUIS `click` : un test qui n'enverrait qu'un `click`
+ * isolé ne peut pas voir ce défaut, et c'est pourquoi la séquence est rejouée
+ * ici telle que le navigateur l'émet.
  *
- * Chaque instance écoute `mousedown` sur le document pour se refermer au clic
- * extérieur. Un clic de l'utilisateur dans le panneau visible n'est « à
- * l'intérieur » que pour UNE instance : pour l'autre, sa propre référence de
- * panneau ne contient pas la cible → elle appelle `closePanel()`. Le panneau se
- * démonte donc PENDANT le `mousedown`, et le `click` qui suit n'atteint plus le
- * bouton : supprimer ou marquer lu ne partait jamais — la notification restait à
- * l'écran, sans requête et sans un mot. C'est le symptôme « ça refuse de
- * disparaître », et c'est ce que ce test mesure.
- *
- * Pourquoi le trou n'était pas couvert : les tests précédents n'envoyaient
- * qu'un `click` isolé. Un doigt ou une souris envoie `mousedown` PUIS `click`
- * (c'est l'appui — pas le relâchement — que le panneau écoute).
+ * Les deux propriétés mesurées :
+ *   1. le nombre de panneaux du document ne dépend PAS du nombre de cloches ;
+ *   2. le panneau est rendu DANS le conteneur de la cloche qui l'a ouvert — donc
+ *      sous la bonne barre, sans une seule mesure de coordonnées.
  */
-describe('NotificationDropdown — deux instances (barres desktop + mobile)', () => {
-  const renduDouble = () => render(
-    <MemoryRouter>
-      <NotificationProvider>
-        <Sonde />
-        <div className="hidden md:flex"><NotificationDropdown /></div>
-        <div className="md:hidden"><NotificationDropdown /></div>
-      </NotificationProvider>
-    </MemoryRouter>,
-  );
-
+describe('centre de notifications — un seul panneau, deux cloches', () => {
   /** Un clic RÉEL : l'appui puis le relâchement, comme le fait le navigateur. */
   const clicReel = (element) => {
     fireEvent.mouseDown(element);
     fireEvent.click(element);
   };
 
-  it("l'appui dans le panneau visible atteint son bouton : la ligne est supprimée par le serveur", async () => {
-    renduDouble();
+  it("deux barres montées, mais UN seul panneau dans le document", async () => {
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+    expect(cloches()).toHaveLength(2);
+
+    clicReel(cloches()[0]);
+
+    await waitFor(() => expect(panneaux()).toHaveLength(1));
+    expect(panneaux()).toHaveLength(1);
+  });
+
+  it("le panneau est hébergé par la barre qui l'a ouvert (la cloche de la barre du bas)", async () => {
+    rendu();
     await waitFor(() => expect(getAll).toHaveBeenCalled());
 
-    clicReel(screen.getAllByRole('button', { name: /notificationsTitle/ })[0]);
-    await waitFor(() => expect(screen.getAllByText(NOTIF_SERVEUR.title).length).toBeGreaterThan(0));
+    // La SECONDE cloche est celle de la barre mobile : c'est elle qui ouvre.
+    clicReel(cloches()[1]);
+    await waitFor(() => expect(panneaux()).toHaveLength(1));
 
-    clicReel(screen.getAllByRole('button', { name: 'deleteNotification' })[0]);
+    const panneau = panneaux()[0];
+    const heberge = cloches().filter((cloche) => panneau.parentElement.contains(cloche));
+
+    expect(heberge).toHaveLength(1);
+    expect(heberge[0]).toBe(cloches()[1]);
+  });
+
+  it("l'appui dans le panneau atteint son bouton : la ligne est supprimée par le serveur", async () => {
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    clicReel(cloches()[0]);
+    await waitFor(() => expect(screen.getByText(NOTIF_SERVEUR.title)).toBeTruthy());
+
+    clicReel(screen.getByRole('button', { name: 'deleteNotification' }));
 
     await waitFor(() => expect(deleteOne).toHaveBeenCalledWith(NOTIF_SERVEUR.id));
   });
 
   it("l'appui sur une ligne atteint sa ligne : elle est marquée lue", async () => {
-    renduDouble();
+    rendu();
     await waitFor(() => expect(getAll).toHaveBeenCalled());
 
-    clicReel(screen.getAllByRole('button', { name: /notificationsTitle/ })[0]);
-    await waitFor(() => expect(screen.getAllByText(NOTIF_SERVEUR.title).length).toBeGreaterThan(0));
+    clicReel(cloches()[0]);
+    await waitFor(() => expect(screen.getByText(NOTIF_SERVEUR.title)).toBeTruthy());
 
-    // Un appui sur la ligne marque la notification lue (et naviguerait vers la
-    // mission si elle en portait une) : c'est la preuve que l'appui est arrivé.
-    const ligne = screen.getAllByRole('button', { name: `${NOTIF_SERVEUR.title}: ${NOTIF_SERVEUR.body}` })[0];
-    clicReel(ligne);
+    clicReel(screen.getByRole('button', { name: `${NOTIF_SERVEUR.title}: ${NOTIF_SERVEUR.body}` }));
 
     await waitFor(() => expect(markRead).toHaveBeenCalledWith(NOTIF_SERVEUR.id));
     expect(deleteOne).not.toHaveBeenCalled();
+  });
+
+  it("l'appui sur la cloche pendant que le panneau est ouvert le REFERME (pas de réouverture)", async () => {
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    clicReel(cloches()[0]);
+    await waitFor(() => expect(panneaux()).toHaveLength(1));
+
+    // L'appui sur la cloche ne doit pas être pris pour un clic « extérieur » :
+    // le panneau se fermerait sur le `mousedown`, et le `click` qui suit
+    // rouvrirait un panneau que l'utilisateur venait de fermer.
+    clicReel(cloches()[0]);
+
+    await waitFor(() => expect(panneaux()).toHaveLength(0));
+  });
+
+  it("un appui hors de la barre ferme le panneau", async () => {
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    clicReel(cloches()[0]);
+    await waitFor(() => expect(panneaux()).toHaveLength(1));
+
+    clicReel(document.body);
+
+    await waitFor(() => expect(panneaux()).toHaveLength(0));
+  });
+
+  it("si la barre qui héberge le panneau cesse d'être affichée, il se ferme", async () => {
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    clicReel(cloches()[0]);
+    await waitFor(() => expect(panneaux()).toHaveLength(1));
+
+    // jsdom ne calcule aucune mise en page : `getClientRects()` y est TOUJOURS
+    // vide, ce qui est justement l'état « masquée » que le composant teste. On
+    // ne simule donc pas un franchissement de point de rupture — on déclenche
+    // l'événement dont ce franchissement s'accompagne, et on exige la décision.
+    // Le franchissement réel (barre desktop → mobile) est mesuré dans un vrai
+    // Chromium par frontend/e2e/notifications.spec.js.
+    window.dispatchEvent(new Event('resize'));
+
+    await waitFor(() => expect(panneaux()).toHaveLength(0));
+  });
+});
+
+/**
+ * LE SENS D'OUVERTURE EST DÉCLARÉ PAR LA CLOCHE QUI OUVRE.
+ *
+ * Le panneau est UN et ne sait pas quelle barre l'héberge : il tombe sur le
+ * bord droit de son conteneur (`absolute right-0`), et rien de ce conteneur ne
+ * dit de quel CÔTÉ il doit s'ouvrir. C'est une DÉCLARATION de la cloche — vers
+ * le bas sous la barre du haut (la page est là), vers le HAUT au-dessus de la
+ * barre du bas (collée au bas de l'écran, un panneau qui descendrait sortirait
+ * de la fenêtre). jsdom ne calcule aucune mise en page : ce qui se vérifie ici
+ * est que la bonne classe d'ancrage part du bon déclencheur, et que chacune
+ * exclut l'autre. Le FAIT — le panneau réellement peint au-dessus de la barre
+ * du bas — se mesure dans Chromium (`e2e/notifications.spec.js`).
+ */
+describe("centre de notifications — le sens d'ouverture est déclaré par la cloche", () => {
+  const clicReel = (element) => {
+    fireEvent.mouseDown(element);
+    fireEvent.click(element);
+  };
+  const panneau = () => document.querySelector('[data-notification-panel]');
+
+  it("la barre du haut ouvre vers le bas, la barre du bas vers le haut — et le sens suit la cloche ouverte", async () => {
+    rendu();
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    // 1. La cloche qui ne déclare RIEN : l'ouverture historique, sous elle.
+    clicReel(cloches()[0]);
+    await waitFor(() => expect(panneau()).toBeTruthy());
+    expect(panneau().classList.contains('mt-2')).toBe(true);
+    expect(panneau().classList.contains('bottom-full')).toBe(false);
+    // Le bord droit reste du côté de la cloche, quel que soit le sens.
+    expect(panneau().classList.contains('right-0')).toBe(true);
+
+    // Refermer, puis ouvrir par l'autre barre : le sens doit SUIVRE la cloche
+    // qui ouvre, et pas rester celui de la précédente.
+    clicReel(cloches()[0]);
+    await waitFor(() => expect(panneau()).toBeNull());
+
+    clicReel(cloches()[1]);
+    await waitFor(() => expect(panneau()).toBeTruthy());
+    expect(panneau().classList.contains('bottom-full')).toBe(true);
+    expect(panneau().classList.contains('mt-2')).toBe(false);
+  });
+
+  it("la barre du bas porte la cloche, avec une colonne de plus dans sa grille", async () => {
+    render(
+      <MemoryRouter>
+        <NotificationProvider>
+          <MobileBottomNav />
+          <NotificationPanel />
+        </NotificationProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(getAll).toHaveBeenCalled());
+
+    // Un seul déclencheur dans cette barre, et c'est celui du centre.
+    const cloche = screen.getByRole('button', { name: /notificationsTitle/ });
+
+    // La grille suit le nombre d'items : cinq avec la cloche, quatre sans elle.
+    // Ajouter l'item sans élargir la grille ferait passer le cinquième sur une
+    // SECONDE ligne — la barre doublerait de hauteur, et rien ne le dirait.
+    const grille = cloche.closest('.grid');
+    expect(grille).toBeTruthy();
+    expect(grille.className).toContain('grid-cols-5');
+
+    clicReel(cloche);
+    await waitFor(() => expect(panneau()).toBeTruthy());
+
+    // Le panneau est hébergé par la cloche de la barre du BAS…
+    expect(panneau().parentElement.contains(cloche)).toBe(true);
+    // …et il s'ouvre VERS LE HAUT : sous la barre du bas, il n'y a plus d'écran.
+    expect(panneau().classList.contains('bottom-full')).toBe(true);
   });
 });

@@ -11,6 +11,7 @@ import path from 'node:path'
 
 import { buildHomeShell } from './prerender/shells-home.js'
 import { buildRouteShells } from './prerender/shells-routes.js'
+import { chromeDePage, piedDePage } from './prerender/app-chrome.js'
 import { makeDeclaredBodyGuard } from './prerender/declared-body.js'
 import { makeWriteRouteText, applyOgCard, setMeta } from './prerender/route-meta.js'
 import { buildAppTemplate } from './prerender/app-template.js'
@@ -114,14 +115,28 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
 
       // La garde, le texte de route et les coquilles : composés à partir des
       // modules, jamais recopiés.
+      // Le bouton Google n'existe que si le client_id est configuré AU BUILD :
+      // `import.meta.env.VITE_GOOGLE_CLIENT_ID` est inliné par Vite, on lit donc
+      // sa source ici — les deux canaux décident sur la même valeur.
+      const googleAuth = Boolean(String(env.VITE_GOOGLE_CLIENT_ID || '').trim())
       const exigerCorpsDeclare = makeDeclaredBodyGuard({
         esc, T, registerT, jobsT, pageSections, pageSectionParts,
+        conditions: googleAuth ? new Set(['google-auth']) : new Set(),
       })
       const writeRouteText = makeWriteRouteText({ pageMeta, T })
+      // Le PIED DE PAGE appartient au CHROME : React le rend après `</main>`
+      // sur toutes les routes, donc les coquilles le publient de la même
+      // façon — une fois pour toutes, depuis app-chrome.js (cf. le fichier :
+      // sans lui, `main` se partage la hauteur sans le pied de page et les
+      // pages centrées verticalement se décalent de 4 à 14 px au montage).
+      const pied = piedDePage({ esc, T, socialLinks })
       const homeShell = buildHomeShell({ esc, T, contact, socialLinks, pageSections })
       const SHELLS = {
         home: homeShell,
-        ...buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pageSections }),
+        ...buildRouteShells({
+          esc, T, registerT, jobsT, contact, frDate, pageSections,
+          googleAuth,
+        }),
       }
       // ── Preload du chunk lazy de chaque route ─────────────────────────
       // Le chunk de la page (Login/Jobs) ne se télécharge que quand
@@ -182,7 +197,12 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         const shell = SHELLS[route] || ''
         exigerCorpsDeclare(routePath, route, shell)
         if (shell) {
-          out = out.replace('<div id="root"></div>', `<div id="root">${shell}</div>`)
+          // Le corps est enveloppé dans le CHROME de l'app (navbar, `.App`,
+          // `main.flex-1`) : les coquilles ne publiaient pas ces conteneurs,
+          // donc l'héritage des styles du document divergeait de React (cf.
+          // app-chrome.js — le `text-align` hérité déplaçait les bornes d'encre
+          // du texte LCP et faisait ré-élire la peinture de React).
+          out = out.replace('<div id="root"></div>', `<div id="root">${chromeDePage(shell, pied)}</div>`)
         }
         // Preload du chunk lazy de la route, en parallèle de l'entrée →
         // boot React accéléré (modulepreload fetch aussi ses imports).
@@ -211,9 +231,12 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // sans cet appel, l'accueil serait le seul corps non vérifié — et
       // c'est exactement par là que la dérive silencieuse rentrerait.
       exigerCorpsDeclare('/', 'home', homeShell)
+      // Même chrome que les routes (cf. app-chrome.js) : l'accueil ne peut pas
+      // être la seule page dont la coquille hérite d'un autre alignement que
+      // celui que React applique au même corps.
       const withHomeShell = html.replace(
         '<div id="root"></div>',
-        `<div id="root">${homeShell}</div>`
+        `<div id="root">${chromeDePage(homeShell, pied)}</div>`
       )
       if (withHomeShell === html) {
         throw new Error(

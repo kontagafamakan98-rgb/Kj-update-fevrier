@@ -12,6 +12,13 @@ fr: {
   tabMissions: 'Mes missions',
   myMissions: 'Mes missions',
   availableJobs: 'Emplois disponibles',
+  // Paragraphe d'introduction de la page : son plus grand bloc de texte, donc
+  // l'élément LCP. Il est publié par la coquille (peinte au premier paint, avant
+  // tout JavaScript) ET par la page — déclaré par son plan, résolu par les deux
+  // canaux. Sans lui, le plus grand texte peint restait celui de l'état vide,
+  // qui n'existe qu'après la réponse de /api/jobs.
+  intro:
+    'Retrouvez ici toutes les missions publiées sur Kojo : parcourez les offres ouvertes près de chez vous, postulez en quelques minutes et suivez vos candidatures au même endroit.',
   allCategories: 'Toutes les catégories',
   allStatuses: 'Tous les statuts',
   loadingMore: 'Chargement…',
@@ -33,6 +40,8 @@ en: {
   tabMissions: 'My jobs',
   myMissions: 'My jobs',
   availableJobs: 'Available jobs',
+  intro:
+    'Find every mission published on Kojo here: browse the open jobs near you, apply in a few minutes and follow your applications in one place.',
   allCategories: 'All categories',
   allStatuses: 'All statuses',
   loadingMore: 'Loading…',

@@ -22,13 +22,18 @@ export default function About() {
   const { t } = useLanguage();
   usePageMeta();
 
-  const { titleKey, introKey, cards, highlight, links } = PAGE_SECTIONS['/about'];
+  const { titleKey, introKey, frameClass, titleClass, introClass, cards, highlight, links } =
+    PAGE_SECTIONS['/about'];
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">{t(titleKey)}</h1>
-        <p className="text-gray-600 mb-8">{t(introKey)}</p>
+      {/* La géométrie est LUE dans le plan, jamais recopiée : le plus grand
+          texte peint de cette page est le paragraphe d'introduction, donc son
+          élément LCP, et une divergence d'un seul côté ré-élit un élément LCP
+          (voir le commentaire du plan, mesures à l'appui). */}
+      <div className={frameClass}>
+        <h1 className={titleClass}>{t(titleKey)}</h1>
+        <p className={introClass}>{t(introKey)}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {cards.map((card) => (

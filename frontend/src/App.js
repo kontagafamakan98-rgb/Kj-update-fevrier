@@ -8,6 +8,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { CountryProvider } from "./contexts/CountryContext";
 import { NotificationProvider } from './contexts/NotificationContext';
 import Navbar from "./components/Navbar";
+import NotificationPanel from "./components/NotificationPanel";
 import CountryChangePopup from "./components/CountryChangePopup";
 import OfflineIndicator from "./components/OfflineIndicator";
 import MobileBottomNav from "./components/MobileBottomNav";
@@ -291,6 +292,18 @@ function AppRoutes() {
 
       {/* Main Navigation */}
       <Navbar />
+
+      {/* Centre de notifications — LE panneau, monté UNE fois pour tout le
+          site, à côté de la navbar et non dedans. La barre de navigation
+          existe en deux dispositions (desktop et mobile) et n'a que des
+          CLOCCHES (`NotificationBell`), qui sont de simples déclencheurs : le
+          panneau, lui, se rend par portail dans le conteneur de la cloche qui
+          l'a ouvert. Une seule instance = un seul écouteur de clic extérieur ;
+          avec un panneau par barre, l'instance dont le conteneur était masqué
+          refermait l'autre PENDANT l'appui et le `click` de suppression
+          n'atteignait plus son bouton. Rien n'est peint tant que le panneau
+          n'est pas ouvert (il retourne `null`). */}
+      <NotificationPanel />
       
       {/* Toast Notifications — lazy (cf. déclaration plus haut) */}
       <Suspense fallback={null}>

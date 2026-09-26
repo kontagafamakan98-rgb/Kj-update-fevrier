@@ -36,12 +36,41 @@ const LIGNE_LIEN =
   'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors';
 const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3';
 
+// ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
+// Le titre du héros est l'élément LCP de « / », et la coquille pré-rendue le
+// peint — mais createRoot() efface #root au montage : React reconstruit le même
+// titre. Mesuré (Chrome 152, sonde LCP + trace) : un remplacement de MÊME
+// TAILLE n'ajoute aucun entry LCP — la peinture de la coquille reste celle que
+// le navigateur retient — alors qu'un remplacement PLUS GRAND en enregistre un
+// nouveau, plus tardif, ce qui fait entrer toute la chaîne JavaScript dans le
+// graphe LCP simulé de Lantern (LCP 3199 ms au lieu de 1254 ms, score 93 au
+// lieu de 100). Ces deux chaînes de classes étaient recopiées face à face dans
+// src/pages/Home.js et dans vite-plugins/prerender/shells-home.js : la moindre
+// retouche d'un côté faisait diverger la géométrie des deux peintures EN
+// SILENCE, et c'est exactement ce que le LCP ne pardonne pas. Elles ont
+// maintenant UN propriétaire, ici, que les deux canaux lisent.
+const HERO_TITRE_CLASSES =
+  'text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto';
+const HERO_SOUS_TITRE_CLASSES = 'text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto';
+
 export const PAGE_SECTIONS = {
   // L'accueil : le corps du shell (trois promesses, trois étapes, catégories)
   // était recopié ici, liste par liste, face aux blocs de src/pages/Home.js —
   // ajouter une catégorie ou une promesse à la page laissait la coquille
   // derrière, sans que rien ne rougisse.
   '/': {
+    // ── Le HÉROS : le titre, son sous-titre et leur géométrie ──────────────
+    // C'était le dernier morceau du corps de l'accueil publié par la coquille
+    // SANS déclaration : la coquille lisait `T('heroTitle')` en littéral, et
+    // rien ne rougissait si cette ligne disparaissait — un crawler, et le
+    // premier paint, perdaient alors l'élément LCP de la page sans qu'aucun
+    // garde ne le voie. Déclaré ici, `exigerCorpsDeclare` refuse un build dont
+    // la coquille ne porte plus le titre (le même refus que pour les
+    // catégories, les promesses, les étapes et les chiffres).
+    titleKey: 'heroTitle',
+    subtitleKey: 'heroSubtitle',
+    heroTitleClass: HERO_TITRE_CLASSES,
+    heroSubtitleClass: HERO_SOUS_TITRE_CLASSES,
     categories: [
       // `labelKey` est AUSSI le code de catégorie canonique du backend : le
       // libellé affiché et le filtre de /jobs sortent donc de la même valeur.
@@ -132,6 +161,20 @@ export const PAGE_SECTIONS = {
     ],
     titleKey: 'howItWorksTitle',
     heroKey: 'howItWorksHero',
+    // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
+    // L'élément LCP de /how-it-works est le SOUS-TITRE du héros (« Trouver un
+    // travailleur ou une mission… »). Mesuré le 25/09/2026 comme sur /jobs
+    // (deux canaux, deux tailles) : UNE SEULE candidate, au premier paint, sur
+    // ce paragraphe, d'aire IDENTIQUE — 30 320 px² mobile, 32 656 px² desktop.
+    //
+    // `heroFrameClass` porte la largeur du héros (donc le retour à la ligne du
+    // sous-titre, qui porte lui-même son `max-w-2xl`), `heroSubtitleClass` sa
+    // hauteur, et `heroTitleClass` le texte qui le précède et pourrait lui
+    // prendre le LCP. Les trois étaient recopiées dans src/pages/HowItWorks.js
+    // et vite-plugins/prerender/shells-routes.js.
+    heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
+    heroTitleClass: 'text-3xl md:text-4xl font-bold mb-4',
+    heroSubtitleClass: 'text-lg opacity-90 max-w-2xl mx-auto',
     escrowTitleKey: 'escrowWhatTitle',
     escrowTextKey: 'escrowWhatText',
     faqTitleKey: 'faqTitle',
@@ -144,8 +187,53 @@ export const PAGE_SECTIONS = {
     ],
   },
 
+  // /jobs : le titre et le PARAGRAPHE D'INTRODUCTION. L'intro n'est pas un
+  // ornement : c'est le plus grand bloc de texte de la page, donc son élément
+  // LCP, et c'est la coquille qui le peint — avant tout JavaScript, à l'instant
+  // du premier paint.
+  //
+  // Ce qu'elle corrige, mesuré (Lighthouse mobile, pile de la CI, 3 runs) :
+  // sans elle, le plus grand texte peint était celui de l'état vide, qui
+  // n'existe QU'APRÈS la réponse de /api/jobs. LCP 3111 / 3071 / 3106 ms, dont
+  // 2657 / 2617 / 2656 ms de `Render Delay` — c'est-à-dire le temps de réponse
+  // du backend, à la milliseconde près, dans le chemin critique du LCP. Le
+  // premier paint, lui, était déjà à 1473 / 1459 / 1454 ms : la page avait 1,6 s
+  // de marge qu'aucun bloc assez grand ne venait occuper.
+  //
+  // Déclarée ici, l'intro a UN propriétaire pour deux canaux : la page la rend
+  // par `t()`, la coquille la peint par `jobsT()` (voir `exigerCorpsDeclare`),
+  // donc aucune des deux ne peut la perdre en silence.
   '/jobs': {
     titleKey: 'availableJobs',
+    introKey: 'intro',
+    // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
+    // L'élément LCP de /jobs est le paragraphe d'introduction, et c'est la
+    // coquille qui le peint. Mesuré le 25/09/2026 (Chrome 152, sonde des
+    // candidates `largest-contentful-paint`, bundle d'entrée BLOQUÉ pour le
+    // canal coquille et navigation réelle pour l'autre, 412×823 et
+    // 1350×940) : UNE SEULE candidate dans les deux canaux, horodatée au
+    // premier paint (t = 112 ms mobile / 88 ms desktop pour la coquille,
+    // 84 / 80 ms pour React), sur ce paragraphe, d'AIRE IDENTIQUE de part et
+    // d'autre — 35 640 px² mobile et 36 002 px² desktop.
+    //
+    // Ces chaînes étaient recopiées face à face dans src/pages/Jobs.js et
+    // vite-plugins/prerender/shells-routes.js (le commentaire de la coquille
+    // disait lui-même « ses classes sont celles de src/pages/Jobs.js, à
+    // l'identique ») : la moindre retouche d'un côté faisait diverger les deux
+    // peintures EN SILENCE, et c'est exactement ce que le LCP ne pardonne pas
+    // (un remplacement PLUS GRAND ré-élit un élément, toute la chaîne
+    // JavaScript entre alors dans le graphe LCP simulé — mesuré sur cette
+    // page avant correctif : `elementRenderDelay` de 1156 à 2345 ms, score
+    // desktop 92 au lieu de 100). Elles ont UN propriétaire, ici.
+    //
+    // `frameClass` porte la LARGEUR du paragraphe (donc son retour à la
+    // ligne), `introClass` sa hauteur — dont les 104 px / 52 px RÉSERVÉS, que
+    // le squelette de Suspense doit réserver à l'identique (voir
+    // `antiClsSkeletons.test.jsx`) — et `titleClass` le seul autre texte
+    // capable de prendre le LCP au paragraphe.
+    frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8',
+    titleClass: 'text-3xl font-bold text-gray-900',
+    introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-gray-600 min-h-[104px] md:min-h-[52px]',
   },
 
   '/login': {
@@ -181,6 +269,22 @@ export const PAGE_SECTIONS = {
     clientIconKey: 'iconClient',
     workerIconKey: 'iconWorker',
     photoIconKey: 'iconProfilePhoto',
+    // Les CONSEILS photo de src/components/ProfilePhotoUpload.js : un bloc
+    // entier (216,56 px mesurés à 412×823) que la coquille oubliait de
+    // publier. Déclaré ici, il devient une partie du corps que la coquille
+    // DOIT porter (`exigerCorpsDeclare`), et la sonde de géométrie le mesure
+    // des deux côtés — avant, tout le bas du formulaire d'inscription montait
+    // de 232 px au montage de React.
+    photoTipsIconKey: 'iconPhotoTips',
+    // Les deux glyphes du sélecteur de pays (src/components/CountryDisplay.js :
+    // le globe affiché tant qu'aucun pays n'est choisi, et le chevron du
+    // menu). La coquille publiait un `<select>` à la place de ce contrôle :
+    // un élément DIFFÉRENT, 1 px moins haut — mesuré, tout le bas du
+    // formulaire (47 textes) était 1 px trop haut.
+    countryGlobeIconKey: 'iconCountryGlobe',
+    countryChevronIconKey: 'iconCountryChevron',
+    photoTipsTitleKey: 'tipsGoodPhoto',
+    photoTipsKeys: ['useRecentPhoto', 'lookCamera', 'avoidGroup', 'neutralBackground'],
     legalNoticeIconKey: 'iconLegalNotice',
     googleSignupKey: 'googleSignup',
     orSeparatorKey: 'orSeparator',
@@ -327,6 +431,22 @@ export const PAGE_SECTIONS = {
   '/about': {
     titleKey: 'aboutTitle',
     introKey: 'aboutIntro',
+    // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
+    // L'élément LCP de /about est le paragraphe d'introduction. Mesuré le
+    // 25/09/2026 comme sur /jobs (deux canaux, deux tailles) : UNE SEULE
+    // candidate, au premier paint (coquille t = 112 / 116 ms, React 88 / 112),
+    // sur ce paragraphe, d'aire IDENTIQUE — 74 466 px² mobile, 80 262 px²
+    // desktop. C'est cette ÉGALITÉ qui tient la garantie : createRoot efface
+    // #root, React reconstruit le même paragraphe, et un remplacement de MÊME
+    // TAILLE n'enregistre aucun nouvel élément LCP.
+    //
+    // Les trois chaînes étaient recopiées dans src/pages/About.js et
+    // vite-plugins/prerender/shells-routes.js. `frameClass` porte la largeur
+    // (donc le retour à la ligne du paragraphe), `introClass` sa hauteur, et
+    // `titleClass` le seul autre texte qui puisse prendre le LCP.
+    frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
+    introClass: 'text-gray-600 mb-8',
     cards: [
       { iconKey: 'iconPromiseFindWork', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
       { iconKey: 'iconPromiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
@@ -348,6 +468,63 @@ export const PAGE_SECTIONS = {
     titleKey: 'contactTitle',
     introKey: 'contactIntro',
     noteKey: 'contactHelpText',
+    // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
+    // L'élément LCP de /contact est le paragraphe d'introduction, et c'est la
+    // coquille pré-rendue qui le peint. Mesuré (Chrome 152, sonde des
+    // candidates `largest-contentful-paint`, serveur de rewrites de
+    // vercel.json, 412×823 et 1350×940, 6 relevés) : UNE SEULE candidate, À
+    // L'INSTANT DU FCP (t = 92 à 112 ms, chaque fois égal au FCP au dixième de
+    // milliseconde près), sur ce paragraphe, et de même aire que celui que
+    // React reconstruit (57 213,8 px² mobile / 65 520 px² desktop, mesurés
+    // JavaScript coupé pour la coquille et activé pour React). C'est cette
+    // ÉGALITÉ qui tient : createRoot EFFACE #root, React reconstruit le
+    // paragraphe, et un remplacement de MÊME TAILLE n'enregistre aucun nouvel
+    // élément LCP.
+    //
+    // La mesure qui prouve le mécanisme est celle de la DIVERGENCE — rejouée le
+    // 25/09/2026 en rétrécissant d'une seule classe la peinture de la coquille
+    // (`… introClass} text-xs`), donc SANS toucher à React : une SECONDE
+    // candidate apparaît, plus tardive, et `e2e/contact-lcp.spec.js` rougit sur
+    // « React a peint un élément PLUS GRAND que la coquille ». Toute la chaîne
+    // JavaScript entre alors dans le graphe LCP simulé de Lantern (mesuré sur
+    // /jobs, où la géométrie avait divergé : `elementRenderDelay` de 1156 à
+    // 2345 ms, score desktop 92 au lieu de 100). Les budgets Lighthouse de
+    // /contact sur l'artefact corrigé : 100/100/100 mobile et 100/100/100
+    // desktop (3 tours chacun).
+    //
+    // Ces chaînes étaient recopiées face à face dans src/pages/Contact.js et
+    // vite-plugins/prerender/shells-routes.js : la moindre retouche d'un côté
+    // faisait diverger la géométrie des deux peintures EN SILENCE, et c'est
+    // exactement ce que le LCP ne pardonne pas. Elles ont maintenant UN
+    // propriétaire, ici, que les deux canaux lisent (le build refuse par
+    // ailleurs une coquille qui ne les publie pas : `exigerCorpsDeclare`).
+    //
+    // Ce qui décide de l'aire du paragraphe, c'est sa LARGEUR (donc le retour à
+    // la ligne) : elle vient de `frameClass`. `titleClass` porte le seul autre
+    // texte capable de prendre le LCP au paragraphe (l'aire du titre grandit
+    // avec lui), et `noteClass` le suit dans le flux.
+    frameClass: 'max-w-2xl mx-auto px-4 py-8',
+    titleClass: 'text-3xl font-bold text-gray-900 mb-2',
+    introClass: 'text-gray-600 mb-3',
+    noteClass: 'text-sm text-gray-500 mb-6',
+    // ── La carte Google : un contrôle, pas un embed au premier écran ───────
+    // La coquille publiait l'iframe elle-même (en `loading="lazy"`). Mesuré
+    // (Lighthouse 12.6.1, pile de la CI, Chrome 152, /contact mobile, 3 runs) :
+    // le premier écran tirait quand même l'embed tiers, et le LCP de la page —
+    // qui est notre PROPRE paragraphe d'introduction — était repoussé à
+    // 4143-4399 ms simulés (scores 81-85), avec jusqu'à 2800 ms de « element
+    // render delay ». La coquille publie donc le MÊME contrôle que la page, avec
+    // les mêmes classes : un lien vers la fiche Google (il fonctionne même sans
+    // JavaScript) que la page transforme en « afficher la carte ici » à l'appui.
+    // Les deux canaux lisent ces classes ICI : une géométrie qui divergerait
+    // ferait sauter le bloc au montage, et ce qui charge au premier écran est
+    // exactement ce qui repousse le LCP.
+    mapButtonKey: 'mapShowMap',
+    mapIconKey: 'iconContactAddress',
+    mapFrameClass:
+      'mt-6 w-full rounded-xl border border-gray-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
+    mapControlClass:
+      'inline-flex items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700',
     // Une ligne de contact = une donnée (icône, libellé, destination, valeur
     // affichée, accent). `href` vient de src/config/contact.js : la règle `tel:`
     // et la règle `mailto:` (sujet compris) n'existent qu'à cet endroit, donc la
@@ -407,6 +584,25 @@ export const PAGE_SECTIONS = {
   '/privacy': {
     titleKey: 'privacyTitle',
     introKey: 'privacyIntro',
+    // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
+    // Sur CETTE page, le plus grand texte n'est pas l'introduction : c'est le
+    // CORPS d'une section (« Kojo conserve les données nécessaires à la mise
+    // en relation… », mesuré le 25/09/2026 : UNE SEULE candidate au premier
+    // paint, 84 360 px² mobile / 86 676 px² desktop, aire identique entre la
+    // coquille et React). La géométrie à déclarer est donc celle de la
+    // section, pas seulement de son en-tête : `sectionBodyClass` porte
+    // l'élément élu, `sectionTitleClass` l'en-tête qui le précède dans le
+    // flux, et `frameClass` la largeur — c'est elle qui décide du retour à la
+    // ligne, donc de la hauteur du corps.
+    //
+    // Ces cinq chaînes étaient recopiées dans src/pages/Privacy.js et
+    // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
+    // faisait diverger les deux peintures en silence.
+    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
+    introClass: 'text-gray-600 mb-8',
+    sectionTitleClass: 'text-xl font-semibold text-gray-900 mb-2',
+    sectionBodyClass: 'text-gray-600',
     sections: [
       { titleKey: 'privacyDataTitle', bodyKey: 'privacyDataBody' },
       { titleKey: 'privacyRetentionTitle', bodyKey: 'privacyRetentionBody' },

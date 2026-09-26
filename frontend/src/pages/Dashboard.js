@@ -202,7 +202,16 @@ export default function Dashboard() {
               🚀 {t('createJobGPS')}
             </Link>
             {import.meta.env.DEV && (
-              <Link to="/photo-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors shadow-md">
+              /* La branche DEV est ÉLIMINÉE du bundle de production : Tailwind, lui,
+                 génère quand même les utilitaires qu'il lit ici, et deux d'entre eux
+                 (un fond pourpre 600 et son survol 700) n'étaient posés par AUCUN
+                 élément livré — mesuré : 2 règles mortes, 199 o par page. Ce lien de
+                 test reprend donc des classes qui, elles, SONT posées (mesure du
+                 25/09/2026 : 2 poses pour le fond pourpre 100, 2 pour le texte 700).
+                 PIÈGE MESURÉ : Nommer ces deux classes en toutes lettres ici les
+                 RESSUSCITE — Tailwind 4 lit le TEXTE BRUT des sources, commentaires
+                 compris, et régénère l'utilitaire qu'on vient de retirer. */
+              <Link to="/photo-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-purple-100 text-purple-700 rounded-xl transition-colors shadow-md">
                 📷 {t('debugPhotos')}
               </Link>
             )}

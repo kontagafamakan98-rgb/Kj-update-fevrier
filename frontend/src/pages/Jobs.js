@@ -60,7 +60,8 @@ const CarteEnChargement = () => (
 // des jobs. On démarre la requête publique par défaut (découverte : status
 // open, 1re page) dès l'ÉVALUATION du module du chunk, donc EN PARALLÈLE du
 // boot React et du montage. Le composant réutilise le résultat au lieu d'en
-// refaire une (cf. consumePublicJobsPrefetch).
+// refaire une (cf. consumePublicJobsPrefetch, et `snapshot` pour la lecture
+// pendant le rendu).
 //
 // Volontairement limité à la vue « Découvrir » publique, déterministe et sans
 // état utilisateur : les onglets « Mes candidatures » / « Mes missions » et
@@ -70,13 +71,13 @@ const CarteEnChargement = () => (
 // L'implémentation vit dans utils/publicJobsPrefetch.js (fabrique testable,
 // voir utils/__tests__/publicJobsPrefetch.test.js) : ici on l'instancie avec
 // les dépendances réelles de la page.
-const { kick: kickPublicJobsPrefetch, consume: consumePublicJobsPrefetch } =
-  makePublicJobsPrefetch({
-    jobsAPI,
-    normalizeJobList,
-    safeLog,
-    pageSize: JOBS_PAGE_SIZE,
-  });
+const publicJobsPrefetch = makePublicJobsPrefetch({
+  jobsAPI,
+  normalizeJobList,
+  safeLog,
+  pageSize: JOBS_PAGE_SIZE,
+});
+const { kick: kickPublicJobsPrefetch } = publicJobsPrefetch;
 
 // Déclencher À L'ÉTAPE MODULE : dès que le chunk lazy Jobs est évalué, la
 // requête part EN PARALLÈLE du boot React et du montage (avant tout useEffect).
@@ -121,7 +122,12 @@ export default function Jobs() {
       network: pageT('loadErrorNetwork'),
       server: pageT('loadErrorServer'),
     },
-    consumePrefetch: consumePublicJobsPrefetch,
+    // L'objet entier (et non seulement `consume`) : le hook lit `snapshot`
+    // pendant le rendu, quand la requête est DÉJÀ arrivée, pour démarrer la page
+    // seedée (liste réelle au premier rendu). Il ne suspend plus : mesuré, le
+    // fallback Suspense gardait la page sans son plus grand texte (l'intro, qui
+    // est l'élément LCP) pendant toute la réponse de l'API (cf. useJobsData.js).
+    prefetch: publicJobsPrefetch,
   });
 
   const reessayer = retry;
@@ -193,10 +199,10 @@ export default function Jobs() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className={pagePlan.frameClass}>
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className={pagePlan.titleClass}>
             {effectiveTab === JOB_TAB_MISSIONS ? (pageT('myMissions') || 'Mes missions') : (pageT(pagePlan.titleKey) || 'Emplois disponibles')}
           </h1>
           <p className="mt-2 text-gray-600">{new Intl.DateTimeFormat(locale, { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date())}</p>
@@ -241,6 +247,29 @@ export default function Jobs() {
           )}
         </div>
       </div>
+
+      {/* ── Le paragraphe d'intro : le premier paint ne dépend plus de l'API ──
+          C'est le plus grand bloc de texte de la page, donc son élément LCP.
+          Il est peint par la COQUILLE pré-rendue (avant tout JavaScript) et
+          repris ici, à l'identique — même clé du plan, et la GÉOMÉTRIE lue
+          dans ce plan (`introClass`, `frameClass`) : ces chaînes n'ont qu'un
+          propriétaire, car une divergence d'un seul côté ré-élit un élément
+          LCP et fait entrer le JavaScript dans le LCP facturé — pour que la
+          bascule coquille → React soit invisible.
+
+          Sans lui, le plus grand texte peint était celui de l'état vide, qui
+          n'existe qu'APRÈS la réponse de /api/jobs : mesuré (Lighthouse
+          mobile, pile de la CI, 3 runs) LCP 3111 / 3071 / 3106 ms dont
+          2657 / 2617 / 2656 ms de `Render Delay`, c'est-à-dire le temps de
+          réponse du backend recopié dans le LCP. Le premier paint était déjà
+          à ~1,46 s : la marge existait, aucun bloc assez grand ne l'occupait.
+
+          Il est rendu sur TOUS les onglets, comme la coquille (qui ne connaît
+          pas l'onglet) : changer d'onglet ne retire donc pas de hauteur, et la
+          coquille reste la réplique exacte de ce que la page affiche. */}
+      <p className={pagePlan.introClass}>
+        {pageT(pagePlan.introKey)}
+      </p>
 
       {/* Onglets : découverte / candidatures / missions. Présentés comme un
           sélecteur unique quand il y en a plusieurs : c'est le même contrôle

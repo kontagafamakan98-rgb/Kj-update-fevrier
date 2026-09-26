@@ -15,312 +15,35 @@
   --kojo-b-radius-sm: 14px;
 }
 
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) {
+:is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) {
   color: inherit;
 }
 
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .card,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .dashboard-card,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .stats-card,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .job-card,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .profile-card,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .settings-card,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .panel {
+:is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) .card, :is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) .panel {
   background: var(--kojo-b-surface);
   border: 1px solid var(--kojo-b-stroke);
   border-radius: var(--kojo-b-radius);
   box-shadow: var(--kojo-b-shadow-soft);
 }
 
-:is(
-  .dashboard-page,
-  .dashboard,
-  [data-screen="dashboard"]
-) .stats-card,
-:is(
-  .dashboard-page,
-  .dashboard,
-  [data-screen="dashboard"]
-) [class*="stat"] {
+:is(.dashboard,[data-screen="dashboard"]) [class*="stat"] {
   background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: var(--kojo-b-shadow-soft);
 }
 
-:is(
-  .dashboard-page,
-  .dashboard,
-  [data-screen="dashboard"]
-) h1,
-:is(
-  .dashboard-page,
-  .dashboard,
-  [data-screen="dashboard"]
-) h2,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) h1,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) h2 {
+:is(.dashboard,[data-screen="dashboard"]) h1, :is(.dashboard,[data-screen="dashboard"]) h2, :is(.profile,.settings,[data-screen="profile"],[data-screen="settings"]) h1, :is(.profile,.settings,[data-screen="profile"],[data-screen="settings"]) h2 {
   letter-spacing: -0.02em;
   line-height: 1.12;
 }
 
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .job-card,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .order-card,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .mission-card,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) li {
+:is(.jobs,.missions,[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"]) li {
   border-radius: var(--kojo-b-radius);
   border: 1px solid var(--kojo-b-stroke);
   box-shadow: var(--kojo-b-shadow-soft);
 }
 
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .job-card:hover,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .order-card:hover,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .mission-card:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--kojo-b-shadow);
-}
-
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .badge,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .chip,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .status,
-:is(
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"]
-) .tag {
+:is(.jobs,.missions,[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"]) .badge, :is(.jobs,.missions,[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"]) .status, :is(.jobs,.missions,[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"]) .tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -333,284 +56,27 @@
   font-weight: 700;
 }
 
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .profile-card,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .settings-card,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .section,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .list-item {
+:is(.profile,.settings,[data-screen="profile"],[data-screen="settings"]) .section {
   border-radius: var(--kojo-b-radius);
   border: 1px solid var(--kojo-b-stroke);
   box-shadow: var(--kojo-b-shadow-soft);
 }
 
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .danger,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .danger-zone,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .logout,
-:is(
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .delete-account {
+:is(.profile,.settings,[data-screen="profile"],[data-screen="settings"]) .danger, :is(.profile,.settings,[data-screen="profile"],[data-screen="settings"]) .logout {
   border: 1px solid rgba(166, 22, 22, 0.22);
   background: rgba(166, 22, 22, 0.04);
 }
 
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) button,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) .btn,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) [role="button"] {
+:is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) button, :is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) [role="button"] {
   border-radius: var(--kojo-b-radius-sm);
 }
 
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) input,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) select,
-:is(
-  .dashboard-page,
-  .dashboard,
-  .jobs-page,
-  .jobs,
-  .missions-page,
-  .missions,
-  .profile-page,
-  .profile,
-  .settings-page,
-  .settings,
-  [data-screen="dashboard"],
-  [data-screen="jobs"],
-  [data-screen="orders"],
-  [data-screen="tracking"],
-  [data-screen="profile"],
-  [data-screen="settings"]
-) textarea {
+:is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) input, :is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) select, :is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) textarea {
   border-radius: var(--kojo-b-radius-sm);
 }
 
 @media (max-width: 768px) {
-  :is(
-    .dashboard-page,
-    .dashboard,
-    .jobs-page,
-    .jobs,
-    .missions-page,
-    .missions,
-    .profile-page,
-    .profile,
-    .settings-page,
-    .settings,
-    [data-screen="dashboard"],
-    [data-screen="jobs"],
-    [data-screen="orders"],
-    [data-screen="tracking"],
-    [data-screen="profile"],
-    [data-screen="settings"]
-  ) .card,
-  :is(
-    .dashboard-page,
-    .dashboard,
-    .jobs-page,
-    .jobs,
-    .missions-page,
-    .missions,
-    .profile-page,
-    .profile,
-    .settings-page,
-    .settings,
-    [data-screen="dashboard"],
-    [data-screen="jobs"],
-    [data-screen="orders"],
-    [data-screen="tracking"],
-    [data-screen="profile"],
-    [data-screen="settings"]
-  ) .dashboard-card,
-  :is(
-    .dashboard-page,
-    .dashboard,
-    .jobs-page,
-    .jobs,
-    .missions-page,
-    .missions,
-    .profile-page,
-    .profile,
-    .settings-page,
-    .settings,
-    [data-screen="dashboard"],
-    [data-screen="jobs"],
-    [data-screen="orders"],
-    [data-screen="tracking"],
-    [data-screen="profile"],
-    [data-screen="settings"]
-  ) .job-card,
-  :is(
-    .dashboard-page,
-    .dashboard,
-    .jobs-page,
-    .jobs,
-    .missions-page,
-    .missions,
-    .profile-page,
-    .profile,
-    .settings-page,
-    .settings,
-    [data-screen="dashboard"],
-    [data-screen="jobs"],
-    [data-screen="orders"],
-    [data-screen="tracking"],
-    [data-screen="profile"],
-    [data-screen="settings"]
-  ) .profile-card,
-  :is(
-    .dashboard-page,
-    .dashboard,
-    .jobs-page,
-    .jobs,
-    .missions-page,
-    .missions,
-    .profile-page,
-    .profile,
-    .settings-page,
-    .settings,
-    [data-screen="dashboard"],
-    [data-screen="jobs"],
-    [data-screen="orders"],
-    [data-screen="tracking"],
-    [data-screen="profile"],
-    [data-screen="settings"]
-  ) .settings-card {
+  :is(.dashboard,.jobs,.missions,.profile,.settings,[data-screen="dashboard"],[data-screen="jobs"],[data-screen="orders"],[data-screen="tracking"],[data-screen="profile"],[data-screen="settings"]) .card {
     border-radius: 18px;
   }
 }
