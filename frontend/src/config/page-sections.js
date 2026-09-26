@@ -74,30 +74,30 @@ export const PAGE_SECTIONS = {
     categories: [
       // `labelKey` est AUSSI le code de catégorie canonique du backend : le
       // libellé affiché et le filtre de /jobs sortent donc de la même valeur.
-      { labelKey: 'general', iconKey: 'iconCategoryGeneral' },
-      { labelKey: 'plumbing', iconKey: 'iconCategoryPlumbing' },
-      { labelKey: 'electrical', iconKey: 'iconCategoryElectrical' },
-      { labelKey: 'construction', iconKey: 'iconCategoryConstruction' },
-      { labelKey: 'cleaning', iconKey: 'iconCategoryCleaning' },
-      { labelKey: 'gardening', iconKey: 'iconCategoryGardening' },
-      { labelKey: 'tutoring', iconKey: 'iconCategoryTutoring' },
-      { labelKey: 'mechanics', iconKey: 'iconCategoryMechanics' },
-      { labelKey: 'carpentry', iconKey: 'iconCategoryCarpentry' },
-      { labelKey: 'computing', iconKey: 'iconCategoryComputing' },
+      { labelKey: 'general', icone: 'categoryGeneral' },
+      { labelKey: 'plumbing', icone: 'categoryPlumbing' },
+      { labelKey: 'electrical', icone: 'categoryElectrical' },
+      { labelKey: 'construction', icone: 'categoryConstruction' },
+      { labelKey: 'cleaning', icone: 'categoryCleaning' },
+      { labelKey: 'gardening', icone: 'categoryGardening' },
+      { labelKey: 'tutoring', icone: 'categoryTutoring' },
+      { labelKey: 'mechanics', icone: 'categoryMechanics' },
+      { labelKey: 'carpentry', icone: 'categoryCarpentry' },
+      { labelKey: 'computing', icone: 'categoryComputing' },
     ],
     promises: [
-      { iconKey: 'iconPromiseFindWork', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
-      { iconKey: 'iconPromiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
-      { iconKey: 'iconPromiseSecurePayments', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
+      { icone: 'promiseFindWork', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
+      { icone: 'promiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
+      { icone: 'promiseSecurePayments', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
     ],
     // `numberKey` porte le NUMÉRO de l'étape (« 1 », « 2 », « 3 » du
     // dictionnaire) : la pastille qui en fait une marche à suivre est publiée
     // par la page ET par sa coquille, donc le numéro a un propriétaire unique
     // au lieu d'être recompté par `index + 1` de chaque côté.
     steps: [
-      { iconKey: 'iconHomeStep1', numberKey: 'stepNumber1', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
-      { iconKey: 'iconHomeStep2', numberKey: 'stepNumber2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
-      { iconKey: 'iconHomeStep3', numberKey: 'stepNumber3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
+      { icone: 'step1', numberKey: 'stepNumber1', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
+      { icone: 'step2', numberKey: 'stepNumber2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
+      { icone: 'step3', numberKey: 'stepNumber3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
     ],
     // Les quatre chiffres de l'accueil. La coquille les publiait dans sa propre
     // liste `[['1 000+', 'activeWorkers'], …]`, pendant que la page tenait ses
@@ -115,10 +115,11 @@ export const PAGE_SECTIONS = {
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le
     // même bouclier, deux domiciles. Comme les icônes des listes, il est
-    // déclaré ici : `escrowIconKey` porte la clé i18n, la page l'affiche par
-    // t() et la coquille par T(), donc les deux canaux ne peuvent pas
-    // publier deux glyphes différents.
-    escrowIconKey: 'iconEscrow',
+    // déclaré ici : `icone` nomme une icône DESSINÉE (src/config/page-icons.js),
+    // que la page et la coquille rendent par le même composant — les deux
+    // canaux ne peuvent pas publier deux dessins différents (ni un emoji d'un
+    // côté et un SVG de l'autre, ce qui était le cas avant).
+    icone: 'escrow',
   },
 
   // /how-it-works : la coquille répliquait TROIS listes de src/pages/HowItWorks.js
@@ -127,22 +128,22 @@ export const PAGE_SECTIONS = {
   // la page laissait la coquille derrière, en silence : le même défaut que les
   // pages de confiance, sur une page de contenu.
   '/how-it-works': {
+    // Les trois étapes publiaient l'emoji de leur clé (`iconHowStep1`,
+    // `iconEscrow`, `iconHowStep3`). Elles déclarent maintenant des icônes
+    // DESSINÉES (`icone`, src/config/page-icons.js) : le bouclier de l'étape 2
+    // est le MÊME contenu que le séquestre de l'accueil et que le bloc de
+    // séquestre de CETTE page (`icone: 'escrow'`, plus bas), donc un seul
+    // dessin pour les trois emplacements — c'était déjà l'intention de la clé
+    // partagée, mais la page et la coquille en publiaient encore un emoji.
     steps: [
-      { iconKey: 'iconHowStep1', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
-      // L'étape 2 recopiait le bouclier du séquestre en littéral, alors que la
-      // clé `iconEscrow` le détient déjà pour le bloc de séquestre de CETTE page
-      // (`escrowIconKey`, plus bas) : deux domiciles pour un seul glyphe, sur une
-      // même page — changer la clé aurait laissé l'étape derrière, en silence.
-      // `iconKey` est résolu par les deux canaux (t() dans la page, T() dans la
-      // coquille), comme les autres clés ; les icônes qui n'ont pas de clé
-      // gardent `icon` et appartiennent au plan.
-      { iconKey: 'iconEscrow', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
-      { iconKey: 'iconHowStep3', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
+      { icone: 'howStep1', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
+      { icone: 'escrow', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
+      { icone: 'howStep3', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
     ],
-    // Le glyphe du bloc « séquestre détaillé » et le repère du dépliant de la
-    // FAQ : la page les écrivait en littéral et la coquille recopiait les
-    // mêmes octets. Ils sont ici par leur clé i18n, comme le reste.
-    escrowIconKey: 'iconEscrow',
+    // Le glyphe du bloc « séquestre détaillé » (le même bouclier dessiné) et le
+    // repère du dépliant de la FAQ : le repère reste une clé i18n, le glyphe est
+    // une icône dessinée.
+    icone: 'escrow',
     faqMarkerKey: 'faqMarker',
     // Les garanties sont des CLÉS i18n : le nom du champ finit par `Key`, donc
     // la coquille doit publier leur TEXTE résolu, pas la clé.
@@ -246,7 +247,25 @@ export const PAGE_SECTIONS = {
     legalNoticeTitleKey: 'legalNoticeTitle',
     legalConsentLinkKey: 'legalConsentLink',
     legalContactLineKey: 'legalContactLine',
-    legalNoticeIconKey: 'iconLegalNotice',
+    // ── La GÉOMÉTRIE du plus grand texte peint ───────────────────────────
+    // L'élément LCP de /login n'est ni le titre ni le bouton : c'est la LIGNE
+    // LÉGALE de contact, en bas du formulaire. Mesuré le 26/09/2026 (Chrome
+    // 152, sonde des candidates `largest-contentful-paint`, navigation réelle,
+    // 412×823 et 1350×940) : UNE SEULE candidate par taille, horodatée au
+    // premier paint — 10 848 px² mobile / 12 448 px² desktop. La même passe a
+    // établi les trois autres routes de ce groupe :
+    //   /register          notice d'étape (`stepNoticeClass`)   10 048 / 12 544
+    //   /forgot-password   sous-titre (`subtitleClass`)         14 001 / 16 458
+    //   /support           sous-titre (`subtitleClass`)         16 468 / 9 324
+    // La chaîne était recopiée face à face dans src/pages/Login.js et
+    // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
+    // faisait diverger les deux peintures en silence, et une seconde peinture
+    // PLUS GRANDE devient un nouvel élément LCP.
+    legalContactClass: 'text-xs text-gray-600',
+    // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
+    // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
+    // comme valeur interdite pour les coquilles, cf. check-prerender-shells).
+    legalNoticeIcon: 'legalNotice',
     noAccountKey: 'noAccount',
     registerKey: 'register',
   },
@@ -265,27 +284,37 @@ export const PAGE_SECTIONS = {
     step2NumberKey: 'stepNumber2',
     step3NumberKey: 'stepNumber3',
     stepNoticeKey: 'clientStepNotice',
-    stepNoticeIconKey: 'iconStepNotice',
-    clientIconKey: 'iconClient',
-    workerIconKey: 'iconWorker',
-    photoIconKey: 'iconProfilePhoto',
+    // La chaîne de la notice d'étape EST l'élément LCP de la page (mesuré :
+    // 10 048 px² mobile / 12 544 desktop après le passage de son ⚠️ de l'emoji
+    // au SVG, UNE candidate au premier paint) — déclarée ici pour que les deux
+    // canaux la lisent (voir /login).
+    stepNoticeClass: 'text-xs text-blue-700 mt-3',
+    stepNoticeIcon: 'stepNotice',
+    clientIcon: 'client',
+    // Le marteau du travailleur est le wrench déjà dessiné pour la catégorie
+    // « plomberie » : un même contenu, jamais recopié.
+    workerIcon: 'categoryPlumbing',
+    photoIcon: 'profilePhoto',
     // Les CONSEILS photo de src/components/ProfilePhotoUpload.js : un bloc
     // entier (216,56 px mesurés à 412×823) que la coquille oubliait de
     // publier. Déclaré ici, il devient une partie du corps que la coquille
     // DOIT porter (`exigerCorpsDeclare`), et la sonde de géométrie le mesure
     // des deux côtés — avant, tout le bas du formulaire d'inscription montait
     // de 232 px au montage de React.
-    photoTipsIconKey: 'iconPhotoTips',
+    photoTipsIcon: 'photoTips',
     // Les deux glyphes du sélecteur de pays (src/components/CountryDisplay.js :
     // le globe affiché tant qu'aucun pays n'est choisi, et le chevron du
     // menu). La coquille publiait un `<select>` à la place de ce contrôle :
     // un élément DIFFÉRENT, 1 px moins haut — mesuré, tout le bas du
     // formulaire (47 textes) était 1 px trop haut.
-    countryGlobeIconKey: 'iconCountryGlobe',
-    countryChevronIconKey: 'iconCountryChevron',
+    countryGlobeIcon: 'countryGlobe',
+    countryChevronIcon: 'countryChevron',
     photoTipsTitleKey: 'tipsGoodPhoto',
     photoTipsKeys: ['useRecentPhoto', 'lookCamera', 'avoidGroup', 'neutralBackground'],
-    legalNoticeIconKey: 'iconLegalNotice',
+    // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
+    // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
+    // comme valeur interdite pour les coquilles, cf. check-prerender-shells).
+    legalNoticeIcon: 'legalNotice',
     googleSignupKey: 'googleSignup',
     orSeparatorKey: 'orSeparator',
     userTypeKey: 'userType',
@@ -322,9 +351,14 @@ export const PAGE_SECTIONS = {
   '/forgot-password': {
     // La pastille de l'étape e-mail : glyphe publié par la page et par la
     // coquille, donc déclaré une fois.
-    badgeIconKey: 'iconPasswordReset',
+    // L'enveloppe de la réinitialisation est l'e-mail déjà dessiné pour le
+    // contact (`contactSendEmail`) : un même contenu, jamais recopié.
+    badgeIcon: 'contactSendEmail',
     titleKey: 'forgotPasswordPageTitle',
     subtitleKey: 'forgotPasswordSubtitle',
+    // Le sous-titre est l'élément LCP de la page (mesuré : 14 001 px² mobile /
+    // 16 458 desktop, UNE candidate au premier paint) — voir /login.
+    subtitleClass: 'mt-3 text-sm text-gray-600',
     stepEmailKey: 'forgotPasswordStepEmail',
     stepCodeKey: 'forgotPasswordStepCode',
     stepPasswordKey: 'forgotPasswordStepPassword',
@@ -338,7 +372,9 @@ export const PAGE_SECTIONS = {
   '/payment': {
     // Le glyphe de la carte « mission requise » (état par défaut, celui que
     // publie la coquille).
-    noJobIconKey: 'iconPaymentEmpty',
+    // La mallette de la carte « mission requise » est celle des promesses de
+    // l'accueil (`promiseFindWork`) : un même contenu, jamais recopié.
+    noJobIcon: 'promiseFindWork',
     titleKey: 'paymentPageTitle',
     subtitleKey: 'paymentPageSubtitle',
     noJobTitleKey: 'paymentPageNoJobTitle',
@@ -358,6 +394,12 @@ export const PAGE_SECTIONS = {
     // page et la page de contact) : un seul texte pour un seul mot.
     titleKey: 'support',
     subtitleKey: 'supportSubtitle',
+    // Le sous-titre est l'élément LCP de la page (mesuré : 16 468 px² mobile /
+    // 9 324 desktop, UNE candidate au premier paint) — voir /login. La chaîne
+    // est courte (`text-gray-600`) mais elle n'apparaît plus ailleurs dans
+    // Support.js ni dans le corps de sa coquille : elle a bien un propriétaire
+    // unique.
+    subtitleClass: 'text-gray-600',
     // La carte de contact publie le titre du mode « contact direct » — même
     // texte, donc même clé (elle était écrite deux fois dans le dictionnaire).
     directCard: {
@@ -374,14 +416,18 @@ export const PAGE_SECTIONS = {
       ctaKey: 'supportTrackCta',
     },
     modes: [
+      // Le glyphe du mode est DESSINÉ : la page publiait déjà un composant
+      // lucide (`Bot`, `Phone`) là où la coquille publiait l'emoji de la clé —
+      // deux dessins pour un même mode. Les deux canaux lisent maintenant le
+      // même `icone`, et la couleur vient du `badgeClass` (`currentColor`).
       {
-        shellIconKey: 'iconSupportRobot',
+        icone: 'supportRobot',
         badgeClass: 'bg-orange-100 text-orange-600',
         titleKey: 'supportRobotTitle',
         subtitleKey: 'supportRobotSubtitle',
       },
       {
-        shellIconKey: 'iconSupportDirect',
+        icone: 'contactCall',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         titleKey: 'supportDirectTitle',
         subtitleKey: 'supportDirectSubtitle',
@@ -389,7 +435,7 @@ export const PAGE_SECTIONS = {
     ],
     rows: [
       {
-        shellIconKey: 'iconContactCall',
+        icone: 'contactCall',
         labelKey: 'contactCall',
         badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
@@ -397,7 +443,7 @@ export const PAGE_SECTIONS = {
         rowClass: LIGNE_LIEN,
       },
       {
-        shellIconKey: 'iconContactWhatsapp',
+        icone: 'contactWhatsapp',
         labelKey: 'contactWhatsapp',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
@@ -406,7 +452,7 @@ export const PAGE_SECTIONS = {
         rowClass: LIGNE_LIEN,
       },
       {
-        shellIconKey: 'iconContactSendEmail',
+        icone: 'contactSendEmail',
         labelKey: 'contactSendEmail',
         badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
@@ -415,7 +461,7 @@ export const PAGE_SECTIONS = {
         rowClass: LIGNE_LIEN,
       },
       {
-        shellIconKey: 'iconContactAddress',
+        icone: 'contactAddress',
         labelKey: 'contactAddress',
         badgeClass: 'bg-gray-100 text-gray-600',
         value: CONTACT.address,
@@ -447,10 +493,15 @@ export const PAGE_SECTIONS = {
     frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
     titleClass: 'text-3xl font-bold text-gray-900 mb-4',
     introClass: 'text-gray-600 mb-8',
+    // Les trois promesses publiaient l'emoji de leur clé (`iconPromise*`) ;
+    // l'accueil, lui, DESSINE déjà ces trois mêmes icônes (`icone:
+    // 'promise*'`). Elles sont maintenant déclarées de la même façon ici, donc
+    // /about et l'accueil publient le même dessin au lieu d'un emoji d'un côté
+    // et d'un SVG de l'autre.
     cards: [
-      { iconKey: 'iconPromiseFindWork', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
-      { iconKey: 'iconPromiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
-      { iconKey: 'iconPromiseSecurePayments', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
+      { icone: 'promiseFindWork', titleKey: 'findWork', descriptionKey: 'findWorkDescription' },
+      { icone: 'promiseConnect', titleKey: 'connect', descriptionKey: 'connectDescription' },
+      { icone: 'promiseSecurePayments', titleKey: 'securePayments', descriptionKey: 'securePaymentsDescription' },
     ],
     highlight: {
       titleKey: 'escrowTrustTitle',
@@ -520,7 +571,11 @@ export const PAGE_SECTIONS = {
     // ferait sauter le bloc au montage, et ce qui charge au premier écran est
     // exactement ce qui repousse le LCP.
     mapButtonKey: 'mapShowMap',
-    mapIconKey: 'iconContactAddress',
+    // Le repère de la façade de carte — le même `contactAddress` que la ligne
+    // d'adresse ci-dessus : un seul dessin pour un seul lieu. Il est LITTÉRAL
+    // ici (un nom d'icône, pas une clé i18n) parce que la page et la coquille
+    // le résolvent par le registre, pas par le dictionnaire.
+    icone: 'contactAddress',
     mapFrameClass:
       'mt-6 w-full rounded-xl border border-gray-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
     mapControlClass:
@@ -543,14 +598,14 @@ export const PAGE_SECTIONS = {
     // langues du site pendant que /support les traduisait.
     actions: [
       {
-        iconKey: 'iconContactCall',
+        icone: 'contactCall',
         labelKey: 'contactCall',
         badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
       },
       {
-        iconKey: 'iconContactWhatsapp',
+        icone: 'contactWhatsapp',
         labelKey: 'contactWhatsapp',
         badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
@@ -558,7 +613,7 @@ export const PAGE_SECTIONS = {
         external: true,
       },
       {
-        iconKey: 'iconContactSendEmail',
+        icone: 'contactSendEmail',
         labelKey: 'contactSendEmail',
         badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
@@ -566,7 +621,7 @@ export const PAGE_SECTIONS = {
         breakAll: true,
       },
       {
-        iconKey: 'iconContactAddress',
+        icone: 'contactAddress',
         labelKey: 'contactAddress',
         badgeClass: 'bg-gray-100 text-gray-600',
         href: CONTACT.mapsUrl,
@@ -631,15 +686,31 @@ export const PAGE_SECTIONS = {
  * est publié par la coquille, sans exception — y compris la valeur d'un lien.
  *
  * @param {object} plan Plan d'une page (`PAGE_SECTIONS[route]`).
- * @returns {{cles: string[], textes: string[]}} Attendus, dédoublonnés.
+ * Un TROISIÈME champ échappe aux deux : `icone` (dans une LISTE d'entrées) ou
+ * un champ de niveau ROUTE terminé par `Icon` (`legalNoticeIcon`,
+ * `countryGlobeIcon`…), qui nomment une icône DESSINÉE (src/config/page-icons.js)
+ * au lieu d'un texte — la coquille doit la publier par son repère `data-icone`,
+ * et non comme un glyphe.
+ *
+ * @returns {{cles: string[], textes: string[], icones: string[]}} Attendus, dédoublonnés.
  */
 export function pageSectionParts(plan) {
   const cles = [];
   const textes = [];
+  const icones = [];
+  // Une clé i18n : un champ terminé par `Key`/`Keys`. Le suffixe `Icon`, lui, est
+  // réservé aux icônes DESSINÉES (cf. `porteUneIcone`) — les deux suffixes ne
+  // peuvent pas cohabiter sur un même nom.
   const porteUneCle = (nom) => Boolean(nom) && /Keys?$/.test(nom);
+  // Un champ `icone` (liste) ou `*Icon` (route) porte le NOM d'une icône
+  // DESSINÉE (src/config/page-icons.js), pas un texte : la coquille doit la
+  // publier comme un SVG (repère `data-icone`), jamais comme un glyphe. C'est ce
+  // qui retire les emoji du document — voir l'en-tête de page-icons.js.
+  const porteUneIcone = (nom) => Boolean(nom) && (nom === 'icone' || /Icon$/.test(nom));
   const visiter = (valeur, nom) => {
     if (typeof valeur === 'string') {
-      (porteUneCle(nom) ? cles : textes).push(valeur);
+      if (porteUneIcone(nom)) icones.push(valeur);
+      else (porteUneCle(nom) ? cles : textes).push(valeur);
       return;
     }
     if (Array.isArray(valeur)) {
@@ -651,5 +722,5 @@ export function pageSectionParts(plan) {
     }
   };
   visiter(plan, null);
-  return { cles: [...new Set(cles)], textes: [...new Set(textes)] };
+  return { cles: [...new Set(cles)], textes: [...new Set(textes)], icones: [...new Set(icones)] };
 }

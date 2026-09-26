@@ -455,7 +455,7 @@ export function runHomeShellCheck(options = {}) {
       errors.push(
         'le shell publie l\'iframe Google (output=embed) au premier écran — ' +
           'elle charge ~300 Ko de tiers et repousse le LCP de l\'accueil ; ' +
-          'publier le contrôle déclaré par le plan (mapButtonKey / mapIconKey / ' +
+          'publier le contrôle déclaré par le plan (mapButtonKey / icone / ' +
           'mapFrameClass / mapControlClass dans src/config/page-sections.js)'
       );
     }

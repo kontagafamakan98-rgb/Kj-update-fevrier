@@ -10,6 +10,7 @@ import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
@@ -209,7 +210,7 @@ export default function Login() {
           <GoogleButton onClick={handleGoogle} label={pageT(pagePlan.googleLoginKey)} />
 
           <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
-            <p className="text-sm font-semibold text-orange-900">{t(pagePlan.legalNoticeIconKey)} {pageT(pagePlan.legalNoticeTitleKey)}</p>
+            <p className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} classe={CLASSES_ICONE.notice} /> {pageT(pagePlan.legalNoticeTitleKey)}</p>
             <a
               href={legalDocumentUrl}
               target="_blank"
@@ -218,7 +219,7 @@ export default function Login() {
             >
               {pageT(pagePlan.legalConsentLinkKey)}
             </a>
-            <p className="text-xs text-gray-600">{pageT(pagePlan.legalContactLineKey)}</p>
+            <p className={pagePlan.legalContactClass}>{pageT(pagePlan.legalContactLineKey)}</p>
           </div>
 
           <div className="text-center">

@@ -9,6 +9,8 @@
 // l'accueil (src/config/page-sections.js, que lit src/pages/Home.js).
 
 import { COUNTRIES } from '../../src/config/countries.js'
+import { CLASSES_ICONE } from '../../src/config/page-icons.js'
+import { svgDeLIcone } from './icons-serveur.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // ── Shell statique de l'ACCUEIL (index.html) ────────────────────
@@ -48,27 +50,33 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   }
 
   // La façade de la carte du bloc de contact est déclarée UNE fois, par
-  // /contact (`mapFrameClass` / `mapControlClass` / `mapButtonKey` /
-  // `mapIconKey`) : la coquille de l'accueil la recopiait en littéral, donc
-  // rétrécir ou déplacer la boîte d'un côté faisait sauter le bloc au montage
-  // de React (CLS), et une coquille vidée de son contrôle ne rougissait
-  // nulle part. Une déclaration disparue de /contact CASSE le build ici.
-  const { mapButtonKey, mapIconKey, mapFrameClass, mapControlClass } = pageSections['/contact']
-  if (!mapButtonKey || !mapIconKey || !mapFrameClass || !mapControlClass) {
+  // /contact (`mapFrameClass` / `mapControlClass` / `mapButtonKey` / `icone`,
+  // le repère dessiné) : la coquille de l'accueil la recopiait en littéral,
+  // donc rétrécir ou déplacer la boîte d'un côté faisait sauter le bloc au
+  // montage de React (CLS), et une coquille vidée de son contrôle ne
+  // rougissait nulle part. Une déclaration disparue de /contact CASSE le build
+  // ici.
+  const { mapButtonKey, icone: iconeDeLaCarte, mapFrameClass, mapControlClass } = pageSections['/contact']
+  if (!mapButtonKey || !iconeDeLaCarte || !mapFrameClass || !mapControlClass) {
     throw new Error(
-      "prerender-shells : /contact ne déclare plus sa carte (mapButtonKey, mapIconKey, mapFrameClass, " +
+      "prerender-shells : /contact ne déclare plus sa carte (mapButtonKey, icone, mapFrameClass, " +
         "mapControlClass dans src/config/page-sections.js) — le bloc de contact de l'accueil publie la même façade."
     )
   }
 
   // Les quatre moyens de contact du bloc ci-dessous sont déclarés UNE fois,
   // par /contact (`actions` de src/config/page-sections.js) — la même
-  // déclaration que lit src/pages/Contact.js. Ce bloc lisait leurs glyphes en
-  // littéral, donc changer l'icône d'un moyen de contact laissait derrière lui
-  // l'appel, WhatsApp, l'e-mail ou l'adresse. La correspondance est explicite
-  // (le libellé de l'accueil dit « Appeler le support », celui de /contact dit
-  // « Appeler ») et une ligne disparue de /contact CASSE le build au lieu de
-  // peindre une pastille vide sans que personne ne le voie.
+  // déclaration que lit src/pages/Contact.js ET que le composant MapEmbed. Ce
+  // bloc lisait leurs glyphes en littéral, donc changer l'icône d'un moyen de
+  // contact laissait derrière lui l'appel, WhatsApp, l'e-mail ou l'adresse. La
+  // correspondance est explicite (le libellé de l'accueil dit « Appeler le
+  // support », celui de /contact dit « Appeler ») et une ligne disparue de
+  // /contact CASSE le build au lieu de peindre une pastille vide sans que
+  // personne ne le voie.
+  //
+  // Le glyphe est DESSINÉ (`icone`, src/config/page-icons.js) : la coquille de
+  // l'accueil et la page publiaient l'emoji `iconContact*` de la clé i18n ; le
+  // dessin, lui, est le même que celui des lignes de /contact et de /support.
   const contactPlan = pageSections['/contact']
   const glypheDeContact = (labelKey) => {
     const action = contactPlan.actions.find((a) => a.labelKey === labelKey)
@@ -78,20 +86,23 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
           "(src/config/page-sections.js) — le bloc de contact de l'accueil lit ses glyphes là-bas."
       )
     }
-    return esc(T(action.iconKey))
+    return svgDeLIcone(action.icone, CLASSES_ICONE.ligne)
   }
 
   return [
     // La navbar et les conteneurs de l'app (`.App`, `.min-h-screen`,
     // `main.flex-1`) viennent de chromeDePage() : le corps commence ici.
-    `<div class="min-h-screen">`,
+    // `sections-differees` : les neuf sections sous la ligne de flottaison
+    // passent en `content-visibility: auto` (src/App.css, tailles intrinsèques
+    // exactes, héros exclu). La page porte la MÊME classe sur son conteneur.
+    `<div class="min-h-screen sections-differees">`,
 
     // Hero : le h1 est l'élément LCP de l'accueil.
     `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white relative overflow-hidden">`,
     `<div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-24">`,
     `<div class="text-center">`,
     `<span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs sm:text-sm font-medium text-white ring-1 ring-inset ring-white/25 mb-6">`,
-    `<span aria-hidden="true">${esc(T('iconEscrow'))}</span>`,
+    svgDeLIcone('escrow', CLASSES_ICONE.heros),
     `${esc(T('escrowBannerTitle'))}`,
     `</span>`,
     `<h1 class="${heroTitleClass}">${esc(T(titleKey))}</h1>`,
@@ -102,8 +113,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</div>`,
     // Bandeau de confiance (mêmes clés i18n que src/pages/Home.js).
     `<div class="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-white/90">`,
-    `<span class="inline-flex items-center gap-2"><span aria-hidden="true">${esc(T('iconEscrow'))}</span>${esc(T('escrowTrustTitle'))}</span>`,
-    `<span class="inline-flex items-center gap-2"><span aria-hidden="true">${esc(T('iconPromiseSecurePayments'))}</span>${esc(T('securePayments'))}</span>`,
+    `<span class="inline-flex items-center gap-2">${svgDeLIcone('escrow', CLASSES_ICONE.heros)}${esc(T('escrowTrustTitle'))}</span>`,
+    `<span class="inline-flex items-center gap-2">${svgDeLIcone('promiseSecurePayments', CLASSES_ICONE.heros)}${esc(T('securePayments'))}</span>`,
     `<a href="/how-it-works" class="font-semibold text-white underline underline-offset-4 hover:text-orange-100">${esc(T('howItWorksLink'))}</a>`,
     `</div>`,
     `</div>`,
@@ -143,7 +154,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     ...homePlan.categories.map(
       (category) =>
         `<a href="/jobs?category=${category.labelKey}" class="group bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 text-center transition hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">` +
-        `<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 text-3xl md:text-4xl transition group-hover:scale-110" aria-hidden="true">${esc(T(category.iconKey))}</div>` +
+        `<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 transition group-hover:scale-110">${svgDeLIcone(category.icone, CLASSES_ICONE.categorie)}</div>` +
         `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.labelKey))}</h3>` +
         `</a>`
     ),
@@ -156,9 +167,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.promises.map(
-      ({ iconKey, titleKey, descriptionKey: textKey }) =>
+      ({ icone, titleKey, descriptionKey: textKey }) =>
         `<div class="rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center shadow-sm transition hover:shadow-md hover:bg-white">` +
-        `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6"><span class="text-2xl" aria-hidden="true">${esc(T(iconKey))}</span></div>` +
+        `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">${svgDeLIcone(icone, CLASSES_ICONE.promesse)}</div>` +
         `<h3 class="text-xl font-semibold mb-4 text-gray-900">${esc(T(titleKey))}</h3>` +
         `<p class="text-gray-600">${esc(T(textKey))}</p>` +
         `</div>`
@@ -176,10 +187,10 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</div>`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.steps.map(
-      ({ iconKey, numberKey, titleKey, descriptionKey: textKey }) =>
+      ({ icone, numberKey, titleKey, descriptionKey: textKey }) =>
         `<div class="relative bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 pt-8 text-center">` +
         `<span class="absolute -top-4 left-1/2 -translate-x-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white shadow-md">${esc(T(numberKey))}</span>` +
-        `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"><span class="text-2xl" aria-hidden="true">${esc(T(iconKey))}</span></div>` +
+        `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">${svgDeLIcone(icone, CLASSES_ICONE.etape)}</div>` +
         `<h3 class="text-lg font-semibold mb-2 text-gray-900">${esc(T(titleKey))}</h3>` +
         `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
         `</div>`
@@ -193,7 +204,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10 shadow-sm">`,
     `<div class="flex flex-col md:flex-row items-center gap-6">`,
-    `<div class="text-5xl" aria-hidden="true">${esc(T(homePlan.escrowIconKey))}</div>`,
+    `<div>${svgDeLIcone(homePlan.icone, CLASSES_ICONE.sequestre)}</div>`,
     `<div class="text-center md:text-left">`,
     `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`,
     `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`,
@@ -275,19 +286,19 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</div>`,
     `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">`,
     `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">${esc(glypheDeContact('contactCall'))}</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">${glypheDeContact('contactCall')}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('homeContactCall'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
     `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">${esc(glypheDeContact('contactWhatsapp'))}</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">${glypheDeContact('contactWhatsapp')}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactWhatsapp'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
     `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">${esc(glypheDeContact('contactSendEmail'))}</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">${glypheDeContact('contactSendEmail')}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
     `</a>`,
     `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">${esc(glypheDeContact('contactAddress'))}</span>`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">${glypheDeContact('contactAddress')}</span>`,
     `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactAddress'))}</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
     `</a>`,
     `</div>`,
@@ -312,7 +323,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         ]
       : []),
     // La carte : un CONTRÔLE, pas un embed au premier écran — le MÊME que
-    // /contact, lu dans la MÊME déclaration (mapButtonKey / mapIconKey /
+    // /contact, lu dans la MÊME déclaration (mapButtonKey / icone /
     // mapFrameClass / mapControlClass de src/config/page-sections.js). La
     // coquille publiait l'iframe `output=embed` elle-même, en `loading="lazy"`
     // — et cela n'a rien empêché : mesuré (Lighthouse 12.6.1, pile de la CI,
@@ -323,7 +334,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // intégrée à l'appui. Les deux canaux publiant les mêmes classes, la
     // bascule coquille → React ne déplace rien.
     `<div class="${contactPlan.mapFrameClass}">`,
-    `<span class="text-2xl" aria-hidden="true">${esc(T(contactPlan.mapIconKey))}</span>`,
+    svgDeLIcone(contactPlan.icone, CLASSES_ICONE.carteContact),
     `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" title="${esc(T('mapIframeTitle').replace('{address}', contact.address))}" class="${contactPlan.mapControlClass}">${esc(T(contactPlan.mapButtonKey))}</a>`,
     `</div>`,
     `</div>`,

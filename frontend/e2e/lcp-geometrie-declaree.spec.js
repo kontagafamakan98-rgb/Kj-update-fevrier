@@ -32,6 +32,16 @@ import { PAGE_SECTIONS } from '../src/config/page-sections.js';
  *   /privacy        <p> le CORPS d'une section  84 360 / 86 676 px²
  *   /how-it-works   <p> le sous-titre du héros   30 320 / 32 656 px²
  *
+ * ── Et le 26/09/2026, les quatre routes restantes ───────────────────────────
+ * Même sonde, navigation RÉELLE : l'élément élu y est un paragraphe SECONDAIRE
+ * (ligne légale, notice d'étape, sous-titres), mesuré sur 412×823 et 1350×940 :
+ * /login (10 848 / 12 448 px²), /register (10 048 / 12 544), /forgot-password
+ * (14 001 / 16 458) et /support (16 468 / 9 324). Les planchers déclarés
+ * ci-dessous sont la PLUS PETITE des deux tailles mesurées, diminuée d'un cran.
+ * (La notice d'étape de /register est passée de 10 560 à 10 048 px² mobile le
+ * 26/09/2026 : son ⚠️ emoji est devenu un SVG, et la ligne se replie un cran
+ * plus bas — même élément élu, aire légèrement plus petite.)
+ *
  * UNE SEULE candidate dans les deux canaux, au premier paint, d'aire IDENTIQUE :
  * la peinture de la coquille reste celle que Chrome retient, et rien du
  * JavaScript n'entre dans le graphe LCP simulé de Lantern. Un remplacement PLUS
@@ -45,6 +55,13 @@ const ROUTES_DECLAREES = [
   // `sectionBodyClass` qui porte l'élément élu, pas l'introduction.
   { route: '/privacy', champ: 'sectionBodyClass', plancher: 70000 },
   { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 25000 },
+  // Le plus grand texte peint de ces quatre pages est un paragraphe secondaire,
+  // pas le titre : ligne légale de /login, notice d'étape de /register,
+  // sous-titres de /forgot-password et de /support (voir la mesure en tête).
+  { route: '/login', champ: 'legalContactClass', plancher: 10000 },
+  { route: '/register', champ: 'stepNoticeClass', plancher: 9000 },
+  { route: '/forgot-password', champ: 'subtitleClass', plancher: 13000 },
+  { route: '/support', champ: 'subtitleClass', plancher: 9000 },
 ];
 
 /**

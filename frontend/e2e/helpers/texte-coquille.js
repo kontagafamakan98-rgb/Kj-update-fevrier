@@ -76,11 +76,12 @@
  *          React peint « 📞 » est refusé, alors que remplacer l'emoji par une
  *          icône SVG ne l'est pas.
  *      Ce que la règle ne juge PAS, et qu'il ne faut pas lui demander : la
- *      SÉMANTIQUE d'une icône de remplacement. La coquille publie « 💬 » sur la
- *      première carte de /support pendant que React y peint `lucide-bot` — les
- *      deux canaux disent des choses différentes, et aucun de ces deux noms
- *      n'est vérifiable par une sonde qui ne connaît pas l'intention. Ce genre
- *      d'écart se voit en relisant le plan (`shellIconKey`, src/config/page-sections.js).
+ *      SÉMANTIQUE d'un dessin. Depuis le 26/09/2026 les pages pré-rendues ne
+ *      publient plus d'emoji : leurs glyphes sont DESSINÉS, déclarés par un nom
+ *      d'icône (`icone`, src/config/page-icons.js) que les deux canaux rendent
+ *      par le même registre — la coquille et React peignent donc le même `<svg>`
+ *      par construction. Le contrôle se contente d'exiger, dans la même bande,
+ *      un pendant NON verbal (SVG ou image), sans juger lequel.
  *
  * ── La borne, dite une fois ─────────────────────────────────────────────────
  * La bande comparée est celle de la COQUILLE. Un bloc ASYNCHRONE que React

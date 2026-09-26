@@ -38,12 +38,13 @@
  * shell, et l'optimisation serait PERDUE EN SILENCE.
  *
  * Enfin, il vérifie la PROVENANCE des glyphes publiés : aucun module de
- * vite-plugins/prerender/ ne doit RECOPIER un glyphe du dictionnaire (📜, 🛡️,
- * 📸…). Ces glyphes se déclarent par une clé i18n nommée par le plan de leur
- * route (`iconLegalNotice`, `escrowIconKey`…) que la page lit par t() et la
- * coquille par T() : un littéral dans le plugin rendrait cette déclaration
- * décorative et laisserait les deux canaux diverger en silence. Les valeurs
- * interdites sont LUES dans le dictionnaire, jamais listées ici.
+ * vite-plugins/prerender/ ne doit RECOPIER un glyphe du dictionnaire (📜, ⚠️,
+ * 📸…). Depuis le 26/09/2026 ces glyphes sont TOUS DESSINÉS (icônes SVG,
+ * src/config/page-icons.js) : leur nom est déclaré par le plan — `icone` dans une
+ * liste, `*Icon` au niveau route — et le build exige le repère `data-icone` de
+ * chacun dans la coquille (`declared-body.js`). Ce contrôle-ci reste le garde de
+ * la RÉINTRODUCTION d'un emoji en littéral dans un module de pré-rendu. Les
+ * valeurs interdites sont LUES dans le dictionnaire, jamais listées ici.
  *
  * Et il vérifie l'APOSTROPHE de la copie publiée : un seul caractère, celui que
  * scripts/published-copy.js nomme, sur les deux vues — les SOURCES
@@ -463,7 +464,7 @@ if (contact) {
       'contact.html : la carte Google (output=embed) est publiée en IFRAME par la coquille — ' +
         'le premier écran charge alors ~300 Ko de tiers qui repoussent le LCP de la page ; ' +
         'publier le contrôle déclaré par le plan dans src/config/page-sections.js ' +
-        '(mapButtonKey / mapIconKey / mapFrameClass / mapControlClass)'
+        '(mapButtonKey / icone / mapFrameClass / mapControlClass)'
     );
   }
 }
@@ -607,10 +608,13 @@ if (vercelRewrites) {
 }
 
 // 7. Les GLYPHES publiés par les coquilles ont UN propriétaire, et ce n'est pas
-// le plugin : le plan de la route dit QUELLE clé (`escrowIconKey`,
-// `step1NumberKey`, `legalNoticeIconKey`…), le dictionnaire global dit la valeur
-// (`icon*`, `brandMark`, `faqMarker`), la page l'affiche par t() et la coquille
-// par T(). Un module qui RECOPIE le glyphe rend cette déclaration décorative :
+// le plugin : le plan de la route dit QUEL marqueur (`step1NumberKey`,
+// `brandMark`, `faqMarker`), le dictionnaire global dit la valeur, la page
+// l'affiche par t() et la coquille par T(). Les icônes DESSINÉES — `icone` dans
+// une liste, `*Icon` au niveau route, src/config/page-icons.js — n'ont pas de
+// valeur dans le dictionnaire : leur contenu est le même pour les deux canaux
+// par construction, et `declared-body.js` exige leur repère `data-icone`. Un
+// module qui RECOPIE un GLYPHE du dictionnaire rend cette déclaration décorative :
 // changer la clé laisserait la coquille derrière, en silence — le défaut que ce
 // découpage vient de supprimer. Les valeurs interdites sont LUES dans le
 // dictionnaire, jamais listées ici.

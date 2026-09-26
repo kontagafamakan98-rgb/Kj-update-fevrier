@@ -8,17 +8,19 @@ import { usePageMeta } from '../utils/seo';
 // question ajoutée ici paraît aussi dans le HTML que lit un crawler sans
 // JavaScript, ou dans aucun des deux.
 import { PAGE_SECTIONS } from '../config/page-sections';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 export default function HowItWorks() {
   const { t } = useLanguage();
   usePageMeta();
 
   const plan = PAGE_SECTIONS['/how-it-works'];
-  const STEPS = plan.steps.map(({ iconKey, titleKey, descriptionKey }) => ({
-    // Le glyphe est une CLÉ i18n, comme le texte : la même clé sert à la page et
-    // à la coquille, donc les deux canaux publient un seul glyphe (voir
-    // `scripts/shell-text-provenance.js`, règle des marqueurs).
-    icon: t(iconKey),
+  const STEPS = plan.steps.map(({ icone, titleKey, descriptionKey }) => ({
+    // Le glyphe est une icône DESSINÉE (src/config/page-icons.js), comme le
+    // texte qui vient d'une clé i18n : les deux canaux lisent le même nom, donc
+    // ils publient le même dessin (l'emoji de la clé `iconHowStep*` a été
+    // remplacé — voir page-icons.js pour la mesure).
+    icone,
     title: t(titleKey),
     description: t(descriptionKey),
   }));
@@ -71,7 +73,7 @@ export default function HowItWorks() {
             {STEPS.map((step) => (
               <div key={step.title} className="rounded-2xl border border-gray-100 shadow-sm p-6">
                 <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">{step.icon}</span>
+                  <IconePage nom={step.icone} classe={CLASSES_ICONE.etape} />
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900 text-center mb-3">{step.title}</h2>
                 <p className="text-gray-600 text-sm">{step.description}</p>
@@ -86,7 +88,9 @@ export default function HowItWorks() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">
             <div className="flex flex-col md:flex-row items-center gap-6">
-              <div className="text-5xl">{t(plan.escrowIconKey)}</div>
+              <div>
+                <IconePage nom={plan.icone} classe={CLASSES_ICONE.sequestre} />
+              </div>
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t(plan.escrowTitleKey)}</h2>
                 <p className="text-emerald-800">

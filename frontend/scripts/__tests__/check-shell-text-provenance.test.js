@@ -31,6 +31,7 @@ import {
   divergencesDeMarqueur,
   divergencesDeProvenance,
   fragmentsVisibles,
+  iconesDuPlan,
   litterauxJs,
   marqueursDuPlan,
   modulesDesCoquilles,
@@ -38,6 +39,8 @@ import {
   textesJsx,
   valeursDerivees,
 } from '../shell-text-provenance.js';
+// Le registre des icônes dessinées : le plan doit nommer des icônes qui existent.
+import { NOMS_D_ICONES } from '../../src/config/page-icons.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(FRONTEND_DIR, 'scripts', 'check-shell-text-provenance.js');
@@ -455,18 +458,30 @@ describe('shell-text-provenance — la règle des marqueurs', () => {
     expect(divergencesDeMarqueur({ frontendDir: FRONTEND_DIR })).toEqual([]);
   });
 
-  it('le plan ne porte plus un seul GLYPHE en littéral, et ses clés existent', () => {
-    // L'état atteint : les 31 glyphes du plan (catégories, promesses, étapes,
-    // cartes d'À propos, modes et lignes du support) sont déclarés par leur clé.
-    // Il ne reste en littéral que les deux suffixes « + », qui font partie d'un
-    // NOMBRE (`1 000+`) et non d'un glyphe.
+  it('le plan ne porte plus un seul GLYPHE en littéral, et ses icônes existent', () => {
+    // L'état atteint le 26/09/2026 : les glyphes des pages pré-rendues sont
+    // TOUS DESSINÉS, déclarés par un NOM d'icône (`icone` dans une liste,
+    // `*Icon` au niveau route, src/config/page-icons.js) — catégories, promesses,
+    // étapes et séquestre de l'accueil, puis cartes d'À propos, étapes de
+    // « Comment ça marche », modes et lignes de contact de /support, lignes et
+    // repère de carte de /contact, puis la DERNIÈRE vague : cartes de type de
+    // compte, notice légale et d'étape, emplacements photo, sélecteur de pays de
+    // /register, notice de /login, pastille de /forgot-password et carte de
+    // /payment. Il ne reste AUCUN glyphe déclaré par sa clé i18n : zéro champ
+    // `iconKey`/`shellIconKey`, et plus aucun `*IconKey` (la forme route est
+    // `*Icon`). Il ne reste en littéral que les deux suffixes « + », qui font
+    // partie d'un NOMBRE (`1 000+`) et non d'un glyphe.
     expect(marqueursDuPlan(FRONTEND_DIR).map((champ) => champ.valeur)).toEqual(['+', '+']);
-    const cles = clesDeGlypheDuPlan(FRONTEND_DIR);
-    expect(cles.length).toBeGreaterThanOrEqual(31);
-    const dictionnaireFr = JSON.parse(
-      fs.readFileSync(path.join(FRONTEND_DIR, 'src', 'i18n', 'fr.json'), 'utf8')
-    );
-    expect(cles.filter(({ cle }) => !(cle in dictionnaireFr))).toEqual([]);
+    expect(clesDeGlypheDuPlan(FRONTEND_DIR)).toEqual([]);
+
+    // Les icônes DESSINÉES : le plan en déclare au moins les 17 de l'accueil (10
+    // catégories, 3 promesses, 3 étapes, 1 séquestre) plus les 30 des sept autres
+    // pages (À propos, Comment ça marche, Support, Contact et les quatre écrans de
+    // compte), et CHACUNE existe dans le registre — un nom inconnu ferait lever
+    // `IconePage` au build.
+    const icones = iconesDuPlan(FRONTEND_DIR);
+    expect(icones.length).toBeGreaterThanOrEqual(45);
+    expect(icones.filter(({ nom }) => !NOMS_D_ICONES.includes(nom))).toEqual([]);
   });
 });
 

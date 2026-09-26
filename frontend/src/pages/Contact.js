@@ -5,6 +5,7 @@ import { usePageMeta } from '../utils/seo';
 import { CONTACT } from '../config/contact';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import MapEmbed from '../components/MapEmbed';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 /**
  * Page « Nous contacter ».
@@ -34,7 +35,7 @@ export default function Contact() {
     // La carte : un contrôle, pas un embed au premier écran (voir le commentaire
     // du plan). La page et la coquille publient les mêmes classes, donc la
     // bascule shell → React ne déplace rien.
-    mapButtonKey, mapIconKey, mapFrameClass, mapControlClass,
+    mapButtonKey, icone, mapFrameClass, mapControlClass,
     // La géométrie du plus grand texte peint — le paragraphe d'introduction,
     // élément LCP de cette page — et de son cadre. Deux propriétaires rendraient
     // les deux peintures divergentes, et une seconde peinture PLUS GRANDE que
@@ -62,7 +63,7 @@ export default function Contact() {
               <span
                 className={`flex h-10 w-10 items-center justify-center rounded-full ${action.badgeClass}`}
               >
-                {t(action.iconKey)}
+                <IconePage nom={action.icone} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
                 <div className="text-sm font-semibold text-gray-900">{t(action.labelKey)}</div>
@@ -85,7 +86,8 @@ export default function Contact() {
           href={CONTACT.mapsUrl}
           title={titreDeLaCarte}
           label={t(mapButtonKey)}
-          icon={t(mapIconKey)}
+          icone={icone}
+          classeIcone={CLASSES_ICONE.carteContact}
           frameClass={mapFrameClass}
           controlClass={mapControlClass}
         />

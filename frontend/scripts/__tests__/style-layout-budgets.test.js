@@ -159,8 +159,27 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
     // temps (0,6 × à 1,5 × le relevé du poste) et le runner de la CI a rendu
     // 18 des 22 cases rouges sur le même artefact — / mobile 662 ms ici contre
     // 80,4 ms là-bas, soit ×8,2. Aucune marge ne couvre les deux hôtes.
+    // Certaines routes ont CHANGÉ d'artefact depuis la mesure de la CI : leur
+    // rapport poste/CI compare alors les temps de DEUX documents différents et ne
+    // dit plus rien de la portabilité. Sont exclues les routes dont le document a
+    // été re-mesuré après le remplacement emoji→SVG — l'accueil, puis /about,
+    // /contact, /how-it-works et /support (26/09/2026), puis les quatre écrans de
+    // compte /login, /register, /forgot-password et /payment (dernière vague,
+    // même jour) : leur relevé CI porte sur l'artefact d'AVANT.
+    const ARTEFACT_CHANGE = new Set([
+      '/',
+      '/about',
+      '/contact',
+      '/how-it-works',
+      '/support',
+      '/login',
+      '/register',
+      '/forgot-password',
+      '/payment',
+    ]);
+    const routesComparables = ROUTES.filter((route) => !ARTEFACT_CHANGE.has(route));
     const ecarts = [];
-    for (const route of ROUTES) {
+    for (const route of routesComparables) {
       for (const condition of CONDITIONS_NOMS) {
         const coutCI = MESURE_CI[route][condition];
         if (coutCI === null) continue;
@@ -170,11 +189,15 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
         ecarts.push(MESURE[route][condition] / coutCI);
       }
     }
-    // Le fait mesuré, nommé une fois : le runner de la CI est TOUJOURS moins cher,
-    // de 1,85 × (/payment desktop : 43 → 23,2 ms) à 8,2 × (accueil mobile :
-    // 662 → 80,4 ms).
+    // Le fait mesuré, nommé une fois : sur ces routes à artefact inchangé, le
+    // runner de la CI est TOUJOURS moins cher, de 3,4 × (/jobs mobile : 155 →
+    // 45,9 ms) à 4,1 × (/privacy mobile : 169 → 41,2 ms). Le rapport le plus
+    // spectaculaire des premiers relevés venait de /register (452 → 74,6 ms,
+    // 6,1 ×), dont le document a changé depuis — il est donc exclu comme les
+    // autres routes re-mesurées, et l'ancrage haut de la non-portabilité suit les
+    // routes restantes.
     expect(Math.min(...ecarts)).toBeGreaterThan(1.8);
-    expect(MESURE['/'].mobile / MESURE_CI['/'].mobile).toBeGreaterThan(8);
+    expect(Math.max(...ecarts)).toBeGreaterThan(4);
     // Et l'ancrage du verdict — la structure — n'a, lui, rien de commun avec la
     // machine : les nœuds sont identiques sur les deux hôtes, mesuré sur les 11
     // routes, et c'est ce que la sonde compare.

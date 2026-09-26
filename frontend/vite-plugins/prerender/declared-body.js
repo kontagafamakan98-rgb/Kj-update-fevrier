@@ -14,6 +14,8 @@
 // le bas du formulaire de connexion au montage.
 // (`cles` porte les CLÉS DE DICTIONNAIRE — les valeurs des champs `*Key` —,
 // pas les noms de champs : c'est `traduire` qui les résout.)
+import { marqueurDIcone } from '../../src/config/page-icons.js';
+
 const CLES_CONDITIONNELLES = {
   googleLogin: 'google-auth',
   googleSignup: 'google-auth',
@@ -31,7 +33,7 @@ export function makeDeclaredBodyGuard({
           `(SHELLS['${route}']) — un crawler sans JavaScript ne lirait rien de cette page.`
       )
     }
-    const { cles, textes } = pageSectionParts(plan)
+    const { cles, textes, icones = [] } = pageSectionParts(plan)
     const traduire = (key) => {
       if (routePath === '/register') return registerT(key)
       if (routePath === '/jobs') return jobsT(key)
@@ -48,6 +50,21 @@ export function makeDeclaredBodyGuard({
         `prerender-shells : la coquille ${routePath} ne porte pas ${manquants.length} élément(s) déclaré(s) par sa page ` +
           `— « ${manquants[0]} » manque. Le corps d'une page a UN propriétaire (src/config/page-sections.js) : ` +
           'la coquille s\'en dérive, elle ne peut pas le recopier.'
+      )
+    }
+
+    // ── Et les ICÔNES DESSINÉES ? ──────────────────────────────────────
+    // Un champ `icone` ne déclare pas un texte mais une icône SVG : la coquille
+    // doit la publier avec son repère `data-icone`, jamais sous forme de glyphe.
+    // Sans ce contrôle, une icône déclarée pouvait disparaître de la coquille en
+    // silence — le défaut exact que ce garde existe pour empêcher, par un autre
+    // chemin.
+    const iconesManquantes = icones.filter((nom) => !corps.includes(marqueurDIcone(nom)))
+    if (iconesManquantes.length) {
+      throw new Error(
+        `prerender-shells : la coquille ${routePath} ne dessine pas ${iconesManquantes.length} icône(s) déclarée(s) par sa page ` +
+          `— « ${iconesManquantes[0]} » manque (aucun ${marqueurDIcone(iconesManquantes[0])} trouvé). ` +
+          "Le corps d'une page a UN propriétaire (src/config/page-sections.js) : la coquille s'en dérive."
       )
     }
   }

@@ -58,10 +58,42 @@
  *     en tête = +3 % ; les deux premières sections dupliquées = +1 %.
  *   • LA MESURE RÉCONCILIE AVEC LIGHTHOUSE : /jobs desktop, document + React =
  *     64 ms ici contre 73–76 ms relevés par l'audit de `lighthouserc.desktop.cjs`.
- *   • LE SEUL LEVIER SYSTÉMIQUE MESURÉ est `content-visibility: auto` sur les
- *     sections 2 à 10 : −172 ms sur l'accueil mobile (659 → 487), au prix d'une
- *     hauteur de défilement FAUSSE tant que `contain-intrinsic-size` n'annonce
- *     pas la taille réelle — levier réel, prix réel, décision produit.
+ *   • LES GLYPHES EMOJI ÉTAIENT LE COÛT, ET ILS SONT PARTIS (26/09/2026).
+ *     Remplacer les 21 glyphes décoratifs `aria-hidden` de l'accueil par un
+ *     caractère latin retire ~194 à 202 ms de « Style & Layout » (632 → 439 ms)
+ *     — ~31 % du document — à hauteur et nœuds inchangés. Appliqué (icônes SVG,
+ *     src/config/page-icons.js), le document d'accueil passe de 639 à 467 ms en
+ *     mobile (cpu×4) et de 126 à 87 ms en desktop. Aucun levier CSS ne s'en
+ *     approchait : présentation texte des emoji, police monochrome, taille
+ *     réduite, pile de polices, `text-rendering` — tous mesurés à ~0 ou négatifs.
+ *   • L'EXTENSION AUX QUATRE AUTRES PAGES CONFIRME L'EFFET, SANS LE RÉPÉTER AU
+ *     MÊME ORDRE DE GRANDEUR (26/09/2026, 25 à 30 tours ENTRELACÉS, minimum) :
+ *     /contact −22,8 % en mobile et −23,0 % en desktop, /support −17,9 % et
+ *     −20,7 %, /about −5,4 % et −5,1 %, /how-it-works −4,6 % et −3,2 %, et les
+ *     QUATRE glyphes du bloc de contact de l'accueil −12,5 % / −10,0 %. Le coût
+ *     n'est donc pas « 21 glyphes » : il suit le NOMBRE d'emoji publiés, et à
+ *     ~8 à 10 ms par glyphe mobile les pages qui en portent trois n'en gagnent
+ *     que ~13. Ce qui reste vrai partout : le SENS de l'effet est le même, et le
+ *     gain est proportionnel à la matière du premier écran.
+ *   • LE PROTOCOLE DE MESURE COMPTE AUTANT QUE LE CHIFFRE. En mesurant chaque
+ *     variante À LA SUITE (minimum de 8-12 runs), la réorganisation de la pile de
+ *     polices montrait −54 ms ; en ENTRELACANT les variantes à chaque tour (25
+ *     runs), l'écart s'INVERSAIT (+15 ms) : c'était la DÉRIVE de l'hôte, pas un
+ *     effet. Une réduction de quelques dizaines de ms ne se lit pas en séquentiel
+ *     sur ce poste — entrelacer, c'est ce qui rend le minimum comparable.
+ *   • LE SECOND LEVIER, APPLIQUÉ LE 26/09/2026 : `content-visibility: auto` sur
+ *     les sections 2 à 10 de l'accueil, le héros EXCLU (`:not(:first-of-type)`),
+ *     avec un `contain-intrinsic-size` EXACT par section — la hauteur de CONTENU
+ *     mesurée (hauteur rendue moins 96 px de `py-12` mobile / 128 px de `py-16`
+ *     desktop). Mesuré ENTRELACÉ (15 tours, mobile cpu×4) : 419,8 → 319,3 ms de
+ *     « Style & Layout », −100,5 ms (−24 %) ; la hauteur du document reste
+ *     7 080 px mobile / 4 783 px desktop contre une référence de 7 079 / 4 782
+ *     (+1 px), vérifiée section par section par `e2e/style-layout-document.spec.js`.
+ *     Un repli UNIFORME de 1 000 px, lui, portait le document à 10 119 px
+ *     (+3 040) : les hauteurs de contenu vont de 216 à 866 px, aucune constante
+ *     unique ne convient. Le héros n'est jamais différé — / reste élu sur son
+ *     `<H1>`, une seule candidate au premier paint, et le CLS est 0,0000 sur les
+ *     deux canaux.
  * Conséquence assumée de ce déplacement : le coût du document n'est plus un gate
  * de PR. Il est couvert là où il se voit vraiment, par les budgets Lighthouse du
  * déploiement (`lighthouserc*.cjs`, job `lighthouse-ci`) et par les gardes de
@@ -89,17 +121,42 @@ const CONDITIONS = [
  * référence de l'hôte, publié par la sonde à chaque passage.
  */
 const MESURE = {
-  '/': { mobile: 662, desktop: 126 },
-  '/about': { mobile: 245, desktop: 47 },
-  '/contact': { mobile: 278, desktop: 46 },
-  '/forgot-password': { mobile: 255, desktop: 46 },
-  '/how-it-works': { mobile: 344, desktop: 61 },
+  // Relevé du 26/09/2026 APRÈS le remplacement des glyphes emoji de l'accueil
+  // par des icônes SVG (src/config/page-icons.js), puis APRÈS l'extension aux
+  // quatre autres pages qui en publiaient encore (À propos, Comment ça marche,
+  // Support, Contact) et aux quatre glyphes du bloc de contact de l'accueil.
+  // La mesure de cette seconde passe est ENTRELACÉE (25 à 30 tours, les deux
+  // variantes à chaque tour — voir la leçon de protocole en tête de fichier) :
+  //
+  //   route            emoji → SVG (mobile)      emoji → SVG (desktop)
+  //   /                484,5 → 423,7 (−60,8)     91,4 → 82,2 (−9,2)
+  //   /about           244,0 → 230,9 (−13,1)     46,6 → 44,2 (−2,4)
+  //   /contact         218,4 → 168,5 (−49,9)     42,7 → 32,8 (−9,8)
+  //   /how-it-works    300,3 → 286,6 (−13,7)     57,3 → 55,4 (−1,8)
+  //   /support         254,7 → 209,0 (−45,7)     49,4 → 39,2 (−10,2)
+  '/': { mobile: 424, desktop: 82 },
+  '/about': { mobile: 231, desktop: 44 },
+  '/contact': { mobile: 169, desktop: 33 },
+  // 26/09/2026, dernière vague emoji→SVG (les quatre écrans de compte). Relevés
+  // de la sonde ci-dessus, après la migration : /login 230 → 176 (mobile) /
+  // 45 → 35 (desktop), /register 452 → 294 / 86 → 52, /forgot-password 255 → 165
+  // / 46 → 32, /payment 220 → 165 / 43 → 33. La BAISSE elle-même est mesurée
+  // ENTRELACÉE (la variante emoji reconstruite dans le document livré en
+  // remettant chaque emoji à la place de son `<svg data-icone=…>`, 25 tours,
+  // minimum) : −34 % /login, −65 % /register (huit glyphes), −43 %
+  // /forgot-password, −30 % /payment en mobile (et −38 / −74 / −55 / −35 % en
+  // desktop). Le coût du PREMIER emoji d'une page n'est pas marginal
+  // (chargement de la police de couleur) : ~47 à 66 ms sur mobile même pour un
+  // seul glyphe, ce qui explique qu'une page à un glyphe gagne autant qu'une
+  // page à six.
+  '/forgot-password': { mobile: 165, desktop: 32 },
+  '/how-it-works': { mobile: 287, desktop: 55 },
   '/jobs': { mobile: 155, desktop: 30 },
-  '/login': { mobile: 230, desktop: 45 },
-  '/payment': { mobile: 220, desktop: 43 },
+  '/login': { mobile: 176, desktop: 35 },
+  '/payment': { mobile: 165, desktop: 33 },
   '/privacy': { mobile: 169, desktop: 33 },
-  '/register': { mobile: 452, desktop: 86 },
-  '/support': { mobile: 261, desktop: 51 },
+  '/register': { mobile: 294, desktop: 52 },
+  '/support': { mobile: 209, desktop: 39 },
 };
 
 /**
@@ -128,17 +185,29 @@ const MESURE_CI = {
  * et la plus dure : mesurée IDENTIQUE sur les deux hôtes, sur les 11 routes.
  */
 const NOEUDS = {
-  '/': 279,
-  '/about': 112,
-  '/contact': 120,
-  '/forgot-password': 108,
-  '/how-it-works': 157,
+  // 279 → 359 : les icônes SVG du corps de l'accueil ajoutent leurs nœuds
+  // (chaque icône porte un <svg> plus ses <path>/<circle>) là où un emoji en
+  // tenait un seul — 21 glyphes du corps (347) puis les 4 du bloc de contact
+  // (359). La structure s'accorde toujours entre les deux hôtes.
+  '/': 359,
+  // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
+  // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
+  // les trois étapes plus le séquestre de « Comment ça marche » (157 → 169) et
+  // les six pastilles de /support (135 → 154).
+  '/about': 123,
+  '/contact': 132,
+  // +3 nœuds chacun pour l'enveloppe de la réinitialisation (108 → 111) et pour
+  // la mallette de /payment (98 → 101) : un `<svg>` plus ses tracés là où un
+  // emoji tenait un seul nœud. /login +5 (114 → 119) et /register +30 (203 → 233,
+  // ses huit glyphes). La structure s'accorde toujours entre les deux hôtes.
+  '/forgot-password': 111,
+  '/how-it-works': 169,
   '/jobs': 103,
-  '/login': 114,
-  '/payment': 98,
+  '/login': 119,
+  '/payment': 101,
   '/privacy': 106,
-  '/register': 203,
-  '/support': 135,
+  '/register': 233,
+  '/support': 154,
 };
 
 /**
@@ -148,16 +217,26 @@ const NOEUDS = {
  * de la marge de la borne.
  */
 const HAUTEUR = {
-  '/': { mobile: 7075, desktop: 4782 },
-  '/about': { mobile: 1691, desktop: 1086 },
+  // 7 075 → 7 079 px : le remplacement emoji→SVG change de 4 px la hauteur du
+  // document (les pastilles d'icône ne portaient plus la hauteur de ligne du
+  // glyphe). Vérifié : les deux canaux publient la même chose.
+  '/': { mobile: 7079, desktop: 4782 },
+  // 1 691 → 1 667 px en mobile : la carte d'À propos portait l'emoji dans un
+  // `text-2xl` (une hauteur de ligne) ; le `<svg>` de 24 px en tient moins. Les
+  // trois autres pages de la passe ne bougent pas d'un pixel.
+  '/about': { mobile: 1667, desktop: 1086 },
   '/contact': { mobile: 1385, desktop: 1086 },
+  // La dernière vague emoji→SVG ne bouge la hauteur que là où l'emoji portait
+  // une hauteur de ligne plus grande que son SVG : /payment 885 → 893 en mobile
+  // (l'emoji `text-4xl`), /register 2946 → 2947 mobile et 2515 → 2517 desktop.
+  // /login (965/940) et /forgot-password (926/940) ne bougent pas d'un pixel.
   '/forgot-password': { mobile: 926, desktop: 940 },
   '/how-it-works': { mobile: 2957, desktop: 2124 },
   '/jobs': { mobile: 823, desktop: 940 },
   '/login': { mobile: 965, desktop: 940 },
-  '/payment': { mobile: 885, desktop: 940 },
+  '/payment': { mobile: 893, desktop: 940 },
   '/privacy': { mobile: 1627, desktop: 1104 },
-  '/register': { mobile: 2946, desktop: 2515 },
+  '/register': { mobile: 2947, desktop: 2517 },
   '/support': { mobile: 1652, desktop: 990 },
 };
 

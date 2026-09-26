@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { IconePage } from '../config/page-icons';
 
 /**
  * Carte Google : un CONTRÔLE d'abord, l'iframe ensuite — à l'appui.
@@ -27,11 +28,11 @@ import { useState } from 'react';
  * donc la bascule shell → React ne décale rien.
  *
  * @param {{
- *   src: string, title: string, href: string, label: string, icon: string,
- *   frameClass: string, controlClass: string,
+ *   src: string, title: string, href: string, label: string,
+ *   icone: string, classeIcone: string, frameClass: string, controlClass: string,
  * }} props
  */
-export default function MapEmbed({ src, title, href, label, icon, frameClass, controlClass }) {
+export default function MapEmbed({ src, title, href, label, icone, classeIcone, frameClass, controlClass }) {
   const [afficherLaCarte, setAfficherLaCarte] = useState(false);
 
   if (afficherLaCarte) {
@@ -49,7 +50,7 @@ export default function MapEmbed({ src, title, href, label, icon, frameClass, co
 
   return (
     <div className={frameClass}>
-      <span className="text-2xl" aria-hidden="true">{icon}</span>
+      <IconePage nom={icone} classe={classeIcone} />
       <a
         href={href}
         target="_blank"
