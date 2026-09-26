@@ -181,6 +181,23 @@
       "hors_mutation": "le harnais ne mute que le garde lui-même (cible = garde) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (détection du cas bugué historique, tolérance de l'état local, tolérance de l'ancrage partagé), et les mutations portent sur le garde"
     },
     {
+      "chemin": "frontend/scripts/check-appui-demontage-controles.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "runner": "vitest",
+      "motif": "autre moitié de la classe de bug du panneau de notifications : balaie TOUS les contrôles interactifs de src/ et refuse tout contrôle qu'un changement d'état déclenché pendant l'appui (onMouseDown/onPointerDown/onTouchStart), porté par le contrôle lui-même ou un ancêtre (bouillonnement), démonte avant que le `click` n'arrive — rendu conditionnel ou retour anticipé gouverné par un état local écrit par le gestionnaire d'appui"
+    },
+    {
+      "chemin": "frontend/scripts/appui-demontage-controles.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (analyse AST Babel : appariement setters/états useState, résolution des gestionnaires d'appui et des fonctions locales qu'ils appellent, tests des rendus conditionnels et des retours anticipés enveloppant le contrôle) : le garde prononce le verdict, ce module fournit l'analyse statique et le comptage des contrôles interactifs",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (cible = garde) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (appui direct, appui d'ancêtre par bouillonnement, retour anticipé, tolérance de l'état non lié, tolérance de la fermeture par prop), et les mutations portent sur le garde"
+    },
+    {
       "chemin": "frontend/scripts/check-test-environment.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -2228,6 +2245,46 @@
       "cwd": "frontend",
       "attend": [
         "refuse de juger si le nombre de fichiers est sous le plancher (< MIN_FICHIERS_LUS)"
+      ]
+    },
+    {
+      "id": "appui-demontage: detection neutralisee (le controle demonte passerait)",
+      "garde": "frontend/scripts/check-appui-demontage-controles.js",
+      "cible": "frontend/scripts/check-appui-demontage-controles.js",
+      "trouve": "  if (resultats.length > 0) {",
+      "remplace": "  if (false && resultats.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-appui-demontage-controles.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme le fichier, le contrôle, l’événement et l’état sur une fixture buguée"
+      ]
+    },
+    {
+      "id": "appui-demontage: plancher de controles neutralise (un arbre sans controle passerait)",
+      "garde": "frontend/scripts/check-appui-demontage-controles.js",
+      "cible": "frontend/scripts/check-appui-demontage-controles.js",
+      "trouve": "  if (controlesAnalyses < MIN_CONTROLES_ANALYSES) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-appui-demontage-controles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-appui-demontage-controles.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse de juger si le nombre de contrôles analysés est sous le plancher"
       ]
     }
   ]
