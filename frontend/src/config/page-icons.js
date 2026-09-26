@@ -158,6 +158,16 @@ export const CLASSES_ICONE = {
   // Le glyphe en TÊTE DE PHRASE (bloc légal, notice d'étape, conseils photo), dans
   // un `text-sm` : il s'aligne sur la ligne de texte au lieu de la décaler.
   notice: 'inline h-4 w-4 align-[-0.15em]',
+  // LA MÊME icône en tête de phrase, mais dans un `text-xs` (12 px — la notice
+  // d'étape de /register, `stepNoticeClass`). L'icône garde sa taille de 16 px
+  // alors que la ligne rétrécit : l'`align-[-0.15em]` de `notice`, calibré sur
+  // `text-sm`/`text-base`, y laissait le centre 1,7 px AU-DESSUS de celui de la
+  // ligne — mesuré en navigateur le 26/09/2026, coquille ET React identiques au
+  // pixel (aucune divergence de canal : c'est bien l'alignement de l'icône sur
+  // la ligne qui divergeait). La valeur ramène le centre de l'icône sur celui de
+  // la ligne, dans ce contexte-là seulement : un `align` en `em` ne peut pas
+  // convenir aux trois tailles avec une icône de taille FIXE.
+  noticePetite: 'inline h-4 w-4 align-[-0.29em]',
   // Les deux cartes de type de compte de /register (l'ancien `text-2xl` d'un
   // emoji, centré par le `text-center` du parent).
   carteUserType: 'h-8 w-8 text-orange-600',

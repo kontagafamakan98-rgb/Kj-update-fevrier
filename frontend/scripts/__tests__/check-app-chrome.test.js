@@ -280,16 +280,81 @@ describe('les autres reliquats du gabarit dans src/App.css, TRANCHÉS eux aussi'
     // donc éditer `index.css`, le fichier de base, n'aurait rien changé, sans
     // que rien ne le dise. Une duplication ne coûte pas que des octets : elle
     // déplace le propriétaire en silence.
+    // La pile commence par la famille que le SITE SERT (déclarée plus bas par
+    // un `@font-face` local) : une pile qui recommencerait par une police du
+    // système rendrait la même page avec une police différente sur chaque hôte
+    // — c'est mesuré, et c'est ce que le cas suivant verrouille.
     expect(
       INDEX_CSS,
       'src/index.css ne porte plus la pile de polices du site'
-    ).toMatch(/font-family:\s*-apple-system/);
+    ).toMatch(/font-family:\s*'Inter'/);
     const bloc = APP_CSS_SANS_COMMENTAIRES.match(/\bbody\s*\{([^}]*)\}/);
     expect(bloc, 'src/App.css ne déclare plus de bloc `body`').not.toBeNull();
     expect(
       bloc[1],
       'src/App.css re-déclare la typographie de base — le propriétaire est index.css'
     ).not.toMatch(/font-family|margin\s*:/);
+  });
+
+  it('la police de base est SERVIE par le site, jamais empruntée à l’hôte', () => {
+    // ── Pourquoi ce cas existe ──────────────────────────────────────────
+    // La pile de `body` a longtemps commencé par `-apple-system`,
+    // `"Segoe UI"`, `Roboto`… : la même page publiait donc une typographie
+    // DIFFÉRENTE selon l'hôte. Mesuré le 26/09/2026, à classes et à géométrie
+    // d'élément IDENTIQUES : l'aire de l'encre du LCP de /support valait
+    // 9 324 px² sur le poste de mesure contre 7 616 sur le runner Linux (un
+    // plancher à 9 000 passait sur l'un et rougissait sur l'autre), et les
+    // hauteurs de repli de la mise en page différée se déplaçaient de 25,5 px.
+    // Aucune constante mesurée ne peut être juste sur deux hôtes quand la police
+    // n'est pas la même — d'où deux fichiers de police DANS le dépôt.
+    const familles = [...INDEX_CSS.matchAll(/@font-face\s*\{([\s\S]*?)\}/g)].map((m) => m[1]);
+    expect(familles.length, 'src/index.css ne déclare plus aucun @font-face').toBeGreaterThan(0);
+    const fichiers = [];
+    for (const bloc of familles) {
+      expect(bloc, 'un @font-face ne nomme plus la famille servie').toMatch(/font-family:\s*'Inter'/);
+      for (const [, url] of bloc.matchAll(/url\('([^']+)'\)/g)) {
+        fichiers.push({ url, latin: /U\+0000-00FF/.test(bloc) });
+      }
+    }
+    expect(fichiers.length, 'aucun fichier de police n’est référencé par les @font-face').toBeGreaterThan(0);
+    for (const { url } of fichiers) {
+      expect(url, `la police ${url} n’est pas servie par le site (URL absolue /fonts/ attendue)`).toMatch(
+        /^\/fonts\/[\w.-]+\.woff2$/
+      );
+      expect(
+        fs.existsSync(path.join(FRONTEND, 'public', url)),
+        `src/index.css déclare ${url}, absent de frontend/public/ — le build publierait une police que personne ne peut télécharger`
+      ).toBe(true);
+    }
+    // La licence : l'OFL exige que l'avis accompagne la police redistribuée.
+    expect(
+      fs.existsSync(path.join(FRONTEND, 'public', 'fonts', 'LICENSE-Inter-OFL.txt')),
+      'la licence SIL OFL de la police servie a disparu — la redistribution n’est plus couverte'
+    ).toBe(true);
+    // Le préchargement : la feuille est inlinée AVANT le corps, donc sans lui le
+    // navigateur ne découvre la police qu'après avoir analysé 69 ko de CSS,
+    // c'est-à-dire après le premier paint — le texte serait peint DEUX fois.
+    // Seul le sous-ensemble que TOUTES les pages emploient (celui qui porte
+    // U+0000-00FF : le latin de base, le français compris) est préchargé :
+    // précharger les 85 ko de `latin-ext` pour des pages qui ne l'utilisent pas
+    // serait payer une police pour rien.
+    const INDEX_HTML = lire('index.html');
+    const precharges = [...INDEX_HTML.matchAll(/<link\b[^>]*>/g)]
+      .map((m) => m[0])
+      .filter((balise) => /rel="preload"/.test(balise) && /as="font"/.test(balise))
+      .map((balise) => (balise.match(/href="([^"]+)"/) || [])[1]);
+    const principal = fichiers.find((f) => f.latin);
+    expect(principal, 'aucun @font-face ne couvre U+0000-00FF : plus rien n’est préchargé pour le texte courant').toBeTruthy();
+    expect(
+      precharges,
+      `index.html ne précharge pas ${principal.url} : la police arriverait après le premier paint et le texte serait peint deux fois (repli, puis Inter)`
+    ).toContain(principal.url);
+    for (const url of precharges) {
+      expect(
+        fichiers.map((f) => f.url),
+        `index.html précharge ${url}, qu'aucun @font-face ne déclare : une requête pour rien, et le vif du sujet reste non préchargé`
+      ).toContain(url);
+    }
   });
 
   it('et ce qu’App.css apporte VRAIMENT à `body` y est resté', () => {

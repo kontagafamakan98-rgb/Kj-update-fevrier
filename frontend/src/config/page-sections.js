@@ -167,6 +167,8 @@ export const PAGE_SECTIONS = {
     // travailleur ou une mission… »). Mesuré le 25/09/2026 comme sur /jobs
     // (deux canaux, deux tailles) : UNE SEULE candidate, au premier paint, sur
     // ce paragraphe, d'aire IDENTIQUE — 30 320 px² mobile, 32 656 px² desktop.
+    // Re-mesuré le 26/09/2026 avec la police SERVIE PAR LE SITE : 26 334 /
+    // 32 928 px² (voir /login — la police n'est plus celle de l'hôte).
     //
     // `heroFrameClass` porte la largeur du héros (donc le retour à la ligne du
     // sous-titre, qui porte lui-même son `max-w-2xl`), `heroSubtitleClass` sa
@@ -216,6 +218,8 @@ export const PAGE_SECTIONS = {
     // premier paint (t = 112 ms mobile / 88 ms desktop pour la coquille,
     // 84 / 80 ms pour React), sur ce paragraphe, d'AIRE IDENTIQUE de part et
     // d'autre — 35 640 px² mobile et 36 002 px² desktop.
+    // Re-mesuré le 26/09/2026 avec la police SERVIE PAR LE SITE : 36 750 /
+    // 35 144 px² (voir /login — la police n'est plus celle de l'hôte).
     //
     // Ces chaînes étaient recopiées face à face dans src/pages/Jobs.js et
     // vite-plugins/prerender/shells-routes.js (le commentaire de la coquille
@@ -252,17 +256,19 @@ export const PAGE_SECTIONS = {
     // LÉGALE de contact, en bas du formulaire. Mesuré le 26/09/2026 (Chrome
     // 152, sonde des candidates `largest-contentful-paint`, navigation réelle,
     // 412×823 et 1350×940) : UNE SEULE candidate par taille, horodatée au
-    // premier paint — 10 848 px² mobile / 12 448 px² desktop. La même passe a
+    // premier paint — 15 040 px² mobile / 12 834 px² desktop. La même passe a
     // établi les trois autres routes de ce groupe :
-    //   /register          notice d'étape (`stepNoticeClass`)   10 048 / 12 544
-    //   /forgot-password   sous-titre (`subtitleClass`)         14 001 / 16 458
-    //   /support           sous-titre (`subtitleClass`)         16 468 / 9 324
-    // L'AIRE DE L'ENCRE SUIT LES POLICES DE L'HÔTE, pas la déclaration : la
-    // même page sur le runner Linux de la CI (26/09/2026) donne 10 290 / 12 120
-    // (/login), 9 796 / 12 183 (/register), 13 104 / 15 336 (/forgot-password)
-    // et 15 120 / 7 616 (/support), à boîte d'élément identique — jusqu'à −18 %.
-    // Les planchers de `e2e/lcp-geometrie-declaree.spec.js` sont calés sur la
-    // plus petite des quatre mesures, jamais sur un seul poste.
+    //   /register          notice d'étape (`stepNoticeClass`)    9 548 / 12 338
+    //   /forgot-password   sous-titre (`subtitleClass`)         13 690 / 16 095
+    //   /support           sous-titre (`subtitleClass`)         16 720 / 9 480
+    // CES AIRES SONT CELLES DE LA POLICE SERVIE PAR LE SITE (src/index.css), et
+    // c'est nouveau : tant que le texte était rendu par la police de l'hôte,
+    // elles valaient jusqu'à 18 % de moins sur le runner Linux de la CI
+    // (/support desktop 7 616 contre 9 324 ici, à boîte d'élément identique —
+    // c'est l'encre qui change, pas le cadre), et les planchers de
+    // `e2e/lcp-geometrie-declaree.spec.js` devaient se caler sur la plus petite
+    // des DEUX machines. La même police pour tous les hôtes, mesurée telle
+    // qu'elle est publiée : c'est ce que l'auto-hébergement a acheté.
     // La chaîne était recopiée face à face dans src/pages/Login.js et
     // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
     // faisait diverger les deux peintures en silence, et une seconde peinture
@@ -292,7 +298,8 @@ export const PAGE_SECTIONS = {
     stepNoticeKey: 'clientStepNotice',
     // La chaîne de la notice d'étape EST l'élément LCP de la page (mesuré :
     // 10 048 px² mobile / 12 544 desktop après le passage de son ⚠️ de l'emoji
-    // au SVG, UNE candidate au premier paint) — déclarée ici pour que les deux
+    // au SVG, puis 9 548 / 12 338 le 26/09/2026 avec la police servie par le
+    // site — UNE candidate au premier paint) — déclarée ici pour que les deux
     // canaux la lisent (voir /login).
     stepNoticeClass: 'text-xs text-blue-700 mt-3',
     stepNoticeIcon: 'stepNotice',
@@ -400,9 +407,9 @@ export const PAGE_SECTIONS = {
     // page et la page de contact) : un seul texte pour un seul mot.
     titleKey: 'support',
     subtitleKey: 'supportSubtitle',
-    // Le sous-titre est l'élément LCP de la page (mesuré : 16 468 px² mobile /
-    // 9 324 desktop ici, 15 120 / 7 616 sur le runner Linux de la CI — même
-    // élément, encre −18 %, voir /login) — UNE candidate au premier paint. La chaîne
+    // Le sous-titre est l'élément LCP de la page (mesuré : 16 720 px² mobile /
+    // 9 480 desktop avec la police servie — voir /login) — UNE candidate au
+    // premier paint. La chaîne
     // est courte (`text-gray-600`) mais elle n'apparaît plus ailleurs dans
     // Support.js ni dans le corps de sa coquille : elle a bien un propriétaire
     // unique.
@@ -489,7 +496,8 @@ export const PAGE_SECTIONS = {
     // 25/09/2026 comme sur /jobs (deux canaux, deux tailles) : UNE SEULE
     // candidate, au premier paint (coquille t = 112 / 116 ms, React 88 / 112),
     // sur ce paragraphe, d'aire IDENTIQUE — 74 466 px² mobile, 80 262 px²
-    // desktop. C'est cette ÉGALITÉ qui tient la garantie : createRoot efface
+    // desktop ; re-mesuré le 26/09/2026 avec la police servie par le site :
+    // 82 940 / 79 540 px² (voir /login). C'est cette ÉGALITÉ qui tient la garantie : createRoot efface
     // #root, React reconstruit le même paragraphe, et un remplacement de MÊME
     // TAILLE n'enregistre aucun nouvel élément LCP.
     //
@@ -651,7 +659,8 @@ export const PAGE_SECTIONS = {
     // CORPS d'une section (« Kojo conserve les données nécessaires à la mise
     // en relation… », mesuré le 25/09/2026 : UNE SEULE candidate au premier
     // paint, 84 360 px² mobile / 86 676 px² desktop, aire identique entre la
-    // coquille et React). La géométrie à déclarer est donc celle de la
+    // coquille et React ; re-mesuré le 26/09/2026 avec la police servie par le
+    // site : 91 630 / 100 788 px² — voir /login). La géométrie à déclarer est donc celle de la
     // section, pas seulement de son en-tête : `sectionBodyClass` porte
     // l'élément élu, `sectionTitleClass` l'en-tête qui le précède dans le
     // flux, et `frameClass` la largeur — c'est elle qui décide du retour à la

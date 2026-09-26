@@ -41,24 +41,35 @@ import { PAGE_SECTIONS } from '../src/config/page-sections.js';
  * 26/09/2026 : son ⚠️ emoji est devenu un SVG, et la ligne se replie un cran
  * plus bas — même élément élu, aire légèrement plus petite.)
  *
- * ── POURQUOI LES PLANCHERS ONT ÉTÉ RECALIBRÉS (26/09/2026) ─────────────────
- * L'aire de l'ENCRE d'un texte n'est pas portable : elle suit les polices de
- * l'hôte. Le MÊME document, mêmes classes, même élément élu, mesuré sur le
- * runner Linux de la CI (run 36254013043, Chrome 152) : /jobs 35 055 / 30 874,
- * /about 73 340 / 78 208, /privacy 83 058 / 83 400, /how-it-works 27 056 /
- * 30 240, /login 10 290 / 12 120, /register 9 796 / 12 183, /forgot-password
- * 13 104 / 15 336 et /support 15 120 / 7 616 — jusqu'à −18 % de ce poste-ci,
- * alors que la BOÎTE de l'élément, elle, ne bouge pas (16 380 px² pour le
- * sous-titre de /support des deux côtés : c'est l'encre qui change, pas le
- * cadre). Des planchers calés à 1 ou 3 % sous le relevé d'UN SEUL hôte
+ * ── LES PLANCHERS, ET CE QUE LA POLICE SERVIE LEUR A FAIT (26/09/2026) ──────
+ * Première leçon, mesurée : l'aire de l'ENCRE d'un texte n'est pas portable, elle
+ * suit les polices de l'hôte. Le MÊME document, mêmes classes, même élément élu,
+ * mesuré sur le runner Linux de la CI (run 36254013043, Chrome 152) : /jobs
+ * 35 055 / 30 874, /about 73 340 / 78 208, /privacy 83 058 / 83 400,
+ * /how-it-works 27 056 / 30 240, /login 10 290 / 12 120, /register 9 796 /
+ * 12 183, /forgot-password 13 104 / 15 336 et /support 15 120 / 7 616 — jusqu'à
+ * −18 % de ce poste-ci, alors que la BOÎTE de l'élément ne bouge pas (16 380 px²
+ * pour le sous-titre de /support des deux côtés : c'est l'encre qui change, pas
+ * le cadre). Des planchers calés à 1 ou 3 % sous le relevé d'UN SEUL hôte
  * (/forgot-password mobile : 13 000 pour 13 104 mesurés ici ; /support desktop :
- * 9 000 pour 7 616 là-bas) ne bornaient donc pas la page, ils bornaient la
- * MACHINE — la leçon que la sonde du document a déjà apprise sur le temps (une
- * borne en millisecondes borne la machine, pas une régression).
+ * 9 000 pour 7 616 là-bas) ne bornaient pas la page, ils bornaient la MACHINE.
  *
- * Chaque plancher vaut désormais ≈ 70 % de la PLUS PETITE des quatre mesures
- * connues (deux tailles × deux hôtes) ; les quatre mesures de chaque route sont
- * en commentaire de sa ligne.
+ * Deuxième leçon, et c'est le remède : depuis que `src/index.css` sert Inter et
+ * que toutes les pages la préchargent, LES DEUX HÔTES RENDENT LA MÊME POLICE.
+ * Les valeurs ci-dessus décrivent l'artefact d'AVANT (police du système) et sont
+ * gardées comme histoire ; les planchers sont re-calés sur les DEUX tailles
+ * re-mesurées avec la police servie, chaque route en commentaire de sa ligne.
+ * Relevé du 26/09/2026 (une seule candidate au premier paint, élément élu et
+ * classes inchangés sur les 8 routes) : /jobs 36 750 / 35 144, /about 82 940 /
+ * 79 540, /privacy 91 630 / 100 788, /how-it-works 26 334 / 32 928, /login
+ * 15 040 / 12 834, /register 9 548 / 12 338, /forgot-password 13 690 / 16 095 et
+ * /support 16 720 / 9 480 — la police servie est un peu plus large que celle de
+ * ce poste-ci, donc l'encre monte (sauf /how-it-works, /register et
+ * /forgot-password, qui perdent quelques centaines de px² au re-pli).
+ *
+ * Chaque plancher vaut ≈ 70 % de la PLUS PETITE DES DEUX tailles servies : une
+ * seule police pour tous les hôtes, donc plus de marge à prendre pour couvrir un
+ * écart de police — c'est exactement ce que l'auto-hébergement a acheté.
  *
  * CE QUE CE PLANCHER EST, ET CE QU'IL N'EST PAS (mesuré le 26/09/2026) : une
  * borne de SANITY, pas le discriminateur de l'identité. Sonde d'atelier
@@ -79,22 +90,21 @@ import { PAGE_SECTIONS } from '../src/config/page-sections.js';
  * `elementRenderDelay` de 1156 à 2345 ms, score desktop 92 au lieu de 100).
  */
 const ROUTES_DECLAREES = [
-  // Plancher ≈ 0,7 × la plus petite des quatre mesures ; relevés en commentaire
-  // dans l'ordre « ce poste (mobile / desktop) · runner de la CI (mobile /
-  // desktop) », en px².
-  { route: '/jobs', champ: 'introClass', plancher: 21000 }, // 35 640 / 36 002 · 35 055 / 30 874
-  { route: '/about', champ: 'introClass', plancher: 51000 }, // 74 466 / 80 262 · 73 340 / 78 208
+  // Plancher ≈ 0,7 × la plus petite des deux tailles ; mesures en commentaire, en
+  // px², MOBILE / DESKTOP, police servie par le site (26/09/2026).
+  { route: '/jobs', champ: 'introClass', plancher: 24000 }, // 36 750 / 35 144
+  { route: '/about', champ: 'introClass', plancher: 55000 }, // 82 940 / 79 540
   // Sur cette page, le plus grand texte peint est un CORPS de section : c'est
   // `sectionBodyClass` qui porte l'élément élu, pas l'introduction.
-  { route: '/privacy', champ: 'sectionBodyClass', plancher: 58000 }, // 84 360 / 86 676 · 83 058 / 83 400
-  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 30 320 / 32 656 · 27 056 / 30 240
+  { route: '/privacy', champ: 'sectionBodyClass', plancher: 64000 }, // 91 630 / 100 788
+  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 26 334 / 32 928
   // Le plus grand texte peint de ces quatre pages est un paragraphe secondaire,
   // pas le titre : ligne légale de /login, notice d'étape de /register,
   // sous-titres de /forgot-password et de /support (voir la mesure en tête).
-  { route: '/login', champ: 'legalContactClass', plancher: 7000 }, // 10 848 / 12 448 · 10 290 / 12 120
-  { route: '/register', champ: 'stepNoticeClass', plancher: 6800 }, // 10 048 / 12 544 · 9 796 / 12 183
-  { route: '/forgot-password', champ: 'subtitleClass', plancher: 9000 }, // 14 001 / 16 458 · 13 104 / 15 336
-  { route: '/support', champ: 'subtitleClass', plancher: 5300 }, // 16 468 / 9 324 · 15 120 / 7 616
+  { route: '/login', champ: 'legalContactClass', plancher: 8900 }, // 15 040 / 12 834
+  { route: '/register', champ: 'stepNoticeClass', plancher: 6600 }, // 9 548 / 12 338
+  { route: '/forgot-password', champ: 'subtitleClass', plancher: 9500 }, // 13 690 / 16 095
+  { route: '/support', champ: 'subtitleClass', plancher: 6600 }, // 16 720 / 9 480
 ];
 
 /**

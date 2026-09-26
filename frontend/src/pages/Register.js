@@ -447,7 +447,7 @@ export default function Register() {
             </div>
             
             <p className={pagePlan.stepNoticeClass}>
-              <IconePage nom={pagePlan.stepNoticeIcon} classe={CLASSES_ICONE.notice} />{' '}
+              <IconePage nom={pagePlan.stepNoticeIcon} classe={CLASSES_ICONE.noticePetite} />{' '}
               {formData.user_type === 'worker' ? pageT('workerStepNotice') : pageT(pagePlan.stepNoticeKey)}
             </p>
           </div>

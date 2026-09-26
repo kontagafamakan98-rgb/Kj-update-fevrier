@@ -60,11 +60,15 @@ const PLANCHER_NOEUDS = 20;
 const PLANCHER_HAUTEUR = 200;
 
 /**
- * La mutation qui doit franchir la borne, MESURÉE le 25/09/2026 : l'accueil
- * amputé de ses neuf dernières sections (shell bâti 94 329 o → 75 601 o,
- * SHA-1 997b3d3c… → dbb86205…, restauré à l'identique).
+ * La mutation qui doit franchir la borne, MESURÉE le 25/09/2026 (279 → 105
+ * nœuds, shell bâti 94 329 o → 75 601 o, SHA-1 997b3d3c… → dbb86205…) et
+ * RE-MESURÉE le 26/09/2026 sur l'artefact à icônes SVG : l'accueil amputé de
+ * ses neuf dernières sections tombe à 112 nœuds (de 360). La hauteur ne bouge
+ * pas (1 125 px mobile, 1 086 px desktop) : elle suit les mêmes sections, quel
+ * que soit le nombre de nœuds qui les composent. Le rejeu vivant est dans
+ * `e2e/style-layout-preuve-echec.spec.js`.
  */
-const MUTATION_ACCUEIL_AMPUTE = { noeuds: 105, hauteur: { mobile: 1125, desktop: 1086 } };
+const MUTATION_ACCUEIL_AMPUTE = { noeuds: 112, hauteur: { mobile: 1125, desktop: 1086 } };
 
 describe('la table de structure du document pré-rendu, et le coût qu’elle publie', () => {
   it('couvre EXACTEMENT les routes pré-rendues, avec les deux conditions par case', () => {
@@ -140,7 +144,7 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
   it('la mutation qui doit franchir la borne la franchit VRAIMENT (mesurée)', () => {
     // Un plancher que rien ne peut franchir ne prouve rien : la seule direction
     // que les mutations savent faire rougir est la perte de matière, et elle est
-    // mesurée — accueil amputé de ses neuf dernières sections (105 nœuds,
+    // mesurée — accueil amputé de ses neuf dernières sections (112 nœuds,
     // 1 125 px mobile, 1 086 px desktop), deux fois et demie sous la borne.
     expect(MUTATION_ACCUEIL_AMPUTE.noeuds).toBeLessThan(plancherNoeudsDe(NOEUDS['/']));
     for (const condition of CONDITIONS_NOMS) {

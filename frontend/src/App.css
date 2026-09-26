@@ -253,21 +253,27 @@ a:focus {
    POURQUOI PAR SECTION : les hauteurs de contenu vont de 216 à 866 px — un repli
    unique se trompe de plusieurs centaines de px sur chacune.
 
-   CE SONT DES VALEURS D'UN POSTE, ET C'EST ASSUMÉ (mesuré le 26/09/2026) : la
-   hauteur d'un bloc de texte suit les POLICES de l'hôte, et le nombre de lignes
-   repliées n'est pas connaissable avant la mise en page. Sous une police
-   étrangère (Verdana, sonde d'atelier `_sonde-carte-police.spec.js`), le
-   document gagne de la hauteur au moment où les sections se posent et le bloc de
-   carte se déplace de 99,1 px (1350×940) / 135,3 px (412×823) ; sur le runner
-   Linux de la CI, de 25,5 px (run 36254013043). AUCUNE constante CSS ne peut
-   fermer cet écart — c'est le prix du levier, et il est PUBLIÉ par les sondes
-   plutôt que caché. Ce qui est VÉRIFIÉ, c'est la STRUCTURE que la coquille doit
-   garder : les nœuds et la hauteur du document, à 20 % près (`BORNE_STRUCTURE`),
-   par `e2e/style-layout-document.spec.js`, et la position du bloc de carte dans
-   une mise en page POSÉE (`e2e/carte-accueil.spec.js`, qui amène le bloc dans la
-   vue avant de mesurer l'appui). Un repli OUBLIÉ, lui, n'est pas un écart de
-   quelques dizaines de px : c'est un document qui s'effondre de 3 040 px sur le
-   repli uniforme, et cette sonde-là le refuse.
+   CES VALEURS SUIVENT LA POLICE, ET LA POLICE EST SERVIE PAR LE SITE (26/09/2026).
+   C'était le défaut de ce levier tant que le texte était rendu par la police de
+   l'hôte : la hauteur d'un bloc suit les POLICES, et le nombre de lignes
+   repliées n'est pas connaissable avant la mise en page — les constantes ne
+   pouvaient donc être justes que sur le poste qui les avait mesurées. Mesuré le
+   26/09/2026 : sous une police étrangère (Verdana, sonde d'atelier
+   `_sonde-carte-police.spec.js`), le document gagnait de la hauteur au moment où
+   les sections se posaient et le bloc de carte se déplaçait de 99,1 px
+   (1350×940) / 135,3 px (412×823) ; sur le runner Linux de la CI, de 25,5 px
+   (run 36254013043). Depuis que `src/index.css` sert Inter et que toutes les
+   pages la préchargent, les cinq valeurs réécrites ci-dessus (§6, §7 et §9 en
+   mobile, §9 en desktop) sont celles de CETTE police, mesurées section par
+   section différée désactivée : le document mesure 7 186 px (mobile) et 4 807 px
+   (desktop) sans la règle, 7 187 / 4 808 avec elle (+1 px d'arrondi sous-pixel,
+   l'écart qu'il y avait déjà : 7 080 contre 7 079), et la dérive publiée par
+   `e2e/carte-accueil.spec.js` retombe à 0,0 px sur cet hôte. Ce qui est VÉRIFIÉ,
+   c'est aussi la STRUCTURE que la coquille doit garder : les nœuds et la hauteur
+   du document, à 20 % près (`BORNE_STRUCTURE`), par
+   `e2e/style-layout-document.spec.js`. Un repli OUBLIÉ, lui, n'est pas un écart
+   de quelques dizaines de px : c'est un document qui s'effondre de 3 040 px sur
+   le repli uniforme, et cette sonde-là le refuse.
 
    LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : il est
    peint au premier écran, donc jamais « différé » — mesuré, la règle ne change
@@ -286,10 +292,10 @@ a:focus {
 .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 865.1px; }
 .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 744.6px; }
 .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 866.2px; }
-.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 462.6px; }
-.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 276px; }
+.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 487.7px; }
+.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 308px; }
 .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 216px; }
-.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 554.6px; }
+.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 604.8px; }
 .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 841.4px; }
 
 /* Au-delà de 768 px, `py-12` devient `py-16` (128 px) et les contenus prennent
@@ -303,7 +309,7 @@ a:focus {
   .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 296.8px; }
   .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 184px; }
   .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 136px; }
-  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 316.8px; }
+  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 342.3px; }
   .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 640.2px; }
 }
 

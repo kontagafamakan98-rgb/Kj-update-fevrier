@@ -7,6 +7,32 @@
          de partage sur fond foncé) : fond graphite + K dégradé, là où
          l'icône claire disparaîtrait. Généré par scripts/gen-og-images.py. -->
     <link rel="icon" media="(prefers-color-scheme: dark)" href="/icons/icon-dark.png" />
+    <!-- LA POLICE DU SITE EST PRÉCHARGÉE ICI, ET CETTE PAGE EST LA SOURCE DES
+         COQUILLES PRÉ-RENDUES : `vite-plugins/prerender-route-meta.js` reconstruit
+         chaque coquille depuis ce HTML (méta + corps), donc les treize pages
+         héritent de ce préchargement. La feuille est INLINÉE (69 ko de CSS avant
+         le corps) : sans lui, le navigateur ne découvre le fichier de police
+         qu'après avoir analysé la feuille, c'est-à-dire après le premier paint —
+         la police arriverait systématiquement en retard et le texte serait peint
+         deux fois (repli puis Inter).
+         NE PAS écrire de balise en toutes lettres dans ce commentaire : il est
+         PUBLIÉ tel quel, et le garde des ressources (`check-shell-remote-resources`)
+         lit le HTML publié, commentaires compris — un exemple écrit ici était
+         refusé comme une déclaration non classée (vécu le 26/09/2026).
+         `crossorigin` est obligatoire même en même-origine : les polices se
+         téléchargent toujours en mode CORS, et sans cet attribut le
+         préchargement est IGNORÉ en silence (double téléchargement mesurable
+         dans le journal réseau). Un seul fichier est préchargé : le sous-ensemble
+         `latin`, celui dont toutes les pages ont besoin ; `latin-ext` (œ, ɛ, ɔ,
+         ŋ des dictionnaires bambara/mooré/wolof) reste découvert par son
+         `unicode-range`, sans payer 85 ko quand la page ne l'utilise pas. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/inter-variable-latin.woff2"
+      crossorigin
+    />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"

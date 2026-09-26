@@ -7,9 +7,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── LA POLICE DU SITE EST AUTO-HÉBERGÉE (26/09/2026) ──────────────────────
+   La pile ci-dessous commençait par les polices DU SYSTÈME (`-apple-system`,
+   `Segoe UI`, `Roboto`…) : la même page était donc rendue avec une police
+   DIFFÉRENTE selon l'hôte — mesuré le 26/09/2026, une aire de LCP variait de
+   18 % entre le poste de mesure et le runner Linux de la CI (/support desktop :
+   9 324 px² contre 7 616, à boîte d'élément identique), et les hauteurs de repli
+   de la mise en page différée (`src/App.css`) se déplaçaient de 25,5 px sur le
+   runner. Aucune constante mesurée ne peut être juste sur deux hôtes quand la
+   police n'est pas la même : elle est donc FOURNIE par le site.
+
+   POURQUOI INTER : c'est déjà la famille que le code nommait
+   (`CountryChangePopup.js`), sa licence permet la redistribution (SIL OFL 1.1,
+   texte publié à côté des fichiers : `public/fonts/LICENSE-Inter-OFL.txt`), et
+   elle couvre les cinq dictionnaires du projet (fr, en, bm, mos, wo).
+
+   DEUX FICHIERS ET PAS HUIT : les fichiers servis par Google sont VARIABLES
+   (`font-weight: 100 900`), donc un seul fichier couvre les quatre graisses du
+   site (400, 500, 600, 700) — une requête au lieu de quatre. Le `unicode-range`
+   est celui de Google, recopié ici : le navigateur ne télécharge QUE le
+   sous-ensemble dont la page a besoin. `latin` couvre le français (`é`, `à`,
+   `ç`, `’`), `latin-ext` les caractères que nos dictionnaires bambara/mooré/
+   wolof emploient (`œ`, `ɛ`, `ɔ`, `ŋ`) — une page sans ces caractères ne
+   télécharge pas le second fichier.
+
+   LE NOM DU FICHIER EST LA VERSION : `/fonts/` est servi en cache immuable d'un
+   an (`vercel.json`, comme `/icons/`) — remplacer un fichier par une autre
+   police exige donc un NOUVEAU NOM, sinon les navigateurs garderont l'ancien
+   pendant un an sans que rien ne le dise.
+
+   `font-display: swap` : le premier paint ne bloque pas sur la police (le
+   fichier est préchargé par la balise `rel="preload" as="font"` du head de
+   `index.html`, donc il arrive avec le HTML) ; l'effet sur le LCP et le CLS est
+   mesuré, pas supposé.
+   Les polices système restent en REPLI derrière Inter : les glyphes qu'Inter ne
+   couvre pas (cyrillique, grec, arabe d'une annonce publiée par l'API) sont
+   rendus par elles, et non par une case vide. */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/fonts/inter-variable-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+        U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/fonts/inter-variable-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+        U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+        U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+        U+A720-A7FF;
+}
+
 body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
         "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
         "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;

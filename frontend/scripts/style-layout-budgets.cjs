@@ -88,6 +88,8 @@
  *     desktop). Mesuré ENTRELACÉ (15 tours, mobile cpu×4) : 419,8 → 319,3 ms de
  *     « Style & Layout », −100,5 ms (−24 %) ; la hauteur du document reste
  *     7 080 px mobile / 4 783 px desktop contre une référence de 7 079 / 4 782
+ *     (puis 7 186 / 4 807 depuis que la police est servie par le site — les
+ *     constantes de repli de src/App.css ont été re-mesurées le 26/09/2026)
  *     (+1 px), vérifiée section par section par `e2e/style-layout-document.spec.js`.
  *     Un repli UNIFORME de 1 000 px, lui, portait le document à 10 119 px
  *     (+3 040) : les hauteurs de contenu vont de 216 à 866 px, aucune constante
@@ -118,7 +120,13 @@ const CONDITIONS = [
  * que le rapport médiane/minimum est de 1,02 à 1,07 sur les autres routes).
  *
  * Ces nombres ne jugent plus rien (voir l'en-tête) : ils sont le relevé de
- * référence de l'hôte, publié par la sonde à chaque passage.
+ * référence de l'hôte, publié par la sonde à chaque passage. Ils décrivent
+ * l'artefact d'AVANT la police auto-hébergée (26/09/2026) et sont conservés
+ * AVEC `MESURE_CI`, mesuré sur le même artefact : c'est cette paire-là — deux
+ * hôtes, un seul artefact — qui prouve que l'axe du temps n'appartient pas à
+ * l'artefact (de 1,8 × à 8,2 ×).
+ * Le passage de la CI qui suit cette vague republiera les siens dans son journal,
+ * où la sonde les imprime à côté des précédents.
  */
 const MESURE = {
   // Relevé du 26/09/2026 APRÈS le remplacement des glyphes emoji de l'accueil
@@ -165,6 +173,12 @@ const MESURE = {
  * que l'axe du temps n'appartient pas à l'artefact. Les 4 cases absentes sont
  * celles qui sont restées au-dessus de l'ancienne borne basse du poste — la
  * sonde n'imprime une mesure que lorsqu'un verdict tombe.
+ *
+ * CETTE TABLE ET `MESURE` DÉCRIVENT UN ARTEFACT D'AVANT LA POLICE AUTO-HÉBERGÉE
+ * (26/09/2026) : elles restent la paire cohérente qui prouve la non-portabilité
+ * du TEMPS (même artefact, deux hôtes, de 1,8 × à 8,2 × d'écart), et le passage
+ * de la CI qui suit cette vague republiera ses propres chiffres dans son
+ * journal. La sonde imprime les deux, avec leur hôte, à chaque case.
  */
 const MESURE_CI = {
   '/': { mobile: 80.4, desktop: 34.4 },
@@ -185,59 +199,78 @@ const MESURE_CI = {
  * et la plus dure : mesurée IDENTIQUE sur les deux hôtes, sur les 11 routes.
  */
 const NOEUDS = {
+  // +1 SUR LES ONZE ROUTES (26/09/2026) : le préchargement de la police servie
+  // par le site ajoute un élément dans le <head>, et la sonde compte
+  // `document.querySelectorAll('*')` — donc le `<link rel="preload" as="font">`
+  // compte. Les écarts emoji→SVG commentés ci-dessous sont ceux du CORPS, que
+  // cette vague ne touche pas.
   // 279 → 359 : les icônes SVG du corps de l'accueil ajoutent leurs nœuds
   // (chaque icône porte un <svg> plus ses <path>/<circle>) là où un emoji en
   // tenait un seul — 21 glyphes du corps (347) puis les 4 du bloc de contact
   // (359). La structure s'accorde toujours entre les deux hôtes.
-  '/': 359,
+  '/': 360,
   // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
   // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
   // les trois étapes plus le séquestre de « Comment ça marche » (157 → 169) et
   // les six pastilles de /support (135 → 154).
-  '/about': 123,
-  '/contact': 132,
+  '/about': 124,
+  '/contact': 133,
   // +3 nœuds chacun pour l'enveloppe de la réinitialisation (108 → 111) et pour
   // la mallette de /payment (98 → 101) : un `<svg>` plus ses tracés là où un
   // emoji tenait un seul nœud. /login +5 (114 → 119) et /register +30 (203 → 233,
   // ses huit glyphes). La structure s'accorde toujours entre les deux hôtes.
-  '/forgot-password': 111,
-  '/how-it-works': 169,
-  '/jobs': 103,
-  '/login': 119,
-  '/payment': 101,
-  '/privacy': 106,
-  '/register': 233,
-  '/support': 154,
+  '/forgot-password': 112,
+  '/how-it-works': 170,
+  '/jobs': 104,
+  '/login': 120,
+  '/payment': 102,
+  '/privacy': 107,
+  '/register': 234,
+  '/support': 155,
 };
 
 /**
  * LA HAUTEUR du document pré-rendu, par route et par condition (px). C'est le
- * relevé du poste ; sur les 18 cases où la CI a imprimé le sien, l'écart va de 0
- * à 32 px, soit 0,9 % au plus (accueil mobile 7 075 → 7 107), très à l'intérieur
- * de la marge de la borne.
+ * relevé du poste.
+ *
+ * RE-MESURÉE EN ENTIER LE 26/09/2026, quand la police du site est devenue une
+ * police SERVIE (src/index.css, /fonts/) : la hauteur d'un document de texte suit
+ * la police, donc upgrader la police change ces onze lignes d'un coup. L'écart
+ * avec les valeurs d'avant va de 0 px (/contact, /jobs, /forgot-password) à
+ * +107 px (accueil mobile, dont les neuf sections différées sont repliées sur
+ * leurs constantes de repli) : c'est bien l'artefact qui a changé, pas l'hôte.
+ * C'est aussi la raison pour laquelle ces deux-là — l'hôte et la police — se
+ * mesuraient autrefois ENSEMBLE : c'est ce que l'auto-hébergement sépare.
  */
 const HAUTEUR = {
-  // 7 075 → 7 079 px : le remplacement emoji→SVG change de 4 px la hauteur du
-  // document (les pastilles d'icône ne portaient plus la hauteur de ligne du
-  // glyphe). Vérifié : les deux canaux publient la même chose.
-  '/': { mobile: 7079, desktop: 4782 },
-  // 1 691 → 1 667 px en mobile : la carte d'À propos portait l'emoji dans un
-  // `text-2xl` (une hauteur de ligne) ; le `<svg>` de 24 px en tient moins. Les
-  // trois autres pages de la passe ne bougent pas d'un pixel.
-  '/about': { mobile: 1667, desktop: 1086 },
+  // 7 079 → 7 187 px en mobile (4 782 → 4 808 en desktop) : le repli par section
+  // des neuf sections différées a été re-mesuré AVEC la police servie
+  // (src/App.css), donc le document différé mesure ce qu'il mesure sans la règle
+  // (7 186 / 4 807 rendues : +1 px d'arrondi sous-pixel, l'écart qu'il y avait
+  // déjà avant, 7 080 contre 7 079) — c'est la propriété que ces constantes
+  // doivent à la page.
+  '/': { mobile: 7187, desktop: 4808 },
+  // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
+  // ligne de plus avec Inter) ; desktop inchangé.
+  '/about': { mobile: 1718, desktop: 1086 },
   '/contact': { mobile: 1385, desktop: 1086 },
-  // La dernière vague emoji→SVG ne bouge la hauteur que là où l'emoji portait
-  // une hauteur de ligne plus grande que son SVG : /payment 885 → 893 en mobile
-  // (l'emoji `text-4xl`), /register 2946 → 2947 mobile et 2515 → 2517 desktop.
-  // /login (965/940) et /forgot-password (926/940) ne bougent pas d'un pixel.
   '/forgot-password': { mobile: 926, desktop: 940 },
-  '/how-it-works': { mobile: 2957, desktop: 2124 },
+  // 2 982 → 3 002 px en mobile : une ligne de plus dans une étape ; desktop
+  // inchangé (la largeur y évite le repli).
+  '/how-it-works': { mobile: 3002, desktop: 2124 },
   '/jobs': { mobile: 823, desktop: 940 },
-  '/login': { mobile: 965, desktop: 940 },
-  '/payment': { mobile: 893, desktop: 940 },
-  '/privacy': { mobile: 1627, desktop: 1104 },
-  '/register': { mobile: 2947, desktop: 2517 },
-  '/support': { mobile: 1652, desktop: 990 },
+  // 965 → 981 px en mobile : la ligne légale de contact se replie une fois de
+  // plus ; desktop inchangé.
+  '/login': { mobile: 981, desktop: 940 },
+  // 893 → 918 px en mobile : le registre de la mallette grandit d'une ligne.
+  '/payment': { mobile: 918, desktop: 940 },
+  // 1 627 → 1 702 px en mobile et 1 104 → 1 181 px en desktop : +1 ligne dans les
+  // deux cas (le corps de section est le plus long texte du site).
+  '/privacy': { mobile: 1702, desktop: 1181 },
+  // 2 947 → 2 997 px en mobile, 2 517 → 2 534 en desktop.
+  '/register': { mobile: 2997, desktop: 2534 },
+  // 1 652 px en mobile (inchangé) et 990 → 1 014 px en desktop.
+  '/support': { mobile: 1652, desktop: 1014 },
 };
 
 /**
@@ -248,13 +281,28 @@ const HAUTEUR = {
  * devenir un test de police.
  *
  * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses neuf
- * dernières sections descend de 279 à 105 nœuds (0,38 du relevé) et de 7 075 à
- * 1 125 px en mobile, de 4 782 à 1 086 px en desktop (0,16 et 0,23) — deux fois
- * et demie sous la borne. Shell bâti avant mutation : 94 329 o, SHA-1
- * 997b3d3c1adb50e3fa669ab29f8ae395249b3aa4 ; après : 75 601 o, SHA-1
- * dbb86205f4d247d8828f2c0d839c8a3b515d000c ; restauré à l'identique, les deux
- * sorties rouges (`/ — mobile` ET `/ — desktop`) nommant « 105 nœuds peints, sous
- * le plancher de 223 ».
+ * dernières sections descend de 360 à 112 nœuds (0,31 du relevé) et de 7 187 à
+ * 1 125 px en mobile, de 4 808 à 1 086 px en desktop (0,16 et 0,23) — deux fois
+ * et demie sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
+ * icônes SVG) donnait 279 → 105 nœuds avec les MÊMES hauteurs : la hauteur suit
+ * les sections retirées, pas le nombre de nœuds qui les composent. Le rejeu
+ * VIVANT est `e2e/style-layout-preuve-echec.spec.js` — il ampute le corps publié
+ * au vol (la navigation est interceptée, `build/index.html` n'est jamais
+ * réécrit), exige le rouge des deux cases sur les DEUX axes, et publie ses
+ * chiffres dans le journal du job `e2e-playwright`.
+ *
+ * ── Ce que la sonde NE sait PAS attraper, et c'est une mesure ───────────────
+ * Casser une TAILLE ne fait PAS mordre la sonde. Remplacer chaque
+ * `contain-intrinsic-size: auto Npx` (les neuf sections différées de l'accueil)
+ * par `auto 4px` laisse le document à 7 186 px en mobile et 4 807 en desktop —
+ * ±1 px de sous-pixel. C'est contre-intuitif et c'est mesuré : la taille
+ * intrinsèque n'agit qu'en PLANCHER, et le mot-clé `auto` MÉMORISE la taille
+ * rendue dès que la section devient pertinente pour l'utilisateur — donc la
+ * casser ne rétrécit pas le document. La conséquence est assumée : la sonde n'a
+ * qu'une BORNE BASSE, elle attrape la PERTE DE MATIÈRE (nœuds/px), jamais une
+ * taille cassée vers le bas. C'est écrit ici pour que personne ne croie le
+ * contraire ; le rejeu correspondant est le second cas de
+ * `e2e/style-layout-preuve-echec.spec.js`.
  */
 const BORNE_STRUCTURE = 0.8;
 
