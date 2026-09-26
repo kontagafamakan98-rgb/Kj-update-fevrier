@@ -24,20 +24,35 @@ const payments = [];
 // Centre de notifications de la fixture : une ligne NON LUE par compte, servie
 // à la connexion. C'est ce que le parcours e2e « notifications » supprime — une
 // vraie fixture serveur, donc une vraie requête HTTP, pas une doublure.
+//
+// « À LA CONNEXION » veut dire à CHAQUE connexion, et c'est une décision
+// mesurée, pas un détail : le parcours consomme la ligne (il la supprime pour de
+// vrai), donc un compte ne peut être servi UNE fois sans que le second passage
+// sur le même compte ouvre un panneau vide. Mesuré le 26/09/2026 en rejouant le
+// parcours mobile sur un serveur déjà utilisé : `getByRole('button', { name:
+// 'Supprimer cette notification' })` n'existe plus, l'appui part dans le vide et
+// le cas tombe en timeout — un rouge qui accuse le produit alors que la fixture
+// était à sec. Un compte neuf à chaque connexion est ce qui rend le parcours
+// indifférent à l'ordre des cas ET au nombre de MOTEURS qui le rejouent.
 const notifications = new Map();
+const notificationDeFixture = (user) => ({
+  id: 'notif-fixture-1',
+  user_id: user.id,
+  title: 'Nouvelle proposition reçue',
+  body: 'Famakan Kontaga a soumis une proposition pour « Test postulation »',
+  type: 'proposal_received',
+  related_id: 'playtest-job-1',
+  related_type: 'job',
+  is_read: false,
+  created_at: new Date().toISOString(),
+});
+// La ligne est re-servie à la connexion SUIVANTE, jamais pendant la session :
+// une suppression reste donc effective jusqu'au bout (c'est la propriété que le
+// parcours mesure), et la session d'après repart d'un compte lisible.
 const notifierLeCompte = (user) => {
-  if (notifications.has(user.id)) return;
-  notifications.set(user.id, [{
-    id: 'notif-fixture-1',
-    user_id: user.id,
-    title: 'Nouvelle proposition reçue',
-    body: 'Famakan Kontaga a soumis une proposition pour « Test postulation »',
-    type: 'proposal_received',
-    related_id: 'playtest-job-1',
-    related_type: 'job',
-    is_read: false,
-    created_at: new Date().toISOString(),
-  }]);
+  const lignes = notifications.get(user.id) || [];
+  if (lignes.some((ligne) => ligne.id === 'notif-fixture-1')) return;
+  notifications.set(user.id, [notificationDeFixture(user), ...lignes]);
 };
 let currentOrigin = 'http://127.0.0.1:4173';
 
