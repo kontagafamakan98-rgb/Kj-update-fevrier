@@ -871,7 +871,17 @@ jobs:
 
   # ─── Tests E2E Playwright : parcours utilisateurs sous navigateur réel ──────
   # Exécute la suite Playwright (frontend/e2e/*.spec.js : user-flows, notifications,
-  # LCP de /contact, et la géométrie du LCP de chaque route pré-rendue) sous Chromium.
+  # LCP de /contact, et la géométrie du LCP de chaque route pré-rendue).
+  # La suite ENTIÈRE tourne sur Chromium ; les DEUX parcours d'APPUI
+  # (appuis-exterieurs.spec.js, notifications.spec.js) sont REJOUÉS sur Firefox
+  # et WebKit (projets `firefox` et `webkit` de playwright.config.js), parce que
+  # la séquence d'événements d'un appui tactile est un fait de MOTEUR :
+  # `pointerdown → touchstart → pointerup → touchend → mousedown → mouseup →
+  # click`. Le panneau de notifications se ferme sur `mousedown` et AGIT sur
+  # `click` ; un moteur qui n'émettrait pas les événements de compatibilité, ou
+  # dans un autre ordre, referait la panne historique (« l'appui ne supprime
+  # jamais ») sans qu'aucun cas Chromium ne le voie. Les trois moteurs sont
+  # donc installés ci-dessous.
   # Complète les tests unitaires jsdom et les vérifications statiques de build :
   #   1. Moteur réel : exécute le bundle JS compilé dans un vrai Chromium headless,
   #      garantissant le rendu DOM, l'exécution CSS et l'absence de runtime error.
@@ -898,10 +908,15 @@ jobs:
   #      SEO / sans-JavaScript (voir frontend/e2e/style-layout-document.spec.js).
   #      Aucun job ni budget Lighthouse ajouté : c'est le job e2e existant qui la
   #      porte, ~1 min de plus.
+  #   7. Multi-moteurs sur les gestes : les cas d'APPUI sont rejoués sur Firefox
+  #      et WebKit, où la lecture du tactile par le moteur diffère de Chromium —
+  #      c'est sur ces deux moteurs qu'un défaut de feuille de style a fait
+  #      tomber la carte de /jobs dans l'ErrorBoundary (« Oups »), invisible en
+  #      Chromium (voir frontend/e2e/appuis-exterieurs.spec.js).
   e2e-playwright:
-    name: E2E Playwright tests (Chromium)
+    name: E2E Playwright tests (Chromium + Firefox + WebKit)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     needs: frontend-build
 
     steps:
@@ -918,20 +933,23 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Cache Playwright Chromium binaries
+      - name: Cache Playwright browser binaries
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-browsers-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          # Le suffixe `v2` accompagne le passage à trois moteurs : les caches
+          # `v1` ne contenaient que Chromium, et un « cache-hit » dessus ferait
+          # échouer les projets firefox/webkit sur des binaires absents.
+          key: playwright-browsers-v2-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
 
-      - name: Install Playwright Chromium dependencies (and binary if cache miss)
+      - name: Install Playwright browser dependencies (and binaries if cache miss)
         working-directory: frontend
         run: |
           if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps chromium
+            npx playwright install-deps chromium firefox webkit
           else
-            npx playwright install --with-deps chromium
+            npx playwright install --with-deps chromium firefox webkit
           fi
 
       - name: Build frontend for E2E (fixture API URL)
