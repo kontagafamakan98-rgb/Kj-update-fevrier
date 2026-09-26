@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { jobsAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
@@ -174,7 +175,7 @@ export default function ProposalModal({ job, onClose, onProposalSubmitted }) {
             <h2 id="proposal-modal-title" className="text-xl font-bold text-gray-900">{t('jobUiApplyTitle')}</h2>
             <p className="text-sm text-gray-500">{t('jobUiApplySubtitlePrefix')} {title}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label={t('close')} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100">✕</button>
+          <button type="button" onClick={onClose} aria-label={t('close')} className="rounded-lg px-3 py-2 text-gray-500 hover:bg-gray-100"><X className="h-4 w-4" aria-hidden="true" /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">

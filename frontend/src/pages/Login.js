@@ -39,7 +39,7 @@ export default function Login() {
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
   const pageT = makeScopedTranslator(currentLanguage, t);
   const pagePlan = PAGE_SECTIONS['/login'];
-  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
+  const legalDocumentUrl = '/terms';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -213,8 +213,6 @@ export default function Login() {
             <p className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} classe={CLASSES_ICONE.notice} /> {pageT(pagePlan.legalNoticeTitleKey)}</p>
             <a
               href={legalDocumentUrl}
-              target="_blank"
-              rel="noreferrer"
               className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
             >
               {pageT(pagePlan.legalConsentLinkKey)}

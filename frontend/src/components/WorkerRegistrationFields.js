@@ -171,7 +171,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
                         key={skillKey}
                         type="button"
                         onClick={() => (isSelected ? handleSpecialtyRemove(storedValue) : handleSpecialtyAdd(storedValue))}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-blue-100'}`}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-blue-100'}`}
                       >
                         {isSelected ? '✓ ' : ''}{translateSkill(skillKey)}
                       </button>

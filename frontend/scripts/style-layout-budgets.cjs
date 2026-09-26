@@ -88,9 +88,10 @@
  *     desktop). Mesuré ENTRELACÉ (15 tours, mobile cpu×4) : 419,8 → 319,3 ms de
  *     « Style & Layout », −100,5 ms (−24 %) ; la hauteur du document reste
  *     7 080 px mobile / 4 783 px desktop contre une référence de 7 079 / 4 782
- *     (puis 7 186 / 4 807 depuis que la police est servie par le site — les
- *     constantes de repli de src/App.css ont été re-mesurées le 26/09/2026)
- *     (+1 px), vérifiée section par section par `e2e/style-layout-document.spec.js`.
+ *     (puis 7 187 / 4 868 depuis que la police est servie par le site et le titre
+ *     du héros rendu concret — les constantes de repli de src/App.css ont été
+ *     re-mesurées le 26/09/2026), vérifiée section par section par
+ *     `e2e/style-layout-document.spec.js`.
  *     Un repli UNIFORME de 1 000 px, lui, portait le document à 10 119 px
  *     (+3 040) : les hauteurs de contenu vont de 216 à 866 px, aucune constante
  *     unique ne convient. Le héros n'est jamais différé — / reste élu sur son
@@ -165,6 +166,8 @@ const MESURE = {
   '/privacy': { mobile: 169, desktop: 33 },
   '/register': { mobile: 294, desktop: 52 },
   '/support': { mobile: 209, desktop: 39 },
+  // Page CGU (26/09/2026, relevée par la sonde) : même famille que /privacy.
+  '/terms': { mobile: 142.4, desktop: 23.3 },
 };
 
 /**
@@ -192,6 +195,9 @@ const MESURE_CI = {
   '/privacy': { mobile: 41.2, desktop: null },
   '/register': { mobile: 74.6, desktop: 31.7 },
   '/support': { mobile: 52.2, desktop: 24.2 },
+  // Page neuve : aucun relevé sur le runner de la CI pour l'instant (la sonde
+  // imprime les deux hôtes dès que le passage suivant en publie un).
+  '/terms': { mobile: null, desktop: null },
 };
 
 /**
@@ -208,7 +214,10 @@ const NOEUDS = {
   // (chaque icône porte un <svg> plus ses <path>/<circle>) là où un emoji en
   // tenait un seul — 21 glyphes du corps (347) puis les 4 du bloc de contact
   // (359). La structure s'accorde toujours entre les deux hôtes.
-  '/': 360,
+  // 360 → 355 (26/09/2026) : les DEUX compteurs inventés de l'accueil
+  // (« 1 000+ travailleurs », « 500+ projets ») sont retirés (règle « pas de
+  // faux compteurs »), ce qui supprime 5 nœuds (deux cartes et leur contenu).
+  '/': 355,
   // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
   // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
   // les trois étapes plus le séquestre de « Comment ça marche » (157 → 169) et
@@ -227,6 +236,10 @@ const NOEUDS = {
   '/privacy': 107,
   '/register': 234,
   '/support': 155,
+  // Même squelette que /privacy (une enveloppe racine, un cadre, un titre, une
+  // intro, quatre sections et le paragraphe de liens) : 108 nœuds mesurés par
+  // la sonde le 26/09/2026.
+  '/terms': 108,
 };
 
 /**
@@ -243,13 +256,13 @@ const NOEUDS = {
  * mesuraient autrefois ENSEMBLE : c'est ce que l'auto-hébergement sépare.
  */
 const HAUTEUR = {
-  // 7 079 → 7 187 px en mobile (4 782 → 4 808 en desktop) : le repli par section
+  // 7 079 → 7 187 px en mobile (4 782 → 4 868 en desktop) : le repli par section
   // des neuf sections différées a été re-mesuré AVEC la police servie
-  // (src/App.css), donc le document différé mesure ce qu'il mesure sans la règle
-  // (7 186 / 4 807 rendues : +1 px d'arrondi sous-pixel, l'écart qu'il y avait
-  // déjà avant, 7 080 contre 7 079) — c'est la propriété que ces constantes
-  // doivent à la page.
-  '/': { mobile: 7187, desktop: 4808 },
+  // (src/App.css), donc le document différé mesure ce qu'il mesure avec la règle.
+  // Desktop 4 808 → 4 868 (26/09/2026) : le titre du héros a été rendu concret
+  // ("Trouvez un travailleur de confiance, payez en toute sécurité"), qui se
+  // replie d'une ligne de plus en desktop ; le mobile ne bouge pas (7 187).
+  '/': { mobile: 7187, desktop: 4868 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
   '/about': { mobile: 1718, desktop: 1086 },
@@ -271,6 +284,9 @@ const HAUTEUR = {
   '/register': { mobile: 2997, desktop: 2534 },
   // 1 652 px en mobile (inchangé) et 990 → 1 014 px en desktop.
   '/support': { mobile: 1652, desktop: 1014 },
+  // Page CGU : 1 563 px en mobile et 1 086 px en desktop, mesurés par la sonde
+  // le 26/09/2026.
+  '/terms': { mobile: 1563, desktop: 1086 },
 };
 
 /**
@@ -281,8 +297,8 @@ const HAUTEUR = {
  * devenir un test de police.
  *
  * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses neuf
- * dernières sections descend de 360 à 112 nœuds (0,31 du relevé) et de 7 187 à
- * 1 125 px en mobile, de 4 808 à 1 086 px en desktop (0,16 et 0,23) — deux fois
+ * dernières sections descend de 355 à 113 nœuds (0,32 du relevé) et de 7 187 à
+ * 1 125 px en mobile, de 4 868 à 1 086 px en desktop (0,16 et 0,22) — deux fois
  * et demie sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
  * icônes SVG) donnait 279 → 105 nœuds avec les MÊMES hauteurs : la hauteur suit
  * les sections retirées, pas le nombre de nœuds qui les composent. Le rejeu
@@ -294,8 +310,9 @@ const HAUTEUR = {
  * ── Ce que la sonde NE sait PAS attraper, et c'est une mesure ───────────────
  * Casser une TAILLE ne fait PAS mordre la sonde. Remplacer chaque
  * `contain-intrinsic-size: auto Npx` (les neuf sections différées de l'accueil)
- * par `auto 4px` laisse le document à 7 186 px en mobile et 4 807 en desktop —
- * ±1 px de sous-pixel. C'est contre-intuitif et c'est mesuré : la taille
+ * par `auto 4px` laisse le document à 7 066 px en mobile (−121 px, −1,7 %) et
+ * 4 867 en desktop (−1 px) — jamais jusqu'au plancher de hauteur (5 749 / 3 894).
+ * C'est contre-intuitif et c'est mesuré : la taille
  * intrinsèque n'agit qu'en PLANCHER, et le mot-clé `auto` MÉMORISE la taille
  * rendue dès que la section devient pertinente pour l'utilisateur — donc la
  * casser ne rétrécit pas le document. La conséquence est assumée : la sonde n'a

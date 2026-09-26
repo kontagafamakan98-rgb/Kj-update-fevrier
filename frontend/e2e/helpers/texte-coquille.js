@@ -94,20 +94,16 @@
  * sera LÉGITIME : la coquille aura cessé d'être l'endroit où ce texte est peint,
  * et c'est un fait à traiter (une frontière à déclarer), pas à contourner.
  *
- * ── Les écarts DÉCLARÉS (et pourquoi il n'y en a que deux) ──────────────────
- * Un seul endroit du site publie des mots que React ne peut pas publier : les
- * quatre chiffres de l'accueil. La page les lit de `/public/stats` et les
- * formate par `toLocaleString()`, la coquille publie le repli statique déclaré
- * dans `src/config/page-sections.js` (`stats[].shellText`) — « 1 000+ » contre
- * « 1+ » avec la fixture mesurée le 25/09/2026. Aucune géométrie ne peut
- * rapprocher une valeur de donnée d'un repli : cet écart est DÉCLARÉ, avec sa
- * raison, et sa contrepartie est VÉRIFIÉE (React doit peindre, dans la bande,
- * un nombre suivi du suffixe — la preuve que le bloc est toujours vivant et que
- * l'écart est bien « une donnée contre un repli », pas « un texte disparu »).
- * Un écart déclaré qui n'est PLUS utilisé, ou dont la contrepartie n'est plus
- * peinte, est PÉRIMÉ et fait rougir : sans cette règle, la table des écarts
- * deviendrait le cimetière des exceptions qu'on n'ose plus retirer (la règle
- * que `scripts/shell-text-provenance.js` applique déjà à ses marqueurs).
+ * ── Les écarts DÉCLARÉS, et pourquoi il n'y en a PLUS ────────────────────────
+ * Deux chiffres de l'accueil étaient lus de `/public/stats` et formatés par
+ * `toLocaleString()`, tandis que la coquille publiait le repli statique — un
+ * écart impossible à rapprocher par la géométrie, qui vivait donc ici, DÉCLARÉ.
+ * Le 26/09/2026, ces deux compteurs INVENTÉS (« 1 000+ travailleurs », « 500+
+ * projets ») ont été retirés (règle « pas de faux compteurs ») : la section des
+ * statistiques ne publie plus que des faits vérifiables, identiques dans les
+ * deux canaux. Il n'y a donc plus AUCUN écart déclaré — la table reste, VIDE,
+ * parce que son contrôle tient la règle qui compte : un écart périmé fait
+ * rougir (une exception qu'on n'ose plus retirer est une exception qui mente).
  */
 
 /**
@@ -220,29 +216,13 @@ const ZONES = [
  * dans la même bande pour que l'écart reste ce qu'il prétend être. Un écart
  * déclaré qui n'est plus utilisé, ou dont la contrepartie n'est plus peinte,
  * fait rougir la sonde.
+ *
+ * VIDE depuis le 26/09/2026 : les deux compteurs inventés de l'accueil ont été
+ * retirés, donc plus aucun écart n'est déclaré. La table reste vide plutôt que
+ * supprimée : c'est SON CONTRÔLE (un écart périmé rougit) qui empêche le
+ * cimetière des exceptions de se reformer.
  */
-export const ECARTS_DECLARES = [
-  {
-    route: '/',
-    texte: '1 000+',
-    raison:
-      "les quatre chiffres de l'accueil sont des DONNÉES : la page les lit de /public/stats et les formate " +
-      'par toLocaleString() (séparateur de milliers selon la locale du navigateur), la coquille publie le repli ' +
-      'statique déclaré dans src/config/page-sections.js (`stats[].shellText`) — mesuré le 25/09/2026 avec la ' +
-      'fixture : React peint « 1+ », la coquille « 1 000+ ». Aucune géométrie ni aucun texte ne peut rapprocher ' +
-      'une valeur de donnée d’un repli.',
-    contrepartie: /^\p{N}[\p{N}\s\u00a0.,]*\+$/u,
-  },
-  {
-    route: '/',
-    texte: '500+',
-    raison:
-      'même bloc que « 1 000+ » : le deuxième chiffre de la grille est lu de /public/stats et formaté par la page ' +
-      '(mesuré : « 0+ » avec la fixture), tandis que la coquille publie le repli « 500+ » déclaré dans ' +
-      'src/config/page-sections.js.',
-    contrepartie: /^\p{N}[\p{N}\s\u00a0.,]*\+$/u,
-  },
-];
+export const ECARTS_DECLARES = [];
 
 /**
  * Compare les deux inventaires d'une route et rend les divergences NOMMÉES,

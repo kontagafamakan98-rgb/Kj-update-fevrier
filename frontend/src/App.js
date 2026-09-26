@@ -34,6 +34,9 @@ const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Privacy = lazy(() => import("./pages/Privacy"));
+// Les CGU, en page citable (le pied de page et les écrans d'inscription y
+// renvoyaient par un .docx fusionné : un crawler n'en lisait rien).
+const Terms = lazy(() => import("./pages/Terms"));
 
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -140,7 +143,6 @@ function MobileLoader() {
 
 function LegalFooter() {
   const { t } = useLanguage();
-  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
   // Les libellés du pied de page sont des CLÉS i18n (src/i18n/*.json), les
   // mêmes que celles que publie la coquille statique de l'accueil : cette
   // carte locale était un troisième domicile pour « Itinéraire », « Conditions
@@ -195,9 +197,9 @@ function LegalFooter() {
           <Link to="/privacy" className="hover:text-orange-800 underline underline-offset-2">
             {t('footerPrivacy')}
           </Link>
-          <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
+          <Link to="/terms" className="hover:text-orange-800 underline underline-offset-2">
             {t('footerTerms')}
-          </a>
+          </Link>
           {SOCIAL_LINKS.map((social) => (
             <a
               key={social.key}
@@ -330,6 +332,7 @@ function AppRoutes() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/login" element={
               <Suspense fallback={<LoginSkeleton />}>
                 <Login />

@@ -469,9 +469,10 @@ describe('shell-text-provenance — la règle des marqueurs', () => {
     // /register, notice de /login, pastille de /forgot-password et carte de
     // /payment. Il ne reste AUCUN glyphe déclaré par sa clé i18n : zéro champ
     // `iconKey`/`shellIconKey`, et plus aucun `*IconKey` (la forme route est
-    // `*Icon`). Il ne reste en littéral que les deux suffixes « + », qui font
-    // partie d'un NOMBRE (`1 000+`) et non d'un glyphe.
-    expect(marqueursDuPlan(FRONTEND_DIR).map((champ) => champ.valeur)).toEqual(['+', '+']);
+    // `*Icon`). Il ne reste AUCUN glyphe en littéral dans le plan : les deux
+    // suffixes « + » des compteurs inventés de l'accueil ont été retirés avec
+    // ces compteurs (26/09/2026).
+    expect(marqueursDuPlan(FRONTEND_DIR).map((champ) => champ.valeur)).toEqual([]);
     expect(clesDeGlypheDuPlan(FRONTEND_DIR)).toEqual([]);
 
     // Les icônes DESSINÉES : le plan en déclare au moins les 17 de l'accueil (10

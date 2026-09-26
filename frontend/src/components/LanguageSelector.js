@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LANGUAGES } from '../config/languages';
 import FlagIcon from './FlagIcon';
@@ -96,7 +97,7 @@ const LanguageSelector = ({
                     <div className="text-xs text-gray-500">{lang.name}</div>
                   </div>
                   {currentLanguage === lang.code && (
-                    <span className="ml-auto text-orange-600">✓</span>
+                    <Check className="ml-auto h-4 w-4 text-orange-600" aria-hidden="true" />
                   )}
                 </button>
               ))}

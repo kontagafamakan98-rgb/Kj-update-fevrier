@@ -228,13 +228,12 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</div>`,
     `</section>`,
 
-    // Chiffres (valeurs de repli de Home.js avant /public/stats, pour
-    // que le remplacement par React ne décale rien). Le texte publié
-    // ici et le repli que lit Home.js sortent de la MÊME déclaration
-    // (homePlan.stats) : une seule liste, deux rendus.
+    // Faits vérifiables (pays couverts, support) : la MÊME déclaration
+    // (homePlan.stats) est lue par Home.js et par cette coquille — une seule
+    // liste, deux rendus, et aucun compteur inventé (cf. page-sections.js).
     `<section class="py-12 md:py-16 bg-gray-50">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">`,
+    `<div class="grid grid-cols-2 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">`,
     ...homePlan.stats.map(
       ({ labelKey, shellText }) =>
         `<div>` +

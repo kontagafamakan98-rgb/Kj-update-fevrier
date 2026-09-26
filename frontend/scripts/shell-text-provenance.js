@@ -592,14 +592,10 @@ const sourcesDesCanaux = (frontendDir) => {
 };
 
 export const MARQUEURS_EN_EXEMPTION = [
-  {
-    valeur: '+',
-    sorte: 'plan',
-    motif:
-      "suffixe d'un chiffre, dans la composition d'un chiffre affiché (`1 000+`, `500+`) : " +
-      "ce n'est pas un glyphe mais une partie du NOMBRE, donc il reste au plan — le repère " +
-      'du dépliant de la FAQ, lui, est la clé `faqMarker`',
-  },
+  // L'exemption de « + » (suffixe d'un chiffre : `1 000+`, `500+`) a été RETIRÉE
+  // avec les compteurs inventés de l'accueil (26/09/2026, règle « pas de faux
+  // compteurs ») : plus aucun « + » n'est publié ni déclaré, donc l'exemption
+  // était devenue PÉRIMÉE — et le garde la refuse précisément pour ça.
   {
     valeur: '·',
     sorte: 'publie',

@@ -99,18 +99,18 @@ export const PAGE_SECTIONS = {
       { icone: 'step2', numberKey: 'stepNumber2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
       { icone: 'step3', numberKey: 'stepNumber3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
     ],
-    // Les quatre chiffres de l'accueil. La coquille les publiait dans sa propre
-    // liste `[['1 000+', 'activeWorkers'], …]`, pendant que la page tenait ses
-    // replis (1000, 500, 4, « 24/7 ») de son côté : deux déclarations du même
-    // bloc. `shellText` est le texte EXACT que la coquille écrit ; `fallback`
-    // est la valeur d'avant /public/stats que la page affiche — les deux, parce
-    // que la page passe par `toLocaleString()` (le séparateur de milliers suit
-    // la locale du navigateur) et qu'aucun texte ne doit changer ici.
+    // Les chiffres de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
+    // inventés. Les deux anciens (« 1 000+ travailleurs », « 500+ projets »)
+    // étaient des replis FABRIQUÉS avant l'appel à /public/stats : le HTML
+    // pré-rendu les publiait donc à un crawler, et le premier paint les
+    // affichait à un visiteur, comme s'ils étaient mesurés. Ils sont RETIRÉS
+    // (règle « pas de faux compteurs »). « 24/7 » l'était aussi : le support
+    // répond du lundi au samedi (cf. contactIntro), donc la valeur dit « 6j/7 ».
+    // `shellText` est le texte EXACT que la coquille écrit ; `fallback` la même
+    // valeur côté page — les deux sortent d'ici, une seule liste.
     stats: [
-      { labelKey: 'activeWorkers', fallback: 1000, suffix: '+', shellText: '1 000+' },
-      { labelKey: 'completedProjects', fallback: 500, suffix: '+', shellText: '500+' },
-      { labelKey: 'countriesCovered', fallback: 4, shellText: '4' },
-      { labelKey: 'customerSupport', fallback: '24/7', shellText: '24/7' },
+      { labelKey: 'countriesCovered', fallback: '4', shellText: '4' },
+      { labelKey: 'customerSupport', fallback: '6j/7', shellText: '6j/7' },
     ],
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le
@@ -683,6 +683,34 @@ export const PAGE_SECTIONS = {
     links: [
       { to: '/contact', labelKey: 'contactTitle' },
       { to: '/about', labelKey: 'aboutTitle' },
+    ],
+  },
+
+  // ── Conditions générales d'utilisation ────────────────────────────────────
+  // Le pied de page renvoyait vers un .docx fusionné (confidentialité + CGU) :
+  // un crawler n'en lisait rien et un lecteur devait télécharger un fichier
+  // Word. Cette page existe pour publier les CGU en clair, à une adresse
+  // citable, avec la MÊME forme que la politique de confidentialité (le plan
+  // est lu par la page React ET par la coquille pré-rendue).
+  '/terms': {
+    titleKey: 'termsTitle',
+    introKey: 'termsIntro',
+    // Même géométrie que /privacy : le plus grand texte peint est le CORPS
+    // d'une section, c'est `sectionBodyClass` qui porte l'élément LCP.
+    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
+    introClass: 'text-gray-600 mb-8',
+    sectionTitleClass: 'text-xl font-semibold text-gray-900 mb-2',
+    sectionBodyClass: 'text-gray-600',
+    sections: [
+      { titleKey: 'termsServiceTitle', bodyKey: 'termsServiceBody' },
+      { titleKey: 'termsAccountTitle', bodyKey: 'termsAccountBody' },
+      { titleKey: 'termsPaymentTitle', bodyKey: 'termsPaymentBody' },
+      { titleKey: 'termsLiabilityTitle', bodyKey: 'termsLiabilityBody' },
+    ],
+    links: [
+      { to: '/privacy', labelKey: 'privacyTitle' },
+      { to: '/contact', labelKey: 'contactTitle' },
     ],
   },
 };

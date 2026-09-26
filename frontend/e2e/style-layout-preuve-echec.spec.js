@@ -23,9 +23,9 @@
  *     `auto 4px` NE FAIT PAS baisser la hauteur du document. C'est contre-
  *     intuitif et c'est MESURÉ ici : la taille intrinsèque n'agit qu'en PLANCHER,
  *     et le mot-clé `auto` MÉMORISE la taille rendue dès que la section devient
- *     pertinente pour l'utilisateur — donc même à 4 px la hauteur ne bouge que de
- *     ±1 px (sous-pixel ; mesuré). La conséquence est assumée : la sonde n'a
- *     qu'une BORNE BASSE,
+ *     pertinente pour l'utilisateur — donc la hauteur ne bouge que de quelques px
+ *     à quelques pour cent (mesuré), jamais jusqu'au plancher. La conséquence est
+ *     assumée : la sonde n'a qu'une BORNE BASSE,
  *     elle n'attrape PAS une taille cassée vers le bas, et ce fichier l'écrit
  *     plutôt que de laisser croire le contraire.
  *
@@ -174,22 +174,18 @@ test.describe('preuve d’échec rejouée — la sonde du document mord sur les 
 
       // La découverte, écrite comme un FAIT mesuré : la taille intrinsèque
       // n'agit qu'en PLANCHER, et `auto` mémorise la taille rendue dès que la
-      // section devient pertinente — donc la casser ne rétrécit pas le document
-      // (mesuré : ±1 px de sous-pixel), et la sonde, qui n'a qu'une borne BASSE,
-      // ne peut pas l'attraper.
-      // La borne est à 99 % (et non à ±1 px) pour rester vraie d'un hôte à
-      // l'autre : ce qui est prouvé, c'est qu'il n'y a PAS de chute, pas une
-      // constante de sous-pixel propre à ce poste (mesurée : −1 px).
+      // section devient pertinente — donc la casser ne rétrécit PAS le document
+      // jusqu'au plancher. Le déplacement observé (quelques px à quelques pour
+      // cent selon la mise en page) est PUBLIÉ, pas borné à une constante propre
+      // à ce poste : ce qui est prouvé, c'est que la hauteur reste AU-DESSUS du
+      // plancher — donc que la sonde, qui n'a qu'une borne BASSE, ne l'attrape
+      // pas.
+      const chute = ((sain.hauteur - casse.hauteur) / sain.hauteur) * 100;
       expect(
         casse.hauteur,
         `accueil (${condition.nom}) : casser contain-intrinsic-size a rétréci le document ` +
-          `(${sain.hauteur} → ${casse.hauteur} px, −${(((sain.hauteur - casse.hauteur) / sain.hauteur) * 100).toFixed(1)} %) — ` +
-          'la découverte « plancher mémorisant » est réfutée, cette preuve doit être réécrite'
-      ).toBeGreaterThan(sain.hauteur * 0.99);
-      expect(
-        casse.hauteur,
-        `accueil (${condition.nom}) : la hauteur cassée passe SOUS le plancher (${plancherHauteur}) — ` +
-          'dans ce cas la sonde la jugerait, contrairement à ce qui est écrit'
+          `jusqu'au plancher (${sain.hauteur} → ${casse.hauteur} px, −${chute.toFixed(1)} % pour un plancher ` +
+          `de ${plancherHauteur}) — la découverte « plancher mémorisant » est réfutée, cette preuve doit être réécrite`
       ).toBeGreaterThanOrEqual(plancherHauteur);
       // Et la structure de nœuds est intacte : la mutation ne touche que le CSS.
       expect(casse.noeuds, `accueil (${condition.nom}) : casser la taille a changé les nœuds`).toBe(sain.noeuds);

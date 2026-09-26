@@ -380,7 +380,7 @@ describe('check-page-meta — règle D (la coquille annonce la table)', () => {
   it('échoue quand une coquille annonce un AUTRE titre', () => {
     cleanTree();
     const html = fs.readFileSync(path.join(root, 'build', 'login.html'), 'utf8');
-    write('build/login.html', html.replace('<title>Connexion — Kojo</title>', '<title>Connexion</title>'));
+    write('build/login.html', html.replace('<title>Connexion · Kojo</title>', '<title>Connexion</title>'));
 
     const result = run();
 
@@ -406,13 +406,13 @@ describe('check-page-meta — règle D (la coquille annonce la table)', () => {
     // en ligne ne bouge pas — l’app et le HTML servi annoncent deux textes.
     cleanTree();
     const fr = JSON.parse(fs.readFileSync(path.join(root, 'src', 'i18n', 'fr.json'), 'utf8'));
-    fr.jobsMetaTitle = 'Emplois — Kojo';
+    fr.jobsMetaTitle = 'Emplois (nouveau)';
     write('src/i18n/fr.json', `${JSON.stringify(fr, null, 2)}\n`);
 
     const result = run();
 
     expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toMatch(/jobs\.html : <title> annonce « Emplois disponibles — Kojo »/);
+    expect(result.errors.join('\n')).toMatch(/jobs\.html : <title> annonce « Emplois disponibles · Kojo »/);
   });
 
   it('échoue quand une route de la table n’a pas de coquille', () => {
@@ -583,9 +583,9 @@ describe('check-page-meta — le runtime suit la table, route par route', () => 
 
     // Les routes autrefois muettes, nommées : sans elles, une table vide ferait
     // passer la boucle précédente pour une preuve.
-    expect(annonces).toContain('/register → Créer un compte — Kojo');
-    expect(annonces).toContain('/forgot-password → Mot de passe oublié — Kojo');
-    expect(annonces).toContain('/payment → Paiements sécurisés — Kojo');
+    expect(annonces).toContain('/register → Créer un compte · Kojo');
+    expect(annonces).toContain('/forgot-password → Mot de passe oublié · Kojo');
+    expect(annonces).toContain('/payment → Paiements sécurisés · Kojo');
   });
 
   it('ne publie aucun texte pour une route absente de la table', async () => {

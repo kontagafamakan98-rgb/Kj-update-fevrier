@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { useCountry } from '../contexts/CountryContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import FlagIcon from './FlagIcon';
@@ -104,7 +105,7 @@ export default function CountrySelector({ className = '' }) {
                 <FlagIcon country={country.id} className="w-5 h-4" showEmoji={false} />
                 <span className="font-medium">{country.name}</span>
                 {currentCountry === country.id && (
-                  <span className="ml-auto text-orange-600">✓</span>
+                  <Check className="ml-auto h-4 w-4 text-orange-600" aria-hidden="true" />
                 )}
               </button>
             ))}

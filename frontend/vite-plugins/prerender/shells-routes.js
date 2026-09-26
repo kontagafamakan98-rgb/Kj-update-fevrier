@@ -102,6 +102,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
   const aboutPlan = pageSections['/about']
   const contactPlan = pageSections['/contact']
   const privacyPlan = pageSections['/privacy']
+  const termsPlan = pageSections['/terms']
   const supportPlan = pageSections['/support']
   const howItWorksPlan = pageSections['/how-it-works']
   const jobsPlan = pageSections['/jobs']
@@ -666,6 +667,24 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
           )
           .join('') +
       liensDePage(privacyPlan, 'text-sm text-gray-500')
+      + `</div>`
+      + `</div>`,
+    // Les CGU : même forme que /privacy (le plus grand texte peint est le CORPS
+    // d'une section), tout est lu dans le plan.
+    terms: `<div class="min-h-screen bg-gray-50">`
+      + `<div class="${termsPlan.frameClass}">`
+      + `<h1 class="${termsPlan.titleClass}">${esc(T(termsPlan.titleKey))}</h1>`
+      + `<p class="${termsPlan.introClass}">${esc(T(termsPlan.introKey))}</p>`
+      + termsPlan.sections
+          .map(
+            ({ titleKey, bodyKey }) =>
+              `<section class="mb-8">` +
+              `<h2 class="${termsPlan.sectionTitleClass}">${esc(T(titleKey))}</h2>` +
+              `<p class="${termsPlan.sectionBodyClass}">${esc(T(bodyKey))}</p>` +
+              `</section>`
+          )
+          .join('') +
+      liensDePage(termsPlan, 'text-sm text-gray-500')
       + `</div>`
       + `</div>`,
   }

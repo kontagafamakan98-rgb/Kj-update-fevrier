@@ -1,12 +1,9 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
 import FlagIcon from '../components/FlagIcon';
 import { usePageMeta } from '../utils/seo';
-import { publicAPI } from '../services/apiEndpoints';
-import { safeLog } from '../utils/env';
 // Le corps de l'accueil (catégories, promesses, étapes) est DÉCLARÉ une fois :
 // src/config/page-sections.js, que le build lit pour écrire la coquille
 // pré-rendue. Ce composant en DÉRIVE au lieu de tenir sa propre liste.
@@ -30,17 +27,6 @@ export default function Home() {
   const { t } = useLanguage();
   const { user } = useAuth();
   usePageMeta();
-
-  // Chiffres réels depuis /public/stats (repli sur des valeurs génériques
-  // si l'appel échoue, pour ne jamais bloquer l'affichage de la landing).
-  const [stats, setStats] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    publicAPI.getStats()
-      .then((data) => { if (!cancelled) setStats(data); })
-      .catch((err) => { safeLog.error('Stats load error', err); });
-    return () => { cancelled = true; };
-  }, []);
 
   // Catégories, promesses, étapes et chiffres : lus dans la déclaration du
   // corps de la page (src/config/page-sections.js) — la MÊME que le build
@@ -80,15 +66,11 @@ export default function Home() {
   // Le titre de l'iframe montée à l'appui (même clé que /contact).
   const titreDeLaCarte = t('mapIframeTitle').replace('{address}', CONTACT.address);
 
-  // Lecture des chiffres par clé de libellé : `fallback` est la valeur affichée
-  // avant /public/stats, `suffix` la marque qui suit le chiffre. Aucune seconde
-  // liste — la déclaration est lue telle quelle. Déclaré AVANT les trois
-  // `statX` ci-dessous, qui le lisent.
-  const STAT = Object.fromEntries(STATS.map((stat) => [stat.labelKey, stat]));
-
-  const statWorkers = stats?.workers != null ? stats.workers : STAT.activeWorkers.fallback;
-  const statCompleted = stats?.completed_jobs != null ? stats.completed_jobs : STAT.completedProjects.fallback;
-  const statCountries = stats?.countries != null ? stats.countries : STAT.countriesCovered.fallback;
+  // LES CHIFFRES SONT DES FAITS VÉRIFIABLES, jamais des compteurs inventés :
+  // les deux anciens replis fabriqués (« 1 000+ travailleurs », « 500+
+  // projets ») et la promesse « 24/7 » sont retirés de la déclaration (voir
+  // src/config/page-sections.js). Ce qui reste est publié tel quel par les deux
+  // canaux — aucun appel réseau, aucun chiffre à remplacer au montage.
 
   // Les pays : la liste ET la couleur de carte viennent du référentiel partagé
   // (src/config/countries.js), que le build lit aussi pour écrire la coquille.
@@ -342,26 +324,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Section - Mobile Friendly */}
+      {/* Faits vérifiables (pays couverts, support) — plus AUCUN compteur
+          inventé : ce que la coquille pré-rendue publie est exactement ce que
+          la page affiche, et rien ici ne dépend d'un appel réseau. */}
       <section className="py-12 md:py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statWorkers.toLocaleString()}{STAT.activeWorkers.suffix}</div>
-              <div className="text-sm md:text-base text-gray-600">{t(STAT.activeWorkers.labelKey)}</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statCompleted.toLocaleString()}{STAT.completedProjects.suffix}</div>
-              <div className="text-sm md:text-base text-gray-600">{t(STAT.completedProjects.labelKey)}</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{statCountries}</div>
-              <div className="text-sm md:text-base text-gray-600">{t(STAT.countriesCovered.labelKey)}</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{STAT.customerSupport.fallback}</div>
-              <div className="text-sm md:text-base text-gray-600">{t(STAT.customerSupport.labelKey)}</div>
-            </div>
+          <div className="grid grid-cols-2 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">
+            {STATS.map((stat) => (
+              <div key={stat.labelKey}>
+                <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{stat.fallback}</div>
+                <div className="text-sm md:text-base text-gray-600">{t(stat.labelKey)}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

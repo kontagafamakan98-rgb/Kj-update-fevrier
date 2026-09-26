@@ -65,6 +65,9 @@ export const DECLARED_PAGE_META = {
   '/about': { title: 'aboutMetaTitle', description: 'aboutMetaDescription' },
   '/contact': { title: 'contactMetaTitle', description: 'contactMetaDescription' },
   '/privacy': { title: 'privacyMetaTitle', description: 'privacyMetaDescription' },
+  // Les CGU : même famille que /privacy (une page de confiance qu'un moteur
+  // exige), servie par la carte générique et pré-rendue comme les autres.
+  '/terms': { title: 'termsMetaTitle', description: 'termsMetaDescription' },
 };
 
 /**

@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import {
+  Bell as BellGlyph, CheckCircle2, ClipboardList, Flag, MessageSquare, PartyPopper, Wallet, Wrench,
+} from 'lucide-react';
 import { BellIcon, CheckAllIcon, TrashIcon, XIcon } from './notificationIcons';
 import { ancrageDe } from './notificationPanelPlacement';
 
@@ -15,19 +18,21 @@ const MESSAGE_ECHEC = {
   markAllRead: 'notifMarkAllFailed',
 };
 
-// Icône selon le type de notification
-const typeIcon = (type) => {
-  const icons = {
-    proposal_received:  '📋',
-    proposal_accepted:  '🎉',
-    job_in_progress:    '🔧',
-    payment_received:   '💰',
-    payment_confirmed:  '✅',
-    job_completed:      '🏁',
-    new_message:        '💬',
-    general:            '🔔',
-  };
-  return icons[type] || '🔔';
+// Icône DESSINÉE selon le type de notification (lucide-react) : plus d'emoji
+// publié comme icône (règle « pas d'emoji en guise d'icônes »).
+const ICONES_PAR_TYPE = {
+  proposal_received: ClipboardList,
+  proposal_accepted: PartyPopper,
+  job_in_progress: Wrench,
+  payment_received: Wallet,
+  payment_confirmed: CheckCircle2,
+  job_completed: Flag,
+  new_message: MessageSquare,
+  general: BellGlyph,
+};
+const TypeIcon = ({ type, className = 'h-5 w-5 text-orange-600' }) => {
+  const Icone = ICONES_PAR_TYPE[type] || BellGlyph;
+  return <Icone className={className} aria-hidden="true" />;
 };
 
 // Formater la date relative (ex: "il y a 3 min") — traduit selon la langue
@@ -253,7 +258,7 @@ export default function NotificationPanel() {
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="text-4xl mb-3">🔔</div>
+            <BellIcon className="mb-3 h-9 w-9 text-gray-300" />
             <p className="text-gray-500 text-sm font-medium">{t('noNotifications')}</p>
             <p className="text-gray-500 text-xs mt-1">{t('notifEmptyHint')}</p>
           </div>
@@ -285,7 +290,7 @@ export default function NotificationPanel() {
 
                   {/* Icône type */}
                   <div className="flex-shrink-0 w-9 h-9 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center text-lg">
-                    {typeIcon(notif.type)}
+                    <TypeIcon type={notif.type} />
                   </div>
 
                   {/* Contenu */}

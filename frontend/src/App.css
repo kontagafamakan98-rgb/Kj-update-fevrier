@@ -265,9 +265,9 @@ a:focus {
    (run 36254013043). Depuis que `src/index.css` sert Inter et que toutes les
    pages la préchargent, les cinq valeurs réécrites ci-dessus (§6, §7 et §9 en
    mobile, §9 en desktop) sont celles de CETTE police, mesurées section par
-   section différée désactivée : le document mesure 7 186 px (mobile) et 4 807 px
-   (desktop) sans la règle, 7 187 / 4 808 avec elle (+1 px d'arrondi sous-pixel,
-   l'écart qu'il y avait déjà : 7 080 contre 7 079), et la dérive publiée par
+   section différée désactivée : le document mesure 7 187 px (mobile) et 4 868 px
+   (desktop) avec la règle (le titre du héros rendu concret a ajouté ~60 px en
+   desktop le 26/09/2026), et la dérive publiée par
    `e2e/carte-accueil.spec.js` retombe à 0,0 px sur cet hôte. Ce qui est VÉRIFIÉ,
    c'est aussi la STRUCTURE que la coquille doit garder : les nœuds et la hauteur
    du document, à 20 % près (`BORNE_STRUCTURE`), par

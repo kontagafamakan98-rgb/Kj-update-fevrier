@@ -42,9 +42,11 @@
 //   vraie — de quoi décaler tout le contenu au montage de React.
 import { CONTACT, mailtoHref, telHref } from '../../src/config/contact.js'
 
-// Le document légal du pied de page : même valeur que src/App.js (qui la tient
-// en littéral local), donc aucune divergence possible entre les deux canaux.
-const DOCUMENT_LEGAL = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx'
+// La page des CGU du pied de page : même valeur que src/App.js (son `<Link
+// to="/terms">`), donc aucune divergence possible entre les deux canaux. Le
+// pied de page renvoyait autrefois vers un .docx fusionné (confidentialité +
+// CGU) : un crawler n'en lisait rien, et le lien n'était pas un lien interne.
+const ROUTE_CGU = '/terms'
 
 export const NAV_PLACEHOLDER =
   '<nav class="sticky top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur">' +
@@ -117,7 +119,7 @@ export function piedDePage({ esc, T, socialLinks = [] }) {
     `<a href="/about" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerAbout'))}</a>` +
     `<a href="/contact" class="hover:text-orange-800 underline underline-offset-2">${esc(T('contactTitle'))}</a>` +
     `<a href="/privacy" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerPrivacy'))}</a>` +
-    `<a href="${DOCUMENT_LEGAL}" target="_blank" rel="noreferrer" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerTerms'))}</a>` +
+    `<a href="${ROUTE_CGU}" class="hover:text-orange-800 underline underline-offset-2">${esc(T('footerTerms'))}</a>` +
     socialLinks
       .map(
         (social) =>

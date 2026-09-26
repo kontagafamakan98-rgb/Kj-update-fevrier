@@ -69,7 +69,7 @@ export default function Register() {
   const pagePlan = PAGE_SECTIONS['/register'];
   const toast = useToast();
   const navigate = useNavigate();
-  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
+  const legalDocumentUrl = '/terms';
 
   const countries = getCountriesList();
 
@@ -766,8 +766,6 @@ export default function Register() {
             </div>
             <a
               href={legalDocumentUrl}
-              target="_blank"
-              rel="noreferrer"
               className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
             >
               {pageT('legalConsentLink')}

@@ -142,6 +142,7 @@ const DEPLOYMENT_PATHS = [
   '/about',
   '/contact',
   '/privacy',
+  '/terms',
   '/dashboard',
   '/profile',
 ];
