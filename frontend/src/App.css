@@ -268,7 +268,8 @@ a:focus {
    section différée désactivée : le document mesure 7 187 px (mobile) et 4 868 px
    (desktop) avec la règle (le titre du héros rendu concret a ajouté ~60 px en
    desktop le 26/09/2026), et la dérive publiée par
-   `e2e/carte-accueil.spec.js` retombe à 0,0 px sur cet hôte. Ce qui est VÉRIFIÉ,
+   `e2e/carte-facade.spec.js` retombe à 0,0 px sur cet hôte (et publie la dérive
+   par route : −88,0 px sur / mobile, 0,0 px sur /contact). Ce qui est VÉRIFIÉ,
    c'est aussi la STRUCTURE que la coquille doit garder : les nœuds et la hauteur
    du document, à 20 % près (`BORNE_STRUCTURE`), par
    `e2e/style-layout-document.spec.js`. Un repli OUBLIÉ, lui, n'est pas un écart

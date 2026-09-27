@@ -24,6 +24,10 @@ import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 import { Skeleton } from '../components/SkeletonLoader';
 import { PHONE_NUMBER_MASK } from '../config/phone-format';
+// La carte du profil : une carte DIFFÉRÉE (montée seulement si le bloc entre
+// dans le viewport), dont les URL viennent de leur propriétaire.
+import DeferredMap from '../components/DeferredMap';
+import { countryMapFor } from '../utils/countryMap';
 
 const getLanguageLabel = (languageCode, t) => {
   const languageMap = {
@@ -62,6 +66,12 @@ export default function Profile() {
   const toast = useToast();
   const navigate = useNavigate();
   usePageTitle(t('profileMetaTitle'));
+
+  // La carte du PAYS DÉCLARÉ — la seule position qu'un profil possède (aucun
+  // modèle ne porte de coordonnées : voir `src/utils/countryMap.js`). `null`
+  // pour un pays hors des quatre couverts : la section n'est alors pas publiée
+  // du tout, plutôt que de peindre un cadre vide.
+  const cartePays = countryMapFor(user?.country);
 
   useEffect(() => {
     loadProfile();
@@ -327,6 +337,27 @@ export default function Profile() {
             }}
           />
         </div>
+
+        {/* Localisation : le pays déclaré, sur une carte DIFFÉRÉE. Le bloc est
+            volontairement LOIN sous la ligne de flottaison (après le paiement,
+            avant l'aide et la zone dangereuse) : c'est la position qui donne
+            son sens à « aucune requête tant que le bloc n'est pas à l'écran »,
+            et le parcours e2e (`e2e/carte-facade.spec.js`) refuse une carte
+            qui serait montée au premier écran. */}
+        {cartePays && (
+          <div className="px-6 py-6 border-t border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">{t('location')}</h2>
+            <p className="mb-4 text-sm text-gray-500">
+              <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
+            </p>
+            <DeferredMap
+              src={cartePays.src}
+              href={cartePays.href}
+              title={t('mapIframeTitle').replace('{address}', cartePays.nom)}
+              label={t('mapShowMap')}
+            />
+          </div>
+        )}
 
         <ConfirmModal
           open={portfolioRemoveIndex !== null}

@@ -55,6 +55,20 @@ export const SORTES = {
   LIEN: 'lien rendu (href, pas une requête)',
   /** Chargé APRÈS un geste de l'utilisateur : le parcours dynamique le couvre. */
   APRES_INTERACTION: 'chargé après interaction',
+  /**
+   * Chargé quand le BLOC DE CARTE entre dans le viewport — donc jamais au
+   * premier écran, mais sans geste non plus (ni appui ni défilement exigés :
+   * c'est l'observation de la mise en page qui décide).
+   *
+   * La sorte a été AJOUTÉE le 27/09/2026, quand la carte différée de /profile a
+   * introduit cette troisième manifestation : la ranger dans
+   * `APRES_INTERACTION` aurait écrit « après un geste » pour une carte montée
+   * sans que personne ne touche à rien, et le vocabulaire de ce module est
+   * FERMÉ précisément pour qu'on ne fasse pas dire à une sorte ce qu'elle ne dit
+   * pas. Son solde est prouvé au runtime : `e2e/carte-facade.spec.js`
+   * (« la carte différée ne part qu'une fois à l'écran »).
+   */
+  APRES_MISE_EN_ECRAN: 'chargé quand le bloc entre dans le viewport (jamais au premier écran)',
   /** Chargé seulement si une variable de BUILD l'autorise : no-op sinon. */
   CONDITIONNEL: 'chargé si la variable de build le demande',
 };
@@ -134,9 +148,24 @@ export const CLASSEMENT_ORIGINES = [
   },
   {
     origine: 'https://www.openstreetmap.org',
-    sorte: SORTES.LIEN,
-    motif: 'lien d’attribution des tuiles (`/copyright`) rendu à côté de la carte : un `href`, pas une requête',
-    preuve: 'vendor-leaflet (attribution des tuiles)',
+    // Deux manifestations sur CETTE origine, et la sorte retenue est la plus
+    // FORTE des deux (une origine est classée une fois, pas deux) :
+    //   • `vendor-leaflet` rend un `href` d'attribution (`/copyright`) : pas une
+    //     requête ;
+    //   • la carte DIFFÉRÉE du profil (`src/components/DeferredMap.js`, URL
+    //     construite par `src/utils/countryMap.js` + `src/utils/locationMaps.js`)
+    //     est une iframe (`/export/embed.html?bbox=…`) MONTÉE quand le bloc
+    //     entre dans le viewport — donc réellement demandée, mais jamais au
+    //     premier écran.
+    sorte: SORTES.APRES_MISE_EN_ECRAN,
+    motif:
+      'lien d’attribution des tuiles (`/copyright`) rendu à côté de la carte Leaflet (un `href`, ' +
+      'pas une requête), ET l’iframe de la carte différée de /profile ' +
+      '(`/export/embed.html?bbox=…`) : montée seulement quand le bloc entre dans le viewport, ' +
+      'jamais au premier écran',
+    preuve:
+      'vendor-leaflet (attribution des tuiles) + src/components/DeferredMap.js ' +
+      '(`src/utils/countryMap.js` pour l’URL)',
   },
   {
     origine: 'https://wa.me',
@@ -181,16 +210,12 @@ export const CLASSEMENT_ORIGINES = [
       'présente dans le bundle mais le script n’est jamais injecté',
     preuve: 'src/utils/analytics.js + vite-plugins/inject-production-csp.js',
   },
-  {
-    origine: 'https://picsum.photos',
-    sorte: SORTES.APRES_INTERACTION,
-    motif:
-      'photo FACTICE de la page de test `/mobile-test` (`src/components/MobilePhotoTest.js`), dont la ' +
-      'route n’est enregistrée que si `import.meta.env.DEV` — en build de production le chunk est ' +
-      'ÉMIS mais la route n’existe pas. L’URL ne part que si quelqu’un ouvre cette page par un geste ' +
-      'en développement',
-    preuve: 'src/App.js (route gardée par `import.meta.env.DEV`) + src/components/MobilePhotoTest.js',
-  },
+  // `https://picsum.photos` (la photo factice de `/mobile-test`) N'EST PLUS ICI :
+  // son import est désormais conditionné à `import.meta.env.DEV` dans `src/App.js`,
+  // donc le chunk n'est plus ÉMIS en production et l'origine a disparu des
+  // fichiers livrés — le refus de PÉRIMÉ exige de la retirer, et c'est ce qui a
+  // été fait. Le jour où ce chunk reviendrait, le garde rougirait en réclamant
+  // de la reclasser, plutôt que de laisser une exemption mentir.
 ];
 
 /** Une URL absolue écrite en clair dans un fichier. */

@@ -46,8 +46,15 @@ const Messages = lazy(() => import("./pages/Messages"));
 const Profile = lazy(() => import("./pages/Profile"));
 const CreateJob = lazy(() => import('./pages/CreateJob'));
 
-// Lazy load test and demo pages (rarely used)
-const MobileTest = lazy(() => import('./pages/MobileTest'));
+// Lazy load test and demo pages (rarely used).
+// MobileTest (et son composant MobilePhotoTest) n'existe qu'en DÉV : la route
+// est déjà gardée par import.meta.env.DEV plus bas, mais un `lazy()` au niveau
+// MODULE fait ÉMETTRE le chunk en production — et ce chunk porte une origine
+// TIERCE (`picsum.photos`, ses images d'exemple). Conditionner la DÉCLARATION
+// retire le chunk du graphe de build : en prod, `MobileTest` vaut `null` et la
+// route n'est pas montée (la branche `import.meta.env.DEV &&` l'élimine). PhotoTest
+// reste inconditionnel : `/photo-debug` l'utilise en production (owner-only).
+const MobileTest = import.meta.env.DEV ? lazy(() => import('./pages/MobileTest')) : null;
 const PhotoTest = lazy(() => import('./pages/PhotoTest'));
 const Payment = lazy(() => import('./pages/Payment'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));

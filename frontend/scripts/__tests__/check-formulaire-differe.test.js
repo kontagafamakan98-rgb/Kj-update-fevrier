@@ -22,9 +22,11 @@
  * garde rouge au départ ferait passer toutes les mutations pour des succès.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   BLOCS_DIFFERES,
   CANAUX,
@@ -36,10 +38,47 @@ import {
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(ICI, '..', '..');
+const GARDE = path.join(ICI, '..', 'check-formulaire-differe.js');
 const lire = (chemin) => fs.readFileSync(path.join(FRONTEND_DIR, chemin), 'utf8');
 
 const FEUILLE_REELLE = lire(FEUILLE);
 const CANAUX_REELS = CANAUX.map((canal) => ({ nom: canal.nom, texte: lire(canal.chemin) }));
+
+const temporaires = [];
+afterEach(() => {
+  for (const dossier of temporaires.splice(0)) fs.rmSync(dossier, { recursive: true, force: true });
+});
+
+/**
+ * Écrit une arborescence `--racine` avec les TROIS fichiers RÉELS (copiés en
+ * clair, au-dessus du plancher d'octets du garde), l'un d'eux éventuellement
+ * muté. C'est le CLI que ces cas éprouvent — la règle pure est prouvée plus haut
+ * par mutation de chaîne, mais rien n'y exécute le BRAS de la CI.
+ */
+const ecrireArborescence = (mutations = {}) => {
+  const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'kojo-formulaire-'));
+  temporaires.push(racine);
+  for (const relatif of [FEUILLE, ...CANAUX.map((canal) => canal.chemin)]) {
+    const complet = path.join(racine, relatif);
+    fs.mkdirSync(path.dirname(complet), { recursive: true });
+    const texte = mutations[relatif] ? mutations[relatif](lire(relatif)) : lire(relatif);
+    fs.writeFileSync(complet, texte);
+  }
+  return racine;
+};
+
+/** Lance le CLI en sous-processus : code de sortie + sortie des deux flux. */
+const lancerLeGarde = (racine) => {
+  try {
+    const stdout = execFileSync(process.execPath, [GARDE, '--racine', racine], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { code: 0, stdout, stderr: '' };
+  } catch (erreur) {
+    return { code: erreur.status, stdout: erreur.stdout || '', stderr: erreur.stderr || '' };
+  }
+};
 
 /** Analyse les vraies sources, avec une seule d'elles remplacée. */
 const avecFeuille = (feuille) => analyserFormulaireDiffere({ feuille, canaux: CANAUX_REELS });
@@ -141,5 +180,27 @@ describe('levier différé de /register — preuve d’échec rejouée', () => {
     // différé, sinon le garde exigerait une constante pour un fantôme.
     expect(classesCitees('[class*="bloc-differe"] { color: red; }')).toEqual([]);
     expect(classesCitees('.bloc-differe-legal { color: red; }')).toEqual(['bloc-differe-legal']);
+  });
+});
+
+describe('levier différé de /register — le CLI en sous-processus', () => {
+  // Ces cas exécutent le BRAS de la CI (le CLI), que les cas ci-dessus ne
+  // touchent pas : ils importent la règle, ils ne lancent pas le garde. Sans
+  // eux, neutraliser la ligne de verdict du CLI ne ferait rougir personne.
+  it('sort 0 sur les VRAIES sources copiées (le vert n’est pas un refus de principe)', () => {
+    const rapport = lancerLeGarde(ecrireArborescence());
+    expect(rapport.code).toBe(0);
+    expect(rapport.stdout).toMatch(/en parité/);
+  });
+
+  it('le CLI refuse une classe retirée d’un seul canal, en nommant la classe et le canal', () => {
+    const rapport = lancerLeGarde(
+      ecrireArborescence({
+        [CANAUX[1].chemin]: (texte) => texte.replace(/bloc-differe-legal/g, 'bloc-differe-legal-renomme'),
+      })
+    );
+    expect(rapport.code).toBe(1);
+    expect(rapport.stderr).toContain('bloc-differe-legal');
+    expect(rapport.stderr).toContain(CANAUX[1].nom);
   });
 });

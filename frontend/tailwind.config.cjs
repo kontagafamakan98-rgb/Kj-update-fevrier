@@ -4,6 +4,20 @@ module.exports = {
   content: [
     './index.html',
     './src/**/*.{js,jsx,ts,tsx}',
+    // ── Les sources qu'un build de PRODUCTION n'émet PAS ────────────────────
+    // `src/pages/MobileTest.js` — et le composant `src/components/MobilePhotoTest.js`
+    // qu'il est seul à importer — n'existent qu'en DÉV : `src/App.js` garde leur
+    // import derrière `import.meta.env.DEV`, donc Rollup retire le chunk du
+    // livré. Tailwind, lui, scanne des FICHIERS et pas un graphe de modules : il
+    // continuait de produire leurs classes dans la feuille SERVIE, où plus rien
+    // ne les portait. Mesuré le 27/09/2026 : 39 règles sans porteur dans
+    // `build/` (`w-fit`, `bg-purple-50`, `text-purple-800`, sur les quatorze
+    // pages servies), ce que `scripts/check-css-selecteurs-morts.js` refuse —
+    // et il a raison : une page éliminée du build ne doit pas peser sur le CSS
+    // que le visiteur télécharge. L'exclusion vit ici, avec sa raison, plutôt
+    // que dans une liste d'exceptions tenue ailleurs.
+    '!./src/pages/MobileTest.js',
+    '!./src/components/MobilePhotoTest.js',
   ],
   theme: {
     extend: {

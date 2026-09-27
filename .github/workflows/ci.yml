@@ -493,6 +493,18 @@ jobs:
         working-directory: frontend
         run: node scripts/audit_api_returns.cjs --fail-on-warning
 
+      # Un drapeau est un DESSIN du registre (`src/config/flags.js`), jamais un
+      # caractère : les données pays/langue portaient un champ `flag` valant un
+      # EMOJI, que la coquille publiait pendant que React peignait un SVG — deux
+      # peintures pour un même drapeau, dépendantes de la police du visiteur. Le
+      # champ a été retiré ; ce garde refuse qu'il REVIENNE (emoji de drapeau dans
+      # le code de `src/`, ou champ `flag` dans les cinq modules de données
+      # déclarés). Il ne lit que `src/`, donc il passe AVANT le build : un
+      # `flag: '🇲🇱'` recopié rougit ici, sans attendre qu'un build le publie.
+      - name: Check no flag emoji in country/language/geolocation data
+        working-directory: frontend
+        run: node scripts/check-drapeaux-emoji.js
+
       - name: Build
         working-directory: frontend
         env:

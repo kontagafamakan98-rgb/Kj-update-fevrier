@@ -28,8 +28,9 @@ const FRONTEND_DIR = path.resolve(ICI, '..');
 
 // Planchers de LECTURE : sous ceux-là, le garde refuse de juger — il n'a pas lu
 // son sujet (un dossier vide, un build absent, un lecteur cassé). Relevé du
-// 27/09/2026 sur un build de production : 63 fichiers livrés, 42 occurrences,
-// 3 origines nôtres et 14 origines classées.
+// 27/09/2026 sur un build de production : 62 fichiers livrés, 40 occurrences,
+// 3 origines nôtres et 14 origines tierces classées (le chunk `/mobile-test`
+// n'étant plus émis, la ligne `picsum.photos` a été retirée du classement).
 const MIN_FICHIERS = 8;
 const MIN_OCCURRENCES = 12;
 const MIN_CLASSEES = 8;

@@ -89,7 +89,8 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/check-formulaire-differe.test.js",
       "runner": "vitest",
-      "motif": "la règle elle-même (lecture des classes différées citées par la feuille et les deux canaux, extraction des constantes `contain-intrinsic-size` par classe, contrôle de forme « auto <nombre>px », comparaison LISTE↔feuille↔canaux) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la règle éprouvable par mutation de chaîne"
+      "motif": "la règle elle-même (lecture des classes différées citées par la feuille et les deux canaux, extraction des constantes `contain-intrinsic-size` par classe, contrôle de forme « auto <nombre>px », comparaison LISTE↔feuille↔canaux) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la règle éprouvable par mutation de chaîne",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : la règle de ce module est verrouillée par ses cas unitaires directs (les quatre blocs des deux canaux, les constantes par classe, la forme « auto <nombre>px », la comparaison LISTE↔feuille↔canaux), et la mutation qui prouve le VERDICT porte sur la ligne du GARDE qui l'énonce (verdict du CLI neutralisé)"
     },
     {
       "chemin": "frontend/scripts/check-generated-icons.js",
@@ -157,7 +158,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-origines-bundles.test.js",
       "runner": "vitest",
-      "motif": "la troisième vue statique de « aucun tiers » : les deux voisines lisent le HTML des coquilles (shell-remote-resources.js) et ce que le navigateur DEMANDE avant un geste (tiers-avant-interaction.js + son parcours) — celle-ci lit les FICHIERS LIVRÉS (`build/assets/*.js` et `*.css`), là où vit l'URL qu'un composant écrit en clair (`script.src = 'https://…'`). Elle refuse (1) une origine tierce non classée, (2) une entrée PÉRIMÉE du classement qu'aucun fichier livré ne porte plus (une exemption que plus rien ne justifie finira par justifier autre chose), (3) un motif vide. Le contrat de « tiers » n'est pas redéclaré : il vient d'`estTiers()`. Planchers de lecture (fichiers, occurrences, origines classées) pour refuser de juger un build absent ou un lecteur cassé. Relevé du 27/09/2026 sur un build de production : 63 fichiers livrés, 42 occurrences d'URL absolue, 3 origines nôtres (api.kojoforafrica.cc.cd, 127.0.0.1:8123, localhost) et 15 origines tierces classées, 0 non classée, 0 périmée."
+      "motif": "la troisième vue statique de « aucun tiers » : les deux voisines lisent le HTML des coquilles (shell-remote-resources.js) et ce que le navigateur DEMANDE avant un geste (tiers-avant-interaction.js + son parcours) — celle-ci lit les FICHIERS LIVRÉS (`build/assets/*.js` et `*.css`), là où vit l'URL qu'un composant écrit en clair (`script.src = 'https://…'`). Elle refuse (1) une origine tierce non classée, (2) une entrée PÉRIMÉE du classement qu'aucun fichier livré ne porte plus (une exemption que plus rien ne justifie finira par justifier autre chose), (3) un motif vide. Le contrat de « tiers » n'est pas redéclaré : il vient d'`estTiers()`. Planchers de lecture (fichiers, occurrences, origines classées) pour refuser de juger un build absent ou un lecteur cassé. Relevé du 27/09/2026 sur un build de production : 62 fichiers livrés, 40 occurrences d'URL absolue, 3 origines nôtres (api.kojoforafrica.cc.cd, 127.0.0.1:8123, localhost) et 14 origines tierces classées, 0 non classée, 0 périmée."
     },
     {
       "chemin": "frontend/scripts/origines-bundles.js",
@@ -165,7 +166,25 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/check-origines-bundles.test.js",
       "runner": "vitest",
-      "motif": "la règle elle-même (lecture des URL absolues écrites en clair et réduction à l'ORIGINE par `new URL()`, contrat de « tiers » délégué à `estTiers()`, et surtout la TABLE DE CLASSEMENT motivée : 15 origines tierces, chacune avec sa sorte (identifiant / message de bibliothèque / lien rendu / chargé après interaction / chargé si la variable de build le demande), son motif et sa preuve) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la table éprouvable — y compris sa FORME, testable sans build"
+      "motif": "la règle elle-même (lecture des URL absolues écrites en clair et réduction à l'ORIGINE par `new URL()`, contrat de « tiers » délégué à `estTiers()`, et surtout la TABLE DE CLASSEMENT motivée : 14 origines tierces, chacune avec sa sorte (identifiant / message de bibliothèque / lien rendu / chargé après interaction / chargé si la variable de build le demande), son motif et sa preuve — 14 après retrait de `picsum.photos`, dont le chunk `/mobile-test` n'est plus émis) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la table éprouvable — y compris sa FORME, testable sans build",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : la règle de ce module (réduction à l'origine, contrat de « tiers » délégué à `estTiers()`, comptage occurrences/fichiers, refus d'une entrée périmée et d'un motif vide) est verrouillée par ses cas unitaires directs, et la mutation qui prouve le VERDICT porte sur la ligne du GARDE (verdict du CLI neutralisé)"
+    },
+    {
+      "chemin": "frontend/scripts/check-drapeaux-emoji.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-drapeaux-emoji.test.js",
+      "runner": "vitest",
+      "motif": "refuse qu'un drapeau redevienne un CARACTÈRE dans les données pays/langue/géolocalisation : (1) tout emoji de drapeau écrit dans le CODE de `src/` (`.js`/`.jsx`/`.json`), une paire d'indicateurs régionaux (U+1F1E6–U+1F1FF) comptée pour UN SEUL drapeau, ou le drapeau blanc (U+1F3F3) ; (2) toute propriété `flag` dans les cinq modules de données DÉCLARÉS — chacun justifié par son rôle dans `MODULES_DONNEES` —, quelle que soit sa valeur. Les commentaires sont masqués (plages de `@babel/parser`, sans se tromper sur un `//` qui appartient à une URL) : le dépôt CITE les emoji qu'il raconte (`src/config/flags.js`, `FlagIcon.js`), et une règle qui refuserait sa propre documentation ferait effacer la mémoire du projet pour rester verte. Planchers de lecture (120 fichiers de `src/`, les cinq modules doivent EXISTER) pour refuser de juger un balayage cassé. Preuve d'échec rejouée à la main le 27/09/2026 : un `flag: '🇲🇱'` remis dans `src/config/countries.js` fait sortir le garde en 1 en nommant `src/config/countries.js:25` — les DEUX refus (emoji ET champ) —, fichier restauré au SHA-1 identique (55ce74f6…). Relevé du 27/09/2026 : 178 fichiers de `src/` jugés, 5 modules de données surveillés, 0 emoji, 0 champ."
+    },
+    {
+      "chemin": "frontend/scripts/drapeaux-emoji.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-drapeaux-emoji.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (masquage des plages de commentaires par `@babel/parser` sans confondre un `//` d'URL, repérage de l'emoji de drapeau avec la paire d'indicateurs GROUPÉE en une seule occurrence pour que la ligne ne soit pas nommée deux fois, lecture des propriétés `flag` de clé d'objet ET d'attribut JSX — un `JSXIdentifier`, jamais un `Identifier` —, énumération des modules de données) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la règle éprouvable par mutation de chaîne",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : la règle de ce module (masquage des commentaires, groupement de la paire d'indicateurs régionaux en UNE occurrence, lecture des `flag` d'objet ET d'attribut JSX, énumération des modules de données) est verrouillée par ses cas unitaires directs, et la mutation qui prouve le VERDICT porte sur la ligne du GARDE (verdict du CLI neutralisé)"
     },
     {
       "chemin": "frontend/scripts/check-pack2-chunks.js",
@@ -579,7 +598,8 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/tiers-avant-interaction.test.js",
       "runner": "vitest",
-      "motif": "le pendant DYNAMIQUE de shell-remote-resources.js : la règle qui classe ce que le navigateur a RÉELLEMENT demandé avant toute interaction (nôtres : origine de la page, SITE_ORIGIN/API_ORIGIN de site-meta.js, toute adresse loopback ; tiers : tout le reste ; schémas locaux non jugés) — le VERDICT est prononcé par le parcours Chromium frontend/e2e/aucun-tiers-avant-interaction.spec.js, hors du périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/), donc ce module se déclare outil ; sa preuve fixe le contrat et le compare au garde statique"
+      "motif": "le pendant DYNAMIQUE de shell-remote-resources.js : la règle qui classe ce que le navigateur a RÉELLEMENT demandé avant toute interaction (nôtres : origine de la page, SITE_ORIGIN/API_ORIGIN de site-meta.js, toute adresse loopback ; tiers : tout le reste ; schémas locaux non jugés) — le VERDICT est prononcé par le parcours Chromium frontend/e2e/aucun-tiers-avant-interaction.spec.js, hors du périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/), donc ce module se déclare outil ; sa preuve fixe le contrat et le compare au garde statique",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : le VERDICT de cette règle est prononcé par le parcours Chromium frontend/e2e/aucun-tiers-avant-interaction.spec.js, hors de la table, et son contrat de « tiers » est verrouillé par ses cas unitaires directs (contrepartie comparée à shell-remote-resources.js) — il n'y a pas de ligne de verdict à neutraliser dans un module qui ne sort jamais en 1"
     },
     {
       "chemin": "frontend/scripts/check-css-selecteurs-morts.js",
@@ -670,6 +690,66 @@
       "cwd": "frontend",
       "attend": [
         "un marqueur URL lazy"
+      ]
+    },
+    {
+      "id": "formulaire-differe: verdict du CLI neutralise",
+      "garde": "frontend/scripts/check-formulaire-differe.js",
+      "cible": "frontend/scripts/check-formulaire-differe.js",
+      "trouve": "  if (problemes.length > 0) {",
+      "remplace": "  if (false && problemes.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-formulaire-differe.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-formulaire-differe.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le CLI refuse une classe retirée"
+      ]
+    },
+    {
+      "id": "origines-bundles: verdict du CLI neutralise",
+      "garde": "frontend/scripts/check-origines-bundles.js",
+      "cible": "frontend/scripts/check-origines-bundles.js",
+      "trouve": "  if (refus.length > 0) {",
+      "remplace": "  if (false && refus.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-origines-bundles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-origines-bundles.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "occurrences et ses fichiers"
+      ]
+    },
+    {
+      "id": "drapeaux-emoji: verdict du CLI neutralise",
+      "garde": "frontend/scripts/check-drapeaux-emoji.js",
+      "cible": "frontend/scripts/check-drapeaux-emoji.js",
+      "trouve": "  if (refus.length > 0) {",
+      "remplace": "  if (false && refus.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-drapeaux-emoji.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-drapeaux-emoji.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 en NOMMANT le fichier et la ligne"
       ]
     },
     {
