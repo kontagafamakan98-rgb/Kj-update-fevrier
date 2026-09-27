@@ -85,12 +85,12 @@ export default function MobileTest() {
               </div>
             </div>
 
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-purple-800 mb-2 flex items-center gap-2">
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
                 <Wrench className="h-5 w-5" aria-hidden="true" />
                 {pageT('troubleshooting')}
               </h3>
-              <ul className="text-purple-700 space-y-1">
+              <ul className="text-gray-700 space-y-1">
                 <li>{pageT('help1')}</li>
                 <li>{pageT('help2')}</li>
                 <li>{pageT('help3')}</li>

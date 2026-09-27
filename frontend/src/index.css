@@ -149,6 +149,100 @@ code {
     }
 }
 
+/* ── LE SOCLE D'INTERACTION ET DE TYPOGRAPHIE ────────────────────────────────
+
+   Ce bloc ferme cinq trous MESURÉS du socle, relevés le 27/09/2026 en comptant
+   les occurrences dans les sept feuilles servies (`App.css`, `index.css` et les
+   cinq packs) : `:focus-visible` 0, `::selection` 0, `color-scheme` 0,
+   `font-variant-numeric` 0, `text-wrap` 1. Autrement dit : l'anneau de focus
+   n'existait que là où un composant l'écrivait (79 utilitaires `focus:*` sur des
+   centaines de contrôles), la sélection restait le bleu du navigateur, et les
+   montants en XOF n'étaient pas alignés d'une carte à l'autre.
+
+   POURQUOI ICI, ET POURQUOI SANS CLASSES. Ces règles ne nomment AUCUNE classe ni
+   aucun id : elles portent sur des éléments (`h1`, `p`, `table`) et des
+   pseudo-classes (`:focus-visible`, `::selection`). C'est le critère de
+   `scripts/check-css-selecteurs-morts.js`, qui refuse une classe ou un id servi
+   sans porteur : un socle qui n'en nomme aucun ne peut pas lui ajouter de dette,
+   et il protège par construction les composants qui ne déclarent rien. Elles
+   vivent dans la couche `base`, donc les UTILITAIRES gardent la main partout où
+   un composant a une intention plus précise — un `focus-visible:ring-*` existant
+   continue de gagner, et ce bloc ne sert que de repli.
+
+   `color-scheme: light` : le site est CLAIR. Sans cette déclaration, un poste
+   réglé en mode sombre rendait les contrôles natifs (champs, cases, barres de
+   défilement) en sombre au milieu d'une page blanche — le navigateur ne devine
+   pas, il suit la préférence du système quand on ne la lui donne pas. Le thème
+   `.dark` de `index.css` n'est atteint par AUCUN code (`darkMode: ['class']` et
+   personne ne pose la classe) : cette déclaration aligne donc le rendu natif sur
+   le seul thème que le site serve.
+
+   L'ANNEAU DE FOCUS est posé sur l'extérieur de l'élément (`outline-offset`) :
+   il se dessine donc sur le FOND DE LA PAGE, pas sur la surface du contrôle.
+   C'est ce qui le rend lisible aussi bien autour d'un bouton orange plein (un
+   anneau orange SUR un bouton orange ne se voit pas) que dans un champ. La
+   teinte est volontairement plus sombre que l'orange de marque, et l'anneau ne
+   coûte rien à la mise en page : `outline` ne participe pas à la boîte.
+
+   `text-wrap: balance` sur les titres évite la ligne orpheline d'un titre sur
+   deux lignes ; `pretty` sur la prose évite la dernière ligne d'un seul mot.
+   Les deux sont ignorées sans dommage par un navigateur plus ancien.
+
+   `scroll-margin-top` : la navbar est COLLANTE (65 px). Une ancre de titre
+   (`#faq`, `#etapes`) se posait donc DERRIÈRE elle — le lien menait au bon
+   endroit et le titre restait caché. La marge vaut la hauteur de la navbar plus
+   la respiration qui la sépare du contenu.
+
+   `font-variant-numeric: tabular-nums` : Kojo est un produit de MONTANTS (XOF
+   partout). En chiffres proportionnels, chaque `1` est plus étroit qu'un `8` :
+   une colonne de prix bouge d'un caractère quand un montant passe de 12 500 à
+   88 000. L'arbitrage est assumé — les chiffres tabulaires d'Inter sont
+   légèrement plus larges en prose — parce que la comparaison de montants est le
+   geste central du produit, et que le repli d'un texte ne dépend jamais de la
+   largeur d'un chiffre isolé. */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid #c2410c;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: #fed7aa;
+    color: #7c2d12;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p,
+  li {
+    text-wrap: pretty;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    scroll-margin-top: 5rem;
+  }
+
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 
 
 

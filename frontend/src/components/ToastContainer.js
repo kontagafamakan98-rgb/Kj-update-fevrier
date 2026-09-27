@@ -67,10 +67,17 @@ const ToastContainer = () => {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+    /* `role="status"` : une confirmation qui apparaît à l'écran sans être annoncée
+       n'existe pas pour un lecteur d'écran — le dépôt n'avait QU'UN seul point
+       `aria-live` (le compteur de la cloche), et les retours de formulaire, les
+       erreurs d'API et les succès de publication passent TOUS par ce conteneur.
+       `polite` et non `assertive` : un empilement de messages ne doit pas couper
+       la lecture en cours. */
+    <div role="status" aria-live="polite" className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
       {toasts.map((toast, index) => (
         <div
           key={toast.id}
+          data-kojo-toast
           className={getToastStyles(toast.type)}
           style={{
             animation: 'slideInRight 0.3s ease-out',
@@ -109,6 +116,20 @@ const ToastContainer = () => {
           to {
             transform: translateX(0);
             opacity: 1;
+          }
+        }
+        /* Le glissement est un AGRÉMENT : sous « animations réduites », la carte
+           apparaît immédiatement à sa place. La règle est écrite ici, à côté de
+           la déclaration qu’elle neutralise, plutôt que dans une feuille globale
+           qui ne saurait pas quel élément elle vise. Le sélecteur est un
+           ATTRIBUT, pas une classe : il reste hors du garde « aucun sélecteur
+           sans porteur », qui ne juge que des noms de classes et d’ids. Les
+           délais sont remis à zéro aussi, sinon une pile de trois messages
+           continuerait d’apparaître en cascade. */
+        @media (prefers-reduced-motion: reduce) {
+          [data-kojo-toast] {
+            animation: none !important;
+            animation-delay: 0s !important;
           }
         }
       `}</style>

@@ -12,7 +12,11 @@
 import { useLanguage } from '../contexts/LanguageContext';
 
 export const WORKER_LEVELS = {
-  expert: { key: 'levelExpert', rank: 4, badgeClass: 'bg-purple-100 text-purple-700 border-purple-200' },
+  // Le niveau le plus haut porte la COULEUR DE MARQUE : c'est le seul endroit du
+  // produit où l'orange dit « ce travailleur est le meilleur », et il ne coûte
+  // aucune couleur supplémentaire au dessin. L'échelle reste lisible dans
+  // l'ordre (marque, émeraude, bleu, gris) et aucune teinte ne sert deux rangs.
+  expert: { key: 'levelExpert', rank: 4, badgeClass: 'bg-orange-100 text-orange-700 border-orange-200' },
   confirmed: { key: 'levelConfirmed', rank: 3, badgeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   reliable: { key: 'levelReliable', rank: 2, badgeClass: 'bg-blue-100 text-blue-700 border-blue-200' },
   beginner: { key: 'levelBeginner', rank: 1, badgeClass: 'bg-gray-100 text-gray-600 border-gray-200' },

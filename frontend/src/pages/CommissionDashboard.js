@@ -164,7 +164,13 @@ const CommissionDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard icon={<Banknote className="h-6 w-6 text-green-600" aria-hidden="true" />} bg="bg-green-100" title={pageT('totalCommissions')} value={`${formatMoney(displayStats.total_commission_earned || displayStats.totalCommissions)} XOF`} valueColor="text-green-600" />
           <StatCard icon={<BarChart3 className="h-6 w-6 text-blue-600" aria-hidden="true" />} bg="bg-blue-100" title={pageT('totalVolume')} value={`${formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF`} valueColor="text-blue-600" />
-          <StatCard icon={<Hash className="h-6 w-6 text-purple-600" aria-hidden="true" />} bg="bg-purple-100" title={pageT('transactions')} value={displayStats.total_transactions || displayStats.totalTransactions || 0} valueColor="text-purple-600" />
+          {/* Le nombre de transactions est une MESURE, pas une émotion : il porte
+              le graphite, quand les deux cartes de montants gardent la couleur du
+              mouvement d'argent (vert perçu, bleu du volume) et la journée de
+              référence garde l'orange de marque. Quatre teintes qui ne se
+              chevauchent pas, et aucune qui appartienne à une autre famille de
+              sens. */}
+          <StatCard icon={<Hash className="h-6 w-6 text-slate-600" aria-hidden="true" />} bg="bg-slate-100" title={pageT('transactions')} value={displayStats.total_transactions || displayStats.totalTransactions || 0} valueColor="text-slate-700" />
           <StatCard icon={<CalendarDays className="h-6 w-6 text-orange-600" aria-hidden="true" />} bg="bg-orange-100" title={pageT('today')} value={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} valueColor="text-orange-600" />
         </div>
 
