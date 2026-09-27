@@ -278,7 +278,12 @@ const HAUTEUR = {
   // 2 982 → 3 002 px en mobile : une ligne de plus dans une étape ; desktop
   // inchangé (la largeur y évite le repli).
   '/how-it-works': { mobile: 3002, desktop: 2124 },
-  '/jobs': { mobile: 823, desktop: 940 },
+  // 823 → 1 125 px en mobile (940 → 1 086 en desktop), 27/09/2026 : la coquille
+  // /jobs réserve désormais la viewport (`min-h-screen` sur son cadre, voir
+  // src/config/page-sections.js). Son pied de page tombait sinon EXACTEMENT au
+  // bas de l'écran (mesuré 1350×940 : y=859, h=81 → 0,0862, la valeur d'un CLS
+  // où il quitte l'écran) quand React, qui peint la liste, le place hors écran.
+  '/jobs': { mobile: 1125, desktop: 1086 },
   // 965 → 981 px en mobile : la ligne légale de contact se replie une fois de
   // plus ; desktop inchangé.
   '/login': { mobile: 981, desktop: 940 },

@@ -87,7 +87,9 @@ export const ROUTES_LCP = [
       { champ: 'introClass', page: 'className={pagePlan.introClass}', coquille: 'class="${jobsPlan.introClass}"' },
     ],
     classes: [
-      'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8',
+      // `min-h-screen` (27/09/2026) : réserve la viewport dans la coquille
+      // /jobs, sinon son pied de page tombait au bas de l'écran (0,0862).
+      'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen',
       'text-3xl font-bold text-gray-900',
       'mb-6 max-w-3xl text-base leading-relaxed text-gray-600 min-h-[104px] md:min-h-[52px]',
     ],

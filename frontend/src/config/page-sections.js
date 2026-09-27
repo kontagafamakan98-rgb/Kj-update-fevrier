@@ -236,7 +236,19 @@ export const PAGE_SECTIONS = {
     // le squelette de Suspense doit réserver à l'identique (voir
     // `antiClsSkeletons.test.jsx`) — et `titleClass` le seul autre texte
     // capable de prendre le LCP au paragraphe.
-    frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8',
+    // `min-h-screen` : la coquille de /jobs ne peint que l'en-tête et l'intro
+    // (~794 px), donc avec `main.flex-1` le pied de page tombait EXACTEMENT au
+    // bas de la viewport (mesuré 1350×940 : footer à y=859, hauteur 81 — soit
+    // 81/940 = 0,0862, la valeur d'un CLS où il quitte l'écran ; idem 412×823).
+    // React, lui, peint la liste : son pied de page naît hors écran (y≈2631).
+    // Le pied de page était donc le SEUL élément à voyager du bas de la
+    // viewport vers le hors-écran à la bascule coquille → React. Réserver la
+    // viewport dans la coquille (comme les pages de contenu /about, /contact,
+    // /privacy, /terms, dont le conteneur racine porte `min-h-screen`) le place
+    // hors écran DÈS le premier paint des deux canaux : plus rien à déplacer.
+    // Côté React la réserve est inerte (la page dépasse déjà la viewport aux
+    // deux tailles mesurées), donc aucune peinture ne bouge.
+    frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen',
     titleClass: 'text-3xl font-bold text-gray-900',
     introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-gray-600 min-h-[104px] md:min-h-[52px]',
   },
