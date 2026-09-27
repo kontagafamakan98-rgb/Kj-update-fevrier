@@ -14,6 +14,7 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
 import { JobDetailsSkeleton } from '../components/SkeletonLoader';
+import { MapPin, ShieldCheck } from 'lucide-react';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
 import { usePageTitle, usePageOpenGraph, absoluteUrl } from '../utils/seo';
 import { jobSeo } from '../utils/jobSeo';
@@ -699,7 +700,7 @@ export default function JobDetails() {
 
             {job.shared_location?.maps_url && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
-                <span className="text-sm text-orange-800">📍 {t('sharedPositionText')}</span>
+                <span className="text-sm text-orange-800"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('sharedPositionText')}</span>
                 <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
                   {t('viewOnMap')}
                 </a>
@@ -710,7 +711,7 @@ export default function JobDetails() {
           {/* Bandeau de confiance : le paiement séquestré est LE différenciateur */}
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">🛡️</span>
+              <ShieldCheck className="h-6 w-6 text-emerald-600" aria-hidden="true" />
               <div>
                 <div className="font-semibold text-emerald-800">{t('escrowBannerTitle')}</div>
                 <p className="text-sm text-emerald-700 mt-1">

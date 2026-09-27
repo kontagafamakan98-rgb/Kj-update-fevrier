@@ -60,7 +60,7 @@ export default function Login() {
           }
         });
       } else {
-        toast.success(t('loginSuccess') + ' 🎉');
+        toast.success(t('loginSuccess'));
         navigate('/dashboard');
       }
     } else {
@@ -105,7 +105,7 @@ export default function Login() {
           }
         });
       } else {
-        toast.success(t('loginSuccess') + ' 🎉');
+        toast.success(t('loginSuccess'));
         navigate('/dashboard');
       }
       return;

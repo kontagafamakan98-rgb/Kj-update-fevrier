@@ -313,6 +313,87 @@ a:focus {
   .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 640.2px; }
 }
 
+/* ── LE FORMULAIRE DE /register : LE MÊME LEVIER, MESURÉ AVANT D'ÊTRE POSÉ ───
+
+   Question posée le 27/09/2026 : `content-visibility: auto` (le levier de
+   l'accueil) rapporte-t-il quelque chose sur les AUTRES pages longues ? Mesure
+   ENTRELACÉE, protocole identique à `e2e/style-layout-document.spec.js` (page
+   neuve, bundle d'entrée bloqué, bridage CPU avant navigation, compteurs du
+   renderer au CDP, MINIMUM de N tours) :
+     • `/` (le contrôle, où le levier est déjà livré) : 351,9 → 288,6 ms,
+       −63,3 ms (−18,0 %) mobile — le harnais reproduit bien le levier.
+     • `/register` : −20,1 ms (−8,2 %) mobile — le plus gros gain des pages
+       longues, et son élément LCP n'est PAS dans le périmètre différé.
+     • `/how-it-works` (4 sections) : −9,8 ms (−5,1 %) ; `/privacy` et `/terms`
+       (moins de trois écrans) : +0,4 % et +1,6 %, c'est-à-dire RIEN.
+   La loi qui sort de ces quatre mesures : le gain suit les ÉCRANS sous la ligne
+   de flottaison et le POIDS de ce qu'on y saute. Une page de moins de trois
+   écrans n'a presque rien à différer, et poser le levier y coûterait des
+   constantes pour zéro.
+
+   RE-MESURE DU 27/09/2026, sur les QUATRE blocs exacts finalement retenus (et non
+   plus sur le périmètre large qui avait donné les −20,1 ms ci-dessus). Quatre
+   passages entrelacés, 25 à 40 tours, variantes `off` / `quatre` / `photo
+   neutralisée`, MINIMUM par variante : mobile −5,1 % à −25,0 % (−12,9 à
+   −70,7 ms sur une référence de 251 à 282 ms) — un seul passage, à froid, est
+   sorti POSITIF (+3,6 %) et trois sur quatre sont dans la fourchette ; desktop
+   +0,4 à +0,5 ms, c'est-à-dire le bruit, comme pour toutes les pages longues.
+   La hauteur du document reste 2 996 px (mobile) / 2 532 px (desktop) dans
+   TOUTES les variantes, levier actif ou neutralisé : c'est la preuve que les
+   constantes sont exactes. Le sous-ensemble « photo neutralisée » rend MOINS
+   (−9,1 % et −5,8 % selon les passages) que les quatre blocs : le bloc photo
+   (1 584 px, sous la ligne de flottaison de 823 px) est donc bien sauté, et le
+   différer paie. Conclusion honnête : gain NET sur mobile, neutre au desktop —
+   le levier suit les écrans sous la ligne de flottaison, pas la machine.
+
+   CE QUI EST DIFFÉRÉ ICI, ET CE QUI NE L'EST PAS. Les quatre blocs choisis sont
+   ceux dont le contenu est le MÊME dans les deux canaux et à l'écran suivant :
+   le bloc photo (539,8 px de contenu en mobile, 454,7 en desktop), le bloc légal
+   (221), le bouton d'envoi (48) et la ligne de renvoi vers /login (24).
+
+   LA CONSTANTE EST LA HAUTEUR DE CONTENU, PADDING **ET BORDURE** RETRANCHÉS — et
+   la bordure est le piège mesuré : `contain-intrinsic-size` porte la boîte de
+   CONTENU, or le bloc photo et le bloc légal ont une bordure de 1 px. Une
+   première écriture avait retranché le seul padding (541,8 et 223 au lieu de
+   539,8 et 221) : mesuré le 27/09/2026, le document gagnait alors 2 px avec le
+   levier, exactement la différence sur le bloc légal (257 px rendus contre 255
+   levier désactivé). Corrigé, les quatre blocs rendent la MÊME hauteur levier
+   activé et levier désactivé, et le document mesure 2 996 px dans les deux cas
+   (mobile) / 2 532 px (desktop). Mesure rejouable : levier neutralisé par une
+   feuille injectée, `class*="bloc-differe"` — c'est le protocole qui a servi à
+   écrire ces constantes, et non l'inverse.
+
+   LE BLOC DE LANGUE EST EXCLU, ET C'EST UNE DÉCISION MESURÉE : la coquille
+   publie son ÉTAT DE CHARGEMENT (« Détection de votre langue… », 98 px) quand
+   React peint le vrai sélecteur (672 px). Une constante réservée y mentirait de
+   574 px sur l'un des deux canaux ; on laisse donc ce bloc se mettre en page
+   normalement (98 px, c'est peu) plutôt que de figer une hauteur fausse. La
+   même raison fait exclure le HAUT du formulaire : l'élément LCP de /register
+   est l'avis d'étape (`stepNoticeClass`), AU-DESSUS du formulaire — le levier ne
+   peut pas le toucher.
+
+   UN SEUL PROPRIÉTAIRE : les quatre classes sont posées par les DEUX canaux
+   (src/pages/Register.js et vite-plugins/prerender/shells-routes.js), et un
+   garde unitaire (`scripts/__tests__/check-formulaire-differe.test.js`) refuse
+   une classe posée d'un seul côté ou une constante disparue. */
+.bloc-differe-photo,
+.bloc-differe-legal,
+.bloc-differe-envoi,
+.bloc-differe-lien {
+  content-visibility: auto;
+}
+.bloc-differe-photo { contain-intrinsic-size: auto 539.8px; }
+.bloc-differe-legal { contain-intrinsic-size: auto 221px; }
+.bloc-differe-envoi { contain-intrinsic-size: auto 48px; }
+.bloc-differe-lien { contain-intrinsic-size: auto 24px; }
+
+/* Au-delà de 768 px, seul le bloc photo change de hauteur de contenu : le bloc
+   légal, le bouton d'envoi et la ligne de renvoi mesurent la même chose aux deux
+   tailles. Déclaré À PART, jamais déduit du mobile. */
+@media (min-width: 768px) {
+  .bloc-differe-photo { contain-intrinsic-size: auto 454.7px; }
+}
+
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   * {

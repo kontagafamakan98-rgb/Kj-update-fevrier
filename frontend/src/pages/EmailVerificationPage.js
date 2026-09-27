@@ -6,6 +6,7 @@ import { authAPI, handleApiError } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/emailVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
+import { Mail, ShieldCheck, Lock, Hourglass } from 'lucide-react';
 
 const OTP_LENGTH = 6;
 
@@ -222,7 +223,7 @@ const EmailVerificationPage = () => {
   return (      <div className="min-h-full bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">📧 {pageT('title')}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3"><Mail className="inline h-7 w-7 mr-2 align-[-0.15em]" aria-hidden="true" /> {pageT('title')}</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">{pageT('subtitle')}</p>
         </div>
 
@@ -267,10 +268,10 @@ const EmailVerificationPage = () => {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3 text-sm text-orange-800">
-                  ⏳ {cooldownSeconds > 0 ? pageT('resendIn', { time: formatTime(cooldownSeconds) }) : pageT('resend')}
+                  <Hourglass className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {cooldownSeconds > 0 ? pageT('resendIn', { time: formatTime(cooldownSeconds) }) : pageT('resend')}
                 </div>
                 <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-800">
-                  🛡️ {pageT('expiresIn', { time: formatTime(expiresInSeconds) })}
+                  <ShieldCheck className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('expiresIn', { time: formatTime(expiresInSeconds) })}
                 </div>
               </div>
 
@@ -319,7 +320,7 @@ const EmailVerificationPage = () => {
         </div>
 
         <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold text-gray-900 mb-3">🔐 {pageT('securityTitle')}</h3>
+          <h3 className="font-semibold text-gray-900 mb-3"><Lock className="inline h-5 w-5 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('securityTitle')}</h3>
           <div className="space-y-2 text-sm text-gray-700">
             <p>{pageT('security1')}</p>
             <p>{pageT('security2')}</p>

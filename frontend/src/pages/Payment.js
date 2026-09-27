@@ -12,6 +12,7 @@ import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { IconePage, CLASSES_ICONE } from '../config/page-icons';
+import { AlertTriangle } from 'lucide-react';
 
 // Pays proposés, statuts de paiement et méthodes : des CODES, jamais du texte.
 // Les libellés appartiennent aux dictionnaires — la clé est le code lui-même
@@ -430,7 +431,7 @@ const Payment = () => {
 
         {checkoutError && (
           <div className="rounded-2xl border border-red-300 bg-red-100 px-5 py-4 text-red-800 font-medium">
-            ⚠️ {checkoutError}
+            <AlertTriangle className="inline h-5 w-5 mr-1 align-[-0.15em]" aria-hidden="true" /> {checkoutError}
           </div>
         )}
 

@@ -306,8 +306,7 @@ class PreciseGeolocationService {
       country,
       countryCode: countryCode || fallbackLocationData?.countryCode || '',
       postalCode: address.postcode || '',
-      phonePrefix: countryData?.phonePrefix || fallbackLocationData?.phonePrefix || '',
-      flag: countryData?.flag || fallbackLocationData?.flag || '📍'
+      phonePrefix: countryData?.phonePrefix || fallbackLocationData?.phonePrefix || ''
     };
   }
 
@@ -418,7 +417,6 @@ class PreciseGeolocationService {
       district: firstResult.region || '',
       fullAddress: `${firstResult.city || ''}${firstResult.region ? ', ' + firstResult.region : ''}, ${firstResult.countryName || firstResult.country || ''}`,
       phonePrefix: '',
-      flag: '🌍',
       coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
       accuracy: 0,
       confidence: detectionAccuracy,
@@ -785,7 +783,6 @@ class PreciseGeolocationService {
       code,
       name: data.country,
       nameFrench: data.nameFrench,
-      flag: data.flag,
       phonePrefix: data.phonePrefix,
       currency: data.currency,
       language: data.language
@@ -808,7 +805,6 @@ const NEUTRAL_DETECTED_COUNTRY = Object.freeze({
   code: '',
   name: 'Detected country',
   nameFrench: 'Pays détecté',
-  flag: '🌍',
   phonePrefix: '',
   currency: 'XOF',
   language: 'fr',
@@ -818,7 +814,7 @@ const NEUTRAL_DETECTED_COUNTRY = Object.freeze({
 /**
  * Détecte le pays de l'utilisateur (IP + GPS + réseau).
  * @returns {Promise<object>} Objet pays {detected, code, name, nameFrench,
- * flag, phonePrefix, currency, language} — objet NEUTRE {detected: false}
+ * phonePrefix, currency, language} — objet NEUTRE {detected: false}
  * si la détection échoue (jamais null).
  */
 export const detectUserCountry = async (options = {}) => {
@@ -838,7 +834,6 @@ export const detectUserCountry = async (options = {}) => {
       code: normalizedCountryCode,
       name: location.country || 'Detected country',
       nameFrench: location.country || 'Pays détecté',
-      flag: location.flag || '🌍',
       phonePrefix: location.phonePrefix || '',
       currency: 'XOF',
       language: 'fr'
@@ -849,7 +844,6 @@ export const detectUserCountry = async (options = {}) => {
     code: normalizedCountryCode,
     name: countryData.country,
     nameFrench: countryData.nameFrench,
-    flag: countryData.flag,
     phonePrefix: countryData.phonePrefix,
     currency: countryData.currency,
     language: countryData.language
@@ -861,7 +855,6 @@ export const COUNTRIES = Object.entries(FALLBACK_COUNTRY_DATA).reduce((acc, [cod
     code,
     name: data.country,
     nameFrench: data.nameFrench,
-    flag: data.flag,
     phonePrefix: data.phonePrefix,
     currency: data.currency,
     language: data.language
@@ -871,7 +864,7 @@ export const COUNTRIES = Object.entries(FALLBACK_COUNTRY_DATA).reduce((acc, [cod
 
 /**
  * Liste tous les pays de la base de géolocalisation.
- * @returns {Array<object>} [{code, name, nameFrench, flag, phonePrefix,
+ * @returns {Array<object>} [{code, name, nameFrench, phonePrefix,
  * currency, language}].
  */
 export const getCountriesList = () => {
@@ -879,7 +872,6 @@ export const getCountriesList = () => {
     code,
     name: data.country,
     nameFrench: data.nameFrench,
-    flag: data.flag,
     phonePrefix: data.phonePrefix,
     currency: data.currency,
     language: data.language
@@ -897,7 +889,6 @@ const buildCountryObject = (countryData, code) => {
     code,
     name: countryData.country,
     nameFrench: countryData.nameFrench,
-    flag: countryData.flag,
     phonePrefix: countryData.phonePrefix,
     currency: countryData.currency,
     language: countryData.language
@@ -941,7 +932,6 @@ export const detectCountryFromPhone = (phoneNumber) => {
         code,
         name: data.country,
         nameFrench: data.nameFrench,
-        flag: data.flag,
         phonePrefix: data.phonePrefix,
         currency: data.currency,
         language: data.language
@@ -1047,32 +1037,27 @@ export const AVAILABLE_LANGUAGES = {
   'fr': {
     code: 'fr',
     name: 'Français',
-    nativeName: 'Français',
-    flag: '🇫🇷'
+    nativeName: 'Français'
   },
   'en': {
     code: 'en', 
     name: 'English',
-    nativeName: 'English',
-    flag: '🇬🇧'
+    nativeName: 'English'
   },
   'wo': {
     code: 'wo',
     name: 'Wolof',
-    nativeName: 'Wolof',
-    flag: '🇸🇳'
+    nativeName: 'Wolof'
   },
   'bm': {
     code: 'bm',
     name: 'Bambara',
-    nativeName: 'Bamanankan',
-    flag: '🇲🇱'
+    nativeName: 'Bamanankan'
   },
   'mos': {
     code: 'mos',
     name: 'Mooré',
-    nativeName: 'Mòoré',
-    flag: '🇧🇫'
+    nativeName: 'Mòoré'
   }
 };
 
@@ -1139,7 +1124,7 @@ export const getLocalLanguageForCountry = (country) => {
 // Organiser les langues selon le pays détecté (langues recommandées en premier, puis les autres)
 /**
  * Langues ordonnées pour un pays détecté (recommandées d'abord).
- * @returns {Array<object>} [{code, name, flag, isPrimary,
+ * @returns {Array<object>} [{code, name, isPrimary,
  * isCountryLanguage, isRecommended}].
  */
 export const getOrderedLanguagesForCountry = (detectedCountry) => {

@@ -14,6 +14,7 @@ import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import TagInput from '../components/TagInput';
 import ConfirmModal from '../components/ConfirmModal';
+import { Users, CheckCircle2 } from 'lucide-react';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI, reviewAPI, workerProfileAPI } from '../services/apiEndpoints';
@@ -134,7 +135,7 @@ export default function Profile() {
       await loadUser();
       requestAnimationFrame(() => setPhotoRefreshKey((prev) => prev + 1));
       setIsEditing(false);
-      toast.success(`${t('profileUpdated')} ✅`);
+      toast.success(t('profileUpdated'));
     } catch (updateError) {
       safeLog.error('Profile update error:', updateError);
       const errorMsg = handleApiError(updateError, t('error'));
@@ -940,7 +941,7 @@ function FilleulsCard({ filleuls, t }) {
   return (
     <div className="mt-6">
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-        <span className="mr-2">👥</span>
+        <Users className="h-4 w-4 mr-2" aria-hidden="true" />
         {t('filleulsTitle')}
         <span className="ml-2 rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
           {filleuls.length}
@@ -976,7 +977,7 @@ function FilleulsCard({ filleuls, t }) {
             <div className="text-right shrink-0 ml-3">
               {filleul.completed_first_job ? (
                 <span className="inline-flex items-center text-xs font-semibold text-green-700">
-                  ✅ {t('filleulFirstJobDone')}
+                  <CheckCircle2 className="inline h-4 w-4 mr-1" aria-hidden="true" /> {t('filleulFirstJobDone')}
                 </span>
               ) : (
                 <span className="inline-flex items-center text-xs text-gray-400">

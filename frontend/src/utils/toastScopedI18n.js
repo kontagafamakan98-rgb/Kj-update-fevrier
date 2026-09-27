@@ -18,10 +18,10 @@
 const toastScopes = {
   paymentVerification: {
     fr: {
-      welcomeToast: 'Bienvenue {firstName} ! Compte vérifié avec succès 🎉',
+      welcomeToast: 'Bienvenue {firstName} ! Compte vérifié avec succès',
       dashboardMessage: 'Bienvenue {firstName} ! Votre compte est vérifié avec {count} moyen(s) de paiement.',
-      referralAppliedToast: '🎁 Code de parrainage appliqué avec succès !',
-      referralAppliedWithBonusToast: '🎁 Code de parrainage appliqué ! +{amount} FCFA de bonus de bienvenue crédités.',
+      referralAppliedToast: 'Code de parrainage appliqué avec succès !',
+      referralAppliedWithBonusToast: 'Code de parrainage appliqué ! +{amount} FCFA de bonus de bienvenue crédités.',
       duplicateEmailError: 'Cette adresse email est déjà utilisée',
       step3DoneToast: 'Étape 3 terminée avec succès.',
       dashboardReadyMessage: 'Configuration des paiements terminée. Votre compte est maintenant prêt.',
@@ -29,10 +29,10 @@ const toastScopes = {
       autoLoginError: 'Erreur lors de la connexion automatique',
     },
     en: {
-      welcomeToast: 'Welcome {firstName}! Account verified successfully 🎉',
+      welcomeToast: 'Welcome {firstName}! Account verified successfully',
       dashboardMessage: 'Welcome {firstName}! Your account is verified with {count} payment method(s).',
-      referralAppliedToast: '🎁 Referral code applied successfully!',
-      referralAppliedWithBonusToast: '🎁 Referral code applied! +{amount} FCFA welcome bonus credited.',
+      referralAppliedToast: 'Referral code applied successfully!',
+      referralAppliedWithBonusToast: 'Referral code applied! +{amount} FCFA welcome bonus credited.',
       duplicateEmailError: 'This email address is already in use',
       step3DoneToast: 'Step 3 completed successfully.',
       dashboardReadyMessage: 'Payment setup complete. Your account is now ready.',
@@ -42,19 +42,19 @@ const toastScopes = {
   },
   emailVerification: {
     fr: {
-      codeSentToast: 'Code Gmail envoyé ✅',
-      codeResentToast: 'Nouveau code Gmail envoyé ✅',
+      codeSentToast: 'Code Gmail envoyé',
+      codeResentToast: 'Nouveau code Gmail envoyé',
       emailVerified: 'Email vérifié. Passage aux moyens de paiement...',
-      welcomeToast: 'Bienvenue {firstName} ! Ton email et tes paiements sont validés 🎉',
+      welcomeToast: 'Bienvenue {firstName} ! Ton email et tes paiements sont validés',
       dashboardMessage: 'Bienvenue {firstName} ! Email confirmé et {count} moyen(s) de paiement validé(s).',
       duplicateEmailError: 'Cette adresse email est déjà utilisée',
       genericError: 'Impossible de terminer la vérification email.',
     },
     en: {
-      codeSentToast: 'Gmail code sent ✅',
-      codeResentToast: 'New Gmail code sent ✅',
+      codeSentToast: 'Gmail code sent',
+      codeResentToast: 'New Gmail code sent',
       emailVerified: 'Email verified. Moving to payment methods...',
-      welcomeToast: 'Welcome {firstName}! Your email and payment setup are validated 🎉',
+      welcomeToast: 'Welcome {firstName}! Your email and payment setup are validated',
       dashboardMessage: 'Welcome {firstName}! Email confirmed and {count} payment method(s) validated.',
       duplicateEmailError: 'This email address is already in use',
       genericError: 'Unable to complete email verification.',

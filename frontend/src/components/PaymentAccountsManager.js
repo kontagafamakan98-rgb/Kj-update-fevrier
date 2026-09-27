@@ -5,6 +5,7 @@ import PaymentAccountService from '../services/paymentAccountService';
 import { detectUserCountry, getPhoneExampleForCountry, getPhonePrefixByCountry, getPopularBanksByCountry } from '../services/geolocationService';
 import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { devLog, safeLog } from '../utils/env';
+import { Landmark } from 'lucide-react';
 
 const PaymentAccountsManager = ({ onSuccess }) => {
   const { user } = useAuth();
@@ -59,7 +60,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
       setDetectedCountry(country);
       setPhoneExample(getPhoneExampleForCountry(country));
       setPopularBanks(getPopularBanksByCountry(country));
-      devLog.info(`🌍 Pays détecté: ${country.nameFrench} ${country.flag}`);
+      devLog.info(`🌍 Pays détecté: ${country.nameFrench}`);
     } catch (error) {
       safeLog.error('Erreur détection pays:', error);
     }
@@ -400,7 +401,7 @@ const PaymentAccountsManager = ({ onSuccess }) => {
         <div className="border rounded-lg p-4">
           <div className="flex items-center mb-3">
             <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center mr-3">
-              <span className="text-white text-sm font-bold">🏦</span>
+              <Landmark className="h-4 w-4 text-white" aria-hidden="true" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900">{t('bankAccount')}</h3>
           </div>

@@ -7,6 +7,7 @@ import { buildBackendUrl } from '../utils/backendUrl';
 import profilePhotoService from '../services/ProfilePhotoService';
 import { handleApiError } from '../services/api';
 import { compressImage, validateImageFile, formatFileSize } from '../utils/imageOptimization';
+import { Sparkles } from 'lucide-react';
 
 const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className = '' }) => {
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
@@ -259,7 +260,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
               {t('imageFormatsLimit')}
             </p>
             <p className="text-xs text-orange-600 mt-1">
-              ✨ {t('autoOptimizedFastConnection')}
+              <Sparkles className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('autoOptimizedFastConnection')}
             </p>
           </div>
 

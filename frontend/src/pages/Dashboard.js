@@ -14,7 +14,11 @@ import {
   Sparkles,
   Wrench,
   Zap,
-  PanelsTopLeft
+  PanelsTopLeft,
+  Crown,
+  Smartphone,
+  Rocket,
+  Camera
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -183,7 +187,7 @@ export default function Dashboard() {
       {isFamakan && (
         <div className="mb-8 p-6 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg">
           <div className="flex items-center mb-4">
-            <span className="text-2xl mr-3">👑</span>
+            <Crown className="h-6 w-6 mr-3 text-orange-500" aria-hidden="true" />
             <h2 className="text-xl font-semibold text-orange-900">{t('famakanAccess')}</h2>
           </div>
           <p className="text-sm text-orange-800 mb-4">{t('famakanDescription')}</p>
@@ -195,11 +199,11 @@ export default function Dashboard() {
                 /photo-debug est l'équivalent prod (owner-only). */}
             {import.meta.env.DEV && (
               <Link to="/mobile-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors shadow-md">
-                📱 {t('testMobileFeatures')}
+                <Smartphone className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('testMobileFeatures')}
               </Link>
             )}
             <Link to="/create-job" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
-              🚀 {t('createJobGPS')}
+              <Rocket className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('createJobGPS')}
             </Link>
             {import.meta.env.DEV && (
               /* La branche DEV est ÉLIMINÉE du bundle de production : Tailwind, lui,
@@ -212,11 +216,11 @@ export default function Dashboard() {
                  RESSUSCITE — Tailwind 4 lit le TEXTE BRUT des sources, commentaires
                  compris, et régénère l'utilitaire qu'on vient de retirer. */
               <Link to="/photo-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-purple-100 text-purple-700 rounded-xl transition-colors shadow-md">
-                📷 {t('debugPhotos')}
+                <Camera className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('debugPhotos')}
               </Link>
             )}
             <Link to="/commission-dashboard" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
-              💼 {t('commissionDashboard')}
+              <Briefcase className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('commissionDashboard')}
             </Link>
           </div>
 

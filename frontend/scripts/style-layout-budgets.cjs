@@ -217,7 +217,14 @@ const NOEUDS = {
   // 360 → 355 (26/09/2026) : les DEUX compteurs inventés de l'accueil
   // (« 1 000+ travailleurs », « 500+ projets ») sont retirés (règle « pas de
   // faux compteurs »), ce qui supprime 5 nœuds (deux cartes et leur contenu).
-  '/': 355,
+  // 355 → 370 (27/09/2026) : les QUATRE drapeaux emoji des cartes « Disponible
+  // dans 4 pays » sont DESSINÉS (src/config/flags.js) — chaque carte publie un
+  // `<svg>` plus ses aplats (3 à 5 enfants) là où un `<div>` portait un emoji,
+  // soit +15 nœuds en tout. La hauteur ne bouge pas d'un pixel (7 187 / 4 868 px,
+  // les mêmes classes `w-14 h-10 md:w-20 md:h-14` dimensionnent les deux), et
+  // l'accueil amputé de ses neuf dernières sections garde SES 113 nœuds : les
+  // quinze ajoutés vivent tous dans des sections que l'amputation retire.
+  '/': 370,
   // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
   // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
   // les trois étapes plus le séquestre de « Comment ça marche » (157 → 169) et
@@ -297,7 +304,7 @@ const HAUTEUR = {
  * devenir un test de police.
  *
  * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses neuf
- * dernières sections descend de 355 à 113 nœuds (0,32 du relevé) et de 7 187 à
+ * dernières sections descend de 370 à 113 nœuds (0,31 du relevé) et de 7 187 à
  * 1 125 px en mobile, de 4 868 à 1 086 px en desktop (0,16 et 0,22) — deux fois
  * et demie sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
  * icônes SVG) donnait 279 → 105 nœuds avec les MÊMES hauteurs : la hauteur suit

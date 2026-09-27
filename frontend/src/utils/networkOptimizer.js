@@ -339,14 +339,9 @@ class NetworkOptimizer {
    */
   getStatusDisplay() {
     const quality = this.currentQuality;
-    const emoji = {
-      [NETWORK_QUALITY.EXCELLENT]: '🚀',
-      [NETWORK_QUALITY.GOOD]: '📱',
-      [NETWORK_QUALITY.MODERATE]: '⚡',
-      [NETWORK_QUALITY.POOR]: '🐌',
-      [NETWORK_QUALITY.OFFLINE]: '📴'
-    };
-    
+    // Le champ `emoji` est parti (26/09/2026) : il portait une table d'emoji
+    // (🚀 📱 ⚡ 🐌 📴) que `NetworkStatus` peignait telle quelle. L'icône se
+    // choisit maintenant sur `quality`, dans le composant, en SVG dessiné.
     const text = {
       [NETWORK_QUALITY.EXCELLENT]: 'Excellent',
       [NETWORK_QUALITY.GOOD]: 'Bon',
@@ -356,7 +351,6 @@ class NetworkOptimizer {
     };
     
     return {
-      emoji: emoji[quality],
       text: text[quality],
       quality: quality
     };

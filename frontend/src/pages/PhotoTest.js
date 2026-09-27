@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import ProfilePhoto from '../components/ProfilePhoto';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/photoTest';
 import { devLog } from '../utils/env';
+import { FlaskConical, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function PhotoTest() {
   const { user } = useAuth();
@@ -60,7 +61,10 @@ export default function PhotoTest() {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{pageT('title')}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center justify-center gap-2">
+            <FlaskConical className="h-7 w-7" aria-hidden="true" />
+            {pageT('title')}
+          </h1>
           <p className="text-gray-600">{pageT('subtitle')}</p>
         </div>
 
@@ -179,21 +183,45 @@ export default function PhotoTest() {
               <strong>{pageT('fileApi')}:</strong>
               <br />
               <span className={window.File ? 'text-green-600' : 'text-red-600'}>
-                {window.File ? pageT('supported') : pageT('unsupported')}
+                {window.File ? <>
+                  <CheckCircle2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
+                  {pageT('supported')}
+                </> : (
+                  <>
+                    <XCircle className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
+                    {pageT('unsupported')}
+                  </>
+                )}
               </span>
             </div>
             <div>
               <strong>{pageT('canvas')}:</strong>
               <br />
               <span className={document.createElement('canvas').getContext ? 'text-green-600' : 'text-red-600'}>
-                {document.createElement('canvas').getContext ? pageT('supported') : pageT('unsupported')}
+                {document.createElement('canvas').getContext ? <>
+                  <CheckCircle2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
+                  {pageT('supported')}
+                </> : (
+                  <>
+                    <XCircle className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
+                    {pageT('unsupported')}
+                  </>
+                )}
               </span>
             </div>
             <div>
               <strong>{pageT('localStorage')}:</strong>
               <br />
               <span className={window.localStorage ? 'text-green-600' : 'text-red-600'}>
-                {window.localStorage ? pageT('supported') : pageT('unsupported')}
+                {window.localStorage ? <>
+                  <CheckCircle2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
+                  {pageT('supported')}
+                </> : (
+                  <>
+                    <XCircle className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
+                    {pageT('unsupported')}
+                  </>
+                )}
               </span>
             </div>
           </div>

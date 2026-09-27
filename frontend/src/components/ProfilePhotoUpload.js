@@ -4,6 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { devLog, safeLog } from '../utils/env';
 import { photoFormatsLine } from '../config/photo-formats';
 import { IconePage, CLASSES_ICONE } from '../config/page-icons';
+import { Image, Camera } from 'lucide-react';
 
 // Les deux glyphes sont DESSINÉS (icônes SVG) : leur nom est passé par la page,
 // qui le lit de son plan (`PAGE_SECTIONS['/register'].photoIcon` / `.photoTipsIcon`),
@@ -15,6 +16,11 @@ const ProfilePhotoUpload = ({
   userType = 'client',
   iconePhoto = 'profilePhoto',
   iconeConseils = 'photoTips',
+  // La classe du BLOC, posée par la page au lieu d'être décidée ici : c'est une
+  // décision de mise en page (ce bloc est sous la ligne de flottaison de
+  // /register, donc différé — voir `bloc-differe-photo` dans src/App.css), et le
+  // composant sert aussi ailleurs. Vide par défaut : aucun effet hors de là.
+  classeBloc = '',
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showCameraOptions, setShowCameraOptions] = useState(false);
@@ -109,7 +115,7 @@ const ProfilePhotoUpload = ({
   };
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
+    <div className={`bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6${classeBloc ? ` ${classeBloc}` : ''}`}>
       <div className="flex items-center mb-4">
         <span className="text-2xl mr-3"><IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoTitre} /></span>
         <h3 className="text-lg font-semibold text-gray-900">
@@ -159,7 +165,7 @@ const ProfilePhotoUpload = ({
                   onClick={handleGalleryClick}
                   className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
                 >
-                  <div className="text-3xl mb-2">🖼️</div>
+                  <Image className="h-8 w-8 mb-2 text-blue-500" aria-hidden="true" />
                   <div className="text-sm font-medium text-blue-900">{t('chooseFromGallery')}</div>
                   <div className="text-xs text-blue-600 mt-1">{t('selectExistingPhoto')}</div>
                 </button>
@@ -170,7 +176,7 @@ const ProfilePhotoUpload = ({
                   onClick={handleCameraClick}
                   className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-green-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
                 >
-                  <div className="text-3xl mb-2">📷</div>
+                  <Camera className="h-8 w-8 mb-2 text-green-600" aria-hidden="true" />
                   <div className="text-sm font-medium text-green-900">{t('takePhoto')}</div>
                   <div className="text-xs text-green-600 mt-1">{t('useCamera')}</div>
                 </button>
@@ -253,7 +259,7 @@ const ProfilePhotoUpload = ({
               onClick={showPhotoOptions}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              📷 {t('changePhoto')}
+              <Camera className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('changePhoto')}
             </button>
           ) : (
             <div className="space-y-3">
@@ -263,14 +269,14 @@ const ProfilePhotoUpload = ({
                   onClick={handleGalleryClick}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
-                  🖼️ {t('gallery')}
+                  <Image className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('gallery')}
                 </button>
                 <button
                   type="button"
                   onClick={handleCameraClick}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
                 >
-                  📷 {t('camera')}
+                  <Camera className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('camera')}
                 </button>
               </div>
               <button

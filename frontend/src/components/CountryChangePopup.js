@@ -4,6 +4,7 @@ import { useCountry } from '../contexts/CountryContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { geolocationAPI } from '../services/api';
 import { safeLog } from '../utils/env';
+import FlagIcon from './FlagIcon';
 
 const CountryChangePopup = () => {
   const { user } = useAuth();
@@ -76,7 +77,11 @@ const CountryChangePopup = () => {
           {t('detectedViaGeolocation') || 'Nouveau pays détecté'}
         </h3>
         <p style={styles.text}>
-          {t('popupDetectedIn')} <strong>{detectedCountry.name}</strong> {detectedCountry.flag}.
+          {t('popupDetectedIn')} <strong>{detectedCountry.name}</strong>{' '}
+          <FlagIcon
+            country={detectedCountry.id}
+            className="w-5 h-4 inline-block align-[-0.15em]"
+          />.
           {t('popupSwitchQuestion')}
         </p>
         <div style={styles.buttons}>

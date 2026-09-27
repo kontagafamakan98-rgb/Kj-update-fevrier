@@ -10,7 +10,8 @@
 
 import { COUNTRIES } from '../../src/config/countries.js'
 import { CLASSES_ICONE } from '../../src/config/page-icons.js'
-import { svgDeLIcone } from './icons-serveur.js'
+import { nomDuDrapeau } from '../../src/config/flags.js'
+import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // ── Shell statique de l'ACCUEIL (index.html) ────────────────────
@@ -129,16 +130,30 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('kojoConnectsDescription'))}</p>`,
     `</div>`,
     `<div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">`,
-    ...COUNTRIES.map(
-      (country) =>
+    ...COUNTRIES.map((country) => {
+      // Le drapeau est DESSINÉ, comme chez React (`FlagIcon`, qui passe par le
+      // même registre) : c'était le dernier emoji de cette coquille, et la seule
+      // chose qui dépendît de la police du VISITEUR. Un pays sans dessin fait
+      // ÉCHOUER le build — le HTML pré-rendu n'a pas le droit de peindre un
+      // drapeau qu'il ne sait pas dessiner (il en publiait un blanc, « 🏳️ »).
+      const drapeau = nomDuDrapeau(country.code)
+      if (!drapeau) {
+        throw new Error(
+          `prerender-home : le pays « ${country.code} » (${country.name}) n’a pas de drapeau dessiné — ` +
+            'déclarez-le dans src/config/flags.js (registre DRAPEAUX), sinon la coquille ' +
+            'publierait un drapeau vide ou un emoji selon la police de l’hôte.'
+        )
+      }
+      return (
         `<div class="${country.color} rounded-2xl p-6 text-center shadow-md ring-1 ring-inset ring-black/5">` +
         `<div class="flex justify-center mb-3">` +
-        `<div class="w-14 h-10 md:w-20 md:h-14 rounded shadow-sm flex items-center justify-center text-3xl">${country.flag}</div>` +
+        svgDuDrapeau(drapeau, 'w-14 h-10 md:w-20 md:h-14 rounded shadow-sm') +
         `</div>` +
         `<h3 class="font-semibold text-gray-900 text-sm md:text-base">${esc(country.name)}</h3>` +
         `<p class="text-xs text-gray-600 mt-1">${esc(T('servicesAvailable'))}</p>` +
         `</div>`
-    ),
+      )
+    }),
     `</div>`,
     `</div>`,
     `</section>`,

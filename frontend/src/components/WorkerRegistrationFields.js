@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { HardHat, Wrench, CalendarDays, Info } from 'lucide-react';
 
 const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
   const [showSkillInput, setShowSkillInput] = useState(false);
@@ -136,13 +137,13 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
       <div className="flex items-center mb-4">
-        <span className="text-2xl mr-3">👷</span>
+        <HardHat className="h-6 w-6 mr-3 text-blue-700" aria-hidden="true" />
         <h3 className="text-lg font-semibold text-blue-900">{t('professionalInformationWorker')}</h3>
       </div>
 
       <div className="space-y-6">
         <div>
-          <p className="block text-sm font-medium text-blue-900 mb-3">🔧 {t('skillsAndSpecialties')} *</p>
+          <p className="block text-sm font-medium text-blue-900 mb-3"><Wrench className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('skillsAndSpecialties')} *</p>
 
           {formData.worker_specialties && formData.worker_specialties.length > 0 && (
             <div className="mb-3">
@@ -218,7 +219,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
         </div>
 
         <div>
-          <label htmlFor="worker_experience_years" className="block text-sm font-medium text-blue-900 mb-2">📅 {t('yearsExperience')}</label>
+          <label htmlFor="worker_experience_years" className="block text-sm font-medium text-blue-900 mb-2"><CalendarDays className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('yearsExperience')}</label>
           <select
             id="worker_experience_years"
             name="worker_experience_years"
@@ -248,7 +249,7 @@ const WorkerRegistrationFields = ({ formData, setFormData, errors }) => {
 
         <div className="bg-blue-100 border border-blue-300 rounded-lg p-4">
           <div className="flex items-start">
-            <span className="text-blue-500 text-lg mr-3">ℹ️</span>
+            <Info className="h-5 w-5 text-blue-500 mr-3 shrink-0" aria-hidden="true" />
             <div className="text-sm text-blue-800">
               <p className="font-medium mb-1">{t('profileInfoNote')}</p>
               <ul className="text-xs space-y-1">

@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/commissionDashboard';
 import { devLog, safeLog } from '../utils/env';
+import { Banknote, BarChart3, Hash, CalendarDays, Ban, Briefcase, Wallet, Waves, CreditCard } from 'lucide-react';
 
 const CommissionDashboard = () => {
   const { user } = useAuth();
@@ -104,13 +105,13 @@ const CommissionDashboard = () => {
   const getMethodIcon = (method) => {
     switch (method) {
       case 'orange_money':
-        return '🧡';
+        return <Wallet className="h-4 w-4" aria-hidden="true" />;
       case 'wave':
-        return '🌊';
+        return <Waves className="h-4 w-4" aria-hidden="true" />;
       case 'bank_card':
-        return '💳';
+        return <CreditCard className="h-4 w-4" aria-hidden="true" />;
       default:
-        return '💰';
+        return <Banknote className="h-4 w-4" aria-hidden="true" />;
     }
   };
 
@@ -132,7 +133,7 @@ const CommissionDashboard = () => {
       <div className="min-h-full bg-gray-50 py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="bg-red-50 border border-red-200 rounded-lg p-8">
-            <div className="text-6xl mb-4">🚫</div>
+            <Ban className="h-14 w-14 mx-auto mb-4 text-red-500" aria-hidden="true" />
             <h1 className="text-2xl font-bold text-red-800 mb-4">{pageT('accessReserved')}</h1>
             <p className="text-red-700 mb-6">{pageT('accessMessage')}</p>
             <div className="bg-red-100 border border-red-300 rounded-lg p-4 mb-6">
@@ -161,10 +162,10 @@ const CommissionDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard icon="💰" bg="bg-green-100" title={pageT('totalCommissions')} value={`${formatMoney(displayStats.total_commission_earned || displayStats.totalCommissions)} XOF`} valueColor="text-green-600" />
-          <StatCard icon="📊" bg="bg-blue-100" title={pageT('totalVolume')} value={`${formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF`} valueColor="text-blue-600" />
-          <StatCard icon="🔢" bg="bg-purple-100" title={pageT('transactions')} value={displayStats.total_transactions || displayStats.totalTransactions || 0} valueColor="text-purple-600" />
-          <StatCard icon="📅" bg="bg-orange-100" title={pageT('today')} value={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} valueColor="text-orange-600" />
+          <StatCard icon={<Banknote className="h-6 w-6 text-green-600" aria-hidden="true" />} bg="bg-green-100" title={pageT('totalCommissions')} value={`${formatMoney(displayStats.total_commission_earned || displayStats.totalCommissions)} XOF`} valueColor="text-green-600" />
+          <StatCard icon={<BarChart3 className="h-6 w-6 text-blue-600" aria-hidden="true" />} bg="bg-blue-100" title={pageT('totalVolume')} value={`${formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF`} valueColor="text-blue-600" />
+          <StatCard icon={<Hash className="h-6 w-6 text-purple-600" aria-hidden="true" />} bg="bg-purple-100" title={pageT('transactions')} value={displayStats.total_transactions || displayStats.totalTransactions || 0} valueColor="text-purple-600" />
+          <StatCard icon={<CalendarDays className="h-6 w-6 text-orange-600" aria-hidden="true" />} bg="bg-orange-100" title={pageT('today')} value={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} valueColor="text-orange-600" />
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -181,7 +182,7 @@ const CommissionDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <AccountCard
               title="Orange Money"
-              emoji="🧡"
+              icone={<Wallet className="h-6 w-6 text-orange-500" aria-hidden="true" />}
               editing={editingAccounts}
               primaryLabel={pageT('phoneNumber')}
               secondaryLabel={pageT('accountName')}
@@ -198,7 +199,7 @@ const CommissionDashboard = () => {
 
             <AccountCard
               title="Wave"
-              emoji="🌊"
+              icone={<Waves className="h-6 w-6 text-blue-500" aria-hidden="true" />}
               editing={editingAccounts}
               primaryLabel={pageT('phoneNumber')}
               secondaryLabel={pageT('accountName')}
@@ -215,7 +216,7 @@ const CommissionDashboard = () => {
 
             <AccountCard
               title={pageT('bankCard')}
-              emoji="💳"
+              icone={<CreditCard className="h-6 w-6 text-gray-600" aria-hidden="true" />}
               editing={editingAccounts}
               primaryLabel={pageT('accountNumber')}
               secondaryLabel={pageT('bank')}
@@ -242,7 +243,7 @@ const CommissionDashboard = () => {
 
           {transactions.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              <span className="text-4xl block mb-4">💼</span>
+              <Briefcase className="h-12 w-12 mx-auto mb-4 text-gray-400" aria-hidden="true" />
               <p>{pageT('noTransactions')}</p>
               <p className="text-sm mt-2">{pageT('noTransactionsHelp')}</p>
             </div>
@@ -296,11 +297,11 @@ function StatCard({ icon, bg, title, value, valueColor }) {
   );
 }
 
-function AccountCard({ title, emoji, editing, primaryLabel, secondaryLabel, primaryValue, secondaryValue, primaryPlaceholder, secondaryPlaceholder, notConfigured, onPrimaryChange, onSecondaryChange, primaryName, secondaryName }) {
+function AccountCard({ title, icone, editing, primaryLabel, secondaryLabel, primaryValue, secondaryValue, primaryPlaceholder, secondaryPlaceholder, notConfigured, onPrimaryChange, onSecondaryChange, primaryName, secondaryName }) {
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-center mb-3">
-        <span className="text-2xl mr-2">{emoji}</span>
+        <span className="mr-2">{icone}</span>
         <h3 className="font-semibold text-gray-900">{title}</h3>
       </div>
       <div className="space-y-3">

@@ -63,7 +63,7 @@ const PLANCHER_HAUTEUR = 200;
  * La mutation qui doit franchir la borne, MESURÉE le 25/09/2026 (279 → 105
  * nœuds, shell bâti 94 329 o → 75 601 o, SHA-1 997b3d3c… → dbb86205…) et
  * RE-MESURÉE le 26/09/2026 sur l'artefact à icônes SVG : l'accueil amputé de
- * ses neuf dernières sections tombe à 113 nœuds (de 355). La hauteur ne bouge
+ * ses neuf dernières sections tombe à 113 nœuds (de 370). La hauteur ne bouge
  * pas (1 125 px mobile, 1 086 px desktop) : elle suit les mêmes sections, quel
  * que soit le nombre de nœuds qui les composent. Le rejeu vivant est dans
  * `e2e/style-layout-preuve-echec.spec.js`.

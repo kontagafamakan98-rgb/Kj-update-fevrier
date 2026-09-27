@@ -173,7 +173,7 @@ export default function Home() {
                 className={`${country.color} rounded-2xl p-6 text-center shadow-md ring-1 ring-inset ring-black/5`}
               >
                 <div className="flex justify-center mb-3">
-                  <FlagIcon country={country.code} className="w-14 h-10 md:w-20 md:h-14" showEmoji={false} />
+                  <FlagIcon country={country.code} className="w-14 h-10 md:w-20 md:h-14" />
                 </div>
                 <h3 className="font-semibold text-gray-900 text-sm md:text-base">{country.name}</h3>
                 <p className="text-xs text-gray-600 mt-1">{t('servicesAvailable')}</p>

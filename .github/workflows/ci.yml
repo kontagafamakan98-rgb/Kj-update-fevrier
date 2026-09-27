@@ -508,6 +508,17 @@ jobs:
         working-directory: frontend
         run: node scripts/check-prerender-shells.js
 
+      # Les deux gardes de coquille lisent le HTML publié ; celui-ci lit les
+      # FICHIERS LIVRÉS (`build/assets/*.js` et `*.css`), seul endroit où vit
+      # l'URL qu'un composant écrit en clair (`script.src = 'https://…'`). Il
+      # refuse une origine TIERCE non classée dans `scripts/origines-bundles.js`,
+      # une entrée de classement PÉRIMÉE (qu'aucun fichier livré ne porte plus) et
+      # un motif vide — donc ajouter une dépendance qui parle à un tiers rougit
+      # ici tant que personne n'a écrit POURQUOI elle a le droit d'y être.
+      - name: Check third-party origins in delivered JS/CSS bundles
+        working-directory: frontend
+        run: node scripts/check-origines-bundles.js
+
       # Le garde ci-dessus compare les textes que le plan DÉCLARE. Celui-ci
       # compare TOUT ce que les coquilles publient — chaque fragment visible des
       # HTML du build — aux textes que la page peut publier : un mot ajouté à la
@@ -704,6 +715,17 @@ jobs:
       - name: Check no interactive control unmounted during press
         working-directory: frontend
         run: node scripts/check-appui-demontage-controles.js
+
+      # Parité du levier "content-visibility" du formulaire de /register : les
+      # quatre blocs différés (photo, légal, envoi, lien) doivent être posés par
+      # les DEUX canaux (src/pages/Register.js ET shells-routes.js) et porter
+      # leur constante de hauteur de contenu dans src/App.css. Une classe posée
+      # d'un seul côté, ou une constante disparue, ferait diverger les deux
+      # peintures ou effondrerait le document — la parité e2e n'est mesurée que
+      # sur les routes déclarées, donc ce garde refuse la divergence à la source.
+      - name: Check deferred form blocks parity (/register)
+        working-directory: frontend
+        run: node scripts/check-formulaire-differe.js
 
       # Même harnais que dans backend-tests, runner Node (Vitest) : les mutations
       # des gardes frontend sont rejouées ici, seul job qui a `node_modules`.
