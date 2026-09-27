@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { isPWA } from '../utils/pwa';
 import LanguageSelector from './LanguageSelector';
 import NotificationBell from './NotificationBell';
+import { Icone } from './chrome-icons';
 import { LANGUAGES } from '../config/languages';
 
 export default function Navbar() {
@@ -92,12 +93,29 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
+            {/* ── Le verrou de marque ────────────────────────────────────────────
+                Trois décisions, et aucune n'est cosmétique :
+                • la pastille passe à 36 px (h-9) avec un rayon de 12 (rounded-xl) —
+                  à 32 px et 8 de rayon, elle se lisait comme un bouton parmi les
+                  autres de la barre, alors que c'est la SEULE surface de marque ;
+                • le mot est en GRAPHITE et non en orange : la couleur de marque vit
+                  dans le symbole, le nom gagne le contraste maximal. Peinte en
+                  orange sur un fond presque blanc, le mot rivalisait avec les
+                  boutons d'action juste à côté ;
+                • l'interlettrage se resserre (tracking-tight) et le glyphe est calé
+                  sur `leading-none`, sinon le « K » flotte de 1 px sous l'axe
+                  optique du mot à côté — le genre de détail qui fait « presque
+                  juste » sans qu'on sache pourquoi. */}
             <Link to="/" className="flex-shrink-0 flex items-center" onClick={closeMobileMenu}>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-lg font-bold">{t('brandMark')}</span>
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600">
+                  <span className="text-[17px] font-extrabold leading-none tracking-tight text-white">
+                    {t('brandMark')}
+                  </span>
                 </div>
-                <div className="text-xl font-bold text-orange-600">Kojo</div>
+                <div className="text-[19px] font-extrabold leading-none tracking-tight text-gray-900">
+                  Kojo
+                </div>
               </div>
             </Link>
           </div>
@@ -182,15 +200,12 @@ export default function Navbar() {
               aria-label={isMobileMenuOpen ? t('closeMenu') : t('openMenu')}
               aria-expanded={isMobileMenuOpen}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-600 p-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="min-h-[44px] min-w-[44px] text-gray-700 hover:text-orange-600 p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {isMobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                )}
-              </svg>
+              {/* Le dessin vient du registre du chrome : c'est lui qui porte les
+                  jointures, les bouts et `aria-hidden`. Deux tracés écrits ici
+                  auraient été deux occasions d'oublier `linejoin`. */}
+              <Icone nom={isMobileMenuOpen ? 'fermer' : 'menu'} classe="w-6 h-6" />
             </button>
           </div>
         </div>
@@ -200,8 +215,12 @@ export default function Navbar() {
         <>
           <button type="button" aria-label={t('closeMenu')} className="fixed inset-0 z-40 bg-black/30 md:hidden" onClick={closeMobileMenu} />
           <div ref={menuRef} className="relative z-50 md:hidden border-t border-gray-200 bg-white shadow-xl">
-            <div className="max-h-[calc(100vh-4rem)] overflow-y-auto px-3 pt-3 pb-6 space-y-2">
-              <div className="rounded-2xl border border-gray-200 px-3 py-3">
+            {/* `overscroll-contain` : arrivé au bout du tiroir, un geste de plus ne
+                doit pas faire défiler la PAGE derrière lui — le corps est déjà gelé
+                (`overflow: hidden`), mais la chaîne de défilement remonte quand
+                même au document sur iOS sans cette borne. */}
+            <div className="max-h-[calc(100vh-4rem)] overflow-y-auto overscroll-contain px-3 pt-3 pb-6 space-y-2">
+              <div className="rounded-xl border border-gray-200 px-3 py-3">
                 <label htmlFor="mobile_language_selector" className="block text-xs font-medium text-gray-500 mb-2">{t('languageLabel')}</label>
                 <select
                   id="mobile_language_selector"
@@ -227,23 +246,23 @@ export default function Navbar() {
 
               {user ? (
                 <>
-                  <Link to="/dashboard" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/dashboard" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('dashboard')}
                   </Link>
-                  <Link to="/jobs" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('jobs')}
                   </Link>
-                  <Link to="/messages" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/messages" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('messages')}
                   </Link>
-                  <Link to="/profile" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/profile" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('profile')}
                   </Link>
-                  <Link to="/support" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/support" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('support')}
                   </Link>
                   <div className="pt-2">
-                    <button onClick={handleLogout} className="w-full rounded-2xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors">
+                    <button onClick={handleLogout} className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors">
                       {t('logout')}
                     </button>
                   </div>
@@ -253,25 +272,25 @@ export default function Navbar() {
                   {/* Les mêmes entrées publiques que sur grand écran : le menu
                       mobile d'un visiteur non connecté ne doit pas être plus
                       pauvre que la barre du haut. */}
-                  <Link to="/jobs" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/jobs" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('jobs')}
                   </Link>
-                  <Link to="/how-it-works" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/how-it-works" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('howItWorksTitle')}
                   </Link>
-                  <Link to="/about" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/about" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('aboutTitle')}
                   </Link>
-                  <Link to="/contact" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/contact" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('contactTitle')}
                   </Link>
-                  <Link to="/privacy" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/privacy" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('privacyTitle')}
                   </Link>
-                  <Link to="/login" className="block rounded-2xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/login" className="block rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('login')}
                   </Link>
-                  <Link to="/register" className="block rounded-2xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
+                  <Link to="/register" className="block rounded-xl bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 text-base font-medium transition-colors" onClick={closeMobileMenu}>
                     {t('register')}
                   </Link>
                 </>

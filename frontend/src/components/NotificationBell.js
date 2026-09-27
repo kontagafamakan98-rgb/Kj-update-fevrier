@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { BellIcon } from './notificationIcons';
+import { Icone } from './chrome-icons';
 import { VERS_LE_BAS } from './notificationPanelPlacement';
 
 /**
@@ -75,7 +75,7 @@ export default function NotificationBell({
             plusieurs dizaines de pixels et ne se lirait plus comme « la
             pastille de la cloche ». */}
         <span className="relative inline-flex">
-          <BellIcon className={iconClassName} />
+          <Icone nom="cloche" classe={iconClassName} />
           {unreadCount > 0 && (
             <span
               aria-hidden="true"

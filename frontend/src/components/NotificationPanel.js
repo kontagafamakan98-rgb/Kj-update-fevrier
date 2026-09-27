@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import {
   Bell as BellGlyph, CheckCircle2, ClipboardList, Flag, MessageSquare, PartyPopper, Wallet, Wrench,
 } from 'lucide-react';
-import { BellIcon, CheckAllIcon, TrashIcon, XIcon } from './notificationIcons';
+import { Icone } from './chrome-icons';
 import { ancrageDe } from './notificationPanelPlacement';
 
 // Le message d'un échec d'action, par action : la copie du produit, jamais le
@@ -177,7 +177,7 @@ export default function NotificationPanel() {
       {/* En-tête */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <BellIcon className="w-5 h-5 text-orange-600" />
+          <Icone nom="cloche" classe="w-5 h-5 text-orange-600" />
           <span className="font-semibold text-gray-800 text-sm">{t('notificationsTitle')}</span>
           {unreadCount > 0 && (
             <span className="bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">
@@ -192,7 +192,7 @@ export default function NotificationPanel() {
               title={t('markAllRead')}
               className="p-1.5 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors"
             >
-              <CheckAllIcon />
+              <Icone nom="cocheDouble" classe="w-4 h-4" />
             </button>
           )}
           {notifications.length > 0 && (
@@ -213,7 +213,7 @@ export default function NotificationPanel() {
                   : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
               }`}
             >
-              <TrashIcon />
+              <Icone nom="corbeille" classe="w-4 h-4" />
               {confirmeToutSupprimer && <span>{t('confirmDeleteAll')}</span>}
             </button>
           )}
@@ -222,7 +222,7 @@ export default function NotificationPanel() {
             aria-label={t('closeNotif')}
             className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
           >
-            <XIcon />
+            <Icone nom="croix" classe="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -248,7 +248,7 @@ export default function NotificationPanel() {
               aria-label={t('closeNotif')}
               className="p-1 rounded-lg text-red-400 hover:text-red-700 hover:bg-red-100 transition-colors"
             >
-              <XIcon className="w-3.5 h-3.5" />
+              <Icone nom="croix" classe="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -258,7 +258,9 @@ export default function NotificationPanel() {
           </div>
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <BellIcon className="mb-3 h-9 w-9 text-gray-300" />
+            {/* h-9 = 36 px : au-delà de 32 px, l'épaisseur du jeu descend à 1,75 —
+              à 2 unités sur la grille de 24, un dessin agrandi épaissit avec lui. */}
+          <Icone nom="cloche" classe="mb-3 h-9 w-9 text-gray-300" epaisseur={1.75} />
             <p className="text-gray-500 text-sm font-medium">{t('noNotifications')}</p>
             <p className="text-gray-500 text-xs mt-1">{t('notifEmptyHint')}</p>
           </div>
@@ -318,7 +320,7 @@ export default function NotificationPanel() {
                     aria-label={t('deleteNotification')}
                     className="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   >
-                    <XIcon className="w-5 h-5 sm:w-4 sm:h-4" />
+                    <Icone nom="croix" classe="w-5 h-5 sm:w-4 sm:h-4" />
                   </button>
                 </div>
               </li>
