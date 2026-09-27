@@ -313,6 +313,195 @@ code {
   }
 }
 
+/* ── LA COUCHE ÉDITORIALE ───────────────────────────────────────────────────
+
+   Ce qu'elle remplace. Le corps des pages publiques était une accumulation
+   d'utilitaires Tailwind choisis un par un : chaque carte inventait son rayon,
+   chaque titre sa taille, et rien ne reliait une section à la suivante. Le
+   regard n'y trouvait ni repère ni rythme — beaucoup de boîtes, aucune page.
+
+   Ce qu'elle ajoute est un vocabulaire FERMÉ : une poignée de classes, un jeu
+   de variables, une seule échelle de titres. Le même bloc est lu par les DEUX
+   canaux (React et les coquilles pré-rendues) puisqu'il vit dans la feuille
+   commune, donc la bascule coquille → React ne déplace rien.
+
+   Ce qui décide, et ce qui ne décide pas :
+     • l'ORANGE reste l'identité du site ; il porte maintenant l'ACCENT (le
+       sur-titre, le survol d'une carte, l'anneau de focus) au lieu de servir
+       de fond à tout, et le texte passe à une gamme CHAUDE (encre, sable,
+       filets) : une page imprimée, pas un tableau de bord.
+     • les RAYONS se resserrent (8 px au lieu de 16) et les OMBRES larges
+       cèdent la place à un FILET de 1 px : c'est la marque de fabrique d'une
+       mise en page éditoriale, et c'est aussi ce qui distingue une carte d'un
+       bouton.
+     • les FONDS alternés quittent le gris froid pour un papier et un sable
+       chauds — deux variables, aucune propriété de mise en page.
+     • l'échelle de titres est UNIQUE et fluide (`clamp`), donc un titre de
+       section ne rétrécit plus à 25 px sur mobile pour remonter à 30 px sur
+       desktop par palier.
+
+   AUCUNE POLICE N'EST AJOUTÉE, et c'est une décision mesurée, pas un oubli.
+   Ce fichier auto-héberge Inter et `index.html` la PRÉCHARGE : c'est ce qui
+   garantit que « la police n'est plus celle de l'hôte », garantie sans
+   laquelle les aires de l'élément LCP ne seraient pas mesurables d'un poste à
+   l'autre (voir src/config/page-sections.js). Une seconde famille, servie en
+   `swap`, se peindrait APRÈS le premier paint sur le titre qui porte le LCP de
+   l'accueil — et un remplacement plus grand RÉ-ÉLIT l'élément LCP, ce qui fait
+   entrer toute la chaîne JavaScript dans le graphe de Lantern. Le caractère
+   éditorial vient donc du RYTHME (sur-titres espacés, titres serrés, cartes
+   franches), jamais d'un dessin de lettre étranger.
+
+   La dernière règle est une GARANTIE, pas une décoration : le socle des
+   formulaires ne touche QUE des propriétés sans effet sur la mise en page
+   (couleur, fond, rayon, couleur de filet). Réécrire une largeur de bordure y
+   ferait grandir chaque champ de 2 px, sur des pages dont les hauteurs sont
+   des constantes mesurées (voir App.css, `contain-intrinsic-size`). */
+:root {
+  --kojo-encre: #1c1917;
+  --kojo-encre-douce: #5c554d;
+  --kojo-filet: #e6e1d7;
+  --kojo-sable: #f7f3ec;
+  --kojo-papier: #fffdf9;
+  --kojo-orange: #ea580c;
+  --kojo-orange-fonce: #c2410c;
+  --kojo-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+/* Le SUR-TITRE : la petite ligne espacée qui annonce ce qui vient. Elle remplace
+   les pastilles `rounded-full` des sections — une pastille se lit comme une
+   étiquette de produit, un sur-titre se lit comme un chapeau de chapitre. */
+.sur-titre {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--kojo-orange-fonce);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.sur-titre::before {
+  width: 1.5rem;
+  height: 1px;
+  background-color: currentColor;
+  content: "";
+}
+
+/* La variante du sur-titre pour le fond orange du héros : l'orange foncé y
+   disparaîtrait (`--kojo-orange-fonce` sur `#ea580c`, contraste 1,3:1). La
+   teinte est dérivée de la crème plutôt que choisie à l'œil : `#ffe4cf` sur
+   `#ea580c` mesure 4,85:1, donc lisible même en petit et en capitales. */
+.sur-titre-clair {
+  color: #ffe4cf;
+}
+
+/* Le TITRE DU HÉROS : un cran au-dessus du titre de page, et la mesure
+   `clamp` remplace les trois paliers responsives écrits à la main — l'échelle
+   progresse désormais continûment au lieu de sauter deux fois.
+   La couleur est blanche parce que ce titre vit sur le fond orange. */
+.titre-heros {
+  color: #fff;
+  font-size: clamp(2rem, 1.25rem + 3.4vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+/* Le TITRE DE SECTION et le TITRE DE PAGE : une seule échelle, un seul dessin.
+   Le `text-wrap: balance` évite la ligne orpheline d'un titre replié en deux. */
+.titre-section {
+  color: var(--kojo-encre);
+  font-size: clamp(1.5rem, 1.05rem + 2vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.titre-page {
+  color: var(--kojo-encre);
+  font-size: clamp(1.875rem, 1.4rem + 2.2vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+/* La CARTE : un filet, pas une ombre. `cliquable` n'ajoute que ce qui répond au
+   survol d'une carte qui mène quelque part — une carte informative n'a rien à
+   promettre, donc elle ne porte pas cette classe. */
+.carte-editoriale {
+  background-color: var(--kojo-papier);
+  border: 1px solid var(--kojo-filet);
+  border-radius: 0.5rem;
+}
+
+.carte-editoriale-cliquable {
+  transition:
+    border-color 0.18s var(--kojo-ease),
+    box-shadow 0.18s var(--kojo-ease),
+    transform 0.18s var(--kojo-ease);
+}
+
+.carte-editoriale-cliquable:hover {
+  border-color: var(--kojo-orange);
+  box-shadow: 0 14px 30px -22px rgba(28, 25, 23, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Les deux FONDS du rythme de page. Ils remplacent l'alternance
+   `bg-white` / `bg-gray-50` des sections : le gris froid jurait avec l'encre
+   chaude du texte, et c'est l'alternance qui donne à une longue page son pas.
+   Aucune propriété de mise en page ici : changer un fond ne déplace rien. */
+.fond-papier {
+  background-color: var(--kojo-papier);
+}
+
+.fond-sable {
+  background-color: var(--kojo-sable);
+}
+
+/* ── LE SOCLE DES FORMULAIRES, PAR SÉLECTEURS D'ÉLÉMENTS ────────────────────
+
+   Même raison que le socle d'interaction du `@layer base` : un sélecteur
+   d'ÉLÉMENT est lu par les deux canaux SANS qu'aucun des deux n'ait à poser une
+   classe — les coquilles pré-rendues publient de vrais `<input>`, exactement
+   comme React. Aucune dette pour le garde « aucun sélecteur sans porteur », et
+   rien à recopier côté coquille.
+
+   La spécificité bat les utilitaires (`form :is(input…)` = 0,3,2 contre 0,1,0
+   pour `border-gray-300`), ce qui est VOULU : le dessin d'un champ appartient à
+   la page, pas au champ qui l'écrit. C'est la seule exception du site à la
+   règle « un utilitaire gagne », et elle est bornée aux propriétés ci-dessous. */
+form :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  background-color: var(--kojo-papier);
+  border-color: var(--kojo-filet);
+  border-radius: 0.5rem;
+  color: var(--kojo-encre);
+}
+
+form :is(input, select, textarea)::placeholder {
+  color: #8a8278;
+  opacity: 1;
+}
+
+form label {
+  color: var(--kojo-encre-douce);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carte-editoriale-cliquable {
+    transition: none;
+  }
+
+  .carte-editoriale-cliquable:hover {
+    transform: none;
+  }
+}
+
 
 
 

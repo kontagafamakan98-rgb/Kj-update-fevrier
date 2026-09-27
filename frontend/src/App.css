@@ -293,29 +293,38 @@
 .sections-differees > section:not(:first-of-type) {
   content-visibility: auto;
 }
-.sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 442.2px; }
-.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 865.1px; }
+/* RE-MESURÉES le 28/09/2026 avec la refonte éditoriale (protocole ci-dessus :
+   levier neutralisé par une feuille injectée, hauteur de la boîte de bordure
+   moins les deux paddings, 412×823 et 1350×940). CE QUI A CHANGÉ, et pourquoi
+   la remesure était obligatoire plutôt qu'un ajustement à vue : les titres de
+   section passent d'une échelle en PALIERS à une échelle fluide, et les cartes
+   troquent l'anneau contre une bordure de 1 px — deux effets de quelques pixels
+   par section. Le §8 (les chiffres) perdait en réalité 86 px sur des constantes
+   périmées : elles dataient des compteurs fabriqués retirés le 26/09/2026, et
+   personne ne les avait reprises depuis. */
+.sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 441.2px; }
+.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 870.1px; }
 .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 744.6px; }
-.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 866.2px; }
-.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 487.7px; }
-.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 308px; }
-.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 216px; }
-.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 604.8px; }
-.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 841.4px; }
+.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 867.2px; }
+.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 480.7px; }
+.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 298.1px; }
+.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 130px; }
+.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 574.7px; }
+.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 836.4px; }
 
 /* Au-delà de 768 px, `py-12` devient `py-16` (128 px) et les contenus prennent
    une autre forme : les tailles de contenu sont donc déclarées À PART, jamais
    déduites de celles du mobile. */
 @media (min-width: 768px) {
-  .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 285.6px; }
-  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 429.6px; }
+  .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 290.5px; }
+  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 436.5px; }
   .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 233.2px; }
-  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 349.6px; }
-  .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 296.8px; }
-  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 184px; }
-  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 136px; }
-  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 342.3px; }
-  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 640.2px; }
+  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 354.5px; }
+  .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 297.7px; }
+  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 182.9px; }
+  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 138px; }
+  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 345.2px; }
+  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 643.1px; }
 }
 
 /* ── LE FORMULAIRE DE /register : LE MÊME LEVIER, MESURÉ AVANT D'ÊTRE POSÉ ───

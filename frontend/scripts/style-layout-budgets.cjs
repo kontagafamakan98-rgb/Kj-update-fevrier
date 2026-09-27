@@ -269,7 +269,14 @@ const HAUTEUR = {
   // Desktop 4 808 → 4 868 (26/09/2026) : le titre du héros a été rendu concret
   // ("Trouvez un travailleur de confiance, payez en toute sécurité"), qui se
   // replie d'une ligne de plus en desktop ; le mobile ne bouge pas (7 187).
-  '/': { mobile: 7187, desktop: 4868 },
+  // 7 187 → 7 183 en mobile et 4 868 → 4 826 en desktop (28/09/2026) : refonte
+  // éditoriale de l'accueil. La baisse vient des `contain-intrinsic-size` de
+  // src/App.css, re-mesurés le même jour — les constantes d'avant étaient plus
+  // HAUTES que les sections qu'elles réservaient (§8 : 216 px pour 130), donc le
+  // document replié était plus haut que le document posé. Les deux valeurs
+  // ci-dessous sont celles du document avec le levier ACTIF, qui égale désormais
+  // celui du levier neutralisé — c'est la preuve que les constantes sont justes.
+  '/': { mobile: 7183, desktop: 4826 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
   '/about': { mobile: 1718, desktop: 1086 },

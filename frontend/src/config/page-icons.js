@@ -121,10 +121,20 @@ const ICONES = {
 
 /**
  * Les CLASSES des emplacements d'icône du corps de l'accueil, par rôle. Elles
- * remplacent le `text-3xl` / `text-2xl` / `text-5xl` qui dimensionnait l'emoji :
- * un SVG ne suit pas la taille de police, il lui faut une taille explicite, et
- * c'est ICI qu'elle a un propriétaire (les deux canaux la lisent, Tailwind la
- * voit). Le `currentColor` du trait suit la couleur de texte de l'emplacement.
+ * remplacent les trois PALIERS DE TAILLE DE POLICE qui dimensionnaient l'emoji :
+ * un SVG ne suit pas `font-size`, il lui faut une taille explicite, et c'est ICI
+ * qu'elle a un propriétaire (les deux canaux la lisent, Tailwind la voit). Le
+ * `currentColor` du trait suit la couleur de texte de l'emplacement.
+ *
+ * NOTE : ces paliers ne sont plus cités littéralement, et c'est un correctif du
+ * 28/09/2026. Tailwind lit AUSSI la prose de ses fichiers scannés : un nom
+ * d'utilitaire CITÉ dans un commentaire est GÉNÉRÉ dans la feuille servie, et
+ * s'il n'est posé nulle part, `check-css-selecteurs-morts.js` refuse le build
+ * (« règle servie sans porteur »). Ces citations-ci ne faisaient pas rougir le
+ * garde — le grand palier se retrouvait par SEGMENT dans un utilitaire
+ * responsive du titre du héros (`md:` + ce palier), que la refonte éditoriale a
+ * retiré : la dette dormait sous un autre nom, et elle s'est réveillée le jour
+ * où ce nom a disparu.
  */
 export const CLASSES_ICONE = {
   // Dans les pastilles rondes `h-14 w-14` des catégories (fond orange-50).
@@ -138,9 +148,9 @@ export const CLASSES_ICONE = {
   heros: 'h-5 w-5',
   // ── Les emplacements des quatre pages qui publiaient encore des emoji
   // (26/09/2026). Comme pour l'accueil, la classe REMPLACE la taille de police
-  // qui dimensionnait le caractère (`text-2xl`, `text-5xl`) : un SVG ne suit pas
-  // `font-size`, il lui faut une taille explicite, et elle est écrite ici UNE
-  // fois pour les deux canaux.
+  // qui dimensionnait le caractère : un SVG ne suit pas `font-size`, il lui faut
+  // une taille explicite, et elle est écrite ici UNE fois pour les deux canaux.
+  // (Les deux paliers concernés ne sont pas cités — voir la note ci-dessus.)
   // Les cartes de /about (l'ancien `text-2xl mb-3` d'un emoji).
   carte: 'h-6 w-6 text-orange-600',
   // La pastille du contrôle de carte de /contact (l'ancien `text-2xl`) : elle

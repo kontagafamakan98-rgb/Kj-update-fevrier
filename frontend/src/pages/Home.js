@@ -47,6 +47,16 @@ export default function Home() {
     subtitleKey: heroSubtitleKey,
     heroTitleClass,
     heroSubtitleClass,
+    // Le vocabulaire éditorial des huit sections : les MÊMES classes que la
+    // coquille (vite-plugins/prerender/shells-home.js) les lit dans le plan.
+    // Rien n'est recopié ici — c'est ce qui rend la bascule invisible.
+    heroKickerClass,
+    headClass,
+    sectionIntroClass,
+    cardClass,
+    cardLinkClass,
+    paperClass,
+    sandClass,
   } = PAGE_SECTIONS['/'];
 
   // La FAÇADE de la carte : le MÊME contrôle que /contact, lu dans la MÊME
@@ -87,7 +97,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-black bg-opacity-10"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-24">
           <div className="text-center">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs sm:text-sm font-medium text-white ring-1 ring-inset ring-white/25 mb-6">
+            <span className={`${heroKickerClass} mb-6`}>
               <IconePage nom="escrow" classe={CLASSES_ICONE.heros} />
               {t('escrowBannerTitle')}
             </span>
@@ -152,13 +162,13 @@ export default function Home() {
       </section>
 
       {/* Countries Coverage Section - Mobile First */}
-      <section className="py-12 md:py-16 bg-white">
+      <section className={`py-12 md:py-16 ${paperClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            <h2 className={`${headClass} mb-4`}>
               {t('availableIn4Countries')}
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className={`${sectionIntroClass} max-w-2xl mx-auto`}>
               {t('kojoConnectsDescription')}
             </p>
           </div>
@@ -170,13 +180,13 @@ export default function Home() {
                  qu'il ne rapporte. */
               <div
                 key={index}
-                className={`${country.color} rounded-2xl p-6 text-center shadow-md ring-1 ring-inset ring-black/5`}
+                className={`${country.color} ${cardClass} p-6 text-center`}
               >
                 <div className="flex justify-center mb-3">
                   <FlagIcon country={country.code} className="w-14 h-10 md:w-20 md:h-14" />
                 </div>
-                <h3 className="font-semibold text-gray-900 text-sm md:text-base">{country.name}</h3>
-                <p className="text-xs text-gray-600 mt-1">{t('servicesAvailable')}</p>
+                <h3 className="font-semibold text-stone-900 text-sm md:text-base">{country.name}</h3>
+                <p className="text-xs text-stone-600 mt-1">{t('servicesAvailable')}</p>
               </div>
             ))}
           </div>
@@ -184,13 +194,13 @@ export default function Home() {
       </section>
 
       {/* Categories Section - Mobile Optimized */}
-      <section className="py-12 md:py-16 bg-gray-50">
+      <section className={`py-12 md:py-16 ${sandClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            <h2 className={`${headClass} mb-4`}>
               {t('popularServices')}
             </h2>
-            <p className="text-gray-600">
+            <p className={sectionIntroClass}>
               {t('findServiceYouNeed')}
             </p>
           </div>
@@ -200,12 +210,12 @@ export default function Home() {
               <Link
                 key={category.labelKey}
                 to={`/jobs?category=${category.labelKey}`}
-                className="group bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 text-center transition hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                className={`group ${cardLinkClass} p-6 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500`}
               >
                 <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 transition group-hover:scale-110">
                   <IconePage nom={category.icone} classe={CLASSES_ICONE.categorie} />
                 </div>
-                <h3 className="font-medium text-gray-900 text-sm md:text-base">{t(category.labelKey)}</h3>
+                <h3 className="font-medium text-stone-900 text-sm md:text-base">{t(category.labelKey)}</h3>
               </Link>
             ))}
           </div>
@@ -213,19 +223,19 @@ export default function Home() {
       </section>
 
       {/* Features Section - Mobile First */}
-      <section className="py-12 md:py-16 bg-white">
+      <section className={`py-12 md:py-16 ${paperClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             {promises.map(({ icone, titleKey, descriptionKey }) => (
               <div
                 key={titleKey}
-                className="rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center shadow-sm transition hover:shadow-md hover:bg-white"
+                className={`${cardClass} p-6 text-center`}
               >
                 <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
                   <IconePage nom={icone} classe={CLASSES_ICONE.promesse} />
                 </div>
-                <h3 className="text-xl font-semibold mb-4 text-gray-900">{t(titleKey)}</h3>
-                <p className="text-gray-600">
+                <h3 className="text-xl font-semibold mb-4 text-stone-900">{t(titleKey)}</h3>
+                <p className="text-stone-600">
                   {t(descriptionKey)}
                 </p>
               </div>
@@ -235,11 +245,11 @@ export default function Home() {
       </section>
 
       {/* Comment ça marche - Mobile First */}
-      <section className="py-12 md:py-16 bg-gray-50">
+      <section className={`py-12 md:py-16 ${sandClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">{t('howItWorksTitle')}</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <h2 className={`${headClass} mb-4`}>{t('howItWorksTitle')}</h2>
+            <p className={`${sectionIntroClass} max-w-2xl mx-auto`}>
               {t('homeHowItWorksSubtitle')}
             </p>
           </div>
@@ -252,7 +262,7 @@ export default function Home() {
             {steps.map(({ icone, numberKey, titleKey, descriptionKey }) => (
               <div
                 key={titleKey}
-                className="relative bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 pt-8 text-center"
+                className={`relative ${cardClass} p-6 pt-8 text-center`}
               >
                 <span className="absolute -top-4 left-1/2 -translate-x-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white shadow-md">
                   {t(numberKey)}
@@ -260,8 +270,8 @@ export default function Home() {
                 <div className="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
                   <IconePage nom={icone} classe={CLASSES_ICONE.etape} />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-gray-900">{t(titleKey)}</h3>
-                <p className="text-gray-600 text-sm">
+                <h3 className="text-lg font-semibold mb-2 text-stone-900">{t(titleKey)}</h3>
+                <p className="text-stone-600 text-sm">
                   {t(descriptionKey)}
                 </p>
               </div>            ))}
@@ -270,13 +280,13 @@ export default function Home() {
       </section>
 
       {/* Escrow Trust - Mobile First */}
-      <section className="py-12 md:py-16 bg-white">
+      <section className={`py-12 md:py-16 ${paperClass}`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10 shadow-sm">
+          <div className={`${cardClass} border-emerald-200 bg-emerald-50 p-8 md:p-10`}>
             <div className="flex flex-col md:flex-row items-center gap-6">
               <div><IconePage nom={iconeSequestre} classe={CLASSES_ICONE.sequestre} /></div>
               <div className="text-center md:text-left">
-                <h2 className="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">{t('escrowTrustTitle')}</h2>
+                <h2 className={`${headClass} text-emerald-900 mb-3`}>{t('escrowTrustTitle')}</h2>
                 <p className="text-emerald-800">
                   {t('escrowTrustText')}
                 </p>
@@ -298,7 +308,7 @@ export default function Home() {
       {/* Call to Action - Mobile Optimized */}
       <section className="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-6">
+          <h2 className={`${headClass} text-white mb-6`}>
             {t('joinThousands')}
           </h2>
           <p className="text-lg md:text-xl mb-8 opacity-90">
@@ -327,13 +337,13 @@ export default function Home() {
       {/* Faits vérifiables (pays couverts, support) — plus AUCUN compteur
           inventé : ce que la coquille pré-rendue publie est exactement ce que
           la page affiche, et rien ici ne dépend d'un appel réseau. */}
-      <section className="py-12 md:py-16 bg-gray-50">
+      <section className={`py-12 md:py-16 ${sandClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">
+          <div className={`grid grid-cols-2 gap-6 md:gap-8 text-center ${cardClass} p-8`}>
             {STATS.map((stat) => (
               <div key={stat.labelKey}>
                 <div className="text-3xl md:text-4xl font-bold text-orange-600 mb-2">{stat.fallback}</div>
-                <div className="text-sm md:text-base text-gray-600">{t(stat.labelKey)}</div>
+                <div className="text-sm md:text-base text-stone-600">{t(stat.labelKey)}</div>
               </div>
             ))}
           </div>
@@ -345,11 +355,11 @@ export default function Home() {
           n'y trouvait pas de quoi comprendre qui édite le site. Le même bloc
           est rendu par la coquille statique (vite.config.js), avec les mêmes
           clés i18n : un crawler sans JavaScript le lit aussi. */}
-      <section className="py-12 md:py-16 bg-white">
+      <section className={`py-12 md:py-16 ${paperClass}`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">{t('homeAboutTitle')}</h2>
-          <p className="text-gray-600 mb-4">{t('homeAboutText1')}</p>
-          <p className="text-gray-600">{t('homeAboutText2')}</p>
+          <h2 className={`${headClass} mb-4`}>{t('homeAboutTitle')}</h2>
+          <p className={`${sectionIntroClass} mb-4`}>{t('homeAboutText1')}</p>
+          <p className={sectionIntroClass}>{t('homeAboutText2')}</p>
           <p className="mt-6 text-sm">
             <Link to="/about" className="text-orange-600 underline underline-offset-2">
               {t('aboutTitle')}
@@ -369,39 +379,39 @@ export default function Home() {
       {/* Contact (N.A.P. + liens cliquables + Google Maps) : section réelle,
           identique à la coquille statique de l'accueil pour le SEO local et
           l'accessibilité en un appui sur mobile. */}
-      <section className="py-12 md:py-16 bg-white border-t border-gray-100">
+      <section className={`py-12 md:py-16 ${paperClass} border-t border-stone-100`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">{t('contactTitle')}</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">{t('homeContactText')}</p>
+            <h2 className={`${headClass} mb-4`}>{t('contactTitle')}</h2>
+            <p className={`${sectionIntroClass} max-w-2xl mx-auto`}>{t('homeContactText')}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">
-            <a href={telHref} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
+            <a href={telHref} className="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">
                 <IconePage nom={ICONE_DE_CONTACT.contactCall} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
-                <div className="text-sm font-semibold text-gray-900">{t('homeContactCall')}</div>
-                <div className="text-xs text-gray-500">{CONTACT.phoneDisplay}</div>
+                <div className="text-sm font-semibold text-stone-900">{t('homeContactCall')}</div>
+                <div className="text-xs text-stone-500">{CONTACT.phoneDisplay}</div>
               </div>
             </a>
-            <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
+            <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                 <IconePage nom={ICONE_DE_CONTACT.contactWhatsapp} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
-                <div className="text-sm font-semibold text-gray-900">{t('contactWhatsapp')}</div>
-                <div className="text-xs text-gray-500">{CONTACT.phoneDisplay}</div>
+                <div className="text-sm font-semibold text-stone-900">{t('contactWhatsapp')}</div>
+                <div className="text-xs text-stone-500">{CONTACT.phoneDisplay}</div>
               </div>
             </a>
-            <a href={mailtoHref} className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">
+            <a href={mailtoHref} className="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
                 <IconePage nom={ICONE_DE_CONTACT.contactSendEmail} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
-                <div className="text-sm font-semibold text-gray-900">{t('contactSendEmail')}</div>
-                <div className="text-xs text-gray-500 break-all">{CONTACT.email}</div>
+                <div className="text-sm font-semibold text-stone-900">{t('contactSendEmail')}</div>
+                <div className="text-xs text-stone-500 break-all">{CONTACT.email}</div>
               </div>
             </a>
             <a
@@ -410,21 +420,21 @@ export default function Home() {
               rel="noreferrer"
               aria-label="Google Maps"
               title="Google Maps"
-              className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-600">
                 <IconePage nom={ICONE_DE_CONTACT.contactAddress} classe={CLASSES_ICONE.ligne} />
               </span>
               <div>
-                <div className="text-sm font-semibold text-gray-900">{t('contactAddress')}</div>
-                <div className="text-xs text-gray-500">{CONTACT.address}</div>
+                <div className="text-sm font-semibold text-stone-900">{t('contactAddress')}</div>
+                <div className="text-xs text-stone-500">{CONTACT.address}</div>
               </div>
             </a>
           </div>
 
           {SOCIAL_LINKS.length > 0 && (
-            <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('homeContactFollow')}</h3>
+            <div className={`mt-8 ${cardClass} bg-stone-50 p-6 text-center`}>
+              <h3 className="text-lg font-semibold text-stone-900 mb-3">{t('homeContactFollow')}</h3>
               <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-orange-700">
                 {SOCIAL_LINKS.map((social) => (
                   <a

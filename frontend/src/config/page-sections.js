@@ -32,9 +32,12 @@ import { CONTACT, mailtoHref, telHref } from './contact.js';
 // `exigerCorpsDeclare` dans vite.config.js).
 // Les deux formes de ligne du bloc de contact : une ligne cliquable (avec son
 // survol) et une ligne de simple information. Elles servent aux DEUX canaux.
+// Refonte éditoriale du 28/09/2026 : le gris froid cède la place au gris chaud
+// (la gamme `stone` de Tailwind), pour que le filet d'une ligne de contact
+// appartienne à la même famille que celui d'une carte.
 const LIGNE_LIEN =
-  'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors';
-const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3';
+  'flex items-center gap-3 rounded-xl border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors';
+const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-stone-200 px-4 py-3';
 
 // ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
 // Le titre du héros est l'élément LCP de « / », et la coquille pré-rendue le
@@ -49,9 +52,83 @@ const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-gray-200 px
 // retouche d'un côté faisait diverger la géométrie des deux peintures EN
 // SILENCE, et c'est exactement ce que le LCP ne pardonne pas. Elles ont
 // maintenant UN propriétaire, ici, que les deux canaux lisent.
-const HERO_TITRE_CLASSES =
-  'text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto';
-const HERO_SOUS_TITRE_CLASSES = 'text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto';
+//
+// Refonte éditoriale du 28/09/2026 : les trois paliers responsives écrits à la
+// main cèdent la place à UNE classe fluide (`.titre-heros`, src/index.css) —
+// les deux canaux la lisent donc par construction, et l'échelle n'a plus de
+// marche à chacune des deux bornes.
+//
+// NOTE POUR QUI ÉCRIT UN COMMENTAIRE ICI : ne citez jamais un utilitaire
+// Tailwind littéral (le nom exact, avec ses deux-points) dans cette prose.
+// Tailwind lit AUSSI les commentaires : un utilitaire cité est GÉNÉRÉ dans la
+// feuille servie, et s'il n'est posé nulle part, `check-css-selecteurs-morts.js`
+// refuse le build pour une règle sans porteur. C'est arrivé le 28/09/2026 avec
+// les trois paliers du titre du héros, cités ci-dessus avant d'être retirés.
+const HERO_TITRE_CLASSES = 'titre-heros mb-5 md:mb-7 max-w-4xl mx-auto';
+const HERO_SOUS_TITRE_CLASSES =
+  'text-lg md:text-xl lg:text-2xl mb-8 text-white/90 max-w-3xl mx-auto';
+
+// ── Le VOCABULAIRE ÉDITORIAL de l'accueil, déclaré une fois ──────────────────
+// Les huit sections de l'accueil recopiaient chacune sa propre soupe
+// d'utilitaires (taille, graisse, couleur et marge du titre, rayon, ombre et
+// anneau de la carte…) dans src/pages/Home.js ET dans
+// vite-plugins/prerender/shells-home.js. Changer le
+// dessin d'une section demandait donc deux retouches accordées à la main, et
+// rien ne rougissait quand elles divergeaient : la bascule coquille → React
+// déplaçait alors la moitié de la page.
+//
+// Ce que déclarent les quatre champs ci-dessous, et pourquoi ce ne sont PAS des
+// utilitaires : ce sont des classes de `src/index.css`, communes aux deux
+// canaux. Une section AJOUTÉE demain hérite du même rythme sans que personne
+// n'ait à recopier quoi que ce soit — et `exigerCorpsDeclare` (declared-body.js)
+// refuse un build dont la coquille ne publie pas ces chaînes, donc une
+// déclaration sans porteur CASSE le build au lieu de peindre une page muette.
+// ── RE-MESURE DU 28/09/2026, APRÈS LA REFONTE ÉDITORIALE ─────────────────────
+// Protocole : `cd frontend && npx playwright test e2e/lcp-geometrie.spec.js`,
+// onze routes pré-rendues × deux tailles, bundle d'entrée bloqué pour la
+// coquille et navigation réelle pour React. Ce que la passe a vérifié, et qui
+// est l'invariant que tout ce fichier tient : sur CHAQUE route et CHAQUE taille,
+// l'aire peinte est IDENTIQUE dans les deux canaux et UNE SEULE candidate est
+// horodatée au premier paint. C'est cette égalité qui empêche Chrome de ré-élire
+// une seconde peinture, plus tardive, déclenchée par le JavaScript.
+//
+// Ce que la refonte a DÉPLACÉ (et pourquoi c'est sans conséquence sur les
+// planchers de `e2e/lcp-geometrie-declaree.spec.js`, calés à ≈ 70 % de la plus
+// petite mesure connue) : le seul élément LCP dont la TYPOGRAPHIE a changé est
+// le titre du héros de l'accueil (37 400 px² en mobile, 110 500 en desktop :
+// il passe d'une échelle en paliers à `.titre-heros`), et l'en-tête de section
+// de /privacy a grandi (son élément élu reste le CORPS d'une section :
+// 91 140 px² en mobile, 103 896 en desktop).
+//
+// Les huit autres restent à moins de 4 % des valeurs écrites dans leurs
+// commentaires respectifs ci-dessous : ces éléments-là n'ont reçu qu'une
+// COULEUR (le gris froid devient `text-stone-*`), et une couleur ne change pas
+// l'aire d'une boîte ni l'encre d'une ligne. Les valeurs des commentaires sont
+// donc conservées TELLES QUELLES plutôt que réécrites d'un iota : elles datent
+// d'une session de mesure précise, et les reécrire avec les chiffres d'une
+// autre session ferait passer une variation d'hôte pour une variation de page.
+const ACCUEIL = {
+  // Le sur-titre du héros : il remplace la pastille `rounded-full` qui
+  // étiquetait la page comme un produit. Pas de sur-titre sur les sections,
+  // faute de texte : un chapeau demande une phrase, et la seule source de
+  // texte du site est `src/i18n/*.json` — dont la parité est tenue sur cinq
+  // langues par `i18nParity.test.js`. Inventer une clé ici publierait un
+  // libellé français au milieu de quatre autres langues.
+  heroKickerClass: 'sur-titre sur-titre-clair',
+  // Les deux fonds du rythme : `papier` pour les sections claires, `sable`
+  // pour celles qui alternent. Ils remplacent `bg-white` / `bg-gray-50`, dont
+  // le gris froid jurait avec l'encre chaude du texte.
+  paperClass: 'fond-papier',
+  sandClass: 'fond-sable',
+  // Le titre de section, et le paragraphe qui le suit.
+  headClass: 'titre-section',
+  introClass: 'text-stone-600',
+  // La carte : un filet de 1 px au lieu d'une ombre large, et un rayon de 8 px
+  // au lieu de 16. `-cliquable` n'est portée que par les cartes qui MÈNENT
+  // quelque part (une carte informative n'a rien à promettre au survol).
+  cardClass: 'carte-editoriale',
+  cardLinkClass: 'carte-editoriale carte-editoriale-cliquable',
+};
 
 export const PAGE_SECTIONS = {
   // L'accueil : le corps du shell (trois promesses, trois étapes, catégories)
@@ -71,6 +148,14 @@ export const PAGE_SECTIONS = {
     subtitleKey: 'heroSubtitle',
     heroTitleClass: HERO_TITRE_CLASSES,
     heroSubtitleClass: HERO_SOUS_TITRE_CLASSES,
+    // Le vocabulaire éditorial des huit sections (voir ACCUEIL plus haut).
+    heroKickerClass: ACCUEIL.heroKickerClass,
+    headClass: ACCUEIL.headClass,
+    sectionIntroClass: ACCUEIL.introClass,
+    cardClass: ACCUEIL.cardClass,
+    cardLinkClass: ACCUEIL.cardLinkClass,
+    paperClass: ACCUEIL.paperClass,
+    sandClass: ACCUEIL.sandClass,
     categories: [
       // `labelKey` est AUSSI le code de catégorie canonique du backend : le
       // libellé affiché et le filtre de /jobs sortent donc de la même valeur.
@@ -176,8 +261,8 @@ export const PAGE_SECTIONS = {
     // prendre le LCP. Les trois étaient recopiées dans src/pages/HowItWorks.js
     // et vite-plugins/prerender/shells-routes.js.
     heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
-    heroTitleClass: 'text-3xl md:text-4xl font-bold mb-4',
-    heroSubtitleClass: 'text-lg opacity-90 max-w-2xl mx-auto',
+    heroTitleClass: 'titre-page mb-4',
+    heroSubtitleClass: 'text-lg text-stone-600 max-w-2xl mx-auto',
     escrowTitleKey: 'escrowWhatTitle',
     escrowTextKey: 'escrowWhatText',
     faqTitleKey: 'faqTitle',
@@ -249,8 +334,8 @@ export const PAGE_SECTIONS = {
     // Côté React la réserve est inerte (la page dépasse déjà la viewport aux
     // deux tailles mesurées), donc aucune peinture ne bouge.
     frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen',
-    titleClass: 'text-3xl font-bold text-gray-900',
-    introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-gray-600 min-h-[104px] md:min-h-[52px]',
+    titleClass: 'titre-page',
+    introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-stone-600 min-h-[104px] md:min-h-[52px]',
   },
 
   '/login': {
@@ -285,7 +370,7 @@ export const PAGE_SECTIONS = {
     // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
     // faisait diverger les deux peintures en silence, et une seconde peinture
     // PLUS GRANDE devient un nouvel élément LCP.
-    legalContactClass: 'text-xs text-gray-600',
+    legalContactClass: 'text-xs text-stone-600',
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
     // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
     // comme valeur interdite pour les coquilles, cf. check-prerender-shells).
@@ -313,7 +398,7 @@ export const PAGE_SECTIONS = {
     // au SVG, puis 9 548 / 12 338 le 26/09/2026 avec la police servie par le
     // site — UNE candidate au premier paint) — déclarée ici pour que les deux
     // canaux la lisent (voir /login).
-    stepNoticeClass: 'text-xs text-blue-700 mt-3',
+    stepNoticeClass: 'text-xs text-amber-800 mt-3',
     stepNoticeIcon: 'stepNotice',
     clientIcon: 'client',
     // Le marteau du travailleur est le wrench déjà dessiné pour la catégorie
@@ -383,7 +468,7 @@ export const PAGE_SECTIONS = {
     subtitleKey: 'forgotPasswordSubtitle',
     // Le sous-titre est l'élément LCP de la page (mesuré : 14 001 px² mobile /
     // 16 458 desktop, UNE candidate au premier paint) — voir /login.
-    subtitleClass: 'mt-3 text-sm text-gray-600',
+    subtitleClass: 'mt-3 text-sm text-stone-600',
     stepEmailKey: 'forgotPasswordStepEmail',
     stepCodeKey: 'forgotPasswordStepCode',
     stepPasswordKey: 'forgotPasswordStepPassword',
@@ -425,7 +510,7 @@ export const PAGE_SECTIONS = {
     // est courte (`text-gray-600`) mais elle n'apparaît plus ailleurs dans
     // Support.js ni dans le corps de sa coquille : elle a bien un propriétaire
     // unique.
-    subtitleClass: 'text-gray-600',
+    subtitleClass: 'text-stone-600',
     // La carte de contact publie le titre du mode « contact direct » — même
     // texte, donc même clé (elle était écrite deux fois dans le dictionnaire).
     directCard: {
@@ -489,7 +574,7 @@ export const PAGE_SECTIONS = {
       {
         icone: 'contactAddress',
         labelKey: 'contactAddress',
-        badgeClass: 'bg-gray-100 text-gray-600',
+        badgeClass: 'bg-stone-100 text-stone-600',
         value: CONTACT.address,
         rowClass: LIGNE_INFO,
       },
@@ -518,8 +603,8 @@ export const PAGE_SECTIONS = {
     // (donc le retour à la ligne du paragraphe), `introClass` sa hauteur, et
     // `titleClass` le seul autre texte qui puisse prendre le LCP.
     frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
-    introClass: 'text-gray-600 mb-8',
+    titleClass: 'titre-page mb-4',
+    introClass: 'text-stone-600 mb-8',
     // Les trois promesses publiaient l'emoji de leur clé (`iconPromise*`) ;
     // l'accueil, lui, DESSINE déjà ces trois mêmes icônes (`icone:
     // 'promise*'`). Elles sont maintenant déclarées de la même façon ici, donc
@@ -582,9 +667,9 @@ export const PAGE_SECTIONS = {
     // texte capable de prendre le LCP au paragraphe (l'aire du titre grandit
     // avec lui), et `noteClass` le suit dans le flux.
     frameClass: 'max-w-2xl mx-auto px-4 py-8',
-    titleClass: 'text-3xl font-bold text-gray-900 mb-2',
-    introClass: 'text-gray-600 mb-3',
-    noteClass: 'text-sm text-gray-500 mb-6',
+    titleClass: 'titre-page mb-2',
+    introClass: 'text-stone-600 mb-3',
+    noteClass: 'text-sm text-stone-500 mb-6',
     // ── La carte Google : un contrôle, pas un embed au premier écran ───────
     // La coquille publiait l'iframe elle-même (en `loading="lazy"`). Mesuré
     // (Lighthouse 12.6.1, pile de la CI, Chrome 152, /contact mobile, 3 runs) :
@@ -604,7 +689,7 @@ export const PAGE_SECTIONS = {
     // le résolvent par le registre, pas par le dictionnaire.
     icone: 'contactAddress',
     mapFrameClass:
-      'mt-6 w-full rounded-xl border border-gray-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
+      'mt-6 w-full rounded-xl border border-stone-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
     mapControlClass:
       'inline-flex items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700',
     // Une ligne de contact = une donnée (icône, libellé, destination, valeur
@@ -650,7 +735,7 @@ export const PAGE_SECTIONS = {
       {
         icone: 'contactAddress',
         labelKey: 'contactAddress',
-        badgeClass: 'bg-gray-100 text-gray-600',
+        badgeClass: 'bg-stone-100 text-stone-600',
         href: CONTACT.mapsUrl,
         value: CONTACT.address,
         external: true,
@@ -682,10 +767,10 @@ export const PAGE_SECTIONS = {
     // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
     // faisait diverger les deux peintures en silence.
     frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
-    introClass: 'text-gray-600 mb-8',
-    sectionTitleClass: 'text-xl font-semibold text-gray-900 mb-2',
-    sectionBodyClass: 'text-gray-600',
+    titleClass: 'titre-page mb-4',
+    introClass: 'text-stone-600 mb-8',
+    sectionTitleClass: 'text-xl font-semibold text-stone-900 mb-2',
+    sectionBodyClass: 'text-stone-600',
     sections: [
       { titleKey: 'privacyDataTitle', bodyKey: 'privacyDataBody' },
       { titleKey: 'privacyRetentionTitle', bodyKey: 'privacyRetentionBody' },
@@ -710,10 +795,10 @@ export const PAGE_SECTIONS = {
     // Même géométrie que /privacy : le plus grand texte peint est le CORPS
     // d'une section, c'est `sectionBodyClass` qui porte l'élément LCP.
     frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
-    introClass: 'text-gray-600 mb-8',
-    sectionTitleClass: 'text-xl font-semibold text-gray-900 mb-2',
-    sectionBodyClass: 'text-gray-600',
+    titleClass: 'titre-page mb-4',
+    introClass: 'text-stone-600 mb-8',
+    sectionTitleClass: 'text-xl font-semibold text-stone-900 mb-2',
+    sectionBodyClass: 'text-stone-600',
     sections: [
       { titleKey: 'termsServiceTitle', bodyKey: 'termsServiceBody' },
       { titleKey: 'termsAccountTitle', bodyKey: 'termsAccountBody' },

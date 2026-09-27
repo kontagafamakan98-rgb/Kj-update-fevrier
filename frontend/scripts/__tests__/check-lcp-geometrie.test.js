@@ -90,8 +90,12 @@ export const ROUTES_LCP = [
       // `min-h-screen` (27/09/2026) : réserve la viewport dans la coquille
       // /jobs, sinon son pied de page tombait au bas de l'écran (0,0862).
       'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen',
-      'text-3xl font-bold text-gray-900',
-      'mb-6 max-w-3xl text-base leading-relaxed text-gray-600 min-h-[104px] md:min-h-[52px]',
+      // Refonte éditoriale du 28/09/2026 : l'échelle de titres passe au
+      // vocabulaire déclaré (`.titre-page`, src/index.css) et le corps au gris
+      // chaud. Les bornes `min-h` de l'intro sont INCHANGÉES : elles réservent
+      // la hauteur du squelette de Suspense (antiClsSkeletons.test.jsx).
+      'titre-page',
+      'mb-6 max-w-3xl text-base leading-relaxed text-stone-600 min-h-[104px] md:min-h-[52px]',
     ],
   },
   {
@@ -107,8 +111,8 @@ export const ROUTES_LCP = [
     ],
     classes: [
       'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-      'text-3xl font-bold text-gray-900 mb-4',
-      'text-gray-600 mb-8',
+      'titre-page mb-4',
+      'text-stone-600 mb-8',
     ],
   },
   {
@@ -126,10 +130,10 @@ export const ROUTES_LCP = [
     ],
     classes: [
       'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-      'text-3xl font-bold text-gray-900 mb-4',
-      'text-gray-600 mb-8',
-      'text-xl font-semibold text-gray-900 mb-2',
-      'text-gray-600',
+      'titre-page mb-4',
+      'text-stone-600 mb-8',
+      'text-xl font-semibold text-stone-900 mb-2',
+      'text-stone-600',
     ],
   },
   {
@@ -145,8 +149,8 @@ export const ROUTES_LCP = [
     ],
     classes: [
       'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
-      'text-3xl md:text-4xl font-bold mb-4',
-      'text-lg opacity-90 max-w-2xl mx-auto',
+      'titre-page mb-4',
+      'text-lg text-stone-600 max-w-2xl mx-auto',
     ],
   },
   // ── Les quatre routes de la seconde passe (26/09/2026) ───────────────────
@@ -167,7 +171,7 @@ export const ROUTES_LCP = [
         coquille: 'class="${loginPlan.legalContactClass}"',
       },
     ],
-    classes: ['text-xs text-gray-600'],
+    classes: ['text-xs text-stone-600'],
   },
   {
     route: '/register',
@@ -182,7 +186,7 @@ export const ROUTES_LCP = [
         coquille: 'class="${registerPlan.stepNoticeClass}"',
       },
     ],
-    classes: ['text-xs text-blue-700 mt-3'],
+    classes: ['text-xs text-amber-800 mt-3'],
   },
   {
     route: '/forgot-password',
@@ -197,7 +201,7 @@ export const ROUTES_LCP = [
         coquille: 'class="${forgotPasswordPlan.subtitleClass}"',
       },
     ],
-    classes: ['mt-3 text-sm text-gray-600'],
+    classes: ['mt-3 text-sm text-stone-600'],
   },
   {
     route: '/support',
@@ -212,7 +216,11 @@ export const ROUTES_LCP = [
         coquille: 'class="${supportPlan.subtitleClass}"',
       },
     ],
-    classes: ['text-gray-600'],
+    // `text-stone-600` tout court ne suffirait PAS : cette chaîne vit aussi
+    // dans les `badgeClass` de /support et /contact, donc une recherche nue
+    // passerait même si le sous-titre changeait de dessin. La borne est le
+    // couple « couleur + rôle » : c'est le sous-titre qui porte le corps chaud.
+    classes: ['text-stone-600'],
   },
 ];
 

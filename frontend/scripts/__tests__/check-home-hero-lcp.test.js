@@ -44,9 +44,15 @@ const AMORCAGE = 'src/index.js';
 
 // Les DEUX chaînes de classes de géométrie du héros : elles ne doivent exister
 // QUE dans la déclaration (le plan), jamais recopiées dans un canal.
+//
+// Mises à jour le 28/09/2026 avec la refonte éditoriale : ce sont les VALEURS
+// MESURÉES d'aujourd'hui. Les laisser sur les anciennes chaînes rendait le
+// second verdict VIDE — il refuse de retrouver ces chaînes dans un canal, et
+// elles n'existaient plus nulle part, donc il ne pouvait plus rien refuser.
+// Un garde qu'on ne peut plus faire mordre est un garde qu'on croit vert.
 const CLASSES_DU_HEROS = [
-  'text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto',
-  'text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto',
+  'titre-heros mb-5 md:mb-7 max-w-4xl mx-auto',
+  'text-lg md:text-xl lg:text-2xl mb-8 text-white/90 max-w-3xl mx-auto',
 ];
 
 /**

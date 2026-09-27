@@ -41,12 +41,30 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // ne rougisse. Même classes d'un côté et de l'autre : mesuré, un
   // remplacement de même taille ne ré-élit pas d'élément LCP (la peinture de la
   // coquille reste celle du navigateur), un remplacement plus grand si.
-  const { titleKey, subtitleKey, heroTitleClass, heroSubtitleClass } = homePlan
+  // Le vocabulaire éditorial des sections sort du MÊME plan : les classes du
+  // dessin (`headClass`, `cardClass`…) n'ont donc pas de porteur recopié ici,
+  // et une retouche de la page ne peut pas laisser la coquille derrière elle.
+  const {
+    titleKey, subtitleKey, heroTitleClass, heroSubtitleClass,
+    heroKickerClass, headClass, sectionIntroClass, cardClass, cardLinkClass, paperClass,
+    sandClass,
+  } = homePlan
+  const champsEditoriaux = {
+    heroKickerClass, headClass, sectionIntroClass, cardClass, cardLinkClass, paperClass, sandClass,
+  }
   if (!titleKey || !subtitleKey || !heroTitleClass || !heroSubtitleClass) {
     throw new Error(
       "prerender-shells : / ne déclare plus son héros (titleKey, subtitleKey, heroTitleClass, " +
         "heroSubtitleClass dans src/config/page-sections.js) — la coquille de l'accueil ne peut pas " +
         "le publier, et l'élément LCP de « / » repasserait au JavaScript."
+    )
+  }
+  const champEditorialManquant = Object.keys(champsEditoriaux).find((nom) => !champsEditoriaux[nom])
+  if (champEditorialManquant) {
+    throw new Error(
+      `prerender-shells : / ne déclare plus « ${champEditorialManquant} » (src/config/page-sections.js) — ` +
+        "la coquille de l'accueil publierait un `undefined` littéral à la place d'une classe, et " +
+        "les deux peintures divergeraient au montage de React."
     )
   }
 
@@ -102,7 +120,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white relative overflow-hidden">`,
     `<div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-24">`,
     `<div class="text-center">`,
-    `<span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs sm:text-sm font-medium text-white ring-1 ring-inset ring-white/25 mb-6">`,
+    `<span class="${heroKickerClass} mb-6">`,
     svgDeLIcone('escrow', CLASSES_ICONE.heros),
     `${esc(T('escrowBannerTitle'))}`,
     `</span>`,
@@ -123,11 +141,11 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
 
     // Pays couverts
-    `<section class="py-12 md:py-16 bg-white">`,
+    `<section class="py-12 md:py-16 ${paperClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('availableIn4Countries'))}</h2>`,
-    `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('kojoConnectsDescription'))}</p>`,
+    `<h2 class="${headClass} mb-4">${esc(T('availableIn4Countries'))}</h2>`,
+    `<p class="${sectionIntroClass} max-w-2xl mx-auto">${esc(T('kojoConnectsDescription'))}</p>`,
     `</div>`,
     `<div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">`,
     ...COUNTRIES.map((country) => {
@@ -145,12 +163,12 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         )
       }
       return (
-        `<div class="${country.color} rounded-2xl p-6 text-center shadow-md ring-1 ring-inset ring-black/5">` +
+        `<div class="${country.color} ${cardClass} p-6 text-center">` +
         `<div class="flex justify-center mb-3">` +
         svgDuDrapeau(drapeau, 'w-14 h-10 md:w-20 md:h-14 rounded shadow-sm') +
         `</div>` +
-        `<h3 class="font-semibold text-gray-900 text-sm md:text-base">${esc(country.name)}</h3>` +
-        `<p class="text-xs text-gray-600 mt-1">${esc(T('servicesAvailable'))}</p>` +
+        `<h3 class="font-semibold text-stone-900 text-sm md:text-base">${esc(country.name)}</h3>` +
+        `<p class="text-xs text-stone-600 mt-1">${esc(T('servicesAvailable'))}</p>` +
         `</div>`
       )
     }),
@@ -159,18 +177,18 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
 
     // Catégories (liens INTERNES réels, avec le filtre de la liste)
-    `<section class="py-12 md:py-16 bg-gray-50">`,
+    `<section class="py-12 md:py-16 ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('popularServices'))}</h2>`,
-    `<p class="text-gray-600">${esc(T('findServiceYouNeed'))}</p>`,
+    `<h2 class="${headClass} mb-4">${esc(T('popularServices'))}</h2>`,
+    `<p class="${sectionIntroClass}">${esc(T('findServiceYouNeed'))}</p>`,
     `</div>`,
     `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">`,
     ...homePlan.categories.map(
       (category) =>
-        `<a href="/jobs?category=${category.labelKey}" class="group bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 text-center transition hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">` +
+        `<a href="/jobs?category=${category.labelKey}" class="group ${cardLinkClass} p-6 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">` +
         `<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 transition group-hover:scale-110">${svgDeLIcone(category.icone, CLASSES_ICONE.categorie)}</div>` +
-        `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.labelKey))}</h3>` +
+        `<h3 class="font-medium text-stone-900 text-sm md:text-base">${esc(T(category.labelKey))}</h3>` +
         `</a>`
     ),
     `</div>`,
@@ -178,15 +196,15 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
 
     // Trois promesses
-    `<section class="py-12 md:py-16 bg-white">`,
+    `<section class="py-12 md:py-16 ${paperClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.promises.map(
       ({ icone, titleKey, descriptionKey: textKey }) =>
-        `<div class="rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center shadow-sm transition hover:shadow-md hover:bg-white">` +
+        `<div class="${cardClass} p-6 text-center">` +
         `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">${svgDeLIcone(icone, CLASSES_ICONE.promesse)}</div>` +
-        `<h3 class="text-xl font-semibold mb-4 text-gray-900">${esc(T(titleKey))}</h3>` +
-        `<p class="text-gray-600">${esc(T(textKey))}</p>` +
+        `<h3 class="text-xl font-semibold mb-4 text-stone-900">${esc(T(titleKey))}</h3>` +
+        `<p class="text-stone-600">${esc(T(textKey))}</p>` +
         `</div>`
     ),
     `</div>`,
@@ -194,20 +212,20 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
 
     // Comment ça marche
-    `<section class="py-12 md:py-16 bg-gray-50">`,
+    `<section class="py-12 md:py-16 ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('howItWorksTitle'))}</h2>`,
-    `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeHowItWorksSubtitle'))}</p>`,
+    `<h2 class="${headClass} mb-4">${esc(T('howItWorksTitle'))}</h2>`,
+    `<p class="${sectionIntroClass} max-w-2xl mx-auto">${esc(T('homeHowItWorksSubtitle'))}</p>`,
     `</div>`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.steps.map(
       ({ icone, numberKey, titleKey, descriptionKey: textKey }) =>
-        `<div class="relative bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 pt-8 text-center">` +
+        `<div class="relative ${cardClass} p-6 pt-8 text-center">` +
         `<span class="absolute -top-4 left-1/2 -translate-x-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white shadow-md">${esc(T(numberKey))}</span>` +
         `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">${svgDeLIcone(icone, CLASSES_ICONE.etape)}</div>` +
-        `<h3 class="text-lg font-semibold mb-2 text-gray-900">${esc(T(titleKey))}</h3>` +
-        `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
+        `<h3 class="text-lg font-semibold mb-2 text-stone-900">${esc(T(titleKey))}</h3>` +
+        `<p class="text-stone-600 text-sm">${esc(T(textKey))}</p>` +
         `</div>`
     ),
     `</div>`,
@@ -215,13 +233,13 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
 
     // Séquestre (confiance)
-    `<section class="py-12 md:py-16 bg-white">`,
+    `<section class="py-12 md:py-16 ${paperClass}">`,
     `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10 shadow-sm">`,
+    `<div class="${cardClass} border-emerald-200 bg-emerald-50 p-8 md:p-10">`,
     `<div class="flex flex-col md:flex-row items-center gap-6">`,
     `<div>${svgDeLIcone(homePlan.icone, CLASSES_ICONE.sequestre)}</div>`,
     `<div class="text-center md:text-left">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`,
+    `<h2 class="${headClass} text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`,
     `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`,
     `<p class="text-emerald-700 mt-3 text-sm">${esc(T('escrowTrustBullets'))}</p>`,
     `<a href="/how-it-works" class="mt-4 inline-block rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">${esc(T('learnMore'))}</a>`,
@@ -234,7 +252,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // Appel à l'action
     `<section class="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">`,
     `<div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">`,
-    `<h2 class="text-2xl md:text-3xl lg:text-4xl font-bold mb-6">${esc(T('joinThousands'))}</h2>`,
+    `<h2 class="${headClass} text-white mb-6">${esc(T('joinThousands'))}</h2>`,
     `<p class="text-lg md:text-xl mb-8 opacity-90">${esc(T('startConnectingToday'))}</p>`,
     `<div class="flex flex-col sm:flex-row gap-4 justify-center">`,
     `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-semibold shadow-xl transform transition hover:-translate-y-0.5">${esc(T('lookingForServices'))}</a>`,
@@ -246,14 +264,14 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // Faits vérifiables (pays couverts, support) : la MÊME déclaration
     // (homePlan.stats) est lue par Home.js et par cette coquille — une seule
     // liste, deux rendus, et aucun compteur inventé (cf. page-sections.js).
-    `<section class="py-12 md:py-16 bg-gray-50">`,
+    `<section class="py-12 md:py-16 ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="grid grid-cols-2 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">`,
+    `<div class="grid grid-cols-2 gap-6 md:gap-8 text-center ${cardClass} p-8">`,
     ...homePlan.stats.map(
       ({ labelKey, shellText }) =>
         `<div>` +
         `<div class="text-3xl md:text-4xl font-bold text-orange-600 mb-2">${esc(shellText)}</div>` +
-        `<div class="text-sm md:text-base text-gray-600">${esc(T(labelKey))}</div>` +
+        `<div class="text-sm md:text-base text-stone-600">${esc(T(labelKey))}</div>` +
         `</div>`
     ),
     `</div>`,
@@ -265,11 +283,11 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // trouvait pas de quoi comprendre QUI édite le site. Mêmes clés i18n
     // et mêmes classes que la section équivalente de src/pages/Home.js :
     // le crawler sans JavaScript et le navigateur lisent un seul texte.
-    `<section class="py-12 md:py-16 bg-white">`,
+    `<section class="py-12 md:py-16 ${paperClass}">`,
     `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('homeAboutTitle'))}</h2>`,
-    `<p class="text-gray-600 mb-4">${esc(T('homeAboutText1'))}</p>`,
-    `<p class="text-gray-600">${esc(T('homeAboutText2'))}</p>`,
+    `<h2 class="${headClass} mb-4">${esc(T('homeAboutTitle'))}</h2>`,
+    `<p class="${sectionIntroClass} mb-4">${esc(T('homeAboutText1'))}</p>`,
+    `<p class="${sectionIntroClass}">${esc(T('homeAboutText2'))}</p>`,
     `<p class="mt-6 text-sm">`,
     `<a href="/about" class="text-orange-600 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`,
     ` · `,
@@ -292,28 +310,28 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // y=5948,69 côté coquille contre 5949,69 côté React, puis les 60 textes
     // suivants au même écart). Une classe d'un seul token suffisait à décaler
     // la moitié basse de la page.
-    `<section class="py-12 md:py-16 bg-white border-t border-gray-100">`,
+    `<section class="py-12 md:py-16 ${paperClass} border-t border-stone-100">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('contactTitle'))}</h2>`,
-    `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeContactText'))}</p>`,
+    `<h2 class="${headClass} mb-4">${esc(T('contactTitle'))}</h2>`,
+    `<p class="${sectionIntroClass} max-w-2xl mx-auto">${esc(T('homeContactText'))}</p>`,
     `</div>`,
     `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">`,
-    `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+    `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">${glypheDeContact('contactCall')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('homeContactCall'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('homeContactCall'))}</div><div class="text-xs text-stone-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
-    `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+    `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">${glypheDeContact('contactWhatsapp')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactWhatsapp'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactWhatsapp'))}</div><div class="text-xs text-stone-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
-    `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+    `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">${glypheDeContact('contactSendEmail')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-stone-500 break-all">${esc(contact.email)}</div></div>`,
     `</a>`,
-    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">${glypheDeContact('contactAddress')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactAddress'))}</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
+    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors">`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-600">${glypheDeContact('contactAddress')}</span>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactAddress'))}</div><div class="text-xs text-stone-500">${esc(contact.address)}</div></div>`,
     `</a>`,
     `</div>`,
     // Bloc social : les MÊMES profils que le footer React et que le
@@ -325,8 +343,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // JavaScript n'a pas d'autre moyen de voir ces liens.
     ...(socialLinks.length
       ? [
-          `<div class="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">`,
-          `<h3 class="text-lg font-semibold text-gray-900 mb-3">${esc(T('homeContactFollow'))}</h3>`,
+          `<div class="mt-8 ${cardClass} bg-stone-50 p-6 text-center">`,
+          `<h3 class="text-lg font-semibold text-stone-900 mb-3">${esc(T('homeContactFollow'))}</h3>`,
           `<div class="flex flex-wrap items-center justify-center gap-4 text-sm text-orange-700">`,
           ...socialLinks.map(
             (social) =>

@@ -163,7 +163,11 @@ const pages = () => ({
     TETE_SHELL +
     ogTagFor('jobs.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
-    '<h1 class="text-3xl font-bold text-gray-900">Emplois disponibles</h1>' +
+    // La classe du h1 vient du plan (`/jobs.titleClass`, src/config/page-sections.js),
+    // que le garde lit désormais : la refonte éditoriale du 28/09/2026 l'a
+    // passée à `.titre-page`, et recopier l'ancienne valeur ici faisait rougir
+    // la fixture conforme.
+    '<h1 class="titre-page">Emplois disponibles</h1>' +
     '</div></body></html>',
   'login.html':
     TETE_SHELL +
@@ -207,7 +211,7 @@ const pages = () => ({
     `<link rel="canonical" href="${SITE_ORIGIN}/how-it-works" />` +
     ogTagFor('how-it-works.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
-    '<h1 class="text-3xl md:text-4xl font-bold mb-4">Comment ça marche ?</h1>' +
+    '<h1 class="titre-page mb-4">Comment ça marche ?</h1>' +
     '<details><summary>FAQ</summary>Réponse</details>' +
     '<a href="/jobs">Missions</a><a href="/support">Support</a>' +
     '</div>' +

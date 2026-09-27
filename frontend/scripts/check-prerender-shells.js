@@ -82,6 +82,11 @@ import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../src/config/phone-f
 import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
 import { photoFormatsLine } from '../src/config/photo-formats.js';
 import { CONTACT } from '../src/config/contact.js';
+// La géométrie des titres n'est PAS recopiée ici : elle est lue dans le plan que
+// lit déjà la coquille (src/config/page-sections.js). Une refonte des titres
+// faisait autrement rougir ce garde en accusant la coquille — c'est ce qui est
+// arrivé le 28/09/2026, où il a fallu le mettre à jour à la main.
+import { PAGE_SECTIONS } from '../src/config/page-sections.js';
 // Table UNIQUE de la correspondance route → carte OG, partagée avec
 // vite.config.js qui écrit ces coquilles : la carte de chaque shell est LUE
 // ici et non recopiée (voir la section « og:image » plus bas).
@@ -240,7 +245,7 @@ if (app) {
 // 2. jobs.html : shell h1 statique + og:image dédié.
 const jobs = read('jobs.html');
 if (jobs) {
-  if (!jobs.includes(`<h1 class="text-3xl font-bold text-gray-900">${jobsT('availableJobs')}</h1>`)) {
+  if (!jobs.includes(`<h1 class="${PAGE_SECTIONS['/jobs'].titleClass}">${jobsT('availableJobs')}</h1>`)) {
     errors.push('jobs.html : shell h1 « Emplois disponibles » ABSENT de #root');
   }
   if (!jobs.includes(NAV_PLACEHOLDER)) {
@@ -418,7 +423,7 @@ if (payment) {
 // pour un crawler sans JavaScript.
 const howItWorks = read('how-it-works.html');
 if (howItWorks) {
-  if (!howItWorks.includes(`<h1 class="text-3xl md:text-4xl font-bold mb-4">${fr.howItWorksTitle}</h1>`)) {
+  if (!howItWorks.includes(`<h1 class="${PAGE_SECTIONS['/how-it-works'].heroTitleClass}">${fr.howItWorksTitle}</h1>`)) {
     errors.push('how-it-works.html : h1 « Comment ça marche ? » absent du shell');
   }
   if (!howItWorks.includes('<details')) {
