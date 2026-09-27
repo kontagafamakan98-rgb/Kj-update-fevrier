@@ -3,11 +3,19 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Le TITRE DU HÉROS de l'accueil est l'élément LCP de « / ».
+// Le HÉROS de l'accueil porte l'élément LCP de « / » : son TITRE jusqu'au
+// 27/09/2026, son ILLUSTRATION depuis la refonte éditoriale de ce jour-là
+// (mesuré, les deux canaux : 62 700 px² en mobile et 139 733 en desktop pour
+// l'image, contre 33 220 et 90 454 pour le titre — une seule candidate, au
+// premier paint). Les deux invariants ci-dessous gardent donc leur raison
+// d'être : c'est la GÉOMÉTRIE de la boîte reconstruite par React qui décide si
+// Chrome ré-élit une seconde peinture plus tardive, et elle vaut pour le titre
+// comme pour l'image.
 //
 // Deux invariants le protègent, et un défaut mesuré justifie chacun d'eux :
 //
-//  1. UN PROPRIÉTAIRE POUR LES DEUX PEINTURES. La coquille pré-rendue peint le
+//  1. UN PROPRIÉTAIRE POUR LES DEUX PEINTURES (du titre ; l'illustration, elle,
+//     n'a qu'un propriétaire par construction — un fichier de `public/assets/`). La coquille pré-rendue peint le
 //     titre avant le JavaScript, puis React reconstruit le même. Les chaînes de
 //     classes étaient recopiées face à face (src/pages/Home.js et
 //     vite-plugins/prerender/shells-home.js) : retoucher l'une faisait diverger

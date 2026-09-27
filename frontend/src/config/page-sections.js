@@ -40,7 +40,19 @@ const LIGNE_LIEN =
 const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-stone-200 px-4 py-3';
 
 // ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
-// Le titre du héros est l'élément LCP de « / », et la coquille pré-rendue le
+// L'ÉLÉMENT LCP DE « / » A CHANGÉ DE NATURE LE 27/09/2026, et c'est mesuré : la
+// refonte éditoriale a donné au héros une ILLUSTRATION (`/assets/kojo-hero.svg`,
+// 960 × 720) dont l'aire peinte dépasse celle du titre — **62 700 px² en mobile
+// et 139 733 en desktop** contre 33 220 et 90 454 pour le `<h1>`, dans les DEUX
+// canaux, une seule candidate, horodatée au premier paint (`e2e/
+// lcp-geometrie.spec.js`, 40/40 ; le CLS de « / » reste 0,0000). Le LCP n'est
+// donc plus un texte mais une image : l'invariant que la parité coquille/React
+// doit tenir est le MÊME qu'avant — une seule candidate, la même aire des deux
+// côtés, au premier paint — et il tient. Ce qui suit garde sa raison d'être
+// pour le TITRE, qui reste le plus grand bloc de TEXTE de la page et dont la
+// géométrie sert d'ancre :
+//
+// Le titre du héros est (avec l'illustration) l'élément LCP de « / », et la coquille pré-rendue le
 // peint — mais createRoot() efface #root au montage : React reconstruit le même
 // titre. Mesuré (Chrome 152, sonde LCP + trace) : un remplacement de MÊME
 // TAILLE n'ajoute aucun entry LCP — la peinture de la coquille reste celle que
@@ -64,9 +76,92 @@ const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-stone-200 p
 // feuille servie, et s'il n'est posé nulle part, `check-css-selecteurs-morts.js`
 // refuse le build pour une règle sans porteur. C'est arrivé le 28/09/2026 avec
 // les trois paliers du titre du héros, cités ci-dessus avant d'être retirés.
-const HERO_TITRE_CLASSES = 'titre-heros mb-5 md:mb-7 max-w-4xl mx-auto';
-const HERO_SOUS_TITRE_CLASSES =
-  'text-lg md:text-xl lg:text-2xl mb-8 text-white/90 max-w-3xl mx-auto';
+const HERO_TITRE_CLASSES = 'titre-heros mb-5 md:mb-6';
+const HERO_SOUS_TITRE_CLASSES = 'heros-lead';
+
+// ── LA COUPURE DU TITRE DU HÉROS, DÉCLARÉE ICI ──────────────────────────────
+// Le titre du héros est UNE chaîne du dictionnaire (« Trouvez un travailleur de
+// confiance, payez en toute sécurité »). Le dessin veut deux lignes : la
+// première en romain, la seconde en italique crème — c'est l'ornement
+// typographique de la maquette de refonte. Couper la chaîne dans la page ET
+// dans la coquille aurait donné deux découpages à tenir d'accord, sur CINQ
+// langues ; le découpage est donc ici, à côté des classes, et les deux canaux
+// lisent la MÊME fonction.
+//
+// La règle est celle qui marche sans connaître la langue : couper à la PREMIÈRE
+// ponctuation forte, garder la ponctuation dans la première moitié. Une langue
+// sans virgule (c'est le cas de plusieurs des cinq) rend une seconde moitié
+// VIDE, et la page peint alors le titre d'un seul tenant — jamais une ligne
+// fantôme, jamais un accent qui ne porte rien.
+//
+// Ce n'est pas un texte de plus : les deux moitiés sont le texte du
+// dictionnaire, et le garde de provenance les retrouve des deux côtés (voir
+// scripts/shell-text-provenance.js, cas « composition de textes entiers »).
+export const couperLeTitre = (texte) => {
+  const valeur = String(texte ?? '');
+  const coupure = valeur.search(/[,;:]/);
+  if (coupure === -1) return [valeur, ''];
+  return [valeur.slice(0, coupure + 1), valeur.slice(coupure + 1).trim()];
+};
+
+// ── LE LANGAGE ÉDITORIAL DE L'ACCUEIL — DEUXIÈME PASSE (27/09/2026) ─────────
+// Les sept champs d'`ACCUEIL` ci-dessus ont donné à la page son fond et son
+// encre ; cette seconde passe lui donne son ÉCHELLE et son PAS : un héros en
+// deux colonnes, des sections qui s'annoncent, des listes en lignes, un panneau
+// de confiance et une clôture orange. Ce sont toujours des classes de
+// src/index.css, donc les DEUX canaux les lisent par construction — et
+// `exigerCorpsDeclare` refuse un build dont la coquille ne publie pas une
+// déclaration.
+//
+// Ces noms sont ici, et pas dans les deux canaux : une retouche de dessin
+// (largeur de la grille du héros, hauteur d'une ligne, fond d'un panneau) se
+// fait dans la feuille, une seule fois. Les deux canaux ne portent plus que la
+// STRUCTURE et les textes.
+const EDITORIAL_ACCUEIL = {
+  heroGrilleClass: 'heros-grille',
+  heroCopieClass: 'heros-copie',
+  heroActionsClass: 'heros-actions',
+  heroBoutonClass: 'bouton bouton-creme',
+  heroBoutonSecondClass: 'bouton bouton-contour',
+  heroReperesClass: 'heros-reperes',
+  heroIllustrationClass: 'cadre-illustration',
+  heroIllustrationFondClass: 'cadre-fond',
+  heroIllustrationImageClass: 'cadre-image',
+  heroAccentClass: 'accent-heros',
+  rubanClass: 'ruban-pays',
+  rubanInnerClass: 'ruban-inner',
+  rubanEtiquetteClass: 'ruban-etiquette',
+  rubanJetonsClass: 'ruban-jetons',
+  rubanJetonClass: 'ruban-jeton',
+  entreeSectionClass: 'entree-section',
+  listeClass: 'liste-editoriale',
+  listeColonnesClass: 'liste-editoriale liste-editoriale-colonnes',
+  ligneMetierClass: 'ligne-editoriale ligne-metier',
+  ligneEtapeClass: 'ligne-editoriale ligne-etape',
+  pastilleClass: 'pastille-rond',
+  pastilleCreuseClass: 'pastille-rond pastille-rond-creuse',
+  nomLigneClass: 'nom-de-ligne',
+  noteLigneClass: 'note-de-ligne',
+  flecheLigneClass: 'fleche-de-ligne',
+  panneauClass: 'panneau-sequestre',
+  panneauArtClass: 'panneau-art',
+  panneauOrbeClass: 'panneau-orbe',
+  panneauImageClass: 'panneau-image',
+  panneauEstampilleClass: 'panneau-estampille',
+  bandeClass: 'bande-chiffres',
+  chiffreClass: 'chiffre',
+  ctaClass: 'cta-final',
+  ctaInnerClass: 'cta-final-inner',
+  ctaActionsClass: 'cta-actions',
+  lienFlecheClass: 'lien-fleche',
+  lienFlecheClairClass: 'lien-fleche lien-fleche-clair',
+  galerieGrilleClass: 'galerie-grille',
+  galerieCarteClass: 'galerie-carte',
+  galerieLegendeClass: 'galerie-legende',
+  etapesGrilleClass: 'etapes-grille',
+  etapesTeteClass: 'etapes-tete',
+  cadrePhotoClass: 'cadre-photo',
+};
 
 // ── Le VOCABULAIRE ÉDITORIAL de l'accueil, déclaré une fois ──────────────────
 // Les huit sections de l'accueil recopiaient chacune sa propre soupe
@@ -140,15 +235,20 @@ export const PAGE_SECTIONS = {
     // C'était le dernier morceau du corps de l'accueil publié par la coquille
     // SANS déclaration : la coquille lisait `T('heroTitle')` en littéral, et
     // rien ne rougissait si cette ligne disparaissait — un crawler, et le
-    // premier paint, perdaient alors l'élément LCP de la page sans qu'aucun
-    // garde ne le voie. Déclaré ici, `exigerCorpsDeclare` refuse un build dont
+    // premier paint, perdaient alors le plus grand bloc de TEXTE de la page
+    // sans qu'aucun garde ne le voie (son ILLUSTRATION est aujourd'hui l'élément
+    // élu, voir plus haut — le titre reste celui dont la géométrie ancre la
+    // parité des deux peintures). Déclaré ici, `exigerCorpsDeclare` refuse un build dont
     // la coquille ne porte plus le titre (le même refus que pour les
     // catégories, les promesses, les étapes et les chiffres).
     titleKey: 'heroTitle',
     subtitleKey: 'heroSubtitle',
     heroTitleClass: HERO_TITRE_CLASSES,
     heroSubtitleClass: HERO_SOUS_TITRE_CLASSES,
-    // Le vocabulaire éditorial des huit sections (voir ACCUEIL plus haut).
+    // Le vocabulaire éditorial des dix sections (voir ACCUEIL et
+    // EDITORIAL_ACCUEIL plus haut) : un seul propriétaire par classe, lu par
+    // src/pages/Home.js ET par vite-plugins/prerender/shells-home.js.
+    ...EDITORIAL_ACCUEIL,
     heroKickerClass: ACCUEIL.heroKickerClass,
     headClass: ACCUEIL.headClass,
     sectionIntroClass: ACCUEIL.introClass,
@@ -183,6 +283,29 @@ export const PAGE_SECTIONS = {
       { icone: 'step1', numberKey: 'stepNumber1', titleKey: 'homeStep1Title', descriptionKey: 'homeStep1Desc' },
       { icone: 'step2', numberKey: 'stepNumber2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
       { icone: 'step3', numberKey: 'stepNumber3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
+    ],
+    // ── LA PHOTO DU PARCOURS ─────────────────────────────────────────────
+    // La colonne de gauche de « comment ça marche » reçoit une photo, et son
+    // CHEMIN est déclaré ici : les deux canaux la publient depuis le même
+    // domicile, avec les mêmes dimensions réservées. Elle est sous la ligne de
+    // flottaison et en `lazy`, donc hors du premier écran et hors du graphe du
+    // LCP. Aucune légende : il n'existe pas de clé de dictionnaire pour une
+    // phrase sous cette photo, et la seule source de texte du site est
+    // src/i18n/*.json.
+    photoEtapes: '/assets/kojo-jardinage.jpg',
+
+    // ── LA GALERIE : trois métiers en photo ──────────────────────────────
+    // La page parlait de travailleurs sans en montrer un seul. Les trois
+    // libellés sont des CLÉS DU DICTIONNAIRE (les mêmes noms de métier que la
+    // liste des catégories) : aucune phrase n'a été inventée pour l'occasion, et
+    // chaque carte mène à la liste filtrée de son métier. Les images vivent dans
+    // `public/assets/`, ré-échantillonnées à 800 × 1 000 et recompressées (voir
+    // src/index.css) : elles sont SOUS la ligne de flottaison, en `lazy`, donc
+    // hors du graphe du LCP.
+    galerie: [
+      { labelKey: 'plumbing', image: '/assets/kojo-metier-plomberie.jpg' },
+      { labelKey: 'electrical', image: '/assets/kojo-metier-electricite.jpg' },
+      { labelKey: 'carpentry', image: '/assets/kojo-metier-menuiserie.jpg' },
     ],
     // Les chiffres de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
     // inventés. Les deux anciens (« 1 000+ travailleurs », « 500+ projets »)

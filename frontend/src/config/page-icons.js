@@ -69,6 +69,13 @@ import { createElement } from 'react';
  */
 const ICONES = {
   escrow: `<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path>`,
+  // Les deux flèches des LISTES EN LIGNES de l'accueil (27/09/2026). Elles ne
+  // sont pas décoratives : une ligne est un lien, et la flèche dit dans quel
+  // sens il mène. Deux dessins — vers la droite pour un métier (une page), vers
+  // le bas pour une étape (la suivante) — parce que les deux listes ne racontent
+  // pas la même chose.
+  flecheDroite: `<path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>`,
+  flecheBas: `<path d="M12 5v14"></path><path d="m6 13 6 6 6-6"></path>`,
   promiseFindWork: `<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect>`,
   promiseConnect: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle>`,
   promiseSecurePayments: `<rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>`,
@@ -144,6 +151,12 @@ export const CLASSES_ICONE = {
   etape: 'h-7 w-7 text-orange-600',
   // Le grand bouclier du bloc séquestre (fond emerald-50).
   sequestre: 'h-12 w-12 text-emerald-600',
+  // Les trois pastilles rondes de 40 px de l'accueil (métiers, promesses,
+  // étapes) : la couleur vient de la pastille qui les porte
+  // (`.pastille-rond`, src/index.css), donc le trait suit `currentColor`.
+  pastille: 'h-5 w-5',
+  // La flèche d'une ligne cliquable, dans la dernière colonne de la ligne.
+  flecheLigne: 'h-4 w-4',
   // Les trois petits repères du héros, sur fond coloré (trait blanc hérité).
   heros: 'h-5 w-5',
   // ── Les emplacements des quatre pages qui publiaient encore des emoji

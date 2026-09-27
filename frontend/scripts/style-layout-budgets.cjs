@@ -220,33 +220,49 @@ const NOEUDS = {
   // 355 → 370 (27/09/2026) : les QUATRE drapeaux emoji des cartes « Disponible
   // dans 4 pays » sont DESSINÉS (src/config/flags.js) — chaque carte publie un
   // `<svg>` plus ses aplats (3 à 5 enfants) là où un `<div>` portait un emoji,
-  // soit +15 nœuds en tout. La hauteur ne bouge pas d'un pixel (7 187 / 4 868 px,
-  // les mêmes classes `w-14 h-10 md:w-20 md:h-14` dimensionnent les deux), et
-  // l'accueil amputé de ses neuf dernières sections garde SES 113 nœuds : les
-  // quinze ajoutés vivent tous dans des sections que l'amputation retire.
-  '/': 370,
+  // soit +15 nœuds en tout. La hauteur ne bouge pas d'un pixel (7 187 / 4 868 px
+  // à l'époque, les mêmes classes `w-14 h-10 md:w-20 md:h-14` dimensionnent les
+  // deux), et l'amputation ne les emporte pas non plus : les quinze ajoutés
+  // vivent tous dans des sections que l'amputation retire.
+  // +1 SUR LES DOUZE ROUTES (27/09/2026) : le PRÉCHARGEMENT DE LA POLICE DE
+  // TITRAGE ajoute un second `<link rel="preload" as="font">` dans le <head>,
+  // et la sonde compte `document.querySelectorAll('*')`. Mesuré dans les DEUX
+  // SENS sur / (sonde `e2e/_sonde-police-lcp.spec.js`, document livré contre le
+  // même document dont on a retiré le préchargement et la famille) : 370 → 371.
+  // Le reste du relevé est une re-mesure de la table entière sur cet artefact.
+  // 371 → 428 (27/09/2026) : refonte éditoriale de l'accueil, mesurée sur la
+  // sonde d'atelier `e2e/_sonde-sections-differees.spec.js`, deux canaux —
+  // coquille pré-rendue 428 nœuds, React 489 (l'écart est celui d'aujourd'hui,
+  // mesuré ici et non déduit : React publie ses composants là où la coquille
+  // écrit le HTML). Ce budget-ci porte la COQUILLE, et la valeur publiée est la
+  // sienne. La hauteur, elle, ne les sépare pas (6 706 px des deux côtés).
+  // 428 → 443 (27/09/2026) : la GALERIE des métiers (trois cartes, chacune un
+  // lien, une image et une légende) et la photo du parcours ajoutent 15 nœuds à
+  // la coquille, et 504 à React (contre 489) — le même écart de méthode, remesuré
+  // sur le même passage que la hauteur.
+  '/': 443,
   // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
   // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
   // les trois étapes plus le séquestre de « Comment ça marche » (157 → 169) et
   // les six pastilles de /support (135 → 154).
-  '/about': 124,
-  '/contact': 133,
+  '/about': 126,
+  '/contact': 135,
   // +3 nœuds chacun pour l'enveloppe de la réinitialisation (108 → 111) et pour
   // la mallette de /payment (98 → 101) : un `<svg>` plus ses tracés là où un
   // emoji tenait un seul nœud. /login +5 (114 → 119) et /register +30 (203 → 233,
   // ses huit glyphes). La structure s'accorde toujours entre les deux hôtes.
-  '/forgot-password': 112,
-  '/how-it-works': 170,
-  '/jobs': 104,
-  '/login': 120,
-  '/payment': 102,
-  '/privacy': 107,
-  '/register': 234,
-  '/support': 155,
+  '/forgot-password': 114,
+  '/how-it-works': 172,
+  '/jobs': 106,
+  '/login': 122,
+  '/payment': 104,
+  '/privacy': 109,
+  '/register': 236,
+  '/support': 157,
   // Même squelette que /privacy (une enveloppe racine, un cadre, un titre, une
   // intro, quatre sections et le paragraphe de liens) : 108 nœuds mesurés par
   // la sonde le 26/09/2026.
-  '/terms': 108,
+  '/terms': 109,
 };
 
 /**
@@ -276,7 +292,37 @@ const HAUTEUR = {
   // document replié était plus haut que le document posé. Les deux valeurs
   // ci-dessous sont celles du document avec le levier ACTIF, qui égale désormais
   // celui du levier neutralisé — c'est la preuve que les constantes sont justes.
-  '/': { mobile: 7183, desktop: 4826 },
+  // 7 183 → 7 046 px en mobile (27/09/2026) : la référence mobile était PÉRIMÉE
+  // de 137 px, et ce n'est PAS la police de titrage qui l'a fait — mesuré dans
+  // les deux sens sur le même artefact (document livré contre le même document
+  // sans la famille de titrage) : 7 046 px des DEUX côtés. La correction est un
+  // effet de bord de la re-mesure, pas la conséquence du changement.
+  // Le DESKTOP, lui, ne bouge pas d'un pixel entre avant et après, et c'est une
+  // compensation mesurée qui mérite d'être notée : la famille de titrage est
+  // plus ÉTROITE (le titre du héros se replie sur DEUX lignes au lieu de trois,
+  // −57 px), ce qui annule exactement la détente du `letter-spacing` de la même
+  // passe. Mesuré sur les trois états : référence publiée d'avant (Inter,
+  // `letter-spacing` serré, 2 lignes) 4 826 px ; la même en Inter avec le
+  // `letter-spacing` détendu (3 lignes) 4 883 px ; avec la police de titrage
+  // 4 826 px — la valeur publiée.
+  // 7 046 → 6 706 px en mobile et 4 826 → 4 840 en desktop (27/09/2026) : re-mesure
+  // de la refonte éditoriale, faite avec les constantes de section DÉJÀ
+  // re-accordées (src/App.css) et sur les deux canaux — la coquille et React
+  // rendent le même document, au pixel, aux deux tailles. Le mobile baisse de
+  // 340 px parce que la page y fait quatre sections de moins en cartes et deux
+  // de plus en lignes (les dix métiers tiennent sur une colonne en lignes
+  // serrées) ; le desktop ne bouge que de 14 px, la liste en deux colonnes et
+  // l'illustration encadrée se compensant presque exactement.
+  // 6 706 → 7 726 px en mobile et 4 840 → 5 407 en desktop (27/09/2026) : la
+  // GALERIE des trois métiers en photo (+813 px en mobile, +716 en desktop) et la
+  // PHOTO DU PARCOURS sous l'entête des étapes (+205 px en mobile, −148 en
+  // desktop, où les deux colonnes raccourcissent la section plus que la photo ne
+  // l'allonge). Ces deux valeurs sont celles du LIVRÉ, levier actif, et elles
+  // ÉGALENT le document rendu au pixel dans les deux canaux (7726 / 5407) : c'est
+  // la vérification que les dix constantes de src/App.css sont justes — avant
+  // re-accord, le levier actif réservait 6 802 et 5 035 px, soit 924 et 372 px de
+  // matière manquante, mesurés sur le même passage.
+  '/': { mobile: 7726, desktop: 5407 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
   '/about': { mobile: 1718, desktop: 1086 },
@@ -315,9 +361,9 @@ const HAUTEUR = {
  * les mêmes polices : une hauteur qui suit le retour à la ligne ne doit pas
  * devenir un test de police.
  *
- * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses neuf
- * dernières sections descend de 370 à 113 nœuds (0,31 du relevé) et de 7 187 à
- * 1 125 px en mobile, de 4 868 à 1 086 px en desktop (0,16 et 0,22) — deux fois
+ * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses DIX
+ * dernières sections descend de 443 à 123 nœuds (0,28 du relevé) et de 7 726 à
+ * 1 236 px en mobile, de 5 407 à 1 086 px en desktop (0,16 et 0,20) — deux fois
  * et demie sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
  * icônes SVG) donnait 279 → 105 nœuds avec les MÊMES hauteurs : la hauteur suit
  * les sections retirées, pas le nombre de nœuds qui les composent. Le rejeu
@@ -328,17 +374,20 @@ const HAUTEUR = {
  *
  * ── Ce que la sonde NE sait PAS attraper, et c'est une mesure ───────────────
  * Casser une TAILLE ne fait PAS mordre la sonde. Remplacer chaque
- * `contain-intrinsic-size: auto Npx` (les neuf sections différées de l'accueil)
- * par `auto 4px` laisse le document à 7 066 px en mobile (−121 px, −1,7 %) et
- * 4 867 en desktop (−1 px) — jamais jusqu'au plancher de hauteur (5 749 / 3 894).
- * C'est contre-intuitif et c'est mesuré : la taille
- * intrinsèque n'agit qu'en PLANCHER, et le mot-clé `auto` MÉMORISE la taille
- * rendue dès que la section devient pertinente pour l'utilisateur — donc la
- * casser ne rétrécit pas le document. La conséquence est assumée : la sonde n'a
- * qu'une BORNE BASSE, elle attrape la PERTE DE MATIÈRE (nœuds/px), jamais une
- * taille cassée vers le bas. C'est écrit ici pour que personne ne croie le
- * contraire ; le rejeu correspondant est le second cas de
- * `e2e/style-layout-preuve-echec.spec.js`.
+ * `contain-intrinsic-size: auto Npx` (les DIX sections différées de l'accueil)
+ * par `auto 4px` NE CHANGE PLUS LA HAUTEUR au point de mesure du protocole :
+ * re-mesuré le 27/09/2026, le document reste à 7 726 px en mobile et 5 407 px en
+ * desktop, Δ 0 px et Δ nœuds 0, très loin des planchers de hauteur (6 180 / 4 325).
+ * Le relevé publié auparavant (−121 px mobile, −1 px desktop) n'était pas une
+ * propriété du document mais un INSTANT de sa convergence : les sections se sont
+ * RENDUES avant le relevé — la sonde lit leurs hauteurs vraies (937 px pour le
+ * rang 3, contre une constante de 841,14) — et le mot-clé `auto` MÉMORISE la
+ * taille rendue. Les constantes ne gouvernent donc que la PREMIÈRE mise en page :
+ * la même mutation, échantillonnée au premier commit en desktop, donne
+ * 5 407 → 1 819 px. La conséquence est assumée : la sonde n'a qu'une BORNE BASSE,
+ * elle attrape la PERTE DE MATIÈRE (nœuds/px), jamais une taille cassée vers le
+ * bas. C'est écrit ici pour que personne ne croie le contraire ; le rejeu
+ * correspondant est le second cas de `e2e/style-layout-preuve-echec.spec.js`.
  */
 const BORNE_STRUCTURE = 0.8;
 

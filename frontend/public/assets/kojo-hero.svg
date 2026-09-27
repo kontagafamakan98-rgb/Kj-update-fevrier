@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 720" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Clients et travailleurs se rencontrent avec Kojo</title>
+  <desc id="desc">Illustration vectorielle chaleureuse d’une cliente et d’un artisan, entourés d’éléments évoquant les missions, les avis vérifiés et le paiement sécurisé.</desc>
+  <defs>
+    <linearGradient id="sun" x1="215" y1="80" x2="690" y2="630" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF1D8"/><stop offset="1" stop-color="#FCE6D7"/></linearGradient>
+    <linearGradient id="orange" x1="445" y1="270" x2="697" y2="594" gradientUnits="userSpaceOnUse"><stop stop-color="#FB923C"/><stop offset="1" stop-color="#EA580C"/></linearGradient>
+    <linearGradient id="green" x1="232" y1="327" x2="433" y2="584" gradientUnits="userSpaceOnUse"><stop stop-color="#8DBD53"/><stop offset="1" stop-color="#4D963D"/></linearGradient>
+    <linearGradient id="skinA" x1="325" y1="250" x2="405" y2="375" gradientUnits="userSpaceOnUse"><stop stop-color="#B86D45"/><stop offset="1" stop-color="#8D4D35"/></linearGradient>
+    <linearGradient id="skinB" x1="565" y1="242" x2="638" y2="367" gradientUnits="userSpaceOnUse"><stop stop-color="#D99A69"/><stop offset="1" stop-color="#B8734D"/></linearGradient>
+    <linearGradient id="card" x1="681" y1="100" x2="833" y2="243" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF"/><stop offset="1" stop-color="#FFF9F1"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#653719" flood-opacity=".12"/></filter>
+    <filter id="smallShadow" x="-30%" y="-30%" width="160%" height="170%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#653719" flood-opacity=".12"/></filter>
+  </defs>
+  <!-- Warm, abstract West African-inspired backdrop -->
+  <path d="M160 470c-62-81-51-221 18-304C247 79 357 46 474 67c118 20 244 82 278 185 31 94-15 222-100 301-86 79-211 110-321 84-111-26-209-86-171-167Z" fill="url(#sun)"/>
+  <circle cx="750" cy="398" r="78" fill="#F8D7B5" opacity=".55"/>
+  <circle cx="231" cy="230" r="12" fill="#F2A34F" opacity=".65"/>
+  <circle cx="726" cy="136" r="8" fill="#75A94D" opacity=".65"/>
+  <path d="M166 556c126 39 263 46 408 18 80-15 153-41 219-78" stroke="#E8C8A7" stroke-width="2" stroke-dasharray="5 11" opacity=".8"/>
+  <!-- Simple storefront / home shape -->
+  <path d="m287 302 183-137 183 137v246H287V302Z" fill="#FFF9F1" opacity=".85"/>
+  <path d="m270 310 200-151 200 151" stroke="#E9B787" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" opacity=".62"/>
+  <path d="M322 323h296v225H322z" fill="#FFF" opacity=".55"/>
+  <path d="M454 430c0-9 7-16 16-16h55c9 0 16 7 16 16v118H454V430Z" fill="#F8E6D1"/>
+  <circle cx="519" cy="489" r="4" fill="#E4A768"/>
+  <path d="M350 359h57v55h-57z" rx="8" fill="#FFF1E5"/>
+  <path d="M561 359h37v55h-37z" rx="8" fill="#EAF1DF"/>
+  <!-- Ground -->
+  <ellipse cx="481" cy="586" rx="266" ry="29" fill="#C99262" opacity=".16"/>
+  <path d="M235 581c107 14 237 16 373 1" stroke="#D7B28C" stroke-width="3" stroke-linecap="round" opacity=".7"/>
+  <!-- Worker: friendly, assured artisan -->
+  <g filter="url(#shadow)">
+    <path d="M495 386c14-34 42-53 78-53h48c41 0 72 29 80 72l24 143H487l8-162Z" fill="url(#orange)"/>
+    <path d="M499 412c35 20 88 28 145 20l14 116H487l12-136Z" fill="#EA580C"/>
+    <path d="m530 545-3 37c-1 17-15 29-32 29h-26c-11 0-17-13-10-21l39-45h32Z" fill="#34443E"/>
+    <path d="m645 545 15 34c6 14 20 23 35 23h17c12 0 18-13 10-21l-44-42-33 6Z" fill="#34443E"/>
+    <path d="M547 281c0-44 32-76 73-76 40 0 69 29 69 70v25c0 45-32 76-72 76-39 0-70-31-70-74v-21Z" fill="url(#skinB)"/>
+    <path d="M543 285c-8-28-4-55 13-75 19-22 52-31 83-22 26 7 45 26 51 52-20-7-33-20-41-35-17 20-51 32-93 30l-13 50Z" fill="#263B33"/>
+    <path d="M553 300c13 11 27 16 42 15" stroke="#874F38" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="612" cy="297" r="4" fill="#49372E"/><circle cx="659" cy="293" r="4" fill="#49372E"/>
+    <path d="M617 324c10 8 21 8 31 0" stroke="#8A4B37" stroke-width="4" stroke-linecap="round"/>
+    <path d="M554 395c17 19 39 29 64 29 23 0 45-10 61-28" stroke="#FFC08B" stroke-width="4" opacity=".7"/>
+    <!-- tool belt and small tool -->
+    <path d="M504 483c47 15 98 17 158 6l4 30c-58 12-111 10-166-5l4-31Z" fill="#C2410C"/>
+    <rect x="545" y="490" width="35" height="38" rx="6" fill="#FDBA74"/>
+    <path d="m559 497 9 9-9 15" stroke="#8B4A25" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- arm and hand, holding a small tool case -->
+    <path d="M679 391c23 13 40 37 42 64l4 40c1 15-10 28-25 29-14 1-26-10-27-24l-5-42-29-20 40-47Z" fill="url(#skinB)"/>
+    <path d="m672 444 29-16 26 26-23 27-31-37Z" fill="#FED7AA"/>
+  </g>
+  <!-- Customer: green outfit, open welcoming gesture -->
+  <g filter="url(#shadow)">
+    <path d="M260 414c7-47 41-76 88-76h28c47 0 78 32 80 78l7 132H245l15-134Z" fill="url(#green)"/>
+    <path d="M298 545 288 582c-4 15-17 25-33 25h-19c-12 0-18-14-10-22l45-40h27Z" fill="#34443E"/>
+    <path d="m405 545 15 33c6 13 19 22 34 22h18c12 0 18-14 9-22l-43-39-33 6Z" fill="#34443E"/>
+    <path d="M302 270c1-43 31-72 71-72 41 0 69 31 68 75l-1 21c-1 44-31 72-69 72-42 0-70-31-69-74v-22Z" fill="url(#skinA)"/>
+    <path d="M299 289c-10-38-2-72 22-92 24-20 60-23 90-8 22 11 36 32 37 59-25-5-44-19-57-37-11 24-42 39-88 42l-4 36Z" fill="#202F2C"/>
+    <path d="M311 303c12 11 26 16 40 15" stroke="#754230" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="369" cy="301" r="4" fill="#342720"/><circle cx="414" cy="301" r="4" fill="#342720"/>
+    <path d="M376 328c10 8 21 8 31 0" stroke="#763E2E" stroke-width="4" stroke-linecap="round"/>
+    <path d="M317 395c17 18 37 27 59 27 23 0 44-10 60-28" stroke="#C5DBA7" stroke-width="4" opacity=".8"/>
+    <path d="M269 415c-26 9-47 27-59 51l-21 38c-7 13-3 29 10 36 13 7 29 2 36-10l24-39 39-19-29-57Z" fill="url(#skinA)"/>
+    <path d="m223 490 31 21-19 31c-7 11-20 14-31 7-10-7-13-20-7-31l26-28Z" fill="#FDBA74"/>
+    <!-- shirt pocket -->
+    <path d="M409 444h33v38h-33z" rx="5" fill="#DCE9C9" opacity=".8"/>
+    <path d="M415 450h21" stroke="#669A46" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- Job card -->
+  <g filter="url(#smallShadow)">
+    <rect x="81" y="151" width="192" height="126" rx="20" fill="url(#card)"/>
+    <rect x="101" y="172" width="46" height="46" rx="14" fill="#FFEDD5"/>
+    <path d="M113 201v-12l11-8 11 8v12h-22Z" stroke="#EA580C" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M121 201v-8h7v8" stroke="#EA580C" stroke-width="3" stroke-linejoin="round"/>
+    <rect x="160" y="176" width="83" height="10" rx="5" fill="#39453E" opacity=".9"/>
+    <rect x="160" y="195" width="66" height="7" rx="3.5" fill="#A6B09F"/>
+    <rect x="101" y="236" width="142" height="7" rx="3.5" fill="#E6E9E1"/>
+    <circle cx="108" cy="259" r="5" fill="#69A64B"/><circle cx="124" cy="259" r="5" fill="#69A64B"/><circle cx="140" cy="259" r="5" fill="#69A64B"/><circle cx="156" cy="259" r="5" fill="#69A64B"/><circle cx="172" cy="259" r="5" fill="#69A64B"/>
+    <rect x="188" y="252" width="55" height="13" rx="6.5" fill="#E8F2E2"/>
+  </g>
+  <!-- Verified payment card -->
+  <g filter="url(#smallShadow)">
+    <rect x="683" y="108" width="183" height="139" rx="22" fill="url(#card)"/>
+    <circle cx="724" cy="151" r="22" fill="#E9F3E4"/>
+    <path d="m714 151 7 7 14-16" stroke="#579842" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="758" y="137" width="83" height="9" rx="4.5" fill="#39453E" opacity=".85"/>
+    <rect x="758" y="155" width="59" height="7" rx="3.5" fill="#A6B09F"/>
+    <rect x="705" y="190" width="137" height="34" rx="11" fill="#FFEDD5"/>
+    <path d="M719 207h43" stroke="#F97316" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="820" cy="207" r="8" fill="#F97316"/>
+  </g>
+  <!-- small trust seal -->
+  <g filter="url(#smallShadow)"><circle cx="772" cy="490" r="37" fill="#FFF"/><circle cx="772" cy="490" r="27" fill="#E8F2E1"/><path d="m760 490 8 8 17-19" stroke="#4D963D" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <!-- decorative leaves -->
+  <path d="M188 468c-26-42-12-74 34-79 5 39-7 66-34 79Z" fill="#8DBD53" opacity=".82"/>
+  <path d="M198 472c4-24 13-43 29-58" stroke="#548D3D" stroke-width="3" stroke-linecap="round"/>
+  <path d="M740 551c31-32 63-24 70 14-28 12-51 8-70-14Z" fill="#7CAF4E" opacity=".82"/>
+  <path d="M742 557c17-3 34-1 51 8" stroke="#548D3D" stroke-width="3" stroke-linecap="round"/>
+</svg>

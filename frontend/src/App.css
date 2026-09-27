@@ -238,11 +238,12 @@
 }
 
 /* ── MISE EN PAGE DIFFÉRÉE des sections sous la ligne de flottaison ────────
-   L'accueil pré-rendu publie dix sections, dont une seule (le héros) tient dans
-   le premier écran. Les neuf autres étaient mises en page AVANT que le visiteur
-   les regarde. Mesuré le 26/09/2026 (minima entrelacés, 412×823 cpu×4, sondes
-   `_sonde-cv.mjs`) : `content-visibility: auto` sur ces neuf sections retire
-   **−100,5 ms** de « Style & Layout » (419,8 → 319,3 ms, −24 %).
+   L'accueil pré-rendu publie ONZE sections (27/09/2026 ; dix avant la galerie),
+   dont une seule (le héros) tient dans le premier écran. Les dix autres étaient
+   mises en page AVANT que le visiteur les regarde. Mesuré le 26/09/2026 (minima
+   entrelacés, 412×823 cpu×4, sondes `_sonde-cv.mjs`, sur les NEUF sections
+   d'alors) : `content-visibility: auto` sur ces sections retire **−100,5 ms** de
+   « Style & Layout » (419,8 → 319,3 ms, −24 %).
 
    LE PRIX, MESURÉ AUSSI : sans taille intrinsèque, le navigateur ne connaît pas
    la hauteur d'une section non rendue et le document annonce une hauteur FAUSSE
@@ -280,7 +281,10 @@
    de quelques dizaines de px : c'est un document qui s'effondre de 3 040 px sur
    le repli uniforme, et cette sonde-là le refuse.
 
-   LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : il est
+   LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : depuis
+   la refonte du 27/09/2026 l'élément élu de « / » est l'ILLUSTRATION du héros
+   (62 700 px² en mobile, 139 733 en desktop, mesuré identique dans les deux
+   canaux), et un élément LCP ne se met pas derrière une hauteur estimée. Il est
    peint au premier écran, donc jamais « différé » — mesuré, la règle ne change
    ni l'élément élu ni son horodatage.
 
@@ -293,7 +297,7 @@
 .sections-differees > section:not(:first-of-type) {
   content-visibility: auto;
 }
-/* RE-MESURÉES le 28/09/2026 avec la refonte éditoriale (protocole ci-dessus :
+/* RE-MESURÉES le 27/09/2026 avec la refonte éditoriale (protocole ci-dessus :
    levier neutralisé par une feuille injectée, hauteur de la boîte de bordure
    moins les deux paddings, 412×823 et 1350×940). CE QUI A CHANGÉ, et pourquoi
    la remesure était obligatoire plutôt qu'un ajustement à vue : les titres de
@@ -301,30 +305,77 @@
    troquent l'anneau contre une bordure de 1 px — deux effets de quelques pixels
    par section. Le §8 (les chiffres) perdait en réalité 86 px sur des constantes
    périmées : elles dataient des compteurs fabriqués retirés le 26/09/2026, et
-   personne ne les avait reprises depuis. */
-.sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 441.2px; }
-.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 870.1px; }
-.sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 744.6px; }
-.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 867.2px; }
-.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 480.7px; }
-.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 298.1px; }
-.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 130px; }
-.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 574.7px; }
-.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 836.4px; }
+   personne ne les avait reprises depuis.
+
+   RE-MESURÉES le 27/09/2026 avec la POLICE DE TITRAGE (même protocole, sonde
+   d'atelier `_sonde-sections-differees.spec.js`), et c'est la condition n°2 écrite
+   plus haut : « re-mesure à chaque changement de contenu, de padding, de
+   BORDURE ou de POLICE ». UNE SEULE section bouge — §7, −27,1 px sur mobile —
+   parce qu'un de ses titres se replie sur une ligne de moins avec le serif ;
+   les huit autres valeurs sont inchangées au dixième près. C'est le résultat
+   attendu, et il dit POURQUOI le protocole est stable : les titres portent une
+   `line-height` SANS UNITÉ, donc la hauteur d'une ligne de titre ne dépend
+   d'aucune métrique de police. Seule la LARGEUR — donc le nombre de lignes —
+   pouvait déplacer quelque chose, et c'est exactement ce qui a bougé. */
+/* RE-MESURÉES le 27/09/2026, APRÈS LA GALERIE ET LA PHOTO DU PARCOURS (même
+   protocole : sonde d'atelier, 412×823 et 1350×940, les deux canaux, le levier
+   NEUTRALISÉ pour lire les hauteurs réelles — et la vérification faite AVANT de
+   descendre la page, sinon `auto` a déjà mémorisé la taille rendue et l'égalité
+   serait vraie par construction). Deux sections sont NEUVES (la galerie, et la
+   photo sous l'entête des étapes), donc tous les rangs à partir du quatrième
+   changent de sujet : la constante du rang 11 (le contact) n'existait pas, et
+   une section sans constante retombe sur une taille de repli de 0. C'est
+   mesuré, pas supposé : sur ce document le levier ACTIF réservait 6 802 px en
+   mobile et 5 035 en desktop là où le document rendu en mesure 7 726 et 5 407,
+   soit 924 et 372 px de matière MANQUANTE. Après re-accord, les deux hauteurs
+   sont égales au pixel dans les deux canaux.
+
+   Les dix constantes, hauteur de CONTENU (boîte de bordure moins les paddings et
+   les bordures, mêmes règles que ci-dessus) :
+
+     section            boîte de bordure   − padding − bordure = CONSTANTE
+                         mob. / desk.        mob. / desk.
+       2  ruban          159,0 /  81,5       159,0 /  81,5   (aucun padding)
+       3  métiers        937,1 / 636,5       841,14 / 508,47
+       4  galerie        813,0 / 715,6       717,0 / 587,63
+       5  promesses      707,3 / 318,0       611,34 / 189,98
+       6  étapes         774,0 / 489,0       678,0 / 361,0
+       7  séquestre      786,3 / 500,8       690,3 / 372,84
+       8  clôture        385,1 / 302,9       385,05 / 302,88  (aucun padding)
+       9  chiffres       218,8 / 250,8       122,8 / 122,8
+      10  à propos       772,9 / 566,8       676,92 / 438,81
+      11  contact        936,4 / 791,1       839,42 / 662,06  (1 px de bordure)
+
+   LES ÉTAPES PERDENT 148 px EN DESKTOP (509,5 → 361) : elles passent d'une
+   entête pleine largeur à deux colonnes, et la photo de la colonne de gauche
+   tient dans la hauteur des trois marches. En MOBILE elles GAGNENT 207 px
+   (471,4 → 678) : la photo s'ajoute sous l'entête, et la grille retombe sur une
+   seule colonne. Les deux sens sont mesurés, et c'est la même page. */
+.sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 159px; }
+.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 841.14px; }
+.sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 717px; }
+.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 611.34px; }
+.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 678px; }
+.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 690.3px; }
+.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 385.05px; }
+.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 122.8px; }
+.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 676.92px; }
+.sections-differees > section:nth-of-type(11) { contain-intrinsic-size: auto 839.42px; }
 
 /* Au-delà de 768 px, `py-12` devient `py-16` (128 px) et les contenus prennent
    une autre forme : les tailles de contenu sont donc déclarées À PART, jamais
    déduites de celles du mobile. */
 @media (min-width: 768px) {
-  .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 290.5px; }
-  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 436.5px; }
-  .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 233.2px; }
-  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 354.5px; }
-  .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 297.7px; }
-  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 182.9px; }
-  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 138px; }
-  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 345.2px; }
-  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 643.1px; }
+  .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 81.5px; }
+  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 508.47px; }
+  .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 587.63px; }
+  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 189.98px; }
+  .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 361px; }
+  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 372.84px; }
+  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 302.88px; }
+  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 122.8px; }
+  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 438.81px; }
+  .sections-differees > section:nth-of-type(11) { contain-intrinsic-size: auto 662.06px; }
 }
 
 /* ── LE FORMULAIRE DE /register : LE MÊME LEVIER, MESURÉ AVANT D'ÊTRE POSÉ ───

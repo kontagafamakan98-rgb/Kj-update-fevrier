@@ -61,14 +61,18 @@ const PLANCHER_HAUTEUR = 200;
 
 /**
  * La mutation qui doit franchir la borne, MESURÉE le 25/09/2026 (279 → 105
- * nœuds, shell bâti 94 329 o → 75 601 o, SHA-1 997b3d3c… → dbb86205…) et
- * RE-MESURÉE le 26/09/2026 sur l'artefact à icônes SVG : l'accueil amputé de
- * ses neuf dernières sections tombe à 113 nœuds (de 370). La hauteur ne bouge
- * pas (1 125 px mobile, 1 086 px desktop) : elle suit les mêmes sections, quel
- * que soit le nombre de nœuds qui les composent. Le rejeu vivant est dans
- * `e2e/style-layout-preuve-echec.spec.js`.
+ * nœuds, shell bâti 94 329 o → 75 601 o, SHA-1 997b3d3c… → dbb86205…),
+ * RE-MESURÉE le 26/09/2026 sur l'artefact à icônes SVG (370 → 113 nœuds) puis le
+ * 27/09/2026 après la galerie des métiers et la photo du parcours : l'accueil
+ * amputé de ses DIX dernières sections tombe à 123 nœuds (de 443). La hauteur
+ * suit les sections retirées, pas le nombre de nœuds qui les composent : elle
+ * mesure 1 236 px en mobile (de 7 726) et 1 086 px en desktop (de 5 407) — le
+ * desktop ne bouge pas d'un tiers de si tôt parce que l'amputation retire la
+ * MÊME matière, quelle que soit la largeur. Le rejeu vivant est dans
+ * `e2e/style-layout-preuve-echec.spec.js`, et cette constante est ce qui
+ * l'empêche de devenir une cérémonie : elle est MESURÉE, jamais déduite.
  */
-const MUTATION_ACCUEIL_AMPUTE = { noeuds: 113, hauteur: { mobile: 1125, desktop: 1086 } };
+const MUTATION_ACCUEIL_AMPUTE = { noeuds: 123, hauteur: { mobile: 1236, desktop: 1086 } };
 
 describe('la table de structure du document pré-rendu, et le coût qu’elle publie', () => {
   it('couvre EXACTEMENT les routes pré-rendues, avec les deux conditions par case', () => {
@@ -144,8 +148,8 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
   it('la mutation qui doit franchir la borne la franchit VRAIMENT (mesurée)', () => {
     // Un plancher que rien ne peut franchir ne prouve rien : la seule direction
     // que les mutations savent faire rougir est la perte de matière, et elle est
-    // mesurée — accueil amputé de ses neuf dernières sections (113 nœuds,
-    // 1 125 px mobile, 1 086 px desktop), deux fois et demie sous la borne.
+    // mesurée — accueil amputé de ses dix dernières sections (123 nœuds,
+    // 1 236 px mobile, 1 086 px desktop), deux fois et demie sous la borne.
     expect(MUTATION_ACCUEIL_AMPUTE.noeuds).toBeLessThan(plancherNoeudsDe(NOEUDS['/']));
     for (const condition of CONDITIONS_NOMS) {
       expect(MUTATION_ACCUEIL_AMPUTE.hauteur[condition], condition).toBeLessThan(

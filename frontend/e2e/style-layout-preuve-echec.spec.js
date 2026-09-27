@@ -10,24 +10,29 @@
  * (`scripts/style-layout-budgets.cjs`). Rien, dans la sonde elle-même, ne dit
  * qu'elle sait ROUGIR — un plancher que rien ne franchit est un plancher qui
  * peut devenir aveugle en silence (le motif F17 du registre des preuves). Ce
- * fichier rejoue donc l'échec : il AMPUTE l'accueil de ses neuf sections
+ * fichier rejoue donc l'échec : il AMPUTE l'accueil de ses dix sections
  * différées, exige que la sonde rougisse sur les DEUX axes (nœuds ET hauteur),
  * et le prouve sans jamais toucher à l'artefact sur disque.
  *
  * ── Les deux mutations, et ce que la mesure a appris sur la SECONDE ─────────
- *  1. AMPUTATION — retirer les neuf sections différées du corps publié fait
+ *  1. AMPUTATION — retirer les dix sections différées du corps publié fait
  *     tomber les nœuds ET la hauteur sous leurs planchers, dans les deux
  *     conditions : c'est la seule direction que la sonde sait faire rougir, et
  *     elle est ici rejouée, pas seulement citée.
  *  2. TAILLE CASSÉE — remplacer chaque `contain-intrinsic-size: auto Npx` par
- *     `auto 4px` NE FAIT PAS baisser la hauteur du document. C'est contre-
- *     intuitif et c'est MESURÉ ici : la taille intrinsèque n'agit qu'en PLANCHER,
- *     et le mot-clé `auto` MÉMORISE la taille rendue dès que la section devient
- *     pertinente pour l'utilisateur — donc la hauteur ne bouge que de quelques px
- *     à quelques pour cent (mesuré), jamais jusqu'au plancher. La conséquence est
- *     assumée : la sonde n'a qu'une BORNE BASSE,
- *     elle n'attrape PAS une taille cassée vers le bas, et ce fichier l'écrit
- *     plutôt que de laisser croire le contraire.
+ *     `auto 4px` NE FAIT PAS baisser la hauteur du document. C'est mesuré ici,
+ *     et le chiffre a été CORRIGÉ le 27/09/2026 : le relevé publié auparavant
+ *     (−121 px en mobile, −1 px en desktop) dépendait du MOMENT de
+ *     l'échantillonnage, et non du document — au point de mesure du protocole,
+ *     la hauteur ne bouge plus du tout (Δ 0 px : 7 726 et 5 407 px, nœuds
+ *     identiques), parce que les sections se sont RENDUES entre-temps : la
+ *     sonde lit leurs hauteurs vraies (937 px pour le rang 3 contre une
+ *     constante de 841,14) et le mot-clé `auto` MÉMORISE cette taille. Les
+ *     constantes ne gouvernent que la PREMIÈRE mise en page : la même mutation,
+ *     échantillonnée au premier commit en desktop, donne 5 407 → 1 819 px. La
+ *     conséquence est assumée : la sonde n'a qu'une BORNE BASSE, elle n'attrape
+ *     PAS une taille cassée vers le bas, et ce fichier l'écrit plutôt que de
+ *     laisser croire le contraire.
  *
  * ── Comment on mute SANS risquer l'artefact ────────────────────────────────
  * La mutation est appliquée au VOL, sur la réponse HTML : la navigation vers `/`
@@ -52,8 +57,10 @@ const COQUILLE_ACCUEIL = path.join(RACINE, 'build', 'index.html');
 const ENTREE_APPLICATION = /\/assets\/index-[^/]*\.js$/;
 /** En dessous, la page n'a manifestement pas été lue (build absent, coquille vide). */
 const PLANCHER_MS = 5;
-/** Le nombre de sections différées de l'accueil : le héros plus neuf. */
-const SECTIONS_ACCUEIL = 10;
+/** Le nombre de sections différées de l'accueil : le héros plus DIX (27/09/2026,
+ * la galerie des métiers s'est ajoutée). Compté sur le document livré, jamais
+ * déduit : ce fichier refuse d'amputer un accueil dont la structure a changé. */
+const SECTIONS_ACCUEIL = 11;
 
 /**
  * Retire du corps publié toutes les sections SAUF le héros — exactement la
@@ -131,7 +138,7 @@ test.describe('preuve d’échec rejouée — la sonde du document mord sur les 
   const htmlSain = fs.readFileSync(COQUILLE_ACCUEIL, 'utf8');
 
   for (const condition of CONDITIONS) {
-    test(`l’accueil amputé de ses neuf sections différées franchit les deux planchers (${condition.nom})`, async ({ browser }) => {
+    test(`l’accueil amputé de ses dix sections différées franchit les deux planchers (${condition.nom})`, async ({ browser }) => {
       const plancherNoeuds = plancherNoeudsDe(NOEUDS['/']);
       const plancherHauteur = plancherHauteurDe(HAUTEUR['/']?.[condition.nom]);
 
@@ -172,14 +179,14 @@ test.describe('preuve d’échec rejouée — la sonde du document mord sur les 
       const sain = await relever(browser, condition, htmlSain);
       const casse = await relever(browser, condition, casserLesTaillesIntrinseques(htmlSain));
 
-      // La découverte, écrite comme un FAIT mesuré : la taille intrinsèque
-      // n'agit qu'en PLANCHER, et `auto` mémorise la taille rendue dès que la
-      // section devient pertinente — donc la casser ne rétrécit PAS le document
-      // jusqu'au plancher. Le déplacement observé (quelques px à quelques pour
-      // cent selon la mise en page) est PUBLIÉ, pas borné à une constante propre
-      // à ce poste : ce qui est prouvé, c'est que la hauteur reste AU-DESSUS du
-      // plancher — donc que la sonde, qui n'a qu'une borne BASSE, ne l'attrape
-      // pas.
+      // La découverte, écrite comme un FAIT mesuré : `auto` mémorise la taille
+      // RENDUE, et les sections se sont rendues avant que la sonde ne relève —
+      // donc casser les constantes ne rétrécit PAS le document jusqu'au plancher
+      // (re-mesuré le 27/09/2026 : Δ 0 px, Δ nœuds 0). Le déplacement observé
+      // (de 0 px à quelques pour cent selon l'INSTANT de l'échantillonnage) est
+      // PUBLIÉ, jamais borné à une constante propre à ce poste : ce qui est
+      // prouvé, c'est que la hauteur reste AU-DESSUS du plancher — donc que la
+      // sonde, qui n'a qu'une borne BASSE, ne l'attrape pas.
       const chute = ((sain.hauteur - casse.hauteur) / sain.hauteur) * 100;
       expect(
         casse.hauteur,
@@ -193,7 +200,9 @@ test.describe('preuve d’échec rejouée — la sonde du document mord sur les 
       console.log(
         `ℹ️  Taille cassée (${condition.nom}) : ${sain.hauteur} → ${casse.hauteur} px de haut ` +
           `(Δ ${casse.hauteur - sain.hauteur} px, nœuds ${sain.noeuds} → ${casse.noeuds}) — la sonde NE mord PAS : ` +
-          'sa seule borne est basse, et `contain-intrinsic-size` agit comme un plancher que `auto` mémorise.'
+          'sa seule borne est basse, les sections se sont rendues avant le relevé et `auto` a mémorisé ' +
+          'leur taille — les constantes ne gouvernent que la PREMIÈRE mise en page (mesuré au premier ' +
+          'commit, en desktop : 5 407 → 1 819 px avec les constantes cassées).'
       );
     });
   }

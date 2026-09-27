@@ -159,15 +159,15 @@ test.describe('le document pré-rendu : sa structure publiée, son coût publié
         // ── La coquille publie-t-elle toujours son corps ? ────────────────
         // Un document qui perd sa matière perd d'abord ses NŒUDS, et c'est la
         // seule direction que les mutations savent faire rougir : l'accueil
-        // amputé de ses neuf dernières sections tombe de 370 à 113 nœuds (le
+        // amputé de ses DIX dernières sections tombe de 443 à 123 nœuds (le
         // rejeu est dans e2e/style-layout-preuve-echec.spec.js).
         const plancherNoeuds = plancherNoeudsDe(noeudsReference);
         expect(
           mesure.noeuds,
           `${chemin} (${condition.nom}) : ${mesure.noeuds} nœuds peints, sous le plancher de ${plancherNoeuds} ` +
             `(${budgets.BORNE_STRUCTURE} × les ${noeudsReference} nœuds du relevé) — la coquille a perdu son corps, ` +
-            'et c’est une régression du contrat SEO / sans-JavaScript (mesuré : accueil amputé de ses neuf dernières ' +
-            `sections, 370 → 113 nœuds et 7 187 → 1 125 px). La hauteur, elle, mesure ${mesure.hauteur} px ` +
+            'et c’est une régression du contrat SEO / sans-JavaScript (mesuré : accueil amputé de ses dix dernières ' +
+            `sections, 443 → 123 nœuds et 7 726 → 1 236 px). La hauteur, elle, mesure ${mesure.hauteur} px ` +
             `(plancher ${plancherHauteurDe(hauteurReference)} px). ` +
             'Un nœud ne dépend pas de la machine : c’est ce qui décide ici.'
         ).toBeGreaterThanOrEqual(plancherNoeuds);
