@@ -243,6 +243,76 @@ code {
   }
 }
 
+/* ── LE RACCORD ENTRE DEUX PAGES EST UNE TRANSITION DE VUE NATIVE ───────────
+
+   Question posée le 27/09/2026 : le site change de page D'UN COUP — l'ancienne
+   peinture disparaît, la nouvelle apparaît, sans rien qui relie les deux. Les
+   composants ne peuvent pas le faire : un `<div>` qui s'efface ne connaît pas la
+   peinture qui s'en va. Le navigateur, lui, la connaît.
+
+   Deux branches, la MÊME animation :
+     • navigation INTERNE (SPA) — les liens du chrome passent par
+       `components/LienVue.js`, qui ouvre lui-même `document.startViewTransition`
+       (la propriété `viewTransition` de React Router n'agit qu'avec un routeur de
+       DONNÉES, et le site monte un `<BrowserRouter>` : mesurée inerte le
+       27/09/2026) : le navigateur photographie la page sortante, peint l'entrante
+       dans le même appel, et anime les deux pseudo-arbres `::view-transition-old/new`
+       ci-dessous ;
+     • navigation DOCUMENT À DOCUMENT (`@view-transition { navigation: auto }`) —
+       le cas des ouvertures dans un nouvel onglet et des visiteurs sans
+       JavaScript : c'est le même raccord, demandé par la feuille au lieu de
+       l'être par un script.
+
+   POURQUOI CES DEUX ANIMATIONS-LÀ. La sortie est un simple effacement (180 ms) :
+   ce qui s'en va n'a pas à se déplacer, le regard le quitte. L'entrée est une
+   montée de 6 px qui se dissout (220 ms) avec la courbe d'accélération du site :
+   assez pour dire « une nouvelle page arrive », assez peu pour ne jamais
+   retarder la lecture ni donner l'impression que le site « glisse ».
+
+   CE QUI N'EST PAS ANIMÉ, ET C'EST LA GARANTIE : ni la géométrie, ni le CLS. Le
+   navigateur anime des PHOTOGRAPHIES des deux peintures — la mise en page réelle
+   est déjà faite des deux côtés quand l'animation commence, et elle ne reçoit
+   aucune propriété transformée. Un navigateur sans `startViewTransition` ignore
+   simplement tout ce bloc : la navigation reste instantanée, comme avant.
+   `prefers-reduced-motion` éteint les deux animations (voir le bloc en fin de
+   feuille) : un visiteur qui a coupé les animations reçoit un changement de page
+   immédiat, et c'est ce que la règle du dépôt exige. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: kojo-vue-sortie 0.18s ease-out both;
+}
+
+::view-transition-new(root) {
+  animation: kojo-vue-entree 0.22s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+@keyframes kojo-vue-sortie {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes kojo-vue-entree {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
 
 
 

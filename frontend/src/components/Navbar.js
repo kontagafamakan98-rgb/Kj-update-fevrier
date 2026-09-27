@@ -1,4 +1,7 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+// Le lien interne passe par la transition de vue native (un seul propriétaire
+// pour les trois surfaces du chrome : voir components/LienVue.js).
+import Link from './LienVue';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';

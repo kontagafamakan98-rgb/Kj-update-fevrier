@@ -208,15 +208,19 @@
   background: #c2410c;
 }
 
-/* Focus styles for accessibility */
-button:focus,
-input:focus,
-textarea:focus,
-select:focus,
-a:focus {
-  outline: 2px solid #ea580c;
-  outline-offset: 2px;
-}
+/* ── L'ANNEAU DE FOCUS N'EST PLUS CELUI DU CLIC (27/09/2026) ─────────────────
+
+   Le bloc qui vivait ici ciblait `:focus` — c'est-à-dire AUSSI le focus posé
+   par un CLIC. Conséquence mesurable à l'œil : chaque appui sur un bouton ou un
+   lien du chrome laissait un anneau orange accroché à la commande, comme un
+   état sélectionné qu'on n'a pas demandé. C'est le contraire de ce qu'on veut
+   montrer : au doigt ou à la souris, la commande est actionnée, pas "focalisée".
+
+   Le repli `:focus-visible` vit désormais à un seul endroit, `src/index.css`
+   (couche `base`) : il ne se déclenche QUE pour le clavier (et pour les champs
+   de saisie, où le navigateur le conserve à juste titre puisqu'on va y écrire).
+   Ce fichier n'en garde AUCUNE copie : deux porteurs auraient divergé en
+   silence, et c'est déjà la règle appliquée ici à `body` (voir plus haut). */
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {

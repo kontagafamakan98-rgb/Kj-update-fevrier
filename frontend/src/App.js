@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Link from "./components/LienVue";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
