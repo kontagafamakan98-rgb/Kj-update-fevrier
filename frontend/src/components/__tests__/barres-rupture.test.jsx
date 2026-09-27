@@ -144,6 +144,10 @@ describe('menu mobile — il se ferme quand sa barre cesse d’être affichée',
  * ne surveille pas une copie, on la supprime. Le premier cas lit le RENDU (le
  * tiroir publie la table, dans l'ordre) ; le second tient la FORME sur `src/`
  * (aucun autre fichier ne la re-déclare).
+ *
+ * La QUATRIÈME copie — `AVAILABLE_LANGUAGES` du service de géolocalisation — a
+ * été UNIFIÉE le 27/09/2026 : elle est désormais construite depuis le
+ * propriétaire, et l'exemption qui la tolérait a été retirée avec elle.
  */
 describe('la liste des langues, d’un seul propriétaire', () => {
   it('le tiroir mobile publie EXACTEMENT la liste du propriétaire', () => {
@@ -187,21 +191,24 @@ describe('la liste des langues, d’un seul propriétaire', () => {
       .filter(([, texte]) => declarees(texte) >= 2)
       .map(([chemin]) => chemin);
 
-    // Une seule copie est tolérée, et elle dit POURQUOI : `AVAILABLE_LANGUAGES`
-    // du service de géolocalisation est une table indexée qui porte en plus le
-    // DRAPEAU, lue par le contrôle de langue de l'inscription et par la
-    // suggestion de langue d'un pays — un fait voisin, pas la liste de la barre.
-    // Son unification est un chantier à part ; ce qui est refusé ici, c'est
-    // qu'elle passe pour la même chose, et l'exemption est refusée dès qu'elle
-    // n'a plus de sujet (copie supprimée ou renommée).
-    const COPIE_CONNUE = '/services/geolocationService.js';
+    // La QUATRIÈME copie a été UNIFIÉE le 27/09/2026 : `AVAILABLE_LANGUAGES`
+    // (`src/services/geolocationService.js`) portait les mêmes libellés, indexés
+    // par code, et servait le contrôle de langue de l'inscription comme la
+    // suggestion de langue d'un pays. Elle est désormais CONSTRUITE depuis le
+    // propriétaire, donc elle ne DÉCLARE plus aucun libellé — et l'exemption qui
+    // la tolérait a été RETIRÉE AVEC ELLE : une exemption qui n'a plus de sujet
+    // est un mensonge, et le refus de péremption l'énonçait déjà. La FORME est
+    // vérifiée elle aussi, sinon « plus de copie » pourrait vouloir dire « plus
+    // de table du tout ».
+    const service = sources.find(([chemin]) => chemin.endsWith('/services/geolocationService.js'));
+    expect(service, 'le service de géolocalisation n’a pas été lu').toBeTruthy();
     expect(
-      declarants.some((chemin) => chemin.endsWith(COPIE_CONNUE)),
-      `l’exemption pour ${COPIE_CONNUE} n’a plus de sujet : elle doit être retirée`
-    ).toBe(true);
+      service[1],
+      'AVAILABLE_LANGUAGES doit être DÉRIVÉE du propriétaire, jamais re-déclarée'
+    ).toMatch(/Object\.fromEntries\(\s*LANGUAGES\.map/);
 
     expect(
-      declarants.filter((chemin) => !chemin.endsWith(COPIE_CONNUE)).map((chemin) => chemin.split('/').pop()),
+      declarants.map((chemin) => chemin.split('/').pop()),
       'la liste des langues est re-déclarée ailleurs que chez son propriétaire'
     ).toEqual(['languages.js']);
   });

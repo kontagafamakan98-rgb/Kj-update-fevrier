@@ -505,6 +505,38 @@ jobs:
         working-directory: frontend
         run: node scripts/check-drapeaux-emoji.js
 
+      # Une `@keyframes` doit être JOUÉE, et une animation jouée doit être
+      # DÉCLARÉE : le garde « aucun sélecteur sans porteur » juge des SÉLECTEURS,
+      # jamais un nom d'ANIMATION, donc les deux directions de cet angle mort
+      # étaient à la main. La seconde est SILENCIEUSE (un `@keyframes` manquant
+      # n'est pas une erreur pour un navigateur) : l'animation ne tourne plus et
+      # aucun test n'échoue. Le décodeur est conscient du JavaScript parce que
+      # LE SUJET Y EST ENTIÈREMENT sur cet arbre : `ToastContainer.js` et
+      # `serviceWorkerRegistration.js` déclarent leurs `@keyframes` dans un
+      # littéral de gabarit, et les usages sont un objet de style JSX et un
+      # `cssText` — un lecteur CSS seul rendrait un vert VIDE. Il ne lit que
+      # `src/`, donc il passe AVANT le build.
+      - name: Check every @keyframes is played and every played animation is declared
+        working-directory: frontend
+        run: node scripts/check-keyframes-animations.js
+
+      # AUCUN VERDICT NE PORTE SUR UN TEMPS ABSOLU sans être déclaré et classé.
+      # Le défaut d'origine est mesuré : un garde jugeait la hauteur du document
+      # pré-rendu contre un nombre de pixels absolu relevé sur une machine — vert
+      # ici, rouge ailleurs, parce que le verdict portait sur l'HÔTE. Ce défaut
+      # vit aussi dans un budget Lighthouse en millisecondes et dans un délai de
+      # test. Le garde n'essaie pas de rendre portables les métriques de
+      # laboratoire : il empêche qu'une borne entre en SILENCE et décide seule.
+      # Chaque borne des surfaces déclarées doit porter une classe d'un
+      # vocabulaire fermé et une justification ; une borne qui DÉCIDE (classe
+      # HOTE ou MESURE) n'est tolérée que si un angle accepté nomme ce qui la
+      # compense ; une borne nouvelle, une borne disparue et une surface
+      # introuvable rougissent. Il lit des fichiers de configuration, donc il
+      # passe AVANT le build.
+      - name: Check no verdict rests on an absolute time bound
+        working-directory: frontend
+        run: node scripts/check-juges-de-temps.js
+
       - name: Build
         working-directory: frontend
         env:

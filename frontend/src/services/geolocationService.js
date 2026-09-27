@@ -5,6 +5,7 @@ import { GeolocationCache } from './geolocation-cache';
 import { getGeolocationPermissionState, getCurrentPositionWithOptions, getBestAvailableGpsPosition, TARGET_GPS_ACCURACY } from './geolocation-gps';
 import { fetchIpGeolocationServices } from './geolocation-network';
 import { loadGeographicDatabase, getDatabase, FALLBACK_COUNTRY_DATA } from './geolocation-database';
+import { LANGUAGES } from '../config/languages';
 
 /**
  * MODULE DE GÉOLOCALISATION UNIQUE (fusion de geolocationService.js et
@@ -1032,34 +1033,23 @@ export const getPopularBanksByCountry = (country) => {
   return banks[countryCode] || [];
 };
 
-// Langues disponibles dans l'application
-export const AVAILABLE_LANGUAGES = {
-  'fr': {
-    code: 'fr',
-    name: 'Français',
-    nativeName: 'Français'
-  },
-  'en': {
-    code: 'en', 
-    name: 'English',
-    nativeName: 'English'
-  },
-  'wo': {
-    code: 'wo',
-    name: 'Wolof',
-    nativeName: 'Wolof'
-  },
-  'bm': {
-    code: 'bm',
-    name: 'Bambara',
-    nativeName: 'Bamanankan'
-  },
-  'mos': {
-    code: 'mos',
-    name: 'Mooré',
-    nativeName: 'Mòoré'
-  }
-};
+// Langues disponibles dans l'application — INDEXÉES par code, et DÉRIVÉES du
+// propriétaire unique (`src/config/languages.js`).
+//
+// Cette table était la QUATRIÈME copie de la liste : les mêmes libellés, écrits
+// une quatrième fois, indexés par code et lus par le contrôle de langue de
+// l'inscription (`RegistrationLanguageSelector`) et par la suggestion de langue
+// d'un pays. Un libellé retouché dans la barre ne l'était donc pas ici, et rien
+// ne rougissait — même défaut que les trois copies que `src/config/languages.js`
+// a fermées, même remède : on ne surveille pas une copie, on la supprime. La
+// FORME attendue par les lecteurs (un accès par code, `AVAILABLE_LANGUAGES[code]`)
+// est conservée, mais elle est désormais CONSTRUITE depuis `LANGUAGES`.
+//
+// L'ordre d'insertion reste celui du propriétaire (fr, en, wo, bm, mos), ce dont
+// dépend `getOrderedLanguagesForCountry` (« les autres langues », dans cet ordre).
+export const AVAILABLE_LANGUAGES = Object.fromEntries(
+  LANGUAGES.map((langue) => [langue.code, langue])
+);
 
 const getLanguageConfigByCountry = (country) => {
   const countryCode = normalizeCountryCode(country?.code || country);
