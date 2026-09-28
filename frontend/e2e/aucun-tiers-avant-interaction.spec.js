@@ -3,7 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ROUTES } from './helpers/geometrie.js'
-import { attendreLeSilenceDesRequetes } from './helpers/attentes.js'
+// L'écoute CDP et les deux attentes de journal vivent dans le harnais partagé :
+// la sonde INVERSE (`e2e/tiers-apres-interaction.spec.js`) a besoin exactement
+// des mêmes, et deux copies divergeraient au premier correctif. Le pourquoi du
+// protocole (l'initiateur, que `page.on('request')` ne porte pas dans cette
+// version de Playwright) est écrit là-bas, une fois.
+import { ecouterLesRequetes, laisserChargerSansAppuyer } from './helpers/requetes.js'
 import { shellFileFor } from '../scripts/site-meta.js'
 import {
   CE_QUE_LE_GARDE_STATIQUE_VOIT,
@@ -38,13 +43,9 @@ import {
  * — un tiers est un hôte qu'on n'exploite pas.
  *
  * ── Pourquoi le protocole, pas `page.on('request')` ─────────────────────────
- * Le listener de haut niveau ne porte PAS l'initiateur dans cette version de
- * Playwright (`request.initiator is not a function`, mesuré le 26/09/2026). Or
- * l'initiateur est la moitié utile du refus. On lit donc `Network.requestWillBeSent`
- * du CDP, qui porte `initiator` (`{ type, url, lineNumber }`) ET le `type` de
- * ressource : la sonde est CHROMIUM par construction, comme la sonde de coût du
- * document (`e2e/style-layout-document.spec.js`), et elle échoue si le protocole
- * ne répond pas plutôt que de rendre un vert sans lecture.
+ * Voir `e2e/helpers/requetes.js` : l'initiateur (la moitié utile d'un refus) ne
+ * se lit que par `Network.requestWillBeSent` du CDP, et les deux sondes — celle
+ * d'AVANT et celle d'APRÈS — partagent cette écoute.
  *
  * ── Les routes ──────────────────────────────────────────────────────────────
  * Dérivées de `src/config/page-meta.js` (comme le harnais de géométrie) : une
@@ -61,33 +62,9 @@ import {
  */
 
 /**
- * Laisse partir les requêtes du chargement sans le moindre appui.
- *
- * C'ÉTAIT une seconde fixe, et elle était choisie CONTRE `networkidle` :
- * l'application interroge son API, et une attente de « réseau au repos » qui ne
- * vient jamais serait un rouge sur la montre, pas sur le fond. Le remède n'était
- * donc pas de revenir à `networkidle`, mais d'écrire la condition sur le JOURNAL
- * QUE LE VERDICT UTILISE DÉJÀ : il se tait (plus une seule requête nouvelle
- * pendant la durée de calme du harnais), avec un plafond. Un chargement rapide
- * rend la main plus tôt ; une application qui interroge en boucle est attendue
- * jusqu'au plafond, au lieu d'être jugée sur une seconde qui ne veut rien dire.
- *
- * Le pas de sondage, la durée de calme et le plafond sont des paramètres NOMMÉS
- * de `e2e/helpers/attentes.js`, jamais des littéraux de spec (angle mort 19 de
- * CI-COVERAGE.md, refermé le 28/09/2026). Ce qui reste vrai et l'est toujours :
- * le cas PUBLIE le nombre de requêtes observées et ne juge jamais sur ce nombre.
- */
-async function laisserChargerSansAppuyer(page, requetes) {
-  await page.waitForLoadState('load')
-  return attendreLeSilenceDesRequetes(() => requetes.length)
-}
-
-/**
- * Branche l'écoute des requêtes au niveau du protocole, AVANT la navigation.
- *
- * @returns {Promise<{requetes: Array<{url: string, sorte: string, initiateur: object}>}>}
- *   La liste vivante que la sonde relit après le chargement. Une URL demandée,
- *   sa sorte de ressource et l'initiateur qui l'a lancée.
+ * La coquille pré-rendue de l'accueil, lue depuis le disque pour la seconde
+ * preuve d'échec (un tiers DÉCLARÉ dans le HTML servi — `build/index.html` n'est
+ * jamais réécrit, la mutation est servie au vol).
  */
 const COQUILLE_ACCUEIL = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -95,20 +72,6 @@ const COQUILLE_ACCUEIL = path.resolve(
   'build',
   'index.html'
 )
-
-async function ecouterLesRequetes(page) {
-  const requetes = []
-  const session = await page.context().newCDPSession(page)
-  await session.send('Network.enable')
-  session.on('Network.requestWillBeSent', (evenement) => {
-    requetes.push({
-      url: evenement.request?.url || '',
-      sorte: evenement.type || 'Autre',
-      initiateur: evenement.initiator,
-    })
-  })
-  return { requetes }
-}
 
 test.describe('Aucun tiers contacté avant toute interaction', () => {
   for (const route of ROUTES) {
