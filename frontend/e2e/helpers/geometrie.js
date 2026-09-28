@@ -214,6 +214,36 @@ export const RELEVE_GEOMETRIE = () => {
       .sort((a, b) => a.boite[1] - b.boite[1] || a.boite[0] - b.boite[0])
   }
 
+  // ── LES ICÔNES DESSINÉES : boîte et `vertical-align` ────────────────────
+  // L'encre d'un texte ne dit RIEN d'une icône : un `<svg>` n'a pas de nœud de
+  // texte, donc l'étendue mesurée ci-dessus l'ignore complètement. Or les icônes
+  // sont dessinées par les DEUX canaux depuis le même registre
+  // (`src/config/page-icons.js`), et deux choses peuvent y diverger sans qu'un
+  // seul mot bouge : la BOÎTE (taille de la classe, `h-4 w-4` contre `h-5 w-5`)
+  // et le `vertical-align` — qui est la propriété par laquelle une icône en tête
+  // de phrase se pose sur la ligne de texte (`align-[-0.15em]` calibré pour
+  // `text-sm` laissait son centre 1,7 px trop haut dans un `text-xs`, mesuré le
+  // 26/09/2026).
+  //
+  // L'identité de l'icône est PORTÉE PAR LE BALISAGE des deux côtés
+  // (`data-icone="nom"`, `data-drapeau="nom"` — les attributs que le build exige
+  // déjà des coquilles), donc l'appariement se fait par NOM et non par position :
+  // c'est ce qui permet de dire « la même icône, ailleurs » au lieu de « quelque
+  // chose a bougé ». Un `<svg>` sans repère (les icônes du chrome, le logo) est
+  // relevé quand même, sous le nom `svg` : sans nom, il ne peut être apparié que
+  // par sa boîte, et il vaut mieux le compter que l'ignorer.
+  const icones = []
+  for (const element of document.querySelectorAll('svg')) {
+    const r = element.getBoundingClientRect()
+    if (r.width <= 0 || r.height <= 0) continue
+    icones.push({
+      nom: element.getAttribute('data-icone') || element.getAttribute('data-drapeau') || 'svg',
+      boite: [arrondi(r.x), arrondi(r.y), arrondi(r.width), arrondi(r.height)],
+      alignement: getComputedStyle(element).verticalAlign,
+      dansMain: Boolean(element.closest('main')),
+    })
+  }
+
   const rect = (selecteur) => {
     const element = document.querySelector(selecteur)
     if (!element) return null
@@ -229,6 +259,7 @@ export const RELEVE_GEOMETRIE = () => {
     footer: rect('footer'),
     alignementApp: document.querySelector('.App') ? getComputedStyle(document.querySelector('.App')).textAlign : null,
     textes,
+    icones,
   }
 }
 
@@ -364,6 +395,65 @@ export function comparerGeometrie(coquille, react) {
       compares += 1
     }
   }
+  // ── Les ICÔNES, comparées SUR LES MÊMES BORNES que les textes ─────────────
+  // Appariement par NOM (`data-icone` / `data-drapeau`), puis par position : une
+  // page dessine plusieurs fois la même icône (les flèches des listes de
+  // l'accueil), donc chaque instance de la coquille réclame son homologue à la
+  // MÊME boîte, comme pour les textes. Ce que le garde exige d'une paire : la
+  // même boîte ET le même `vertical-align` — la boîte seule laisserait passer
+  // l'icône en tête de phrase posée 1,7 px trop haut, qui est exactement le
+  // défaut qu'une mesure d'atelier avait trouvé à la main le 26/09/2026.
+  //
+  // La DIRECTION est celle de la coquille, comme pour les textes : une icône que
+  // la coquille publie doit être dessinée par React (sinon elle est comptée
+  // « absente » et NOMMÉE, la divergence de contenu étant jugée mot pour mot par
+  // `e2e/texte-coquille-react.spec.js`) ; l'inverse — React dessine des icônes que
+  // la coquille n'a pas (le chrome de l'app, les cartes d'une réponse d'API) — est
+  // normal, compté, jamais une divergence.
+  const dispo = new Map()
+  for (const i of react.icones || []) {
+    if (!dispo.has(i.nom)) dispo.set(i.nom, [])
+    dispo.get(i.nom).push({ i, pris: false })
+  }
+  const iconesAbsentes = []
+  const iconesHorsZone = []
+  let iconesComparees = 0
+  for (const a of coquille.icones || []) {
+    // La frontière de contenu vaut aussi pour les icônes : au-delà, la position
+    // dépend d'un bloc que la coquille ne connaît pas (cf. plus haut).
+    if (!a.dansMain && a.boite[1] >= frontiere) {
+      iconesHorsZone.push(a.nom)
+      continue
+    }
+    const candidats = dispo.get(a.nom) || []
+    const libres = candidats.filter(({ pris }) => !pris)
+    if (!libres.length) {
+      iconesAbsentes.push(a.nom)
+      continue
+    }
+    let choisi = libres.find(
+      ({ i }) => i.alignement === a.alignement && memeBoite(a.boite, i.boite)
+    )
+    if (!choisi) {
+      const proche = libres
+        .map(({ i }) => ({ i, d: Math.max(ecart(a.boite, i.boite), i.alignement === a.alignement ? 0 : 1) }))
+        .sort((u, v) => u.d - v.d)[0]
+      const sien = proche.i
+      divergences.push(
+        `icône « ${a.nom} » : ${boite(a.boite)} dans la coquille — React la dessine à ` +
+          `${boite(sien.boite)}, soit Δx=${(a.boite[0] - sien.boite[0]).toFixed(2)} px et ` +
+          `Δy=${(a.boite[1] - sien.boite[1]).toFixed(2)} px` +
+          (a.alignement !== sien.alignement
+            ? ` ; vertical-align : « ${a.alignement} » contre « ${sien.alignement} »`
+            : '')
+      )
+      choisi = proche
+    }
+    choisi.pris = true
+    iconesComparees += 1
+  }
+  const nomsCoquille = new Set((coquille.icones || []).map((i) => i.nom))
+
   return {
     divergences,
     compares,
@@ -373,6 +463,13 @@ export function comparerGeometrie(coquille, react) {
     texteFrontiere,
     horsZone: horsZone.length,
     exemplesHorsZone: [...new Set(horsZone)].slice(0, 5),
+    iconesComparees,
+    iconesCoquille: (coquille.icones || []).length,
+    iconesAbsentes: iconesAbsentes.length,
+    exemplesIconesAbsentes: [...new Set(iconesAbsentes)].slice(0, 5),
+    iconesHorsZone: iconesHorsZone.length,
+    exemplesIconesHorsZone: [...new Set(iconesHorsZone)].slice(0, 5),
+    iconesReactSeules: (react.icones || []).filter((i) => !nomsCoquille.has(i.nom)).length,
   }
 }
 
