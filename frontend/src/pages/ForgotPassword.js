@@ -196,27 +196,33 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">
-            <span className="text-white text-2xl font-bold"><IconePage nom={pagePlan.badgeIcon} classe={CLASSES_ICONE.badge} /></span>
+          <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600">
+            <span className="text-white text-2xl font-bold"><IconePage nom={pagePlan.badgeIcon} classe={CLASSES_ICONE.badgeEtape} /></span>
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (forgot-password.html). Classes inchangées. */}
-          <h1 className="mt-6 text-3xl font-extrabold text-gray-900">{t(pagePlan.titleKey)}</h1>
+          {/* Voir src/pages/Register.js : le titre garde sa taille sans 30 px.
+              Le passer au serif du site faisait élire ce `<h1>` comme élément
+              LCP (mesuré : 18 576 px² en desktop contre 16 021 px² pour le
+              sous-titre que le plan déclare), et les deux tailles n'élisent pas
+              le même élément — une déclaration ne peut en décrire qu'un. Seule
+              la TEINTE change (encre chaude). */}
+          <h1 className="mt-6 text-3xl font-bold text-stone-900">{t(pagePlan.titleKey)}</h1>
           <p className={pagePlan.subtitleClass}>{t(pagePlan.subtitleKey)}</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-md p-6 space-y-6">
+        <div className="carte-editoriale p-6 space-y-6">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <span className={step === 'email' ? 'text-blue-600' : 'text-green-600'}>1. {t(pagePlan.stepEmailKey)}</span>
-            <span className={step === 'code' ? 'text-blue-600' : step === 'password' ? 'text-green-600' : 'text-gray-500'}>2. {t(pagePlan.stepCodeKey)}</span>
-            <span className={step === 'password' ? 'text-blue-600' : 'text-gray-500'}>3. {t(pagePlan.stepPasswordKey)}</span>
+            <span className={step === 'email' ? 'text-orange-600' : 'text-green-600'}>1. {t(pagePlan.stepEmailKey)}</span>
+            <span className={step === 'code' ? 'text-orange-600' : step === 'password' ? 'text-green-600' : 'text-stone-500'}>2. {t(pagePlan.stepCodeKey)}</span>
+            <span className={step === 'password' ? 'text-orange-600' : 'text-stone-500'}>3. {t(pagePlan.stepPasswordKey)}</span>
           </div>
 
           {displayedEmail && step !== 'email' && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-700">
               {interpolate(t('forgotPasswordSentTo'), { email: displayedEmail })}
             </div>
           )}
@@ -236,7 +242,7 @@ const ForgotPassword = () => {
                   type="email"
                   autoComplete="email"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
                   placeholder={t('email')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -248,7 +254,7 @@ const ForgotPassword = () => {
               <LoadingButton
                 type="submit"
                 loading={loading}
-                className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
               >
                 {t(pagePlan.sendCodeKey)}
               </LoadingButton>
@@ -266,7 +272,7 @@ const ForgotPassword = () => {
                   autoComplete="one-time-code"
                   maxLength={6}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-center text-lg tracking-[0.35em] focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-center text-lg tracking-[0.35em] focus:border-orange-500 focus:outline-none focus:ring-orange-500"
                   placeholder="000000"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
@@ -282,7 +288,7 @@ const ForgotPassword = () => {
               <LoadingButton
                 type="submit"
                 loading={loading}
-                className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
               >
                 {t('forgotPasswordVerifyCode')}
               </LoadingButton>
@@ -291,7 +297,7 @@ const ForgotPassword = () => {
                 type="button"
                 disabled={loading || cooldownSeconds > 0}
                 onClick={() => handleRequestCode('resend')}
-                className="w-full rounded-md border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-lg border border-orange-200 px-4 py-2 text-sm font-medium text-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t('forgotPasswordResendCode')}
               </button>
@@ -307,7 +313,7 @@ const ForgotPassword = () => {
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
                   placeholder={t('forgotPasswordStepPassword')}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -321,7 +327,7 @@ const ForgotPassword = () => {
                   type="password"
                   autoComplete="new-password"
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500"
                   placeholder={t('forgotPasswordConfirmPasswordLabel')}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -331,7 +337,7 @@ const ForgotPassword = () => {
               <LoadingButton
                 type="submit"
                 loading={loading}
-                className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
               >
                 {t('forgotPasswordResetPassword')}
               </LoadingButton>

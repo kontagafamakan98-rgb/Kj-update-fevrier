@@ -59,7 +59,7 @@ export const NAV_PLACEHOLDER =
 // dérive silencieuse possible entre la fabrique et son contrôle).
 export const CHROME_OUVERTURE =
   '<div class="App">' +
-  '<div class="min-h-screen bg-gray-50 relative flex flex-col">' +
+  '<div class="min-h-screen fond-sable relative flex flex-col">' +
   NAV_PLACEHOLDER +
   '<main class="flex-1 pb-24 md:pb-0">'
 

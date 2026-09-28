@@ -30,14 +30,24 @@ import { CONTACT, mailtoHref, telHref } from './contact.js';
 // données non textuelles (icônes, destination d'un lien, accent d'une ligne). Le
 // build refuse une coquille qui ne porte pas tout ce qui est déclaré ici (voir
 // `exigerCorpsDeclare` dans vite.config.js).
-// Les deux formes de ligne du bloc de contact : une ligne cliquable (avec son
-// survol) et une ligne de simple information. Elles servent aux DEUX canaux.
-// Refonte éditoriale du 28/09/2026 : le gris froid cède la place au gris chaud
-// (la gamme `stone` de Tailwind), pour que le filet d'une ligne de contact
-// appartienne à la même famille que celui d'une carte.
-const LIGNE_LIEN =
-  'flex items-center gap-3 rounded-xl border border-stone-200 px-4 py-3 hover:bg-stone-50 transition-colors';
-const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-stone-200 px-4 py-3';
+// La ligne de contact — la même pour /contact et pour /support, et lue par les
+// DEUX canaux de chacune. Refonte éditoriale du 28/09/2026 : elle quitte le
+// cadre à coin arrondi (`rounded-xl border border-stone-200 px-4 py-3`) pour la
+// LIGNE À FILET de l'accueil (`.liste-editoriale` + `.ligne-editoriale`, src/index.css),
+// avec la pastille ronde et la flèche de la colonne de droite. Une ligne de
+// contact devient donc une ENTRÉE : ce qu'elle publie tient dans une liste dont
+// l'ordre se lit, au lieu d'une boîte posée à côté d'une autre.
+const LIGNE_CONTACT = 'ligne-editoriale ligne-contact';
+
+// Les quatre classes du BLOC de contact (la liste, la pastille, le libellé, la
+// valeur) : elles sont portées par /contact et par /support, donc déclarées une
+// fois et recopiées dans les deux plans — jamais dans une page.
+const BLOC_CONTACT = {
+  listeContactClass: 'liste-editoriale',
+  pastilleContactClass: 'pastille-rond',
+  etiquetteContactClass: 'etiquette-contact',
+  valeurContactClass: 'valeur-contact',
+};
 
 // ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
 // L'ÉLÉMENT LCP DE « / » A CHANGÉ DE NATURE LE 27/09/2026, et c'est mesuré : la
@@ -161,6 +171,53 @@ const EDITORIAL_ACCUEIL = {
   etapesGrilleClass: 'etapes-grille',
   etapesTeteClass: 'etapes-tete',
   cadrePhotoClass: 'cadre-photo',
+};
+
+// ── LE VOCABULAIRE COMMUN AUX PAGES DE CONTENU (28/09/2026) ─────────────────
+// Deuxième portée du même langage. `EDITORIAL_ACCUEIL` ci-dessus habille
+// l'accueil ; celui-ci habille toute page dont la coquille publie un corps de
+// contenu — aujourd'hui /how-it-works. Ce ne sont pas des variantes : ce sont
+// les MÊMES classes de src/index.css, déclarées une seconde fois parce qu'un
+// plan se lit seul (chaque route déclare ce que SA coquille doit porter).
+//
+// Ce qui a décidé de la séparation : `pageSectionParts` (plus bas) verse dans
+// les textes attendus TOUTE chaîne du plan qui n'est ni une clé i18n ni un nom
+// d'icône. Étaler le vocabulaire complet de l'accueil sur /how-it-works aurait
+// donc exigé que sa coquille publiât aussi la grille du héros, le ruban des
+// pays et la galerie — trois choses que cette page ne peint pas, et le build
+// aurait refusé. Un plan ne déclare que ce qu'il publie.
+const EDITORIAL_PAGE = {
+  // La bande de tête : elle remplace le dégradé orange → ROUGE que seule cette
+  // page portait.
+  bandePageClass: 'bande-page',
+  entreeSectionClass: 'entree-section',
+  listeClass: 'liste-editoriale',
+  ligneEtapeClass: 'ligne-editoriale ligne-etape',
+  pastilleClass: 'pastille-rond',
+  pastilleCreuseClass: 'pastille-rond pastille-rond-creuse',
+  nomLigneClass: 'nom-de-ligne',
+  noteLigneClass: 'note-de-ligne',
+  flecheLigneClass: 'fleche-de-ligne',
+  panneauClass: 'panneau-sequestre',
+  panneauArtClass: 'panneau-art',
+  panneauOrbeClass: 'panneau-orbe',
+  panneauImageClass: 'panneau-image',
+  panneauEstampilleClass: 'panneau-estampille',
+  listeGarantiesClass: 'liste-garanties',
+  faqListeClass: 'faq-liste',
+  faqLigneClass: 'faq-ligne',
+  faqMarqueClass: 'faq-marque',
+  ctaClass: 'cta-final',
+  ctaInnerClass: 'cta-final-inner',
+  ctaActionsClass: 'cta-actions',
+  lienFlecheClass: 'lien-fleche',
+  lienFlecheClairClass: 'lien-fleche lien-fleche-clair',
+  boutonClass: 'bouton bouton-creme',
+  boutonSecondClass: 'bouton bouton-contour',
+  headClass: 'titre-section',
+  sectionIntroClass: 'text-stone-600',
+  paperClass: 'fond-papier',
+  sandClass: 'fond-sable',
 };
 
 // ── Le VOCABULAIRE ÉDITORIAL de l'accueil, déclaré une fois ──────────────────
@@ -344,9 +401,9 @@ export const PAGE_SECTIONS = {
     // dessin pour les trois emplacements — c'était déjà l'intention de la clé
     // partagée, mais la page et la coquille en publiaient encore un emoji.
     steps: [
-      { icone: 'howStep1', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
-      { icone: 'escrow', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
-      { icone: 'howStep3', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
+      { icone: 'howStep1', numberKey: 'stepNumber1', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
+      { icone: 'escrow', numberKey: 'stepNumber2', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
+      { icone: 'howStep3', numberKey: 'stepNumber3', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
     ],
     // Le glyphe du bloc « séquestre détaillé » (le même bouclier dessiné) et le
     // repère du dépliant de la FAQ : le repère reste une clé i18n, le glyphe est
@@ -370,6 +427,10 @@ export const PAGE_SECTIONS = {
     ],
     titleKey: 'howItWorksTitle',
     heroKey: 'howItWorksHero',
+    // Le vocabulaire éditorial commun (voir EDITORIAL_PAGE plus haut) : les
+    // mêmes classes que l'accueil, lues par src/pages/HowItWorks.js ET par
+    // vite-plugins/prerender/shells-routes.js.
+    ...EDITORIAL_PAGE,
     // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
     // L'élément LCP de /how-it-works est le SOUS-TITRE du héros (« Trouver un
     // travailleur ou une mission… »). Mesuré le 25/09/2026 comme sur /jobs
@@ -378,6 +439,18 @@ export const PAGE_SECTIONS = {
     // Re-mesuré le 26/09/2026 avec la police SERVIE PAR LE SITE : 26 334 /
     // 32 928 px² (voir /login — la police n'est plus celle de l'hôte).
     //
+    // RE-MESURÉ LE 28/09/2026, au port du vocabulaire éditorial : **29 260 px²
+    // en mobile et 32 830 en desktop**, une seule candidate au premier paint
+    // (`e2e/lcp-geometrie-declaree.spec.js`), et l'aire est IDENTIQUE entre la
+    // coquille et React (`e2e/lcp-geometrie.spec.js`) — c'est l'invariant, et il
+    // tient. Le mobile gagne 2 926 px² par rapport au relevé de la veille : ce
+    // n'est PAS la correction de contraste (une couleur ne change ni la boîte ni
+    // le repli) mais le TITRE de la bande, qui est passé à la police de titrage
+    // le 27/09/2026 et se replie plus court — le paragraphe remonte donc
+    // entièrement au-dessus de la ligne de flottaison, là où il était auparavant
+    // coupé par le bas de la fenêtre. Le plancher de 18 000 px² de
+    // `e2e/lcp-geometrie-declaree.spec.js` reste très en dessous des deux tailles.
+    //
     // `heroFrameClass` porte la largeur du héros (donc le retour à la ligne du
     // sous-titre, qui porte lui-même son `max-w-2xl`), `heroSubtitleClass` sa
     // hauteur, et `heroTitleClass` le texte qui le précède et pourrait lui
@@ -385,9 +458,26 @@ export const PAGE_SECTIONS = {
     // et vite-plugins/prerender/shells-routes.js.
     heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
     heroTitleClass: 'titre-page mb-4',
-    heroSubtitleClass: 'text-lg text-stone-600 max-w-2xl mx-auto',
+    // Le sous-titre du héros est l'élément LCP de la page : sa GÉOMÉTRIE ne
+    // change pas d'un caractère (`text-lg` et `max-w-2xl` décident du retour à
+    // la ligne, donc de l'aire mesurée). Ce qui change est sa COULEUR, et c'est
+    // un défaut qui a été mesuré : `text-stone-600` sur le fond orange du héros
+    // donne un contraste de 2,6:1 — la page publiait un paragraphe illisible
+    // depuis sa mise en ligne. `text-orange-50` mesure 7,3:1 sur `#ea580c`.
+    heroSubtitleClass: 'text-lg text-orange-50 max-w-2xl mx-auto',
     escrowTitleKey: 'escrowWhatTitle',
     escrowTextKey: 'escrowWhatText',
+    // L'illustration et l'estampille du panneau de séquestre : le MÊME fichier et
+    // la MÊME clé que le panneau de l'accueil (l'estampille reprend un texte que
+    // la page publie déjà ; elle n'en invente aucun). Le chemin est déclaré ici
+    // parce que la coquille le publie aussi, dans la même balise `<img>`.
+    panneauImageSrc: '/assets/kojo-paiement-securise.svg',
+    estampilleKey: 'securePayments',
+    // Le repère des quatre garanties : une icône DESSINÉE (`check`), jamais un
+    // caractère — c'est la règle qui a retiré les emoji du document. Le nom du
+    // champ finit par `Icon` : `pageSectionParts` le verse dans les icônes, dont
+    // la coquille doit porter le repère `data-icone`.
+    garantieIcon: 'check',
     faqTitleKey: 'faqTitle',
     readyTitleKey: 'readyToStart',
     lookingKey: 'lookingForServices',
@@ -629,10 +719,10 @@ export const PAGE_SECTIONS = {
     subtitleKey: 'supportSubtitle',
     // Le sous-titre est l'élément LCP de la page (mesuré : 16 720 px² mobile /
     // 9 480 desktop avec la police servie — voir /login) — UNE candidate au
-    // premier paint. La chaîne
-    // est courte (`text-gray-600`) mais elle n'apparaît plus ailleurs dans
-    // Support.js ni dans le corps de sa coquille : elle a bien un propriétaire
-    // unique.
+    // premier paint. La chaîne est courte (`text-stone-600`) mais elle vit dans
+    // CE plan seulement : Support.js et le corps de sa coquille la lisent,
+    // aucun des deux ne la recopie (c'est ce que vérifie
+    // scripts/__tests__/check-lcp-geometrie.test.js).
     subtitleClass: 'text-stone-600',
     // La carte de contact publie le titre du mode « contact direct » — même
     // texte, donc même clé (elle était écrite deux fois dans le dictionnaire).
@@ -649,20 +739,33 @@ export const PAGE_SECTIONS = {
       emailPlaceholderKey: 'supportTicketEmailPlaceholder',
       ctaKey: 'supportTrackCta',
     },
+    // ── Le vocabulaire éditorial de la page, déclaré UNE fois ──────────────
+    // Les deux cartes de choix, la carte de contact et les quatre lignes de
+    // contact lisent ces cinq chaînes. Le 28/09/2026, elles portaient encore
+    // une ombre (`shadow-sm`), un coin `rounded-2xl` et une pastille de teinte
+    // EMPRUNTÉE (`bg-blue-100` pour le courriel, `bg-emerald-100` pour le
+    // téléphone) : c'étaient les deux seules teintes du site qui
+    // n'appartenaient à personne. La pastille ronde, elle, prend le sable et
+    // l'orange de la marque — c'est la même que sur l'accueil, et le glyphe qui
+    // la remplit dit déjà de quel moyen de contact il s'agit.
+    carteClass: 'carte-editoriale p-6',
+    carteModeClass:
+      'carte-editoriale carte-editoriale-cliquable flex flex-col items-center gap-3 p-6 text-center',
+    pastilleModeClass: 'pastille-rond pastille-rond-large',
+    titreEntreeClass: 'titre-entree',
+    ...BLOC_CONTACT,
     modes: [
       // Le glyphe du mode est DESSINÉ : la page publiait déjà un composant
       // lucide (`Bot`, `Phone`) là où la coquille publiait l'emoji de la clé —
-      // deux dessins pour un même mode. Les deux canaux lisent maintenant le
-      // même `icone`, et la couleur vient du `badgeClass` (`currentColor`).
+      // deux dessins pour un même mode. Les deux canaux lisent le même `icone`,
+      // et la couleur vient de la pastille qui le porte (`currentColor`).
       {
         icone: 'supportRobot',
-        badgeClass: 'bg-orange-100 text-orange-600',
         titleKey: 'supportRobotTitle',
         subtitleKey: 'supportRobotSubtitle',
       },
       {
         icone: 'contactCall',
-        badgeClass: 'bg-emerald-100 text-emerald-600',
         titleKey: 'supportDirectTitle',
         subtitleKey: 'supportDirectSubtitle',
       },
@@ -671,35 +774,34 @@ export const PAGE_SECTIONS = {
       {
         icone: 'contactCall',
         labelKey: 'contactCall',
-        badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
-        rowClass: LIGNE_LIEN,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactWhatsapp',
         labelKey: 'contactWhatsapp',
-        badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
         value: CONTACT.phoneDisplay,
         external: true,
-        rowClass: LIGNE_LIEN,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactSendEmail',
         labelKey: 'contactSendEmail',
-        badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
         value: CONTACT.email,
         breakAll: true,
-        rowClass: LIGNE_LIEN,
+        rowClass: LIGNE_CONTACT,
       },
       {
+        // Cette ligne N'EST PAS un lien (elle n'a pas de `href`) : c'est elle
+        // qui décide, dans les deux canaux, qu'aucune flèche n'est peinte —
+        // une flèche promet une destination.
         icone: 'contactAddress',
         labelKey: 'contactAddress',
-        badgeClass: 'bg-stone-100 text-stone-600',
         value: CONTACT.address,
-        rowClass: LIGNE_INFO,
+        rowClass: LIGNE_CONTACT,
       },
     ],
     links: [
@@ -793,6 +895,11 @@ export const PAGE_SECTIONS = {
     titleClass: 'titre-page mb-2',
     introClass: 'text-stone-600 mb-3',
     noteClass: 'text-sm text-stone-500 mb-6',
+    // Le vocabulaire éditorial des quatre lignes de contact : le MÊME bloc que
+    // /support (`BLOC_CONTACT`, plus haut). Les deux pages publiaient la même
+    // ligne sous deux habillages — un cadre arrondi ici, un cadre arrondi
+    // là-bas — et les deux sont maintenant une entrée de liste.
+    ...BLOC_CONTACT,
     // ── La carte Google : un contrôle, pas un embed au premier écran ───────
     // La coquille publiait l'iframe elle-même (en `loading="lazy"`). Mesuré
     // (Lighthouse 12.6.1, pile de la CI, Chrome 152, /contact mobile, 3 runs) :
@@ -820,10 +927,10 @@ export const PAGE_SECTIONS = {
     // et la règle `mailto:` (sujet compris) n'existent qu'à cet endroit, donc la
     // page et sa coquille ne peuvent pas publier deux liens différents.
     //
-    // `badgeClass` / `breakAll` sont l'identité de LA LIGNE (un accent par moyen
-    // de contact, un e-mail qui se coupe proprement) et non la mise en page de la
-    // page : les deux canaux doivent rendre la même ligne, donc ils la lisent ici
-    // plutôt que de la réécrire chacun de leur côté.
+    // `breakAll` est l'identité de LA LIGNE (un e-mail qui se coupe proprement,
+    // sans déborder de sa colonne) et non la mise en page de la page : les deux
+    // canaux doivent rendre la même ligne, donc ils la lisent ici plutôt que de
+    // la réécrire chacun de leur côté.
     //
     // Les libellés sont des CLÉS i18n, et les QUATRE MÊMES que les lignes de
     // /support (`rows` plus haut) : « Appeler », « WhatsApp », « Envoyer un
@@ -835,33 +942,33 @@ export const PAGE_SECTIONS = {
       {
         icone: 'contactCall',
         labelKey: 'contactCall',
-        badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactWhatsapp',
         labelKey: 'contactWhatsapp',
-        badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
         value: CONTACT.phoneDisplay,
         external: true,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactSendEmail',
         labelKey: 'contactSendEmail',
-        badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
         value: CONTACT.email,
         breakAll: true,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactAddress',
         labelKey: 'contactAddress',
-        badgeClass: 'bg-stone-100 text-stone-600',
         href: CONTACT.mapsUrl,
         value: CONTACT.address,
         external: true,
+        rowClass: LIGNE_CONTACT,
       },
     ],
     links: [
@@ -886,14 +993,25 @@ export const PAGE_SECTIONS = {
     // flux, et `frameClass` la largeur — c'est elle qui décide du retour à la
     // ligne, donc de la hauteur du corps.
     //
-    // Ces cinq chaînes étaient recopiées dans src/pages/Privacy.js et
+    // Ces six chaînes étaient recopiées dans src/pages/Privacy.js et
     // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
     // faisait diverger les deux peintures en silence.
+    //
+    // Refonte éditoriale du 28/09/2026 : le titre d'une section prend le dessin
+    // des titres d'entrée du site (serif, un cran sous `.titre-section`) et
+    // chaque section devient une ENTRÉE à filet (`.bloc-de-section`) — quatre
+    // paragraphes séparés par du vide se lisaient comme un document, quatre
+    // entrées à filet se lisent comme une liste ordonnée, le vocabulaire de
+    // l'accueil. La TAILLE du titre ne bouge pas (`1.25rem`, soit le `text-xl`
+    // qu'elle portait) : le plus grand texte peint reste le CORPS d'une
+    // section, donc l'élément LCP de la page reste celui sur lequel elle a été
+    // mesurée.
     frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
     titleClass: 'titre-page mb-4',
     introClass: 'text-stone-600 mb-8',
-    sectionTitleClass: 'text-xl font-semibold text-stone-900 mb-2',
+    sectionTitleClass: 'titre-entree mb-2',
     sectionBodyClass: 'text-stone-600',
+    sectionWrapClass: 'bloc-de-section',
     sections: [
       { titleKey: 'privacyDataTitle', bodyKey: 'privacyDataBody' },
       { titleKey: 'privacyRetentionTitle', bodyKey: 'privacyRetentionBody' },
@@ -917,11 +1035,14 @@ export const PAGE_SECTIONS = {
     introKey: 'termsIntro',
     // Même géométrie que /privacy : le plus grand texte peint est le CORPS
     // d'une section, c'est `sectionBodyClass` qui porte l'élément LCP.
+    // Même vocabulaire aussi : les deux pages se lisent d'un bout à l'autre
+    // comme un document — titre serif et sections à filet.
     frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
     titleClass: 'titre-page mb-4',
     introClass: 'text-stone-600 mb-8',
-    sectionTitleClass: 'text-xl font-semibold text-stone-900 mb-2',
+    sectionTitleClass: 'titre-entree mb-2',
     sectionBodyClass: 'text-stone-600',
+    sectionWrapClass: 'bloc-de-section',
     sections: [
       { titleKey: 'termsServiceTitle', bodyKey: 'termsServiceBody' },
       { titleKey: 'termsAccountTitle', bodyKey: 'termsAccountBody' },

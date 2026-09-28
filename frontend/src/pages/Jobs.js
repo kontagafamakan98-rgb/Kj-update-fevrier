@@ -31,6 +31,23 @@ import {
   JOBS_PAGE_SIZE,
 } from '../hooks/useJobsData';
 
+// ── LES PUCES ET LE PANNEAU DES FILTRES ────────────────────────────────────
+// Le vocabulaire éditorial du site (src/index.css), et NON des utilitaires
+// recopiés : les onglets et les puces de catégorie étaient des PILULES
+// (`rounded-full`) aux teintes froides (`bg-gray-900`, `border-gray-200`),
+// c'est-à-dire la forme et la gamme que la refonte a retirées. Ils gardent
+// leur fonction (une catégorie active reste visible sans ouvrir de menu) avec
+// le rayon des boutons du site et la gamme chaude.
+//
+// Ces classes ne sont PAS déclarées dans le plan de /jobs (`page-sections.js`)
+// et c'est voulu : le plan déclare ce que la coquille pré-rendue publie, et la
+// coquille de /jobs ne peint que son en-tête et son introduction. Une
+// déclaration sans porteur dans la coquille FERAIT ÉCHOUER le build.
+const PUCE = 'puce-filtre';
+const PUCE_ACTIVE = 'puce-filtre puce-filtre-active';
+const PANNEAU_FILTRES = 'panneau-filtres';
+const puceClass = (actif) => (actif ? PUCE_ACTIVE : PUCE);
+
 // ── La carte (Leaflet) n'est téléchargée QUE si on l'ouvre ─────────────────
 // `leaflet` ne publie qu'un bundle UMD ES5 (`dist/leaflet-src.js` : ni champ
 // `module`, ni `exports`), donc Rollup ne peut rien élaguer et la
@@ -281,19 +298,19 @@ export default function Jobs() {
           <>
             <button
               onClick={() => setTab(JOB_TAB_DISCOVER)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_DISCOVER ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+              className={puceClass(effectiveTab === JOB_TAB_DISCOVER)}
             >
               {pageT('tabDiscover') || 'Découvrir'}
             </button>
             <button
               onClick={() => setTab(JOB_TAB_APPLICATIONS)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_APPLICATIONS ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+              className={puceClass(effectiveTab === JOB_TAB_APPLICATIONS)}
             >
               {pageT('tabApplications') || 'Mes candidatures'}
             </button>
             <button
               onClick={() => setTab(JOB_TAB_MISSIONS)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_MISSIONS ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+              className={puceClass(effectiveTab === JOB_TAB_MISSIONS)}
             >
               {pageT('tabMissions') || 'Mes missions'}
             </button>
@@ -302,13 +319,13 @@ export default function Jobs() {
         {user?.user_type === 'client' && (
           <button
             onClick={() => setTab(JOB_TAB_MISSIONS)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${effectiveTab === JOB_TAB_MISSIONS ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+            className={puceClass(effectiveTab === JOB_TAB_MISSIONS)}
           >
             {pageT('myMissions') || 'Mes missions'}
           </button>
         )}
         {!user && (
-          <span className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-200">
+          <span className={PUCE_ACTIVE}>
             {pageT('tabDiscover') || 'Découvrir'}
           </span>
         )}
@@ -319,11 +336,11 @@ export default function Jobs() {
           lisaient comme trois blocs sans lien. Ils sont ici dans un seul
           panneau, dans l'ordre où on s'en sert : on écrit une recherche, on
           choisit une catégorie, puis on resserre autour de soi. */}
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+      <div className={PANNEAU_FILTRES}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <label htmlFor="jobs-recherche" className="sr-only">{t('search')}</label>
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="6.5" />
                 <path strokeLinecap="round" d="m16 16 4.5 4.5" />
@@ -338,14 +355,14 @@ export default function Jobs() {
               // `type="search"` allume le clavier de recherche sur mobile ;
               // WebKit y ajoute AUSSI sa propre croix d'effacement, qui ferait
               // doublon avec celle ci-dessus — elle est donc masquée.
-              className="w-full rounded-xl border border-gray-200 py-3 pl-11 pr-11 outline-none transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-100 [&::-webkit-search-cancel-button]:hidden"
+              className="w-full rounded-lg border border-stone-200 py-3 pl-11 pr-11 outline-none transition-colors focus:border-orange-500 focus:ring-2 focus:ring-orange-100 [&::-webkit-search-cancel-button]:hidden"
             />
             {Boolean(filters.search) && (
               <button
                 type="button"
                 onClick={() => setFilters((prev) => ({ ...prev, search: '' }))}
                 aria-label={t('clear')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
               >
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
@@ -357,7 +374,7 @@ export default function Jobs() {
             <select
               value={filters.status}
               onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-              className="rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 sm:w-56"
+              className="rounded-lg border border-stone-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100 sm:w-56"
             >
               {statuses.map((status) => (
                 <option key={status.value} value={status.value}>{status.label}</option>
@@ -368,7 +385,7 @@ export default function Jobs() {
             <button
               type="button"
               onClick={effacerLesFiltres}
-              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-stone-200 px-4 py-3 text-sm font-semibold text-stone-600 transition-colors hover:bg-stone-50"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
@@ -381,7 +398,7 @@ export default function Jobs() {
         {/* Catégories en puces : la catégorie active reste VISIBLE sans
             déplier un menu natif, et sur mobile un appui suffit. Le menu
             déroulant précédent demandait d'ouvrir, parcourir puis valider. */}
-        <div className="mt-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label={pageT('allCategories') || t('allCategories')}>
+        <div className="puces-defilantes mt-3" role="group" aria-label={pageT('allCategories') || t('allCategories')}>
           {categories.map((category) => {
             const actif = filters.category === category.value;
             return (
@@ -390,7 +407,7 @@ export default function Jobs() {
                 type="button"
                 onClick={() => setFilters((prev) => ({ ...prev, category: category.value }))}
                 aria-pressed={actif}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${actif ? 'border-orange-600 bg-orange-600 text-white' : 'border-gray-200 bg-white text-gray-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-700'}`}
+                className={puceClass(actif)}
               >
                 {category.label}
               </button>
@@ -401,9 +418,9 @@ export default function Jobs() {
         {/* Recherche par rayon : trouve les jobs proches de toi (uniquement
             les jobs portant des coordonnées GPS — les autres sont exclus quand
             le filtre est actif). */}
-        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-3">
-          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-            <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-3">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-700">
+            <svg className="h-4 w-4 text-stone-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 1 1 13 0C18.5 15.4 12 21 12 21z" />
               <circle cx="12" cy="10.5" r="2.2" />
             </svg>
@@ -417,32 +434,32 @@ export default function Jobs() {
               onChange={(e) => setRadiusKm(e.target.value)}
               aria-label={t('nearMe')}
               placeholder={t('radiusKmPlaceholder')}
-              className="w-32 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+              className="w-32 rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
             />
             <button
               onClick={locateMe}
               disabled={locating}
-              className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700 disabled:opacity-60"
+              className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700 disabled:opacity-60"
             >
               {locating ? t('locating') : (userCoords ? t('myPosition') : t('useMyPosition'))}
             </button>
             {radiusKm && (
               <button
                 onClick={() => { setRadiusKm(''); setUserCoords(null); }}
-                className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                className="rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50"
               >
                 {t('clear')}
               </button>
             )}
           </div>
           {radiusKm && !userCoords && (
-            <span className="text-xs text-gray-500">{t('radiusActivateHint')}</span>
+            <span className="text-xs text-stone-500">{t('radiusActivateHint')}</span>
           )}
         </div>
       </div>
 
       {loadError && (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <p className="font-medium">{loadError.message}</p>
           <button
             onClick={reessayer}
@@ -461,7 +478,7 @@ export default function Jobs() {
           // Placeholder à la hauteur exacte de la carte (60vh) : le swap
           // skeleton → carte ne décale rien (anti-CLS, même principe que
           // le skeleton de liste ci-dessous).
-          <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
+          <div className="rounded-lg overflow-hidden border border-stone-200" style={{ height: '60vh' }}>
             <CarteEnChargement />
           </div>
         ) : (
@@ -471,7 +488,7 @@ export default function Jobs() {
           <ListSkeleton count={JOBS_PAGE_SIZE} />
         )
       ) : viewMode === 'map' ? (
-        <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm" style={{ height: '60vh' }}>
+        <div className="rounded-lg overflow-hidden border border-stone-200" style={{ height: '60vh' }}>
           <Suspense fallback={<CarteEnChargement />}>
             <JobsMap jobs={filteredJobs} />
           </Suspense>
@@ -486,17 +503,17 @@ export default function Jobs() {
         !user && effectiveTab === JOB_TAB_DISCOVER && !filtresActifs ? (
           <DemoJobsEmptyState t={t} />
         ) : (
-          <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
+          <div className="rounded-lg border border-dashed border-stone-300 fond-sable p-10 text-center text-stone-500">
             {/* Un état vide a besoin d'un VISAGE avant d'avoir une phrase :
                 le pictogramme dit en une seconde qu'il n'y a rien à lire, et
                 l'action est juste en dessous. */}
-            <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400" aria-hidden="true">
+            <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-stone-100 text-stone-400" aria-hidden="true">
               <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <circle cx="11" cy="11" r="6.5" />
                 <path strokeLinecap="round" d="m16 16 4.5 4.5" />
               </svg>
             </span>
-            <p className="font-medium text-gray-600">
+            <p className="font-medium text-stone-600">
               {filtresActifs
                 ? pageT('emptyFiltered')
                 : (effectiveTab === JOB_TAB_APPLICATIONS
@@ -506,12 +523,12 @@ export default function Jobs() {
             {filtresActifs ? (
               <button
                 onClick={effacerLesFiltres}
-                className="mt-4 inline-flex items-center rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
+                className="mt-4 inline-flex items-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700"
               >
                 {pageT('clearFilters')}
               </button>
             ) : (
-              <p className="mt-2 text-sm text-gray-400">{pageT('emptyHint')}</p>
+              <p className="mt-2 text-sm text-stone-400">{pageT('emptyHint')}</p>
             )}
           </div>
         )
@@ -527,7 +544,7 @@ export default function Jobs() {
               <button
                 onClick={() => loadJobs({ append: true })}
                 disabled={loadingMore}
-                className="rounded-xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                className="rounded-lg border border-stone-300 fond-papier px-6 py-3 text-sm font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700 disabled:opacity-60"
               >
                 {loadingMore ? (pageT('loadingMore') || 'Chargement…') : (pageT('loadMore') || 'Afficher plus de missions')}
               </button>

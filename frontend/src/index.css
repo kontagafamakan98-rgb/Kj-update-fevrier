@@ -580,6 +580,19 @@ code {
   transform: translateY(-2px);
 }
 
+/* Un PANNEAU qui flotte au-dessus du contenu (centre de notifications, menus
+   du sélecteur de pays et de langue) : la carte à filet, plus une élévation
+   douce. Elle existe parce qu'une carte posée sur le papier n'a rien à dire de
+   plus, alors qu'un panneau superposé doit se détacher du texte qu'il recouvre
+   — et l'ombre large d'un panneau (`shadow-2xl`) faisait un halo froid, une
+   tache grise sur l'encre chaude du site. */
+.carte-flottante {
+  background-color: var(--kojo-papier);
+  border: 1px solid var(--kojo-filet);
+  border-radius: 0.5rem;
+  box-shadow: 0 18px 40px -28px rgba(28, 25, 23, 0.45);
+}
+
 /* Les deux FONDS du rythme de page. Ils remplacent l'alternance
    `bg-white` / `bg-gray-50` des sections : le gris froid jurait avec l'encre
    chaude du texte, et c'est l'alternance qui donne à une longue page son pas.
@@ -668,6 +681,27 @@ code {
 .bouton-contour:hover {
   border-color: var(--kojo-creme);
   background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Sur fond CLAIR : le contour de filet, encre, qui vire à l'orange au survol.
+   C'est le pendant de `bouton-contour` (qui vit sur l'orange), et il manquait :
+   une action SECONDAIRE sur une page claire n'avait que des utilitaires pour se
+   dessiner, donc chaque page réinventait son bouton — `rounded-xl` ici,
+   `shadow-md` là, un contour froid ailleurs (les quatre actions du tableau de
+   bord, mesurées le 28/09/2026).
+   Le contour est porté par la FEUILLE, pas par un utilitaire : `.bouton` pose
+   déjà `border-color: transparent`, et une feuille non posée dans une couche
+   l'emporte sur les utilitaires de Tailwind — même raison que
+   `.bande-page .titre-page` plus haut. */
+.bouton-clair {
+  border-color: var(--kojo-filet);
+  background-color: var(--kojo-papier);
+  color: var(--kojo-encre);
+}
+
+.bouton-clair:hover {
+  border-color: var(--kojo-orange);
+  color: var(--kojo-orange-fonce);
 }
 
 /* Sur fond clair : l'encre du site, qui vire à l'orange au survol. */
@@ -990,6 +1024,14 @@ code {
   color: var(--kojo-orange-fonce);
 }
 
+/* L'étape COURANTE d'un parcours : la pastille du site dans l'orange de la
+   marque. Elle existe parce qu'une pastille sable ne se distingue pas de la
+   suivante, or un parcours doit dire OÙ l'on est. */
+.pastille-courante {
+  background-color: var(--kojo-orange);
+  color: var(--kojo-creme);
+}
+
 .pastille-rond-creuse {
   width: 2.75rem;
   height: 2.75rem;
@@ -1229,6 +1271,341 @@ code {
 
   .galerie-carte:hover img {
     transform: none;
+  }
+}
+
+/* ══ LE MÊME VOCABULAIRE, PORTÉ HORS DE L'ACCUEIL (28/09/2026) ══════════════
+
+   L'accueil avait reçu un langage (bande orange, listes à filets, panneau à
+   deux moitiés, clôture) et les AUTRES pages étaient restées sur l'ancien :
+   dégradés orange → rouge, cartes `rounded-2xl` à ombre, fonds `bg-gray-50`,
+   et — mesuré sur /how-it-works — un panneau de séquestre VERT ÉMERAUDE au
+   milieu d'un site orange, plus un sous-titre en `text-stone-600` posé sur le
+   fond orange du héros (contraste 2,6:1 : illisible, et la page le publiait
+   depuis toujours).
+
+   Ce qui suit est la part du vocabulaire qui manquait à ces pages. Aucune de
+   ces classes n'écrit de texte : elles dessinent une boîte, donc la provenance
+   du texte (scripts/shell-text-provenance.js) n'a pas à les connaître. Et
+   aucune ne touche la GÉOMÉTRIE déclarée des héros — les éléments LCP de
+   /how-it-works et /jobs gardent leurs classes de mesure au caractère près.
+*/
+
+/* ── L'ENCART DE CONFIANCE ─────────────────────────────────────────────────
+
+   Il remplace la DEUXIÈME tache verte du site — le bloc « séquestre » de
+   /about, en vert d'eau « emerald », après celui de /how-it-works. Ce qu'une
+   teinte étrangère disait sans le vouloir : cette page n'appartient pas à la
+   même famille que les autres.
+
+   Ce qui le distingue d'une carte : un filet franchement plus épais sur son
+   BORD GAUCHE, dans l'orange de la marque, et un fond sable. C'est le geste
+   d'un encart de presse — quelque chose qu'on isole sur le côté — et il ne
+   coûte aucune couleur nouvelle. */
+.encart {
+  padding: 2rem;
+  border: 1px solid var(--kojo-filet);
+  border-left: 3px solid var(--kojo-orange);
+  background-color: var(--kojo-sable);
+}
+
+@media (min-width: 768px) {
+  .encart {
+    padding: 2.5rem;
+  }
+}
+
+/* ── LA BANDE DE TÊTE D'UNE PAGE DE CONTENU ─────────────────────────────────
+
+   Elle remplace trois choses d'un coup : le dégradé orange → ROUGE du héros de
+   /how-it-works (une teinte rouge que seule cette page portait), le dégradé
+   du bloc de clôture de la même page, et les fonds gris froids qui alternaient
+   dans son corps. Le filet crème du bas ne décore pas : il ferme la bande, là
+   où l'ancien dégradé s'arrêtait sur un bord flou. */
+.bande-page {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--kojo-orange);
+  background-image: linear-gradient(135deg, var(--kojo-orange), #c2410c);
+  color: #fff;
+}
+
+.bande-page::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background-color: var(--kojo-creme);
+  content: "";
+}
+
+/* Le titre de la bande est BLANC, et c'est dit ici plutôt que par un
+   utilitaire : `.titre-page` appartient à la feuille, et une feuille non posée
+   dans une couche l'emporte sur les utilitaires de Tailwind — un `text-white`
+   posé à côté de `.titre-page` était donc sans effet (mesuré : le titre du
+   héros de /how-it-works se peignait en encre foncée sur le fond orange depuis
+   sa mise en ligne, comme celui de la clôture de l'accueil avant lui). */
+.bande-page .titre-page {
+  color: #fff;
+}
+
+/* ── LA LISTE DES GARANTIES ─────────────────────────────────────────────────
+
+   Les quatre garanties de séquestre étaient un `<ul>` à puces dans un panneau
+   vert. Elles deviennent des LIGNES à filet, comme les listes de l'accueil :
+   une garantie est une entrée, et son ordre se lit. Le repère est une icône
+   DESSINÉE (`check`, src/config/page-icons.js), jamais un caractère. */
+.liste-garanties {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--kojo-filet);
+}
+
+.liste-garanties li {
+  display: grid;
+  grid-template-columns: 1.125rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.875rem;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--kojo-filet);
+  color: var(--kojo-encre-douce);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  list-style: none;
+}
+
+.liste-garanties li svg {
+  margin-top: 0.2rem;
+  color: var(--kojo-orange-fonce);
+}
+
+/* ── LA FAQ, EN LIGNES ──────────────────────────────────────────────────────
+
+   Cinq cartes à ombre, chacune avec sa propre bordure, disaient « cinq
+   produits ». Cinq lignes à filet disent « cinq questions, dans cet ordre » —
+   c'est la même règle que les métiers et les étapes de l'accueil. Le marqueur
+   reste le `<summary>` du dépliant natif : la question se répond donc au
+   clavier, et sans JavaScript. */
+.faq-liste {
+  border-top: 1px solid var(--kojo-filet);
+  border-bottom: 1px solid var(--kojo-filet);
+}
+
+.faq-ligne > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 0;
+  cursor: pointer;
+  color: var(--kojo-encre);
+  font-family: var(--kojo-serif);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  list-style: none;
+  transition: color 0.18s var(--kojo-ease);
+}
+
+.faq-ligne > summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-ligne > summary:hover {
+  color: var(--kojo-orange-fonce);
+}
+
+.faq-ligne[open] > summary {
+  color: var(--kojo-orange-fonce);
+}
+
+.faq-ligne .faq-marque {
+  flex: none;
+  color: var(--kojo-orange);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1;
+  transition: transform 0.18s var(--kojo-ease);
+}
+
+.faq-ligne[open] .faq-marque {
+  transform: rotate(45deg);
+}
+
+.faq-ligne > p {
+  max-width: 44rem;
+  padding-bottom: 1.25rem;
+  color: var(--kojo-encre-douce);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-ligne > summary,
+  .faq-ligne .faq-marque {
+    transition: none;
+  }
+}
+
+/* ── LES PAGES DE CONFIANCE ─────────────────────────────────────────────────
+
+   28/09/2026. /contact, /support, /privacy et /terms — les quatre pages où un
+   visiteur vérifie à qui il parle — portaient encore le vocabulaire d'AVANT la
+   refonte : des cartes à ombre (`rounded-2xl` + `shadow-sm`), des pastilles de
+   teinte empruntée (le bleu du courriel, le vert d'eau du téléphone), et du
+   gris FROID pour tout le texte secondaire. Une page de contact qui ne
+   ressemble pas au site qu'elle représente dit exactement le contraire de ce
+   qu'elle est là pour dire.
+
+   Elles prennent donc le vocabulaire de l'accueil, de /how-it-works et de
+   /jobs : la carte à FILET, la ligne à filet, la pastille ronde, le titre
+   serif, le gris chaud. Aucun texte dans ce bloc : ces classes DESSINENT une
+   boîte, elles n'écrivent rien, donc la provenance du texte
+   (scripts/shell-text-provenance.js) n'a pas à les connaître. */
+
+/* La LIGNE DE CONTACT : la même ligne que les métiers de l'accueil (pastille,
+   libellé, valeur, flèche), avec des colonnes plus serrées. Quatre colonnes
+   déclarées pour trois enfants au plus : une colonne oubliée ferait passer la
+   flèche à la ligne suivante de la grille (voir `.ligne-etape`). */
+.ligne-contact {
+  grid-template-columns: 2.5rem minmax(0, 1fr) 1.25rem;
+  gap: 1rem;
+  min-height: 4.5rem;
+}
+
+/* Les deux textes d'une ligne : ils sont EMPILÉS, donc déclarés en bloc — un
+   `<span>` reste en ligne par défaut, et deux valeurs côte à côte ne se
+   liraient pas comme un libellé au-dessus de sa valeur. */
+.etiquette-contact {
+  display: block;
+  color: var(--kojo-encre);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.valeur-contact {
+  display: block;
+  color: var(--kojo-encre-douce);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+/* Le TITRE D'UNE ENTRÉE : celui d'une carte de /support comme celui d'une
+   section de /privacy ou de /terms. Un cran sous le titre de section, dans la
+   même serif — c'est ce qui fait qu'un titre de carte et un titre de page
+   appartiennent au même document. Il remplace `text-lg`/`text-xl
+   font-semibold text-gray-900`, qui était la typographie d'un tableau de bord. */
+.titre-entree {
+  color: var(--kojo-encre);
+  font-family: var(--kojo-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* La pastille d'une carte de mode de /support : 48 px au lieu des 40 px d'une
+   ligne, parce qu'elle n'est pas un repère de liste mais le sujet de la carte
+   entière. Elle ne porte aucune teinte propre : le fond sable et l'orange
+   viennent de `.pastille-rond` (déclaré plus haut, donc surchargé ici). */
+.pastille-rond-large {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* LA SECTION D'UNE PAGE DE TEXTE : un filet qui ouvre, comme une entrée de
+   liste. Les quatre sections de /privacy et les quatre de /terms se lisaient
+   comme quatre paragraphes séparés par du vide ; elles se lisent maintenant
+   comme quatre entrées, DANS L'ORDRE, et le dernier filet ferme la liste là où
+   commencent les liens de pied de page. */
+.bloc-de-section {
+  padding-top: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-top: 1px solid var(--kojo-filet);
+}
+
+.bloc-de-section:last-of-type {
+  border-bottom: 1px solid var(--kojo-filet);
+}
+
+/* ── LES PUCES DE FILTRE, CARRÉES ──────────────────────────────────────────
+
+   Les puces de catégorie de /jobs étaient des PILULES (`rounded-full`, rayon
+   9999 px) : c'est la forme qu'on a interdite sur ce site, elle se lit comme
+   une étiquette de produit. Elles gardent leur fonction (une catégorie active
+   reste visible sans ouvrir de menu) avec le rayon des boutons du site. */
+/* La rangée de puces DÉFILE sur un écran de téléphone (on fait glisser du
+   doigt) et SE REPLIE sur un écran large — mesuré le 28/09/2026 : les dix
+   catégories débordaient aussi sur desktop, donc la rangée portait une barre
+   de défilement HORIZONTALE sous les puces, c'est-à-dire un aplat orange de
+   1 200 px au milieu du panneau de filtres. Un défilement qui n'a pas de raison
+   d'être n'est pas une affordance, c'est un défaut de mise en page. */
+.puces-defilantes {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+@media (min-width: 640px) {
+  .puces-defilantes {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+}
+
+.puce-filtre {
+  flex: none;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--kojo-filet);
+  border-radius: 3px;
+  background-color: var(--kojo-papier);
+  color: var(--kojo-encre-douce);
+  font-size: 0.875rem;
+  font-weight: 600;
+  /* La ligne est FIXÉE : les puces remplacent des utilitaires qui la fixaient
+     (`text-sm`), et deux puces voisines doivent avoir la même hauteur, quel que
+     soit le texte qu'elles portent. */
+  line-height: 1.25;
+  transition:
+    border-color 0.18s var(--kojo-ease),
+    background-color 0.18s var(--kojo-ease),
+    color 0.18s var(--kojo-ease);
+}
+
+.puce-filtre:hover {
+  border-color: var(--kojo-orange);
+  color: var(--kojo-orange-fonce);
+}
+
+.puce-filtre-active {
+  border-color: var(--kojo-orange);
+  background-color: var(--kojo-orange);
+  color: #fff;
+}
+
+.puce-filtre-active:hover {
+  color: #fff;
+}
+
+/* ── LE PANNEAU DES FILTRES ─────────────────────────────────────────────────
+
+   La recherche et ses trois contrôles vivaient dans une carte à ombre large
+   (`rounded-2xl shadow-sm`) : la même boîte que les cartes de résultat, alors
+   que ce n'en est pas une — c'est une barre d'outils. Un fond sable et un
+   filet la distinguent du contenu qu'elle filtre, sans lui donner un rang de
+   carte. */
+.panneau-filtres {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--kojo-filet);
+  background-color: var(--kojo-sable);
+}
+
+@media (min-width: 640px) {
+  .panneau-filtres {
+    padding: 1.5rem;
   }
 }
 

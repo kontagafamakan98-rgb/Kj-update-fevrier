@@ -10,15 +10,20 @@
 //   - Nouveau   : tout le reste (peu/pas d'avis)
 
 import { useLanguage } from '../contexts/LanguageContext';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
+// 28/09/2026 : l'échelle de teintes quitte l'émeraude et le BLEU — les deux
+// dernières teintes du produit qui n'appartenaient à personne — pour la gamme
+// CHAUDE du site (orange, ambre, sable, gris chaud de Tailwind, redirigé vers
+// `stone` par tailwind.config.cjs). L'ordre reste lisible (marque, ambre, sable,
+// sable sourd) et aucune teinte ne sert deux rangs — c'est ce que l'ancienne
+// échelle faisait déjà, avec des couleurs que le reste du site n'employait pas.
 export const WORKER_LEVELS = {
   // Le niveau le plus haut porte la COULEUR DE MARQUE : c'est le seul endroit du
-  // produit où l'orange dit « ce travailleur est le meilleur », et il ne coûte
-  // aucune couleur supplémentaire au dessin. L'échelle reste lisible dans
-  // l'ordre (marque, émeraude, bleu, gris) et aucune teinte ne sert deux rangs.
+  // produit où l'orange dit « ce travailleur est le meilleur ».
   expert: { key: 'levelExpert', rank: 4, badgeClass: 'bg-orange-100 text-orange-700 border-orange-200' },
-  confirmed: { key: 'levelConfirmed', rank: 3, badgeClass: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  reliable: { key: 'levelReliable', rank: 2, badgeClass: 'bg-blue-100 text-blue-700 border-blue-200' },
+  confirmed: { key: 'levelConfirmed', rank: 3, badgeClass: 'bg-amber-100 text-amber-800 border-amber-200' },
+  reliable: { key: 'levelReliable', rank: 2, badgeClass: 'bg-stone-100 text-stone-700 border-stone-200' },
   beginner: { key: 'levelBeginner', rank: 1, badgeClass: 'bg-gray-100 text-gray-600 border-gray-200' },
 };
 
@@ -60,7 +65,7 @@ export const WorkerTrustBadge = ({ person, className = '' }) => {
   const label = t(level.key);
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${level.badgeClass} ${className}`}
+      className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${level.badgeClass} ${className}`}
       title={t('trustLevelTitle').replace('{level}', label)}
     >
       {label}
@@ -73,10 +78,13 @@ export const VerifiedBadge = ({ verified, className = '' }) => {
   if (!verified) return null;
   return (
     <span
-      className={`inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ${className}`}
+      className={`inline-flex items-center gap-1 rounded border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-semibold text-orange-700 ${className}`}
       title={t('verifiedBadgeTitle')}
     >
-      ✓ {t('verifiedBadge')}
+      {/* Le repère du badge est DESSINÉ (`check`) : c'était un caractère `✓`,
+          c'est-à-dire un glyphe qui dépend de la police du poste — la règle du
+          site est qu'une icône se dessine (src/config/page-icons.js). */}
+      <IconePage nom="check" classe={CLASSES_ICONE.badgeRepere} /> {t('verifiedBadge')}
     </span>
   );
 };

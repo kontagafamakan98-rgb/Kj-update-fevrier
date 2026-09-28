@@ -109,6 +109,12 @@ const ICONES = {
   // pour le bloc de séquestre de la MÊME page.
   howStep1: `<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path>`,
   howStep3: `<path d="M20 6 9 17l-5-5"></path>`,
+  // Le repère des listes de GARANTIES (les quatre garanties de séquestre de
+  // /how-it-works) : c'est le MÊME dessin que `howStep3`, déclaré à part parce
+  // que les deux s'emploient dans deux sens différents — l'un est « l'étape 3
+  // est franchie », l'autre « cette promesse est tenue ». Un dessin, deux
+  // noms : les remplacer l'un sans l'autre resterait possible.
+  check: `<path d="M20 6 9 17l-5-5"></path>`,
   // ── Les écrans de compte (26/09/2026, DERNIÈRE vague emoji→SVG) : /login,
   // /register, /forgot-password et /payment publiaient encore les emoji de
   // leurs clés `*IconKey` (📜 ⚠️ 👤 🔧 📸 💡 🌍 ▼ ✉️ 💼). Trois dessins sont
@@ -169,11 +175,12 @@ export const CLASSES_ICONE = {
   // La pastille du contrôle de carte de /contact (l'ancien `text-2xl`) : elle
   // est grise, comme le contrôle qu'elle accompagne.
   carteContact: 'h-6 w-6 text-gray-500',
-  // La pastille d'un mode de /support (`h-12 w-12`) — la couleur vient du
-  // `badgeClass` de la ligne, donc le trait suit `currentColor`.
+  // La pastille d'un mode de /support (`pastille-rond-large`, 3 rem depuis le
+  // 28/09/2026) — la couleur vient de la pastille, donc le trait suit
+  // `currentColor`.
   mode: 'h-6 w-6',
-  // La pastille d'une ligne de contact (`h-10 w-10`, /contact comme /support) :
-  // même héritage de couleur par `currentColor`.
+  // La pastille d'une ligne de contact (`pastille-rond`, 2,5 rem — /contact
+  // comme /support) : même héritage de couleur par `currentColor`.
   ligne: 'h-5 w-5',
   // ── Les emplacements des quatre écrans de compte (26/09/2026). Le SVG remplace
   // le CARACTÈRE, il ne suit donc pas `font-size` : la taille est écrite ici, une
@@ -191,15 +198,31 @@ export const CLASSES_ICONE = {
   // la ligne, dans ce contexte-là seulement : un `align` en `em` ne peut pas
   // convenir aux trois tailles avec une icône de taille FIXE.
   noticePetite: 'inline h-4 w-4 align-[-0.29em]',
+  // Le repère d'un BADGE (11 px, `workerTrustLevel.js`) : 12 px et un
+  // alignement qui le pose sur la ligne de base du libellé qu'il précède.
+  //
+  // Il s'appelait `badge`, et `badge` était déclaré DEUX fois dans cet objet :
+  // la seconde déclaration (celle de l'étape de /forgot-password, 24 px et
+  // blanche) écrasait celle-ci, et le repère du badge de confiance se peignait
+  // donc en BLANC de 24 px dans une pastille orange pâle — invisible, et personne
+  // ne le voyait parce qu'un doublon de clé ne fait qu'avertir à la compilation.
+  // Deux emplacements, deux noms : `badgeRepere` (dans une phrase) et
+  // `badgeEtape` (dans une tuile).
+  badgeRepere: 'inline h-3 w-3 align-[-0.125em]',
   // Les deux cartes de type de compte de /register (l'ancien `text-2xl` d'un
   // emoji, centré par le `text-center` du parent).
   carteUserType: 'h-8 w-8 text-orange-600',
-  // La pastille d'étape de /forgot-password, dans le rond bleu `h-14 w-14` :
-  // l'ancien `text-white text-2xl` devient un trait blanc.
-  badge: 'h-6 w-6 text-white',
+  // La pastille d'étape de /forgot-password, dans la tuile `h-14 w-14` :
+  // l'ancien `text-white text-2xl` devient un trait blanc. Nommée `badgeEtape`
+  // (et non `badge`) pour ne plus écraser le repère du badge de confiance.
+  badgeEtape: 'h-6 w-6 text-white',
   // Les deux emplacements photo de /register : l'en-tête `text-2xl` et la zone de
   // dépôt `text-4xl` (l'ancien emoji, dans un `text-center`).
-  photoTitre: 'inline h-6 w-6 align-[-0.2em] text-gray-500',
+  // Depuis le 28/09/2026, il est posé DANS la rangée d'un titre de section
+  // (`titre-entree`) : plus de glyphe en ligne dans un `text-2xl`, donc la
+  // hauteur de ligne ne le dimensionne plus et l'alignement par `em` n'a plus
+  // d'objet. La teinte suit celle de la section, c'est-à-dire l'orange du site.
+  photoTitre: 'h-6 w-6 text-orange-700',
   photoZone: 'h-10 w-10 text-gray-400',
   // Le globe et le chevron du sélecteur de pays, dans un `text-lg`/`text-xs`.
   paysGlobe: 'h-5 w-5 text-gray-500',

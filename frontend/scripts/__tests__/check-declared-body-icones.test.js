@@ -27,9 +27,12 @@
  *     nomme la COQUILLE, là où le registre nomme le PLAN. Le registre ne peut pas
  *     le remplacer : il ne regarde QUE le nom, jamais ce que la coquille publie.
  */
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { describe, expect, it } from 'vitest';
 import { makeDeclaredBodyGuard } from '../../vite-plugins/prerender/declared-body.js';
-import { contenuDeLICone, marqueurDIcone, NOMS_D_ICONES } from '../../src/config/page-icons.js';
+import { CLASSES_ICONE, contenuDeLICone, marqueurDIcone, NOMS_D_ICONES } from '../../src/config/page-icons.js';
 import { PAGE_SECTIONS, pageSectionParts } from '../../src/config/page-sections.js';
 
 /** Un garde monté sur un plan SYNTHÉTIQUE : seul le champ `*Icon` compte ici. */
@@ -94,5 +97,33 @@ describe('forme `*Icon` — preuve d’échec rejouée', () => {
     // boucle a lu le vrai plan, sans se figer sur une valeur exacte.
     expect(declarees.size).toBeGreaterThanOrEqual(30);
     expect([...declarees].filter((nom) => !NOMS_D_ICONES.includes(nom))).toEqual([]);
+  });
+
+  it('`CLASSES_ICONE` ne déclare aucune clé DEUX fois', () => {
+    // L'état mesuré le 28/09/2026 : `badge` était déclaré deux fois — le repère
+    // du badge de confiance (`inline h-3 w-3`) ÉTAIT écrasé par la pastille
+    // blanche de 24 px de /forgot-password, si bien que la coche du badge se
+    // peignait blanche dans une pastille orange pâle, c'est-à-dire invisible.
+    // Rien ne l'a vu pendant une passe entière : un doublon de clé n'est qu'un
+    // AVERTISSEMENT de compilation, et le canevas publié n'en garde aucune trace
+    // (la classe écrasée n'existe simplement plus). Ce contrôle lit la SOURCE de
+    // l'objet — c'est le seul endroit où le doublon est encore visible — et
+    // compare la liste des clés écrite à la liste que JavaScript garde.
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'config', 'page-icons.js'),
+      'utf8'
+    );
+    const debut = source.indexOf('export const CLASSES_ICONE');
+    expect(debut, '`CLASSES_ICONE` a quitté src/config/page-icons.js — ce contrôle ne lit plus rien').toBeGreaterThan(-1);
+    const corps = source.slice(debut, source.indexOf('};', debut));
+    const ecrites = [...corps.matchAll(/^\s{2}([A-Za-z_][A-Za-z0-9_]*):/gm)].map((m) => m[1]);
+    // Le plancher prouve que l'extraction a lu l'objet entier, sans se figer sur
+    // un compte exact (une classe ajoutée ne doit pas rougir ici).
+    expect(ecrites.length).toBeGreaterThanOrEqual(15);
+    const doublons = ecrites.filter((cle, index) => ecrites.indexOf(cle) !== index);
+    expect(doublons, `clé(s) déclarée(s) deux fois dans CLASSES_ICONE : ${doublons.join(', ')}`).toEqual([]);
+    // Et le témoin direct : ce que JavaScript garde vraiment de cet objet porte
+    // autant de clés qu'il en est écrit — sinon l'extraction lit un autre objet.
+    expect(Object.keys(CLASSES_ICONE).length).toBe(ecrites.length);
   });
 });

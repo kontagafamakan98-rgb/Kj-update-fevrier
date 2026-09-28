@@ -190,13 +190,28 @@
    `scripts/check-css-selecteurs-morts.js` interdit d'en réécrire : une classe ou
    un id nommé par un sélecteur doit être POSÉ par le livré. */
 
-/* Custom scrollbar for webkit browsers */
+/* ── LA BARRE DE DÉFILEMENT (28/09/2026) ────────────────────────────────────
+
+   Deux retouches, et la seconde est un défaut MESURÉ à l'œil :
+
+     • `height` MANQUAIT. Seule la largeur était réglée, donc toute barre
+       HORIZONTALE gardait la hauteur native du navigateur (mesurée ~15 px sur
+       Chromium) avec la même gomme orange — et /jobs en a une, sous la rangée
+       de puces de catégorie (`overflow-x-auto`), où elle dessinait un aplat
+       orange de 1 200 px de large au milieu du panneau de filtres. Elle reçoit
+       la même épaisseur que la verticale.
+
+     • la piste était `#f1f1f1`, un gris FROID : c'est la seule teinte du site
+       qui ne venait pas de la gamme chaude (encre, sable, filet, papier), et
+       elle se voyait sur le fond sable des panneaux. Elle prend le filet du
+       site, qui est déjà la couleur du trait le plus discret de l'interface. */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--kojo-filet);
 }
 
 ::-webkit-scrollbar-thumb {

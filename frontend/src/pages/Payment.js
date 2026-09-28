@@ -235,7 +235,7 @@ const Payment = () => {
     <div className="min-h-full bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t(pagePlan.titleKey)}</h1>
+          <h1 className="titre-page mb-2">{t(pagePlan.titleKey)}</h1>
           <p className="text-gray-600">{t(pagePlan.subtitleKey)}</p>
           {jobPaymentContext && (
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
@@ -245,13 +245,13 @@ const Payment = () => {
         </div>
 
         {statusData && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="carte-editoriale p-6">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">{t('paymentStatusTitle')}</h2>
+                <h2 className="titre-entree">{t('paymentStatusTitle')}</h2>
                 <p className="text-sm text-gray-600 mt-1">ID: {statusData.id}</p>
               </div>
-              <span className="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold bg-blue-50 text-blue-700">
+              <span className="inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold bg-blue-50 text-blue-700">
                 {statusLabel(statusData.status)}
               </span>
             </div>
@@ -276,9 +276,9 @@ const Payment = () => {
         )}
 
         {!jobPaymentContext && !statusParams ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+          <div className="carte-editoriale p-8 text-center">
             <div className="text-4xl mb-3"><IconePage nom={pagePlan.noJobIcon} classe={CLASSES_ICONE.carteVide} /></div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">{t(pagePlan.noJobTitleKey)}</h2>
+            <h2 className="titre-entree mb-2">{t(pagePlan.noJobTitleKey)}</h2>
             <p className="text-gray-600 max-w-lg mx-auto mb-5">{t(pagePlan.noJobTextKey)}</p>
             <Link to="/jobs" className="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">
               {t(pagePlan.noJobCtaKey)}
@@ -286,10 +286,10 @@ const Payment = () => {
           </div>
         ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="lg:col-span-2 carte-editoriale p-6">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
-              <h2 className="text-xl font-semibold text-gray-900">{t('automaticDistribution')}</h2>
-              <span className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold ${providerConfig?.configured ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+              <h2 className="titre-entree">{t('automaticDistribution')}</h2>
+              <span className={`inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold ${providerConfig?.configured ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
                 {providerConfig?.configured ? t('paymentGatewayConfigured') : t('paymentGatewayNotConfigured')}
               </span>
             </div>
@@ -401,7 +401,7 @@ const Payment = () => {
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="carte-editoriale p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">{t('paymentMyPayments')}</h3>
               {payments.length === 0 ? (
                 <p className="text-sm text-gray-500">{t('paymentNoPayments')}</p>
@@ -411,7 +411,7 @@ const Payment = () => {
                     <div key={payment.id} className="rounded-xl border border-gray-200 p-3">
                       <div className="flex items-center justify-between gap-3">
                         <span className="font-semibold text-gray-900">{Number(payment.amount || 0).toLocaleString()} XOF</span>
-                        <span className="text-xs rounded-full bg-gray-100 px-3 py-1 text-gray-700">{statusLabel(payment.status)}</span>
+                        <span className="text-xs rounded-lg bg-gray-100 px-3 py-1 text-gray-700">{statusLabel(payment.status)}</span>
                       </div>
                       <div className="text-xs text-gray-500 mt-2">{payment.payment_method} • {payment.id}</div>
                     </div>
