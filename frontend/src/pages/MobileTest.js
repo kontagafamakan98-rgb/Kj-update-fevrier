@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import MobilePhotoTest from '../components/MobilePhotoTest';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/mobileTest';

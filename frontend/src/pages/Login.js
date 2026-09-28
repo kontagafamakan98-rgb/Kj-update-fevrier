@@ -1,16 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import LoadingButton from '../components/LoadingButton';
 import GoogleButton from '../components/GoogleButton';
+import { isGoogleAuthEnabled } from '../utils/googleAuth';
 import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { IconePage, CLASSES_ICONE } from '../config/page-icons';
+import { MarqueKojo } from '../config/marque-kojo';
 
 const requiresRegistrationCompletion = (user) => {
   if (!user) return false;
@@ -125,9 +129,9 @@ export default function Login() {
     <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-lg bg-orange-600">
-            <span className="text-white text-xl font-bold">{t('brandMark')}</span>
-          </div>
+          {/* La marque : un tracé partagé, pas la lettre « K » du dictionnaire
+              (voir src/config/marque-kojo.js). Même pastille, même boîte. */}
+          <MarqueKojo emplacement="entete" />
           {/* Titre de PAGE en h1 (et non h2) : un audit SEO exige un h1 unique
               par page, et un crawler qui exécute le JavaScript doit voir le même
               niveau que le shell statique pré-rendu (login.html). Les classes
@@ -143,6 +147,33 @@ export default function Login() {
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
               {displayedError}
             </div>
+          )}
+
+          {/* ── LES RÉSEAUX D'ABORD (28/09/2026) ─────────────────────────────
+              Le bouton Google vivait SOUS le formulaire : pour trouver le chemin
+              le plus court, un visiteur devait d'abord traverser deux champs et
+              un bouton. C'est l'INVERSE de /register, qui place le même bouton
+              avant ses champs avec le même séparateur (`orSeparator`) — deux
+              pages de compte, deux ordres, pour la même décision.
+
+              Le séparateur coupe la ligne derrière son libellé avec la couleur
+              de la SURFACE (`fond-sable`) : /login est la seule page de compte
+              sans carte blanche, un `bg-white` y aurait peint un rectangle sur
+              le sable (c'est la seule différence avec celui de /register, et
+              elle tient à la surface, pas au goût). */}
+          {isGoogleAuthEnabled() && (
+            <>
+              <GoogleButton onClick={handleGoogle} label={pageT(pagePlan.googleLoginKey)} />
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="fond-sable px-3 text-gray-400">{t('orSeparator') || 'ou'}</span>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="space-y-4">
@@ -206,8 +237,6 @@ export default function Login() {
               {t(pagePlan.titleKey)}
             </LoadingButton>
           </div>
-
-          <GoogleButton onClick={handleGoogle} label={pageT(pagePlan.googleLoginKey)} />
 
           <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">
             <p className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} classe={CLASSES_ICONE.notice} /> {pageT(pagePlan.legalNoticeTitleKey)}</p>

@@ -14,6 +14,7 @@ import { safeLog } from '../utils/env';
 import { DemoJobsEmptyState, JobCard } from '../components/JobsResults';
 import { normalizeJobList } from '../utils/jobDisplayBridge';
 import CountrySelector from '../components/CountrySelector';
+import CountryDisplay, { getCountry } from '../components/CountryDisplay';
 import { haversineKm, getJobCoordinates } from '../utils/workerTrustLevel';
 import { usePageMeta } from '../utils/seo';
 import { makePublicJobsPrefetch } from '../utils/publicJobsPrefetch';
@@ -108,6 +109,11 @@ export default function Jobs() {
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState(() => ({
     category: searchParams.get('category') || '',
+    // Le PAYS arrive par un LIEN (`/jobs?country=mali`), depuis le ruban de
+    // l'accueil : il n'a donc pas de menu dans cette page, seulement un rappel
+    // de ce qui est filtré et le moyen de le lever. Lu ici comme la catégorie,
+    // parce qu'un lien vers /jobs change l'URL SANS remonter la page.
+    country: searchParams.get('country') || '',
     status: '',
     search: '',
   }));
@@ -151,12 +157,17 @@ export default function Jobs() {
 
   // Filtres qui expliquent une liste vide (et que l'utilisateur peut lever) :
   // sans eux, « rien à afficher » n'a pas la même prochaine étape.
-  const filtresActifs = Boolean(filters.search.trim() || filters.category || filters.status || radiusKm);
+  const filtresActifs = Boolean(filters.search.trim() || filters.category || filters.country || filters.status || radiusKm);
   const effacerLesFiltres = () => {
-    setFilters({ category: '', status: '', search: '' });
+    setFilters({ category: '', country: '', status: '', search: '' });
     setRadiusKm('');
     setUserCoords(null);
   };
+
+  // Le pays du filtre, tel que le référentiel le déclare (nom traduit, drapeau
+  // et teinte) : la pastille ci-dessous se peint donc avec les données du pays,
+  // pas avec une couleur choisie ici.
+  const paysFiltre = filters.country ? getCountry(filters.country) : null;
 
   const filteredJobs = useMemo(() => {
     // Seul le filtre RAYON reste côté client (distance par rapport à la
@@ -415,6 +426,32 @@ export default function Jobs() {
           })}
         </div>
 
+        {/* ── LE PAYS FILTRÉ : un rappel, et un moyen de le lever ────────────
+            Il n'entre pas par cette page mais par le ruban de l'accueil : sans
+            cette ligne, une liste réduite à un pays n'aurait AUCUN signe
+            visible de ce qui la réduit, et « pourquoi si peu d'offres ? »
+            resterait sans réponse à l'écran. La pastille prend la teinte
+            déclarée avec le pays (`src/config/countries.js`) : la couleur dit
+            « ce filtre vient d'ailleurs » avant même que le nom soit lu. */}
+        {paysFiltre && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-200 pt-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+              {t('country')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setFilters((prev) => ({ ...prev, country: '' }))}
+              aria-label={`${pageT('clearFilters')} — ${paysFiltre.name}`}
+              className={`inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-sm font-semibold text-stone-800 transition-colors hover:border-stone-300 ${paysFiltre.color}`}
+            >
+              <CountryDisplay countryCode={paysFiltre.code} />
+              <svg className="h-4 w-4 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Recherche par rayon : trouve les jobs proches de toi (uniquement
             les jobs portant des coordonnées GPS — les autres sont exclus quand
             le filtre est actif). */}
@@ -436,10 +473,18 @@ export default function Jobs() {
               placeholder={t('radiusKmPlaceholder')}
               className="w-32 rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
             />
+            {/* ACTION SECONDAIRE, ET ELLE LE DIT : « utiliser ma position »
+                n'est pas ce qu'on vient faire sur cette page — c'est un
+                réglage du filtre de rayon. Peinte en orange plein comme
+                « Créer un emploi » et la bascule de vue, elle donnait TROIS
+                actions principales à l'écran, dont deux qui n'en sont pas :
+                le contour la range du côté des réglages, et il n'en reste
+                qu'une. L'action principale de la page est celle qu'on ne peut
+                pas confondre. */}
             <button
               onClick={locateMe}
               disabled={locating}
-              className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-700 disabled:opacity-60"
+              className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition-colors hover:border-orange-500 hover:text-orange-700 disabled:opacity-60"
             >
               {locating ? t('locating') : (userCoords ? t('myPosition') : t('useMyPosition'))}
             </button>

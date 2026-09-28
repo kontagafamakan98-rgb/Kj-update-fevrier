@@ -9,6 +9,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { CountryProvider } from "./contexts/CountryContext";
 import { NotificationProvider } from './contexts/NotificationContext';
 import Navbar from "./components/Navbar";
+import { MarqueKojo } from "./config/marque-kojo";
 import NotificationPanel from "./components/NotificationPanel";
 import CountryChangePopup from "./components/CountryChangePopup";
 import OfflineIndicator from "./components/OfflineIndicator";
@@ -134,9 +135,9 @@ function MobileLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-orange-600 to-orange-700">
       <div className="text-center">
-        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <span className="text-3xl font-bold text-orange-600">{t('brandMark')}</span>
-        </div>
+        {/* La marque, en orange sur la pastille blanche : le même tracé que
+            partout ailleurs (src/config/marque-kojo.js). */}
+        <MarqueKojo emplacement="ouverture" />
         <div className="text-white text-2xl font-bold mb-2">Kojo</div>
         <div className="text-orange-200 text-sm mb-6">Afrique de l’Ouest</div>
         <div className="flex justify-center space-x-2">

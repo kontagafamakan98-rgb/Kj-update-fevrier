@@ -10,6 +10,7 @@ import LanguageSelector from './LanguageSelector';
 import NotificationBell from './NotificationBell';
 import { Icone } from './chrome-icons';
 import { LANGUAGES } from '../config/languages';
+import { MarqueKojo } from '../config/marque-kojo';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -98,24 +99,25 @@ export default function Navbar() {
           <div className="flex items-center">
             {/* ── Le verrou de marque ────────────────────────────────────────────
                 Trois décisions, et aucune n'est cosmétique :
-                • la pastille passe à 36 px (h-9) avec un rayon de 12 (rounded-xl) —
+                • la pastille fait 36 px (h-9) avec un rayon de 12 (rounded-xl) —
                   à 32 px et 8 de rayon, elle se lisait comme un bouton parmi les
                   autres de la barre, alors que c'est la SEULE surface de marque ;
                 • le mot est en GRAPHITE et non en orange : la couleur de marque vit
                   dans le symbole, le nom gagne le contraste maximal. Peinte en
                   orange sur un fond presque blanc, le mot rivalisait avec les
                   boutons d'action juste à côté ;
-                • l'interlettrage se resserre (tracking-tight) et le glyphe est calé
-                  sur `leading-none`, sinon le « K » flotte de 1 px sous l'axe
-                  optique du mot à côté — le genre de détail qui fait « presque
-                  juste » sans qu'on sache pourquoi. */}
+                • l'interlettrage se resserre (tracking-tight) et le mot est calé
+                  sur `leading-none`, sinon il flotte de 1 px sous l'axe optique
+                  de la marque à côté — le genre de détail qui fait « presque
+                  juste » sans qu'on sache pourquoi.
+
+                Le symbole, lui, n'est plus dessiné ici : c'était un CARACTÈRE
+                (`t('brandMark')`) dans un carré, recopié à six endroits du site.
+                Il vient de src/config/marque-kojo.js, avec les deux canaux — voir
+                l'en-tête de ce module. */}
             <Link to="/" className="flex-shrink-0 flex items-center" onClick={closeMobileMenu}>
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600">
-                  <span className="text-[17px] font-extrabold leading-none tracking-tight text-white">
-                    {t('brandMark')}
-                  </span>
-                </div>
+                <MarqueKojo emplacement="barre" />
                 <div className="text-[19px] font-extrabold leading-none tracking-tight text-gray-900">
                   Kojo
                 </div>

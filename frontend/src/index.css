@@ -564,6 +564,102 @@ code {
   }
 }
 
+/* ── L'ÉTAT D'UNE MISSION, DIT PAR LA COULEUR ───────────────────────────────
+
+   La pastille d'état d'une carte de mission était orange POUR TOUS LES ÉTATS :
+   « Ouverte », « En cours », « Terminée » et « Annulée » portaient la même
+   teinte et le même point orange. La couleur n'y disait donc rien — il fallait
+   lire le mot, et un mot se lit après la couleur. Elle est maintenant une
+   DONNÉE de l'élément (`data-statut`), et la teinte en découle :
+
+     ouverte / en attente → orange  (quelque chose est ouvert, on peut agir)
+     en cours             → bleu    (quelqu'un travaille dessus)
+     terminée             → vert    (c'est fini, et bien fini)
+     annulée / inconnu    → gris    (rien à faire ici)
+
+   La boîte ne change pas d'un pixel (mêmes rayon, rembourrage et taille de
+   texte : le squelette de la liste est calibré sur elle), et le POINT prend la
+   teinte du texte par `currentColor` — impossible que les deux se contredisent. */
+.pastille-statut {
+  border-color: #e7e5e4;
+  background-color: #fafaf9;
+  color: #78716c;
+}
+
+.pastille-statut[data-statut='open'],
+.pastille-statut[data-statut='pending'] {
+  border-color: #fdba74;
+  background-color: #fff7ed;
+  color: #c2410c;
+}
+
+.pastille-statut[data-statut='in_progress'] {
+  border-color: #bfdbfe;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+}
+
+.pastille-statut[data-statut='completed'] {
+  border-color: #bbf7d0;
+  background-color: #f0fdf4;
+  color: #15803d;
+}
+
+.pastille-statut-point {
+  background-color: currentColor;
+}
+
+/* ── LA JAUGE DU FORMULAIRE D'INSCRIPTION ──────────────────────────────────
+
+   Elle remplace ce qui n'existait pas : trois pastilles STATIQUES disaient le
+   parcours (trois pages) et jamais l'avancement, donc remplir sept champs sur
+   neuf ne changeait rien à l'écran. La piste est un rail gris, la jauge le
+   remplit, et sa LARGEUR est une donnée de l'écran (le pré-rendu la peint
+   vide : c'est l'état du document, et la boîte est identique dans les deux
+   canaux).
+
+   LA COULEUR EST LE VERDICT, pas la décoration — c'est à cela qu'une jauge
+   sert : « vide » (rien de rempli), « en-cours » (l'orange de la marque :
+   l'action est commencée), « complet » (le vert : les champs exigés sont tous
+   là, la suite est ouverte). Trois états, trois couleurs, et aucune phrase à
+   traduire en cinq langues — le texte de la jauge n'appartient pas au
+   dictionnaire parce qu'il n'y a pas de texte. */
+.jauge-inscription {
+  height: 0.5rem;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: #e7e5e4;
+}
+
+.jauge-inscription-remplie {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background-color: var(--kojo-orange);
+  transition:
+    width 0.25s var(--kojo-ease),
+    background-color 0.25s var(--kojo-ease);
+}
+
+.jauge-inscription-remplie[data-etat='vide'] {
+  background-color: transparent;
+}
+
+.jauge-inscription-remplie[data-etat='en-cours'] {
+  background-color: var(--kojo-orange);
+}
+
+.jauge-inscription-remplie[data-etat='complet'] {
+  background-color: #15803d;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jauge-inscription-remplie {
+    transition: none;
+  }
+}
+
 /* ── LA COUCHE ÉDITORIALE ───────────────────────────────────────────────────
 
    Ce qu'elle remplace. Le corps des pages publiques était une accumulation
@@ -1167,6 +1263,37 @@ code {
   color: #fff;
   font-size: 0.8125rem;
   font-weight: 600;
+  /* Le jeton est devenu un LIEN (vers `/jobs` filtré sur son pays) : ces
+     quatre états sont ce qui le dit. Sans eux, la pastille resterait
+     exactement ce qu'elle était quand elle ne menait nulle part — et rien à
+     l'écran ne distinguerait une liste de pays d'un jeu de filtres. */
+  text-decoration: none;
+  transition:
+    background-color 0.18s var(--kojo-ease),
+    border-color 0.18s var(--kojo-ease),
+    transform 0.18s var(--kojo-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ruban-jeton:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.38);
+  }
+}
+
+.ruban-jeton:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.ruban-jeton:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ruban-jeton {
+    transition: none;
+  }
 }
 
 /* ── LES LISTES EN LIGNES ───────────────────────────────────────────────────
