@@ -126,7 +126,10 @@ button,
    mesuré, pas supposé.
    Les polices système restent en REPLI derrière Inter : les glyphes qu'Inter ne
    couvre pas (cyrillique, grec, arabe d'une annonce publiée par l'API) sont
-   rendus par elles, et non par une case vide. */
+   rendus par elles, et non par une case vide.
+
+   MAIS `swap` VEUT DIRE PEINDRE DEUX FOIS, et c'est ce que la face suivante
+   atténue : voir « LE REPLI EST ALIGNÉ SUR LE DESSIN D'INTER », juste après. */
 @font-face {
     font-family: 'Inter';
     font-style: normal;
@@ -148,6 +151,52 @@ button,
         U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
         U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
         U+A720-A7FF;
+}
+
+/* ── LE REPLI EST ALIGNÉ SUR LE DESSIN D'INTER ────────────────────────────
+
+   `font-display: swap` et le préchargement réduisent la probabilité d'un
+   remplacement, ils ne l'annulent pas : sur une liaison froide et lente, le
+   fichier arrive après le premier paint, et le texte se remet en page. C'est le
+   CLS de la police, et il est MESURÉ, jamais supposé — sonde du 28/09/2026
+   (Chromium 412×823, SEULES les requêtes `/fonts/*.woff2` retardées de 1 500 ms,
+   donc tout décalage est attribuable au remplacement et à rien d'autre) :
+   /how-it-works 0,0016, /login 0,0014, / 0,0006, /about 0,0002, chaque décalage
+   nommé par ses nœuds SOURCES — tous des nœuds de TEXTE.
+
+   Pourquoi il y a quelque chose à aligner : Inter est plus LARGE que les
+   familles que l'hôte substitue. Mesuré à 100 px sur la même phrase
+   (« Services et travailleurs… — 0123456789 ») : Inter 3 829,64 px, contre
+   3 601,86 px pour Arial (6,32 % de moins) et 3 538,78 px pour Segoe UI
+   (8,22 % de moins) — et les boîtes diffèrent aussi (Inter asc 97 / desc 24,
+   hauteur de ligne 121 px ; Arial 91/21, 115 px ; Segoe UI 108/25, 133 px).
+   Sans correction, le texte peint dans le repli se remet en page à l'arrivée du
+   fichier : c'est exactement le décalage mesuré ci-dessus.
+
+   AUCUNE CONSTANTE N'EST RECOPIÉE. `size-adjust` vient du rapport des largeurs
+   mesurées (100 × 3 829,64 / 3 601,86 = 106,32 %). Les deux `override` sont
+   RÉSOLUS, pas dérivés : la face candidate est mesurée à `ascent-override:
+   100 %` puis `200 %`, la pente relevée (1,07 px par point) dit que
+   `size-adjust` s'applique AUSSI aux override dans ce moteur, et la constante
+   est celle qui rend la BOÎTE D'INTER (asc 97 / desc 24 à 100 px, donc
+   91,2 % et 22,6 % du corps ajusté ; le `line-gap` d'Inter est nul, d'où 0 %).
+
+   `Liberation Sans` est déclarée pour les hôtes Linux, où elle REMPLACE Arial :
+   sa table d'avances est identique à celle d'Arial — c'est sa raison d'être —,
+   donc la même constante y vaut. Une famille absente de l'hôte est simplement
+   ignorée par `local()`, d'où un `src` en cascade et une seule face.
+
+   Ce que cette face NE couvre PAS, et qui reste OUVERT : Roboto (Android,
+   ChromeOS) et les familles exotiques de la pile de `body`. Elles ne sont pas
+   mesurables ici, donc elles ne sont pas alignées : le comportement y reste
+   celui d'avant (aucune régression), et c'est consigné comme tel. */
+@font-face {
+    font-family: 'Inter repli Arial';
+    src: local('Arial'), local('Liberation Sans'), local('Helvetica');
+    size-adjust: 106.32%;
+    ascent-override: 91.2%;
+    descent-override: 22.6%;
+    line-gap-override: 0%;
 }
 
 /* ── LA POLICE DE TITRAGE ──────────────────────────────────────────────────
@@ -208,25 +257,87 @@ button,
         U+A720-A7FF;
 }
 
-/* Les deux REPLIS, chacun avec SA constante : une famille locale ne peut porter
-   qu'un `size-adjust`, et Georgia n'a pas la largeur de la famille Times. */
+/* Les deux REPLIS, chacun avec SES constantes : une famille locale ne peut
+   porter qu'un `size-adjust`, et Georgia n'a pas la largeur de la famille
+   Times.
+
+   LA LARGEUR NE SUFFISAIT PAS, ET C'EST MESURÉ. Le `size-adjust` seul alignait
+   le NOMBRE DE LIGNES (la raison pour laquelle il est là), mais pas la BOÎTE de
+   la police : le texte se remettait en page VERTICALEMENT — la ligne de base
+   d'un repli dont l'ascendante diffère se déplace DANS la même boîte. Sonde du
+   28/09/2026 (Chromium 412×823, seules les requêtes `cormorant-*.woff2`
+   retardées de 1 500 ms, donc tout décalage est du remplacement de la police de
+   titrage) : 0,0005 sur / et /how-it-works, 0,0003 sur /login, 0,0002 sur
+   /about — chaque décalage nommé par un NŒUD DE TEXTE de TITRE (« Trouvez un
+   travailleur d… », « Comment ça marche ? », « À propos de Kojo »), et AUCUN
+   par un texte de corps. Les boîtes mesurées à 100 px le disent :
+   Cormorant Garamond asc 92 / desc 29 (hauteur 121 px), repli Times 82 / 20
+   (106 px), repli Georgia 70 / 17 (87 px).
+
+   Les deux `override` rendent donc la boîte du repli ÉGALE À CELLE DU DESSIN
+   SERVI, par la même arithmétique que la face d'Inter ci-dessus (la constante
+   divisée par le `size-adjust` de la face, parce que celui-ci s'applique aussi
+   aux override : 100/0,921 = 99,9 % puis 31,5 % ; 100/0,763 = 120,6 % puis
+   38,0 % — le `line-gap` de Cormorant est nul, d'où 0 %). Les deux boîtes
+   valent alors (99,9 + 31,5) × 0,921 = 121 px et (120,6 + 38,0) × 0,763 =
+   121 px, soit la hauteur mesurée de Cormorant Garamond.
+
+   CE QUE LES OVERRIDE LAISSENT, ET POURQUOI ÇA NE SE RÈGLE PAS PAR UNE
+   CONSTANTE. Après correction, les deux familles retardées de 1 500 ms :
+   / 0,0000 · /about 0,0000 · /jobs 0,0000 ; /how-it-works 0,0004 et /login
+   0,0003 en mobile (412×823), 0,0003 et 0,0001 en desktop (1350×940), plus
+   /support 0,0034 en desktop — tous SOUS les plafonds publiés, et tous encore
+   nommés par un nœud de TITRE. La trace dit ce qui bouge, et ce n'est plus la
+   boîte : les deux replis mesurent 92 / 29 / 121 px, la boîte EXACTE de
+   Cormorant, mais sur /how-it-works « Le paiement séquestre… » tient sur UNE
+   ligne dans le repli et en prend DEUX dans le dessin servi — la matière
+   suivante descend alors de 27 px, et c'est le résidu.
+   Un `size-adjust` unique ne peut pas l'égaler partout, parce que le rapport
+   des LARGEURS dépend de la phrase. Mesuré sur 48 titres réels, à leur corps et
+   leur graisse (canvas, Chromium 412×823), le rapport Cormorant ÷ repli Times
+   va de 1,027 à 1,126, soit un `size-adjust` équivalent de 88,8 % à 97,4 %,
+   médiane 94,3 % — deux glyphes de FIGURE sortant de la plage (« 4 » 100,9 %,
+   « + » 130,5 %) : un dessin ne se met pas à l'échelle d'un autre glyphe à
+   glyphe. 92,1 % EST LA VALEUR DU TITRE DU HÉROS, et c'est un choix : cet
+   élément est le LCP de « / », au-dessus de la ligne de flottaison, et sa boîte
+   — suivie à part, avant et après le remplacement — est INCHANGÉE (380×104,06
+   px en mobile, 640×171,33 en desktop). Deux constantes de rechange ont été
+   essayées sans reconstruire (feuille réécrite dans le document servi, AVANT
+   analyse du corps) : à 94,3 % (la médiane) et à 96,4 % (la valeur qui annule
+   le retour à la ligne de /how-it-works), le héros tient encore, mais AUCUNE ne
+   domine — 96,4 % annule /how-it-works et /login en mobile, laisse /support
+   desktop à 0,0037 et fait apparaître 0,0001 sur « / » à t=336 ms, donc AVANT
+   le remplacement : du bruit de mise en page, pas de la police. Re-ancrer la
+   constante sur le résidu d'une page qui ne porte pas le LCP de l'accueil
+   échangerait une parité GARANTIE contre un zéro du jour. */
 @font-face {
     font-family: 'Cormorant Garamond repli Times';
     src: local('Times New Roman'), local('Liberation Serif'), local('DejaVu Serif');
     size-adjust: 92.1%;
+    ascent-override: 99.9%;
+    descent-override: 31.5%;
+    line-gap-override: 0%;
 }
 
 @font-face {
     font-family: 'Cormorant Garamond repli Georgia';
     src: local('Georgia');
     size-adjust: 76.3%;
+    ascent-override: 120.6%;
+    descent-override: 38%;
+    line-gap-override: 0%;
 }
 
 body {
     margin: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-        "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
-        "Helvetica Neue", sans-serif;
+    /* 'Inter repli Arial' passe AVANT les familles de l'hôte : elle est le même
+       dessin à la bonne largeur, donc le remplacement ne déplace plus le texte.
+       Ce qui suit ne sert plus qu'aux hôtes où ni Arial, ni Liberation Sans, ni
+       Helvetica n'existent (Android, ChromeOS), et aux glyphes hors du fichier
+       servi. */
+    font-family: 'Inter', 'Inter repli Arial', -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans",
+        "Droid Sans", "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
