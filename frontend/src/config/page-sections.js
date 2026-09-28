@@ -144,6 +144,24 @@ const EDITORIAL_ACCUEIL = {
   rubanJetonsClass: 'ruban-jetons',
   rubanJetonClass: 'ruban-jeton',
   entreeSectionClass: 'entree-section',
+  // ── LES DEUX PAS DU RYTHME : LA SECTION ET LA CARTE (28/09/2026) ──────────
+  // Le pas vertical d'une section (deux utilitaires de rembourrage, dont la
+  // variante de largeur doublait le pas) et le rembourrage d'une carte (`p-6`)
+  // n'étaient déclarés NULLE PART : dix sections de l'accueil, neuf dans sa
+  // coquille, et deux cartes de chaque côté portaient chacun leur propre
+  // littéral. (Ces utilitaires ne sont PAS nommés ici : Tailwind lit ce fichier
+  // comme une source de candidats, commentaires compris — les citer ici ferait
+  // réapparaître leurs règles dans la feuille servie, sans porteur, et le garde
+  // de sélecteurs les refuserait ; c'est mesuré, la première rédaction de ce
+  // commentaire a fait rougir douze pages.) Un rythme recopié dix-neuf fois n'est pas un rythme, c'est
+  // dix-neuf accords à tenir — et rien ne rougissait quand deux copies
+  // cessaient d'être d'accord : la page changeait simplement de pas à la
+  // bascule coquille → React. Ces deux classes sont dans src/index.css (elles
+  // n'y portent qu'un pas, jamais un dessin), donc les DEUX canaux les lisent
+  // par construction, et `exigerCorpsDeclare` refuse un build dont la coquille
+  // a perdu l'une des deux chaînes.
+  sectionClass: 'section-publique',
+  carteClass: 'carte-publique',
   listeClass: 'liste-editoriale',
   listeColonnesClass: 'liste-editoriale liste-editoriale-colonnes',
   ligneMetierClass: 'ligne-editoriale ligne-metier',
@@ -191,6 +209,16 @@ const EDITORIAL_PAGE = {
   // page portait.
   bandePageClass: 'bande-page',
   entreeSectionClass: 'entree-section',
+  // Le pas de SECTION, le même qu'à l'accueil (voir `EDITORIAL_ACCUEIL`) :
+  // déclaré une seconde fois parce qu'un plan se lit seul, mais c'est la MÊME
+  // classe de src/index.css. Le pas de CARTE, lui, n'est pas déclaré ici :
+  // cette page ne peint aucune carte (ses blocs sont un panneau —
+  // `.panneau-sequestre`, qui porte déjà ce pas — et des lignes à filet), et
+  // un plan ne déclare que ce qu'il publie : l'avoir déclaré quand même a fait
+  // REFUSER le build par `exigerCorpsDeclare` (« carte-publique manque »), ce
+  // qui est exactement son travail — une déclaration sans porteur casse au lieu
+  // de peindre une page muette.
+  sectionClass: 'section-publique',
   listeClass: 'liste-editoriale',
   ligneEtapeClass: 'ligne-editoriale ligne-etape',
   pastilleClass: 'pastille-rond',
@@ -251,6 +279,29 @@ const EDITORIAL_PAGE = {
 // il passe d'une échelle en paliers à `.titre-heros`), et l'en-tête de section
 // de /privacy a grandi (son élément élu reste le CORPS d'une section :
 // 91 140 px² en mobile, 103 896 en desktop).
+//
+// ── RE-MESURE DU 28/09/2026, APRÈS LE RYTHME DÉCLARÉ ────────────────────────
+// Deuxième passe du même jour : le PAS des cadres, des sections et des cartes
+// est passé en classes de `src/index.css` (`cadre-page`, `section-publique`,
+// `carte-publique`), donc les peintures rétrécissent ou grandissent de quelques
+// pixels — dans les DEUX canaux à la fois, puisque les deux lisent les mêmes
+// jetons. Relevé (`npx playwright test e2e/lcp-geometrie-declaree.spec.js`,
+// taille de l'élément élu / aire réellement peinte, mobile / desktop) :
+//
+//   /jobs           37 240 / 34 960   (avant 36 750 / 35 144)
+//   /about          74 295 / 79 346   (avant 82 940 / 79 540)
+//   /privacy        91 140 / 103 896  (inchangé — son cadre est un `min-h-screen`)
+//   /how-it-works   29 260 / 32 830   (inchangé)
+//   /login          15 040 / 11 532   (avant 15 040 / 12 834)
+//   /register        9 792 / 12 672   (avant 9 548 / 12 338)
+//   /forgot-password 13 690 / 16 021  (avant 13 690 / 16 095)
+//   /support        16 632 /  9 648   (avant 16 720 / 9 480)
+//
+// Aucun plancher n'a bougé d'un chiffre : le plus serré reste /about
+// (55 000 px² pour 74 295 mesurés, soit 26 % de marge) — et c'est voulu. Les
+// mesures des commentaires de chaque route sont conservées TELLES QUELLES :
+// elles datent d'une session précise, et les réécrire avec les chiffres d'une
+// autre session ferait passer une variation d'hôte pour une variation de page.
 //
 // Les huit autres restent à moins de 4 % des valeurs écrites dans leurs
 // commentaires respectifs ci-dessous : ces éléments-là n'ont reçu qu'une
@@ -456,7 +507,11 @@ export const PAGE_SECTIONS = {
     // hauteur, et `heroTitleClass` le texte qui le précède et pourrait lui
     // prendre le LCP. Les trois étaient recopiées dans src/pages/HowItWorks.js
     // et vite-plugins/prerender/shells-routes.js.
-    heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
+    // `section-publique` remplace les deux valeurs de rembourrage du héros
+    // (28/09/2026) : le premier écran est le PREMIER TEMPS du rythme, pas un
+    // bloc à part qui aurait ses propres valeurs — c'est déjà la règle du héros de l'accueil
+    // (`.heros-grille`).
+    heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 section-publique text-center',
     heroTitleClass: 'titre-page mb-4',
     // Le sous-titre du héros est l'élément LCP de la page : sa GÉOMÉTRIE ne
     // change pas d'un caractère (`text-lg` et `max-w-2xl` décident du retour à
@@ -546,7 +601,11 @@ export const PAGE_SECTIONS = {
     // hors écran DÈS le premier paint des deux canaux : plus rien à déplacer.
     // Côté React la réserve est inerte (la page dépasse déjà la viewport aux
     // deux tailles mesurées), donc aucune peinture ne bouge.
-    frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen',
+    // `cadre-page` remplace le rembourrage écrit ici (28/09/2026) : le pas d'un
+    // cadre de page est le même sur toutes les pages publiques, et il est
+    // FLUIDE — une valeur fixe laissait 32 px de tête sur un téléphone comme
+    // sur un 27 pouces.
+    frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page min-h-screen',
     titleClass: 'titre-page',
     introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-stone-600 min-h-[104px] md:min-h-[52px]',
   },
@@ -715,6 +774,11 @@ export const PAGE_SECTIONS = {
   '/support': {
     // Le titre de la page EST le libellé de son lien (même clé que le pied de
     // page et la page de contact) : un seul texte pour un seul mot.
+    // Le CADRE de la page (28/09/2026) : il portait `py-8` en littéral, écrit
+    // deux fois — dans src/pages/Support.js et dans sa coquille. C'est le pas
+    // commun des cadres de page publiques (`cadre-page`), qui est FLUIDE là où
+    // un `py-8` fixe donnait 32 px de tête à toutes les tailles d'écran.
+    frameClass: 'max-w-2xl mx-auto px-4 cadre-page',
     titleKey: 'support',
     subtitleKey: 'supportSubtitle',
     // Le sous-titre est l'élément LCP de la page (mesuré : 16 720 px² mobile /
@@ -748,9 +812,14 @@ export const PAGE_SECTIONS = {
     // n'appartenaient à personne. La pastille ronde, elle, prend le sable et
     // l'orange de la marque — c'est la même que sur l'accueil, et le glyphe qui
     // la remplit dit déjà de quel moyen de contact il s'agit.
-    carteClass: 'carte-editoriale p-6',
+    // Le `p-6` de ces deux cartes est devenu `carte-publique` (28/09/2026) : le
+    // rembourrage d'une carte est LE MÊME pas partout, y compris sur les cartes
+    // de l'accueil et de /about, qui portaient le même littéral chacune de leur
+    // côté. Ce qui reste ici est ce qui DISTINGUE ces cartes (elles se cliquent,
+    // elles centrent leur contenu), jamais leur pas.
+    carteClass: 'carte-editoriale carte-publique',
     carteModeClass:
-      'carte-editoriale carte-editoriale-cliquable flex flex-col items-center gap-3 p-6 text-center',
+      'carte-editoriale carte-editoriale-cliquable carte-publique flex flex-col items-center gap-3 text-center',
     pastilleModeClass: 'pastille-rond pastille-rond-large',
     titreEntreeClass: 'titre-entree',
     ...BLOC_CONTACT,
@@ -827,9 +896,15 @@ export const PAGE_SECTIONS = {
     // vite-plugins/prerender/shells-routes.js. `frameClass` porte la largeur
     // (donc le retour à la ligne du paragraphe), `introClass` sa hauteur, et
     // `titleClass` le seul autre texte qui puisse prendre le LCP.
-    frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+    frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
     titleClass: 'titre-page mb-4',
     introClass: 'text-stone-600 mb-8',
+    // Le PAS de la carte (28/09/2026) : les trois promesses portaient
+    // `carte-editoriale p-6`, la MÊME chaîne écrite deux fois — ici la page, et
+    // dans la coquille. `carte-publique` est le pas commun aux cartes du site
+    // (src/index.css) ; ce qui reste propre à cette page est son dessin
+    // (`carte-editoriale`), jamais son rembourrage.
+    carteClass: 'carte-editoriale carte-publique',
     // Les trois promesses publiaient l'emoji de leur clé (`iconPromise*`) ;
     // l'accueil, lui, DESSINE déjà ces trois mêmes icônes (`icone:
     // 'promise*'`). Elles sont maintenant déclarées de la même façon ici, donc
@@ -891,7 +966,7 @@ export const PAGE_SECTIONS = {
     // la ligne) : elle vient de `frameClass`. `titleClass` porte le seul autre
     // texte capable de prendre le LCP au paragraphe (l'aire du titre grandit
     // avec lui), et `noteClass` le suit dans le flux.
-    frameClass: 'max-w-2xl mx-auto px-4 py-8',
+    frameClass: 'max-w-2xl mx-auto px-4 cadre-page',
     titleClass: 'titre-page mb-2',
     introClass: 'text-stone-600 mb-3',
     noteClass: 'text-sm text-stone-500 mb-6',
@@ -1006,7 +1081,7 @@ export const PAGE_SECTIONS = {
     // qu'elle portait) : le plus grand texte peint reste le CORPS d'une
     // section, donc l'élément LCP de la page reste celui sur lequel elle a été
     // mesurée.
-    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
     titleClass: 'titre-page mb-4',
     introClass: 'text-stone-600 mb-8',
     sectionTitleClass: 'titre-entree mb-2',
@@ -1037,7 +1112,7 @@ export const PAGE_SECTIONS = {
     // d'une section, c'est `sectionBodyClass` qui porte l'élément LCP.
     // Même vocabulaire aussi : les deux pages se lisent d'un bout à l'autre
     // comme un document — titre serif et sections à filet.
-    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
     titleClass: 'titre-page mb-4',
     introClass: 'text-stone-600 mb-8',
     sectionTitleClass: 'titre-entree mb-2',

@@ -78,7 +78,7 @@ export default function HowItWorks() {
           numérotées disent « une marche à suivre, et voici son ordre ». C'est
           la MÊME liste que celle de l'accueil, avec ses classes déclarées : le
           numéro vient du dictionnaire (`numberKey`) et non d'un `index + 1`. */}
-      <section className={`py-12 md:py-16 ${plan.paperClass}`}>
+      <section className={`${plan.sectionClass} ${plan.paperClass}`}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={plan.listeClass}>
             {STEPS.map((step) => (
@@ -109,7 +109,7 @@ export default function HowItWorks() {
           devient le panneau à deux moitiés de l'accueil (l'illustration sur son
           propre sol, le texte à droite) et les garanties deviennent des LIGNES
           à filet, repérées par une icône dessinée — jamais un caractère. */}
-      <section className={`py-12 md:py-16 ${plan.sandClass}`}>
+      <section className={`${plan.sectionClass} ${plan.sandClass}`}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={plan.panneauClass}>
             <div className={plan.panneauArtClass}>
@@ -150,7 +150,7 @@ export default function HowItWorks() {
           `<details>` natif : la question s'ouvre au clavier, et sans
           JavaScript. Le marqueur est DÉCORATIF (`aria-hidden`) : il ne dit rien
           que le dépliant ne dise déjà. */}
-      <section className={`py-12 md:py-16 ${plan.paperClass}`}>
+      <section className={`${plan.sectionClass} ${plan.paperClass}`}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={plan.entreeSectionClass}>
             <h2 className={plan.headClass}>{t(plan.faqTitleKey)}</h2>

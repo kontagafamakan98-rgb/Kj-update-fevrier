@@ -81,6 +81,14 @@ export default function Home() {
     rubanJetonsClass,
     rubanJetonClass,
     entreeSectionClass,
+    // ── Le RYTHME (28/09/2026) : le pas d'une section et celui d'une carte. ──
+    // Les sections de cette page portaient leur rembourrage en littéral (dix
+    // fois ici, neuf dans la coquille) et ses cartes `p-6` (deux fois de chaque
+    // côté). Ces deux pas sont maintenant des classes de src/index.css, lues
+    // par les deux canaux : retoucher le rythme de la page se fait à un seul
+    // endroit, et les deux peintures ne peuvent plus diverger en silence.
+    sectionClass,
+    carteClass,
     listeClass,
     listeColonnesClass,
     ligneMetierClass,
@@ -277,7 +285,7 @@ export default function Home() {
           Dix cartes identiques disaient « dix produits » ; dix lignes disent
           « dix entrées, et voici leur ordre ». Chaque ligne est un lien réel
           vers /jobs avec le filtre de la catégorie. */}
-      <section className={`py-12 md:py-16 ${paperClass}`}>
+      <section className={`${sectionClass} ${paperClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={entreeSectionClass}>
             <h2 className={headClass}>{t('popularServices')}</h2>
@@ -313,7 +321,7 @@ export default function Home() {
           ci-dessus) : aucune phrase n'a été inventée pour l'occasion. Elles
           sont sous la ligne de flottaison et chargées en `lazy`, donc hors du
           premier écran et hors du graphe du LCP. */}
-      <section className={`py-12 md:py-16 ${sandClass}`}>
+      <section className={`${sectionClass} ${sandClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={galerieGrilleClass}>
             {galerie.map(({ labelKey, image }) => (
@@ -327,11 +335,11 @@ export default function Home() {
       </section>
 
       {/* ── LES TROIS PROMESSES ────────────────────────────────────────────── */}
-      <section className={`py-12 md:py-16 ${paperClass}`}>
+      <section className={`${sectionClass} ${paperClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
             {promises.map(({ icone, titleKey, descriptionKey }) => (
-              <div key={titleKey} className={`${cardClass} p-6`}>
+              <div key={titleKey} className={`${cardClass} ${carteClass}`}>
                 <span className={`${pastilleClass} mb-5`}>
                   <IconePage nom={icone} classe={CLASSES_ICONE.pastille} />
                 </span>
@@ -354,7 +362,7 @@ export default function Home() {
           colonne de gauche porte la photo du parcours (chemin lu dans le plan).
           Elle est en `lazy`, sous la ligne de flottaison : le LCP de la page
           reste l'illustration du héros. */}
-      <section className={`py-12 md:py-16 ${sandClass}`}>
+      <section className={`${sectionClass} ${sandClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={etapesGrilleClass}>
             <div className={etapesTeteClass}>
@@ -401,7 +409,7 @@ export default function Home() {
           page orange. Il devient un panneau en deux moitiés — l'illustration du
           séquestre sur son propre sol, le texte à droite — et l'accent reste
           l'orange de la marque. */}
-      <section className={`py-12 md:py-16 ${paperClass}`}>
+      <section className={`${sectionClass} ${paperClass}`}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={panneauClass}>
             <div className={panneauArtClass}>
@@ -465,7 +473,7 @@ export default function Home() {
           Deux chiffres, à filets, séparés par le même trait que les listes.
           Aucun compteur inventé : ce que la coquille pré-rendue publie est
           exactement ce que la page affiche. */}
-      <section className={`py-12 md:py-16 ${sandClass}`}>
+      <section className={`${sectionClass} ${sandClass}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={bandeClass}>
             {STATS.map((stat) => (
@@ -484,7 +492,7 @@ export default function Home() {
           qui édite le site. Le même bloc est rendu par la coquille statique
           (vite.config.js), avec les mêmes clés i18n : un crawler sans
           JavaScript le lit aussi. */}
-      <section className={`py-12 md:py-16 ${paperClass}`}>
+      <section className={`${sectionClass} ${paperClass}`}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={entreeSectionClass}>
             <h2 className={headClass}>{t('homeAboutTitle')}</h2>
@@ -515,7 +523,7 @@ export default function Home() {
       {/* ── LE CONTACT ──────────────────────────────────────────────────────
           Section réelle, identique à la coquille statique de l'accueil pour le
           SEO local et l'accessibilité en un appui sur mobile. */}
-      <section className={`py-12 md:py-16 ${sandClass} border-t border-stone-100`}>
+      <section className={`${sectionClass} ${sandClass} border-t border-stone-100`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={entreeSectionClass}>
             <h2 className={headClass}>{t('contactTitle')}</h2>
@@ -569,7 +577,7 @@ export default function Home() {
           </div>
 
           {SOCIAL_LINKS.length > 0 && (
-            <div className={`mt-8 ${cardClass} bg-stone-50 p-6 text-center`}>
+            <div className={`mt-8 ${cardClass} bg-stone-50 ${carteClass} text-center`}>
               <h3 className="text-lg font-semibold text-stone-900 mb-3">{t('homeContactFollow')}</h3>
               <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-orange-700">
                 {SOCIAL_LINKS.map((social) => (

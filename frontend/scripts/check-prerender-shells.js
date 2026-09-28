@@ -283,8 +283,8 @@ if (login) {
   if (!login.includes('id="email"')) {
     errors.push('login.html : champ e-mail absent du shell');
   }
-  // Le bouton est un `<button>` : `[type="submit"]` (src/styles/
-  // kojo-pack-f-readability-no-color.css) porte `min-height: 48px` quand un
+  // Le bouton est un `<button>` : `[type="submit"]` (l'en-tête de
+  // src/index.css) porte `min-height: 48px` quand un
   // `<div>` s'arrêtait à 36-40 px — la sonde de géométrie refusait l'écart.
   if (!login.includes(`bg-orange-600">${fr.login}</button>`)) {
     errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');

@@ -62,6 +62,12 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     heroIllustrationFondClass, heroIllustrationImageClass, heroAccentClass,
     rubanClass, rubanInnerClass, rubanEtiquetteClass, rubanJetonsClass, rubanJetonClass,
     entreeSectionClass, listeClass, listeColonnesClass, ligneMetierClass, ligneEtapeClass,
+    // Le RYTHME (28/09/2026) : le pas d'une section et celui d'une carte, les
+    // mêmes qu'en React. Neuf sections et deux cartes portaient ici les
+    // littéraux `py-12 md:py-16` et `p-6` — les recopier était la seule façon
+    // de les tenir d'accord, et rien ne rougissait quand elles ne l'étaient
+    // plus. Ils sont lus dans le plan comme le reste.
+    sectionClass, carteClass,
     pastilleClass, pastilleCreuseClass, nomLigneClass, noteLigneClass, flecheLigneClass,
     panneauClass, panneauArtClass, panneauOrbeClass, panneauImageClass, panneauEstampilleClass,
     bandeClass, chiffreClass, ctaClass, ctaInnerClass, ctaActionsClass,
@@ -74,7 +80,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     heroGrilleClass, heroCopieClass, heroActionsClass, heroBoutonClass, heroBoutonSecondClass,
     heroReperesClass, heroIllustrationClass, heroIllustrationFondClass,
     heroIllustrationImageClass, heroAccentClass, rubanClass, rubanInnerClass,
-    rubanEtiquetteClass, rubanJetonsClass, rubanJetonClass, entreeSectionClass, listeClass,
+    rubanEtiquetteClass, rubanJetonsClass, rubanJetonClass, entreeSectionClass, sectionClass,
+    carteClass, listeClass,
     listeColonnesClass, ligneMetierClass, ligneEtapeClass, pastilleClass, pastilleCreuseClass,
     nomLigneClass, noteLigneClass, flecheLigneClass, panneauClass, panneauArtClass,
     panneauOrbeClass, panneauImageClass, panneauEstampilleClass, bandeClass, chiffreClass,
@@ -231,7 +238,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
 
     // Catégories (liens INTERNES réels, avec le filtre de la liste) : des
     // LIGNES, comme la page.
-    `<section class="py-12 md:py-16 ${paperClass}">`,
+    `<section class="${sectionClass} ${paperClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="${entreeSectionClass}">`,
     `<h2 class="${headClass}">${esc(T('popularServices'))}</h2>`,
@@ -255,7 +262,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // que la liste ci-dessus) et les images sont déclarées par le plan — la
     // coquille publie donc exactement ce que React publie, y compris les
     // attributs de dimension qui réservent la boîte (aucun décalage au chargement).
-    `<section class="py-12 md:py-16 ${sandClass}">`,
+    `<section class="${sectionClass} ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="${galerieGrilleClass}">`,
     ...homePlan.galerie.map(
@@ -270,12 +277,12 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
 
     // Trois promesses
-    `<section class="py-12 md:py-16 ${paperClass}">`,
+    `<section class="${sectionClass} ${paperClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.promises.map(
       ({ icone, titleKey, descriptionKey: textKey }) =>
-        `<div class="${cardClass} p-6">` +
+        `<div class="${cardClass} ${carteClass}">` +
         `<span class="${pastilleClass} mb-5">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
         `<h3 class="${nomLigneClass} mb-3">${esc(T(titleKey))}</h3>` +
         `<p class="${noteLigneClass}">${esc(T(textKey))}</p>` +
@@ -289,7 +296,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // dictionnaire, `numberKey` — jamais recompté par `index + 1`), sous
     // l'entête de la même grille — dont la première colonne porte la photo du
     // parcours, dont le chemin est lu dans le plan.
-    `<section class="py-12 md:py-16 ${sandClass}">`,
+    `<section class="${sectionClass} ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="${etapesGrilleClass}">`,
     `<div class="${etapesTeteClass}">`,
@@ -319,7 +326,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
 
     // Séquestre (confiance) : un PANNEAU en deux moitiés, l'illustration sur
     // son sol, l'estampille orange à l'angle.
-    `<section class="py-12 md:py-16 ${paperClass}">`,
+    `<section class="${sectionClass} ${paperClass}">`,
     `<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="${panneauClass}">`,
     `<div class="${panneauArtClass}">`,
@@ -352,7 +359,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // Faits vérifiables (pays couverts, support) : la MÊME déclaration
     // (homePlan.stats) est lue par Home.js et par cette coquille — une seule
     // liste, deux rendus, et aucun compteur inventé (cf. page-sections.js).
-    `<section class="py-12 md:py-16 ${sandClass}">`,
+    `<section class="${sectionClass} ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="${bandeClass}">`,
     ...homePlan.stats.map(
@@ -371,7 +378,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // trouvait pas de quoi comprendre QUI édite le site. Mêmes clés i18n
     // et mêmes classes que la section équivalente de src/pages/Home.js :
     // le crawler sans JavaScript et le navigateur lisent un seul texte.
-    `<section class="py-12 md:py-16 ${paperClass}">`,
+    `<section class="${sectionClass} ${paperClass}">`,
     `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="${entreeSectionClass}">`,
     `<h2 class="${headClass}">${esc(T('homeAboutTitle'))}</h2>`,
@@ -404,7 +411,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // y=5948,69 côté coquille contre 5949,69 côté React, puis les 60 textes
     // suivants au même écart). Une classe d'un seul token suffisait à décaler
     // la moitié basse de la page.
-    `<section class="py-12 md:py-16 ${sandClass} border-t border-stone-100">`,
+    `<section class="${sectionClass} ${sandClass} border-t border-stone-100">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="${entreeSectionClass}">`,
     `<h2 class="${headClass}">${esc(T('contactTitle'))}</h2>`,
@@ -437,7 +444,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // JavaScript n'a pas d'autre moyen de voir ces liens.
     ...(socialLinks.length
       ? [
-          `<div class="mt-8 ${cardClass} bg-stone-50 p-6 text-center">`,
+          `<div class="mt-8 ${cardClass} bg-stone-50 ${carteClass} text-center">`,
           `<h3 class="text-lg font-semibold text-stone-900 mb-3">${esc(T('homeContactFollow'))}</h3>`,
           `<div class="flex flex-wrap items-center justify-center gap-4 text-sm text-orange-700">`,
           ...socialLinks.map(

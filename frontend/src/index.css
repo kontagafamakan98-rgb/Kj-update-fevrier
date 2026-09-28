@@ -1,8 +1,92 @@
-﻿@import './styles/kojo-pack-g-mobile-premium-no-color.css';
-@import './styles/kojo-pack-f-readability-no-color.css';
-@import './styles/kojo-pack-c-pwa-capacitor.css';
-@import './styles/kojo-pack-b-dashboard-jobs-profile.css';
-@import './styles/kojo-pack-a-auth-landing.css';
+/* ══ CE QUI RESTE DES CINQ `kojo-pack-*.css` (28/09/2026) ═══════════════════
+
+   Cinq feuilles importées ici portaient 292 lignes d'un système de design
+   ÉTRANGER au site : 39 noms de classes (`card`, `panel`, `badge`, `hero`,
+   `toast`, `overlay`…), des attributs `[data-screen="…"]` que le produit n'écrit
+   nulle part, et deux palettes froides (`--kojo-premium-*`, `--kojo-c-*`, dont un
+   fond `#0f172a`). MESURÉ : aucun élément livré ne porte un seul de ces noms
+   (0 occurrence de `[data-screen]`, 0 de `.card`), donc aucune de ces règles ne
+   pouvait rien peindre — et le garde de sélecteurs ne le voyait pas, parce qu'il
+   comptait les noms n'importe où dans l'artefact : `card` n'était « porté » que
+   par `<meta name="twitter:card">`, `dialog` par l'attribut `role="dialog"`,
+   `overlay` par le code de Leaflet, `header` par un en-tête HTTP de Sentry,
+   `toast` par une variable, et `dashboard`/`settings`/`jobs` par les noms de
+   routes. Les feuilles sont supprimées, et le corpus du garde ne retient plus
+   que les POSITIONS DE CLASSE (scripts/css-selecteurs-morts.js).
+
+   Ce qui suit est ce qui, dans ces 292 lignes, était RÉELLEMENT peint : des
+   déclarations sur des ÉLÉMENTS (`html`, `body`, `h1`, `p`, `input`, `button`,
+   `*`), qui n'ont pas besoin d'un porteur de classe pour agir. Elles sont
+   recopiées À L'IDENTIQUE et À CETTE PLACE (avant `@tailwind base`, exactement
+   là où les `@import` étaient) : la cascade ne bouge donc pas d'un iota — une
+   déclaration d'élément déplacée plus bas l'emporterait sur des règles du site
+   qui la battaient jusqu'ici. Rien d'autre n'est repris : les règles de classes
+   mortes sont parties avec les feuilles, et c'est tout l'objet de la passe. */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: contain;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+p,
+label,
+small,
+li {
+  line-height: 1.6;
+}
+
+input,
+select,
+textarea {
+  min-height: 48px;
+}
+
+button,
+[role="button"],
+[type="button"],
+[type="submit"] {
+  min-height: 48px;
+  padding-inline: 16px;
+}
+
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+@media (max-width: 768px) {
+  h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); }
+  h2 { font-size: clamp(1.25rem, 4vw, 1.6rem); }
+  p, label, small, li { font-size: 0.98rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -182,32 +266,16 @@ code {
         --chart-5: 27 87% 67%;
         --radius: 0.5rem;
     }
-  .dark {
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 3.9%;
-        --card-foreground: 0 0% 98%;
-        --popover: 0 0% 3.9%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 0 0% 9%;
-        --secondary: 0 0% 14.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 14.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 14.9%;
-        --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14.9%;
-        --input: 0 0% 14.9%;
-        --ring: 0 0% 83.1%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-    }
+
+    /* LE BLOC `.dark` A ÉTÉ RETIRÉ ICI (28/09/2026), et c'est le garde de
+       sélecteurs qui l'a nommé : aucun élément livré ne porte la classe `dark`,
+       et AUCUN code ne l'ajoute (`grep -rn "'dark'" src/` est vide) — donc ses
+       vingt-trois variables ne pouvaient rien peindre. C'était le même défaut de
+       forme que les cinq `kojo-pack-*.css` supprimés le même jour : un sélecteur
+       qu'aucun porteur ne peut satisfaire. Il portait en outre une palette
+       étrangère au site — un thème sombre shadcn (fond `3.9%`) et un
+       `--chart-4: 280 65% 60%`, c'est-à-dire un VIOLET, dans un produit dont la
+       charte en refuse. */
 }
 
 
@@ -490,6 +558,51 @@ code {
   --kojo-orange: #ea580c;
   --kojo-orange-fonce: #c2410c;
   --kojo-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+
+  /* ── LE RYTHME ÉDITORIAL (28/09/2026) ──────────────────────────────────────
+
+     Cinq pas, et rien d'autre : le site n'écrit plus d'espace « au cas où ».
+     Chaque pas est FLUIDE (`clamp`) parce qu'une échelle fixe fait deux choses
+     de plus en plus fausses en s'éloignant du format pour lequel elle a été
+     choisie : trop serrée sur un grand écran (les blocs se collent) et trop
+     large sur un téléphone (une section vide un écran et demie). Les bornes
+     sont des valeurs CHOISIES, pas des restes de l'ancien rythme
+     (`py-12 md:py-16`, `p-6`, `mb-4` écrits en littéral) — et les tables de
+     structure et d'aire du LCP, qui sont des mesures, sont re-mesurées à
+     chaque fois qu'un de ces pas bouge.
+       • `page`   — ce qu'un cadre de page laisse avant son premier bloc ;
+       • `section`— le pas vertical ENTRE deux sections (le pas qui fait lire
+         une longue page comme un sommaire) ;
+       • `tete`   — ce qu'un en-tête (titre de page ou d'entrée de section)
+         laisse avant le corps qu'il annonce ;
+       • `bloc`   — l'espace DANS un groupe (titre → phrase, texte → actions) ;
+       • `carte`  — le rembourrage intérieur d'une carte de contenu. */
+  --rythme-page: clamp(2.5rem, 2rem + 2vw, 4rem);
+  --rythme-section: clamp(3.75rem, 3rem + 3vw, 6.5rem);
+  --rythme-tete: clamp(2rem, 1.6rem + 1.6vw, 3.5rem);
+  --rythme-bloc: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
+  --rythme-carte: clamp(1.375rem, 1.2rem + 0.7vw, 2rem);
+}
+
+/* ── LES TROIS CLASSES DU RYTHME ────────────────────────────────────────────
+
+   Elles portent le pas, jamais le dessin : une section qui change de pas ne
+   change ni son fond ni son contenu, et une carte qui change de rembourrage ne
+   change pas son filet. Les deux canaux les lisent par construction (elles sont
+   déclarées dans `src/config/page-sections.js` et recopiées À L'IDENTIQUE dans
+   les coquilles pré-rendues, où `exigerCorpsDeclare` REFUSE un build qui en
+   oublie une) : la géométrie des deux peintures reste donc identique sans
+   qu'aucune des deux ne recalcule rien. */
+.section-publique {
+  padding-block: var(--rythme-section);
+}
+
+.cadre-page {
+  padding-block: var(--rythme-page);
+}
+
+.carte-publique {
+  padding: var(--rythme-carte);
 }
 
 /* Le SUR-TITRE : la petite ligne espacée qui annonce ce qui vient. Elle remplace
@@ -773,23 +886,21 @@ code {
    touche à leur mesure est mesuré, pas choisi (voir src/config/page-sections.js). */
 .heros-grille {
   display: grid;
-  gap: 2.5rem;
+  gap: var(--rythme-tete);
   align-items: center;
   margin-inline: auto;
   max-width: 80rem;
-  padding: 3.5rem 1rem;
-}
-
-@media (min-width: 768px) {
-  .heros-grille {
-    padding-block: 5rem;
-  }
+  /* Le héros prend le PAS DE SECTION, comme les sections qu'il précède : c'est
+     ce qui fait du premier écran le premier temps du rythme, et non un bloc à
+     part. Avant, il portait ses propres valeurs (3,5 rem puis 5 rem), donc la
+     page changeait de pas dès la première bascule de largeur. */
+  padding-block: var(--rythme-section);
+  padding-inline: 1rem;
 }
 
 @media (min-width: 1024px) {
   .heros-grille {
     grid-template-columns: 1.12fr 0.88fr;
-    gap: 4rem;
     padding-inline: 2rem;
   }
 }
@@ -803,7 +914,7 @@ code {
    sur `#ea580c`). */
 .heros-lead {
   max-width: 34rem;
-  margin-bottom: 2rem;
+  margin-bottom: var(--rythme-bloc);
   color: rgba(255, 255, 255, 0.92);
   font-size: 1.0625rem;
   line-height: 1.7;
@@ -831,6 +942,9 @@ code {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.875rem;
+  /* Les deux boutons du héros se lisent comme UNE rangée : l'écart reste donc
+     sous le pas de groupe (0,875 rem, la mesure de la maquette) — le rythme
+     s'arrête devant les commandes, il ne les écarte pas. */
 }
 
 .heros-reperes {
@@ -838,7 +952,7 @@ code {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem 1.5rem;
-  margin-top: 2rem;
+  margin-top: var(--rythme-bloc);
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.875rem;
 }
@@ -1090,17 +1204,16 @@ code {
    moitié droite de la page. */
 .entree-section {
   max-width: 46rem;
-  margin-bottom: 2.5rem;
+  margin-bottom: var(--rythme-tete);
 }
 
+/* Le sur-titre, le titre et la phrase de l'entrée sont TROIS pas du rythme, pas
+   trois marges écrites à la main : 0,75 rem du sur-titre au titre (ils forment
+   un seul objet), puis le pas de groupe avant la phrase. Le palier de 1 024 px
+   qui doublait la marge a disparu avec le `clamp` du jeton — une échelle
+   fluide n'a plus de marche à franchir. */
 .entree-section .titre-section {
-  margin: 0.75rem 0 1rem;
-}
-
-@media (min-width: 1024px) {
-  .entree-section {
-    margin-bottom: 3.5rem;
-  }
+  margin: 0.75rem 0 var(--rythme-bloc);
 }
 
 /* ── LES ÉTAPES, EN DEUX COLONNES ────────────────────────────────────────────
@@ -1143,7 +1256,7 @@ code {
 }
 
 .etapes-tete .titre-section {
-  margin: 0.75rem 0 1rem;
+  margin: 0.75rem 0 var(--rythme-bloc);
 }
 
 /* Le cadre de la photo : 288 × 186, soit le rapport 287/186 déclaré en
@@ -1303,16 +1416,12 @@ code {
    d'un encart de presse — quelque chose qu'on isole sur le côté — et il ne
    coûte aucune couleur nouvelle. */
 .encart {
-  padding: 2rem;
+  /* Un encart EST une carte de contenu : il prend le pas de la carte, comme
+     `.carte-publique` — un seul pas, deux dessins. */
+  padding: var(--rythme-carte);
   border: 1px solid var(--kojo-filet);
   border-left: 3px solid var(--kojo-orange);
   background-color: var(--kojo-sable);
-}
-
-@media (min-width: 768px) {
-  .encart {
-    padding: 2.5rem;
-  }
 }
 
 /* ── LA BANDE DE TÊTE D'UNE PAGE DE CONTENU ─────────────────────────────────
@@ -1519,8 +1628,11 @@ code {
    comme quatre entrées, DANS L'ORDRE, et le dernier filet ferme la liste là où
    commencent les liens de pied de page. */
 .bloc-de-section {
-  padding-top: 1.25rem;
-  padding-bottom: 1.25rem;
+  /* Le pas de GROUPE : quatre sections de /privacy se lisent comme quatre
+     entrées d'une même liste — c'est le même pas que « titre → phrase » et
+     « texte → actions », donc la même variable. */
+  padding-top: var(--rythme-bloc);
+  padding-bottom: var(--rythme-bloc);
   border-top: 1px solid var(--kojo-filet);
 }
 
@@ -1618,9 +1730,9 @@ code {
    marque, y compris sur l'anneau et sur l'estampille. */
 .panneau-sequestre {
   display: grid;
-  gap: 2rem;
+  gap: var(--rythme-tete);
   align-items: center;
-  padding: 2rem;
+  padding: var(--rythme-carte);
   border: 1px solid var(--kojo-filet);
   border-radius: 0.5rem;
   background-color: var(--kojo-papier);
@@ -1629,8 +1741,6 @@ code {
 @media (min-width: 768px) {
   .panneau-sequestre {
     grid-template-columns: 0.85fr 1.15fr;
-    gap: 2.5rem;
-    padding: 2.5rem;
   }
 }
 
@@ -1688,7 +1798,8 @@ code {
 }
 
 .bande-chiffres > div {
-  padding: 1.75rem 1rem;
+  padding-block: var(--rythme-bloc);
+  padding-inline: 1rem;
   text-align: center;
 }
 
@@ -1736,7 +1847,11 @@ code {
   z-index: 1;
   max-width: 48rem;
   margin-inline: auto;
-  padding: 4rem 1rem;
+  /* La clôture est une SECTION : elle prend donc le pas de section, comme
+     `.section-publique` — la dernière section du rythme, avec ses 4 rem
+     écrits à la main remplacés par le même jeton que les autres. */
+  padding-block: var(--rythme-section);
+  padding-inline: 1rem;
   text-align: center;
 }
 
@@ -1755,7 +1870,7 @@ code {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.875rem;
-  margin-top: 2rem;
+  margin-top: var(--rythme-bloc);
 }
 
 /* ── LE SOCLE DES FORMULAIRES, PAR SÉLECTEURS D'ÉLÉMENTS ────────────────────

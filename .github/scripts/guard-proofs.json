@@ -623,7 +623,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
       "runner": "vitest",
-      "motif": "une classe ou un id nommé par un sélecteur doit être POSÉ par l'artefact livré — les littéraux de className du JavaScript du build, ou le HTML des coquilles pré-rendues ; sinon le sélecteur ne peut rien peindre et la feuille décrit un site qui n'existe pas. Le garde remplace l'ÉLAGAGE AU BUILD (`vite-plugins/purge-css-mort.js`, supprimé) et rend DEUX verdicts : les feuilles SOURCE (fichier, ligne, nom mort, sélecteur, et position obligatoire vs alternative de :is()/:where()) et la feuille LIVRÉE (une règle servie dont aucun sélecteur n'a de porteur — l'utilitaire qu'un composant éliminé du bundle, une branche import.meta.env.DEV, fait générer à Tailwind ; mesuré le 25/09/2026 : 2 utilitaires, 199 o par page). Le corpus des POSEURS exclut délibérément les feuilles du build : une feuille ne peut que se justifier elle-même. Mesures du 25/09/2026 : 36 règles mortes, 131 sélecteurs inapplicables et 148 arguments morts de :is()/:where() retirés des sources (six feuilles touchées : 30 676 → 19 636 o ; sept feuilles source : 33 215 → 22 175 o, mesuré contre HEAD), 105 noms morts (4 769 o, 6,85 % de la feuille servie) que l'élagage laissait passer, feuille servie 69 432 → 60 929 o, 7 feuilles source et 13 pages jugées, 0 divergence."
+      "motif": "une classe ou un id nommé par un sélecteur doit être POSÉ par l'artefact livré — les littéraux de className du JavaScript du build, ou le HTML des coquilles pré-rendues ; sinon le sélecteur ne peut rien peindre et la feuille décrit un site qui n'existe pas. Le garde remplace l'ÉLAGAGE AU BUILD (`vite-plugins/purge-css-mort.js`, supprimé) et rend DEUX verdicts : les feuilles SOURCE (fichier, ligne, nom mort, sélecteur, et position obligatoire vs alternative de :is()/:where()) et la feuille LIVRÉE (une règle servie dont aucun sélecteur n'a de porteur — l'utilitaire qu'un composant éliminé du bundle, une branche import.meta.env.DEV, fait générer à Tailwind ; mesuré le 25/09/2026 : 2 utilitaires, 199 o par page). Le corpus des POSEURS exclut délibérément les feuilles du build : une feuille ne peut que se justifier elle-même. SA LECTURE A ÉTÉ RESSERRÉE le 28/09/2026, et c'est une mesure qui l'a imposée : cinq feuilles importées (`src/styles/kojo-pack-*.css`, 292 lignes d'un système de design étranger, 39 classes, plus les attributs `[data-screen=…]`) étaient LIVRÉES sans qu'AUCUN élément porte leurs noms, et ce verdict était VERT — le corpus comptait alors les jetons de tout le texte du build, donc `card` était « porté » par `<meta name=twitter:card>`, `dialog` par `role=dialog`, `overlay` par sept occurrences de Leaflet, `header` par un en-tête HTTP de Sentry, `toast` par une variable, et `dashboard`/`settings`/`jobs`/`profile` par les noms de routes du routeur — aucune de ces occurrences ne peut peindre un `.card`. Le verdict 1 ne retient donc plus que les POSITIONS DE CLASSE (attribut `class=` d'une page, `className`/`class`/`classe`/`…Class`, `classList.add`, `setAttribute('class', …)`, affectation `el.className =`, variable locale nommée dans une de ces positions, lue par AST — un motif ne distingue pas une valeur de `className` d'un argument de `console.log`) ; le verdict 2 garde la lecture large, parce que Tailwind y génère un utilitaire depuis n'importe quel jeton (312 règles servies par `.container` et `.ease-out`, dette d'un autre propriétaire, comptée et publiée, pas tue). Mesures du 25/09/2026 : 36 règles mortes, 131 sélecteurs inapplicables et 148 arguments morts de :is()/:where() retirés des sources (six feuilles touchées : 30 676 → 19 636 o ; sept feuilles source : 33 215 → 22 175 o, mesuré contre HEAD), 105 noms morts (4 769 o, 6,85 % de la feuille servie) que l'élagage laissait passer, feuille servie 69 432 → 60 929 o, 7 feuilles source et 13 pages jugées, 0 divergence. Mesures du 28/09/2026, après retrait des cinq feuilles : 2 feuilles source (214 règles) et 14 pages (12 135 règles livrées) lues, corpus des poseurs 75 fichiers/791 jetons issus de 2 713 valeurs de classe, 0 nom mort et 0 règle servie sans porteur ; le plancher des feuilles source est descendu de 6 à 2, parce qu'un plancher qu'une dette suffit à satisfaire n'est pas un plancher."
     },
     {
       "chemin": "frontend/scripts/css-selecteurs-morts.js",
@@ -631,8 +631,8 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
       "runner": "vitest",
-      "motif": "la règle elle-même (ce qu'est un nom de classe dans un sélecteur — échappements CSS résolus par un SCANNER, pas par une expression régulière dont le motif hérité déclarait sans porteur la classe que le JavaScript livre pourtant, valeurs arbitraires, chaînes entre guillemets ignorées ; ce qu'est un PORTEUR — ensemble de jetons ET revérification en texte avec bornes de nom, pour que `container` ne compte pas dans `containerRef` ; le corpus des poseurs ; les planchers de lecture) : le garde prononce le verdict, ce module fournit le classement",
-      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (valeur arbitraire échappée, nom à crochets et deux-points, variantes hover:/md:, id, liste de sélecteurs, point entre guillemets, crochet nu, bornes de nom, corpus vide, ligne et sélecteur du nom mort, position obligatoire vs alternative, règle livrée sans porteur, règle livrée gardée par UN porteur), et les cinq mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict, lecture des feuilles source, trois planchers de lecture)"
+      "motif": "la règle elle-même (ce qu'est un nom de classe dans un sélecteur — échappements CSS résolus par un SCANNER, pas par une expression régulière dont le motif hérité déclarait sans porteur la classe que le JavaScript livre pourtant, valeurs arbitraires, chaînes entre guillemets ignorées ; ce qu'est un PORTEUR — ensemble de jetons ET revérification en texte avec bornes de nom, pour que `container` ne compte pas dans `containerRef` ; DEUX corpus, et l'asymétrie est mesurée — `corpusPoseurs` ne lit que les POSITIONS DE CLASSE d'un JavaScript compilé (AST `@babel/parser`) et les attributs `class=` d'une page, `corpusPoseursLarge` garde la lecture large pour le seul verdict de la feuille LIVRÉE ; les planchers de lecture) : le garde prononce le verdict, ce module fournit le classement",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (valeur arbitraire échappée, nom à crochets et deux-points, variantes hover:/md:, id, liste de sélecteurs, point entre guillemets, crochet nu, bornes de nom, corpus vide, ligne et sélecteur du nom mort, position obligatoire vs alternative, règle livrée sans porteur, règle livrée gardée par UN porteur), et les six mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict, lecture des feuilles source, corpus des feuilles source — large au lieu de serré, trois planchers de lecture), et le module est verrouillé en outre par ses cas directs sur ce qui POSE VRAIMENT une classe (tableau de chaînes, prose, clé i18n, `role`, en-tête HTTP : rien de tout cela ne porte ; `className`, attribut JSX, `classList.add`, `setAttribute('class')`, `el.className =`, clé `…Class`, littéraux descendus d'un gabarit/condition/appel)"
     },
     {
       "chemin": "frontend/scripts/check-shell-text-provenance.js",
@@ -683,7 +683,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
       "runner": "vitest",
-      "motif": "refuse qu'un verdict porte sur un TEMPS ABSOLU sans être déclaré et classé — le défaut d'origine étant un garde qui jugeait la hauteur du document pré-rendu contre un nombre de pixels absolu relevé sur une machine : vert sur un poste, rouge sur un autre, parce que le verdict portait sur l'HÔTE et non sur l'artefact. Le module des règles (scripts/juges-de-temps.js) inventorie les bornes de temps des surfaces de verdict déclarées (budgets Lighthouse, délais de test Vitest/Playwright, plafond HTTP de la sonde OG) et exige, pour chacune, une classe d'un vocabulaire FERMÉ (PROPRIETE = plafond d'attente, VIVACITE = borne de blocage dimensionnée par le travail, HOTE = délai qui décide et suit la machine, MESURE = métrique en millisecondes) et une justification de plus de 40 caractères. Une borne qui DÉCIDE (HOTE ou MESURE) n'est tolérée que si un ANGLE ACCEPTÉ nomme ce qui la compense ; une borne NOUVELLE rougit ; une borne DISPARUE ou dont le nombre d'occurrences a changé rougit (registre périmé) ; un fichier de surface introuvable rougit. Planchers de lecture (5 surfaces, 4 bornes) : sous eux, le garde refuse de juger plutôt que de rendre un vert vide. Angles morts publiés, mesurés et non devinés : les `{ timeout: N }` d'attente de CONDITION de `e2e/` (classe PROPRIETE par construction), les `timeout-minutes` des workflows, les 19 attentes de stabilisation `waitForTimeout` de `e2e/` (classe HOTE, nommées comme angle accepté, remède = une attente de condition), les bornes calculées (dont le TBT de la coquille, écrit `targetIsLocal ? 1600 : 1200` : deux seuils, un par hôte, la forme portable), les tables mesurées (CLS, TBT desktop) gouvernées par leurs propres tests, et le fait que le relevé est TEXTUEL — une borne citée dans un commentaire compte, donc le garde surestime toujours, jamais l'inverse."
+      "motif": "refuse qu'un verdict porte sur un TEMPS ABSOLU sans être déclaré et classé — le défaut d'origine étant un garde qui jugeait la hauteur du document pré-rendu contre un nombre de pixels absolu relevé sur une machine : vert sur un poste, rouge sur un autre, parce que le verdict portait sur l'HÔTE et non sur l'artefact. Le module des règles (scripts/juges-de-temps.js) inventorie les bornes de temps des surfaces de verdict déclarées (budgets Lighthouse, délais de test Vitest/Playwright, plafond HTTP de la sonde OG) et exige, pour chacune, une classe d'un vocabulaire FERMÉ (PROPRIETE = plafond d'attente, VIVACITE = borne de blocage dimensionnée par le travail, HOTE = délai qui décide et suit la machine, MESURE = métrique en millisecondes) et une justification de plus de 40 caractères. Une borne qui DÉCIDE (HOTE ou MESURE) n'est tolérée que si un ANGLE ACCEPTÉ nomme ce qui la compense ; une borne NOUVELLE rougit ; une borne DISPARUE ou dont le nombre d'occurrences a changé rougit (registre périmé) ; un fichier de surface introuvable rougit. Une surface peut être un DOSSIER (`frontend/e2e`, `dossier: true`) : le bras la développe en ses fichiers JavaScript, lus ET NOMMÉS un par un — donc un parcours AJOUTÉ demain est jugé sans être inscrit nulle part, et le motif `attenteFixe` y est déclaré VIDE : toute `waitForTimeout(N)` sous `e2e/` est une borne NON DÉCLARÉE, refusée en nommant le fichier, la ligne et la valeur (dix-neuf attentes fixes recensées le 27/09/2026, converties en attentes de condition le 28/09/2026 — part (a) de l'angle 19 de CI-COVERAGE.md, fermée ; relevé : 24 surfaces lues). Planchers de lecture (5 surfaces, 4 bornes) : sous eux, le garde refuse de juger plutôt que de rendre un vert vide. Angles morts publiés, mesurés et non devinés : les `{ timeout: N }` d'attente de CONDITION de `e2e/` (classe PROPRIETE par construction), les `timeout-minutes` des workflows, les attentes de CONDITION de `e2e/` (`waitForSelector`, `waitForFunction`, `e2e/helpers/attentes.js` — les inventorier ferait crier le garde à chaque condition écrite), les bornes calculées (dont le TBT de la coquille, écrit `targetIsLocal ? 1600 : 1200` : deux seuils, un par hôte, la forme portable), les tables mesurées (CLS, TBT desktop) gouvernées par leurs propres tests, et le fait que le relevé est TEXTUEL — une borne citée dans un commentaire compte, donc le garde surestime toujours, jamais l'inverse."
     },
     {
       "chemin": "frontend/scripts/juges-de-temps.js",
@@ -691,7 +691,7 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
       "runner": "vitest",
-      "motif": "les RÈGLES du garde des temps absolus, sans aucune E/S : classes (vocabulaire fermé), motifs de relevé, surfaces déclarées, JUGES (la déclaration), angles acceptés, relevé, inventaire, confrontation et délits de déclaration. Les fonctions sont pures parce qu'elles reçoivent le TEXTE des fichiers : c'est ce qui les rend éprouvables par mutation de chaîne, et ce qui permet à la preuve de fabriquer une borne nouvelle, une borne disparue, une classe inconnue et une justification trop courte sans toucher aux vrais budgets."
+      "motif": "les RÈGLES du garde des temps absolus, sans aucune E/S : classes (vocabulaire fermé), motifs de relevé, surfaces déclarées, JUGES (la déclaration), angles acceptés, relevé, inventaire, confrontation et délits de déclaration. Les fonctions sont pures parce qu'elles reçoivent le TEXTE des fichiers : c'est ce qui les rend éprouvables par mutation de chaîne, et ce qui permet à la preuve de fabriquer une borne nouvelle, une borne disparue, une classe inconnue et une justification trop courte sans toucher aux vrais budgets. Elle porte aussi la RÈGLE du harnais e2e : `frontend/e2e` est une surface (`dossier: true`) sur le seul motif `attenteFixe`, avec une déclaration VIDE — l'inventaire développe un dossier en ses fichiers À LEUR NOM (le refus nomme le fichier), ce qui rend toute `waitForTimeout(N)` refusée, y compris dans un parcours écrit demain — et c'est CETTE ligne de développement qu'une mutation neutralise pour prouver les deux cas neufs."
     },
     {
       "chemin": "frontend/scripts/budget-de-vivacite.js",
@@ -2315,6 +2315,26 @@
       ]
     },
     {
+      "id": "css-selecteurs-morts: corpus large pour les feuilles source",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "const corpus = corpusPoseurs(RACINE);",
+      "remplace": "const corpus = corpusPoseursLarge(RACINE);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "ne se laisse PAS convaincre par un nom écrit ailleurs que dans une classe"
+      ]
+    },
+    {
       "id": "css-selecteurs-morts: plancher du corpus neutralise",
       "garde": "frontend/scripts/check-css-selecteurs-morts.js",
       "cible": "frontend/scripts/check-css-selecteurs-morts.js",
@@ -2674,6 +2694,27 @@
       "cwd": "frontend",
       "attend": [
         "refuse une surface déclarée INTROUVABLE"
+      ]
+    },
+    {
+      "id": "temps absolus: une attente fixe dans e2e passe pour une condition",
+      "garde": "frontend/scripts/juges-de-temps.js",
+      "cible": "frontend/scripts/juges-de-temps.js",
+      "trouve": "      ? [...parChemin.keys()].filter((chemin) => chemin.startsWith(`${surface.chemin}/`))",
+      "remplace": "      ? []",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "la surface `frontend/e2e` est un DOSSIER : chaque fichier est lu À SON NOM",
+        "une attente fixe, MÊME dans un parcours qui n’est listé nulle part, est REFUSÉE et NOMMÉE"
       ]
     },
     {

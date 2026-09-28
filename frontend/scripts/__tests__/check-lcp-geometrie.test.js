@@ -91,7 +91,9 @@ export const ROUTES_LCP = [
     classes: [
       // `min-h-screen` (27/09/2026) : réserve la viewport dans la coquille
       // /jobs, sinon son pied de page tombait au bas de l'écran (0,0862).
-      'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-screen',
+      // `cadre-page` (28/09/2026) remplace le `py-8` : le pas d'un cadre de
+      // page publique est le MÊME sur toutes ces pages et il est fluide.
+      'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page min-h-screen',
       // Refonte éditoriale du 28/09/2026 : l'échelle de titres passe au
       // vocabulaire déclaré (`.titre-page`, src/index.css) et le corps au gris
       // chaud. Les bornes `min-h` de l'intro sont INCHANGÉES : elles réservent
@@ -112,7 +114,9 @@ export const ROUTES_LCP = [
       { champ: 'introClass', page: 'className={introClass}', coquille: 'class="${aboutPlan.introClass}"' },
     ],
     classes: [
-      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+      // `cadre-page` (28/09/2026) : le cadre de la page n'écrit plus ses 48 px
+      // de tête — il prend le pas fluide commun à tous les cadres de page.
+      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
       'titre-page mb-4',
       'text-stone-600 mb-8',
     ],
@@ -135,7 +139,7 @@ export const ROUTES_LCP = [
       { champ: 'sectionWrapClass', page: 'className={sectionWrapClass}', coquille: 'class="${privacyPlan.sectionWrapClass}"' },
     ],
     classes: [
-      'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
+      'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
       'titre-page mb-4',
       'text-stone-600 mb-8',
       // 28/09/2026 : le titre d'une section quitte la typographie d'un tableau
@@ -159,7 +163,10 @@ export const ROUTES_LCP = [
       { champ: 'heroSubtitleClass', page: 'className={plan.heroSubtitleClass}', coquille: 'class="${howItWorksPlan.heroSubtitleClass}"' },
     ],
     classes: [
-      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
+      // `section-publique` (28/09/2026) : le premier écran de la page prend le
+      // pas de SECTION — c'est le premier temps du rythme, comme le héros de
+      // l'accueil, et non un bloc à part avec ses propres valeurs.
+      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 section-publique text-center',
       'titre-page mb-4',
       // 28/09/2026 : la COULEUR du sous-titre est corrigée — il était publié en
       // `text-stone-600` sur le fond orange du héros, soit 2,6:1 de contraste,
@@ -244,12 +251,19 @@ export const ROUTES_LCP = [
         page: 'className={titreEntreeClass}',
         coquille: 'class="${supportPlan.titreEntreeClass}"',
       },
+      // Le CADRE de la page (28/09/2026) : il portait `py-8` en littéral, écrit
+      // deux fois. Le pas est maintenant déclaré, donc vérifiable ici.
+      {
+        champ: 'frameClass',
+        page: 'className={frameClass}',
+        coquille: 'class="${supportPlan.frameClass}"',
+      },
     ],
     // La borne est le couple « couleur + rôle » : c'est le sous-titre qui porte
     // le corps chaud de la page, et la chaîne doit vivre dans SON plan — pas
     // dans Support.js ni dans le corps de sa coquille, où les lignes de contact
     // portaient autrefois la même teinte sous un autre nom.
-    classes: ['text-stone-600'],
+    classes: ['text-stone-600', 'max-w-2xl mx-auto px-4 cadre-page'],
   },
 ];
 

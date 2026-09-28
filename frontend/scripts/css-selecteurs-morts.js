@@ -33,6 +33,32 @@
 // qui laissait une porte ouverte ; mesuré sur l'arbre du 25/09/2026 : la seule
 // feuille du build est celle de leaflet, et l'exclure ne change AUCUN verdict).
 //
+// ── Ce qui POSE une classe, et ce qui ne la pose pas (28/09/2026) ────────────
+// Ce corpus a d'abord compté les JETONS de TOUT le texte du build. C'était trop
+// large, et c'est mesuré : les cinq feuilles `kojo-pack-*.css` (292 lignes, un
+// système de design étranger au site) nommaient 39 classes dont AUCUNE n'était
+// posée par un élément, et le garde rendait vert — parce que leurs noms
+// apparaissaient quelque part dans une chaîne, un identifiant ou une clé de
+// traduction. Mesuré un par un : `card` n'était porté que par
+// `<meta name="twitter:card">`, `dialog` par l'attribut `role="dialog"`,
+// `overlay` par sept occurrences dans le code de Leaflet, `header` par un en-tête
+// HTTP de Sentry, `toast` par une variable du contexte de notifications, et
+// `dashboard`/`settings`/`jobs`/`profile` par les NOMS DE ROUTES du routeur.
+// Aucune de ces occurrences ne peut peindre un `.card`.
+//
+// Le corpus ne retient donc plus que ce qui POSE VRAIMENT une classe :
+//   • un attribut `class="…"` d'une page pré-rendue ;
+//   • une position `className`/`class` — attribut JSX, propriété d'objet (la
+//     forme que React reçoit après compilation), affectation `el.className = …` ;
+//   • un appel `classList.add/remove/toggle/contains('…')` et
+//     `setAttribute('class', '…')` ;
+//   • une propriété de configuration dont le nom FINIT par `Class`
+//     (`titreEntreeClass: 'titre-entree'`) : c'est la convention du dépôt pour
+//     nommer une classe lue des DEUX canaux, et sans elle les noms vivants des
+//     plans seraient déclarés morts.
+// Tout le reste — identifiants, clés, prose, `role="dialog"`, en-têtes HTTP — ne
+// peint rien et ne porte donc rien.
+//
 // ── Ce que les décodeurs ci-dessous ont coûté, et qu'il ne faut pas défaire ──
 // `RE_JETON` accepte les caractères d'une VALEUR ARBITRAIRE (`[`, `]`, `%`, `#`…)
 // parce qu'ils font partie du nom (`w-[340px]`, `z-[9999]`) ; un découpage plus
@@ -52,11 +78,20 @@ import path from 'node:path';
 // les modules de `scripts/` — celui-ci compris — donc un import paresseux ne
 // protégerait de rien et rendrait le garde dépendant d'un appel d'amorçage.
 import postcss from 'postcss';
+// L'AST, et pas une expression régulière : voir `classesDuJs` — un motif ne peut
+// pas distinguer la valeur d'un `className` d'un argument de `console.log`.
+import { parse as babelParse } from '@babel/parser';
 
 /** En dessous, on refuse de juger : un lecteur cassé produirait un faux vert. */
 export const MIN_FICHIERS_CORPUS = 20;
 export const MIN_JETONS_CORPUS = 200;
-export const MIN_FEUILLES_SOURCE = 6;
+// Le plancher des feuilles SOURCE était à 6, et il n'était atteint que grâce aux
+// cinq `kojo-pack-*.css` : leur suppression laisse `index.css` et `App.css`. Un
+// plancher qu'une dette suffit à satisfaire n'est pas un plancher — c'est un
+// chiffre qui décrit l'arbre du jour. Il est ramené au sujet réel (les deux
+// feuilles du site), et c'est le plancher de RÈGLES qui empêche désormais un
+// lecteur cassé de rendre un vert sur du vide.
+export const MIN_FEUILLES_SOURCE = 2;
 export const MIN_REGLES_LUES = 60;
 export const MIN_PAGES_LIVREES = 10;
 
@@ -142,13 +177,27 @@ export function feuillesDe(html) {
 }
 
 /**
- * Corpus des POSEURS : tous les `.html` du build (blocs `<style>` retirés) et
- * tous les `.js`/`.mjs`. Aucune feuille : cf. l'en-tête.
+ * Corpus LARGE : tous les jetons de tous les `.html` du build (blocs `<style>`
+ * retirés) et de tous les `.js`/`.mjs`. Aucune feuille : cf. l'en-tête.
+ *
+ * Il est conservé pour le verdict de la feuille LIVRÉE, et c'est une asymétrie
+ * assumée, mesurée le 28/09/2026 : Tailwind GÉNÈRE un utilitaire dès qu'un jeton
+ * candidat apparaît quelque part dans les fichiers scannés, même là où il n'est
+ * pas une classe. `index.css` ne contient pas `.container`, mais il contient
+ * `containerRef` ; `ease-out` n'est écrit que dans un `animation: '… 0.3s
+ * ease-out'` en style en ligne — et les deux utilitaires sont LIVRÉS, sans
+ * porteur, dans les quatorze pages. Mesuré : **312 règles servies** sont dans ce
+ * cas (`.container`, `.ease-out` et leurs variantes de media query). C'est une
+ * dette d'un AUTRE propriétaire (la configuration de Tailwind, pas une feuille
+ * source), elle n'est ni fermée ni tue ici : le verdict 2 garde donc la lecture
+ * large, qui la tolérait avant et la tolère encore, et le compte est publié.
+ * Les CINQ feuilles mortes, elles, ne passaient que par là : leur verdict est
+ * celui du corpus STRICT ci-dessous.
  *
  * @param {string} outDir Dossier de build.
  * @returns {{jetons: Set<string>, texte: string, fichiers: string[]}}
  */
-export function corpusPoseurs(outDir) {
+export function corpusPoseursLarge(outDir) {
   const fichiers = [];
   const morceaux = [];
   const parcourir = (dossier) => {
@@ -165,6 +214,244 @@ export function corpusPoseurs(outDir) {
   parcourir(outDir);
   const texte = morceaux.join('\n');
   return { jetons: jetonsDe(texte), texte, fichiers };
+}
+
+/**
+ * Corpus STRICT des POSEURS : ce qui POSE VRAIMENT une classe — cf. l'en-tête
+ * (« Ce qui POSE une classe, et ce qui ne la pose pas »). C'est la lecture du
+ * verdict 1, celui des feuilles SOURCE.
+ *
+ * @param {string} outDir Dossier de build.
+ * @returns {{jetons: Set<string>, texte: string, fichiers: string[], valeurs: number}}
+ */
+export function corpusPoseurs(outDir) {
+  const fichiers = [];
+  const valeursDeClasse = [];
+  const parcourir = (dossier) => {
+    for (const entree of fs.readdirSync(dossier, { withFileTypes: true })) {
+      const chemin = path.join(dossier, entree.name);
+      if (entree.isDirectory()) { parcourir(chemin); continue; }
+      if (!/[.](html|js|mjs)$/.test(entree.name)) continue;
+      fichiers.push(chemin);
+      const brut = fs.readFileSync(chemin, 'utf8');
+      if (entree.name.endsWith('.html')) {
+        // Le bloc `<style>` est RETIRÉ avant la lecture des attributs : sans cela
+        // une feuille se justifierait elle-même, et le nom d'une classe morte
+        // serait « porté » par la règle qui la décrit.
+        valeursDeClasse.push(...classesDuHtml(brut.replace(RE_FEUILLE, ' ')));
+      } else {
+        valeursDeClasse.push(...classesDuJs(brut));
+      }
+    }
+  };
+  parcourir(outDir);
+  const texte = valeursDeClasse.join('\n');
+  return { jetons: jetonsDe(texte), texte, fichiers, valeurs: valeursDeClasse.length };
+}
+
+/**
+ * Ce nom de clé porte-t-il une VALEUR DE CLASSE ?
+ *
+ *   • `className` / `class` — la position React ;
+ *   • `classe` — la convention du dépôt pour un composant qui dessine une icône
+ *     (`<Icone nom="croix" classe="w-5 h-5 sm:w-4 sm:h-4" />`, `IconePage`) : le
+ *     prop passe ensuite au `className` du `<svg>`, et l'ignorer faisait
+ *     déclarer morts 351 utilitaires LIVRÉS ;
+ *   • `…Class` / `…ClassName` — la convention des plans (`titreEntreeClass`,
+ *     `inputClassName`) pour une classe déclarée une fois et lue des deux canaux.
+ */
+const EST_UNE_CLE_DE_CLASSE = (nom) =>
+  Boolean(nom) &&
+  (nom === 'className' || nom === 'class' || nom === 'classe' || /Class(Name|e)?$/.test(nom));
+
+/** Les valeurs d'un attribut `class` dans un HTML (guillemets simples ou doubles). */
+export function classesDuHtml(html) {
+  const valeurs = [];
+  for (const m of String(html).matchAll(/\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+    if (m[1] ?? m[2]) valeurs.push(m[1] ?? m[2]);
+  }
+  return valeurs;
+}
+
+/**
+ * Les valeurs de classe d'un JavaScript COMPILÉ, lues par AST.
+ *
+ * L'AST est indispensable et non un confort : une expression régulière ne
+ * distingue pas `className:"a b"` de `console.log("a b")`, et c'est exactement
+ * la distinction que ce corpus existe pour faire. Le parseur est celui que
+ * d'autres gardes du dépôt utilisent déjà (`@babel/parser`) ; en cas de fichier
+ * illisible, on rend ce qu'on a — un fichier non lu ne condamne aucun nom.
+ */
+export function classesDuJs(code) {
+  const valeurs = [];
+  let ast;
+  try {
+    ast = babelParse(code, { sourceType: 'unambiguous', errorRecovery: true, plugins: ['jsx'] });
+  } catch {
+    return valeurs;
+  }
+
+  // Les IDENTIFIANTS nommés dans une position de classe (`className={`${pastille} x`}`,
+  // `className={PANNEAU_FILTRES}`) : leur valeur est souvent une chaîne écrite
+  // ailleurs dans le MÊME fichier, et c'est par là que deux classes VIVANTES
+  // (`pastille-courante`, `panneau-filtres`) se faisaient déclarer mortes au
+  // premier essai de ce corpus. Les collecter demande deux passes — d'où la
+  // liste remplie pendant la visite, et relue après.
+  const identifiantsDeClasse = new Set();
+  const nommer = (noeud) => {
+    if (noeud?.type === 'Identifier') identifiantsDeClasse.add(noeud.name);
+  };
+
+  /** Les littéraux de chaîne d'une expression, en descendant les compositions. */
+  const litteraux = (noeud) => {
+    if (!noeud || typeof noeud !== 'object') return;
+    if (noeud.type === 'Identifier') nommer(noeud);
+    switch (noeud.type) {
+      case 'StringLiteral':
+        valeurs.push(noeud.value);
+        return;
+      case 'TemplateLiteral':
+        for (const quasi of noeud.quasis) if (quasi.value?.cooked) valeurs.push(quasi.value.cooked);
+        // Les EXPRESSIONS d'un gabarit : c'est là que se cache la classe d'un
+        // `className={`x ${cond ? 'y' : ''}`}` — ne lire que les quasis laissait
+        // `pt-safe-area-inset-top` et `puce-filtre-active` sans porteur.
+        for (const expression of noeud.expressions) litteraux(expression);
+        return;
+      case 'ArrayExpression':
+        for (const element of noeud.elements) litteraux(element);
+        return;
+      case 'ConditionalExpression':
+        litteraux(noeud.consequent);
+        litteraux(noeud.alternate);
+        return;
+      case 'LogicalExpression':
+      case 'BinaryExpression':
+        litteraux(noeud.left);
+        litteraux(noeud.right);
+        return;
+      // Un APPEL dans une position de classe (`className: clsx("a", cond && "sm:w-4")`) :
+      // ses arguments sont des valeurs de classe, et l'oublier faisait déclarer
+      // morts 351 utilitaires LIVRÉS lors du premier essai de ce corpus
+      // (`.sm\\:w-4` et ses semblables, que Tailwind génère depuis les composants).
+      case 'CallExpression':
+      case 'OptionalCallExpression':
+      case 'NewExpression':
+        for (const argument of noeud.arguments || []) litteraux(argument);
+        return;
+      case 'SequenceExpression':
+        for (const expression of noeud.expressions || []) litteraux(expression);
+        return;
+      case 'JSXExpressionContainer':
+      case 'JSXElement':
+      case 'ParenthesizedExpression':
+        litteraux(noeud.expression || noeud);
+        return;
+      default:
+        return;
+    }
+  };
+  /** Les identifiants nommés par une expression, sans collecter de littéraux. */
+  const identifiantsDe = (noeud, vus = new Set()) => {
+    if (!noeud || typeof noeud !== 'object') return vus;
+    if (Array.isArray(noeud)) {
+      for (const element of noeud) identifiantsDe(element, vus);
+      return vus;
+    }
+    if (noeud.type === 'Identifier') vus.add(noeud.name);
+    for (const [cle, valeur] of Object.entries(noeud)) {
+      if (cle === 'loc' || cle === 'start' || cle === 'end') continue;
+      if (valeur && typeof valeur === 'object') identifiantsDe(valeur, vus);
+    }
+    return vus;
+  };
+  const nomDe = (noeud) =>
+    noeud && (noeud.type === 'Identifier' || noeud.type === 'JSXIdentifier') ? noeud.name : null;
+  /** Le nom d'une clé, quelle que soit la façon dont elle est écrite. */
+  const nomDeCle = (noeud) =>
+    noeud?.type === 'StringLiteral' || noeud?.type === 'NumericLiteral'
+      ? String(noeud.value)
+      : nomDe(noeud);
+
+  const visiter = (noeud) => {
+    if (!noeud || typeof noeud !== 'object') return;
+    if (Array.isArray(noeud)) {
+      for (const element of noeud) visiter(element);
+      return;
+    }
+    switch (noeud.type) {
+      case 'JSXAttribute': {
+        const nom = nomDe(noeud.name);
+        if (EST_UNE_CLE_DE_CLASSE(nom)) {
+          const valeur = noeud.value;
+          if (valeur?.type === 'StringLiteral') valeurs.push(valeur.value);
+          else litteraux(valeur);
+        }
+        break;
+      }
+      // La variable locale qui PORTE la classe : `const panneau = 'panneau-filtres'`.
+      // Elle n'est lue que si son nom a été nommé dans une position de classe —
+      // sans quoi toute chaîne du fichier redeviendrait un porteur, c'est-à-dire
+      // le corpus large que ce module vient de remplacer.
+      case 'VariableDeclarator': {
+        const nom = nomDe(noeud.id);
+        if (nom && identifiantsDeClasse.has(nom)) litteraux(noeud.init);
+        break;
+      }
+      case 'ObjectProperty':
+      case 'Property': {
+        const cle = nomDeCle(noeud.key);
+        if (cle && EST_UNE_CLE_DE_CLASSE(cle)) {
+          litteraux(noeud.value);
+          // Les identifiants d'une valeur de classe (souvent un gabarit) sont
+          // retenus pour la seconde passe des `VariableDeclarator`.
+          for (const identifiant of identifiantsDe(noeud.value)) litteraux({ type: 'Identifier', name: identifiant });
+        }
+        break;
+      }
+      case 'AssignmentExpression': {
+        const gauche = noeud.left;
+        if (gauche?.type === 'MemberExpression') {
+          const prop = nomDeCle(gauche.property);
+          if (prop === 'className' || prop === 'class') litteraux(noeud.right);
+        }
+        break;
+      }
+      case 'CallExpression':
+      case 'OptionalCallExpression': {
+        const callee = noeud.callee;
+        if (callee?.type === 'MemberExpression' || callee?.type === 'OptionalMemberExpression') {
+          const methode = nomDeCle(callee.property);
+          const objet = callee.object;
+          const surListeDeClasses =
+            objet?.type === 'MemberExpression' && nomDeCle(objet.property) === 'classList';
+          if (surListeDeClasses && ['add', 'remove', 'toggle', 'contains'].includes(methode)) {
+            for (const argument of noeud.arguments) litteraux(argument);
+          }
+          if (methode === 'setAttribute') {
+            const [attribut, valeur] = noeud.arguments || [];
+            if (attribut?.value === 'class') litteraux(valeur);
+          }
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    for (const [cle, valeur] of Object.entries(noeud)) {
+      if (cle === 'loc' || cle === 'start' || cle === 'end') continue;
+      if (valeur && typeof valeur === 'object') visiter(valeur);
+    }
+  };
+  visiter(ast.program || ast);
+  // SECONDE PASSE : les déclarations locales des identifiants nommés dans une
+  // position de classe. La première visite les a déjà rencontrées — mais elle ne
+  // pouvait pas savoir, en les voyant, qu'un `className` les nommerait plus bas.
+  visiter(ast.program || ast);
+  // La valeur est rendue UNE fois, et c'est une correction : la seconde passe
+  // relit chaque position de classe, donc un littéral y était compté DEUX fois,
+  // et le compte publié par le garde (« N valeur(s) de classe ») valait le double
+  // de la matière. C'est un ensemble de valeurs distinctes, pas un journal.
+  return [...new Set(valeurs)];
 }
 
 /** Les noms de classes/ids d'un sélecteur qu'AUCUN élément du corpus ne porte. */

@@ -115,7 +115,7 @@ const ProfilePhotoUpload = ({
   };
 
   return (
-    <div className={`carte-editoriale p-6 mb-6${classeBloc ? ` ${classeBloc}` : ''}`}>
+    <div className={`carte-editoriale carte-publique mb-6${classeBloc ? ` ${classeBloc}` : ''}`}>
       <div className="mb-4 flex items-center gap-3">
         <IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoTitre} />
         <h3 className="titre-entree">

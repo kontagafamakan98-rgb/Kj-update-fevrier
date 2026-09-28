@@ -214,7 +214,7 @@ const ForgotPassword = () => {
           <p className={pagePlan.subtitleClass}>{t(pagePlan.subtitleKey)}</p>
         </div>
 
-        <div className="carte-editoriale p-6 space-y-6">
+        <div className="carte-editoriale carte-publique space-y-6">
           <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">
             <span className={step === 'email' ? 'text-orange-600' : 'text-green-600'}>1. {t(pagePlan.stepEmailKey)}</span>
             <span className={step === 'code' ? 'text-orange-600' : step === 'password' ? 'text-green-600' : 'text-stone-500'}>2. {t(pagePlan.stepCodeKey)}</span>

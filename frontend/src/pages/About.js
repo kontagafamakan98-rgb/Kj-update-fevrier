@@ -23,7 +23,7 @@ export default function About() {
   const { t } = useLanguage();
   usePageMeta();
 
-  const { titleKey, introKey, frameClass, titleClass, introClass, cards, highlight, links } =
+  const { titleKey, introKey, frameClass, titleClass, introClass, carteClass, cards, highlight, links } =
     PAGE_SECTIONS['/about'];
 
   return (
@@ -44,7 +44,7 @@ export default function About() {
             appartenait. */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {cards.map((card) => (
-            <div key={card.titleKey} className="carte-editoriale p-6">
+            <div key={card.titleKey} className={carteClass}>
               <span className="pastille-rond mb-4">
                 <IconePage nom={card.icone} classe={CLASSES_ICONE.pastille} />
               </span>

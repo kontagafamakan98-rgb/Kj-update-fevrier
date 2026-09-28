@@ -88,11 +88,12 @@ const Support = () => {
   usePageMeta();
   const [mode, setMode] = useState(null); // null | 'robot' | 'direct'
   const {
-    titleKey, subtitleKey, subtitleClass, modes, carteModeClass, pastilleModeClass, titreEntreeClass,
+    titleKey, subtitleKey, subtitleClass, frameClass, modes, carteModeClass, pastilleModeClass,
+    titreEntreeClass,
   } = PAGE_SECTIONS['/support'];
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className={frameClass}>
       <div className="mb-6 text-center">
         <h1 className="titre-page mb-2">{t(titleKey)}</h1>
         <p className={subtitleClass}>{t(subtitleKey)}</p>

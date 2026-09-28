@@ -9,11 +9,27 @@
  *   2. le GARDE (`scripts/check-css-selecteurs-morts.js`) est lancé en
  *      SOUS-PROCESSUS sur des arbres de fixture — parce que ce qui compte est son
  *      CODE DE SORTIE et ses messages, pas ses fonctions. Les fixtures sont
- *      ENGENDRÉES au-dessus des planchers de lecture (20 fichiers, 6 feuilles,
+ *      ENGENDRÉES au-dessus des planchers de lecture (20 fichiers, 2 feuilles,
  *      60 règles, 10 pages) : sans ça, le garde refuserait de juger et le test
  *      confondrait « refus » et « verdict ».
  *
  * Ce fichier ne dépend PAS de `build/` : la CI exécute `vitest` sans build.
+ *
+ * ── Les fixtures POSENT leurs classes, et depuis le 28/09/2026 elles le font
+ * DANS UNE POSITION DE CLASSE ─────────────────────────────────────────────────
+ * Elles écrivaient `const a=["classe-posee-0", …]` : le corpus LARGE y voyait
+ * des porteurs, le corpus des POSEURS (verdict 1) n'y voit qu'un tableau de
+ * chaînes, et l'arbre « conforme » sortait donc en 1 — le garde avait raison
+ * contre sa propre fixture. `className:"…"` est la forme que React reçoit après
+ * compilation, et c'est elle qu'on écrit ici.
+ *
+ * Le cas `prose` de `ecrireArbre` est l'inverse, et c'est une PREUVE : un nom
+ * écrit ailleurs que dans une position de classe (nom de route, clé i18n, prose)
+ * ne doit PAS disculper une règle morte. Les cinq `kojo-pack-*.css` supprimés le
+ * 28/09/2026 ne tenaient que par là (`card` « porté » par `<meta
+ * name="twitter:card">`, `dialog` par `role="dialog"`, `dashboard` par un nom de
+ * route) : la mutation « corpus large pour les feuilles source » du registre rend
+ * ce cas vert, et rien d'autre.
  *
  * ── Preuves d'échec (rejouées à la main, harnais de mutation) ────────────────
  *   • réécrire une règle morte dans `src/App.css` → sortie 1, nommant fichier,
@@ -39,6 +55,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  classesDuHtml,
+  classesDuJs,
   corpusPoseurs,
   feuillesDe,
   jetonsDe,
@@ -110,6 +128,51 @@ describe('css-selecteurs-morts — ce qu’est un PORTEUR', () => {
   });
 });
 
+/**
+ * Ce que le corpus STRICT retient, et ce qu'il REFUSE de retenir. C'est la
+ * bascule du 28/09/2026 : le corpus comptait les jetons de TOUT le texte du
+ * build, donc les cinq feuilles mortes passaient (leurs noms apparaissaient dans
+ * une chaîne, un attribut ou une clé de traduction).
+ */
+describe('css-selecteurs-morts — ce qui POSE VRAIMENT une classe', () => {
+  it('ne compte PAS une chaîne posée nulle part : `["card"]` ne porte pas `.card`', () => {
+    // Le corps de ce cas est la forme qu'avaient les fixtures, et c'est ainsi
+    // que le corpus large disculpait un nom qu'aucun élément ne porte.
+    expect(classesDuJs('const routes=["card","panel","dashboard"];export{routes}')).toEqual([]);
+    expect(classesDuJs('console.log("card");const i18n={dashboard:"Tableau"};const p={role:"dialog"};')).toEqual([]);
+    expect(classesDuJs('fetch("/api/jobs", { headers: { "x-header": "toast" } })')).toEqual([]);
+  });
+
+  it('compte les positions de classe : propriété, attribut JSX, classList, affectation, clé …Class', () => {
+    expect(classesDuJs('const a={className:"card panel"};')).toEqual(['card panel']);
+    expect(classesDuJs('const a=<div className="hero" class="x"/>;')).toEqual(['hero', 'x']);
+    expect(classesDuJs('document.body.classList.add("toast");')).toEqual(['toast']);
+    expect(classesDuJs('el.setAttribute("class", "overlay");')).toEqual(['overlay']);
+    expect(classesDuJs('el.className = "hero";')).toEqual(['hero']);
+    // La convention du dépôt : une classe déclarée une fois et lue des deux
+    // canaux (`titreEntreeClass`, `inputClassName`).
+    expect(classesDuJs('const o={titreEntreeClass:"titre-entree", inputClassName:"champ"};')).toEqual([
+      'titre-entree',
+      'champ',
+    ]);
+  });
+
+  it('descend les gabarits, les conditions et les appels d’un `className`', () => {
+    // Sans ça, deux classes VIVANTES (`pastille-courante`, `panneau-filtres`) et
+    // 351 utilitaires livrés étaient déclarés morts.
+    expect(classesDuJs('const c="panneau-filtres";const a={className:`${c} x`};')).toContain('panneau-filtres');
+    expect(classesDuJs('const a={className:cond ? "pastille-courante" : ""};')).toContain('pastille-courante');
+    expect(classesDuJs('const a={className:clsx("sm:w-4", cond && "sm:h-4")};')).toEqual(
+      expect.arrayContaining(['sm:w-4', 'sm:h-4'])
+    );
+  });
+
+  it('lit les valeurs de classe du HTML, et rien que l’attribut `class`', () => {
+    expect(classesDuHtml('<body class="a b"><p class=\'c\'></p>')).toEqual(['a b', 'c']);
+    expect(classesDuHtml('<meta name="twitter:card" content="summary">')).toEqual([]);
+  });
+});
+
 describe('css-selecteurs-morts — les règles d’une feuille', () => {
   it('nomme le nom mort avec sa ligne et son sélecteur (feuille source)', () => {
     const css = ['.pose { color: red }', '', '.job-card { color: blue }'].join('\n');
@@ -156,8 +219,11 @@ describe('css-selecteurs-morts — les règles d’une feuille', () => {
  * seul plancher y était démontré. Ici, un arbre peut être illisible au seul
  * niveau du corpus (1 fichier de poseurs), ou de ses feuilles source (1 feuille),
  * ou de son livré (1 page) — le reste étant complet.
+ *
+ * `prose` est écrit dans le JS du build SANS être une position de classe : c'est
+ * la forme sous laquelle un nom mort se faisait disculper avant le 28/09/2026.
  */
-function ecrireArbre({ regleMorte = null, regleLivree = null, nbJs = 25, nbPages = 12, nbFeuilles = 6 } = {}) {
+function ecrireArbre({ regleMorte = null, regleLivree = null, prose = '', nbJs = 25, nbPages = 12, nbFeuilles = 6 } = {}) {
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'kojo-css-mort-'));
   const build = path.join(racine, 'build');
   const assets = path.join(build, 'assets');
@@ -165,15 +231,16 @@ function ecrireArbre({ regleMorte = null, regleLivree = null, nbJs = 25, nbPages
   fs.mkdirSync(assets, { recursive: true });
   fs.mkdirSync(src, { recursive: true });
 
-  // Les noms POSÉS : écrits dans le JS du build, comme React les publie. Il en
-  // faut 200 au moins (plancher de jetons du garde) et chacun doit être un jeton
-  // DISTINCT — les écrire en une chaîne séparée par des espaces n'en produisait
-  // que 40, et le garde refusait alors de juger au lieu de rendre un verdict.
+  // Les noms POSÉS : écrits dans le JS du build DANS UNE POSITION DE CLASSE,
+  // comme React les publie (`className:"…"`). Il en faut 200 au moins (plancher
+  // de jetons du garde) et chacun doit être un jeton DISTINCT — les écrire en une
+  // chaîne séparée par des espaces n'en produisait que 40, et le garde refusait
+  // alors de juger au lieu de rendre un verdict.
   const poses = Array.from({ length: 240 }, (_, i) => `classe-posee-${i}`);
   for (let i = 0; i < nbJs; i += 1) {
     fs.writeFileSync(
       path.join(assets, `chunk-${i}.js`),
-      `const a=[${poses.map((p) => `"${p}"`).join(',')}];export{a}`,
+      `const a=[${poses.map((p) => `{className:"${p}"}`).join(',')}];\n${prose}\nexport{a}`,
       'utf8'
     );
   }
@@ -270,6 +337,22 @@ describe('check-css-selecteurs-morts — le garde, sur des arbres de fixture', (
     })();
     expect(sortie.code).toBe(1);
     expect(sortie.sortie).toMatch(/dossier de build introuvable/);
+  });
+
+  it('ne se laisse PAS convaincre par un nom écrit ailleurs que dans une classe', () => {
+    // `job-card-mobile` est écrit dans le JS du build — comme NOM DE ROUTE, pas
+    // dans une position de classe. Le corpus large y verrait un porteur (c'est
+    // ainsi que `card`, `dialog`, `overlay`, `header`, `toast`, `dashboard`,
+    // `settings`, `jobs` et `profile` disculpaient les cinq `kojo-pack-*.css`
+    // supprimés le 28/09/2026) ; le corpus des POSEURS ne le compte pas.
+    const arbre = ecrireArbre({
+      regleMorte: '\n.job-card-mobile{color:red}',
+      prose: 'const ROUTES=["job-card-mobile"];export{ROUTES}',
+    });
+    const { code, sortie } = lancerGarde(arbre);
+    expect(code).toBe(1);
+    expect(sortie).toMatch(/job-card-mobile/);
+    expect(sortie).toMatch(/posé par AUCUN élément livré/);
   });
 
   it('lit le corpus des POSEURS : les feuilles du build en sont exclues', () => {

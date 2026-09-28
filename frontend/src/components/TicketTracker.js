@@ -75,7 +75,7 @@ export default function TicketTracker() {
     // page, et ses deux champs sont les seuls du site qui vivent HORS d'un
     // `<form>` — donc les seuls que le socle `form :is(input…)` ne dessine pas.
     // Ils portent maintenant le même rayon (0,5 rem) que ce socle, en clair.
-    <div className="mb-6 carte-editoriale p-6">
+    <div className="mb-6 carte-editoriale carte-publique">
       <h2 className="titre-entree mb-1">{t('supportTrackTitle')}</h2>
       <p className="text-sm text-stone-500 mb-4">{t('supportTrackSubtitle')}</p>
 

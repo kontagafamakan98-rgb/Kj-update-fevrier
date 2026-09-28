@@ -184,8 +184,9 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div>`
       // `type="submit"` : le MÊME attribut que le bouton de React (le
       // `LoadingButton` de Login.js le déclare). Il décide de la hauteur :
-      // `[type="submit"]` (src/styles/kojo-pack-f-readability-no-color.css)
-      // porte `min-height: 48px` et l'emporte par spécificité sur le
+      // `[type="submit"]` (l'en-tête de src/index.css, où vivent désormais
+      // les déclarations d'ÉLÉMENT des cinq `kojo-pack-*.css` supprimés) porte
+      // `min-height: 48px` et l'emporte par spécificité sur le
       // `button { min-height: 44px }` de App.css — un `type="button"`
       // intermédiaire peindrait 4 px de moins que la page.
       + `<button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">${esc(T(loginPlan.titleKey))}</button>`
@@ -254,7 +255,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
       // Les deux cartes sont des `<label>` — l'ÉLÉMENT de React, pas un
       // `<div>` — et portent leur `<input class="sr-only">` :
-      // src/styles/kojo-pack-f-readability-no-color.css cible `p, label,
+      // L'en-tête de src/index.css cible `p, label,
       // small, li` pour leur donner `font-size: 0.98rem` et `line-height: 1.6`
       // sous 768 px. Un `<label>` transmet donc à ses descendants un strut de
       // 25,09 px là où un `<div>` en transmet un de 24 : mesuré à 412×823, le
@@ -309,7 +310,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
       + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
-      + `<div class="bloc-differe-photo carte-editoriale p-6 mb-6">`
+      + `<div class="bloc-differe-photo carte-editoriale carte-publique mb-6">`
       + `<div class="mb-4 flex items-center gap-3">${svgDeLIcone(registerPlan.photoIcon, CLASSES_ICONE.photoTitre)}<h3 class="titre-entree">${esc(registerT('profilePhotoOptional'))}</h3></div>`
       + `<p class="mb-4 text-sm text-stone-600">${esc(registerT('profilePhotoHelps'))}</p>`
       + `<div class="relative rounded-[3px] border-2 border-dashed border-stone-300 p-6">`
@@ -357,7 +358,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<h1 class="mt-6 text-3xl font-bold text-stone-900">${esc(T(forgotPasswordPlan.titleKey))}</h1>`
       + `<p class="${forgotPasswordPlan.subtitleClass}">${esc(T(forgotPasswordPlan.subtitleKey))}</p>`
       + `</div>`
-      + `<div class="carte-editoriale p-6 space-y-6">`
+      + `<div class="carte-editoriale carte-publique space-y-6">`
       + `<div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">`
       + `<span class="text-orange-600">1. ${esc(T(forgotPasswordPlan.stepEmailKey))}</span>`
       + `<span class="text-stone-500">2. ${esc(T(forgotPasswordPlan.stepCodeKey))}</span>`
@@ -415,7 +416,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<p class="${howItWorksPlan.heroSubtitleClass}">${esc(T(howItWorksPlan.heroKey))}</p>`
       + `</div>`
       + `</section>`
-      + `<section class="py-12 md:py-16 ${howItWorksPlan.paperClass}">`
+      + `<section class="${howItWorksPlan.sectionClass} ${howItWorksPlan.paperClass}">`
       + `<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">`
       + `<div class="${howItWorksPlan.listeClass}">`
       + howItWorksPlan.steps
@@ -443,7 +444,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // Le panneau de séquestre : les MÊMES classes que celui de l'accueil, y
       // compris son illustration (le fichier est déclaré dans le plan) et son
       // estampille, qui reprend un texte que la page publie déjà.
-      + `<section class="py-12 md:py-16 ${howItWorksPlan.sandClass}">`
+      + `<section class="${howItWorksPlan.sectionClass} ${howItWorksPlan.sandClass}">`
       + `<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">`
       + `<div class="${howItWorksPlan.panneauClass}">`
       + `<div class="${howItWorksPlan.panneauArtClass}">`
@@ -463,7 +464,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `</div>`
       + `</section>`
-      + `<section class="py-12 md:py-16 ${howItWorksPlan.paperClass}">`
+      + `<section class="${howItWorksPlan.sectionClass} ${howItWorksPlan.paperClass}">`
       + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">`
       + `<div class="${howItWorksPlan.entreeSectionClass}">`
       + `<h2 class="${howItWorksPlan.headClass}">${esc(T(howItWorksPlan.faqTitleKey))}</h2>`
@@ -517,7 +518,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // Les `aria-label` portent LES MÊMES clés que les placeholders : c'est
     // ce que fait src/components/TicketTracker.js, donc la coquille et le
     // runtime ne peuvent plus annoncer deux libellés différents.
-    support: `<div class="max-w-2xl mx-auto px-4 py-8">`
+    support: `<div class="${supportPlan.frameClass}">`
       + `<div class="mb-6 text-center">`
       + `<h1 class="titre-page mb-2">${esc(T(supportPlan.titleKey))}</h1>`
       + `<p class="${supportPlan.subtitleClass}">${esc(T(supportPlan.subtitleKey))}</p>`
@@ -533,7 +534,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // les deux champs y portent le rayon du socle de formulaire (0,5 rem),
       // qu'ils n'héritent pas de `form :is(input…)` puisqu'ils vivent hors
       // d'un `<form>`.
-      + `<div class="mb-6 carte-editoriale p-6">`
+      + `<div class="mb-6 carte-editoriale carte-publique">`
       + `<h2 class="titre-entree mb-1">${esc(T(supportPlan.tracker.titleKey))}</h2>`
       + `<p class="text-sm text-stone-500 mb-4">${esc(T(supportPlan.tracker.subtitleKey))}</p>`
       + `<div class="flex flex-col sm:flex-row gap-2">`
@@ -621,7 +622,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + aboutPlan.cards
           .map(
             ({ icone, titleKey, descriptionKey }) =>
-              `<div class="carte-editoriale p-6">` +
+              `<div class="${aboutPlan.carteClass}">` +
               `<span class="pastille-rond mb-4">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
               `<h2 class="nom-de-ligne mb-2">${esc(T(titleKey))}</h2>` +
               `<p class="note-de-ligne">${esc(T(descriptionKey))}</p>` +
