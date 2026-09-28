@@ -42,7 +42,19 @@ import {
  *      déclare), et le canal par lequel la centure par héritage déplaçait les
  *      bornes d'encre de l'élément LCP de /jobs avant qu'elle ne soit retirée ;
  *   3. la hauteur de la navbar (64 px au lieu de 65 = 1 px de décalage pour
- *      tout le contenu au montage).
+ *      tout le contenu au montage) ;
+ *   4. la BOÎTE et le `vertical-align` des ICÔNES DESSINÉES (`<svg>`). Les trois
+ *      points ci-dessus ne les voient pas : une icône n'a pas de nœud de texte,
+ *      donc aucune encre à comparer. Or les deux canaux les dessinent depuis le
+ *      MÊME registre (`src/config/page-icons.js`, `IconePage` pour React,
+ *      `svgDeLIcone` pour la coquille), et c'est précisément là que se glissent
+ *      une taille recopiée (`h-4 w-4` d'un côté, `h-5 w-5` de l'autre) ou un
+ *      `align-[-0.15em]` calibré pour une autre taille de texte — mesuré le
+ *      26/09/2026 : dans la notice de /register (`text-xs`), le centre de
+ *      l'icône restait 1,7 px au-dessus de celui de sa ligne. L'appariement se
+ *      fait par le repère que les DEUX canaux portent déjà (`data-icone`
+ *      `data-drapeau` : le build l'exige des coquilles), donc une divergence est
+ *      nommée par le nom de l'icône, jamais par un rang.
  *
  * ── Le protocole ───────────────────────────────────────────────────────────
  * Deux navigations, sur des pages NEUVES : (1) « coquille », le bundle
@@ -56,8 +68,61 @@ import {
  * coquille dans `main` (son en-tête de page, quel qu'il soit — jamais recopié)
  * doit faire partie des textes comparés. Les routes dont le premier rendu
  * REDIRIGE (page protégée) n'ont pas de peinture à comparer : elles sont
- * nommées dans le journal, jamais comptées comme un vert.
+ * nommées dans le journal, jamais comptées comme un vert. Et parce que le
+ * plancher des icônes est DÉRIVÉ de ce que la coquille dessine (il ne peut donc
+ * pas voir une route sans icône), un cas dédié fixe la COUVERTURE de la sonde
+ * d'icônes sur l'accueil mobile, la page qui en dessine le plus.
  */
+
+/**
+ * Le plancher de couverture des icônes sur « / » mobile — MESURÉ (voir le
+ * journal de l'exécution), pas deviné : il est à mi-chemin entre le relevé et la
+ * borne basse qu'une régression franche franchirait. Le jour où l'accueil cesse
+ * de dessiner ses icônes, ce cas rougit — et c'est le seul endroit où la sonde
+ * le dirait, les planchers dérivés étant muets sur une page vidée.
+ */
+const PLANCHER_ICONES_ACCUEIL_MOBILE = 20;
+/**
+ * Les DEUX peintures d'une route : la coquille seule, puis le premier rendu de
+ * React. Le protocole est décrit ci-dessus ; il est écrit une fois parce que le
+ * cas de couverture des icônes (plus bas) mesure avec le MÊME, et deux copies
+ * finiraient par ne plus mesurer la même chose.
+ *
+ * @param {import('@playwright/test').Browser} browser Navigateur du test.
+ * @param {string} route Route pré-rendue à mesurer.
+ * @param {{width: number, height: number}} viewport Taille de la fenêtre.
+ * @returns {Promise<{coquille: object, react: object}>} Les deux relevés.
+ */
+async function releverLesDeuxPeintures(browser, route, viewport) {
+  // ── 1. La coquille SEULE (bundle d'entrée bloqué) ────────────────
+  const pageCoquille = await ouvrirLaPage(browser, 'coquille', viewport);
+  let coquille;
+  try {
+    await pageCoquille.goto(route);
+    await attendreLaStabilite(pageCoquille);
+    coquille = await pageCoquille.evaluate(RELEVE_GEOMETRIE);
+  } finally {
+    await pageCoquille.close();
+  }
+
+  // ── 2. La même route, peinte par le PREMIER rendu de React ───────
+  const pageReact = await ouvrirLaPage(browser, 'reelle', viewport);
+  let react;
+  try {
+    await gelerLePremierRendu(pageReact);
+    await pageReact.goto(route);
+    // La navbar de l'app (avec ses liens) ne peut exister QUE si React a
+    // monté : le chrome des coquilles publie une navbar vide.
+    await pageReact.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
+    await attendreLaStabilite(pageReact);
+    react = await pageReact.evaluate(RELEVE_GEOMETRIE);
+  } finally {
+    await pageReact.close();
+  }
+
+  return { coquille, react };
+}
+
 test.describe('Garde de géométrie — la coquille et React peignent les mêmes textes', () => {
   // PAS de mode `serial` : un garde doit nommer TOUTES les routes en défaut en
   // un passage (le mode série s'arrête au premier échec, donc on corrige une
@@ -65,31 +130,7 @@ test.describe('Garde de géométrie — la coquille et React peignent les mêmes
   for (const route of ROUTES) {
     for (const { nom: taille, viewport } of TAILLES) {
       test(`${route} — ${taille}`, async ({ browser }) => {
-        // ── 1. La coquille SEULE (bundle d'entrée bloqué) ────────────────
-        const pageCoquille = await ouvrirLaPage(browser, 'coquille', viewport);
-        let coquille;
-        try {
-          await pageCoquille.goto(route);
-          await attendreLaStabilite(pageCoquille);
-          coquille = await pageCoquille.evaluate(RELEVE_GEOMETRIE);
-        } finally {
-          await pageCoquille.close();
-        }
-
-        // ── 2. La même route, peinte par le PREMIER rendu de React ───────
-        const pageReact = await ouvrirLaPage(browser, 'reelle', viewport);
-        let react;
-        try {
-          await gelerLePremierRendu(pageReact);
-          await pageReact.goto(route);
-          // La navbar de l'app (avec ses liens) ne peut exister QUE si React a
-          // monté : le chrome des coquilles publie une navbar vide.
-          await pageReact.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
-          await attendreLaStabilite(pageReact);
-          react = await pageReact.evaluate(RELEVE_GEOMETRIE);
-        } finally {
-          await pageReact.close();
-        }
+        const { coquille, react } = await releverLesDeuxPeintures(browser, route, viewport);
 
         // ── Une route PROTÉGÉE n'a pas de premier rendu à comparer ───────
         // ProtectedRoute redirige vers /login : comparer la coquille de
@@ -131,6 +172,13 @@ test.describe('Garde de géométrie — la coquille et React peignent les mêmes
           exemplesHorsZone,
           frontiere,
           texteFrontiere,
+          iconesComparees,
+          iconesCoquille,
+          iconesAbsentes,
+          exemplesIconesAbsentes,
+          iconesHorsZone,
+          exemplesIconesHorsZone,
+          iconesReactSeules,
         } = comparerGeometrie(coquille, react);
         expect(
           divergences,
@@ -144,10 +192,23 @@ test.describe('Garde de géométrie — la coquille et React peignent les mêmes
           compares,
           `${route} (${taille}) : ${compares} texte(s) comparé(s) seulement — la géométrie n'a pas été vérifiée`
         ).toBeGreaterThanOrEqual(3);
+        // Les icônes ont leur propre plancher, et il est DÉRIVÉ de ce que la
+        // coquille dessine : une route sans icône n'en compare aucune (et ce
+        // n'est pas un trou), mais une route qui en dessine une seule doit
+        // l'avoir comparée — sinon l'extension serait muette là où il y a de la
+        // matière, ce que le plancher des textes ne verrait pas.
+        if (iconesCoquille) {
+          expect(
+            iconesComparees,
+            `${route} (${taille}) : la coquille dessine ${iconesCoquille} icône(s) et ${iconesComparees} ` +
+              'seulement ont été comparées à celles de React — la géométrie des icônes n\'a pas été vérifiée'
+          ).toBeGreaterThan(0);
+        }
 
         console.log(
           `ℹ️  Géométrie ${route} (${taille}) : ${compares} texte(s) peints au même endroit ` +
-            `(encre + text-align), navbar ${react.hauteurNavbar} px des deux côtés` +
+            `(encre + text-align), ${iconesComparees}/${iconesCoquille} icône(s) à la même boîte ` +
+            `(et au même vertical-align), navbar ${react.hauteurNavbar} px des deux côtés` +
             (absents
               ? ` — ${absents} texte(s) de la coquille que React ne peint pas dans cet état ` +
                 `(${exemplesAbsents.map((t) => `« ${t.slice(0, 24)} »`).join(', ')} — divergence de CONTENU, ` +
@@ -159,9 +220,50 @@ test.describe('Garde de géométrie — la coquille et React peignent les mêmes
                 `(la hauteur de ce bloc lui est inconnue) ; exemples de textes sautés : ${exemplesHorsZone
                   .map((t) => `« ${t.slice(0, 20)} »`)
                   .join(', ')})`
+              : '') +
+            (iconesAbsentes
+              ? ` — ${iconesAbsentes} icône(s) dessinée(s) par la coquille que React ne dessine pas dans cet état ` +
+                `(${exemplesIconesAbsentes.map((n) => `« ${n} »`).join(', ')}) — divergence de CONTENU`
+              : '') +
+            (iconesHorsZone
+              ? ` — ${iconesHorsZone} icône(s) NON comparées au-delà de la frontière de contenu ` +
+                `(${exemplesIconesHorsZone.map((n) => `« ${n} »`).join(', ')} — même raison que les textes : ` +
+                'leur position dépend d’un bloc que la coquille ne connaît pas)'
+              : '') +
+            (iconesReactSeules
+              ? ` — ${iconesReactSeules} icône(s) que React dessine sans la coquille (chrome de l'app, ` +
+                'contenu asynchrone) : comptées, jamais des divergences'
               : '')
         );
       });
     }
   }
+
+  // ── La COUVERTURE des icônes, mesurée là où il y en a le plus ─────────────
+  // Les 24 cas ci-dessus (12 routes × 2 tailles) comparent les icônes route par
+  // route, mais chacun peut
+  // rester vert en n'en comparant AUCUNE (une route sans icône, ou un filtre qui
+  // ne serait jamais satisfait) : le plancher d'icônes y est DÉRIVÉ, donc il ne
+  // voit un zéro que sur une route qui dessine. Ce cas-ci fixe la seule chose
+  // que ces planchers ne peuvent pas dire : que la sonde des icônes a bien de la
+  // matière, et il la fixe sur l'accueil MOBILE, la page qui en dessine le plus
+  // (les trois repères du héros, les dix catégories, les trois promesses, les
+  // trois étapes, les quatre drapeaux, les flèches des listes).
+  test('l’accueil mobile dessine assez d’icônes pour que leur géométrie soit jugée', async ({ browser }) => {
+    const viewport = TAILLES.find(({ nom }) => nom === 'mobile').viewport;
+    const { coquille, react } = await releverLesDeuxPeintures(browser, '/', viewport);
+    const { divergences, iconesComparees, iconesCoquille, iconesAbsentes } = comparerGeometrie(coquille, react);
+    expect(divergences).toEqual([]);
+    // Le plancher est MESURÉ (cf. le journal de l'exécution) : il est très
+    // au-dessus de 1, donc un filtre cassé le franchit à la baisse bruyamment.
+    expect(
+      iconesComparees,
+      `« / » mobile : ${iconesComparees} icône(s) comparée(s) sur ${iconesCoquille} dessinée(s) par la ` +
+        `coquille (${iconesAbsentes} absente(s) chez React) — la sonde des icônes ne mord plus`
+    ).toBeGreaterThanOrEqual(PLANCHER_ICONES_ACCUEIL_MOBILE);
+    console.log(
+      `ℹ️  Couverture des icônes — « / » mobile : ${iconesComparees} icône(s) comparée(s) ` +
+        `sur ${iconesCoquille} dessinée(s), plancher ${PLANCHER_ICONES_ACCUEIL_MOBILE}`
+    );
+  });
 });
