@@ -8,6 +8,12 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // Les relevés par moteur : vidés avant la suite, agrégés après elle. C'est le
+  // seul moment où les trois projets coexistent (un processus de travail par
+  // projet), donc le seul endroit où un ÉCART se calcule — voir
+  // e2e/helpers/moteurs.js et e2e/global-teardown-moteurs.js.
+  globalSetup: './e2e/global-setup-moteurs.js',
+  globalTeardown: './e2e/global-teardown-moteurs.js',
   use: {
     baseURL: 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
@@ -27,18 +33,37 @@ export default defineConfig({
     // AVANT le `touchend`, referait la panne historique (« l'appui ne supprime
     // jamais ») sans qu'aucun cas Chromium ne le voie.
     //
-    // Le périmètre est DÉLIBÉRÉMENT limité à ces deux parcours : ce sont eux
-    // qui mesurent des gestes, et rejouer les 141 cas de la suite sur trois
-    // moteurs triplerait le job pour des assertions qui ne portent pas
-    // d'événements. La suite entière reste mesurée sur Chromium.
+    // Le périmètre est DÉLIBÉRÉMENT limité aux parcours qui MESURENT DES
+    // GESTES : rejouer les 150 cas de la suite sur trois moteurs triplerait le
+    // job pour des assertions qui ne portent pas d'événements. La suite entière
+    // reste mesurée sur Chromium.
+    //
+    // ── Ce que le périmètre couvre, geste par geste (28/09/2026) ────────────
+    //   • `appuis-exterieurs` — l'appui du doigt sur une commande de la barre :
+    //     la séquence d'événements de compatibilité, sur laquelle ce fichier
+    //     repose entièrement ;
+    //   • `notifications` — le même appui, sur le panneau qui se ferme à
+    //     `mousedown` et AGIT à `click`, plus le cas qui PUBLIE la séquence ;
+    //   • `barres-rupture` — la BASCULE de taille (rotation d'un téléphone), la
+    //     molette et l'ouverture du tiroir : trois gestes qui dépendent du
+    //     moteur pour des raisons différentes (re-mise en page, défilement
+    //     inertiel, capture du premier appui) ;
+    //   • `carte-accueil` — l'appui qui monte la carte tierce : ce qu'on mesure
+    //     est l'instant où la requête PART, et il n'est pas le même d'un moteur
+    //     à l'autre (un moteur qui préchargerait l'iframe ferait payer le tiers
+    //     au premier écran).
+    //
+    // Le périmètre est tenu par `scripts/__tests__/check-moteurs-gestes.test.js` :
+    // un parcours qui mesurerait un geste sans être rejoué ici est REFUSÉ — le
+    // figer en commentaire l'aurait laissé dériver.
     {
       name: 'firefox',
-      testMatch: /(appuis-exterieurs|notifications)\.spec\.js/,
+      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-accueil)\.spec\.js/,
       use: { ...devices['Desktop Firefox'] },
     },
     {
       name: 'webkit',
-      testMatch: /(appuis-exterieurs|notifications)\.spec\.js/,
+      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-accueil)\.spec\.js/,
       use: { ...devices['Desktop Safari'] },
     },
   ],

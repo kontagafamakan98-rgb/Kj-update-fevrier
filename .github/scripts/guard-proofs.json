@@ -150,6 +150,23 @@
       "runner": "vitest"
     },
     {
+      "chemin": "frontend/scripts/check-moteurs-gestes.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-moteurs-gestes.test.js",
+      "runner": "vitest",
+      "motif": "périmètre des projets firefox et webkit de Playwright : la liste des parcours qui mesurent des GESTES vivait dans un commentaire de playwright.config.js, donc un geste ajouté demain (appui, molette, bascule de taille) n'entrait dans le périmètre que si quelqu'un y pensait ; le garde croise le registre (scripts/moteurs-gestes.js) avec le testMatch des deux projets dans les deux sens, exige que chaque parcours du périmètre PUBLIE ses mesures par moteur (e2e/helpers/moteurs.js), exige le même périmètre des deux côtés et le bon appareil, exige que la CI installe les trois binaires, détecte les gestes de bas niveau par leurs API réelles (les seules qui ne peuvent pas se cacher) et refuse de juger sous ses planchers de lecture"
+    },
+    {
+      "chemin": "frontend/scripts/moteurs-gestes.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-moteurs-gestes.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (registre des gestes et motif qui doit être PRÉSENT dans le parcours déclaré, détection des gestes de bas niveau par leurs API réelles, découpe du bloc d'un projet de playwright.config.js malgré l'objet imbriqué de devices[...], et les deux sens de la comparaison testMatch ↔ registre) : elle ne lit rien, donc chaque refus et chaque tolérance s'éprouve à l'unité au lieu de se croire",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (cible = garde) : les fonctions de ce module sont verrouillées par leurs cas unitaires directs (dix refus, dont un geste de bas niveau hors du registre, une déclaration démentie par la source, un fichier du registre absent du testMatch et l'inverse, deux périmètres différents, un appareil perdu, une CI amputée, un périmètre vide ; et deux cas de TOLÉRANCE : un parcours déclaré sans API rare, un parcours sans geste hors périmètre), et les deux mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict, plancher de lecture)"
+    },
+    {
       "chemin": "frontend/scripts/check-page-meta.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -2285,6 +2302,46 @@
       "cwd": "frontend",
       "attend": [
         "refuse de juger si le nombre de contrôles analysés est sous le plancher"
+      ]
+    },
+    {
+      "id": "moteurs-gestes: verdict neutralise (un perimetre rompu sortirait en 0)",
+      "garde": "frontend/scripts/check-moteurs-gestes.js",
+      "cible": "frontend/scripts/check-moteurs-gestes.js",
+      "trouve": "  if (rapport.refus.length > 0) {",
+      "remplace": "  if (false && rapport.refus.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-moteurs-gestes.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-moteurs-gestes.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "Le périmètre multi-moteurs est rompu"
+      ]
+    },
+    {
+      "id": "moteurs-gestes: plancher de lecture neutralise (un arbre sans sujet passerait)",
+      "garde": "frontend/scripts/check-moteurs-gestes.js",
+      "cible": "frontend/scripts/check-moteurs-gestes.js",
+      "trouve": "  if (specs.length < MIN_SPECS) {",
+      "remplace": "  if (false && specs.length < MIN_SPECS) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-moteurs-gestes.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-moteurs-gestes.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "Nombre de parcours lus insuffisant"
       ]
     }
   ]

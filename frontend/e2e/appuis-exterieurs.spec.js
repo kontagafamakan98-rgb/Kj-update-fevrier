@@ -2,6 +2,13 @@ import { test, expect } from '@playwright/test';
 // Le harnais partagé : la mise en page doit s'être STABILISÉE, pas seulement
 // avoir changé d'URL (voir `connexion` ci-dessous).
 import { attendreLaStabilite } from './helpers/geometrie.js';
+// La PUBLICATION par moteur : ce fichier est rejoué sur Firefox et WebKit, et
+// ce qu'il mesure alors — « un SEUL appui suffit » — se publie avec le moteur
+// qui l'a mesuré (voir playwright.config.js pour le périmètre).
+// La PUBLICATION par moteur : les écarts entre moteurs se lisent une fois la
+// suite finie (e2e/global-teardown-moteurs.js) — chaque projet a son propre
+// processus, donc un `afterAll` de fichier ne verrait qu'un seul moteur.
+import { publier } from './helpers/moteurs.js';
 
 /**
  * Un appui qui vise une commande doit ATTEINDRE cette commande — même quand un
@@ -70,6 +77,11 @@ test.describe("Parcours E2E — un appui extérieur ferme le menu sans avaler l'
 
     await expect(page).toHaveURL(/\/jobs/, { timeout: 10000 });
     await expect(page.getByRole('button', { name: /Wolof/ })).toHaveCount(0);
+    // Le fait mesuré, publié avec son moteur : combien d'appuis il a fallu, et
+    // où le geste a mené. Un moteur qui perdrait le premier appui ferait
+    // ressortir son compte ici, nommément.
+    publier(test, 'menu de langue → lien de la barre : appuis nécessaires', 1);
+    publier(test, 'menu de langue → lien de la barre : URL atteinte', new URL(page.url()).pathname);
   });
 
   test("menu de langue ouvert, un SEUL appui sur la cloche ouvre le centre de notifications", async ({ page }) => {
@@ -86,6 +98,8 @@ test.describe("Parcours E2E — un appui extérieur ferme le menu sans avaler l'
     // …et le menu de langue s'est refermé dans le même geste.
     await expect(page.getByRole('button', { name: /Wolof/ })).toHaveCount(0);
     await expect(declencheur).toBeVisible();
+    publier(test, 'menu de langue → cloche : appuis nécessaires', 1);
+    publier(test, 'menu de langue → cloche : panneaux ouverts', 1);
   });
 
   test("menu de pays ouvert sur /jobs, un SEUL appui sur la bascule de vue l'active", async ({ page }) => {

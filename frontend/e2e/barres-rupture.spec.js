@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { MARQUEUR_DE_MONTAGE } from './helpers/geometrie.js';
+import { attendreLaCondition } from './helpers/attentes.js';
+// La PUBLICATION par moteur : ce que les trois moteurs font des mêmes gestes se
+// lit au tableau des écarts, publié une fois la suite finie
+// (e2e/global-teardown-moteurs.js).
+import { publier } from './helpers/moteurs.js';
 
 /**
  * LES DEUX BARRES, LE POINT DE RUPTURE, ET LA QUESTION DE L'INSTANCE DUPLIQUÉE.
@@ -61,20 +66,33 @@ const MOBILE = { width: 412, height: 823 };
 const DESKTOP = { width: 1350, height: 940 };
 
 /** Ce que la page dit de son propre état : tout est LIT, rien n'est supposé. */
-const etatDeLaPage = (page) =>
-  page.evaluate(() => {
-    const affiches = (elements) => elements.filter((el) => el.getClientRects().length > 0).length;
-    const dansLaBarre = (selecteur) => [...document.querySelectorAll(selecteur)];
-    return {
-      verrouDeDefilement: document.body.style.overflow,
-      surfaceOuverte: dansLaBarre('nav button[aria-label="Fermer le menu"]').length,
-      hamburgerAffiche: affiches(
-        dansLaBarre('nav button[aria-label="Ouvrir le menu"], nav button[aria-label="Fermer le menu"]')
-      ),
-      hauteurDeDefilement: document.scrollingElement.scrollHeight - window.innerHeight,
-      positionDeDefilement: Math.round(document.scrollingElement.scrollTop),
-    };
-  });
+const SONDE_ETAT = () => {
+  const affiches = (elements) => elements.filter((el) => el.getClientRects().length > 0).length;
+  const dansLaBarre = (selecteur) => [...document.querySelectorAll(selecteur)];
+  return {
+    verrouDeDefilement: document.body.style.overflow,
+    surfaceOuverte: dansLaBarre('nav button[aria-label="Fermer le menu"]').length,
+    hamburgerAffiche: affiches(
+      dansLaBarre('nav button[aria-label="Ouvrir le menu"], nav button[aria-label="Fermer le menu"]')
+    ),
+    // Le LIBELLÉ du hamburger AFFICHÉ : c'est lui qui dit si le tiroir est
+    // ouvert (« Fermer le menu ») ou refermé (« Ouvrir le menu »). Un compte
+    // d'éléments affichés ne le dit pas — les deux libellés comptent pour un —,
+    // donc un cas qui n'attendrait que « au moins un » se satisferait d'un
+    // tiroir resté ouvert et jugerait ensuite sur autre chose.
+    libelleHamburger:
+      dansLaBarre('nav button[aria-label="Ouvrir le menu"], nav button[aria-label="Fermer le menu"]')
+        .filter((el) => el.getClientRects().length > 0)
+        .map((el) => el.getAttribute('aria-label'))[0] ?? null,
+    hauteurDeDefilement: document.scrollingElement.scrollHeight - window.innerHeight,
+    positionDeDefilement: Math.round(document.scrollingElement.scrollTop),
+  };
+};
+
+// La sonde est séparée de sa lecture : `attendreLaCondition` évalue la FONCTION
+// dans la page, donc lui passer `etatDeLaPage` (qui prend un `page`) lui
+// enverrait du code qui ne peut pas s'exécuter là-bas.
+const etatDeLaPage = (page) => page.evaluate(SONDE_ETAT);
 
 /**
  * La page est MONTÉE : sans ce repère, un compte lu trop tôt vaut zéro pour
@@ -98,12 +116,31 @@ const ouvrirLeMenuMobile = async (page) => {
  * (« Français »). La question de l'instance dupliquée se répond par ce compte :
  * jamais deux à l'écran, quelle que soit la disposition.
  */
-const controlesDeLangue = (page) =>
-  page.evaluate(() =>
-    [...document.querySelectorAll('nav button')].filter(
-      (b) => b.textContent.includes('Français') && b.getClientRects().length > 0
-    ).length
-  );
+const SONDE_LANGUE = () =>
+  [...document.querySelectorAll('nav button')].filter(
+    (b) => b.textContent.includes('Français') && b.getClientRects().length > 0
+  ).length;
+
+const controlesDeLangue = (page) => page.evaluate(SONDE_LANGUE);
+
+/**
+ * Publie une attente MESURÉE : ses DEUX bornes, sous un même nom.
+ *
+ * Une durée de sondage est un intervalle (voir `e2e/helpers/attentes.js`) : la
+ * condition a été vue vraie à la borne haute, et elle était fausse à la borne
+ * basse. Publier la seule borne haute fait entrer la latence d'UNE lecture de
+ * page dans la mesure — relevé du 28/09/2026 : une bascule à 6 283 ms sur
+ * Firefox dont ~6 s étaient une seule lecture, soit un « écart » de 104 616 %
+ * qui ne mesurait que la lenteur d'une sonde. Publier la seule borne basse
+ * l'inverse : un fait déjà vrai à la première lecture vaut 0, ce qui est exact
+ * mais muet. Les deux, côte à côte, se lisent : `3 · 12` est une bascule de
+ * ~3 ms, `3 · 6283` dit que la sonde a attendu son tour.
+ */
+const publierLesBornes = (test, nom, attente) => {
+  publier(test, `${nom} (borne basse)`, attente.fourchetteMs[0], 'ms');
+  publier(test, `${nom} (borne haute)`, attente.fourchetteMs[1], 'ms');
+  return attente;
+};
 
 test.describe('les barres et le point de rupture', () => {
   test("le menu mobile se ferme quand sa barre cesse d'être affichée (et la page défile à nouveau)", async ({ page }) => {
@@ -119,8 +156,22 @@ test.describe('les barres et le point de rupture', () => {
     // Le franchissement : c'est ce que fait une rotation d'écran. L'état est
     // LU, puis jugé — un `toHaveCount(0)` aurait rougi sans dire pourquoi, et
     // un rouge qui n'est pas nommé n'est pas réparable.
+    //
+    // La bascule est un GESTE, et sa durée se MESURE (elle se compare d'un
+    // moteur à l'autre : une re-mise en page de rupture n'est pas instantanée
+    // partout). L'ancien `waitForTimeout(100)` la décidait au lieu de la lire.
     await page.setViewportSize(DESKTOP);
-    await page.waitForTimeout(100);
+    const bascule = await attendreLaCondition(
+      page,
+      SONDE_ETAT,
+      (etat) => etat.surfaceOuverte === 0 && etat.verrouDeDefilement === ''
+    );
+    expect(
+      bascule.atteinte,
+      `après la bascule en desktop, le tiroir est resté ouvert (${JSON.stringify(bascule.dernier)}) : ` +
+        'aucune commande visible ne le ferme, et le verrou de défilement survit à sa barre.'
+    ).toBe(true);
+    publierLesBornes(test, 'bascule mobile→desktop : état refermé', bascule);
 
     const apres = await etatDeLaPage(page);
     expect(
@@ -134,12 +185,22 @@ test.describe('les barres et le point de rupture', () => {
     expect(apres.hauteurDeDefilement, 'la page doit avoir de quoi défiler, sinon le cas ne prouverait rien').toBeGreaterThan(300);
     await page.mouse.move(DESKTOP.width / 2, DESKTOP.height / 2);
     await page.mouse.wheel(0, 900);
-    await page.waitForTimeout(200);
-    const defile = await etatDeLaPage(page);
+    // La molette est un geste INERTIEL sur certains moteurs : la position
+    // atteinte n'est pas la même au bout du même temps, donc on attend la
+    // condition (la page a défilé) et on PUBLIE la durée — l'écart entre
+    // moteurs est précisément ce qu'un délai fixe cachait.
+    const defilement = await attendreLaCondition(
+      page,
+      SONDE_ETAT,
+      (etat) => etat.positionDeDefilement > 300
+    );
     expect(
-      defile.positionDeDefilement,
+      defilement.atteinte,
       "900 px de molette n'ont pas bougé la page : le verrou du tiroir a survécu à sa barre"
-    ).toBeGreaterThan(300);
+    ).toBe(true);
+    const defile = defilement.dernier;
+    publierLesBornes(test, 'molette de 900 px : défiler jusqu’à 300 px', defilement);
+    publier(test, 'molette de 900 px : position atteinte', defile.positionDeDefilement, 'px');
   });
 
   test("l'état ne survit pas au retour en mobile : le hamburger dit « Ouvrir le menu »", async ({ page }) => {
@@ -149,14 +210,42 @@ test.describe('les barres et le point de rupture', () => {
     await ouvrirLeMenuMobile(page);
 
     await page.setViewportSize(DESKTOP);
-    await page.waitForTimeout(100);
+    // ATTEINDRE le desktop n'est pas être ARRIVÉ : le point de rupture masque le
+    // hamburger dès la re-mise en page CSS, AVANT que l'état React ne se referme
+    // (le verrou de défilement est le témoin de cet état, pas la peinture du
+    // bouton). Attendre le premier et repartir aussitôt mesurait donc un
+    // aller-retour commencé en plein vol : relevé du 28/09/2026 sur WebKit, le
+    // tiroir restait ouvert au retour en mobile — non pas que WebKit referme
+    // mal, mais parce que la bascule retour arrivait avant l'effet de fermeture.
+    // Le cas 1 mesure cette fermeture ; ici, elle est la condition de DÉPART.
+    const masque = await attendreLaCondition(
+      page,
+      SONDE_ETAT,
+      (etat) => etat.hamburgerAffiche === 0 && etat.surfaceOuverte === 0 && etat.verrouDeDefilement === ''
+    );
+    expect(
+      masque.atteinte,
+      `en desktop, ${masque.dernier.hamburgerAffiche} hamburger(s) affiché(s), ` +
+        `${masque.dernier.surfaceOuverte} surface(s) ouverte(s), verrou de défilement « ${masque.dernier.verrouDeDefilement} » : ` +
+        "la barre mobile ne s'est pas entièrement refermée"
+    ).toBe(true);
+    publierLesBornes(test, 'bascule mobile→desktop : état refermé, verrou levé', masque);
     await page.setViewportSize(MOBILE);
-    await page.waitForTimeout(100);
 
     // Le hamburger est le seul juge de l'état : son libellé vient de
     // `isMobileMenuOpen`, donc la commande doit être l'OUVERTURE, pas la
-    // fermeture d'un tiroir que personne ne voit.
-    await expect(page.getByRole('button', { name: 'Ouvrir le menu' })).toBeVisible();
+    // fermeture d'un tiroir que personne ne voit. C'est ce libellé qu'on
+    // ATTEND (et non « un hamburger quelconque »), puis qu'on juge en le
+    // nommant : un WebKit qui laisserait le tiroir ouvert doit dire « Fermer le
+    // menu » et sa durée, au lieu de rougir sur un localisateur introuvable.
+    const retour = await attendreLaCondition(page, SONDE_ETAT, (etat) => etat.libelleHamburger === 'Ouvrir le menu');
+    publierLesBornes(test, 'aller-retour desktop→mobile : hamburger repeint', retour);
+    publier(test, 'aller-retour desktop→mobile : libellé du hamburger', retour.dernier.libelleHamburger ?? '(aucun)');
+    expect(
+      retour.atteinte,
+      `après le retour en mobile, le hamburger dit « ${retour.dernier.libelleHamburger} » ` +
+        `(${retour.dernier.hamburgerAffiche} affiché(s)) : le menu mobile aurait dû se refermer en quittant le point de rupture`
+    ).toBe(true);
     await expect(page.locator('#mobile_menu')).toHaveCount(0);
     expect((await etatDeLaPage(page)).verrouDeDefilement).toBe('');
   });
@@ -178,7 +267,11 @@ test.describe('les barres et le point de rupture', () => {
     expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toBe(1);
 
     await page.setViewportSize(DESKTOP);
-    await page.waitForTimeout(100);
+    const barre = await attendreLaCondition(page, SONDE_LANGUE, (n) => n === 1);
+    expect(barre.atteinte, `après la bascule, ${barre.dernier} contrôle(s) de langue affiché(s) au lieu d'un`).toBe(
+      true
+    );
+    publierLesBornes(test, 'bascule mobile→desktop : un seul contrôle de langue', barre);
     expect(await controlesDeLangue(page), 'barre desktop').toBe(1);
   });
 
@@ -194,7 +287,9 @@ test.describe('les barres et le point de rupture', () => {
     expect(await controlesDeLangue(page), 'déclencheur + la liste ouverte').toBeGreaterThan(1);
 
     await page.setViewportSize(MOBILE);
-    await page.waitForTimeout(150);
+    const masquee = await attendreLaCondition(page, SONDE_LANGUE, (n) => n === 0);
+    expect(masquee.atteinte, `la barre masquée peint encore ${masquee.dernier} contrôle(s) de langue`).toBe(true);
+    publierLesBornes(test, 'bascule desktop→mobile : barre masquée vidée', masquee);
     expect(await controlesDeLangue(page), 'la barre masquée ne doit plus rien peindre').toBe(0);
 
     // L'appui suit sa cible au PREMIER geste (le menu de langue resté ouvert

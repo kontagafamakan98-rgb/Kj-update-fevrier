@@ -2,6 +2,13 @@ import { test, expect } from '@playwright/test';
 // Le harnais partagé : la mise en page doit s'être STABILISÉE, pas seulement
 // avoir changé d'URL (voir `connexion` ci-dessous).
 import { attendreLaStabilite } from './helpers/geometrie.js';
+// La PUBLICATION par moteur : la séquence d'un appui est un fait de MOTEUR, et
+// c'est le seul endroit de la suite où elle est publiée TELLE QUELLE, moteur par
+// moteur, avec le tableau des écarts en fin de fichier.
+// La PUBLICATION par moteur : les écarts entre moteurs sont publiés une fois la
+// suite finie (e2e/global-teardown-moteurs.js) — chaque projet a son propre
+// processus de travail, donc un `afterAll` de fichier ne voit qu'un moteur.
+import { publier } from './helpers/moteurs.js';
 
 /**
  * Le centre de notifications : UN panneau pour tout le site, et une suppression
@@ -190,6 +197,10 @@ test.describe("Parcours E2E — un seul panneau, hébergé par la barre qui l'ou
  *      et la preuve est une navigation : le panneau se ferme ET l'écran change.
  */
 test.describe('Parcours E2E mobile — au doigt, la barre mobile gagne', () => {
+  // La séquence d'événements PUBLIÉE ici (une séquence IDENTIQUE sur les trois
+  // moteurs est ce qui autorise tout le reste du fichier : le panneau se ferme
+  // sur `mousedown` et AGIT sur `click`) se compare au tableau des écarts, une
+  // fois la suite finie.
   // Le profil de référence du dépôt pour un téléphone (le même que la sonde de
   // géométrie du LCP), avec un vrai écran tactile.
   test.use({ viewport: { width: 412, height: 823 }, hasTouch: true, isMobile: true });
@@ -239,9 +250,9 @@ test.describe('Parcours E2E mobile — au doigt, la barre mobile gagne', () => {
     await expect(page.locator('[data-notification-panel]')).toHaveCount(1);
     const sequence = await page.evaluate(() => window.__sequenceAppui.slice());
 
-    console.log(
-      `ℹ️  Séquence d'appui (${test.info().project.name}, 412×823 tactile) : ${sequence.join(' → ') || '(aucun événement)'}`
-    );
+    // Publiée par le registre commun : la ligne porte le moteur, et le tableau
+    // de fin de fichier dit si les trois s'ACCORDENT (identité) ou divergent.
+    publier(test, "séquence d'un appui (412×823 tactile)", sequence.join(' → ') || '(aucun événement)');
 
     expect(
       sequence,

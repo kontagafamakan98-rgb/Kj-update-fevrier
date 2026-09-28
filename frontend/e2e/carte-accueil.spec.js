@@ -2,6 +2,17 @@ import { test, expect } from '@playwright/test';
 // Le protocole de la peinture « coquille » (bundle d'entrée bloqué) vient du
 // harnais partagé, comme les deux tailles mesurées.
 import { TAILLES, MARQUEUR_DE_MONTAGE, attendreLaStabilite, ouvrirLaPage } from './helpers/geometrie.js';
+// Les attentes de CONDITION (et la durée qu'elles mesurent) : ce parcours
+// n'attend plus un nombre de millisecondes, il attend un fait — c'est ce fait
+// qui se publie, moteur par moteur.
+import { attendreLeSilenceDesRequetes, surveillerLesRequetes } from './helpers/attentes.js';
+// La PUBLICATION par moteur : ce fichier est rejoué sur Firefox et WebKit
+// (voir playwright.config.js), et ce qu'il mesure alors n'est plus une
+// curiosité — c'est l'écart entre moteurs, publié avec eux.
+// La PUBLICATION par moteur : les écarts entre moteurs sont publiés une fois la
+// suite finie (e2e/global-teardown-moteurs.js) — chaque projet a son propre
+// processus de travail, donc un `afterAll` de fichier ne voit qu'un moteur.
+import { publier } from './helpers/moteurs.js';
 // LES DEUX URL ET LE LIBELLÉ VIENNENT DE LEURS PROPRIÉTAIRES : `contact.json`
 // porte les adresses (et `contact.js` les dérive), `page-sections.js` la clé du
 // contrôle, `fr.json` son texte. Aucune n'est recopiée ici — deux copies
@@ -106,16 +117,28 @@ test.describe('Parcours E2E — la carte de l’accueil ne part qu’à l’appu
 
     test(`/ — ${taille} : aucun octet de carte avant l’appui, la carte s’ouvre à l’appui`, async ({ browser }) => {
       const page = await browser.newPage({ viewport, hasTouch: tactile, isMobile: tactile });
-      const requetes = [];
-      page.on('request', (requete) => requetes.push(requete.url()));
+      // Le journal des requêtes sert DEUX fois : aux assertions (ses URL) et à
+      // l'attente de CONDITION qui remplace l'ancienne attente fixe — la durée
+      // de calme se lit sur l'instant de la dernière requête, pas sur une
+      // horloge parallèle.
+      const journal = surveillerLesRequetes(page);
+      const requetes = journal.urls;
       try {
         await page.goto('/');
         await page.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
         await attendreLaStabilite(page);
         // Le chargement doit être FINI : une iframe montée par un `useEffect`
         // tardif doit tomber dans cette fenêtre, sinon le parcours ne mesurerait
-        // que les premières centaines de millisecondes.
-        await page.waitForTimeout(700);
+        // que les premières centaines de millisecondes. C'était un
+        // `waitForTimeout(700)` : la fenêtre est maintenant un FAIT (plus aucune
+        // requête nouvelle), donc elle s'élargit d'elle-même sur un moteur plus
+        // lent au lieu de le faire échouer.
+        const silence = await attendreLeSilenceDesRequetes(journal);
+        expect(
+          silence.silence,
+          'la page n’a jamais cessé de demander ses ressources : le relevé d’avant l’appui porterait sur un ' +
+            `chargement inachevé (${silence.requetes} requête(s) en ${silence.ms} ms)`
+        ).toBe(true);
 
         // ── 1. Rien du tiers avant l'appui ───────────────────────────────
         expect(
@@ -163,11 +186,16 @@ test.describe('Parcours E2E — la carte de l’accueil ne part qu’à l’appu
           await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: REPONSE_CARTE });
         });
 
+        // ── 2 bis. Le GESTE est chronométré : c'est cette durée qui se compare
+        // d'un moteur à l'autre (un moteur qui préchargerait l'iframe la
+        // ramènerait près de zéro, et c'est justement ce qu'on refuse).
+        const debutDuGeste = Date.now();
         if (tactile) await controle.tap();
         else await controle.click();
 
         const carte = page.locator('iframe');
         await expect(carte, 'la carte n’est pas montée à l’appui').toHaveCount(1);
+        const delaiDuGeste = Date.now() - debutDuGeste;
         expect(
           await carte.getAttribute('src'),
           'la carte montée n’est pas l’embed attendu'
@@ -203,13 +231,13 @@ test.describe('Parcours E2E — la carte de l’accueil ne part qu’à l’appu
           ).toBeLessThanOrEqual(1);
         }
 
-        console.log(
-          `ℹ️  Carte / (${taille}, ${tactile ? 'appui tactile' : 'clic'}) : ${requetes.length} requête(s) avant ` +
-            `l’appui, 0 de carte ; à l’appui, iframe ${boiteApres.largeur.toFixed(0)}×${boiteApres.hauteur.toFixed(0)} px ` +
-            `au document y=${boiteApres.hautDocument.toFixed(1)} — identique au contrôle ` +
-            `(${boiteAvant.largeur.toFixed(0)}×${boiteAvant.hauteur.toFixed(0)} à y=${boiteAvant.hautDocument.toFixed(1)}) ` +
-            `· ${requetesDeCarte} requête(s) de carte partie(s) après l’appui`
-        );
+        // Publié MOTEUR PAR MOTEUR : les cinq chiffres que ce parcours mesure,
+        // et dont deux se comparent (le délai du geste, la boîte peinte).
+        publier(test, `/ ${taille} — requêtes avant l’appui`, requetes.length);
+        publier(test, `/ ${taille} — requêtes de carte avant l’appui`, 0);
+        publier(test, `/ ${taille} — ${tactile ? 'appui' : 'clic'} → carte montée`, delaiDuGeste, 'ms');
+        publier(test, `/ ${taille} — largeur de la carte`, Math.round(boiteApres.largeur), 'px');
+        publier(test, `/ ${taille} — écart de position du bloc`, +Math.abs(boiteAvant.hautDocument - boiteApres.hautDocument).toFixed(2), 'px');
       } finally {
         await page.close();
       }
@@ -217,11 +245,11 @@ test.describe('Parcours E2E — la carte de l’accueil ne part qu’à l’appu
 
     test(`/ — ${taille} (coquille, JavaScript bloqué) : le contrôle est publié sans un octet de carte`, async ({ browser }) => {
       const page = await ouvrirLaPage(browser, 'coquille', viewport);
-      const requetes = [];
-      page.on('request', (requete) => requetes.push(requete.url()));
+      const journal = surveillerLesRequetes(page);
+      const requetes = journal.urls;
       try {
         await page.goto('/');
-        await page.waitForTimeout(200);
+        await attendreLeSilenceDesRequetes(journal);
 
         expect(
           requetes.filter((url) => CARTE_TIERS.test(url) || url.includes('output=embed')),
@@ -237,10 +265,8 @@ test.describe('Parcours E2E — la carte de l’accueil ne part qu’à l’appu
         await expect(controle, `la coquille ne publie pas le contrôle « ${LIBELLE} »`).toHaveCount(1);
         expect(await controle.getAttribute('href')).toBe(CONTACT.mapsUrl);
 
-        console.log(
-          `ℹ️  Carte / (${taille}, coquille sans JavaScript) : contrôle « ${LIBELLE} » publié vers la fiche Google, ` +
-            `${requetes.length} requête(s) au total, 0 de carte`
-        );
+        publier(test, `/ ${taille} (coquille) — requêtes au total`, requetes.length);
+        publier(test, `/ ${taille} (coquille) — requêtes de carte`, 0);
       } finally {
         await page.close();
       }

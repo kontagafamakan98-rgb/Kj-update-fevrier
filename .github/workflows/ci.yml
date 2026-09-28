@@ -598,6 +598,21 @@ jobs:
         working-directory: frontend
         run: node scripts/check-pack2-i18n-hygiene.js
 
+      # Périmètre des projets Firefox et WebKit de Playwright : la liste « qui
+      # mérite trois moteurs » vivait dans un commentaire de
+      # playwright.config.js, et rejouer toute la suite trois fois triplerait le
+      # job — donc un parcours qui MESURE UN GESTE ajouté demain (un appui, une
+      # molette, une bascule de taille) n'entrait dans ce périmètre que si
+      # quelqu'un y pensait. Le garde croise le registre des gestes
+      # (scripts/moteurs-gestes.js) avec le testMatch des deux projets, exige
+      # que chaque parcours du périmètre PUBLIE ses mesures (sinon trois relevés
+      # identiques ne se comparent pas) et que la CI installe les trois
+      # binaires ; il refuse de juger si l'arbre est trop petit pour qu'il ait
+      # lu son sujet.
+      - name: Check the multi-engine perimeter (Firefox + WebKit gesture journeys)
+        working-directory: frontend
+        run: node scripts/check-moteurs-gestes.js
+
       # Garde-fou du découpage services/api vs services/apiEndpoints : les
       # groupes d'endpoints LAZY (jobsAPI, usersAPI, paymentAPI…) doivent
       # rester confinés dans apiEndpoints — importés uniquement par les pages
@@ -967,7 +982,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: frontend/playwright-report/
+          # Le rapport HTML, ET le tableau des écarts entre moteurs : c'est le
+          # seul artefact qui dit ce que Firefox et WebKit ont mesuré des mêmes
+          # gestes (publié aussi au journal par e2e/global-teardown-moteurs.js,
+          # mais un rouge se diagnostique mieux avec les deux chiffres sous les
+          # yeux).
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/ecarts-moteurs.md
           retention-days: 7
 
   # ─── Performance : budgets Lighthouse CI (10 pages : publiques, protégées) ──
