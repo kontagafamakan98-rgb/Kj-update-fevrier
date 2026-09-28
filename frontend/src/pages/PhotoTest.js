@@ -58,25 +58,25 @@ export default function PhotoTest() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-full fond-sable py-8">
       <div className="max-w-4xl mx-auto px-4">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center justify-center gap-2">
-            <FlaskConical className="h-7 w-7" aria-hidden="true" />
+        <div className="mb-8">
+          <h1 className="titre-page flex items-center gap-3">
+            <FlaskConical className="h-7 w-7 text-orange-700" aria-hidden="true" />
             {pageT('title')}
           </h1>
-          <p className="text-gray-600">{pageT('subtitle')}</p>
+          <p className="mt-3 text-stone-600">{pageT('subtitle')}</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">{pageT('userInfo')}</h2>
-          <div className="bg-gray-100 p-4 rounded">
+        <div className="carte-editoriale mb-6 p-6">
+          <h2 className="titre-entree mb-4">{pageT('userInfo')}</h2>
+          <div className="rounded-[3px] border border-stone-200 fond-papier p-4">
             <pre className="text-sm">{JSON.stringify(testUser, null, 2)}</pre>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">{pageT('photoComponent')}</h2>
+        <div className="carte-editoriale mb-6 p-6">
+          <h2 className="titre-entree mb-4">{pageT('photoComponent')}</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center">
@@ -88,13 +88,13 @@ export default function PhotoTest() {
                 onPhotoChange={handlePhotoChange}
                 showEditButton={true}
               />
-              <p className="text-sm text-gray-500 mt-2">{pageT('clickToEdit')}</p>
+              <p className="text-sm text-stone-500 mt-2">{pageT('clickToEdit')}</p>
             </div>
 
             <div className="text-center">
               <h3 className="font-medium mb-4">{pageT('readMode')}</h3>
               <ProfilePhoto user={testUser} size={150} editable={false} showEditButton={false} />
-              <p className="text-sm text-gray-500 mt-2">{pageT('readOnly')}</p>
+              <p className="text-sm text-stone-500 mt-2">{pageT('readOnly')}</p>
             </div>
 
             <div className="text-center">
@@ -106,63 +106,59 @@ export default function PhotoTest() {
                 onPhotoChange={handlePhotoChange}
                 showEditButton={true}
               />
-              <p className="text-sm text-gray-500 mt-2">80px</p>
+              <p className="text-sm text-stone-500 mt-2">80px</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">{pageT('manualTests')}</h2>
+        <div className="carte-editoriale mb-6 p-6">
+          <h2 className="titre-entree mb-4">{pageT('manualTests')}</h2>
 
-          <div className="space-y-4">
-            <button
-              onClick={testFileInput}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
+          <div className="flex flex-wrap items-center gap-3">
+            <button onClick={testFileInput} className="bouton bouton-encre">
               {pageT('directFileTest')}
             </button>
 
-            <button
-              onClick={() => addTestResult(pageT('manualLogEntry'), 'info')}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 ml-4"
-            >
+            <button onClick={() => addTestResult(pageT('manualLogEntry'), 'info')} className="bouton bouton-clair">
               {pageT('addLog')}
             </button>
 
-            <button
-              onClick={clearResults}
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 ml-4"
-            >
+            <button onClick={clearResults} className="bouton bouton-clair">
               {pageT('clearLogs')}
             </button>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">{pageT('testLogs')}</h2>
-            <span className="text-sm text-gray-500">{pageT('entriesCount', { count: testResults.length })}</span>
+        <div className="carte-editoriale p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="titre-entree">{pageT('testLogs')}</h2>
+            <span className="text-sm text-stone-500">{pageT('entriesCount', { count: testResults.length })}</span>
           </div>
 
           <div className="max-h-96 overflow-y-auto">
             {testResults.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">{t('noLogsYet')}</p>
+              <p className="py-8 text-center text-stone-500">{t('noLogsYet')}</p>
             ) : (
               <div className="space-y-2">
                 {testResults.map((result, index) => (
+                  /* La gravité d'une ligne de journal se dit par l'INTENSITÉ et
+                     non par la teinte : le site n'a ni vert ni jaune, et une
+                     page de diagnostic qui emprunte ses couleurs à personne se
+                     lit mal. Seule la ligne en échec porte une couleur, parce
+                     que c'est la seule qui demande un geste. */
                   <div
                     key={index}
-                    className={`p-3 rounded text-sm ${
+                    className={`rounded-[3px] border p-3 text-sm ${
                       result.type === 'error'
-                        ? 'bg-red-100 text-red-800'
+                        ? 'border-red-200 bg-red-50 text-red-700'
                         : result.type === 'warning'
-                          ? 'bg-yellow-100 text-yellow-800'
+                          ? 'border-orange-200 bg-orange-50 text-orange-800'
                           : result.type === 'success'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'border-stone-300 bg-stone-100 text-stone-900'
+                            : 'border-stone-200 bg-stone-50 text-stone-700'
                     }`}
                   >
-                    <span className="font-mono text-xs text-gray-500 mr-2">{result.timestamp}</span>
+                    <span className="mr-2 font-mono text-xs text-stone-500">{result.timestamp}</span>
                     {result.message}
                   </div>
                 ))}
@@ -171,18 +167,18 @@ export default function PhotoTest() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mt-6">
-          <h2 className="text-xl font-bold mb-4">{pageT('browserInfo')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div className="carte-editoriale mt-6 p-6">
+          <h2 className="titre-entree mb-4">{pageT('browserInfo')}</h2>
+          <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
             <div>
               <strong>{pageT('userAgent')}:</strong>
               <br />
-              <span className="text-gray-600">{navigator.userAgent}</span>
+              <span className="text-stone-600">{navigator.userAgent}</span>
             </div>
             <div>
               <strong>{pageT('fileApi')}:</strong>
               <br />
-              <span className={window.File ? 'text-green-600' : 'text-red-600'}>
+              <span className={window.File ? 'text-orange-700' : 'text-red-600'}>
                 {window.File ? <>
                   <CheckCircle2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
                   {pageT('supported')}
@@ -197,7 +193,7 @@ export default function PhotoTest() {
             <div>
               <strong>{pageT('canvas')}:</strong>
               <br />
-              <span className={document.createElement('canvas').getContext ? 'text-green-600' : 'text-red-600'}>
+              <span className={document.createElement('canvas').getContext ? 'text-orange-700' : 'text-red-600'}>
                 {document.createElement('canvas').getContext ? <>
                   <CheckCircle2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
                   {pageT('supported')}
@@ -212,7 +208,7 @@ export default function PhotoTest() {
             <div>
               <strong>{pageT('localStorage')}:</strong>
               <br />
-              <span className={window.localStorage ? 'text-green-600' : 'text-red-600'}>
+              <span className={window.localStorage ? 'text-orange-700' : 'text-red-600'}>
                 {window.localStorage ? <>
                   <CheckCircle2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
                   {pageT('supported')}

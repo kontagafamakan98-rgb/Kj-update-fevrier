@@ -171,16 +171,17 @@ export default function NotificationPanel() {
       tabIndex={-1}
       data-notification-panel="true"
       aria-label={t('notifCenterAria')}
-      className={`absolute right-0 ${ancrageDe(sens)} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden outline-none`}
+      className={`carte-flottante absolute right-0 ${ancrageDe(sens)} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col z-50 overflow-hidden outline-none`}
       style={{ maxHeight: 'calc(100vh - 80px)' }}
     >
       {/* En-tête */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 flex-shrink-0">
+      <div className="flex items-center justify-between border-b border-stone-200 fond-sable px-4 py-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Icone nom="cloche" classe="w-5 h-5 text-orange-600" />
-          <span className="font-semibold text-gray-800 text-sm">{t('notificationsTitle')}</span>
+          <span className="font-semibold text-stone-800 text-sm">{t('notificationsTitle')}</span>
+          {/* Un COMPTE, pas un bouton : carré, il se lit comme une donnée. */}
           {unreadCount > 0 && (
-            <span className="bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+            <span className="rounded-[3px] bg-orange-100 text-orange-800 text-xs font-semibold px-2 py-0.5">
               {t('notifUnreadCount').replace('{count}', String(unreadCount))}
             </span>
           )}
@@ -190,7 +191,7 @@ export default function NotificationPanel() {
             <button
               onClick={markAllAsRead}
               title={t('markAllRead')}
-              className="p-1.5 rounded-lg text-gray-500 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+              className="p-1.5 rounded-[3px] text-stone-500 hover:text-orange-700 hover:bg-orange-50 transition-colors"
             >
               <Icone nom="cocheDouble" classe="w-4 h-4" />
             </button>
@@ -207,10 +208,10 @@ export default function NotificationPanel() {
               }}
               title={confirmeToutSupprimer ? t('confirmDeleteAll') : t('deleteAll')}
               aria-label={confirmeToutSupprimer ? t('confirmDeleteAll') : t('deleteAll')}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-[3px] text-xs font-semibold transition-colors ${
                 confirmeToutSupprimer
                   ? 'bg-red-600 text-white hover:bg-red-700'
-                  : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
+                  : 'text-stone-500 hover:text-red-600 hover:bg-red-50'
               }`}
             >
               <Icone nom="corbeille" classe="w-4 h-4" />
@@ -220,7 +221,7 @@ export default function NotificationPanel() {
           <button
             onClick={closePanel}
             aria-label={t('closeNotif')}
-            className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            className="p-1.5 rounded-[3px] text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors"
           >
             <Icone nom="croix" classe="w-4 h-4" />
           </button>
@@ -246,7 +247,7 @@ export default function NotificationPanel() {
             <button
               onClick={clearActionError}
               aria-label={t('closeNotif')}
-              className="p-1 rounded-lg text-red-400 hover:text-red-700 hover:bg-red-100 transition-colors"
+              className="p-1 rounded-[3px] text-red-500 hover:text-red-700 hover:bg-red-100 transition-colors"
             >
               <Icone nom="croix" classe="w-3.5 h-3.5" />
             </button>
@@ -260,18 +261,18 @@ export default function NotificationPanel() {
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             {/* h-9 = 36 px : au-delà de 32 px, l'épaisseur du jeu descend à 1,75 —
               à 2 unités sur la grille de 24, un dessin agrandi épaissit avec lui. */}
-          <Icone nom="cloche" classe="mb-3 h-9 w-9 text-gray-300" epaisseur={1.75} />
-            <p className="text-gray-500 text-sm font-medium">{t('noNotifications')}</p>
-            <p className="text-gray-500 text-xs mt-1">{t('notifEmptyHint')}</p>
+          <Icone nom="cloche" classe="mb-3 h-9 w-9 text-stone-300" epaisseur={1.75} />
+            <p className="text-stone-600 text-sm font-medium">{t('noNotifications')}</p>
+            <p className="text-stone-500 text-xs mt-1">{t('notifEmptyHint')}</p>
           </div>
         ) : (
-          <ul role="list" className="divide-y divide-gray-50">
+          <ul role="list" className="divide-y divide-stone-100">
             {notifications.map((notif) => (
               <li key={notif.id}>
                 <div
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors group ${
                     notif.is_read
-                      ? 'hover:bg-gray-50'
+                      ? 'hover:bg-stone-50'
                       : 'bg-orange-50/60 hover:bg-orange-50'
                   }`}
                   onClick={() => handleNotificationClick(notif)}
@@ -291,19 +292,23 @@ export default function NotificationPanel() {
                   </div>
 
                   {/* Icône type */}
-                  <div className="flex-shrink-0 w-9 h-9 rounded-full bg-white border border-gray-100 shadow-sm flex items-center justify-center text-lg">
-                    <TypeIcon type={notif.type} />
+                  {/* Un CARREAU, comme la pastille des listes de l'accueil : un
+                      cercle blanc à ombre par ligne faisait quarante disques
+                      flottants, et l'ombre d'un carreau de 36 px ne se voyait
+                      pas assez pour porter quoi que ce soit. */}
+                  <div className="flex-shrink-0 w-9 h-9 rounded-[3px] border border-stone-200 bg-orange-50 flex items-center justify-center">
+                    <TypeIcon type={notif.type} className="h-4 w-4 text-orange-700" />
                   </div>
 
                   {/* Contenu */}
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium truncate ${notif.is_read ? 'text-gray-700' : 'text-gray-900'}`}>
+                    <p className={`text-sm font-medium truncate ${notif.is_read ? 'text-stone-600' : 'text-stone-900'}`}>
                       {notif.title}
                     </p>
-                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-stone-500 mt-0.5 line-clamp-2 leading-relaxed">
                       {notif.body}
                     </p>
-                    <p className="text-[11px] text-gray-500 mt-1">
+                    <p className="text-[11px] text-stone-500 mt-1">
                       {relativeTime(notif.created_at, t)}
                     </p>
                   </div>
@@ -318,7 +323,7 @@ export default function NotificationPanel() {
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
                     aria-label={t('deleteNotification')}
-                    className="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                    className="flex-shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2 -mr-2 rounded-[3px] text-stone-400 hover:text-red-600 hover:bg-red-50 active:bg-red-100 transition-all focus:outline-none focus:ring-2 focus:ring-red-400 sm:w-9 sm:h-9 sm:-my-1 sm:-mr-1 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   >
                     <Icone nom="croix" classe="w-5 h-5 sm:w-4 sm:h-4" />
                   </button>

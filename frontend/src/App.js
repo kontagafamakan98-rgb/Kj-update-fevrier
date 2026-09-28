@@ -295,7 +295,13 @@ function AppRoutes() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative flex flex-col">
+    // Le fond de l'application prend le SABLE du site (`fond-sable`,
+    // src/index.css) : c'était le dernier `bg-gray-50` de la coquille — le
+    // gris froid de la gamme Tailwind, celui qui donnait aux pages
+    // d'application une autre couleur de papier que le site public. Les pages
+    // pré-rendues posent leur propre fond, donc ce changement ne touche que
+    // celles qui n'en posaient pas.
+    <div className="min-h-screen fond-sable relative flex flex-col">
       {/* Network Status and Offline Indicator */}
       <NetworkStatus />
       <OfflineIndicator />

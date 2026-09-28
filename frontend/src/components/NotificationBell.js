@@ -58,7 +58,7 @@ export default function NotificationBell({
   const { t } = useLanguage();
 
   const habillage = buttonClassName
-    || 'relative p-2 rounded-xl text-gray-700 hover:text-orange-600 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors';
+    || 'relative p-2 rounded-[3px] text-stone-700 hover:text-orange-700 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors';
 
   return (
     <div ref={conteneurRef} className={`relative ${className}`}>
@@ -79,7 +79,7 @@ export default function NotificationBell({
           {unreadCount > 0 && (
             <span
               aria-hidden="true"
-              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full leading-none"
+              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-600 text-white text-[10px] font-bold rounded-[3px] leading-none"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>

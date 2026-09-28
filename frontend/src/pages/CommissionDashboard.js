@@ -157,7 +157,7 @@ const CommissionDashboard = () => {
     <div className="min-h-full bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{pageT('title')}</h1>
+          <h1 className="titre-page mb-2">{pageT('title')}</h1>
           <p className="text-gray-600">{pageT('subtitle')}</p>
         </div>
 
@@ -174,9 +174,9 @@ const CommissionDashboard = () => {
           <StatCard icon={<CalendarDays className="h-6 w-6 text-orange-600" aria-hidden="true" />} bg="bg-orange-100" title={pageT('today')} value={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} valueColor="text-orange-600" />
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+        <div className="carte-editoriale p-6 mb-8">
           <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-            <h2 className="text-xl font-semibold text-gray-900">{pageT('receptionAccounts')}</h2>
+            <h2 className="titre-entree">{pageT('receptionAccounts')}</h2>
             <button
               onClick={() => (editingAccounts ? saveAccounts() : setEditingAccounts(true))}
               className={`px-4 py-2 rounded-lg font-medium ${editingAccounts ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
@@ -239,9 +239,9 @@ const CommissionDashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="carte-editoriale p-6">
           <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-            <h2 className="text-xl font-semibold text-gray-900">{pageT('history')}</h2>
+            <h2 className="titre-entree">{pageT('history')}</h2>
             <button onClick={loadOwnerData} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
               {pageT('refresh')}
             </button>
@@ -291,7 +291,7 @@ const CommissionDashboard = () => {
 
 function StatCard({ icon, bg, title, value, valueColor }) {
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="carte-editoriale p-6">
       <div className="flex items-center">
         <div className={`p-3 rounded-full ${bg} mr-4`}><span className="text-2xl">{icon}</span></div>
         <div>

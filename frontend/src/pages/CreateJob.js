@@ -104,26 +104,28 @@ export default function CreateJob() {
     }
   };
 
-  const inputClass = 'w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100';
+  // Le dessin du champ (papier, filet, rayon) appartient à la feuille :
+  // `form :is(input, select, textarea)` le pose. Seule la mesure se dit ici.
+  const inputClass = 'w-full px-4 py-3 outline-none';
   const locationLabel = buildLocationLabel(formData.location);
   const mapUrl = buildMapEmbedUrl(formData.location);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">{ui.createJobTitle}</h1>
-        <p className="mt-2 text-gray-600">{ui.createJobSubtitle}</p>
+        <h1 className="titre-page">{ui.createJobTitle}</h1>
+        <p className="mt-2 text-stone-600">{ui.createJobSubtitle}</p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-5 rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-        {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      <form onSubmit={handleSubmit} className="carte-editoriale space-y-5 p-6">
+        {error && <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">{ui.title} *</label>
+          <label className="mb-2 block text-sm font-medium">{ui.title} *</label>
           <input name="title" value={formData.title} onChange={handleChange} className={inputClass} placeholder={ui.title} />
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">{ui.description}</label>
+          <label className="mb-2 block text-sm font-medium">{ui.description}</label>
           <textarea name="description" rows="4" value={formData.description} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
         </div>
 
@@ -146,21 +148,21 @@ export default function CreateJob() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 font-semibold text-orange-700 hover:bg-orange-100 disabled:opacity-60">
+          <button type="button" onClick={handleUseCurrentLocation} disabled={locating} className="bouton bouton-clair disabled:cursor-not-allowed disabled:opacity-60">
             {locating ? ui.locating : ui.useCurrentLocation}
           </button>
           {hasCoordinates(formData.location) && (
-            <div className="flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            <div className="flex items-center rounded-[3px] border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
               {ui.gpsDetected}
             </div>
           )}
         </div>
 
-        {locationError && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{locationError}</div>}
+        {locationError && <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{locationError}</div>}
 
         {locationLabel && (
-          <div className="rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 text-sm text-gray-700">
+          <div className="carte-editoriale overflow-hidden">
+            <div className="border-b border-stone-200 fond-sable px-4 py-3 text-sm text-stone-700">
               <div className="font-semibold">{ui.selectedAddress}</div>
               <div>{locationLabel}</div>
             </div>
@@ -171,15 +173,15 @@ export default function CreateJob() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">{ui.price} *</label>
+            <label className="mb-2 block text-sm font-medium">{ui.price} *</label>
             <input type="number" min="0" name="budget_min" value={formData.budget_min} onChange={handleChange} className={inputClass} placeholder={ui.price} />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">{ui.priceMax}</label>
+            <label className="mb-2 block text-sm font-medium">{ui.priceMax}</label>
             <input type="number" min="0" name="budget_max" value={formData.budget_max} onChange={handleChange} className={inputClass} placeholder={ui.optional} />
           </div>
         </div>
-        <p className="text-sm text-gray-500">{ui.priceHint}</p>
+        <p className="text-sm text-stone-500">{ui.priceHint}</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input name="estimated_duration" value={formData.estimated_duration} onChange={handleChange} className={inputClass} placeholder={`${ui.estimatedDuration} (${ui.optional.toLowerCase?.() || ui.optional})`} />
@@ -194,12 +196,12 @@ export default function CreateJob() {
           max={20}
           inputClassName={inputClass}
         />
-        <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_parts" checked={formData.mechanic_must_bring_parts} onChange={handleChange} /> {ui.workerBringsParts}</label>
-        <label className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_tools" checked={formData.mechanic_must_bring_tools} onChange={handleChange} /> {ui.workerBringsTools}</label>
+        <label className="flex items-center gap-3 rounded-[3px] border border-stone-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_parts" checked={formData.mechanic_must_bring_parts} onChange={handleChange} /> {ui.workerBringsParts}</label>
+        <label className="flex items-center gap-3 rounded-[3px] border border-stone-200 px-4 py-3"><input type="checkbox" name="mechanic_must_bring_tools" checked={formData.mechanic_must_bring_tools} onChange={handleChange} /> {ui.workerBringsTools}</label>
         <textarea name="parts_and_tools_notes" rows="3" value={formData.parts_and_tools_notes} onChange={handleChange} className={inputClass} placeholder={`${ui.partsNotes} (${ui.optional.toLowerCase?.() || ui.optional})`} />
         <div className="flex gap-3">
-          <button type="button" onClick={() => navigate('/jobs')} className="rounded-xl border border-gray-200 px-5 py-3 font-semibold text-gray-700 hover:bg-gray-50">{ui.cancel}</button>
-          <button type="submit" disabled={loading} className="rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700 disabled:opacity-60">{loading ? ui.publishing : ui.createJob}</button>
+          <button type="button" onClick={() => navigate('/jobs')} className="bouton bouton-clair">{ui.cancel}</button>
+          <button type="submit" disabled={loading} className="bouton bouton-encre disabled:cursor-not-allowed disabled:opacity-60">{loading ? ui.publishing : ui.createJob}</button>
         </div>
       </form>
     </div>
