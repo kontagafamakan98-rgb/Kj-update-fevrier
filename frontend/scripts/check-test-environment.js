@@ -7,7 +7,11 @@
  *      playwright.config.js et du serveur de rewrites, jamais recopiée ;
  *   2. une URL de Preview qui pointe sur un port mort ;
  *   3. une hygiène git propre : branches locales fusionnées et réfs distantes
- *      orphelines, déléguée au module scripts/check-git-branches.js.
+ *      orphelines, déléguée au module scripts/check-git-branches.js ;
+ *   4. du travail qui n'existe QUE sur ce disque : une branche locale dont la
+ *      tête n'est contenue dans aucune réf distante. Ce dernier verdict ne
+ *      bloque JAMAIS — voir `verdictDeLaPasse` — mais il est nommé dans les
+ *      deux modes, parce que c'est la fin de passe qui l'a demandé.
  *
  * DEUX MODES, un seul propriétaire du partage (`verdictDeLaPasse`) :
  *   * fin de passe — tout compte, on remet tout à zéro ;
@@ -115,8 +119,24 @@ export function actionsDesArguments(args) {
  */
 export const verdictDeLaPasse = ({ avantPush, branches, environnement }) => ({
   bloquants: avantPush ? branches.issues : [...branches.issues, ...environnement],
-  rappels: avantPush ? environnement : [],
+  // Le travail non publié est toujours RAPPELÉ et jamais bloquant : à l'instant
+  // où le pré-vol tourne, la branche qu'on pousse EST du travail non publié —
+  // refuser là-dessus reviendrait à refuser le geste qui le publie, et il ne
+  // resterait que `--no-verify`, c'est-à-dire l'habitude d'ignorer le garde. Le
+  // pré-vol retire même de cette liste les branches que CE push publie (voir
+  // KOJO_BRANCHES_POUSEES) : un rappel qui nomme à chaque push ce que le push
+  // publie ne serait plus lu.
+  rappels: [...(branches.publication?.lignes ?? []), ...(avantPush ? environnement : [])],
 });
+
+/**
+ * Les rappels sont AFFICHÉS dans les deux modes, avant le verdict : c'est tout
+ * leur intérêt — ils doivent être lus à la fin de chaque passe, y compris
+ * quand tout le reste est vert.
+ */
+export function afficherLesRappels(rappels) {
+  for (const rappel of rappels) console.log(`::notice::${rappel}`);
+}
 
 export function isPreviewReachable(url, timeoutMs = 1500) {
   return new Promise((resolve) => {
@@ -177,26 +197,31 @@ export async function main(args = process.argv.slice(2), { mesurer = mesurerBran
   try {
     branches = mesurer({ cwd });
   } catch (error) {
-    branches = { issues: [`branches : lecture impossible (${error.message})`], examinees: 0, distantes: 0 };
+    branches = { issues: [`branches : lecture impossible (${error.message})`], examinees: 0, distantes: 0, publication: { jugees: 0, lignes: [] } };
   }
   if (avantPush) {
-    const { bloquants } = verdictDeLaPasse({ avantPush: true, branches, environnement: [] });
+    const { bloquants, rappels } = verdictDeLaPasse({ avantPush: true, branches, environnement: [] });
+    afficherLesRappels(rappels);
     if (bloquants.length) {
       for (const issue of bloquants) console.error(`::error::${issue}`);
       return false;
     }
-    console.log(`Pré-vol de push : ${branches.examinees} branche(s) locale(s) suivie(s) et ${branches.distantes} réf(s) distante(s) sans branche locale — aucun résidu.`);
+    console.log(
+      `Pré-vol de push : ${branches.examinees} branche(s) locale(s) suivie(s) et ${branches.distantes} réf(s) distante(s) sans branche locale, ` +
+        `${branches.publication?.jugees ?? 0} branche(s) locale(s) jugée(s) pour la publication — aucun résidu.`,
+    );
     return true;
   }
   const ports = await chargerServeursTest();
   const environnement = await checkTestEnvironment({ ports, previewUrls });
-  const { bloquants } = verdictDeLaPasse({ avantPush: false, branches, environnement });
+  const { bloquants, rappels } = verdictDeLaPasse({ avantPush: false, branches, environnement });
+  afficherLesRappels(rappels);
   if (bloquants.length) {
     for (const issue of bloquants) console.error(`::error::${issue}`);
     return false;
   }
   console.log(
-    `Environnement propre : ${ports.length} ports de test fermés; ${branches.examinees} branche(s) locale(s) suivie(s); ${branches.distantes} réf(s) distante(s) sans branche locale; ${previewUrls.length} URL(s) de Preview vérifiée(s).`,
+    `Environnement propre : ${ports.length} ports de test fermés; ${branches.examinees} branche(s) locale(s) suivie(s); ${branches.distantes} réf(s) distante(s) sans branche locale; ${branches.publication?.jugees ?? 0} branche(s) locale(s) jugée(s) pour la publication; ${previewUrls.length} URL(s) de Preview vérifiée(s).`,
   );
   return true;
 }

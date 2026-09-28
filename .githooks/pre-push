@@ -51,10 +51,20 @@ fi
 # ne publie rien : c'est la publication des résidus que ce hook intercepte.
 # git passe sur l'entrée standard « <réf locale> <oid local> <réf distante> <oid
 # distante> » : un oid local fait de zéros = une suppression.
+#
+# Les réfs locales lues ici servent AUSSI au verdict de publication du garde :
+# une branche que CE push publie n'est pas « du travail qui n'existe que sur ce
+# disque ». La liste est passée par l'environnement plutôt que par un argument :
+# le pré-vol n'a rien à déclarer, et un rappel qui nommerait à chaque push la
+# branche que ce push publie s'apprendrait à être ignoré.
 publication=0
 lignes=0
-while read -r _ref_locale oid_local _ref_distante _oid_distante; do
+branches_poussees=''
+while read -r ref_locale oid_local _ref_distante _oid_distante; do
   lignes=$((lignes + 1))
+  case "${ref_locale:-}" in
+    refs/heads/*) branches_poussees="$branches_poussees ${ref_locale#refs/heads/}" ;;
+  esac
   case "${oid_local:-}" in
     *[!0]*) publication=1 ;;
   esac
@@ -64,6 +74,15 @@ if [ "$lignes" -gt 0 ] && [ "$publication" = 0 ]; then
   echo "pré-vol de push : suppression seule, rien n'est publié — contrôle ignoré."
   exit 0
 fi
+
+# La variable est POSÉE puis EXPORTÉE, jamais préfixée sur la commande : la
+# ligne d'appel du pré-vol est le SUJET d'une mutation déclarée (« pre-push:
+# verdict ignore, le push passe »), et un préfixe la réécrirait — le harnais
+# refuse alors une mutation qui ne trouve plus son littéral (mesuré en CI sur la
+# première poussée de cette passe). L'enfant voit la variable de toute façon,
+# l'export n'est donc pas un détour.
+KOJO_BRANCHES_POUSEES="$branches_poussees"
+export KOJO_BRANCHES_POUSEES
 
 if node "$script" --avant-push; then
   exit 0

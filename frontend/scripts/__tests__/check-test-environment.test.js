@@ -15,7 +15,11 @@ import {
   mesurerBranches,
   verdictDeLaPasse,
 } from '../check-test-environment.js';
-import { main as mainGitBranches } from '../check-git-branches.js';
+import {
+  ENV_BRANCHES_POUSEES,
+  branchesPoussees,
+  main as mainGitBranches,
+} from '../check-git-branches.js';
 
 const FRONTEND_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -113,6 +117,43 @@ describe('check-test-environment — le verdict selon le mode', () => {
     expect(verdict.bloquants).toEqual([]);
     expect(verdict.rappels).toEqual(environnement);
   });
+
+  it('un travail non publié est rappelé dans les deux modes, et ne bloque rien', () => {
+    // Le pré-vol lui-même pousse du travail non publié : bloquer là-dessus
+    // reviendrait à refuser le geste qui le publie. Il est donc nommé dans les
+    // DEUX modes — c'est la fin de passe qui exige qu'il soit lu.
+    const presse = {
+      jugees: 1,
+      lignes: ["branche locale « encours » : 3 commit(s) n'existent dans aucune réf distante — la publier"],
+    };
+    const enFinDePasse = verdictDeLaPasse({
+      avantPush: false,
+      branches: { issues: [], publication: presse },
+      environnement,
+    });
+    expect(enFinDePasse.bloquants).toEqual(environnement);
+    expect(enFinDePasse.rappels).toEqual(presse.lignes);
+
+    const avantPush = verdictDeLaPasse({
+      avantPush: true,
+      branches: { issues: [], publication: presse },
+      environnement,
+    });
+    expect(avantPush.bloquants).toEqual([]);
+    expect(avantPush.rappels).toEqual([...presse.lignes, ...environnement]);
+  });
+
+  it('lit les branches qu’un push publie dans l’environnement, et rien d’autre', () => {
+    // C'est le contrat du hook : `.githooks/pre-push` collecte les réfs locales
+    // lues sur son entrée standard et les passe ici, pour que le rappel ne nomme
+    // pas la branche que CE push publie.
+    expect(branchesPoussees({ [ENV_BRANCHES_POUSEES]: ' refs/heads/main  refonte ' })).toEqual([
+      'main',
+      'refonte',
+    ]);
+    expect(branchesPoussees({})).toEqual([]);
+    expect(branchesPoussees({ [ENV_BRANCHES_POUSEES]: '' })).toEqual([]);
+  });
 });
 
 // ── Branches locales ET distantes : le lecteur de git est injecté ─────────────────────────
@@ -138,11 +179,20 @@ function fauxGit(table) {
 const ORIGIN_HEAD = { 'symbolic-ref --short refs/remotes/origin/HEAD': { lignes: ['origin/main'] } };
 const COMMANDE_DISTANTE = `for-each-ref --format=${CHAMPS_REF_DISTANTE} refs/remotes`;
 
-function mesurer(branches, lire = {}, distantes = []) {
+// Par défaut, la branche de base est PUBLIÉE — la plupart des cas ci-dessous ne
+// parlent pas de publication, et chaque table qui la juge l'écrit explicitement.
+// Ce défaut ne peut pas rendre un cas vert sans lecture : le faux git ci-dessus
+// refuse tout appel imprévu, donc une table qui ne l'aurait pas prévu fait
+// échouer le test au lieu de le laisser passer.
+const BASE_PUBLIEE = { 'rev-list --count main --not --remotes': { lignes: ['0'] } };
+
+function mesurer(branches, lire = {}, distantes = [], publiees = []) {
   return mesurerBranches({
     cwd: 'dépôt-fixture',
+    publiees,
     lire: fauxGit({
       ...ORIGIN_HEAD,
+      ...BASE_PUBLIEE,
       'for-each-ref': { lignes: branches },
       [COMMANDE_DISTANTE]: { lignes: distantes },
       ...lire,
@@ -159,6 +209,121 @@ const REFONTE_EST_LA = [
   'branche locale « refonte » : son arbre est identique à main (fusion par squash), ' +
     'et sa réf distante « origin/refonte » a disparu — la supprimer (git branch -D refonte)',
 ];
+
+// ── Le travail qui n'existe que sur ce disque : nommé, jamais bloquant ──────
+// Ce que ce verdict protège, MESURÉ : sept commits d'un chantier entier vivaient
+// dans un seul checkout, sept commits sous sa réf distante, et rien ne le disait.
+// Les deux verdicts ci-dessus ne regardent que ce qui est DÉJÀ livré ; celui-ci
+// regarde ce qui ne l'est PAS, avec une seule lecture par branche (`--not
+// --remotes` : le nombre de commits qu'aucun distant ne porte).
+const REFS_DU_DISTANT = ['origin/main\t', 'origin/encours\t'];
+
+describe('check-test-environment — travail qui n’existe que sur ce disque', () => {
+  it('nomme la branche dont la tête n’est contenue dans aucune réf distante, et dit quoi en faire', () => {
+    const { publication } = mesurer(
+      ['main\torigin/main\t\t*', 'encours\torigin/encours\t\t '],
+      {
+        'rev-list --count main --not --remotes': { lignes: ['0'] },
+        'rev-list --count encours --not --remotes': { lignes: ['3'] },
+      },
+      REFS_DU_DISTANT,
+    );
+    expect(publication).toEqual({
+      jugees: 2,
+      lignes: [
+        'branche locale « encours » : 3 commit(s) n\'existent dans aucune réf distante — ' +
+          'la publier (git push origin encours), ou la supprimer si son contenu a déjà été ' +
+          'livré autrement (git branch -D encours)',
+      ],
+    });
+  });
+
+  it('juge aussi la branche de base : `main` en avance n’existe que sur ce disque', () => {
+    // La base n'est exclue de RIEN ici : un `main` local en avance de deux
+    // commits est exactement le même risque, et le remède est le même push.
+    const { publication } = mesurer(
+      ['main\torigin/main\t\t*'],
+      { 'rev-list --count main --not --remotes': { lignes: ['2'] } },
+      ['origin/main\t'],
+    );
+    expect(publication.jugees).toBe(1);
+    expect(publication.lignes).toEqual([
+      'branche locale « main » : 2 commit(s) n\'existent dans aucune réf distante — ' +
+        'la publier (git push origin main), ou la supprimer si son contenu a déjà été ' +
+        'livré autrement (git branch -D main)',
+    ]);
+  });
+
+  it('se tait quand toute la tête existe déjà sur un distant', () => {
+    // Aucune ligne, et la lecture a bien eu lieu : la fixture a reçu la question.
+    const { publication } = mesurer(['main\torigin/main\t\t*'], {}, ['origin/main\t']);
+    expect(publication).toEqual({ jugees: 1, lignes: [] });
+  });
+
+  it('ne rappelle pas la branche que le push EN COURS publie', () => {
+    // Sans cette exclusion, tout push nommerait la branche qu'il publie — le
+    // seul message que cette classe existe pour faire lire deviendrait du bruit.
+    const { publication } = mesurer(
+      ['main\torigin/main\t\t*', 'encours\torigin/encours\t\t '],
+      { 'rev-list --count encours --not --remotes': { lignes: ['1'] } },
+      REFS_DU_DISTANT,
+      ['encours'],
+    );
+    expect(publication).toEqual({ jugees: 1, lignes: [] });
+  });
+
+  it('nomme l’état au lieu de juger quand aucune réf distante ne peut être comparée', () => {
+    // Dépôt sans aucune réf de suivi : `--not --remotes` rendrait « tout est non
+    // publié ». Le plancher de lecture le dit — et il ne bloque pas.
+    const { issues, publication } = mesurer(['main\torigin/main\t\t*']);
+    expect(issues).toEqual([]);
+    expect(publication).toEqual({
+      jugees: 0,
+      lignes: [
+        'publication : aucune réf distante dans ce dépôt — 1 branche(s) locale(s) non ' +
+          'jugée(s), rien à comparer',
+      ],
+    });
+  });
+
+  it('ne produit pas deux lignes pour une branche déjà nommée comme résidu', () => {
+    // `refonte` est un résidu (son contenu est dans la base) : la publication ne
+    // la compte pas, donc une branche à supprimer n'est jamais présentée aussi
+    // comme du travail à sauver. La partition est stricte, comme pour les réfs.
+    const { issues, publication } = mesurer(
+      ['main\torigin/main\t\t*', 'refonte\torigin/refonte\t[gone]\t '],
+      FUSION_PAR_SQUASH,
+      ['origin/main\t'],
+    );
+    expect(issues).toEqual(REFONTE_EST_LA);
+    expect(publication).toEqual({ jugees: 1, lignes: [] });
+  });
+});
+
+// Sur un VRAI dépôt, la question posée à git est la vraie : un commit local non
+// poussé, puis le push qui le publie — le rappel doit disparaître de lui-même.
+describe('check-test-environment — publication, sur un vrai dépôt', () => {
+  it('nomme un commit qui n’existe que sur ce disque, puis se tait après le push', async () => {
+    const { racine, travail } = await decorDeFusion('kojo-publication-');
+    try {
+      await git(travail, 'switch', 'main');
+      writeFileSync(path.join(travail, 'depart.txt'), 'local\n');
+      await git(travail, 'commit', '-am', 'local');
+
+      const avant = mesurerBranches({ cwd: travail, publiees: [] });
+      expect(avant.issues).toEqual([]);
+      expect(avant.publication.lignes).toEqual([
+        expect.stringContaining('branche locale « main » : 1 commit(s)'),
+      ]);
+      expect(avant.publication.lignes[0]).toContain('git push origin main');
+
+      await git(travail, 'push', 'origin', 'main');
+      expect(mesurerBranches({ cwd: travail, publiees: [] }).publication.lignes).toEqual([]);
+    } finally {
+      await nettoyer(racine);
+    }
+  }, 60_000);
+});
 
 describe('check-test-environment — branches locales', () => {
   it('nomme une branche fusionnée par squash dont la réf distante a disparu', () => {
@@ -542,12 +707,38 @@ describe('check-test-environment et check-git-branches — exécution de main()'
     expect(ok).toBe(true);
   });
 
+  it('affiche le rappel de publication en pré-vol de push, sans bloquer', async () => {
+    const sorties = [];
+    const origLog = console.log;
+    console.log = (msg) => sorties.push(String(msg));
+    try {
+      const ok = await main(['--avant-push'], {
+        cwd: tmpdir(),
+        mesurer: () => ({
+          issues: [],
+          examinees: 1,
+          distantes: 0,
+          publication: { jugees: 1, lignes: ['branche locale « encours » : 1 commit(s) n\'existent dans aucune réf distante — la publier (git push origin encours)'] },
+        }),
+      });
+      expect(ok).toBe(true);
+      expect(sorties.some((l) => l.startsWith('::notice::branche locale « encours »'))).toBe(true);
+    } finally {
+      console.log = origLog;
+    }
+  });
+
   it('écrit un résumé Markdown dans $GITHUB_STEP_SUMMARY si renseigné', async () => {
     const fichierTemp = path.join(tmpdir(), `summary-${Date.now()}.md`);
     try {
       const ok = await mainGitBranches([], {
         cwd: tmpdir(),
-        mesurer: () => ({ issues: [], examinees: 3, distantes: 2 }),
+        mesurer: () => ({
+          issues: [],
+          examinees: 3,
+          distantes: 2,
+          publication: { jugees: 3, lignes: ['branche locale « encours » : 1 commit(s) — la publier'] },
+        }),
         stepSummaryPath: fichierTemp,
       });
       expect(ok).toBe(true);
@@ -555,6 +746,9 @@ describe('check-test-environment et check-git-branches — exécution de main()'
       expect(contenu).toContain('Hygiène des branches et réfs distantes');
       expect(contenu).toContain('3 branche(s) locale(s)');
       expect(contenu).toContain('2 réf(s) distante(s)');
+      // Les rappels ont leur propre section : le tableau des résidus dit ce qu'il
+      // faut supprimer, cette section ce qu'il faut publier.
+      expect(contenu).toContain("Travail qui n'existe que sur ce disque");
     } finally {
       await rm(fichierTemp, { force: true });
     }

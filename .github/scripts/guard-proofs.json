@@ -270,7 +270,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
       "runner": "vitest",
-      "motif": "refuse en fin de passe un serveur de test encore ouvert, une URL de Preview injoignable, et relaie l'hygiene git (branches locales fusionnees, refs distantes orphelines) deleguee a scripts/check-git-branches.js ; la liste des ports vient de playwright.config.js et du serveur de rewrites"
+      "motif": "refuse en fin de passe un serveur de test encore ouvert, une URL de Preview injoignable, et relaie l'hygiene git (branches locales fusionnees, refs distantes orphelines) deleguee a scripts/check-git-branches.js ; NOMME SANS BLOQUER le travail qui n'existe que sur ce disque — branche locale dont la tete n'est contenue dans AUCUNE ref distante, mesuree par une lecture par branche (`rev-list --count <branche> --not --remotes`), avec sa marche a suivre (git push, ou git branch -D si le contenu a ete livre autrement) — et nomme l'etat au lieu de juger quand aucune ref distante n'existe (plancher de lecture)la liste des ports vient de playwright.config.js et du serveur de rewrites"
     },
     {
       "chemin": "frontend/scripts/check-git-branches.js",
@@ -2735,6 +2735,46 @@
       "cwd": "frontend",
       "attend": [
         "refuse de juger quand le relevé ne lit plus assez de bornes"
+      ]
+    },
+    {
+      "id": "environment: travail non publie non nomme",
+      "garde": "frontend/scripts/check-git-branches.js",
+      "cible": "frontend/scripts/check-git-branches.js",
+      "trouve": "  if (compte === 0) return null;\n",
+      "remplace": "  // mutation : toute branche passe pour publiee\n",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "n'existent dans aucune réf distante"
+      ]
+    },
+    {
+      "id": "environment: plancher de lecture de la publication neutralise",
+      "garde": "frontend/scripts/check-git-branches.js",
+      "cible": "frontend/scripts/check-git-branches.js",
+      "trouve": "  if (refsDistantes.every((ref) => ref.symbolique)) {\n",
+      "remplace": "  if (false) {\n",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "aucune réf distante dans ce dépôt"
       ]
     }
   ]
