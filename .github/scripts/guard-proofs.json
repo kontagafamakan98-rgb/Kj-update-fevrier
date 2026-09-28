@@ -2338,7 +2338,7 @@
       "id": "css-selecteurs-morts: plancher du corpus neutralise",
       "garde": "frontend/scripts/check-css-selecteurs-morts.js",
       "cible": "frontend/scripts/check-css-selecteurs-morts.js",
-      "trouve": "if (corpus.fichiers.length < MIN_FICHIERS_CORPUS || corpus.jetons.size < MIN_JETONS_CORPUS) {",
+      "trouve": "if (corpusLarge.fichiers.length < MIN_FICHIERS_CORPUS || corpusLarge.jetons.size < MIN_JETONS_CORPUS) {",
       "remplace": "if (false) {",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
