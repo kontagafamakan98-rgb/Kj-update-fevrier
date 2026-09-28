@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test';
+// Le marqueur de MONTAGE (un lien dans `nav`) et les attentes de condition : le
+// cas ci-dessous n'a plus une seule horloge. Un `waitForTimeout(N)` espérait
+// que le repaint de React soit passé ; ce qui le PROUVE est que React a monté,
+// que la mise en page ne bouge plus et que le nombre de candidates LCP s'est
+// arrêté de changer.
+import { MARQUEUR_DE_MONTAGE, attendreLaStabilite } from './helpers/geometrie.js';
+import { attendreUneValeurStable } from './helpers/attentes.js';
 
 /**
  * /contact : le LCP est la PEINTURE DE LA COQUILLE, pas le repaint de React.
@@ -50,9 +57,21 @@ test.describe('Parcours E2E — le LCP de /contact reste la peinture de la coqui
     await page.goto('/contact');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-    // Laisse le temps à createRoot, à la reconstruction de la page et au
-    // repaint : une seconde candidate, si elle existe, apparaît ici.
-    await page.waitForTimeout(1500);
+    // ── React a monté, et le repaint a EU LIEU ──────────────────────────────
+    // L'attente du seul `h1` ne prouverait pas que React est monté : la coquille
+    // publie un `h1` du même texte. Le marqueur, lui, ne peut exister qu'après
+    // le montage (le chrome des coquilles publie une navbar vide).
+    await page.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
+    await attendreLaStabilite(page);
+    // Puis on attend que le NOMBRE DE CANDIDATES cesse de changer : c'est la
+    // condition exacte de « une seconde candidate, si elle existe, est déjà
+    // arrivée ». Quatre lectures égales (trois intervalles de calme) et non
+    // deux : une candidate tardive doit tomber dans la fenêtre, et c'est la
+    // comparaison qui la jugera, pas l'attente.
+    await attendreUneValeurStable(page, () => (window.__kojoLcp ? window.__kojoLcp.candidates.length : -1), {
+      lecturesEgales: 4,
+      maxMs: 2000,
+    });
 
     const releve = await page.evaluate(() => window.__kojoLcp);
     expect(releve.fcp, 'aucun premier paint relevé : le relevé ne peut rien prouver').not.toBeNull();

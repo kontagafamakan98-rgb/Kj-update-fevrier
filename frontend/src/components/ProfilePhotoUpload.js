@@ -4,6 +4,7 @@ import { useToast } from '../contexts/ToastContext';
 import { devLog, safeLog } from '../utils/env';
 import { photoFormatsLine } from '../config/photo-formats';
 import { IconePage, CLASSES_ICONE } from '../config/page-icons';
+import { Image, Camera, Check } from 'lucide-react';
 
 // Les deux glyphes sont DESSINÉS (icônes SVG) : leur nom est passé par la page,
 // qui le lit de son plan (`PAGE_SECTIONS['/register'].photoIcon` / `.photoTipsIcon`),
@@ -15,6 +16,11 @@ const ProfilePhotoUpload = ({
   userType = 'client',
   iconePhoto = 'profilePhoto',
   iconeConseils = 'photoTips',
+  // La classe du BLOC, posée par la page au lieu d'être décidée ici : c'est une
+  // décision de mise en page (ce bloc est sous la ligne de flottaison de
+  // /register, donc différé — voir `bloc-differe-photo` dans src/App.css), et le
+  // composant sert aussi ailleurs. Vide par défaut : aucun effet hors de là.
+  classeBloc = '',
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showCameraOptions, setShowCameraOptions] = useState(false);
@@ -109,15 +115,15 @@ const ProfilePhotoUpload = ({
   };
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
-      <div className="flex items-center mb-4">
-        <span className="text-2xl mr-3"><IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoTitre} /></span>
-        <h3 className="text-lg font-semibold text-gray-900">
+    <div className={`carte-editoriale carte-publique mb-6${classeBloc ? ` ${classeBloc}` : ''}`}>
+      <div className="mb-4 flex items-center gap-3">
+        <IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoTitre} />
+        <h3 className="titre-entree">
           {t('profilePhotoOptional')}
         </h3>
       </div>
       
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="mb-4 text-sm text-stone-600">
         {userType === 'worker' 
           ? t('professionalPhotoHelps') || 'Une photo de profil professionnelle augmente la confiance des clients et améliore vos chances d’être sélectionné.'
           : t('profilePhotoHelps')
@@ -128,10 +134,10 @@ const ProfilePhotoUpload = ({
         <>
           {!showCameraOptions ? (
             <div
-              className={`relative border-2 border-dashed rounded-lg p-6 transition-colors cursor-pointer ${
-                dragActive 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+              className={`relative cursor-pointer rounded-[3px] border-2 border-dashed p-6 transition-colors ${
+                dragActive
+                  ? 'border-orange-500 bg-orange-50'
+                  : 'border-stone-300 hover:border-stone-400 hover:bg-stone-50'
               }`}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
@@ -139,12 +145,12 @@ const ProfilePhotoUpload = ({
               onClick={showPhotoOptions}
             >
               <div className="text-center">
-                <div className="text-4xl mb-3"><IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoZone} /></div>
-                <div className="text-sm text-gray-600">
+                <div className="mb-3 flex justify-center"><IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoZone} /></div>
+                <div className="text-sm text-stone-600">
                   <p className="font-medium">{t('addProfilePhoto')}</p>
                   <p>{t('clickToChooseOption')}</p>
                 </div>
-                <div className="text-xs text-gray-500 mt-2">
+                <div className="mt-2 text-xs text-stone-500">
                   {photoFormatsLine(t('upTo') || 'jusqu’à')}
                 </div>
               </div>
@@ -157,22 +163,22 @@ const ProfilePhotoUpload = ({
                 <button
                   type="button"
                   onClick={handleGalleryClick}
-                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-blue-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  className="flex flex-col items-center justify-center gap-1 rounded-[3px] border-2 border-dashed border-stone-300 p-6 text-center transition-colors hover:border-orange-400 hover:bg-orange-50"
                 >
-                  <div className="text-3xl mb-2">🖼️</div>
-                  <div className="text-sm font-medium text-blue-900">{t('chooseFromGallery')}</div>
-                  <div className="text-xs text-blue-600 mt-1">{t('selectExistingPhoto')}</div>
+                  <Image className="h-8 w-8 text-orange-700" aria-hidden="true" />
+                  <div className="text-sm font-medium text-stone-800">{t('chooseFromGallery')}</div>
+                  <div className="text-xs text-stone-500">{t('selectExistingPhoto')}</div>
                 </button>
 
                 {/* Option Caméra */}
                 <button
                   type="button"
                   onClick={handleCameraClick}
-                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-green-300 rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors"
+                  className="flex flex-col items-center justify-center gap-1 rounded-[3px] border-2 border-dashed border-stone-300 p-6 text-center transition-colors hover:border-orange-400 hover:bg-orange-50"
                 >
-                  <div className="text-3xl mb-2">📷</div>
-                  <div className="text-sm font-medium text-green-900">{t('takePhoto')}</div>
-                  <div className="text-xs text-green-600 mt-1">{t('useCamera')}</div>
+                  <Camera className="h-8 w-8 text-orange-700" aria-hidden="true" />
+                  <div className="text-sm font-medium text-stone-800">{t('takePhoto')}</div>
+                  <div className="text-xs text-stone-500">{t('useCamera')}</div>
                 </button>
               </div>
 
@@ -180,9 +186,9 @@ const ProfilePhotoUpload = ({
               <button
                 type="button"
                 onClick={() => setShowCameraOptions(false)}
-                className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className="w-full px-4 py-2 text-sm text-stone-600 transition-colors hover:text-orange-700"
               >
-                ← {t('back')}
+                {t('back')}
               </button>
 
               {/* Inputs cachés */}
@@ -212,21 +218,21 @@ const ProfilePhotoUpload = ({
       ) : (
         <div className="space-y-4">
           {/* Aperçu de la photo */}
-          <div className="flex items-start space-x-4 p-4 bg-white border border-gray-200 rounded-lg">
+          <div className="flex items-start gap-4 rounded-[3px] border border-stone-200 fond-sable p-4">
             <div className="flex-shrink-0">
               <img
                 src={photoData.base64}
                 alt={t('preview')}
-                className="w-20 h-20 object-cover rounded-full border-2 border-gray-300"
+                className="w-20 h-20 object-cover rounded-full border border-stone-300"
               />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-medium text-gray-900 truncate">
+                  <h4 className="truncate font-medium text-stone-900">
                     {photoData.name}
                   </h4>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-stone-500">
                     {(photoData.size / 1024 / 1024).toFixed(2)} MB
                   </p>
                 </div>
@@ -239,8 +245,8 @@ const ProfilePhotoUpload = ({
                 </button>
               </div>
               
-              <div className="mt-2 flex items-center text-sm text-green-600">
-                <span className="mr-2">✓</span>
+              <div className="mt-2 flex items-center gap-2 text-sm text-orange-700">
+                <Check className="h-4 w-4" aria-hidden="true" />
                 {t('photoReadyForRegistration')}
               </div>
             </div>
@@ -251,9 +257,9 @@ const ProfilePhotoUpload = ({
             <button
               type="button"
               onClick={showPhotoOptions}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              className="bouton bouton-clair w-full"
             >
-              📷 {t('changePhoto')}
+              <Camera className="h-4 w-4" aria-hidden="true" /> {t('changePhoto')}
             </button>
           ) : (
             <div className="space-y-3">
@@ -261,22 +267,22 @@ const ProfilePhotoUpload = ({
                 <button
                   type="button"
                   onClick={handleGalleryClick}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                  className="bouton bouton-encre"
                 >
-                  🖼️ {t('gallery')}
+                  <Image className="h-4 w-4" aria-hidden="true" /> {t('gallery')}
                 </button>
                 <button
                   type="button"
                   onClick={handleCameraClick}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                  className="bouton bouton-clair"
                 >
-                  📷 {t('camera')}
+                  <Camera className="h-4 w-4" aria-hidden="true" /> {t('camera')}
                 </button>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCameraOptions(false)}
-                className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className="w-full px-4 py-2 text-sm text-stone-600 transition-colors hover:text-orange-700"
               >
                 {t('cancel')}
               </button>
@@ -308,9 +314,14 @@ const ProfilePhotoUpload = ({
       )}
 
       {/* Conseils pour une bonne photo */}
-      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <h4 className="font-medium text-yellow-800 mb-1"><IconePage nom={iconeConseils} classe={CLASSES_ICONE.notice} /> {t('tipsGoodPhoto')}</h4>
-        <ul className="text-xs text-yellow-700 space-y-1">
+      {/* Les conseils sont une NOTICE : la note orange du site, au lieu d'un
+          jaune qui n'appartenait à personne. Elle garde la mesure de `p-3` —
+          le vocabulaire change la TEINTE, pas la boîte : ce bloc est mesuré par
+          le budget de /register, et une notice plus haute déplaçait tout ce qui
+          le suit. */}
+      <div className="mt-4 rounded-[3px] border border-orange-200 bg-orange-50 p-3">
+        <h4 className="mb-1 font-medium text-orange-900"><IconePage nom={iconeConseils} classe={CLASSES_ICONE.notice} /> {t('tipsGoodPhoto')}</h4>
+        <ul className="space-y-1 text-xs text-orange-800">
           <li>• {t('useRecentPhoto')}</li>
           <li>• {t('lookCamera')}</li>
           <li>• {t('avoidGroup')}</li>

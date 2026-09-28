@@ -1,8 +1,10 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import Link from './LienVue';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import NotificationBell from './NotificationBell';
 import { VERS_LE_HAUT } from './notificationPanelPlacement';
+import { Icone } from './chrome-icons';
 
 const HIDDEN_PATHS = ['/login', '/register', '/forgot-password', '/email-verification'];
 
@@ -25,36 +27,40 @@ export default function MobileBottomNav() {
         {
           path: '/',
           icon: (active) => (
-            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 11l9-8 9 8M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10" />
-            </svg>
+            <Icone
+              nom="accueil"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
           ),
           label: t('home'),
         },
         {
           path: '/jobs',
           icon: (active) => (
-            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8"></path>
-            </svg>
+            <Icone
+              nom="valise"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
           ),
           label: t('jobs'),
         },
         {
           path: '/support',
           icon: (active) => (
-            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 10a6 6 0 10-12 0v4a3 3 0 003 3h1v-7H8m10 0v4a3 3 0 01-3 3h-1v-7h4" />
-            </svg>
+            <Icone
+              nom="casque"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
           ),
           label: t('support'),
         },
         {
           path: '/login',
           icon: (active) => (
-            <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <Icone
+              nom="entree"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
           ),
           label: t('login'),
         },
@@ -63,36 +69,40 @@ export default function MobileBottomNav() {
     {
       path: '/dashboard',
       icon: (active) => (
-        <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
-        </svg>
+        <Icone
+              nom="tableau"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
       ),
       label: t('dashboard')
     },
     {
       path: '/jobs',
       icon: (active) => (
-        <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m-8 0h8"></path>
-        </svg>
+        <Icone
+              nom="valise"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
       ),
       label: t('jobs')
     },
     {
       path: '/messages',
       icon: (active) => (
-        <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-        </svg>
+        <Icone
+              nom="messages"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
       ),
       label: t('messages')
     },
     {
       path: '/profile',
       icon: (active) => (
-        <svg className={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-        </svg>
+        <Icone
+              nom="profil"
+              classe={`w-6 h-6 ${active ? 'text-orange-600' : 'text-gray-400'}`}
+            />
       ),
       label: t('profile')
     }

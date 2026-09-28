@@ -2,6 +2,16 @@
 // n'ont aucun contenu statique propre. Il doit rester NU (aucun canonical,
 // aucun JSON-LD) et se dire non indexable.
 
+/**
+ * Le NOM de l'artefact, lu des DEUX côtés : le build l'ÉCRIT, le garde
+ * d'après-build (`scripts/check-prerender-shells.js`) le RELIT pour vérifier
+ * l'équilibre de ses balises. Il compte d'autant plus ici que le gabarit est
+ * obtenu par RETRAIT (canonical, JSON-LD, méta) : une expression régulière qui
+ * emporte une ouvrante sans sa fermante laisse un document que le parseur
+ * répare en silence, et dont plus aucune sonde de navigateur ne peut rien dire.
+ */
+export const NOM_DU_GABARIT_APP = 'app.html';
+
 export function buildAppTemplate({ html, T, setMeta }) {
   // ── Gabarit des routes CLIENTES : app.html ──────────────────────
   // Les routes sans pré-rendu (/dashboard, /profile, /messages,

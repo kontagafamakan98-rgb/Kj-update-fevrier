@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import preciseGeolocationService from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { devLog } from '../utils/env';
+import { Satellite, Globe, Brain, Dices, MapPin, Target, Search, Building2, Home, Phone, Map, Microscope, Timer } from 'lucide-react';
 
 const PreciseLocationDemo = () => {
   const [location, setLocation] = useState(null);
@@ -60,13 +61,14 @@ const PreciseLocationDemo = () => {
   };
 
   const getMethodIcon = (method) => {
-    const icons = {
-      'gps': '📡',
-      'ip': '🌐',
-      'contextual': '🧠',
-      'intelligent_fallback': '🎲'
+    const icones = {
+      'gps': Satellite,
+      'ip': Globe,
+      'contextual': Brain,
+      'intelligent_fallback': Dices
     };
-    return icons[method] || '📍';
+    const Icone = icones[method] || MapPin;
+    return <Icone className="h-4 w-4" aria-hidden="true" />;
   };
 
   const getMethodName = (method) => {
@@ -99,7 +101,7 @@ const PreciseLocationDemo = () => {
           color: '#1f2937',
           marginBottom: '8px'
         }}>
-          🎯 {t('preciseGeolocation')}
+          <Target className="inline h-6 w-6 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('preciseGeolocation')}
         </h2>
         <p style={{
           color: '#6b7280',
@@ -128,7 +130,11 @@ const PreciseLocationDemo = () => {
             transition: 'all 0.2s'
           }}
         >
-          {isDetecting ? `🔍 ${t('detecting')}` : `📍 ${t('detectMyLocation')}`}
+          {isDetecting ? (
+            <><Search className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />{t('detecting')}</>
+          ) : (
+            <><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />{t('detectMyLocation')}</>
+          )}
         </button>
       </div>
 
@@ -151,7 +157,7 @@ const PreciseLocationDemo = () => {
               color: '#1f2937',
               margin: '0'
             }}>
-              📍 Localisation Détectée
+              <MapPin className="inline h-5 w-5 mr-1 align-[-0.15em]" aria-hidden="true" /> Localisation Détectée
             </h3>
             <div style={{
               display: 'flex',
@@ -178,8 +184,7 @@ const PreciseLocationDemo = () => {
             display: 'grid',
             gap: '12px'
           }}>
-            <div>
-              <strong style={{ color: '#374151' }}>📍 Adresse complète:</strong>
+            <div>                <strong style={{ color: '#374151' }}><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Adresse complète:</strong>
               <div style={{
                 marginTop: '4px',
                 padding: '8px',
@@ -197,13 +202,13 @@ const PreciseLocationDemo = () => {
               gap: '12px'
             }}>
               <div>
-                <strong style={{ color: '#374151' }}>🏙️ Ville:</strong>
+                <strong style={{ color: '#374151' }}><Building2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Ville:</strong>
                 <div style={{ fontSize: '14px', marginTop: '2px' }}>
                   {location.city}
                 </div>
               </div>
               <div>
-                <strong style={{ color: '#374151' }}>🏘️ Quartier:</strong>
+                <strong style={{ color: '#374151' }}><Home className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Quartier:</strong>
                 <div style={{ fontSize: '14px', marginTop: '2px' }}>
                   {location.district}
                 </div>
@@ -216,13 +221,13 @@ const PreciseLocationDemo = () => {
               gap: '12px'
             }}>
               <div>
-                <strong style={{ color: '#374151' }}>🌍 Pays:</strong>
+                <strong style={{ color: '#374151' }}><Globe className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Pays:</strong>
                 <div style={{ fontSize: '14px', marginTop: '2px' }}>
                   {location.country}
                 </div>
               </div>
               <div>
-                <strong style={{ color: '#374151' }}>📞 Préfixe:</strong>
+                <strong style={{ color: '#374151' }}><Phone className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Préfixe:</strong>
                 <div style={{ fontSize: '14px', marginTop: '2px' }}>
                   {location.phonePrefix}
                 </div>
@@ -235,13 +240,13 @@ const PreciseLocationDemo = () => {
               gap: '12px'
             }}>
               <div>
-                <strong style={{ color: '#374151' }}>🗺️ Coordonnées:</strong>
+                <strong style={{ color: '#374151' }}><Map className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Coordonnées:</strong>
                 <div style={{ fontSize: '12px', marginTop: '2px', fontFamily: 'monospace' }}>
                   {location.coordinates.lat.toFixed(4)}, {location.coordinates.lng.toFixed(4)}
                 </div>
               </div>
               <div>
-                <strong style={{ color: '#374151' }}>⏱️ Temps:</strong>
+                <strong style={{ color: '#374151' }}><Timer className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Temps:</strong>
                 <div style={{ fontSize: '14px', marginTop: '2px' }}>
                   {detectionTime}ms
                 </div>
@@ -308,7 +313,7 @@ const PreciseLocationDemo = () => {
         fontSize: '12px',
         color: '#0c4a6e'
       }}>
-        <strong>🔬 {t('detectionMethods')} :</strong><br />
+        <strong><Microscope className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('detectionMethods')} :</strong><br />
         1. {t('gpsHighPrecision')}<br />
         2. {t('multiIPGeolocation')}<br />
         3. {t('contextualAnalysis')}<br />

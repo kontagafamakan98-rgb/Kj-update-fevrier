@@ -109,7 +109,6 @@ const NEUTRAL_COUNTRY = Object.freeze({
   code: '',
   name: 'Detected country',
   nameFrench: 'Pays détecté',
-  flag: '🌍',
   phonePrefix: '',
   currency: 'XOF',
   language: 'fr',

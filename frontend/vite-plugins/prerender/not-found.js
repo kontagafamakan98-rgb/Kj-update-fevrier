@@ -1,5 +1,15 @@
 // La page 404 statique : servie par Vercel sans scripts, noindex.
 
+/**
+ * Le NOM de l'artefact, lu des DEUX côtés : le build l'ÉCRIT, et le garde
+ * d'après-build (`scripts/check-prerender-shells.js`) le RELIT pour vérifier
+ * l'équilibre de ses balises. Le nom vit ici, près de ce qui le produit, pour
+ * qu'un artefact renommé ne puisse pas sortir du contrôle en silence — un
+ * fichier que le garde ne lit pas est un fichier dont l'équilibre n'est vérifié
+ * par personne, et c'est exactement l'angle que cette page fermait.
+ */
+export const NOM_DE_LA_PAGE_404 = '404.html';
+
 export function buildNotFoundPage({ T, contact }) {
   // ── Page 404 ────────────────────────────────────────────────
   // Servie par Vercel (statut 404) pour une URL qui ne correspond à

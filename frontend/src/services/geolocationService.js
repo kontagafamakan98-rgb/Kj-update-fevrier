@@ -5,6 +5,7 @@ import { GeolocationCache } from './geolocation-cache';
 import { getGeolocationPermissionState, getCurrentPositionWithOptions, getBestAvailableGpsPosition, TARGET_GPS_ACCURACY } from './geolocation-gps';
 import { fetchIpGeolocationServices } from './geolocation-network';
 import { loadGeographicDatabase, getDatabase, FALLBACK_COUNTRY_DATA } from './geolocation-database';
+import { LANGUAGES } from '../config/languages';
 
 /**
  * MODULE DE GÉOLOCALISATION UNIQUE (fusion de geolocationService.js et
@@ -306,8 +307,7 @@ class PreciseGeolocationService {
       country,
       countryCode: countryCode || fallbackLocationData?.countryCode || '',
       postalCode: address.postcode || '',
-      phonePrefix: countryData?.phonePrefix || fallbackLocationData?.phonePrefix || '',
-      flag: countryData?.flag || fallbackLocationData?.flag || '📍'
+      phonePrefix: countryData?.phonePrefix || fallbackLocationData?.phonePrefix || ''
     };
   }
 
@@ -418,7 +418,6 @@ class PreciseGeolocationService {
       district: firstResult.region || '',
       fullAddress: `${firstResult.city || ''}${firstResult.region ? ', ' + firstResult.region : ''}, ${firstResult.countryName || firstResult.country || ''}`,
       phonePrefix: '',
-      flag: '🌍',
       coordinates: { lat: validatedResult.latitude, lng: validatedResult.longitude },
       accuracy: 0,
       confidence: detectionAccuracy,
@@ -785,7 +784,6 @@ class PreciseGeolocationService {
       code,
       name: data.country,
       nameFrench: data.nameFrench,
-      flag: data.flag,
       phonePrefix: data.phonePrefix,
       currency: data.currency,
       language: data.language
@@ -808,7 +806,6 @@ const NEUTRAL_DETECTED_COUNTRY = Object.freeze({
   code: '',
   name: 'Detected country',
   nameFrench: 'Pays détecté',
-  flag: '🌍',
   phonePrefix: '',
   currency: 'XOF',
   language: 'fr',
@@ -818,7 +815,7 @@ const NEUTRAL_DETECTED_COUNTRY = Object.freeze({
 /**
  * Détecte le pays de l'utilisateur (IP + GPS + réseau).
  * @returns {Promise<object>} Objet pays {detected, code, name, nameFrench,
- * flag, phonePrefix, currency, language} — objet NEUTRE {detected: false}
+ * phonePrefix, currency, language} — objet NEUTRE {detected: false}
  * si la détection échoue (jamais null).
  */
 export const detectUserCountry = async (options = {}) => {
@@ -838,7 +835,6 @@ export const detectUserCountry = async (options = {}) => {
       code: normalizedCountryCode,
       name: location.country || 'Detected country',
       nameFrench: location.country || 'Pays détecté',
-      flag: location.flag || '🌍',
       phonePrefix: location.phonePrefix || '',
       currency: 'XOF',
       language: 'fr'
@@ -849,7 +845,6 @@ export const detectUserCountry = async (options = {}) => {
     code: normalizedCountryCode,
     name: countryData.country,
     nameFrench: countryData.nameFrench,
-    flag: countryData.flag,
     phonePrefix: countryData.phonePrefix,
     currency: countryData.currency,
     language: countryData.language
@@ -861,7 +856,6 @@ export const COUNTRIES = Object.entries(FALLBACK_COUNTRY_DATA).reduce((acc, [cod
     code,
     name: data.country,
     nameFrench: data.nameFrench,
-    flag: data.flag,
     phonePrefix: data.phonePrefix,
     currency: data.currency,
     language: data.language
@@ -871,7 +865,7 @@ export const COUNTRIES = Object.entries(FALLBACK_COUNTRY_DATA).reduce((acc, [cod
 
 /**
  * Liste tous les pays de la base de géolocalisation.
- * @returns {Array<object>} [{code, name, nameFrench, flag, phonePrefix,
+ * @returns {Array<object>} [{code, name, nameFrench, phonePrefix,
  * currency, language}].
  */
 export const getCountriesList = () => {
@@ -879,7 +873,6 @@ export const getCountriesList = () => {
     code,
     name: data.country,
     nameFrench: data.nameFrench,
-    flag: data.flag,
     phonePrefix: data.phonePrefix,
     currency: data.currency,
     language: data.language
@@ -897,7 +890,6 @@ const buildCountryObject = (countryData, code) => {
     code,
     name: countryData.country,
     nameFrench: countryData.nameFrench,
-    flag: countryData.flag,
     phonePrefix: countryData.phonePrefix,
     currency: countryData.currency,
     language: countryData.language
@@ -941,7 +933,6 @@ export const detectCountryFromPhone = (phoneNumber) => {
         code,
         name: data.country,
         nameFrench: data.nameFrench,
-        flag: data.flag,
         phonePrefix: data.phonePrefix,
         currency: data.currency,
         language: data.language
@@ -1042,39 +1033,23 @@ export const getPopularBanksByCountry = (country) => {
   return banks[countryCode] || [];
 };
 
-// Langues disponibles dans l'application
-export const AVAILABLE_LANGUAGES = {
-  'fr': {
-    code: 'fr',
-    name: 'Français',
-    nativeName: 'Français',
-    flag: '🇫🇷'
-  },
-  'en': {
-    code: 'en', 
-    name: 'English',
-    nativeName: 'English',
-    flag: '🇬🇧'
-  },
-  'wo': {
-    code: 'wo',
-    name: 'Wolof',
-    nativeName: 'Wolof',
-    flag: '🇸🇳'
-  },
-  'bm': {
-    code: 'bm',
-    name: 'Bambara',
-    nativeName: 'Bamanankan',
-    flag: '🇲🇱'
-  },
-  'mos': {
-    code: 'mos',
-    name: 'Mooré',
-    nativeName: 'Mòoré',
-    flag: '🇧🇫'
-  }
-};
+// Langues disponibles dans l'application — INDEXÉES par code, et DÉRIVÉES du
+// propriétaire unique (`src/config/languages.js`).
+//
+// Cette table était la QUATRIÈME copie de la liste : les mêmes libellés, écrits
+// une quatrième fois, indexés par code et lus par le contrôle de langue de
+// l'inscription (`RegistrationLanguageSelector`) et par la suggestion de langue
+// d'un pays. Un libellé retouché dans la barre ne l'était donc pas ici, et rien
+// ne rougissait — même défaut que les trois copies que `src/config/languages.js`
+// a fermées, même remède : on ne surveille pas une copie, on la supprime. La
+// FORME attendue par les lecteurs (un accès par code, `AVAILABLE_LANGUAGES[code]`)
+// est conservée, mais elle est désormais CONSTRUITE depuis `LANGUAGES`.
+//
+// L'ordre d'insertion reste celui du propriétaire (fr, en, wo, bm, mos), ce dont
+// dépend `getOrderedLanguagesForCountry` (« les autres langues », dans cet ordre).
+export const AVAILABLE_LANGUAGES = Object.fromEntries(
+  LANGUAGES.map((langue) => [langue.code, langue])
+);
 
 const getLanguageConfigByCountry = (country) => {
   const countryCode = normalizeCountryCode(country?.code || country);
@@ -1139,7 +1114,7 @@ export const getLocalLanguageForCountry = (country) => {
 // Organiser les langues selon le pays détecté (langues recommandées en premier, puis les autres)
 /**
  * Langues ordonnées pour un pays détecté (recommandées d'abord).
- * @returns {Array<object>} [{code, name, flag, isPrimary,
+ * @returns {Array<object>} [{code, name, isPrimary,
  * isCountryLanguage, isRecommended}].
  */
 export const getOrderedLanguagesForCountry = (detectedCountry) => {

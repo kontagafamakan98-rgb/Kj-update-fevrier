@@ -20,7 +20,6 @@ export const COUNTRIES = [
   {
     code: 'mali',
     name: 'Mali',
-    flag: '🇲🇱',
     fullName: 'Mali',
     iso: 'ML',
     color: 'bg-green-100',
@@ -28,7 +27,6 @@ export const COUNTRIES = [
   {
     code: 'senegal',
     name: 'Sénégal',
-    flag: '🇸🇳',
     fullName: 'Sénégal',
     iso: 'SN',
     color: 'bg-yellow-100',
@@ -36,7 +34,6 @@ export const COUNTRIES = [
   {
     code: 'burkina_faso',
     name: 'Burkina Faso',
-    flag: '🇧🇫',
     fullName: 'Burkina Faso',
     iso: 'BF',
     color: 'bg-red-100',
@@ -48,7 +45,6 @@ export const COUNTRIES = [
     // pour vérifier que la coquille publie bien chaque pays). En guillemets
     // doubles, ce pays sortait de la vérification sans que rien ne le dise.
     name: 'Côte d’Ivoire',
-    flag: '🇨🇮',
     fullName: 'Côte d’Ivoire',
     iso: 'CI',
     color: 'bg-orange-100',

@@ -13,6 +13,7 @@ import {
   exemptionsPerimees,
   extractRootHtml,
   missingClasses,
+  raisonRacineProblem,
   runHomeShellCheck,
   visibleText,
 } from '../check-home-shell';
@@ -65,7 +66,9 @@ const SHELL_CSS =
   '.min-h-screen{min-height:100vh}.text-3xl{font-size:1.875rem}.mt-8{margin-top:2rem}' +
   '.md\\:text-5xl{font-size:3rem}.bg-white\\/95{background-color:rgba(255,255,255,.95)}' +
   // Classes des cartes pays de la fixture (le garde exige que chaque classe du
-  // shell existe dans le CSS du build).
+  // shell existe dans le CSS du build), et la classe du JETON de pays — celle
+  // que le garde lit dans src/config/page-sections.js pour savoir où regarder.
+  '.ruban-jeton{display:inline-flex}' +
   '.font-semibold{font-weight:600}.text-gray-900{color:#111827}.text-sm{font-size:.875rem}' +
   '.md\\:text-base{font-size:1rem}' +
   // Classes de la FAÇADE DE CARTE de la fixture — les mêmes que publie la
@@ -86,11 +89,12 @@ function shellBody({ heroTitle = HERO_TITLE, words = FILLER, extra = '', countri
     '<div class="min-h-screen">' +
     `<h1 class="text-3xl md:text-5xl">${heroTitle}</h1>` +
     '<h2>Services populaires</h2>' +
-    // Chaque pays du référentiel est publié comme TITRE DE CARTE : le garde
+    // Chaque pays du référentiel est publié dans un JETON de la liste : le garde
     // exige cette forme-là (une simple mention dans la prose ne prouve pas que
-    // la carte est là).
+    // la liste des pays est là), et la classe du jeton est DÉCLARÉE par
+    // src/config/page-sections.js — la fixture la reprend telle quelle.
     countries
-      .map((name) => `<h3 class="font-semibold text-gray-900 text-sm md:text-base">${name}</h3>`)
+      .map((name) => `<span class="ruban-jeton">${name}</span>`)
       .join('') +
     `<p>${words}</p>` +
     '<a href="/jobs">Voir les emplois</a>' +
@@ -244,6 +248,20 @@ describe('check-home-shell — le shell ne doit pas disparaître', () => {
     expect(run(project).errors.join('\n')).toContain('introuvable');
   });
 
+  // Le même symptôme (une extraction vide) a DEUX causes, et les confondre
+  // envoie sur une fausse piste. MESURÉ le 27/09/2026 : un `</div>` oublié dans
+  // la section des étapes du shell — qui publiait 520 mots — s'est annoncé comme
+  // « #root est VIDE, le shell a disparu (plugin désactivé ?) ». Un navigateur
+  // répare ce document en silence, donc aucune sonde de navigateur ne le voit.
+  it('NOMME le déséquilibre des balises au lieu de la disparition du shell', () => {
+    const project = makeProject({ body: '<div>jamais refermé' });
+    const result = run(project);
+    expect(result.ok).toBe(false);
+    const message = result.errors.join('\n');
+    expect(message).toContain('DÉSÉQUILIBRÉES');
+    expect(message).not.toContain('est VIDE');
+  });
+
   it('échoue si le contenu statique est trop court (page « vide »)', () => {
     const project = makeProject({ body: shellBody({ words: 'trop court' }) });
     expect(run(project).errors.join('\n')).toContain('mots');
@@ -313,17 +331,19 @@ describe('check-home-shell — référentiels partagés', () => {
     expect(run(project).errors.join('\n')).toContain('Burkina Faso');
   });
 
-  it('échoue si le pays n\'est plus publié en CARTE (une mention dans la prose ne suffit pas)', () => {
+  it('échoue si le pays n\'est plus publié dans un JETON (une mention dans la prose ne suffit pas)', () => {
     // Régression réelle : le sous-titre du hero cite les quatre pays, donc une
     // simple recherche du nom dans le HTML était satisfaite même section des
-    // pays supprimée du shell. Le garde exige donc un TITRE DE CARTE (un h3).
+    // pays supprimée du shell. Le garde exige donc le nom DANS un élément qui
+    // porte la classe du jeton de pays — déclarée par le plan, donc il ne peut
+    // pas regarder ailleurs sans le dire.
     const project = makeProject({
       countries: ['Mali'],
       body: shellBody({ countries: [] }),
     });
     const result = run(project);
     expect(result.ok).toBe(false);
-    expect(result.errors.join('\n')).toContain('carte');
+    expect(result.errors.join('\n')).toContain('jeton');
   });
 
   it('gère les apostrophes échappées des noms de pays', () => {
@@ -332,7 +352,7 @@ describe('check-home-shell — référentiels partagés', () => {
     const project = makeProject({
       countries: ['Mali', "Côte d'Ivoire"],
       body: shellBody({
-        extra: '<h3 class="font-semibold text-gray-900 text-sm md:text-base">Côte d\'Ivoire</h3>',
+        extra: '<span class="ruban-jeton">Côte d\'Ivoire</span>',
       }),
     });
     const result = run(project);
@@ -435,6 +455,16 @@ describe('helpers du shell', () => {
     const html = '<body><div id="root"><p>salut</p></div><script></script></body>';
     expect(extractRootHtml(html)).toBe('<p>salut</p>');
     expect(extractRootHtml('<body></body>')).toBe('');
+    // Un `</div>` oublié rend AUSSI une chaîne vide, mais pour une autre
+    // raison — c'est ce que `raisonRacineProblem` distingue.
+    expect(extractRootHtml('<body><div id="root"><div>jamais refermé</div></body>')).toBe('');
+  });
+
+  it('raisonRacineProblem distingue le marqueur absent, la racine vide et le déséquilibre', () => {
+    expect(raisonRacineProblem('<body></body>')).toBe('absent');
+    expect(raisonRacineProblem('<body><div id="root"></div></body>')).toBe('vide');
+    expect(raisonRacineProblem('<body><div id="root"><div>x</div></body>')).toBe('desquilibre');
+    expect(raisonRacineProblem('<body><div id="root"><p>x</p></div></body>')).toBe('present');
   });
 
   it('visibleText retire balises, scripts et styles', () => {

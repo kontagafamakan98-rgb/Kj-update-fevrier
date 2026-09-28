@@ -23,11 +23,11 @@ export default function About() {
   const { t } = useLanguage();
   usePageMeta();
 
-  const { titleKey, introKey, frameClass, titleClass, introClass, cards, highlight, links } =
+  const { titleKey, introKey, frameClass, titleClass, introClass, carteClass, cards, highlight, links } =
     PAGE_SECTIONS['/about'];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen fond-papier">
       {/* La géométrie est LUE dans le plan, jamais recopiée : le plus grand
           texte peint de cette page est le paragraphe d'introduction, donc son
           élément LCP, et une divergence d'un seul côté ré-élit un élément LCP
@@ -36,30 +36,38 @@ export default function About() {
         <h1 className={titleClass}>{t(titleKey)}</h1>
         <p className={introClass}>{t(introKey)}</p>
 
+        {/* Les trois promesses : la carte à filet du vocabulaire éditorial
+            (src/index.css), avec le glyphe dans la pastille ronde des autres
+            listes du site et le titre au dessin serif. Ce qui remplace une
+            carte `rounded-2xl` à ombre large et un titre sans — c'est-à-dire
+            une boîte qui ne disait pas à quelle famille de page elle
+            appartenait. */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           {cards.map((card) => (
-            <div
-              key={card.titleKey}
-              className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm"
-            >
-              <div className="mb-3">
-                <IconePage nom={card.icone} classe={CLASSES_ICONE.carte} />
-              </div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
+            <div key={card.titleKey} className={carteClass}>
+              <span className="pastille-rond mb-4">
+                <IconePage nom={card.icone} classe={CLASSES_ICONE.pastille} />
+              </span>
+              <h2 className="nom-de-ligne mb-2">
                 {t(card.titleKey)}
               </h2>
-              <p className="text-sm text-gray-600">{t(card.descriptionKey)}</p>
+              <p className="note-de-ligne">{t(card.descriptionKey)}</p>
             </div>
           ))}
         </div>
 
-        <div className="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 mb-10">
-          <h2 className="text-xl font-bold text-emerald-900 mb-3">{t(highlight.titleKey)}</h2>
-          <p className="text-emerald-800">{t(highlight.textKey)}</p>
-          <p className="text-emerald-700 mt-3 text-sm">{t(highlight.bulletsKey)}</p>
+        {/* Le bloc de confiance : c'était la DEUXIÈME tache verte du site (le
+            vert d'eau « emerald », la seule teinte qui n'appartenait à aucune
+            gamme de la marque), après celle de /how-it-works. Il prend le
+            panneau du vocabulaire éditorial : fond sable, filet, titre serif,
+            et l'accent orange en bordure plutôt qu'en fond. */}
+        <div className="encart mb-10">
+          <h2 className="titre-section mb-3">{t(highlight.titleKey)}</h2>
+          <p className="text-stone-600">{t(highlight.textKey)}</p>
+          <p className="note-de-ligne mt-3">{t(highlight.bulletsKey)}</p>
         </div>
 
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-stone-500">
           {links.map((link, index) => (
             <Fragment key={link.to}>
               {index > 0 && ' · '}

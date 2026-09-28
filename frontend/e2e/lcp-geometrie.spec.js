@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // harnais partagé : la table unique `src/config/page-meta.js` en est la source,
 // jamais une copie. `geometrie-coquille-react.spec.js` mesure la même chose par
 // l'autre bout (rect, encre, text-align, navbar).
-import { ROUTES, TAILLES, ouvrirLaPage } from './helpers/geometrie.js';
+import { ROUTES, TAILLES, ouvrirLaPage, MARQUEUR_DE_MONTAGE, attendreLaStabilite } from './helpers/geometrie.js';
 import { shellFileFor } from '../scripts/site-meta.js';
 
 /**
@@ -116,8 +116,11 @@ async function relever(browser, chemin, { peinture, viewport }) {
     await page.goto(chemin);
     // Laisse le temps au montage (`first-contentful-paint` déclenche
     // `root.render`, puis le repaint) : une seconde candidate, si elle existe,
-    // est enregistrée ici.
-    await page.waitForTimeout(1000);
+    // apparaît lors de la stabilisation de la page.
+    if (peinture === 'reelle') {
+      await page.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
+    }
+    await attendreLaStabilite(page);
     return await page.evaluate(() => window.__kojoLcp);
   } finally {
     await page.close();

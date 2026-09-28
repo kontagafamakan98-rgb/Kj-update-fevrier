@@ -65,7 +65,12 @@ describe('app-chrome — le chrome est la copie de celui de l’app', () => {
     // coquille ne peut plus peindre une autre géométrie que la page.
     for (const classes of [
       'className="App"',
-      'className="min-h-screen bg-gray-50 relative flex flex-col"',
+      // 28/09/2026 : le fond de l'application prend le SABLE du site
+      // (`fond-sable`, src/index.css) au lieu du gris froid `bg-gray-50`. La
+      // chaîne reste écrite ICI en clair, comme les deux autres : c'est ce qui
+      // fait rougir ce test le jour où l'app change d'habillage sans que la
+      // coquille suive.
+      'className="min-h-screen fond-sable relative flex flex-col"',
       'className="flex-1 pb-24 md:pb-0"',
     ]) {
       expect(APP, `src/App.js ne contient plus ${classes}`).toContain(classes);
@@ -73,7 +78,7 @@ describe('app-chrome — le chrome est la copie de celui de l’app', () => {
     // Et le chrome les publie en HTML (class=, pas className=).
     expect(CHROME_OUVERTURE).toContain('<div class="App">');
     expect(CHROME_OUVERTURE).toContain(
-      '<div class="min-h-screen bg-gray-50 relative flex flex-col">'
+      '<div class="min-h-screen fond-sable relative flex flex-col">'
     );
     expect(CHROME_OUVERTURE).toContain('<main class="flex-1 pb-24 md:pb-0">');
     expect(CHROME_FERMETURE).toBe('</main>');
@@ -206,13 +211,27 @@ describe('app-chrome — l’alignement est EXPLICITE, plus hérité (refonte du
     ).not.toMatch(/\.App\s*\{[^}]*text-align/);
   });
 
-  it('la moitié CENTRÉE du dessin est déclarée là où elle vit : l’accueil', () => {
+  it('la moitié CENTRÉE du dessin est déclarée là où elle vit : la clôture de l’accueil', () => {
     // Relevé du 25/09/2026 : Home.js portait `text-center` 13 fois, et 6 de ses
-    // 7 blocs d'en-tête de section sont centrés par un conteneur
-    // `text-center mb-12`. C'est le dessin écrit — il reste centré sans la règle
-    // héritée, et c'est ce que ce minimum vérifie.
+    // 7 blocs d'en-tête de section étaient centrés par un conteneur
+    // `text-center mb-12` : la page ENTIÈRE était centrée, et c'était écrit.
+    //
+    // La refonte éditoriale du 27/09/2026 a reposé la question et tranché
+    // l'inverse, pour la raison qui avait fait retirer `.App { text-align }` :
+    // une page de lecture se lit à GAUCHE. Le héros se compose en deux colonnes,
+    // les intitulés de section s'alignent sur leur titre, les listes de métiers
+    // et d'étapes se lisent de haut en bas. Reste UN bloc centré — la clôture
+    // orange — et il le déclare là où il vit : la classe `.cta-final-inner` de
+    // src/index.css, portée par la page. C'est ce que ce test exige maintenant :
+    // plus un COMPTE de conteneurs centrés, mais la preuve que le seul bloc
+    // centré de la page porte bien sa déclaration, au lieu de l'hériter.
     const home = lire('src/pages/Home.js');
-    expect(home.match(/text-center/g) || []).toHaveLength(13);
+    expect(home.match(/text-center/g) || []).toHaveLength(1);
+    expect(home, 'la clôture n’utilise plus la classe déclarée').toContain('ctaInnerClass');
+    expect(
+      lire('src/index.css'),
+      'la clôture n’est plus centrée par sa propre classe — la centure serait revenue par héritage ou par un utilitaire, et le dessin de la page ne serait plus écrit quelque part'
+    ).toMatch(/\.cta-final-inner\s*\{[^}]*text-align:\s*center/);
   });
 
   it('la moitié GAUCHE est celle qui ne déclare rien : les pages de contenu', () => {
@@ -280,16 +299,130 @@ describe('les autres reliquats du gabarit dans src/App.css, TRANCHÉS eux aussi'
     // donc éditer `index.css`, le fichier de base, n'aurait rien changé, sans
     // que rien ne le dise. Une duplication ne coûte pas que des octets : elle
     // déplace le propriétaire en silence.
+    // La pile commence par la famille que le SITE SERT (déclarée plus bas par
+    // un `@font-face` local) : une pile qui recommencerait par une police du
+    // système rendrait la même page avec une police différente sur chaque hôte
+    // — c'est mesuré, et c'est ce que le cas suivant verrouille.
     expect(
       INDEX_CSS,
       'src/index.css ne porte plus la pile de polices du site'
-    ).toMatch(/font-family:\s*-apple-system/);
+    ).toMatch(/font-family:\s*'Inter'/);
     const bloc = APP_CSS_SANS_COMMENTAIRES.match(/\bbody\s*\{([^}]*)\}/);
     expect(bloc, 'src/App.css ne déclare plus de bloc `body`').not.toBeNull();
     expect(
       bloc[1],
       'src/App.css re-déclare la typographie de base — le propriétaire est index.css'
     ).not.toMatch(/font-family|margin\s*:/);
+  });
+
+  it('la police de base est SERVIE par le site, jamais empruntée à l’hôte', () => {
+    // ── Pourquoi ce cas existe ──────────────────────────────────────────
+    // La pile de `body` a longtemps commencé par `-apple-system`,
+    // `"Segoe UI"`, `Roboto`… : la même page publiait donc une typographie
+    // DIFFÉRENTE selon l'hôte. Mesuré le 26/09/2026, à classes et à géométrie
+    // d'élément IDENTIQUES : l'aire de l'encre du LCP de /support valait
+    // 9 324 px² sur le poste de mesure contre 7 616 sur le runner Linux (un
+    // plancher à 9 000 passait sur l'un et rougissait sur l'autre), et les
+    // hauteurs de repli de la mise en page différée se déplaçaient de 25,5 px.
+    // Aucune constante mesurée ne peut être juste sur deux hôtes quand la police
+    // n'est pas la même — d'où deux fichiers de police DANS le dépôt.
+    const familles = [...INDEX_CSS.matchAll(/@font-face\s*\{([\s\S]*?)\}/g)].map((m) => m[1]);
+    expect(familles.length, 'src/index.css ne déclare plus aucun @font-face').toBeGreaterThan(0);
+    const fichiers = [];
+    // Les familles dont un FICHIER est servi par le site : ce sont elles qui
+    // doivent une licence, un préchargement et un `size-adjust` de repli.
+    const servies = new Set();
+    const noms = [];
+    for (const bloc of familles) {
+      // UNE famille, jamais une PILE : une pile écrite dans un `@font-face`
+      // ferait résoudre la famille par l'HÔTE, ce que ce cas existe pour
+      // interdire — et c'est exactement le défaut d'origine (une pile qui
+      // commençait par `-apple-system`), déplacé d'un cran. Le nom peut
+      // contenir des espaces ; ce qui est refusé, c'est la virgule.
+      const nom = (bloc.match(/font-family:\s*'([^']+)'/) || [])[1];
+      expect(nom, `un @font-face ne nomme plus UNE famille : ${bloc.slice(0, 60)}`).toBeTruthy();
+      expect(
+        bloc,
+        `le @font-face « ${nom} » déclare une PILE de familles : c'est l'hôte qui déciderait du dessin`
+      ).not.toMatch(/font-family:\s*'[^']+'\s*,/);
+      noms.push(nom);
+      for (const [, url] of bloc.matchAll(/url\('([^']+)'\)/g)) {
+        fichiers.push({ url, latin: /U\+0000-00FF/.test(bloc), famille: nom });
+        servies.add(nom);
+      }
+    }
+    // Et une famille déclarée doit être EMPLOYÉE par la feuille : un
+    // `@font-face` que rien n'applique est un fichier téléchargé pour rien (et
+    // une famille `local()` sans emploi est une règle morte). Le reste de la
+    // feuille, ses déclarations retirées : c'est là que vit l'application —
+    // directement (`body`) ou par la variable qui la nomme (les titres).
+    const cssSansDeclarations = INDEX_CSS.replace(/@font-face\s*\{[\s\S]*?\}/g, '');
+    for (const nom of noms) {
+      expect(
+        cssSansDeclarations,
+        `« ${nom} » est déclarée par un @font-face mais n'est APPLIQUÉE nulle part dans src/index.css : ` +
+          'le fichier serait servi sans jamais peindre',
+      ).toContain(`'${nom}'`);
+    }
+    expect(fichiers.length, 'aucun fichier de police n’est référencé par les @font-face').toBeGreaterThan(0);
+    for (const { url } of fichiers) {
+      expect(url, `la police ${url} n’est pas servie par le site (URL absolue /fonts/ attendue)`).toMatch(
+        /^\/fonts\/[\w.-]+\.woff2$/
+      );
+      expect(
+        fs.existsSync(path.join(FRONTEND, 'public', url)),
+        `src/index.css déclare ${url}, absent de frontend/public/ — le build publierait une police que personne ne peut télécharger`
+      ).toBe(true);
+    }
+    // La licence : l'OFL exige que l'avis accompagne la police redistribuée, et
+    // ELLE PAR FAMILLE — un avis unique pour deux familles couvrirait la
+    // redistribution de l'une en laissant l'autre sans droit. Le nom du fichier
+    // se dérive du nom de la famille, donc une famille ajoutée sans son avis
+    // rougit ici sans qu'on ait à y penser.
+    for (const nom of servies) {
+      const fichier = `LICENSE-${nom.replace(/[^A-Za-z0-9]/g, '')}-OFL.txt`;
+      expect(
+        fs.existsSync(path.join(FRONTEND, 'public', 'fonts', fichier)),
+        `la licence SIL OFL de « ${nom} » a disparu (attendu : public/fonts/${fichier}) — ` +
+          'la redistribution n’est plus couverte'
+      ).toBe(true);
+    }
+    // Le préchargement : la feuille est inlinée AVANT le corps, donc sans lui le
+    // navigateur ne découvre la police qu'après avoir analysé 69 ko de CSS,
+    // c'est-à-dire après le premier paint — le texte serait peint DEUX fois.
+    // Seul le sous-ensemble que TOUTES les pages emploient (celui qui porte
+    // U+0000-00FF : le latin de base, le français compris) est préchargé :
+    // précharger les 85 ko de `latin-ext` pour des pages qui ne l'utilisent pas
+    // serait payer une police pour rien.
+    const INDEX_HTML = lire('index.html');
+    const precharges = [...INDEX_HTML.matchAll(/<link\b[^>]*>/g)]
+      .map((m) => m[0])
+      .filter((balise) => /rel="preload"/.test(balise) && /as="font"/.test(balise))
+      .map((balise) => (balise.match(/href="([^"]+)"/) || [])[1]);
+    // Chaque FAMILLE dont un sous-ensemble couvre U+0000-00FF doit être
+    // préchargée — et il en faut UNE PAR FAMILLE, pas une seule en tout : ce
+    // sous-ensemble porte le texte courant du site ET le titre du héros pour la
+    // police de titrage. Une famille servie sans préchargement est un dessin qui
+    // arrive après le premier paint, c'est-à-dire un remplacement — celui qui
+    // ré-élit l'élément LCP quand il est plus large.
+    for (const nom of servies) {
+      const latin = fichiers.find((f) => f.famille === nom && f.latin);
+      expect(
+        latin,
+        `« ${nom} » n'a aucun @font-face couvrant U+0000-00FF : cette famille n'est jamais préchargée`
+      ).toBeTruthy();
+      expect(
+        precharges,
+        `index.html ne précharge pas ${latin.url} : le dessin de « ${nom} » arriverait après le ` +
+          'premier paint et le texte serait peint deux fois (repli, puis dessin servi)'
+      ).toContain(latin.url);
+    }
+    for (const url of precharges) {
+      expect(
+        fichiers.map((f) => f.url),
+        `index.html précharge ${url}, qu'aucun @font-face ne déclare : une requête pour rien, et le vif du sujet reste non préchargé`
+      ).toContain(url);
+    }
   });
 
   it('et ce qu’App.css apporte VRAIMENT à `body` y est resté', () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Icone } from './chrome-icons';
 
 export default function OfflineIndicator() {
   const { t } = useLanguage();
@@ -37,14 +38,14 @@ export default function OfflineIndicator() {
       {!isOnline ? (
         <div className="bg-red-600 text-white text-center py-2 px-4">
           <div className="flex items-center justify-center space-x-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 5.636l-12.728 12.728m0-12.728l12.728 12.728"></path></svg>
+            <Icone nom="croix" classe="w-4 h-4" />
             <span className="text-sm font-medium">{t('networkOffline')}</span>
           </div>
         </div>
       ) : (
         <div className="bg-green-600 text-white text-center py-2 px-4">
           <div className="flex items-center justify-center space-x-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+            <Icone nom="coche" classe="w-4 h-4" />
             <span className="text-sm font-medium">{t('connectionRestored')}</span>
           </div>
         </div>

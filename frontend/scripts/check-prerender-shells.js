@@ -82,6 +82,11 @@ import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../src/config/phone-f
 import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
 import { photoFormatsLine } from '../src/config/photo-formats.js';
 import { CONTACT } from '../src/config/contact.js';
+// La géométrie des titres n'est PAS recopiée ici : elle est lue dans le plan que
+// lit déjà la coquille (src/config/page-sections.js). Une refonte des titres
+// faisait autrement rougir ce garde en accusant la coquille — c'est ce qui est
+// arrivé le 28/09/2026, où il a fallu le mettre à jour à la main.
+import { PAGE_SECTIONS } from '../src/config/page-sections.js';
 // Table UNIQUE de la correspondance route → carte OG, partagée avec
 // vite.config.js qui écrit ces coquilles : la carte de chaque shell est LUE
 // ici et non recopiée (voir la section « og:image » plus bas).
@@ -93,6 +98,22 @@ import { ROUTES as OG_CARD_ROUTES } from './check-og-images.js';
 // corriger la coquille laissait le garde affirmer l'ancien mot.
 import { makeScopedTranslator as makeRegisterTranslator } from '../src/utils/pack2PageI18n/register.js';
 import { makeScopedTranslator as makeJobsTranslator } from '../src/utils/pack2PageI18n/jobs.js';
+// L'ÉQUILIBRE DES BALISES est UNE règle, et elle est partagée avec le build :
+// vite-plugins/prerender/balises.js refuse la coquille qui ne se referme pas au
+// moment où elle est FABRIQUÉE (les douze pages, avant écriture) ; ce garde
+// relit les mêmes fichiers APRÈS le build. Deux lectures, une seule règle —
+// deux implémentations auraient fini par diverger sur un cas limite, ce qui est
+// exactement la façon dont un contrôle devient aveugle sans que personne ne le
+// voie. La table des pages (PAGE_META) est lue ici pour que le NOMBRE de
+// fichiers vérifiés soit DÉRIVÉ des routes déclarées, jamais écrit en dur :
+// ajouter une page pré-rendue demain doit rendre ce garde exigeant, pas un peu
+// plus court.
+import { desequilibresDesBalises, decrireDesequilibre } from '../vite-plugins/prerender/balises.js';
+import { PAGE_META } from '../src/config/page-meta.js';
+// Les deux artefacts bâtis hors des routes : leurs noms viennent des modules
+// qui les écrivent, jamais d'une liste tenue ici.
+import { NOM_DU_GABARIT_APP } from '../vite-plugins/prerender/app-template.js';
+import { NOM_DE_LA_PAGE_404 } from '../vite-plugins/prerender/not-found.js';
 
 // ── L'ALIGNEMENT NE SE CENTRE PLUS PAR HÉRITAGE : c'est la refonte ──────────
 // `.App { text-align: center }` a été RETIRÉE de src/App.css le 25/09/2026 : le
@@ -240,7 +261,7 @@ if (app) {
 // 2. jobs.html : shell h1 statique + og:image dédié.
 const jobs = read('jobs.html');
 if (jobs) {
-  if (!jobs.includes(`<h1 class="text-3xl font-bold text-gray-900">${jobsT('availableJobs')}</h1>`)) {
+  if (!jobs.includes(`<h1 class="${PAGE_SECTIONS['/jobs'].titleClass}">${jobsT('availableJobs')}</h1>`)) {
     errors.push('jobs.html : shell h1 « Emplois disponibles » ABSENT de #root');
   }
   if (!jobs.includes(NAV_PLACEHOLDER)) {
@@ -253,14 +274,17 @@ const login = read('login.html');
 if (login) {
   // Titre de PAGE en h1 (et non h2) : une page doit avoir UN h1, identique
   // pour un crawler sans JavaScript et pour celui qui exécute le bundle.
-  if (!login.includes(`<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">${fr.login}</h1>`)) {
+  // 28/09/2026 : le titre de page passe au dessin serif du site
+  // (`titre-page`, src/index.css) — la chaîne d'ici suit le balisage LIVRÉ
+  // (vite-plugins/prerender/shells-routes.js), jamais l'inverse.
+  if (!login.includes(`<h1 class="mt-6 text-center titre-page">${fr.login}</h1>`)) {
     errors.push('login.html : h1 « Connexion » absent du shell');
   }
   if (!login.includes('id="email"')) {
     errors.push('login.html : champ e-mail absent du shell');
   }
-  // Le bouton est un `<button>` : `[type="submit"]` (src/styles/
-  // kojo-pack-f-readability-no-color.css) porte `min-height: 48px` quand un
+  // Le bouton est un `<button>` : `[type="submit"]` (l'en-tête de
+  // src/index.css) porte `min-height: 48px` quand un
   // `<div>` s'arrêtait à 36-40 px — la sonde de géométrie refusait l'écart.
   if (!login.includes(`bg-orange-600">${fr.login}</button>`)) {
     errors.push('login.html : bouton Connexion (bg-orange-600) absent du shell');
@@ -277,7 +301,10 @@ if (login) {
 // 4. register.html : shell formulaire (mode client) + modulepreload du chunk.
 const register = read('register.html');
 if (register) {
-  if (!register.includes(`<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">${registerT('title')}</h1>`)) {
+  // Même passe : la TEINTE seule change sur cette page (le titre garde sa
+  // taille — le passer au serif élisait le `<h1>` comme élément LCP en desktop,
+  // voir le commentaire de src/pages/Register.js).
+  if (!register.includes(`<h1 class="mt-6 text-center text-3xl font-bold text-stone-900">${registerT('title')}</h1>`)) {
     errors.push('register.html : h1 « Créer un compte » absent du shell');
   }
   // Le bouton Google est CONDITIONNEL : il n'est publié que si le client_id
@@ -371,13 +398,16 @@ if (register) {
 // 4bis. forgot-password.html : shell formulaire étape email (par défaut).
 const forgot = read('forgot-password.html');
 if (forgot) {
-  if (!forgot.includes(`<h1 class="mt-6 text-3xl font-extrabold text-gray-900">${fr.forgotPasswordPageTitle}</h1>`)) {
+  if (!forgot.includes(`<h1 class="mt-6 text-3xl font-bold text-stone-900">${fr.forgotPasswordPageTitle}</h1>`)) {
     errors.push('forgot-password.html : h1 « Mot de passe oublié » absent du shell');
   }
   if (!forgot.includes('id="reset-email"')) {
     errors.push('forgot-password.html : champ e-mail (reset-email) absent du shell');
   }
-  if (!forgot.includes('bg-blue-600 px-4 py-2 text-sm font-semibold text-white')) {
+  // Le bouton du formulaire prend l'orange de la marque (il était bleu, la
+  // seule teinte du site qui n'appartenait à personne) — même forme, même
+  // hauteur, seule la couleur change.
+  if (!forgot.includes('bg-orange-600 px-4 py-2 text-sm font-semibold text-white')) {
     errors.push('forgot-password.html : bouton « Envoyer le code » (bg-blue-600) absent du shell');
   }
   if (!/<link rel="modulepreload"[^>]*href="[^"]*ForgotPassword-[^"]*\.js"/.test(forgot)) {
@@ -389,7 +419,7 @@ if (forgot) {
 // (état par défaut, sans contexte de mission).
 const payment = read('payment.html');
 if (payment) {
-  if (!payment.includes(`<h1 class="text-3xl font-bold text-gray-900 mb-2">${fr.paymentPageTitle}</h1>`)) {
+  if (!payment.includes(`<h1 class="titre-page mb-2">${fr.paymentPageTitle}</h1>`)) {
     errors.push('payment.html : h1 « KOJO Paiements réels » absent du shell');
   }
   if (!payment.includes(fr.paymentPageNoJobTitle)) {
@@ -418,7 +448,7 @@ if (payment) {
 // pour un crawler sans JavaScript.
 const howItWorks = read('how-it-works.html');
 if (howItWorks) {
-  if (!howItWorks.includes(`<h1 class="text-3xl md:text-4xl font-bold mb-4">${fr.howItWorksTitle}</h1>`)) {
+  if (!howItWorks.includes(`<h1 class="${PAGE_SECTIONS['/how-it-works'].heroTitleClass}">${fr.howItWorksTitle}</h1>`)) {
     errors.push('how-it-works.html : h1 « Comment ça marche ? » absent du shell');
   }
   if (!howItWorks.includes('<details')) {
@@ -471,7 +501,7 @@ if (contact) {
 
 const support = read('support.html');
 if (support) {
-  if (!support.includes(`<h1 class="text-3xl font-bold text-gray-900 mb-2">${fr.support}</h1>`)) {
+  if (!support.includes(`<h1 class="titre-page mb-2">${fr.support}</h1>`)) {
     errors.push('support.html : h1 « Support » absent du shell');
   }
   if (!support.includes(fr.supportTrackTitle)) {
@@ -712,6 +742,65 @@ for (const violation of apostrophesHorsConvention(surfacesApostrophe)) {
   );
 }
 
+// 9. L'ÉQUILIBRE DES BALISES de CHAQUE page pré-rendue.
+//
+// Le défaut mesuré le 27/09/2026 (un `</div>` manquant dans la section des
+// étapes du shell d'accueil) était INVISIBLE à toutes les sondes de navigateur :
+// le parseur HTML répare — un `</section>` dont la section est en portée referme
+// d'abord les `div` restés ouverts — donc la parité de hauteur, celle du texte
+// et le CLS restaient verts (113/113) pendant que le document publié était
+// bancal. Le défaut n'existe que pour qui LIT le document.
+//
+// Ce contrôle portait alors sur l'accueil, et seulement sur lui (c'est là que le
+// défaut avait été trouvé). Il porte maintenant sur les DOUZE pages pré-rendues,
+// et le compte est DÉRIVÉ de la table (`src/config/page-meta.js`) : une page
+// ajoutée à la table sans être lue ici est signalée, parce qu'une page qui
+// échappe à la boucle est une page dont l'équilibre n'est vérifié par personne.
+//
+// Le build refuse DÉJÀ ces coquilles (vite-plugins/prerender/balises.js) : ce
+// second passage ne le remplace pas, il porte sur l'ARTEFACT — un `build/`
+// restauré d'un cache, un fichier réécrit à la main, un plugin débrayé ne
+// passent pas par la fabrique, et c'est l'artefact qui part en production.
+//
+// ET LES DEUX ARTEFACTS QUI NE SONT PAS DES ROUTES (28/09/2026) : le gabarit
+// des routes privées et la 404 statique sont bâtis par le MÊME plugin, écrits
+// dans le MÊME `build/`, et lus par personne jusqu'ici. Leurs NOMS ne sont pas
+// écrits ici : ils sont importés des modules qui les produisent
+// (`app-template.js`, `not-found.js`), si bien qu'un artefact renommé reste
+// dans la boucle au lieu d'en sortir en silence — un `build/404.html` disparu
+// ne serait pas seulement un document non vérifié, ce serait une URL inconnue
+// servie sans page d'erreur.
+{
+  const artefactsHorsRoutes = [NOM_DU_GABARIT_APP, NOM_DE_LA_PAGE_404];
+  const pagesPreRendues = ['index.html', ...prerenderedPages];
+  const pagesDeclarees = Object.keys(PAGE_META);
+  // Le compte attendu est DÉRIVÉ : les pages de la table, plus les artefacts
+  // hors routes que ces deux modules déclarent. Une page soustraite à la table
+  // comme un artefact renommé rougissent ici, au lieu de raccourcir le contrôle.
+  const attendus = pagesDeclarees.length + artefactsHorsRoutes.length;
+  if (pagesPreRendues.length + artefactsHorsRoutes.length !== attendus) {
+    errors.push(
+      `équilibre des balises : ${pagesPreRendues.length} page(s) pré-rendue(s) lue(s) dans ` +
+        `build/ pour ${pagesDeclarees.length} déclarée(s) dans src/config/page-meta.js — ` +
+        'les pages absentes de cette boucle ne sont vérifiées par personne ' +
+        `(déclarées : ${pagesDeclarees.join(', ')})`
+    );
+  }
+  for (const fichier of [...pagesPreRendues, ...artefactsHorsRoutes]) {
+    const contenu = read(fichier);
+    if (!contenu) continue; // read() a déjà refusé le fichier manquant
+    for (const probleme of desequilibresDesBalises(contenu)) {
+      errors.push(
+        `build/${fichier} : ${decrireDesequilibre(probleme)} — un document déséquilibré n'est PAS ` +
+          'une erreur visible : le parseur le RÉPARE en silence, donc aucune sonde de navigateur ' +
+          'ne peut le voir (ni la parité de hauteur, ni celle du texte, ni le CLS). Le défaut ' +
+          "n'existe que pour qui LIT la page : un crawler sans JavaScript, un lecteur " +
+          "d'accessibilité, l'extraction du `#root`"
+      );
+    }
+  }
+}
+
 if (errors.length) {
   console.error('❌ Pré-rendu par route invalide — ' + errors.length + ' problème(s) :');
   for (const e of errors) console.error('  ' + e);
@@ -719,6 +808,8 @@ if (errors.length) {
 }
 console.log(
   `✅ Pré-rendu par route intact : shell d'accueil dans index.html, shells statiques vérifiés, ` +
+    `les ${Object.keys(PAGE_META).length} pages pré-rendues aux balises ÉQUILIBRÉES, ` +
+    `plus les ${NOM_DU_GABARIT_APP} et ${NOM_DE_LA_PAGE_404} (hors routes) lus avec la même règle, ` +
     `et les ${prerenderedPages.length} pages pré-rendues (${prerenderedPages.join(', ')}) ` +
     `sont routées par vercel.json (sans catch-all : URL inconnue → 404). Fiches /jobs/:id servies ` +
     `par le backend (GET /api/og/jobs/{id}).`

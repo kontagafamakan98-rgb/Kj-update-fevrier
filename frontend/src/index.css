@@ -1,17 +1,343 @@
-﻿@import './styles/kojo-pack-g-mobile-premium-no-color.css';
-@import './styles/kojo-pack-f-readability-no-color.css';
-@import './styles/kojo-pack-c-pwa-capacitor.css';
-@import './styles/kojo-pack-b-dashboard-jobs-profile.css';
-@import './styles/kojo-pack-a-auth-landing.css';
+/* ══ CE QUI RESTE DES CINQ `kojo-pack-*.css` (28/09/2026) ═══════════════════
+
+   Cinq feuilles importées ici portaient 292 lignes d'un système de design
+   ÉTRANGER au site : 39 noms de classes (`card`, `panel`, `badge`, `hero`,
+   `toast`, `overlay`…), des attributs `[data-screen="…"]` que le produit n'écrit
+   nulle part, et deux palettes froides (`--kojo-premium-*`, `--kojo-c-*`, dont un
+   fond `#0f172a`). MESURÉ : aucun élément livré ne porte un seul de ces noms
+   (0 occurrence de `[data-screen]`, 0 de `.card`), donc aucune de ces règles ne
+   pouvait rien peindre — et le garde de sélecteurs ne le voyait pas, parce qu'il
+   comptait les noms n'importe où dans l'artefact : `card` n'était « porté » que
+   par `<meta name="twitter:card">`, `dialog` par l'attribut `role="dialog"`,
+   `overlay` par le code de Leaflet, `header` par un en-tête HTTP de Sentry,
+   `toast` par une variable, et `dashboard`/`settings`/`jobs` par les noms de
+   routes. Les feuilles sont supprimées, et le corpus du garde ne retient plus
+   que les POSITIONS DE CLASSE (scripts/css-selecteurs-morts.js).
+
+   Ce qui suit est ce qui, dans ces 292 lignes, était RÉELLEMENT peint : des
+   déclarations sur des ÉLÉMENTS (`html`, `body`, `h1`, `p`, `input`, `button`,
+   `*`), qui n'ont pas besoin d'un porteur de classe pour agir. Elles sont
+   recopiées À L'IDENTIQUE et À CETTE PLACE (avant `@tailwind base`, exactement
+   là où les `@import` étaient) : la cascade ne bouge donc pas d'un iota — une
+   déclaration d'élément déplacée plus bas l'emporterait sur des règles du site
+   qui la battaient jusqu'ici. Rien d'autre n'est repris : les règles de classes
+   mortes sont parties avec les feuilles, et c'est tout l'objet de la passe. */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: contain;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+p,
+label,
+small,
+li {
+  line-height: 1.6;
+}
+
+input,
+select,
+textarea {
+  min-height: 48px;
+}
+
+button,
+[role="button"],
+[type="button"],
+[type="submit"] {
+  min-height: 48px;
+  padding-inline: 16px;
+}
+
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+@media (max-width: 768px) {
+  h1 { font-size: clamp(1.8rem, 5vw, 2.3rem); }
+  h2 { font-size: clamp(1.25rem, 4vw, 1.6rem); }
+  p, label, small, li { font-size: 0.98rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── LA POLICE DU SITE EST AUTO-HÉBERGÉE (26/09/2026) ──────────────────────
+   La pile ci-dessous commençait par les polices DU SYSTÈME (`-apple-system`,
+   `Segoe UI`, `Roboto`…) : la même page était donc rendue avec une police
+   DIFFÉRENTE selon l'hôte — mesuré le 26/09/2026, une aire de LCP variait de
+   18 % entre le poste de mesure et le runner Linux de la CI (/support desktop :
+   9 324 px² contre 7 616, à boîte d'élément identique), et les hauteurs de repli
+   de la mise en page différée (`src/App.css`) se déplaçaient de 25,5 px sur le
+   runner. Aucune constante mesurée ne peut être juste sur deux hôtes quand la
+   police n'est pas la même : elle est donc FOURNIE par le site.
+
+   POURQUOI INTER : c'est déjà la famille que le code nommait
+   (`CountryChangePopup.js`), sa licence permet la redistribution (SIL OFL 1.1,
+   texte publié à côté des fichiers : `public/fonts/LICENSE-Inter-OFL.txt`), et
+   elle couvre les cinq dictionnaires du projet (fr, en, bm, mos, wo).
+
+   DEUX FICHIERS ET PAS HUIT : les fichiers servis par Google sont VARIABLES
+   (`font-weight: 100 900`), donc un seul fichier couvre les quatre graisses du
+   site (400, 500, 600, 700) — une requête au lieu de quatre. Le `unicode-range`
+   est celui de Google, recopié ici : le navigateur ne télécharge QUE le
+   sous-ensemble dont la page a besoin. `latin` couvre le français (`é`, `à`,
+   `ç`, `’`), `latin-ext` les caractères que nos dictionnaires bambara/mooré/
+   wolof emploient (`œ`, `ɛ`, `ɔ`, `ŋ`) — une page sans ces caractères ne
+   télécharge pas le second fichier.
+
+   LE NOM DU FICHIER EST LA VERSION : `/fonts/` est servi en cache immuable d'un
+   an (`vercel.json`, comme `/icons/`) — remplacer un fichier par une autre
+   police exige donc un NOUVEAU NOM, sinon les navigateurs garderont l'ancien
+   pendant un an sans que rien ne le dise.
+
+   `font-display: swap` : le premier paint ne bloque pas sur la police (le
+   fichier est préchargé par la balise `rel="preload" as="font"` du head de
+   `index.html`, donc il arrive avec le HTML) ; l'effet sur le LCP et le CLS est
+   mesuré, pas supposé.
+   Les polices système restent en REPLI derrière Inter : les glyphes qu'Inter ne
+   couvre pas (cyrillique, grec, arabe d'une annonce publiée par l'API) sont
+   rendus par elles, et non par une case vide.
+
+   MAIS `swap` VEUT DIRE PEINDRE DEUX FOIS, et c'est ce que la face suivante
+   atténue : voir « LE REPLI EST ALIGNÉ SUR LE DESSIN D'INTER », juste après. */
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/fonts/inter-variable-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+        U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/fonts/inter-variable-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+        U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+        U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+        U+A720-A7FF;
+}
+
+/* ── LE REPLI EST ALIGNÉ SUR LE DESSIN D'INTER ────────────────────────────
+
+   `font-display: swap` et le préchargement réduisent la probabilité d'un
+   remplacement, ils ne l'annulent pas : sur une liaison froide et lente, le
+   fichier arrive après le premier paint, et le texte se remet en page. C'est le
+   CLS de la police, et il est MESURÉ, jamais supposé — sonde du 28/09/2026
+   (Chromium 412×823, SEULES les requêtes `/fonts/*.woff2` retardées de 1 500 ms,
+   donc tout décalage est attribuable au remplacement et à rien d'autre) :
+   /how-it-works 0,0016, /login 0,0014, / 0,0006, /about 0,0002, chaque décalage
+   nommé par ses nœuds SOURCES — tous des nœuds de TEXTE.
+
+   Pourquoi il y a quelque chose à aligner : Inter est plus LARGE que les
+   familles que l'hôte substitue. Mesuré à 100 px sur la même phrase
+   (« Services et travailleurs… — 0123456789 ») : Inter 3 829,64 px, contre
+   3 601,86 px pour Arial (6,32 % de moins) et 3 538,78 px pour Segoe UI
+   (8,22 % de moins) — et les boîtes diffèrent aussi (Inter asc 97 / desc 24,
+   hauteur de ligne 121 px ; Arial 91/21, 115 px ; Segoe UI 108/25, 133 px).
+   Sans correction, le texte peint dans le repli se remet en page à l'arrivée du
+   fichier : c'est exactement le décalage mesuré ci-dessus.
+
+   AUCUNE CONSTANTE N'EST RECOPIÉE. `size-adjust` vient du rapport des largeurs
+   mesurées (100 × 3 829,64 / 3 601,86 = 106,32 %). Les deux `override` sont
+   RÉSOLUS, pas dérivés : la face candidate est mesurée à `ascent-override:
+   100 %` puis `200 %`, la pente relevée (1,07 px par point) dit que
+   `size-adjust` s'applique AUSSI aux override dans ce moteur, et la constante
+   est celle qui rend la BOÎTE D'INTER (asc 97 / desc 24 à 100 px, donc
+   91,2 % et 22,6 % du corps ajusté ; le `line-gap` d'Inter est nul, d'où 0 %).
+
+   `Liberation Sans` est déclarée pour les hôtes Linux, où elle REMPLACE Arial :
+   sa table d'avances est identique à celle d'Arial — c'est sa raison d'être —,
+   donc la même constante y vaut. Une famille absente de l'hôte est simplement
+   ignorée par `local()`, d'où un `src` en cascade et une seule face.
+
+   Ce que cette face NE couvre PAS, et qui reste OUVERT : Roboto (Android,
+   ChromeOS) et les familles exotiques de la pile de `body`. Elles ne sont pas
+   mesurables ici, donc elles ne sont pas alignées : le comportement y reste
+   celui d'avant (aucune régression), et c'est consigné comme tel. */
+@font-face {
+    font-family: 'Inter repli Arial';
+    src: local('Arial'), local('Liberation Sans'), local('Helvetica');
+    size-adjust: 106.32%;
+    ascent-override: 91.2%;
+    descent-override: 22.6%;
+    line-gap-override: 0%;
+}
+
+/* ── LA POLICE DE TITRAGE ──────────────────────────────────────────────────
+
+   Elle est SERVIE par le site, pour la raison exacte qui a fait servir Inter :
+   une famille empruntée à l'hôte rendrait les aires mesurées non portables
+   d'un poste à l'autre (cf. la puce « la police du site est servie par le
+   site » dans src/config/page-sections.js). Ce qui change par rapport à Inter,
+   c'est ce qu'elle expose : elle peint le TITRE DU HÉROS de l'accueil, qui EST
+   l'élément LCP de « / ». Une famille servie en `swap` se peint donc après le
+   premier paint, sur l'élément même dont on mesure l'aire.
+
+   Deux réponses, et il faut les DEUX :
+
+     • LE PRÉCHARGEMENT (index.html, comme Inter). La feuille est inlinée AVANT
+       le corps : sans lui, le fichier ne serait découvert qu'après l'analyse
+       du CSS, donc après le premier paint.
+
+     • LE REPLI EST DIMENSIONNÉ POUR CE DESSIN. Cormorant Garamond est plus
+       ÉTROIT qu'un serif de système — mesuré à 100 px, gras, sur le titre du
+       héros (sonde du 27/09/2026, Chromium) : 2 335,70 px contre 2 535,70 px
+       pour la famille Times/DejaVu/Liberation (rapport 1,086) et 3 060,89 px
+       pour Georgia (rapport 1,310). Sans correction, un repli peint avant
+       l'arrivée du fichier serait de 9 % à 31 % PLUS LARGE, et un
+       remplacement plus large RÉ-ÉLIT l'élément LCP à la bascule. Les deux
+       faces `local()` portent donc le `size-adjust` MESURÉ qui les ramène à
+       la largeur du dessin servi (100/1,086 = 92,1 % ; 100/1,310 = 76,3 %) :
+       un titre se replie sur le même nombre de lignes avec ou sans le fichier.
+       `size-adjust` agit sur les contours ET les métriques, mais les titres
+       portent une `line-height` SANS UNITÉ — la hauteur de ligne ne dépend
+       donc d'aucune métrique de police, et c'est la LARGEUR, elle seule, qui
+       pouvait déplacer quelque chose.
+
+   Trois fichiers, deux sous-ensembles et deux replis : le fichier « latin » est
+   préchargé (toutes les pages en ont besoin), « latin-ext » porte œ, ŋ, ɛ, ɔ
+   des dictionnaires bambara/mooré/wolof et n'est téléchargé que si un titre en
+   emploie un. */
+@font-face {
+    font-family: 'Cormorant Garamond';
+    font-style: normal;
+    font-weight: 500 700;
+    font-display: swap;
+    src: url('/fonts/cormorant-garamond-variable-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+        U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+        U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Cormorant Garamond';
+    font-style: normal;
+    font-weight: 500 700;
+    font-display: swap;
+    src: url('/fonts/cormorant-garamond-variable-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+        U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+        U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+        U+A720-A7FF;
+}
+
+/* Les deux REPLIS, chacun avec SES constantes : une famille locale ne peut
+   porter qu'un `size-adjust`, et Georgia n'a pas la largeur de la famille
+   Times.
+
+   LA LARGEUR NE SUFFISAIT PAS, ET C'EST MESURÉ. Le `size-adjust` seul alignait
+   le NOMBRE DE LIGNES (la raison pour laquelle il est là), mais pas la BOÎTE de
+   la police : le texte se remettait en page VERTICALEMENT — la ligne de base
+   d'un repli dont l'ascendante diffère se déplace DANS la même boîte. Sonde du
+   28/09/2026 (Chromium 412×823, seules les requêtes `cormorant-*.woff2`
+   retardées de 1 500 ms, donc tout décalage est du remplacement de la police de
+   titrage) : 0,0005 sur / et /how-it-works, 0,0003 sur /login, 0,0002 sur
+   /about — chaque décalage nommé par un NŒUD DE TEXTE de TITRE (« Trouvez un
+   travailleur d… », « Comment ça marche ? », « À propos de Kojo »), et AUCUN
+   par un texte de corps. Les boîtes mesurées à 100 px le disent :
+   Cormorant Garamond asc 92 / desc 29 (hauteur 121 px), repli Times 82 / 20
+   (106 px), repli Georgia 70 / 17 (87 px).
+
+   Les deux `override` rendent donc la boîte du repli ÉGALE À CELLE DU DESSIN
+   SERVI, par la même arithmétique que la face d'Inter ci-dessus (la constante
+   divisée par le `size-adjust` de la face, parce que celui-ci s'applique aussi
+   aux override : 100/0,921 = 99,9 % puis 31,5 % ; 100/0,763 = 120,6 % puis
+   38,0 % — le `line-gap` de Cormorant est nul, d'où 0 %). Les deux boîtes
+   valent alors (99,9 + 31,5) × 0,921 = 121 px et (120,6 + 38,0) × 0,763 =
+   121 px, soit la hauteur mesurée de Cormorant Garamond.
+
+   CE QUE LES OVERRIDE LAISSENT, ET POURQUOI ÇA NE SE RÈGLE PAS PAR UNE
+   CONSTANTE. Après correction, les deux familles retardées de 1 500 ms :
+   / 0,0000 · /about 0,0000 · /jobs 0,0000 ; /how-it-works 0,0004 et /login
+   0,0003 en mobile (412×823), 0,0003 et 0,0001 en desktop (1350×940), plus
+   /support 0,0034 en desktop — tous SOUS les plafonds publiés, et tous encore
+   nommés par un nœud de TITRE. La trace dit ce qui bouge, et ce n'est plus la
+   boîte : les deux replis mesurent 92 / 29 / 121 px, la boîte EXACTE de
+   Cormorant, mais sur /how-it-works « Le paiement séquestre… » tient sur UNE
+   ligne dans le repli et en prend DEUX dans le dessin servi — la matière
+   suivante descend alors de 27 px, et c'est le résidu.
+   Un `size-adjust` unique ne peut pas l'égaler partout, parce que le rapport
+   des LARGEURS dépend de la phrase. Mesuré sur 48 titres réels, à leur corps et
+   leur graisse (canvas, Chromium 412×823), le rapport Cormorant ÷ repli Times
+   va de 1,027 à 1,126, soit un `size-adjust` équivalent de 88,8 % à 97,4 %,
+   médiane 94,3 % — deux glyphes de FIGURE sortant de la plage (« 4 » 100,9 %,
+   « + » 130,5 %) : un dessin ne se met pas à l'échelle d'un autre glyphe à
+   glyphe. 92,1 % EST LA VALEUR DU TITRE DU HÉROS, et c'est un choix : cet
+   élément est le LCP de « / », au-dessus de la ligne de flottaison, et sa boîte
+   — suivie à part, avant et après le remplacement — est INCHANGÉE (380×104,06
+   px en mobile, 640×171,33 en desktop). Deux constantes de rechange ont été
+   essayées sans reconstruire (feuille réécrite dans le document servi, AVANT
+   analyse du corps) : à 94,3 % (la médiane) et à 96,4 % (la valeur qui annule
+   le retour à la ligne de /how-it-works), le héros tient encore, mais AUCUNE ne
+   domine — 96,4 % annule /how-it-works et /login en mobile, laisse /support
+   desktop à 0,0037 et fait apparaître 0,0001 sur « / » à t=336 ms, donc AVANT
+   le remplacement : du bruit de mise en page, pas de la police. Re-ancrer la
+   constante sur le résidu d'une page qui ne porte pas le LCP de l'accueil
+   échangerait une parité GARANTIE contre un zéro du jour. */
+@font-face {
+    font-family: 'Cormorant Garamond repli Times';
+    src: local('Times New Roman'), local('Liberation Serif'), local('DejaVu Serif');
+    size-adjust: 92.1%;
+    ascent-override: 99.9%;
+    descent-override: 31.5%;
+    line-gap-override: 0%;
+}
+
+@font-face {
+    font-family: 'Cormorant Garamond repli Georgia';
+    src: local('Georgia');
+    size-adjust: 76.3%;
+    ascent-override: 120.6%;
+    descent-override: 38%;
+    line-gap-override: 0%;
+}
+
 body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-        "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
-        "Helvetica Neue", sans-serif;
+    /* 'Inter repli Arial' passe AVANT les familles de l'hôte : elle est le même
+       dessin à la bonne largeur, donc le remplacement ne déplace plus le texte.
+       Ce qui suit ne sert plus qu'aux hôtes où ni Arial, ni Liberation Sans, ni
+       Helvetica n'existent (Android, ChromeOS), et aux glyphes hors du fichier
+       servi. */
+    font-family: 'Inter', 'Inter repli Arial', -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans",
+        "Droid Sans", "Helvetica Neue", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -51,32 +377,16 @@ code {
         --chart-5: 27 87% 67%;
         --radius: 0.5rem;
     }
-  .dark {
-        --background: 0 0% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 0 0% 3.9%;
-        --card-foreground: 0 0% 98%;
-        --popover: 0 0% 3.9%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 0 0% 9%;
-        --secondary: 0 0% 14.9%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 0 0% 14.9%;
-        --muted-foreground: 0 0% 63.9%;
-        --accent: 0 0% 14.9%;
-        --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 14.9%;
-        --input: 0 0% 14.9%;
-        --ring: 0 0% 83.1%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-    }
+
+    /* LE BLOC `.dark` A ÉTÉ RETIRÉ ICI (28/09/2026), et c'est le garde de
+       sélecteurs qui l'a nommé : aucun élément livré ne porte la classe `dark`,
+       et AUCUN code ne l'ajoute (`grep -rn "'dark'" src/` est vide) — donc ses
+       vingt-trois variables ne pouvaient rien peindre. C'était le même défaut de
+       forme que les cinq `kojo-pack-*.css` supprimés le même jour : un sélecteur
+       qu'aucun porteur ne peut satisfaire. Il portait en outre une palette
+       étrangère au site — un thème sombre shadcn (fond `3.9%`) et un
+       `--chart-4: 280 65% 60%`, c'est-à-dire un VIOLET, dans un produit dont la
+       charte en refuse. */
 }
 
 
@@ -88,6 +398,1628 @@ code {
   body {
     @apply bg-background text-foreground;
     }
+}
+
+/* ── LE SOCLE D'INTERACTION ET DE TYPOGRAPHIE ────────────────────────────────
+
+   Ce bloc ferme cinq trous MESURÉS du socle, relevés le 27/09/2026 en comptant
+   les occurrences dans les sept feuilles servies (`App.css`, `index.css` et les
+   cinq packs) : `:focus-visible` 0, `::selection` 0, `color-scheme` 0,
+   `font-variant-numeric` 0, `text-wrap` 1. Autrement dit : l'anneau de focus
+   n'existait que là où un composant l'écrivait (79 utilitaires `focus:*` sur des
+   centaines de contrôles), la sélection restait le bleu du navigateur, et les
+   montants en XOF n'étaient pas alignés d'une carte à l'autre.
+
+   POURQUOI ICI, ET POURQUOI SANS CLASSES. Ces règles ne nomment AUCUNE classe ni
+   aucun id : elles portent sur des éléments (`h1`, `p`, `table`) et des
+   pseudo-classes (`:focus-visible`, `::selection`). C'est le critère de
+   `scripts/check-css-selecteurs-morts.js`, qui refuse une classe ou un id servi
+   sans porteur : un socle qui n'en nomme aucun ne peut pas lui ajouter de dette,
+   et il protège par construction les composants qui ne déclarent rien. Elles
+   vivent dans la couche `base`, donc les UTILITAIRES gardent la main partout où
+   un composant a une intention plus précise — un `focus-visible:ring-*` existant
+   continue de gagner, et ce bloc ne sert que de repli.
+
+   `color-scheme: light` : le site est CLAIR. Sans cette déclaration, un poste
+   réglé en mode sombre rendait les contrôles natifs (champs, cases, barres de
+   défilement) en sombre au milieu d'une page blanche — le navigateur ne devine
+   pas, il suit la préférence du système quand on ne la lui donne pas. Le thème
+   `.dark` de `index.css` n'est atteint par AUCUN code (`darkMode: ['class']` et
+   personne ne pose la classe) : cette déclaration aligne donc le rendu natif sur
+   le seul thème que le site serve.
+
+   L'ANNEAU DE FOCUS est posé sur l'extérieur de l'élément (`outline-offset`) :
+   il se dessine donc sur le FOND DE LA PAGE, pas sur la surface du contrôle.
+   C'est ce qui le rend lisible aussi bien autour d'un bouton orange plein (un
+   anneau orange SUR un bouton orange ne se voit pas) que dans un champ. La
+   teinte est volontairement plus sombre que l'orange de marque, et l'anneau ne
+   coûte rien à la mise en page : `outline` ne participe pas à la boîte.
+
+   `text-wrap: balance` sur les titres évite la ligne orpheline d'un titre sur
+   deux lignes ; `pretty` sur la prose évite la dernière ligne d'un seul mot.
+   Les deux sont ignorées sans dommage par un navigateur plus ancien.
+
+   `scroll-margin-top` : la navbar est COLLANTE (65 px). Une ancre de titre
+   (`#faq`, `#etapes`) se posait donc DERRIÈRE elle — le lien menait au bon
+   endroit et le titre restait caché. La marge vaut la hauteur de la navbar plus
+   la respiration qui la sépare du contenu.
+
+   `font-variant-numeric: tabular-nums` : Kojo est un produit de MONTANTS (XOF
+   partout). En chiffres proportionnels, chaque `1` est plus étroit qu'un `8` :
+   une colonne de prix bouge d'un caractère quand un montant passe de 12 500 à
+   88 000. L'arbitrage est assumé — les chiffres tabulaires d'Inter sont
+   légèrement plus larges en prose — parce que la comparaison de montants est le
+   geste central du produit, et que le repli d'un texte ne dépend jamais de la
+   largeur d'un chiffre isolé. */
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid #c2410c;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: #fed7aa;
+    color: #7c2d12;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p,
+  li {
+    text-wrap: pretty;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    scroll-margin-top: 5rem;
+  }
+
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ── LE RACCORD ENTRE DEUX PAGES EST UNE TRANSITION DE VUE NATIVE ───────────
+
+   Question posée le 27/09/2026 : le site change de page D'UN COUP — l'ancienne
+   peinture disparaît, la nouvelle apparaît, sans rien qui relie les deux. Les
+   composants ne peuvent pas le faire : un `<div>` qui s'efface ne connaît pas la
+   peinture qui s'en va. Le navigateur, lui, la connaît.
+
+   Deux branches, la MÊME animation :
+     • navigation INTERNE (SPA) — les liens du chrome passent par
+       `components/LienVue.js`, qui ouvre lui-même `document.startViewTransition`
+       (la propriété `viewTransition` de React Router n'agit qu'avec un routeur de
+       DONNÉES, et le site monte un `<BrowserRouter>` : mesurée inerte le
+       27/09/2026) : le navigateur photographie la page sortante, peint l'entrante
+       dans le même appel, et anime les deux pseudo-arbres `::view-transition-old/new`
+       ci-dessous ;
+     • navigation DOCUMENT À DOCUMENT (`@view-transition { navigation: auto }`) —
+       le cas des ouvertures dans un nouvel onglet et des visiteurs sans
+       JavaScript : c'est le même raccord, demandé par la feuille au lieu de
+       l'être par un script.
+
+   POURQUOI CES DEUX ANIMATIONS-LÀ. La sortie est un simple effacement (180 ms) :
+   ce qui s'en va n'a pas à se déplacer, le regard le quitte. L'entrée est une
+   montée de 6 px qui se dissout (220 ms) avec la courbe d'accélération du site :
+   assez pour dire « une nouvelle page arrive », assez peu pour ne jamais
+   retarder la lecture ni donner l'impression que le site « glisse ».
+
+   CE QUI N'EST PAS ANIMÉ, ET C'EST LA GARANTIE : ni la géométrie, ni le CLS. Le
+   navigateur anime des PHOTOGRAPHIES des deux peintures — la mise en page réelle
+   est déjà faite des deux côtés quand l'animation commence, et elle ne reçoit
+   aucune propriété transformée. Un navigateur sans `startViewTransition` ignore
+   simplement tout ce bloc : la navigation reste instantanée, comme avant.
+   `prefers-reduced-motion` éteint les deux animations (voir le bloc en fin de
+   feuille) : un visiteur qui a coupé les animations reçoit un changement de page
+   immédiat, et c'est ce que la règle du dépôt exige. */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: kojo-vue-sortie 0.18s ease-out both;
+}
+
+::view-transition-new(root) {
+  animation: kojo-vue-entree 0.22s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+}
+
+@keyframes kojo-vue-sortie {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes kojo-vue-entree {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+/* ── LA COUCHE ÉDITORIALE ───────────────────────────────────────────────────
+
+   Ce qu'elle remplace. Le corps des pages publiques était une accumulation
+   d'utilitaires Tailwind choisis un par un : chaque carte inventait son rayon,
+   chaque titre sa taille, et rien ne reliait une section à la suivante. Le
+   regard n'y trouvait ni repère ni rythme — beaucoup de boîtes, aucune page.
+
+   Ce qu'elle ajoute est un vocabulaire FERMÉ : une poignée de classes, un jeu
+   de variables, une seule échelle de titres. Le même bloc est lu par les DEUX
+   canaux (React et les coquilles pré-rendues) puisqu'il vit dans la feuille
+   commune, donc la bascule coquille → React ne déplace rien.
+
+   Ce qui décide, et ce qui ne décide pas :
+     • l'ORANGE reste l'identité du site ; il porte maintenant l'ACCENT (le
+       sur-titre, le survol d'une carte, l'anneau de focus) au lieu de servir
+       de fond à tout, et le texte passe à une gamme CHAUDE (encre, sable,
+       filets) : une page imprimée, pas un tableau de bord.
+     • les RAYONS se resserrent (8 px au lieu de 16) et les OMBRES larges
+       cèdent la place à un FILET de 1 px : c'est la marque de fabrique d'une
+       mise en page éditoriale, et c'est aussi ce qui distingue une carte d'un
+       bouton.
+     • les FONDS alternés quittent le gris froid pour un papier et un sable
+       chauds — deux variables, aucune propriété de mise en page.
+     • l'échelle de titres est UNIQUE et fluide (`clamp`), donc un titre de
+       section ne rétrécit plus à 25 px sur mobile pour remonter à 30 px sur
+       desktop par palier.
+
+   LA POLICE DE TITRAGE, ELLE, A ÉTÉ AJOUTÉE APRÈS MESURE (27/09/2026) — et la
+   première version de cette note concluait l'INVERSE, ce qui est écrit ici pour
+   que la raison du renversement ne se reperde pas. L'argument d'alors était
+   juste sur le mécanisme : une seconde famille servie en `swap` se peint APRÈS
+   le premier paint du titre qui porte le LCP de l'accueil, et un remplacement
+   PLUS GRAND ré-élit l'élément LCP, ce qui fait entrer toute la chaîne
+   JavaScript dans le graphe de Lantern. Ce qui manquait n'était pas un
+   raisonnement mais un CHIFFRE : le paragraphe ci-dessus décrit ce que coûte un
+   remplacement trop large, et le remède mesuré existe — préchargement du
+   fichier (il n'est plus découvert après l'analyse de la feuille inlinée) et
+   repli du système `size-adjust`é sur la largeur du dessin servi (il n'est plus
+   plus large, donc il ne peut plus ré-élire). Le caractère éditorial ne vient
+   donc pas SEULEMENT du rythme : un titre serré en sans, au-dessus d'une prose
+   en sans, reste une page de tableau de bord ; c'est le CONTRASTE des deux
+   dessins qui fait la page. Ce qui n'a PAS été acheté pour autant : aucune
+   taille, aucune `line-height` et aucun poids ne bougent — les titres gardent
+   l'échelle fluide et les interlignes mesurés, donc les constantes du dépôt
+   (aires de `src/config/page-sections.js`, `contain-intrinsic-size` de
+   `src/App.css`, hauteurs de `scripts/style-layout-budgets.cjs`) décrivent
+   toujours la même mise en page. Seul le DESSIN change, et le seul endroit où
+   il pouvait déplacer quelque chose — la largeur, donc le repli des titres —
+   est mesuré ci-dessous et dans `e2e/lcp-geometrie-declaree.spec.js`.
+
+   CE QUE LA MESURE A DONNÉ (27/09/2026), protocole ENTRELACÉ du dépôt, deux
+   artefacts du MÊME build — le document livré, et le même document dont on a
+   retiré la famille, son préchargement et son application aux titres, donc
+   l'état d'AVANT, titres en Inter :
+
+     • LCP DE L'ACCUEIL, minimum de 8 tours : MOBILE (412×823, cpu×4) 348 ms
+       sans la police, 364 ms avec (+16 ms) ; DESKTOP (1350×940, cpu×1) 116 ms
+       contre 120 ms (+4 ms). Dans les DEUX cas le FCP vaut le LCP : la police
+       ne retarde pas la SÉLECTION de l'élément, elle décale la PEINTURE du
+       document — c'est le prix de 37 640 o en priorité haute.
+     • PARITÉ COQUILLE/REACT : intacte, et c'est ce qui était à prouver. L'aire
+       de l'élément élu est IDENTIQUE de part et d'autre (32 010 px² sur mobile,
+       90 375 px² sur desktop, une seule candidate, horodatée au premier paint),
+       les cinq sondes de LCP, de géométrie et de texte passent ENSEMBLE —
+       **113/113** — et le CLS de « / » est mesuré 0,0000 sur les DEUX canaux et
+       les DEUX tailles.
+     • LE REPLI, éprouvé en le RENDANT NÉCESSAIRE : la réponse du fichier est
+       retardée de 2,5 s pour forcer le repli à peindre (`document.fonts.check`
+       rend `false` AVANT, donc c'est bien lui qui a peint), puis la boîte du
+       `<h1>` est relue à l'arrivée du fichier. Avec les deux faces
+       `size-adjust`ées : **0 px** de déplacement (114,2 px avant, 114,2 px
+       après). Sans elles, le même document se déplace de **−57,1 px** — une
+       ligne de titre qui disparaît à l'arrivée de la police, exactement le
+       remplacement qui ré-élit l'élément LCP quand il va dans l'autre sens.
+     • CE QU'ELLE DÉPLACE QUAND MÊME, et qui a été re-mesuré pour ça : sur
+       desktop le titre du héros tient en DEUX lignes au lieu de trois (la
+       famille est plus étroite) ; la hauteur du document, elle, ne bouge pas
+       d'un pixel (4 826 px, la valeur publiée — la détente du `letter-spacing`
+       de la même passe et le dessin plus étroit s'annulent exactement) ; sur
+       mobile une section différée perd 27,1 px et sa constante a été
+       re-mesurée (`src/App.css`, §7) ; et le préchargement ajoute UN nœud par
+       page (`scripts/style-layout-budgets.cjs`).
+
+   La dernière règle est une GARANTIE, pas une décoration : le socle des
+   formulaires ne touche QUE des propriétés sans effet sur la mise en page
+   (couleur, fond, rayon, couleur de filet). Réécrire une largeur de bordure y
+   ferait grandir chaque champ de 2 px, sur des pages dont les hauteurs sont
+   des constantes mesurées (voir App.css, `contain-intrinsic-size`). */
+:root {
+  --kojo-encre: #1c1917;
+  --kojo-encre-douce: #5c554d;
+  --kojo-filet: #e6e1d7;
+  --kojo-sable: #f7f3ec;
+  --kojo-papier: #fffdf9;
+  /* La CRÈME et le BRUN : les deux teintes de l'orange du héros et du ruban.
+     La crème porte le bouton principal et l'accent du titre (« #fff7ed » sur
+     « #ea580c » mesure 4,9:1, donc lisible en petit), le brun porte la bande
+     des pays (« #7c2d12 », contraste 10,4:1 avec le blanc). */
+  --kojo-creme: #fff7ed;
+  --kojo-brun: #7c2d12;
+  --kojo-serif: 'Cormorant Garamond', 'Cormorant Garamond repli Times',
+    'Cormorant Garamond repli Georgia', Georgia, serif;
+  --kojo-orange: #ea580c;
+  --kojo-orange-fonce: #c2410c;
+  --kojo-ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+
+  /* ── LE RYTHME ÉDITORIAL (28/09/2026) ──────────────────────────────────────
+
+     Cinq pas, et rien d'autre : le site n'écrit plus d'espace « au cas où ».
+     Chaque pas est FLUIDE (`clamp`) parce qu'une échelle fixe fait deux choses
+     de plus en plus fausses en s'éloignant du format pour lequel elle a été
+     choisie : trop serrée sur un grand écran (les blocs se collent) et trop
+     large sur un téléphone (une section vide un écran et demie). Les bornes
+     sont des valeurs CHOISIES, pas des restes de l'ancien rythme
+     (`py-12 md:py-16`, `p-6`, `mb-4` écrits en littéral) — et les tables de
+     structure et d'aire du LCP, qui sont des mesures, sont re-mesurées à
+     chaque fois qu'un de ces pas bouge.
+       • `page`   — ce qu'un cadre de page laisse avant son premier bloc ;
+       • `section`— le pas vertical ENTRE deux sections (le pas qui fait lire
+         une longue page comme un sommaire) ;
+       • `tete`   — ce qu'un en-tête (titre de page ou d'entrée de section)
+         laisse avant le corps qu'il annonce ;
+       • `bloc`   — l'espace DANS un groupe (titre → phrase, texte → actions) ;
+       • `carte`  — le rembourrage intérieur d'une carte de contenu. */
+  --rythme-page: clamp(2.5rem, 2rem + 2vw, 4rem);
+  --rythme-section: clamp(3.75rem, 3rem + 3vw, 6.5rem);
+  --rythme-tete: clamp(2rem, 1.6rem + 1.6vw, 3.5rem);
+  --rythme-bloc: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
+  --rythme-carte: clamp(1.375rem, 1.2rem + 0.7vw, 2rem);
+}
+
+/* ── LES TROIS CLASSES DU RYTHME ────────────────────────────────────────────
+
+   Elles portent le pas, jamais le dessin : une section qui change de pas ne
+   change ni son fond ni son contenu, et une carte qui change de rembourrage ne
+   change pas son filet. Les deux canaux les lisent par construction (elles sont
+   déclarées dans `src/config/page-sections.js` et recopiées À L'IDENTIQUE dans
+   les coquilles pré-rendues, où `exigerCorpsDeclare` REFUSE un build qui en
+   oublie une) : la géométrie des deux peintures reste donc identique sans
+   qu'aucune des deux ne recalcule rien. */
+.section-publique {
+  padding-block: var(--rythme-section);
+}
+
+.cadre-page {
+  padding-block: var(--rythme-page);
+}
+
+.carte-publique {
+  padding: var(--rythme-carte);
+}
+
+/* Le SUR-TITRE : la petite ligne espacée qui annonce ce qui vient. Elle remplace
+   les pastilles `rounded-full` des sections — une pastille se lit comme une
+   étiquette de produit, un sur-titre se lit comme un chapeau de chapitre. */
+.sur-titre {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--kojo-orange-fonce);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.sur-titre::before {
+  width: 1.5rem;
+  height: 1px;
+  background-color: currentColor;
+  content: "";
+}
+
+/* La variante du sur-titre pour le fond orange du héros : l'orange foncé y
+   disparaîtrait (`--kojo-orange-fonce` sur `#ea580c`, contraste 1,3:1). La
+   teinte est dérivée de la crème plutôt que choisie à l'œil : `#ffe4cf` sur
+   `#ea580c` mesure 4,85:1, donc lisible même en petit et en capitales. */
+.sur-titre-clair {
+  color: #ffe4cf;
+}
+
+/* Le TITRE DU HÉROS : un cran au-dessus du titre de page, et la mesure
+   `clamp` remplace les trois paliers responsives écrits à la main — l'échelle
+   progresse désormais continûment au lieu de sauter deux fois.
+   La couleur est blanche parce que ce titre vit sur le fond orange. */
+.titre-heros {
+  color: #fff;
+  font-family: var(--kojo-serif);
+  font-size: clamp(2rem, 1.25rem + 3.4vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+/* Le TITRE DE SECTION et le TITRE DE PAGE : une seule échelle, un seul dessin.
+   Le `text-wrap: balance` évite la ligne orpheline d'un titre replié en deux. */
+.titre-section {
+  color: var(--kojo-encre);
+  font-family: var(--kojo-serif);
+  font-size: clamp(1.5rem, 1.05rem + 2vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.titre-page {
+  color: var(--kojo-encre);
+  font-family: var(--kojo-serif);
+  font-size: clamp(1.875rem, 1.4rem + 2.2vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+
+/* La CARTE : un filet, pas une ombre. `cliquable` n'ajoute que ce qui répond au
+   survol d'une carte qui mène quelque part — une carte informative n'a rien à
+   promettre, donc elle ne porte pas cette classe. */
+.carte-editoriale {
+  background-color: var(--kojo-papier);
+  border: 1px solid var(--kojo-filet);
+  border-radius: 0.5rem;
+}
+
+.carte-editoriale-cliquable {
+  transition:
+    border-color 0.18s var(--kojo-ease),
+    box-shadow 0.18s var(--kojo-ease),
+    transform 0.18s var(--kojo-ease);
+}
+
+.carte-editoriale-cliquable:hover {
+  border-color: var(--kojo-orange);
+  box-shadow: 0 14px 30px -22px rgba(28, 25, 23, 0.5);
+  transform: translateY(-2px);
+}
+
+/* Un PANNEAU qui flotte au-dessus du contenu (centre de notifications, menus
+   du sélecteur de pays et de langue) : la carte à filet, plus une élévation
+   douce. Elle existe parce qu'une carte posée sur le papier n'a rien à dire de
+   plus, alors qu'un panneau superposé doit se détacher du texte qu'il recouvre
+   — et l'ombre large d'un panneau (`shadow-2xl`) faisait un halo froid, une
+   tache grise sur l'encre chaude du site. */
+.carte-flottante {
+  background-color: var(--kojo-papier);
+  border: 1px solid var(--kojo-filet);
+  border-radius: 0.5rem;
+  box-shadow: 0 18px 40px -28px rgba(28, 25, 23, 0.45);
+}
+
+/* Les deux FONDS du rythme de page. Ils remplacent l'alternance
+   `bg-white` / `bg-gray-50` des sections : le gris froid jurait avec l'encre
+   chaude du texte, et c'est l'alternance qui donne à une longue page son pas.
+   Aucune propriété de mise en page ici : changer un fond ne déplace rien. */
+.fond-papier {
+  background-color: var(--kojo-papier);
+}
+
+.fond-sable {
+  background-color: var(--kojo-sable);
+}
+
+/* ══ LE LANGAGE ÉDITORIAL DE L'ACCUEIL ══════════════════════════════════════
+
+   Deuxième passe, 27/09/2026. La première (les classes ci-dessus) a retiré le
+   gris froid et les pastilles de produit ; celle-ci donne à la page son
+   ÉCHELLE et son PAS — un héros en deux colonnes, des sections qui s'annoncent
+   par un sur-titre et un titre serif, des listes en LIGNES plutôt qu'en grille
+   de cartes, un panneau de confiance qui met l'illustration du séquestre au
+   même rang que le texte, et une clôture orange qui porte l'ornement du site.
+
+   TROIS RÈGLES, tenues par tout ce qui suit :
+     • aucun gris froid — l'encre, le filet et les fonds restent chauds, comme
+       le texte (`--kojo-encre` sur `--kojo-papier`) ;
+     • aucun texte dans cette feuille — ces classes DESSINENT une boîte, elles
+       n'écrivent rien, donc la provenance du texte (scripts/
+       shell-text-provenance.js) n'a pas à les connaître ;
+     • le dessin est lu par les DEUX canaux : les coquilles pré-rendues portent
+       ces mêmes classes, déclarées une fois dans src/config/page-sections.js.
+
+   L'essentiel des valeurs de boîte (hauteurs minimales, `clamp`, paliers) est
+   repris de la maquette de refonte : ce sont des mesures de dessin, pas des
+   mesures de page. */
+
+/* ── Les BOUTONS ────────────────────────────────────────────────────────────
+
+   Un rayon de 3 px (et non une pilule), une hauteur minimale de 52 px — la
+   cible tactile du site est de 44 px, celle-ci la dépasse pour un bouton qui
+   porte l'action principale —, et un seul geste au survol : la boîte se lève,
+   son ombre s'allume en orange. La flèche qui suit un libellé avance de 3 px.
+   Le pointeur GROSSIER (tactile) ne reçoit ni levée ni ombre : sur un écran
+   tactile, l'état de survol colle après l'appui et fait clignoter le bouton.
+   `prefers-reduced-motion` reçoit le dessin immobile. */
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  min-height: 3.25rem;
+  padding: 0 1.5rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    transform 0.22s var(--kojo-ease),
+    background-color 0.22s var(--kojo-ease),
+    border-color 0.22s var(--kojo-ease),
+    color 0.22s var(--kojo-ease),
+    box-shadow 0.22s var(--kojo-ease);
+}
+
+.bouton svg {
+  flex: none;
+  transition: transform 0.22s var(--kojo-ease);
+}
+
+.bouton:hover svg {
+  transform: translateX(3px);
+}
+
+/* Sur le fond orange du héros : crème, et l'anneau de la levée reste lisible. */
+.bouton-creme {
+  background-color: var(--kojo-creme);
+  color: var(--kojo-orange-fonce);
+}
+
+.bouton-contour {
+  border-color: rgba(255, 255, 255, 0.55);
+  background-color: transparent;
+  color: #fff;
+}
+
+.bouton-contour:hover {
+  border-color: var(--kojo-creme);
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Sur fond CLAIR : le contour de filet, encre, qui vire à l'orange au survol.
+   C'est le pendant de `bouton-contour` (qui vit sur l'orange), et il manquait :
+   une action SECONDAIRE sur une page claire n'avait que des utilitaires pour se
+   dessiner, donc chaque page réinventait son bouton — `rounded-xl` ici,
+   `shadow-md` là, un contour froid ailleurs (les quatre actions du tableau de
+   bord, mesurées le 28/09/2026).
+   Le contour est porté par la FEUILLE, pas par un utilitaire : `.bouton` pose
+   déjà `border-color: transparent`, et une feuille non posée dans une couche
+   l'emporte sur les utilitaires de Tailwind — même raison que
+   `.bande-page .titre-page` plus haut. */
+.bouton-clair {
+  border-color: var(--kojo-filet);
+  background-color: var(--kojo-papier);
+  color: var(--kojo-encre);
+}
+
+.bouton-clair:hover {
+  border-color: var(--kojo-orange);
+  color: var(--kojo-orange-fonce);
+}
+
+/* Sur fond clair : l'encre du site, qui vire à l'orange au survol. */
+.bouton-encre {
+  background-color: var(--kojo-encre);
+  color: #fff;
+}
+
+.bouton-encre:hover {
+  background-color: var(--kojo-orange);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bouton:hover {
+    box-shadow: 0 10px 23px rgba(234, 88, 12, 0.22);
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bouton,
+  .bouton svg {
+    transition: none;
+  }
+
+  .bouton:hover,
+  .bouton:hover svg {
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+/* Le LIEN EN LIGNE : petit, en capitales espacées, suivi d'une flèche qui
+   avance. C'est le troisième niveau d'action de la page, après les boutons et
+   les lignes cliquables. */
+.lien-fleche {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--kojo-orange-fonce);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lien-fleche svg {
+  transition: transform 0.18s var(--kojo-ease);
+}
+
+.lien-fleche:hover svg {
+  transform: translateX(3px);
+}
+
+.lien-fleche-clair {
+  color: var(--kojo-creme);
+}
+
+/* ── LE HÉROS ───────────────────────────────────────────────────────────────
+
+   Le fond orange de Kojo est CONSERVÉ : c'est l'identité du site, et aucune
+   refonte ne se paie d'un changement de marque. Ce qui change, c'est la
+   composition — un texte tenu à gauche, une illustration encadrée à droite,
+   et sous les deux un ruban qui nomme les pays.
+
+   Le titre et le sous-titre gardent leurs classes de géométrie (`.titre-heros`,
+   `.heros-lead`) parce que le titre est l'élément LCP de « / » et que la
+   coquille pré-rendue peint la même boîte avant le JavaScript : tout ce qui
+   touche à leur mesure est mesuré, pas choisi (voir src/config/page-sections.js). */
+.heros-grille {
+  display: grid;
+  gap: var(--rythme-tete);
+  align-items: center;
+  margin-inline: auto;
+  max-width: 80rem;
+  /* Le héros prend le PAS DE SECTION, comme les sections qu'il précède : c'est
+     ce qui fait du premier écran le premier temps du rythme, et non un bloc à
+     part. Avant, il portait ses propres valeurs (3,5 rem puis 5 rem), donc la
+     page changeait de pas dès la première bascule de largeur. */
+  padding-block: var(--rythme-section);
+  padding-inline: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .heros-grille {
+    grid-template-columns: 1.12fr 0.88fr;
+    padding-inline: 2rem;
+  }
+}
+
+.heros-copie {
+  max-width: 40rem;
+}
+
+/* Le sous-titre du héros : une phrase de lecture, pas un titre. Elle est plus
+   pâle que le blanc du titre, sans descendre sous le contraste (5,1:1 mesuré
+   sur `#ea580c`). */
+.heros-lead {
+  max-width: 34rem;
+  margin-bottom: var(--rythme-bloc);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+
+@media (min-width: 768px) {
+  .heros-lead {
+    font-size: 1.1875rem;
+  }
+}
+
+/* La seconde moitié du titre, celle que le plan découpe sur la virgule (voir
+   `couperLeTitre` dans src/config/page-sections.js) : le serif passe en
+   italique et prend la crème du fond. C'est le seul ornement typographique de
+   la page, et il ne coûte aucun mot : les deux moitiés sont le MÊME texte du
+   dictionnaire, coupé une seule fois pour les deux canaux. */
+.accent-heros {
+  color: var(--kojo-creme);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.heros-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.875rem;
+  /* Les deux boutons du héros se lisent comme UNE rangée : l'écart reste donc
+     sous le pas de groupe (0,875 rem, la mesure de la maquette) — le rythme
+     s'arrête devant les commandes, il ne les écarte pas. */
+}
+
+.heros-reperes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-top: var(--rythme-bloc);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.875rem;
+}
+
+.heros-reperes > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* L'ILLUSTRATION ENCADRÉE. Le fichier est un SVG de 960 × 720, sur un fond
+   crème : le poser tel quel sur l'orange du héros salirait ses teintes claires.
+   Il reçoit donc son propre sol (papier), un cadre qui se décale derrière lui
+   et une ombre portée — la vignette se lit comme une image posée sur la page,
+   pas comme un aplat de plus. Aucun texte : la note de la maquette portait une
+   phrase française écrite à la main, et un texte ne s'invente pas ici (la
+   provenance du texte appartient au dictionnaire). */
+.cadre-illustration {
+  position: relative;
+  justify-self: center;
+  width: min(100%, 27rem);
+}
+
+.cadre-fond {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.75rem;
+}
+
+.cadre-image {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  background-color: var(--kojo-papier);
+  box-shadow: 0 24px 48px -28px rgba(69, 26, 3, 0.75);
+}
+
+/* ── LE RUBAN DES PAYS ──────────────────────────────────────────────────────
+
+   La section « pays couverts » était quatre cartes à drapeau sur un fond
+   papier : la même information, à la même place, mais lue comme une grille de
+   produits. Elle devient une BANDE sombre qui longe le héros — l'étiquette à
+   gauche, les quatre jettons à droite — et se lit comme une portée, pas comme
+   une liste.
+
+   Le brun profond (`--kojo-brun`, l'orange 900 de la marque) descend d'un cran
+   sous l'orange du héros : c'est ce qui fait qu'on lit DEUX bandes et non une
+   seule tache. Le contraste du texte y est de 10,4:1. */
+.ruban-pays {
+  background-color: var(--kojo-brun);
+}
+
+.ruban-etiquette {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ffd9b8;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ruban-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 1.5rem 1rem;
+}
+
+@media (min-width: 1024px) {
+  .ruban-inner {
+    padding-inline: 2rem;
+  }
+}
+
+.ruban-jetons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ruban-jeton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem 0.375rem 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* ── LES LISTES EN LIGNES ───────────────────────────────────────────────────
+
+   Les métiers et les étapes étaient des GRILLES DE CARTES identiques : dix
+   boîtes de même taille pour dix métiers (les plus nommés et les plus rares au
+   même rang visuel), trois boîtes pour trois étapes. Une liste en lignes dit ce
+   qu'une grille cache : ce sont des ENTRÉES, elles se lisent de haut en bas, et
+   leur ordre est une information. C'est le dessin de la maquette de refonte,
+   repris ici sur la palette du site.
+
+   Le filet supérieur est porté par la liste entière, le filet inférieur par
+   chaque ligne : deux lignes voisines ne dessinent jamais deux filets collés. */
+.liste-editoriale {
+  border-top: 1px solid var(--kojo-filet);
+}
+
+/* Les dix métiers tiennent sur deux colonnes à partir de la tablette : en une
+   seule, la liste ferait 900 px de haut pour dix lignes de 86 px, et
+   repousserait tout ce qui suit hors de portée. */
+@media (min-width: 768px) {
+  .liste-editoriale-colonnes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 3rem;
+    border-top: 0;
+  }
+
+  .liste-editoriale-colonnes > .ligne-editoriale:nth-child(odd) {
+    border-top: 1px solid var(--kojo-filet);
+  }
+}
+
+
+.ligne-editoriale {
+  display: grid;
+  align-items: center;
+  gap: 0.875rem;
+  border-bottom: 1px solid var(--kojo-filet);
+  text-decoration: none;
+  transition:
+    background-color 0.18s var(--kojo-ease),
+    padding 0.18s var(--kojo-ease);
+}
+
+/* Métiers : pastille, nom, flèche. Pas de colonne de numéro : un numéro de
+   ligne est un TEXTE publié, et le dictionnaire n'en porte pas pour les dix
+   métiers — l'inventer ici publierait un chiffre sans propriétaire (voir la
+   règle de provenance). L'ordre se lit à la lecture. */
+.ligne-metier {
+  grid-template-columns: 2.5rem minmax(0, 1fr) 1.25rem;
+  min-height: 4.5rem;
+}
+
+/* Étapes : numéro, pastille, texte, flèche — QUATRE colonnes pour quatre
+   enfants. Trois colonnes déclarées pour quatre enfants faisaient passer la
+   flèche à la ligne suivante de la grille, et chaque étape mesurait 500 px au
+   lieu de 104 : mesuré au navigateur le 27/09/2026 (section « Comment ça
+   marche » à 1 629 px au lieu de 508, même compte dans les deux canaux — donc
+   la faute était dans la feuille, pas dans un canal). */
+.ligne-etape {
+  grid-template-columns: 2.25rem 2.75rem minmax(0, 1fr) 1.25rem;
+  gap: 1.125rem;
+  min-height: 6.5rem;
+}
+
+@media (min-width: 1024px) {
+  .ligne-etape {
+    min-height: 7.5rem;
+  }
+}
+
+.pastille-rond {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background-color: var(--kojo-sable);
+  color: var(--kojo-orange-fonce);
+}
+
+/* L'étape COURANTE d'un parcours : la pastille du site dans l'orange de la
+   marque. Elle existe parce qu'une pastille sable ne se distingue pas de la
+   suivante, or un parcours doit dire OÙ l'on est. */
+.pastille-courante {
+  background-color: var(--kojo-orange);
+  color: var(--kojo-creme);
+}
+
+.pastille-rond-creuse {
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--kojo-filet);
+  background-color: transparent;
+}
+
+.nom-de-ligne {
+  color: var(--kojo-encre);
+  font-family: var(--kojo-serif);
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+@media (min-width: 768px) {
+  .nom-de-ligne {
+    font-size: 1.5rem;
+  }
+}
+
+.note-de-ligne {
+  color: var(--kojo-encre-douce);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+
+.fleche-de-ligne {
+  color: #b9a696;
+  transition:
+    color 0.18s var(--kojo-ease),
+    transform 0.18s var(--kojo-ease);
+}
+
+.ligne-editoriale:hover .fleche-de-ligne,
+.ligne-editoriale:focus-visible .fleche-de-ligne {
+  color: var(--kojo-orange);
+  transform: translate(2px, -2px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ligne-editoriale:hover {
+    background-color: rgba(255, 255, 255, 0.7);
+    padding-inline: 0.75rem;
+  }
+}
+
+.ligne-editoriale:hover .pastille-rond {
+  background-color: #fde9d6;
+}
+
+/* L'EN-TÊTE DE SECTION : un sur-titre, un titre serif, une phrase. Une seule
+   largeur de lecture pour les trois, sinon la phrase part se promener sous la
+   moitié droite de la page. */
+.entree-section {
+  max-width: 46rem;
+  margin-bottom: var(--rythme-tete);
+}
+
+/* Le sur-titre, le titre et la phrase de l'entrée sont TROIS pas du rythme, pas
+   trois marges écrites à la main : 0,75 rem du sur-titre au titre (ils forment
+   un seul objet), puis le pas de groupe avant la phrase. Le palier de 1 024 px
+   qui doublait la marge a disparu avec le `clamp` du jeton — une échelle
+   fluide n'a plus de marche à franchir. */
+.entree-section .titre-section {
+  margin: 0.75rem 0 var(--rythme-bloc);
+}
+
+/* ── LES ÉTAPES, EN DEUX COLONNES ────────────────────────────────────────────
+
+   « Comment ça marche » était une entête pleine largeur suivie de la liste des
+   trois marches : le titre occupait 1 200 px pour six mots, la liste commençait
+   250 px plus bas, et la moitié droite de l'écran restait vide au-dessus. Les
+   deux se partagent maintenant la largeur (0,92 / 1,08), comme dans la maquette
+   de refonte : l'entête tient une colonne de lecture, les trois lignes tiennent
+   l'autre.
+
+   La colonne de gauche, qui n'a plus qu'un titre et une phrase à porter, reçoit
+   la seule PHOTO du parcours — une professionnelle au travail, 800 × 1 000 à la
+   source (417 691 o), recompressée à 800 × 1 000 en JPEG progressif qualité 78
+   pour 153 371 o, affichée à 288 × 186. Elle est SOUS la ligne de flottaison et
+   chargée en `lazy` : elle n'entre ni dans le premier écran ni dans le graphe du
+   LCP, dont l'élément élu reste l'illustration du héros.
+
+   Le dessin d'origine portait sous cette photo une légende de trois mots
+   (« DES GENS. DES COMPÉTENCES. »). Elle est OMISE, pas traduite : la seule
+   source de texte du site est `src/i18n/*.json`, et une légende écrite ici
+   publierait un libellé français au milieu de quatre autres langues. */
+.etapes-grille {
+  display: grid;
+  gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .etapes-grille {
+    grid-template-columns: 0.92fr 1.08fr;
+    align-items: center;
+    gap: 5%;
+  }
+}
+
+/* La colonne de l'entête : une largeur de lecture, et pas de marge basse — la
+   grille l'aligne au milieu de la colonne voisine, une marge l'aurait décalée. */
+.etapes-tete {
+  max-width: 34rem;
+}
+
+.etapes-tete .titre-section {
+  margin: 0.75rem 0 var(--rythme-bloc);
+}
+
+/* Le cadre de la photo : 288 × 186, soit le rapport 287/186 déclaré en
+   `aspect-ratio` plutôt qu'en hauteur fixe — la boîte garde ses proportions à
+   toutes les largeurs, et le chargement ne déplace rien. */
+.cadre-photo {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 18rem);
+  margin-top: 1.75rem;
+  border-radius: 0.5rem;
+}
+
+.cadre-photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 287 / 186;
+  object-fit: cover;
+  object-position: 50% 38%;
+}
+
+/* ── LA GALERIE DES MÉTIERS ─────────────────────────────────────────────────
+
+   Trois photos, chacune un lien vers la liste filtrée de son métier. C'est le
+   seul endroit de la page où l'on voit des GENS, et c'est ce que la maquette de
+   refonte apportait de plus visible : une page qui parle de travailleurs sans en
+   montrer un seul reste une page de promesses.
+
+   LES PHOTOS SONT OPTIMISÉES, ET C'EST MESURÉ : les fichiers d'origine mesurent
+   1 400 × 1 750 px pour 252 à 408 ko ; ils sont ré-échantillonnés à 800 × 1 000
+   et recompressés (JPEG progressif, qualité 78) à 86-122 ko, soit 3 à 4 fois
+   moins, pour un affichage de 190 à 420 px de large selon l'écran. Elles sont
+   SOUS LA LIGNE DE FLOTTAISON et chargées en `lazy` : elles n'entrent ni dans le
+   premier écran ni dans le graphe du LCP (dont l'élément est, lui, mesuré à
+   62 700 px² en mobile et 139 733 en desktop sur l'illustration du héros).
+
+   Aucune légende n'a été inventée : chaque carte porte le NOM DU MÉTIER lu dans
+   le plan (`galerie`, src/config/page-sections.js), donc dans le dictionnaire —
+   et il n'y a pas de texte de remplacement (`alt=""`), un texte de remplacement
+   étant un texte publié qui appartiendrait au dictionnaire. */
+.galerie-grille {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .galerie-grille {
+    grid-template-columns: 1.08fr 0.82fr 0.82fr;
+    align-items: start;
+    gap: 1rem;
+  }
+
+  /* Les deux colonnes de droite sont DÉCALÉES (27 px et 54 px) : trois photos
+     alignées sur la même ligne se liraient comme un catalogue, décalées elles
+     se lisent comme une planche. */
+  .galerie-carte:nth-child(2) {
+    margin-top: 1.75rem;
+  }
+
+  .galerie-carte:nth-child(3) {
+    margin-top: 3.5rem;
+  }
+}
+
+.galerie-carte {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background-color: var(--kojo-encre);
+  text-decoration: none;
+}
+
+/* La première carte occupe les deux colonnes en mobile : c'est celle qui porte
+   le propos, et une photo seule sur une ligne se voit. La règle vit DANS la
+   requête de largeur : hors d'elle, la carte s'étalait sur les trois colonnes du
+   bureau et la section mesurait 2 152 px au lieu de 660 (mesuré au navigateur). */
+@media (max-width: 767px) {
+  .galerie-carte:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.galerie-carte img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  transition: transform 0.6s var(--kojo-ease);
+}
+
+/* Le voile du bas : il porte le contraste du libellé, il ne décore pas. */
+.galerie-carte::after {
+  position: absolute;
+  inset: 35% 0 0;
+  background-image: linear-gradient(to top, rgba(28, 25, 23, 0.92), rgba(28, 25, 23, 0));
+  content: "";
+}
+
+.galerie-legende {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 1;
+  color: #fff;
+  font-family: var(--kojo-serif);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .galerie-carte:hover img {
+    transform: scale(1.035);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .galerie-carte img {
+    transition: none;
+  }
+
+  .galerie-carte:hover img {
+    transform: none;
+  }
+}
+
+/* ══ LE MÊME VOCABULAIRE, PORTÉ HORS DE L'ACCUEIL (28/09/2026) ══════════════
+
+   L'accueil avait reçu un langage (bande orange, listes à filets, panneau à
+   deux moitiés, clôture) et les AUTRES pages étaient restées sur l'ancien :
+   dégradés orange → rouge, cartes `rounded-2xl` à ombre, fonds `bg-gray-50`,
+   et — mesuré sur /how-it-works — un panneau de séquestre VERT ÉMERAUDE au
+   milieu d'un site orange, plus un sous-titre en `text-stone-600` posé sur le
+   fond orange du héros (contraste 2,6:1 : illisible, et la page le publiait
+   depuis toujours).
+
+   Ce qui suit est la part du vocabulaire qui manquait à ces pages. Aucune de
+   ces classes n'écrit de texte : elles dessinent une boîte, donc la provenance
+   du texte (scripts/shell-text-provenance.js) n'a pas à les connaître. Et
+   aucune ne touche la GÉOMÉTRIE déclarée des héros — les éléments LCP de
+   /how-it-works et /jobs gardent leurs classes de mesure au caractère près.
+*/
+
+/* ── L'ENCART DE CONFIANCE ─────────────────────────────────────────────────
+
+   Il remplace la DEUXIÈME tache verte du site — le bloc « séquestre » de
+   /about, en vert d'eau « emerald », après celui de /how-it-works. Ce qu'une
+   teinte étrangère disait sans le vouloir : cette page n'appartient pas à la
+   même famille que les autres.
+
+   Ce qui le distingue d'une carte : un filet franchement plus épais sur son
+   BORD GAUCHE, dans l'orange de la marque, et un fond sable. C'est le geste
+   d'un encart de presse — quelque chose qu'on isole sur le côté — et il ne
+   coûte aucune couleur nouvelle. */
+.encart {
+  /* Un encart EST une carte de contenu : il prend le pas de la carte, comme
+     `.carte-publique` — un seul pas, deux dessins. */
+  padding: var(--rythme-carte);
+  border: 1px solid var(--kojo-filet);
+  border-left: 3px solid var(--kojo-orange);
+  background-color: var(--kojo-sable);
+}
+
+/* ── LA BANDE DE TÊTE D'UNE PAGE DE CONTENU ─────────────────────────────────
+
+   Elle remplace trois choses d'un coup : le dégradé orange → ROUGE du héros de
+   /how-it-works (une teinte rouge que seule cette page portait), le dégradé
+   du bloc de clôture de la même page, et les fonds gris froids qui alternaient
+   dans son corps. Le filet crème du bas ne décore pas : il ferme la bande, là
+   où l'ancien dégradé s'arrêtait sur un bord flou. */
+.bande-page {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--kojo-orange);
+  background-image: linear-gradient(135deg, var(--kojo-orange), #c2410c);
+  color: #fff;
+}
+
+.bande-page::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background-color: var(--kojo-creme);
+  content: "";
+}
+
+/* Le titre de la bande est BLANC, et c'est dit ici plutôt que par un
+   utilitaire : `.titre-page` appartient à la feuille, et une feuille non posée
+   dans une couche l'emporte sur les utilitaires de Tailwind — un `text-white`
+   posé à côté de `.titre-page` était donc sans effet (mesuré : le titre du
+   héros de /how-it-works se peignait en encre foncée sur le fond orange depuis
+   sa mise en ligne, comme celui de la clôture de l'accueil avant lui). */
+.bande-page .titre-page {
+  color: #fff;
+}
+
+/* ── LA LISTE DES GARANTIES ─────────────────────────────────────────────────
+
+   Les quatre garanties de séquestre étaient un `<ul>` à puces dans un panneau
+   vert. Elles deviennent des LIGNES à filet, comme les listes de l'accueil :
+   une garantie est une entrée, et son ordre se lit. Le repère est une icône
+   DESSINÉE (`check`, src/config/page-icons.js), jamais un caractère. */
+.liste-garanties {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--kojo-filet);
+}
+
+.liste-garanties li {
+  display: grid;
+  grid-template-columns: 1.125rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.875rem;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--kojo-filet);
+  color: var(--kojo-encre-douce);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  list-style: none;
+}
+
+.liste-garanties li svg {
+  margin-top: 0.2rem;
+  color: var(--kojo-orange-fonce);
+}
+
+/* ── LA FAQ, EN LIGNES ──────────────────────────────────────────────────────
+
+   Cinq cartes à ombre, chacune avec sa propre bordure, disaient « cinq
+   produits ». Cinq lignes à filet disent « cinq questions, dans cet ordre » —
+   c'est la même règle que les métiers et les étapes de l'accueil. Le marqueur
+   reste le `<summary>` du dépliant natif : la question se répond donc au
+   clavier, et sans JavaScript. */
+.faq-liste {
+  border-top: 1px solid var(--kojo-filet);
+  border-bottom: 1px solid var(--kojo-filet);
+}
+
+.faq-ligne > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem 0;
+  cursor: pointer;
+  color: var(--kojo-encre);
+  font-family: var(--kojo-serif);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  list-style: none;
+  transition: color 0.18s var(--kojo-ease);
+}
+
+.faq-ligne > summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-ligne > summary:hover {
+  color: var(--kojo-orange-fonce);
+}
+
+.faq-ligne[open] > summary {
+  color: var(--kojo-orange-fonce);
+}
+
+.faq-ligne .faq-marque {
+  flex: none;
+  color: var(--kojo-orange);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1;
+  transition: transform 0.18s var(--kojo-ease);
+}
+
+.faq-ligne[open] .faq-marque {
+  transform: rotate(45deg);
+}
+
+.faq-ligne > p {
+  max-width: 44rem;
+  padding-bottom: 1.25rem;
+  color: var(--kojo-encre-douce);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-ligne > summary,
+  .faq-ligne .faq-marque {
+    transition: none;
+  }
+}
+
+/* ── LES PAGES DE CONFIANCE ─────────────────────────────────────────────────
+
+   28/09/2026. /contact, /support, /privacy et /terms — les quatre pages où un
+   visiteur vérifie à qui il parle — portaient encore le vocabulaire d'AVANT la
+   refonte : des cartes à ombre (`rounded-2xl` + `shadow-sm`), des pastilles de
+   teinte empruntée (le bleu du courriel, le vert d'eau du téléphone), et du
+   gris FROID pour tout le texte secondaire. Une page de contact qui ne
+   ressemble pas au site qu'elle représente dit exactement le contraire de ce
+   qu'elle est là pour dire.
+
+   Elles prennent donc le vocabulaire de l'accueil, de /how-it-works et de
+   /jobs : la carte à FILET, la ligne à filet, la pastille ronde, le titre
+   serif, le gris chaud. Aucun texte dans ce bloc : ces classes DESSINENT une
+   boîte, elles n'écrivent rien, donc la provenance du texte
+   (scripts/shell-text-provenance.js) n'a pas à les connaître. */
+
+/* La LIGNE DE CONTACT : la même ligne que les métiers de l'accueil (pastille,
+   libellé, valeur, flèche), avec des colonnes plus serrées. Quatre colonnes
+   déclarées pour trois enfants au plus : une colonne oubliée ferait passer la
+   flèche à la ligne suivante de la grille (voir `.ligne-etape`). */
+.ligne-contact {
+  grid-template-columns: 2.5rem minmax(0, 1fr) 1.25rem;
+  gap: 1rem;
+  min-height: 4.5rem;
+}
+
+/* Les deux textes d'une ligne : ils sont EMPILÉS, donc déclarés en bloc — un
+   `<span>` reste en ligne par défaut, et deux valeurs côte à côte ne se
+   liraient pas comme un libellé au-dessus de sa valeur. */
+.etiquette-contact {
+  display: block;
+  color: var(--kojo-encre);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.valeur-contact {
+  display: block;
+  color: var(--kojo-encre-douce);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+/* Le TITRE D'UNE ENTRÉE : celui d'une carte de /support comme celui d'une
+   section de /privacy ou de /terms. Un cran sous le titre de section, dans la
+   même serif — c'est ce qui fait qu'un titre de carte et un titre de page
+   appartiennent au même document. Il remplace `text-lg`/`text-xl
+   font-semibold text-gray-900`, qui était la typographie d'un tableau de bord. */
+.titre-entree {
+  color: var(--kojo-encre);
+  font-family: var(--kojo-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* La pastille d'une carte de mode de /support : 48 px au lieu des 40 px d'une
+   ligne, parce qu'elle n'est pas un repère de liste mais le sujet de la carte
+   entière. Elle ne porte aucune teinte propre : le fond sable et l'orange
+   viennent de `.pastille-rond` (déclaré plus haut, donc surchargé ici). */
+.pastille-rond-large {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* LA SECTION D'UNE PAGE DE TEXTE : un filet qui ouvre, comme une entrée de
+   liste. Les quatre sections de /privacy et les quatre de /terms se lisaient
+   comme quatre paragraphes séparés par du vide ; elles se lisent maintenant
+   comme quatre entrées, DANS L'ORDRE, et le dernier filet ferme la liste là où
+   commencent les liens de pied de page. */
+.bloc-de-section {
+  /* Le pas de GROUPE : quatre sections de /privacy se lisent comme quatre
+     entrées d'une même liste — c'est le même pas que « titre → phrase » et
+     « texte → actions », donc la même variable. */
+  padding-top: var(--rythme-bloc);
+  padding-bottom: var(--rythme-bloc);
+  border-top: 1px solid var(--kojo-filet);
+}
+
+.bloc-de-section:last-of-type {
+  border-bottom: 1px solid var(--kojo-filet);
+}
+
+/* ── LES PUCES DE FILTRE, CARRÉES ──────────────────────────────────────────
+
+   Les puces de catégorie de /jobs étaient des PILULES (`rounded-full`, rayon
+   9999 px) : c'est la forme qu'on a interdite sur ce site, elle se lit comme
+   une étiquette de produit. Elles gardent leur fonction (une catégorie active
+   reste visible sans ouvrir de menu) avec le rayon des boutons du site. */
+/* La rangée de puces DÉFILE sur un écran de téléphone (on fait glisser du
+   doigt) et SE REPLIE sur un écran large — mesuré le 28/09/2026 : les dix
+   catégories débordaient aussi sur desktop, donc la rangée portait une barre
+   de défilement HORIZONTALE sous les puces, c'est-à-dire un aplat orange de
+   1 200 px au milieu du panneau de filtres. Un défilement qui n'a pas de raison
+   d'être n'est pas une affordance, c'est un défaut de mise en page. */
+.puces-defilantes {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+@media (min-width: 640px) {
+  .puces-defilantes {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+}
+
+.puce-filtre {
+  flex: none;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--kojo-filet);
+  border-radius: 3px;
+  background-color: var(--kojo-papier);
+  color: var(--kojo-encre-douce);
+  font-size: 0.875rem;
+  font-weight: 600;
+  /* La ligne est FIXÉE : les puces remplacent des utilitaires qui la fixaient
+     (`text-sm`), et deux puces voisines doivent avoir la même hauteur, quel que
+     soit le texte qu'elles portent. */
+  line-height: 1.25;
+  transition:
+    border-color 0.18s var(--kojo-ease),
+    background-color 0.18s var(--kojo-ease),
+    color 0.18s var(--kojo-ease);
+}
+
+.puce-filtre:hover {
+  border-color: var(--kojo-orange);
+  color: var(--kojo-orange-fonce);
+}
+
+.puce-filtre-active {
+  border-color: var(--kojo-orange);
+  background-color: var(--kojo-orange);
+  color: #fff;
+}
+
+.puce-filtre-active:hover {
+  color: #fff;
+}
+
+/* ── LE PANNEAU DES FILTRES ─────────────────────────────────────────────────
+
+   La recherche et ses trois contrôles vivaient dans une carte à ombre large
+   (`rounded-2xl shadow-sm`) : la même boîte que les cartes de résultat, alors
+   que ce n'en est pas une — c'est une barre d'outils. Un fond sable et un
+   filet la distinguent du contenu qu'elle filtre, sans lui donner un rang de
+   carte. */
+.panneau-filtres {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--kojo-filet);
+  background-color: var(--kojo-sable);
+}
+
+@media (min-width: 640px) {
+  .panneau-filtres {
+    padding: 1.5rem;
+  }
+}
+
+/* ── LE PANNEAU DU SÉQUESTRE ────────────────────────────────────────────────
+
+   Le bloc « votre argent est protégé » était une carte vert d'eau (« emerald »)
+   au milieu d'une page orange : la seule teinte de la page qui n'appartenait à
+   personne. Il devient un panneau en deux moitiés — l'illustration du séquestre
+   sur son propre sol, le texte à droite — et l'accent reste l'orange de la
+   marque, y compris sur l'anneau et sur l'estampille. */
+.panneau-sequestre {
+  display: grid;
+  gap: var(--rythme-tete);
+  align-items: center;
+  padding: var(--rythme-carte);
+  border: 1px solid var(--kojo-filet);
+  border-radius: 0.5rem;
+  background-color: var(--kojo-papier);
+}
+
+@media (min-width: 768px) {
+  .panneau-sequestre {
+    grid-template-columns: 0.85fr 1.15fr;
+  }
+}
+
+.panneau-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 15rem;
+  padding: 1rem;
+  background-color: var(--kojo-sable);
+}
+
+.panneau-orbe {
+  position: absolute;
+  inset: 0.75rem;
+  border: 1px solid rgba(234, 88, 12, 0.22);
+  border-radius: 50%;
+}
+
+.panneau-image {
+  position: relative;
+  width: 74%;
+  max-width: 20rem;
+  height: auto;
+}
+
+.panneau-estampille {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  background-color: var(--kojo-orange);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 6px 6px 0 var(--kojo-papier);
+}
+
+/* ── LA BANDE DES CHIFFRES ET LA CLÔTURE ────────────────────────────────────
+
+   Les chiffres vérifiables tenaient dans une carte à ombre ; ils deviennent une
+   bande à filets, séparés par le même trait que les listes. Le chiffre reste en
+   orange — c'est la seule graisse colorée de la page, donc l'œil y va — et il
+   est en chiffres tabulaires (le socle du `body` s'en charge). */
+.bande-chiffres {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--kojo-filet);
+  border-bottom: 1px solid var(--kojo-filet);
+}
+
+.bande-chiffres > div {
+  padding-block: var(--rythme-bloc);
+  padding-inline: 1rem;
+  text-align: center;
+}
+
+.bande-chiffres > div + div {
+  border-left: 1px solid var(--kojo-filet);
+}
+
+.bande-chiffres .chiffre {
+  color: var(--kojo-orange-fonce);
+  font-family: var(--kojo-serif);
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* La CLÔTURE : orange, pleine largeur, avec deux anneaux qui débordent — le
+   seul endroit de la page où le dessin sort du cadre. Rien n'y est animé. */
+.cta-final {
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-final::before,
+.cta-final::after {
+  position: absolute;
+  width: 22rem;
+  height: 22rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  content: "";
+}
+
+.cta-final::before {
+  top: -9rem;
+  right: 6%;
+}
+
+.cta-final::after {
+  bottom: -11rem;
+  left: 6%;
+}
+
+.cta-final-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 48rem;
+  margin-inline: auto;
+  /* La clôture est une SECTION : elle prend donc le pas de section, comme
+     `.section-publique` — la dernière section du rythme, avec ses 4 rem
+     écrits à la main remplacés par le même jeton que les autres. */
+  padding-block: var(--rythme-section);
+  padding-inline: 1rem;
+  text-align: center;
+}
+
+/* Le titre de la clôture est blanc, et c'est DIT ici plutôt que par un
+   utilitaire : `.titre-section` appartient à la feuille, et une feuille non
+   posée dans une couche l'emporte sur les utilitaires de Tailwind — poser
+   « text-white » à côté de `.titre-section` était donc sans effet (l'encre
+   foncée gagnait, sur l'orange). Mesuré au passage : la clôture de l'accueil
+   publiait un titre brun sur orange depuis la première passe éditoriale. */
+.cta-final h2 {
+  color: #fff;
+}
+
+.cta-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.875rem;
+  margin-top: var(--rythme-bloc);
+}
+
+/* ── LE SOCLE DES FORMULAIRES, PAR SÉLECTEURS D'ÉLÉMENTS ────────────────────
+
+   Même raison que le socle d'interaction du `@layer base` : un sélecteur
+   d'ÉLÉMENT est lu par les deux canaux SANS qu'aucun des deux n'ait à poser une
+   classe — les coquilles pré-rendues publient de vrais `<input>`, exactement
+   comme React. Aucune dette pour le garde « aucun sélecteur sans porteur », et
+   rien à recopier côté coquille.
+
+   La spécificité bat les utilitaires (`form :is(input…)` = 0,3,2 contre 0,1,0
+   pour `border-gray-300`), ce qui est VOULU : le dessin d'un champ appartient à
+   la page, pas au champ qui l'écrit. C'est la seule exception du site à la
+   règle « un utilitaire gagne », et elle est bornée aux propriétés ci-dessous. */
+form :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  background-color: var(--kojo-papier);
+  border-color: var(--kojo-filet);
+  border-radius: 0.5rem;
+  color: var(--kojo-encre);
+}
+
+form :is(input, select, textarea)::placeholder {
+  color: #8a8278;
+  opacity: 1;
+}
+
+form label {
+  color: var(--kojo-encre-douce);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carte-editoriale-cliquable {
+    transition: none;
+  }
+
+  .carte-editoriale-cliquable:hover {
+    transform: none;
+  }
 }
 
 

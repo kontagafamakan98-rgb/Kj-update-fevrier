@@ -96,8 +96,17 @@ describe('anti-CLS — les pages partagent leur squelette (pas de doublon)', () 
 describe('anti-CLS — structure des squelettes (hauteurs du layout réel)', () => {
   const CASES = [
     ['MessagesSkeleton', MessagesSkeleton, ['max-w-6xl', 'h-[75vh]', 'sm:w-[320px]']],
-    ['PaymentSkeleton', PaymentSkeleton, ['min-h-full', 'bg-gray-50', 'max-w-6xl']],
-    ['PaymentContentSkeleton', PaymentContentSkeleton, ['rounded-2xl', 'grid-cols-1', 'md:grid-cols-3']],
+    // 28/09/2026 : le fond `bg-gray-50` du squelette devient `fond-sable`, comme
+    // celui de la page RÉELLE — c'est la classe qui doit rester, pas la teinte
+    // d'avant (les deux sont des gris CHAUDS ; le squelette ne peut pas peindre
+    // autre chose que ce que la page peindra au swap).
+    ['PaymentSkeleton', PaymentSkeleton, ['min-h-full', 'fond-sable', 'max-w-6xl']],
+    // 28/09/2026 : la carte du squelette prend le dessin de la carte RÉELLE
+    // (`carte-editoriale`, src/index.css) — la forme arrondie `rounded-2xl`
+    // n'est plus ce que les deux peignent. La boîte, elle, ne bouge pas : elle
+    // portait déjà une bordure de 1 px, que la classe remplace sans changer le
+    // rayon utile (le CLS ne dépend pas du rayon, mais l'œil si).
+    ['PaymentContentSkeleton', PaymentContentSkeleton, ['carte-editoriale', 'grid-cols-1', 'md:grid-cols-3']],
     ['JobsSkeleton', JobsSkeleton, ['max-w-7xl']],
     ['JobDetailsSkeleton', JobDetailsSkeleton, ['max-w-7xl']],
     ['LoginSkeleton', LoginSkeleton, []],

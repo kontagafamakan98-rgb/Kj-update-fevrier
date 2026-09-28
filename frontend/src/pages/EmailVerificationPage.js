@@ -6,8 +6,12 @@ import { authAPI, handleApiError } from '../services/api';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/emailVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
+import { Mail, ShieldCheck, Lock, Hourglass, Check } from 'lucide-react';
 
 const OTP_LENGTH = 6;
+
+/** Le rayon du site pour un contrôle : 3 px, jamais une pilule. */
+const RAYON = 'rounded-[3px]';
 
 const EmailVerificationPage = () => {
   const navigate = useNavigate();
@@ -210,47 +214,50 @@ const EmailVerificationPage = () => {
 
   if (!userData) {
     return (
-      <div className="min-h-full bg-gray-50 flex items-center justify-center">
+      <div className="min-h-full fond-sable flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-500 mx-auto"></div>
-          <div className="mt-4 text-orange-600 font-medium">{pageT('redirecting')}</div>
+          <div className="mt-4 text-orange-700 font-medium">{pageT('redirecting')}</div>
         </div>
       </div>
     );
   }
 
-  return (      <div className="min-h-full bg-gray-50 py-8">
+  return (      <div className="min-h-full fond-sable py-8">
       <div className="max-w-3xl mx-auto px-4">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">📧 {pageT('title')}</h1>
-          <p className="text-gray-600 max-w-2xl mx-auto">{pageT('subtitle')}</p>
+        <div className="mb-8">
+          <h1 className="titre-page flex items-center gap-3"><Mail className="h-7 w-7 text-orange-600" aria-hidden="true" /> {pageT('title')}</h1>
+          <p className="mt-3 max-w-2xl text-stone-600">{pageT('subtitle')}</p>
         </div>
 
-        <div className="mb-8 flex items-center justify-center space-x-4">
-          <StepDot number="✓" label={pageT('stepPersonal')} bg="bg-green-500" text="text-green-600" />
-          <div className="w-16 h-1 bg-orange-200"></div>
-          <StepDot number="2" label={pageT('stepEmail')} bg="bg-orange-500" text="text-orange-600" />
-          <div className="w-16 h-1 bg-gray-200"></div>
-          <StepDot number="3" label={pageT('stepPayments')} bg="bg-gray-300" text="text-gray-500" textColor="text-gray-600" />
+        {/* Le parcours en trois temps : les pastilles rondes du site
+            (`.pastille-rond`) au lieu de trois cercles de couleurs empruntées,
+            et le filet qui les relie au lieu d'une barre de 4 px. */}
+        <div className="mb-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
+          <StepDot number="1" label={pageT('stepPersonal')} etat="fait" />
+          <span className="hidden h-px w-12 bg-stone-300 sm:block" aria-hidden="true"></span>
+          <StepDot number="2" label={pageT('stepEmail')} etat="courant" />
+          <span className="hidden h-px w-12 bg-stone-300 sm:block" aria-hidden="true"></span>
+          <StepDot number="3" label={pageT('stepPayments')} etat="a-venir" />
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg border border-orange-100 overflow-hidden">
-          <div className="bg-gradient-to-r from-orange-500 to-amber-500 p-6 text-white">
-            <p className="text-sm uppercase tracking-wide opacity-90">KOJO Gmail OTP</p>
-            <h2 className="text-2xl font-semibold mt-1">{pageT('sentTo', { email: maskedDestination })}</h2>
-            <p className="text-sm mt-2 opacity-90">{pageT('otpHelp')}</p>
+        <div className="carte-editoriale overflow-hidden">
+          <div className="bande-page p-6">
+            <p className="sur-titre sur-titre-clair">{pageT('title')}</p>
+            <h2 className="titre-page mt-3">{pageT('sentTo', { email: maskedDestination })}</h2>
+            <p className="mt-2 text-sm text-orange-50">{pageT('otpHelp')}</p>
           </div>
 
           <div className="p-6 md:p-8">
             {displayedError && (
-              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className={`mb-6 ${RAYON} border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700`}>
                 {displayedError}
               </div>
             )}
 
             <form onSubmit={handleVerify} className="space-y-6">
               <div>
-                <label htmlFor="email-otp" className="block text-sm font-semibold text-gray-800 mb-3">{pageT('otpLabel')}</label>
+                <label htmlFor="email-otp" className="block text-sm font-semibold text-stone-700 mb-3">{pageT('otpLabel')}</label>
                 <input
                   id="email-otp"
                   type="text"
@@ -261,16 +268,19 @@ const EmailVerificationPage = () => {
                   onChange={(event) => setOtp((event.target.value || '').replace(/\D/g, '').slice(0, OTP_LENGTH))}
                   disabled={sendingCode || verifying}
                   placeholder="123456"
-                  className="w-full rounded-2xl border border-gray-300 px-5 py-4 text-center text-3xl font-semibold tracking-[0.5em] text-gray-900 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-200 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  className="w-full px-5 py-4 text-center text-3xl font-semibold tracking-[0.5em] disabled:cursor-not-allowed"
                 />
               </div>
 
+              {/* Deux notes en petit : le délai de renvoi (orange, c'est une
+                  action possible) et la durée de validité (neutre, c'est une
+                  information). Le bleu de la seconde n'appartenait à personne. */}
               <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3 text-sm text-orange-800">
-                  ⏳ {cooldownSeconds > 0 ? pageT('resendIn', { time: formatTime(cooldownSeconds) }) : pageT('resend')}
+                <div className={`${RAYON} border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800`}>
+                  <Hourglass className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {cooldownSeconds > 0 ? pageT('resendIn', { time: formatTime(cooldownSeconds) }) : pageT('resend')}
                 </div>
-                <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-800">
-                  🛡️ {pageT('expiresIn', { time: formatTime(expiresInSeconds) })}
+                <div className={`${RAYON} border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700`}>
+                  <ShieldCheck className="inline h-4 w-4 mr-1 align-[-0.15em] text-orange-700" aria-hidden="true" /> {pageT('expiresIn', { time: formatTime(expiresInSeconds) })}
                 </div>
               </div>
 
@@ -279,7 +289,7 @@ const EmailVerificationPage = () => {
                   type="button"
                   onClick={() => handleSendCode('resend')}
                   disabled={sendingCode || verifying || cooldownSeconds > 0}
-                  className="flex-1 rounded-xl border border-orange-200 bg-white px-4 py-3 font-medium text-orange-700 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="bouton bouton-clair flex-1 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {sendingCode ? pageT('sendInProgress') : (cooldownSeconds > 0 ? pageT('resendIn', { time: formatTime(cooldownSeconds) }) : pageT('resend'))}
                 </button>
@@ -287,7 +297,7 @@ const EmailVerificationPage = () => {
                 <button
                   type="submit"
                   disabled={sendingCode || verifying}
-                  className="flex-1 rounded-xl bg-orange-600 px-4 py-3 font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="bouton bouton-encre flex-1 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {verifying ? pageT('verifying') : pageT('verifyButton')}
                 </button>
@@ -301,7 +311,7 @@ const EmailVerificationPage = () => {
                   clearRegistrationFlow();
                   navigate('/register');
                 }}
-                className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="bouton bouton-clair"
               >
                 {pageT('backToRegister')}
               </button>
@@ -309,7 +319,7 @@ const EmailVerificationPage = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/payment-verification', { state: { userData, paymentAccounts, emailVerificationToken } })}
-                  className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="bouton bouton-clair"
                 >
                   {pageT('backToPayments')}
                 </button>
@@ -318,9 +328,9 @@ const EmailVerificationPage = () => {
           </div>
         </div>
 
-        <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="font-semibold text-gray-900 mb-3">🔐 {pageT('securityTitle')}</h3>
-          <div className="space-y-2 text-sm text-gray-700">
+        <div className="carte-editoriale mt-8 p-6">
+          <h3 className="titre-entree mb-3 flex items-center gap-2"><Lock className="h-5 w-5 text-orange-700" aria-hidden="true" /> {pageT('securityTitle')}</h3>
+          <div className="space-y-2 text-sm text-stone-600">
             <p>{pageT('security1')}</p>
             <p>{pageT('security2')}</p>
             <p>{pageT('security3')}</p>
@@ -331,14 +341,27 @@ const EmailVerificationPage = () => {
   );
 };
 
-function StepDot({ number, label, bg, text, textColor = 'text-white' }) {
+/**
+ * Une étape du parcours, dans les pastilles du site : faite (sable, coche
+ * dessinée), COURANTE (l'orange de la marque) ou à venir (creuse, sans fond).
+ * Elle portait trois cercles de teintes empruntées (vert, orange, gris) : un
+ * parcours ne décorait pas, il dit OÙ l'on est.
+ */
+function StepDot({ number, label, etat }) {
+  const pastille =
+    etat === 'courant'
+      ? 'pastille-rond pastille-courante'
+      : etat === 'fait'
+        ? 'pastille-rond'
+        : 'pastille-rond pastille-rond-creuse';
+  const teinte = etat === 'courant' ? 'text-stone-700' : 'text-stone-500';
   return (
-    <div className="flex items-center">
-      <div className={`w-8 h-8 ${bg} ${textColor} rounded-full flex items-center justify-center text-sm font-medium`}>
-        {number}
-      </div>
-      <span className={`ml-2 text-sm font-medium ${text}`}>{label}</span>
-    </div>
+    <span className="flex items-center">
+      <span className={`${pastille} text-sm font-semibold`} aria-hidden="true">
+        {etat === 'fait' ? <Check className="h-4 w-4" /> : number}
+      </span>
+      <span className={`ml-2 text-sm font-medium ${teinte}`}>{label}</span>
+    </span>
   );
 }
 

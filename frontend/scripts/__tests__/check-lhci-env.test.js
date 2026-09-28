@@ -112,6 +112,7 @@ describe('lighthouserc — sélection des pages auditées', () => {
       '/about',
       '/contact',
       '/privacy',
+      '/terms',
       '/dashboard',
       '/profile',
     ]);
@@ -175,9 +176,9 @@ describe('lighthouserc — sélection des pages auditées', () => {
     for (const base of ['http://127.0.0.1:4174', 'http://localhost:4173', 'http://[::1]:4173']) {
       expect(urlsFor(base), base).toEqual([`${base}/`]);
     }
-    // Adresse DISTANTE → les 13 pages.
+    // Adresse DISTANTE → les 14 pages.
     for (const base of ['https://kj-update-fevrier.vercel.app', 'https://x.vercel.app']) {
-      expect(urlsFor(base), base).toHaveLength(13);
+      expect(urlsFor(base), base).toHaveLength(14);
     }
     // Sans base, le repli local reste `localBase` — et c'est un repli, pas un
     // « oui » par défaut : il ne fait pas passer une base distante pour locale.

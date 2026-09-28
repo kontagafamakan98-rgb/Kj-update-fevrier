@@ -156,7 +156,7 @@ describe('detectUserCountry — objet neutre au lieu de null (élimine la classe
   it('renvoie un pays detected:true quand la localisation aboutit', async () => {
     const spy = vi
       .spyOn(preciseGeolocationService, 'detectPreciseLocation')
-      .mockResolvedValue({ isApproximate: false, countryCode: 'SN', country: 'Sénégal', phonePrefix: '+221', flag: '🇸🇳' });
+      .mockResolvedValue({ isApproximate: false, countryCode: 'SN', country: 'Sénégal', phonePrefix: '+221' });
     const country = await detectUserCountry();
     expect(country.detected).toBe(true);
     expect(country.code).toBe('senegal');

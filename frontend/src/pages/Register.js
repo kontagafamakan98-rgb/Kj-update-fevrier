@@ -8,6 +8,7 @@ import WorkerRegistrationFields from '../components/WorkerRegistrationFields';
 import ProfilePhotoUpload from '../components/ProfilePhotoUpload';
 import RegistrationLanguageSelector from '../components/RegistrationLanguageSelector';
 import LoadingButton from '../components/LoadingButton';
+import { MapPin, Globe, Gift } from 'lucide-react';
 import GoogleButton from '../components/GoogleButton';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
@@ -69,7 +70,7 @@ export default function Register() {
   const pagePlan = PAGE_SECTIONS['/register'];
   const toast = useToast();
   const navigate = useNavigate();
-  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
+  const legalDocumentUrl = '/terms';
 
   const countries = getCountriesList();
 
@@ -188,7 +189,7 @@ export default function Register() {
         }
 
         setDetectedCountry(country);
-        devLog.info(`📍 Pays détecté: ${country.nameFrench} ${country.flag}`);
+        devLog.info(`📍 Pays détecté: ${country.nameFrench}`);
         
         // Mettre à jour automatiquement le pays et le préfixe téléphonique
         setFormData(prev => ({
@@ -269,7 +270,7 @@ export default function Register() {
     // Rediriger d'abord vers la vérification email
     devLog.info('📝 Redirection vers la vérification email...');
 
-    toast.success(t('registerStepSuccess') + ' ✅');
+    toast.success(t('registerStepSuccess'));
 
     clearRegistrationFlow();
     saveRegistrationFlow({
@@ -380,15 +381,28 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">
+          <div className="mx-auto h-16 w-16 bg-orange-600 rounded-lg flex items-center justify-center">
             <span className="text-white text-2xl font-bold">{t('brandMark')}</span>
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (register.html). Classes inchangées. */}
-          <h1 className="mt-6 text-center text-3xl font-bold text-gray-900">
+          {/* Le titre RESTE en sans 30 px, et c'est MESURÉ, pas un oubli : le
+              passer au titre serif du site faisait ÉLIRE ce `<h1>` comme élément
+              LCP de la page. Mesuré (sonde `e2e/lcp-geometrie.spec.js`) :
+              avant, la notice d'étape ci-dessous, que le plan déclare
+              (`stepNoticeClass`), 9 792 px² en mobile et 12 672 en desktop ;
+              après, le titre à 15 984 px² en desktop — plus grand qu'elle —
+              alors qu'en MOBILE la notice gardait la tête. Deux tailles, deux
+              élus : une déclaration ne peut en décrire qu'un, et le changera
+              sans re-mesurer déplacerait la géométrie que la coquille et React
+              doivent peindre à l'identique. Seule la TEINTE change donc ici :
+              le gris froid cède l'encre chaude, ce qui ne déplace aucun pixel
+              (document mesuré à 2 997 px en mobile et 2 534 en desktop, les
+              valeurs publiées). */}
+          <h1 className="mt-6 text-center text-3xl font-bold text-stone-900">
             {pageT(pagePlan.titleKey)}
           </h1>
           <p className="mt-2 text-sm text-gray-600">
@@ -396,16 +410,16 @@ export default function Register() {
           </p>
           
           {/* Information sur le processus avec géolocalisation */}
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
             {geoLoading ? (
               <div className="flex items-center justify-center py-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500 mr-2"></div>
                 <span className="text-xs text-blue-700">{t('detectingLocation')}</span>
               </div>
             ) : detectedCountry ? (
               <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-center">
                 <p className="text-sm text-green-800">
-                  <span className="font-medium">📍 {pageT('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
+                  <span className="font-medium"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionDetected')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
                 </p>
                 <p className="text-xs text-green-600 mt-1">
                   {pageT('adjustedAutomatically')}
@@ -414,7 +428,7 @@ export default function Register() {
             ) : (
               <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-center">
                 <p className="text-xs text-yellow-700">
-                  📍 {pageT('positionNotDetected')}
+                  <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('positionNotDetected')}
                 </p>
               </div>
             )}
@@ -430,7 +444,7 @@ export default function Register() {
               <div className="w-12 h-1 bg-gray-200"></div>
 
               <div className="flex items-center">
-                <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
+                <div className="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step2NumberKey)}
                 </div>
                 <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step2TitleKey)}</span>
@@ -439,7 +453,7 @@ export default function Register() {
               <div className="w-12 h-1 bg-gray-200"></div>
 
               <div className="flex items-center">
-                <div className="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">
+                <div className="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">
                   {t(pagePlan.step3NumberKey)}
                 </div>
                 <span className="ml-2 text-gray-500 font-medium whitespace-nowrap">{pageT(pagePlan.step3TitleKey)}</span>
@@ -447,7 +461,7 @@ export default function Register() {
             </div>
             
             <p className={pagePlan.stepNoticeClass}>
-              <IconePage nom={pagePlan.stepNoticeIcon} classe={CLASSES_ICONE.notice} />{' '}
+              <IconePage nom={pagePlan.stepNoticeIcon} classe={CLASSES_ICONE.noticePetite} />{' '}
               {formData.user_type === 'worker' ? pageT('workerStepNotice') : pageT(pagePlan.stepNoticeKey)}
             </p>
           </div>
@@ -543,12 +557,12 @@ export default function Register() {
                   {t('country')}
                   {detectedCountry && (
                     <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                      📍 {t('detectedAutomatically')}
+                      <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('detectedAutomatically')}
                     </span>
                   )}
                 </label>
                 {activeCountry && (
-                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-medium whitespace-nowrap ${
+                  <span className={`inline-flex items-center gap-2 px-3 py-1 rounded border text-xs font-medium whitespace-nowrap ${
                     detectedCountry ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-700'
                   }`}>
                     <CountryDisplay countryCode={activeCountry.code} className="inline-flex align-middle" />
@@ -568,7 +582,7 @@ export default function Register() {
               />
               {detectedCountry && (
                 <p className="mt-1 text-xs text-green-600">
-                  🌍 {t('detectedViaGeolocation')}
+                  <Globe className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('detectedViaGeolocation')}
                 </p>
               )}
             </div>
@@ -631,7 +645,7 @@ export default function Register() {
                 }}
               />
               {emailChecking && (
-                <p className="mt-1 text-sm text-blue-600">{pageT('checkingEmail')}</p>
+                <p className="mt-1 text-sm text-orange-600">{pageT('checkingEmail')}</p>
               )}
               {!emailChecking && emailAvailability?.available === false && (
                 <p className="mt-1 text-sm text-red-600">{displayedEmailAvailabilityMessage || pageT('duplicateEmailError')}</p>
@@ -713,7 +727,7 @@ export default function Register() {
             {formData.user_type === 'worker' && (
               <div>
                 <label htmlFor="referral_code" className="block text-sm font-medium text-gray-700 mb-2">
-                  🎁 {pageT('referralCodeLabel')}
+                  <Gift className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('referralCodeLabel')}
                 </label>
                 <input
                   id="referral_code"
@@ -738,6 +752,7 @@ export default function Register() {
             userType={formData.user_type}
             iconePhoto={pagePlan.photoIcon}
             iconeConseils={pagePlan.photoTipsIcon}
+            classeBloc="bloc-differe-photo"
           />
 
           {/* Sélecteur de langue : pays détecté OU choisi manuellement */}
@@ -759,15 +774,13 @@ export default function Register() {
             />
           )}
 
-          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+          <div className="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
             <div>
               <h3 className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} classe={CLASSES_ICONE.notice} /> {pageT('legalNoticeTitle')}</h3>
               <p className="text-xs text-orange-800 mt-1">{pageT('legalConsentHelp')}</p>
             </div>
             <a
               href={legalDocumentUrl}
-              target="_blank"
-              rel="noreferrer"
               className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
             >
               {pageT('legalConsentLink')}
@@ -786,7 +799,7 @@ export default function Register() {
             <p className="text-xs text-gray-600">{pageT('legalContactLine')}</p>
           </div>
 
-          <div>
+          <div className="bloc-differe-envoi">
             <LoadingButton
               type="submit"
               loading={loading}
@@ -796,7 +809,7 @@ export default function Register() {
             </LoadingButton>
           </div>
 
-          <div className="text-center">
+          <div className="bloc-differe-lien text-center">
             <span className="text-sm text-gray-600">
               {pageT('signInPrompt')}{' '}
               <Link to="/login" className="font-medium text-orange-600 hover:text-orange-500 transition-colors">

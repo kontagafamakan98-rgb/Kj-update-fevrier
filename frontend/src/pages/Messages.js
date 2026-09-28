@@ -181,9 +181,9 @@ export default function Messages() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">{t('messages')}</h1>
+      <h1 className="titre-page mb-4">{t('messages')}</h1>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[75vh] flex">
+      <div className="carte-editoriale overflow-hidden h-[75vh] flex">
         {/* Liste des conversations : plein ecran sur mobile tant qu'aucune n'est ouverte,
             colonne fixe a partir de sm. */}
         <div className={`w-full sm:w-[320px] sm:flex-shrink-0 border-r border-gray-100 flex-col ${activeConversation ? 'hidden sm:flex' : 'flex'}`}>
@@ -214,7 +214,7 @@ export default function Messages() {
                       <p className="text-xs text-gray-500 truncate">{stripJobMarkerFromMessage(conversation.last_message)}</p>
                     </div>
                     {Number(conversation.unread_count || 0) > 0 && (
-                      <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-600 text-white text-xs font-bold">
+                      <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded bg-orange-600 text-white text-xs font-bold">
                         {conversation.unread_count}
                       </span>
                     )}
@@ -261,7 +261,7 @@ export default function Messages() {
                       type="button"
                       onClick={loadOlderMessages}
                       disabled={loadingOlder}
-                      className="inline-flex items-center rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                      className="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                     >
                       {loadingOlder ? (pageT('loadingOlder') || 'Chargement…') : (pageT('loadOlderExists') || 'Afficher les messages plus anciens')}
                     </button>
@@ -318,7 +318,7 @@ export default function Messages() {
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder={pageT('placeholder')}
-                    className="flex-1 rounded-full border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    className="flex-1 rounded-lg border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                   <button
                     aria-label={pageT('sendMessageAria')}
