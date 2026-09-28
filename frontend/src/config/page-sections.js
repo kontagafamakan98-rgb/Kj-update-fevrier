@@ -30,14 +30,39 @@ import { CONTACT, mailtoHref, telHref } from './contact.js';
 // données non textuelles (icônes, destination d'un lien, accent d'une ligne). Le
 // build refuse une coquille qui ne porte pas tout ce qui est déclaré ici (voir
 // `exigerCorpsDeclare` dans vite.config.js).
-// Les deux formes de ligne du bloc de contact : une ligne cliquable (avec son
-// survol) et une ligne de simple information. Elles servent aux DEUX canaux.
-const LIGNE_LIEN =
-  'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors';
-const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3';
+// La ligne de contact — la même pour /contact et pour /support, et lue par les
+// DEUX canaux de chacune. Refonte éditoriale du 28/09/2026 : elle quitte le
+// cadre à coin arrondi (`rounded-xl border border-stone-200 px-4 py-3`) pour la
+// LIGNE À FILET de l'accueil (`.liste-editoriale` + `.ligne-editoriale`, src/index.css),
+// avec la pastille ronde et la flèche de la colonne de droite. Une ligne de
+// contact devient donc une ENTRÉE : ce qu'elle publie tient dans une liste dont
+// l'ordre se lit, au lieu d'une boîte posée à côté d'une autre.
+const LIGNE_CONTACT = 'ligne-editoriale ligne-contact';
+
+// Les quatre classes du BLOC de contact (la liste, la pastille, le libellé, la
+// valeur) : elles sont portées par /contact et par /support, donc déclarées une
+// fois et recopiées dans les deux plans — jamais dans une page.
+const BLOC_CONTACT = {
+  listeContactClass: 'liste-editoriale',
+  pastilleContactClass: 'pastille-rond',
+  etiquetteContactClass: 'etiquette-contact',
+  valeurContactClass: 'valeur-contact',
+};
 
 // ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
-// Le titre du héros est l'élément LCP de « / », et la coquille pré-rendue le
+// L'ÉLÉMENT LCP DE « / » A CHANGÉ DE NATURE LE 27/09/2026, et c'est mesuré : la
+// refonte éditoriale a donné au héros une ILLUSTRATION (`/assets/kojo-hero.svg`,
+// 960 × 720) dont l'aire peinte dépasse celle du titre — **62 700 px² en mobile
+// et 139 733 en desktop** contre 33 220 et 90 454 pour le `<h1>`, dans les DEUX
+// canaux, une seule candidate, horodatée au premier paint (`e2e/
+// lcp-geometrie.spec.js`, 40/40 ; le CLS de « / » reste 0,0000). Le LCP n'est
+// donc plus un texte mais une image : l'invariant que la parité coquille/React
+// doit tenir est le MÊME qu'avant — une seule candidate, la même aire des deux
+// côtés, au premier paint — et il tient. Ce qui suit garde sa raison d'être
+// pour le TITRE, qui reste le plus grand bloc de TEXTE de la page et dont la
+// géométrie sert d'ancre :
+//
+// Le titre du héros est (avec l'illustration) l'élément LCP de « / », et la coquille pré-rendue le
 // peint — mais createRoot() efface #root au montage : React reconstruit le même
 // titre. Mesuré (Chrome 152, sonde LCP + trace) : un remplacement de MÊME
 // TAILLE n'ajoute aucun entry LCP — la peinture de la coquille reste celle que
@@ -49,9 +74,264 @@ const LIGNE_INFO = 'flex items-center gap-3 rounded-xl border border-gray-200 px
 // retouche d'un côté faisait diverger la géométrie des deux peintures EN
 // SILENCE, et c'est exactement ce que le LCP ne pardonne pas. Elles ont
 // maintenant UN propriétaire, ici, que les deux canaux lisent.
-const HERO_TITRE_CLASSES =
-  'text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto';
-const HERO_SOUS_TITRE_CLASSES = 'text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto';
+//
+// Refonte éditoriale du 28/09/2026 : les trois paliers responsives écrits à la
+// main cèdent la place à UNE classe fluide (`.titre-heros`, src/index.css) —
+// les deux canaux la lisent donc par construction, et l'échelle n'a plus de
+// marche à chacune des deux bornes.
+//
+// NOTE POUR QUI ÉCRIT UN COMMENTAIRE ICI : ne citez jamais un utilitaire
+// Tailwind littéral (le nom exact, avec ses deux-points) dans cette prose.
+// Tailwind lit AUSSI les commentaires : un utilitaire cité est GÉNÉRÉ dans la
+// feuille servie, et s'il n'est posé nulle part, `check-css-selecteurs-morts.js`
+// refuse le build pour une règle sans porteur. C'est arrivé le 28/09/2026 avec
+// les trois paliers du titre du héros, cités ci-dessus avant d'être retirés.
+const HERO_TITRE_CLASSES = 'titre-heros mb-5 md:mb-6';
+const HERO_SOUS_TITRE_CLASSES = 'heros-lead';
+
+// ── LA COUPURE DU TITRE DU HÉROS, DÉCLARÉE ICI ──────────────────────────────
+// Le titre du héros est UNE chaîne du dictionnaire (« Trouvez un travailleur de
+// confiance, payez en toute sécurité »). Le dessin veut deux lignes : la
+// première en romain, la seconde en italique crème — c'est l'ornement
+// typographique de la maquette de refonte. Couper la chaîne dans la page ET
+// dans la coquille aurait donné deux découpages à tenir d'accord, sur CINQ
+// langues ; le découpage est donc ici, à côté des classes, et les deux canaux
+// lisent la MÊME fonction.
+//
+// La règle est celle qui marche sans connaître la langue : couper à la PREMIÈRE
+// ponctuation forte, garder la ponctuation dans la première moitié. Une langue
+// sans virgule (c'est le cas de plusieurs des cinq) rend une seconde moitié
+// VIDE, et la page peint alors le titre d'un seul tenant — jamais une ligne
+// fantôme, jamais un accent qui ne porte rien.
+//
+// Ce n'est pas un texte de plus : les deux moitiés sont le texte du
+// dictionnaire, et le garde de provenance les retrouve des deux côtés (voir
+// scripts/shell-text-provenance.js, cas « composition de textes entiers »).
+export const couperLeTitre = (texte) => {
+  const valeur = String(texte ?? '');
+  const coupure = valeur.search(/[,;:]/);
+  if (coupure === -1) return [valeur, ''];
+  return [valeur.slice(0, coupure + 1), valeur.slice(coupure + 1).trim()];
+};
+
+// ── LE LANGAGE ÉDITORIAL DE L'ACCUEIL — DEUXIÈME PASSE (27/09/2026) ─────────
+// Les sept champs d'`ACCUEIL` ci-dessus ont donné à la page son fond et son
+// encre ; cette seconde passe lui donne son ÉCHELLE et son PAS : un héros en
+// deux colonnes, des sections qui s'annoncent, des listes en lignes, un panneau
+// de confiance et une clôture orange. Ce sont toujours des classes de
+// src/index.css, donc les DEUX canaux les lisent par construction — et
+// `exigerCorpsDeclare` refuse un build dont la coquille ne publie pas une
+// déclaration.
+//
+// Ces noms sont ici, et pas dans les deux canaux : une retouche de dessin
+// (largeur de la grille du héros, hauteur d'une ligne, fond d'un panneau) se
+// fait dans la feuille, une seule fois. Les deux canaux ne portent plus que la
+// STRUCTURE et les textes.
+const EDITORIAL_ACCUEIL = {
+  heroGrilleClass: 'heros-grille',
+  heroCopieClass: 'heros-copie',
+  heroActionsClass: 'heros-actions',
+  heroBoutonClass: 'bouton bouton-creme',
+  heroBoutonSecondClass: 'bouton bouton-contour',
+  heroReperesClass: 'heros-reperes',
+  heroIllustrationClass: 'cadre-illustration',
+  heroIllustrationFondClass: 'cadre-fond',
+  heroIllustrationImageClass: 'cadre-image',
+  heroAccentClass: 'accent-heros',
+  rubanClass: 'ruban-pays',
+  rubanInnerClass: 'ruban-inner',
+  rubanEtiquetteClass: 'ruban-etiquette',
+  rubanJetonsClass: 'ruban-jetons',
+  rubanJetonClass: 'ruban-jeton',
+  entreeSectionClass: 'entree-section',
+  // ── LES DEUX PAS DU RYTHME : LA SECTION ET LA CARTE (28/09/2026) ──────────
+  // Le pas vertical d'une section (deux utilitaires de rembourrage, dont la
+  // variante de largeur doublait le pas) et le rembourrage d'une carte (`p-6`)
+  // n'étaient déclarés NULLE PART : dix sections de l'accueil, neuf dans sa
+  // coquille, et deux cartes de chaque côté portaient chacun leur propre
+  // littéral. (Ces utilitaires ne sont PAS nommés ici : Tailwind lit ce fichier
+  // comme une source de candidats, commentaires compris — les citer ici ferait
+  // réapparaître leurs règles dans la feuille servie, sans porteur, et le garde
+  // de sélecteurs les refuserait ; c'est mesuré, la première rédaction de ce
+  // commentaire a fait rougir douze pages.) Un rythme recopié dix-neuf fois n'est pas un rythme, c'est
+  // dix-neuf accords à tenir — et rien ne rougissait quand deux copies
+  // cessaient d'être d'accord : la page changeait simplement de pas à la
+  // bascule coquille → React. Ces deux classes sont dans src/index.css (elles
+  // n'y portent qu'un pas, jamais un dessin), donc les DEUX canaux les lisent
+  // par construction, et `exigerCorpsDeclare` refuse un build dont la coquille
+  // a perdu l'une des deux chaînes.
+  sectionClass: 'section-publique',
+  carteClass: 'carte-publique',
+  listeClass: 'liste-editoriale',
+  listeColonnesClass: 'liste-editoriale liste-editoriale-colonnes',
+  ligneMetierClass: 'ligne-editoriale ligne-metier',
+  ligneEtapeClass: 'ligne-editoriale ligne-etape',
+  pastilleClass: 'pastille-rond',
+  pastilleCreuseClass: 'pastille-rond pastille-rond-creuse',
+  nomLigneClass: 'nom-de-ligne',
+  noteLigneClass: 'note-de-ligne',
+  flecheLigneClass: 'fleche-de-ligne',
+  panneauClass: 'panneau-sequestre',
+  panneauArtClass: 'panneau-art',
+  panneauOrbeClass: 'panneau-orbe',
+  panneauImageClass: 'panneau-image',
+  panneauEstampilleClass: 'panneau-estampille',
+  bandeClass: 'bande-chiffres',
+  chiffreClass: 'chiffre',
+  ctaClass: 'cta-final',
+  ctaInnerClass: 'cta-final-inner',
+  ctaActionsClass: 'cta-actions',
+  lienFlecheClass: 'lien-fleche',
+  lienFlecheClairClass: 'lien-fleche lien-fleche-clair',
+  galerieGrilleClass: 'galerie-grille',
+  galerieCarteClass: 'galerie-carte',
+  galerieLegendeClass: 'galerie-legende',
+  etapesGrilleClass: 'etapes-grille',
+  etapesTeteClass: 'etapes-tete',
+  cadrePhotoClass: 'cadre-photo',
+};
+
+// ── LE VOCABULAIRE COMMUN AUX PAGES DE CONTENU (28/09/2026) ─────────────────
+// Deuxième portée du même langage. `EDITORIAL_ACCUEIL` ci-dessus habille
+// l'accueil ; celui-ci habille toute page dont la coquille publie un corps de
+// contenu — aujourd'hui /how-it-works. Ce ne sont pas des variantes : ce sont
+// les MÊMES classes de src/index.css, déclarées une seconde fois parce qu'un
+// plan se lit seul (chaque route déclare ce que SA coquille doit porter).
+//
+// Ce qui a décidé de la séparation : `pageSectionParts` (plus bas) verse dans
+// les textes attendus TOUTE chaîne du plan qui n'est ni une clé i18n ni un nom
+// d'icône. Étaler le vocabulaire complet de l'accueil sur /how-it-works aurait
+// donc exigé que sa coquille publiât aussi la grille du héros, le ruban des
+// pays et la galerie — trois choses que cette page ne peint pas, et le build
+// aurait refusé. Un plan ne déclare que ce qu'il publie.
+const EDITORIAL_PAGE = {
+  // La bande de tête : elle remplace le dégradé orange → ROUGE que seule cette
+  // page portait.
+  bandePageClass: 'bande-page',
+  entreeSectionClass: 'entree-section',
+  // Le pas de SECTION, le même qu'à l'accueil (voir `EDITORIAL_ACCUEIL`) :
+  // déclaré une seconde fois parce qu'un plan se lit seul, mais c'est la MÊME
+  // classe de src/index.css. Le pas de CARTE, lui, n'est pas déclaré ici :
+  // cette page ne peint aucune carte (ses blocs sont un panneau —
+  // `.panneau-sequestre`, qui porte déjà ce pas — et des lignes à filet), et
+  // un plan ne déclare que ce qu'il publie : l'avoir déclaré quand même a fait
+  // REFUSER le build par `exigerCorpsDeclare` (« carte-publique manque »), ce
+  // qui est exactement son travail — une déclaration sans porteur casse au lieu
+  // de peindre une page muette.
+  sectionClass: 'section-publique',
+  listeClass: 'liste-editoriale',
+  ligneEtapeClass: 'ligne-editoriale ligne-etape',
+  pastilleClass: 'pastille-rond',
+  pastilleCreuseClass: 'pastille-rond pastille-rond-creuse',
+  nomLigneClass: 'nom-de-ligne',
+  noteLigneClass: 'note-de-ligne',
+  flecheLigneClass: 'fleche-de-ligne',
+  panneauClass: 'panneau-sequestre',
+  panneauArtClass: 'panneau-art',
+  panneauOrbeClass: 'panneau-orbe',
+  panneauImageClass: 'panneau-image',
+  panneauEstampilleClass: 'panneau-estampille',
+  listeGarantiesClass: 'liste-garanties',
+  faqListeClass: 'faq-liste',
+  faqLigneClass: 'faq-ligne',
+  faqMarqueClass: 'faq-marque',
+  ctaClass: 'cta-final',
+  ctaInnerClass: 'cta-final-inner',
+  ctaActionsClass: 'cta-actions',
+  lienFlecheClass: 'lien-fleche',
+  lienFlecheClairClass: 'lien-fleche lien-fleche-clair',
+  boutonClass: 'bouton bouton-creme',
+  boutonSecondClass: 'bouton bouton-contour',
+  headClass: 'titre-section',
+  sectionIntroClass: 'text-stone-600',
+  paperClass: 'fond-papier',
+  sandClass: 'fond-sable',
+};
+
+// ── Le VOCABULAIRE ÉDITORIAL de l'accueil, déclaré une fois ──────────────────
+// Les huit sections de l'accueil recopiaient chacune sa propre soupe
+// d'utilitaires (taille, graisse, couleur et marge du titre, rayon, ombre et
+// anneau de la carte…) dans src/pages/Home.js ET dans
+// vite-plugins/prerender/shells-home.js. Changer le
+// dessin d'une section demandait donc deux retouches accordées à la main, et
+// rien ne rougissait quand elles divergeaient : la bascule coquille → React
+// déplaçait alors la moitié de la page.
+//
+// Ce que déclarent les quatre champs ci-dessous, et pourquoi ce ne sont PAS des
+// utilitaires : ce sont des classes de `src/index.css`, communes aux deux
+// canaux. Une section AJOUTÉE demain hérite du même rythme sans que personne
+// n'ait à recopier quoi que ce soit — et `exigerCorpsDeclare` (declared-body.js)
+// refuse un build dont la coquille ne publie pas ces chaînes, donc une
+// déclaration sans porteur CASSE le build au lieu de peindre une page muette.
+// ── RE-MESURE DU 28/09/2026, APRÈS LA REFONTE ÉDITORIALE ─────────────────────
+// Protocole : `cd frontend && npx playwright test e2e/lcp-geometrie.spec.js`,
+// onze routes pré-rendues × deux tailles, bundle d'entrée bloqué pour la
+// coquille et navigation réelle pour React. Ce que la passe a vérifié, et qui
+// est l'invariant que tout ce fichier tient : sur CHAQUE route et CHAQUE taille,
+// l'aire peinte est IDENTIQUE dans les deux canaux et UNE SEULE candidate est
+// horodatée au premier paint. C'est cette égalité qui empêche Chrome de ré-élire
+// une seconde peinture, plus tardive, déclenchée par le JavaScript.
+//
+// Ce que la refonte a DÉPLACÉ (et pourquoi c'est sans conséquence sur les
+// planchers de `e2e/lcp-geometrie-declaree.spec.js`, calés à ≈ 70 % de la plus
+// petite mesure connue) : le seul élément LCP dont la TYPOGRAPHIE a changé est
+// le titre du héros de l'accueil (37 400 px² en mobile, 110 500 en desktop :
+// il passe d'une échelle en paliers à `.titre-heros`), et l'en-tête de section
+// de /privacy a grandi (son élément élu reste le CORPS d'une section :
+// 91 140 px² en mobile, 103 896 en desktop).
+//
+// ── RE-MESURE DU 28/09/2026, APRÈS LE RYTHME DÉCLARÉ ────────────────────────
+// Deuxième passe du même jour : le PAS des cadres, des sections et des cartes
+// est passé en classes de `src/index.css` (`cadre-page`, `section-publique`,
+// `carte-publique`), donc les peintures rétrécissent ou grandissent de quelques
+// pixels — dans les DEUX canaux à la fois, puisque les deux lisent les mêmes
+// jetons. Relevé (`npx playwright test e2e/lcp-geometrie-declaree.spec.js`,
+// taille de l'élément élu / aire réellement peinte, mobile / desktop) :
+//
+//   /jobs           37 240 / 34 960   (avant 36 750 / 35 144)
+//   /about          74 295 / 79 346   (avant 82 940 / 79 540)
+//   /privacy        91 140 / 103 896  (inchangé — son cadre est un `min-h-screen`)
+//   /how-it-works   29 260 / 32 830   (inchangé)
+//   /login          15 040 / 11 532   (avant 15 040 / 12 834)
+//   /register        9 792 / 12 672   (avant 9 548 / 12 338)
+//   /forgot-password 13 690 / 16 021  (avant 13 690 / 16 095)
+//   /support        16 632 /  9 648   (avant 16 720 / 9 480)
+//
+// Aucun plancher n'a bougé d'un chiffre : le plus serré reste /about
+// (55 000 px² pour 74 295 mesurés, soit 26 % de marge) — et c'est voulu. Les
+// mesures des commentaires de chaque route sont conservées TELLES QUELLES :
+// elles datent d'une session précise, et les réécrire avec les chiffres d'une
+// autre session ferait passer une variation d'hôte pour une variation de page.
+//
+// Les huit autres restent à moins de 4 % des valeurs écrites dans leurs
+// commentaires respectifs ci-dessous : ces éléments-là n'ont reçu qu'une
+// COULEUR (le gris froid devient `text-stone-*`), et une couleur ne change pas
+// l'aire d'une boîte ni l'encre d'une ligne. Les valeurs des commentaires sont
+// donc conservées TELLES QUELLES plutôt que réécrites d'un iota : elles datent
+// d'une session de mesure précise, et les reécrire avec les chiffres d'une
+// autre session ferait passer une variation d'hôte pour une variation de page.
+const ACCUEIL = {
+  // Le sur-titre du héros : il remplace la pastille `rounded-full` qui
+  // étiquetait la page comme un produit. Pas de sur-titre sur les sections,
+  // faute de texte : un chapeau demande une phrase, et la seule source de
+  // texte du site est `src/i18n/*.json` — dont la parité est tenue sur cinq
+  // langues par `i18nParity.test.js`. Inventer une clé ici publierait un
+  // libellé français au milieu de quatre autres langues.
+  heroKickerClass: 'sur-titre sur-titre-clair',
+  // Les deux fonds du rythme : `papier` pour les sections claires, `sable`
+  // pour celles qui alternent. Ils remplacent `bg-white` / `bg-gray-50`, dont
+  // le gris froid jurait avec l'encre chaude du texte.
+  paperClass: 'fond-papier',
+  sandClass: 'fond-sable',
+  // Le titre de section, et le paragraphe qui le suit.
+  headClass: 'titre-section',
+  introClass: 'text-stone-600',
+  // La carte : un filet de 1 px au lieu d'une ombre large, et un rayon de 8 px
+  // au lieu de 16. `-cliquable` n'est portée que par les cartes qui MÈNENT
+  // quelque part (une carte informative n'a rien à promettre au survol).
+  cardClass: 'carte-editoriale',
+  cardLinkClass: 'carte-editoriale carte-editoriale-cliquable',
+};
 
 export const PAGE_SECTIONS = {
   // L'accueil : le corps du shell (trois promesses, trois étapes, catégories)
@@ -63,14 +343,27 @@ export const PAGE_SECTIONS = {
     // C'était le dernier morceau du corps de l'accueil publié par la coquille
     // SANS déclaration : la coquille lisait `T('heroTitle')` en littéral, et
     // rien ne rougissait si cette ligne disparaissait — un crawler, et le
-    // premier paint, perdaient alors l'élément LCP de la page sans qu'aucun
-    // garde ne le voie. Déclaré ici, `exigerCorpsDeclare` refuse un build dont
+    // premier paint, perdaient alors le plus grand bloc de TEXTE de la page
+    // sans qu'aucun garde ne le voie (son ILLUSTRATION est aujourd'hui l'élément
+    // élu, voir plus haut — le titre reste celui dont la géométrie ancre la
+    // parité des deux peintures). Déclaré ici, `exigerCorpsDeclare` refuse un build dont
     // la coquille ne porte plus le titre (le même refus que pour les
     // catégories, les promesses, les étapes et les chiffres).
     titleKey: 'heroTitle',
     subtitleKey: 'heroSubtitle',
     heroTitleClass: HERO_TITRE_CLASSES,
     heroSubtitleClass: HERO_SOUS_TITRE_CLASSES,
+    // Le vocabulaire éditorial des dix sections (voir ACCUEIL et
+    // EDITORIAL_ACCUEIL plus haut) : un seul propriétaire par classe, lu par
+    // src/pages/Home.js ET par vite-plugins/prerender/shells-home.js.
+    ...EDITORIAL_ACCUEIL,
+    heroKickerClass: ACCUEIL.heroKickerClass,
+    headClass: ACCUEIL.headClass,
+    sectionIntroClass: ACCUEIL.introClass,
+    cardClass: ACCUEIL.cardClass,
+    cardLinkClass: ACCUEIL.cardLinkClass,
+    paperClass: ACCUEIL.paperClass,
+    sandClass: ACCUEIL.sandClass,
     categories: [
       // `labelKey` est AUSSI le code de catégorie canonique du backend : le
       // libellé affiché et le filtre de /jobs sortent donc de la même valeur.
@@ -99,18 +392,41 @@ export const PAGE_SECTIONS = {
       { icone: 'step2', numberKey: 'stepNumber2', titleKey: 'homeStep2Title', descriptionKey: 'homeStep2Desc' },
       { icone: 'step3', numberKey: 'stepNumber3', titleKey: 'homeStep3Title', descriptionKey: 'homeStep3Desc' },
     ],
-    // Les quatre chiffres de l'accueil. La coquille les publiait dans sa propre
-    // liste `[['1 000+', 'activeWorkers'], …]`, pendant que la page tenait ses
-    // replis (1000, 500, 4, « 24/7 ») de son côté : deux déclarations du même
-    // bloc. `shellText` est le texte EXACT que la coquille écrit ; `fallback`
-    // est la valeur d'avant /public/stats que la page affiche — les deux, parce
-    // que la page passe par `toLocaleString()` (le séparateur de milliers suit
-    // la locale du navigateur) et qu'aucun texte ne doit changer ici.
+    // ── LA PHOTO DU PARCOURS ─────────────────────────────────────────────
+    // La colonne de gauche de « comment ça marche » reçoit une photo, et son
+    // CHEMIN est déclaré ici : les deux canaux la publient depuis le même
+    // domicile, avec les mêmes dimensions réservées. Elle est sous la ligne de
+    // flottaison et en `lazy`, donc hors du premier écran et hors du graphe du
+    // LCP. Aucune légende : il n'existe pas de clé de dictionnaire pour une
+    // phrase sous cette photo, et la seule source de texte du site est
+    // src/i18n/*.json.
+    photoEtapes: '/assets/kojo-jardinage.jpg',
+
+    // ── LA GALERIE : trois métiers en photo ──────────────────────────────
+    // La page parlait de travailleurs sans en montrer un seul. Les trois
+    // libellés sont des CLÉS DU DICTIONNAIRE (les mêmes noms de métier que la
+    // liste des catégories) : aucune phrase n'a été inventée pour l'occasion, et
+    // chaque carte mène à la liste filtrée de son métier. Les images vivent dans
+    // `public/assets/`, ré-échantillonnées à 800 × 1 000 et recompressées (voir
+    // src/index.css) : elles sont SOUS la ligne de flottaison, en `lazy`, donc
+    // hors du graphe du LCP.
+    galerie: [
+      { labelKey: 'plumbing', image: '/assets/kojo-metier-plomberie.jpg' },
+      { labelKey: 'electrical', image: '/assets/kojo-metier-electricite.jpg' },
+      { labelKey: 'carpentry', image: '/assets/kojo-metier-menuiserie.jpg' },
+    ],
+    // Les chiffres de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
+    // inventés. Les deux anciens (« 1 000+ travailleurs », « 500+ projets »)
+    // étaient des replis FABRIQUÉS avant l'appel à /public/stats : le HTML
+    // pré-rendu les publiait donc à un crawler, et le premier paint les
+    // affichait à un visiteur, comme s'ils étaient mesurés. Ils sont RETIRÉS
+    // (règle « pas de faux compteurs »). « 24/7 » l'était aussi : le support
+    // répond du lundi au samedi (cf. contactIntro), donc la valeur dit « 6j/7 ».
+    // `shellText` est le texte EXACT que la coquille écrit ; `fallback` la même
+    // valeur côté page — les deux sortent d'ici, une seule liste.
     stats: [
-      { labelKey: 'activeWorkers', fallback: 1000, suffix: '+', shellText: '1 000+' },
-      { labelKey: 'completedProjects', fallback: 500, suffix: '+', shellText: '500+' },
-      { labelKey: 'countriesCovered', fallback: 4, shellText: '4' },
-      { labelKey: 'customerSupport', fallback: '24/7', shellText: '24/7' },
+      { labelKey: 'countriesCovered', fallback: '4', shellText: '4' },
+      { labelKey: 'customerSupport', fallback: '6j/7', shellText: '6j/7' },
     ],
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le
@@ -136,9 +452,9 @@ export const PAGE_SECTIONS = {
     // dessin pour les trois emplacements — c'était déjà l'intention de la clé
     // partagée, mais la page et la coquille en publiaient encore un emoji.
     steps: [
-      { icone: 'howStep1', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
-      { icone: 'escrow', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
-      { icone: 'howStep3', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
+      { icone: 'howStep1', numberKey: 'stepNumber1', titleKey: 'howStep1Title', descriptionKey: 'howStep1Desc' },
+      { icone: 'escrow', numberKey: 'stepNumber2', titleKey: 'howStep2Title', descriptionKey: 'howStep2Desc' },
+      { icone: 'howStep3', numberKey: 'stepNumber3', titleKey: 'howStep3Title', descriptionKey: 'howStep3Desc' },
     ],
     // Le glyphe du bloc « séquestre détaillé » (le même bouclier dessiné) et le
     // repère du dépliant de la FAQ : le repère reste une clé i18n, le glyphe est
@@ -162,22 +478,61 @@ export const PAGE_SECTIONS = {
     ],
     titleKey: 'howItWorksTitle',
     heroKey: 'howItWorksHero',
+    // Le vocabulaire éditorial commun (voir EDITORIAL_PAGE plus haut) : les
+    // mêmes classes que l'accueil, lues par src/pages/HowItWorks.js ET par
+    // vite-plugins/prerender/shells-routes.js.
+    ...EDITORIAL_PAGE,
     // ── La GÉOMÉTRIE du plus grand texte peint ────────────────────────────
     // L'élément LCP de /how-it-works est le SOUS-TITRE du héros (« Trouver un
     // travailleur ou une mission… »). Mesuré le 25/09/2026 comme sur /jobs
     // (deux canaux, deux tailles) : UNE SEULE candidate, au premier paint, sur
     // ce paragraphe, d'aire IDENTIQUE — 30 320 px² mobile, 32 656 px² desktop.
+    // Re-mesuré le 26/09/2026 avec la police SERVIE PAR LE SITE : 26 334 /
+    // 32 928 px² (voir /login — la police n'est plus celle de l'hôte).
+    //
+    // RE-MESURÉ LE 28/09/2026, au port du vocabulaire éditorial : **29 260 px²
+    // en mobile et 32 830 en desktop**, une seule candidate au premier paint
+    // (`e2e/lcp-geometrie-declaree.spec.js`), et l'aire est IDENTIQUE entre la
+    // coquille et React (`e2e/lcp-geometrie.spec.js`) — c'est l'invariant, et il
+    // tient. Le mobile gagne 2 926 px² par rapport au relevé de la veille : ce
+    // n'est PAS la correction de contraste (une couleur ne change ni la boîte ni
+    // le repli) mais le TITRE de la bande, qui est passé à la police de titrage
+    // le 27/09/2026 et se replie plus court — le paragraphe remonte donc
+    // entièrement au-dessus de la ligne de flottaison, là où il était auparavant
+    // coupé par le bas de la fenêtre. Le plancher de 18 000 px² de
+    // `e2e/lcp-geometrie-declaree.spec.js` reste très en dessous des deux tailles.
     //
     // `heroFrameClass` porte la largeur du héros (donc le retour à la ligne du
     // sous-titre, qui porte lui-même son `max-w-2xl`), `heroSubtitleClass` sa
     // hauteur, et `heroTitleClass` le texte qui le précède et pourrait lui
     // prendre le LCP. Les trois étaient recopiées dans src/pages/HowItWorks.js
     // et vite-plugins/prerender/shells-routes.js.
-    heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
-    heroTitleClass: 'text-3xl md:text-4xl font-bold mb-4',
-    heroSubtitleClass: 'text-lg opacity-90 max-w-2xl mx-auto',
+    // `section-publique` remplace les deux valeurs de rembourrage du héros
+    // (28/09/2026) : le premier écran est le PREMIER TEMPS du rythme, pas un
+    // bloc à part qui aurait ses propres valeurs — c'est déjà la règle du héros de l'accueil
+    // (`.heros-grille`).
+    heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 section-publique text-center',
+    heroTitleClass: 'titre-page mb-4',
+    // Le sous-titre du héros est l'élément LCP de la page : sa GÉOMÉTRIE ne
+    // change pas d'un caractère (`text-lg` et `max-w-2xl` décident du retour à
+    // la ligne, donc de l'aire mesurée). Ce qui change est sa COULEUR, et c'est
+    // un défaut qui a été mesuré : `text-stone-600` sur le fond orange du héros
+    // donne un contraste de 2,6:1 — la page publiait un paragraphe illisible
+    // depuis sa mise en ligne. `text-orange-50` mesure 7,3:1 sur `#ea580c`.
+    heroSubtitleClass: 'text-lg text-orange-50 max-w-2xl mx-auto',
     escrowTitleKey: 'escrowWhatTitle',
     escrowTextKey: 'escrowWhatText',
+    // L'illustration et l'estampille du panneau de séquestre : le MÊME fichier et
+    // la MÊME clé que le panneau de l'accueil (l'estampille reprend un texte que
+    // la page publie déjà ; elle n'en invente aucun). Le chemin est déclaré ici
+    // parce que la coquille le publie aussi, dans la même balise `<img>`.
+    panneauImageSrc: '/assets/kojo-paiement-securise.svg',
+    estampilleKey: 'securePayments',
+    // Le repère des quatre garanties : une icône DESSINÉE (`check`), jamais un
+    // caractère — c'est la règle qui a retiré les emoji du document. Le nom du
+    // champ finit par `Icon` : `pageSectionParts` le verse dans les icônes, dont
+    // la coquille doit porter le repère `data-icone`.
+    garantieIcon: 'check',
     faqTitleKey: 'faqTitle',
     readyTitleKey: 'readyToStart',
     lookingKey: 'lookingForServices',
@@ -216,6 +571,8 @@ export const PAGE_SECTIONS = {
     // premier paint (t = 112 ms mobile / 88 ms desktop pour la coquille,
     // 84 / 80 ms pour React), sur ce paragraphe, d'AIRE IDENTIQUE de part et
     // d'autre — 35 640 px² mobile et 36 002 px² desktop.
+    // Re-mesuré le 26/09/2026 avec la police SERVIE PAR LE SITE : 36 750 /
+    // 35 144 px² (voir /login — la police n'est plus celle de l'hôte).
     //
     // Ces chaînes étaient recopiées face à face dans src/pages/Jobs.js et
     // vite-plugins/prerender/shells-routes.js (le commentaire de la coquille
@@ -232,9 +589,25 @@ export const PAGE_SECTIONS = {
     // le squelette de Suspense doit réserver à l'identique (voir
     // `antiClsSkeletons.test.jsx`) — et `titleClass` le seul autre texte
     // capable de prendre le LCP au paragraphe.
-    frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8',
-    titleClass: 'text-3xl font-bold text-gray-900',
-    introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-gray-600 min-h-[104px] md:min-h-[52px]',
+    // `min-h-screen` : la coquille de /jobs ne peint que l'en-tête et l'intro
+    // (~794 px), donc avec `main.flex-1` le pied de page tombait EXACTEMENT au
+    // bas de la viewport (mesuré 1350×940 : footer à y=859, hauteur 81 — soit
+    // 81/940 = 0,0862, la valeur d'un CLS où il quitte l'écran ; idem 412×823).
+    // React, lui, peint la liste : son pied de page naît hors écran (y≈2631).
+    // Le pied de page était donc le SEUL élément à voyager du bas de la
+    // viewport vers le hors-écran à la bascule coquille → React. Réserver la
+    // viewport dans la coquille (comme les pages de contenu /about, /contact,
+    // /privacy, /terms, dont le conteneur racine porte `min-h-screen`) le place
+    // hors écran DÈS le premier paint des deux canaux : plus rien à déplacer.
+    // Côté React la réserve est inerte (la page dépasse déjà la viewport aux
+    // deux tailles mesurées), donc aucune peinture ne bouge.
+    // `cadre-page` remplace le rembourrage écrit ici (28/09/2026) : le pas d'un
+    // cadre de page est le même sur toutes les pages publiques, et il est
+    // FLUIDE — une valeur fixe laissait 32 px de tête sur un téléphone comme
+    // sur un 27 pouces.
+    frameClass: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page min-h-screen',
+    titleClass: 'titre-page',
+    introClass: 'mb-6 max-w-3xl text-base leading-relaxed text-stone-600 min-h-[104px] md:min-h-[52px]',
   },
 
   '/login': {
@@ -252,22 +625,24 @@ export const PAGE_SECTIONS = {
     // LÉGALE de contact, en bas du formulaire. Mesuré le 26/09/2026 (Chrome
     // 152, sonde des candidates `largest-contentful-paint`, navigation réelle,
     // 412×823 et 1350×940) : UNE SEULE candidate par taille, horodatée au
-    // premier paint — 10 848 px² mobile / 12 448 px² desktop. La même passe a
+    // premier paint — 15 040 px² mobile / 12 834 px² desktop. La même passe a
     // établi les trois autres routes de ce groupe :
-    //   /register          notice d'étape (`stepNoticeClass`)   10 048 / 12 544
-    //   /forgot-password   sous-titre (`subtitleClass`)         14 001 / 16 458
-    //   /support           sous-titre (`subtitleClass`)         16 468 / 9 324
-    // L'AIRE DE L'ENCRE SUIT LES POLICES DE L'HÔTE, pas la déclaration : la
-    // même page sur le runner Linux de la CI (26/09/2026) donne 10 290 / 12 120
-    // (/login), 9 796 / 12 183 (/register), 13 104 / 15 336 (/forgot-password)
-    // et 15 120 / 7 616 (/support), à boîte d'élément identique — jusqu'à −18 %.
-    // Les planchers de `e2e/lcp-geometrie-declaree.spec.js` sont calés sur la
-    // plus petite des quatre mesures, jamais sur un seul poste.
+    //   /register          notice d'étape (`stepNoticeClass`)    9 548 / 12 338
+    //   /forgot-password   sous-titre (`subtitleClass`)         13 690 / 16 095
+    //   /support           sous-titre (`subtitleClass`)         16 720 / 9 480
+    // CES AIRES SONT CELLES DE LA POLICE SERVIE PAR LE SITE (src/index.css), et
+    // c'est nouveau : tant que le texte était rendu par la police de l'hôte,
+    // elles valaient jusqu'à 18 % de moins sur le runner Linux de la CI
+    // (/support desktop 7 616 contre 9 324 ici, à boîte d'élément identique —
+    // c'est l'encre qui change, pas le cadre), et les planchers de
+    // `e2e/lcp-geometrie-declaree.spec.js` devaient se caler sur la plus petite
+    // des DEUX machines. La même police pour tous les hôtes, mesurée telle
+    // qu'elle est publiée : c'est ce que l'auto-hébergement a acheté.
     // La chaîne était recopiée face à face dans src/pages/Login.js et
     // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
     // faisait diverger les deux peintures en silence, et une seconde peinture
     // PLUS GRANDE devient un nouvel élément LCP.
-    legalContactClass: 'text-xs text-gray-600',
+    legalContactClass: 'text-xs text-stone-600',
     // Le glyphe du bloc légal est DESSINÉ (page-icons.js) : le plan nomme une
     // icône, pas une clé i18n d'emoji (`iconLegalNotice` reste au dictionnaire
     // comme valeur interdite pour les coquilles, cf. check-prerender-shells).
@@ -292,9 +667,10 @@ export const PAGE_SECTIONS = {
     stepNoticeKey: 'clientStepNotice',
     // La chaîne de la notice d'étape EST l'élément LCP de la page (mesuré :
     // 10 048 px² mobile / 12 544 desktop après le passage de son ⚠️ de l'emoji
-    // au SVG, UNE candidate au premier paint) — déclarée ici pour que les deux
+    // au SVG, puis 9 548 / 12 338 le 26/09/2026 avec la police servie par le
+    // site — UNE candidate au premier paint) — déclarée ici pour que les deux
     // canaux la lisent (voir /login).
-    stepNoticeClass: 'text-xs text-blue-700 mt-3',
+    stepNoticeClass: 'text-xs text-amber-800 mt-3',
     stepNoticeIcon: 'stepNotice',
     clientIcon: 'client',
     // Le marteau du travailleur est le wrench déjà dessiné pour la catégorie
@@ -364,7 +740,7 @@ export const PAGE_SECTIONS = {
     subtitleKey: 'forgotPasswordSubtitle',
     // Le sous-titre est l'élément LCP de la page (mesuré : 14 001 px² mobile /
     // 16 458 desktop, UNE candidate au premier paint) — voir /login.
-    subtitleClass: 'mt-3 text-sm text-gray-600',
+    subtitleClass: 'mt-3 text-sm text-stone-600',
     stepEmailKey: 'forgotPasswordStepEmail',
     stepCodeKey: 'forgotPasswordStepCode',
     stepPasswordKey: 'forgotPasswordStepPassword',
@@ -398,15 +774,20 @@ export const PAGE_SECTIONS = {
   '/support': {
     // Le titre de la page EST le libellé de son lien (même clé que le pied de
     // page et la page de contact) : un seul texte pour un seul mot.
+    // Le CADRE de la page (28/09/2026) : il portait `py-8` en littéral, écrit
+    // deux fois — dans src/pages/Support.js et dans sa coquille. C'est le pas
+    // commun des cadres de page publiques (`cadre-page`), qui est FLUIDE là où
+    // un `py-8` fixe donnait 32 px de tête à toutes les tailles d'écran.
+    frameClass: 'max-w-2xl mx-auto px-4 cadre-page',
     titleKey: 'support',
     subtitleKey: 'supportSubtitle',
-    // Le sous-titre est l'élément LCP de la page (mesuré : 16 468 px² mobile /
-    // 9 324 desktop ici, 15 120 / 7 616 sur le runner Linux de la CI — même
-    // élément, encre −18 %, voir /login) — UNE candidate au premier paint. La chaîne
-    // est courte (`text-gray-600`) mais elle n'apparaît plus ailleurs dans
-    // Support.js ni dans le corps de sa coquille : elle a bien un propriétaire
-    // unique.
-    subtitleClass: 'text-gray-600',
+    // Le sous-titre est l'élément LCP de la page (mesuré : 16 720 px² mobile /
+    // 9 480 desktop avec la police servie — voir /login) — UNE candidate au
+    // premier paint. La chaîne est courte (`text-stone-600`) mais elle vit dans
+    // CE plan seulement : Support.js et le corps de sa coquille la lisent,
+    // aucun des deux ne la recopie (c'est ce que vérifie
+    // scripts/__tests__/check-lcp-geometrie.test.js).
+    subtitleClass: 'text-stone-600',
     // La carte de contact publie le titre du mode « contact direct » — même
     // texte, donc même clé (elle était écrite deux fois dans le dictionnaire).
     directCard: {
@@ -422,20 +803,38 @@ export const PAGE_SECTIONS = {
       emailPlaceholderKey: 'supportTicketEmailPlaceholder',
       ctaKey: 'supportTrackCta',
     },
+    // ── Le vocabulaire éditorial de la page, déclaré UNE fois ──────────────
+    // Les deux cartes de choix, la carte de contact et les quatre lignes de
+    // contact lisent ces cinq chaînes. Le 28/09/2026, elles portaient encore
+    // une ombre (`shadow-sm`), un coin `rounded-2xl` et une pastille de teinte
+    // EMPRUNTÉE (`bg-blue-100` pour le courriel, `bg-emerald-100` pour le
+    // téléphone) : c'étaient les deux seules teintes du site qui
+    // n'appartenaient à personne. La pastille ronde, elle, prend le sable et
+    // l'orange de la marque — c'est la même que sur l'accueil, et le glyphe qui
+    // la remplit dit déjà de quel moyen de contact il s'agit.
+    // Le `p-6` de ces deux cartes est devenu `carte-publique` (28/09/2026) : le
+    // rembourrage d'une carte est LE MÊME pas partout, y compris sur les cartes
+    // de l'accueil et de /about, qui portaient le même littéral chacune de leur
+    // côté. Ce qui reste ici est ce qui DISTINGUE ces cartes (elles se cliquent,
+    // elles centrent leur contenu), jamais leur pas.
+    carteClass: 'carte-editoriale carte-publique',
+    carteModeClass:
+      'carte-editoriale carte-editoriale-cliquable carte-publique flex flex-col items-center gap-3 text-center',
+    pastilleModeClass: 'pastille-rond pastille-rond-large',
+    titreEntreeClass: 'titre-entree',
+    ...BLOC_CONTACT,
     modes: [
       // Le glyphe du mode est DESSINÉ : la page publiait déjà un composant
       // lucide (`Bot`, `Phone`) là où la coquille publiait l'emoji de la clé —
-      // deux dessins pour un même mode. Les deux canaux lisent maintenant le
-      // même `icone`, et la couleur vient du `badgeClass` (`currentColor`).
+      // deux dessins pour un même mode. Les deux canaux lisent le même `icone`,
+      // et la couleur vient de la pastille qui le porte (`currentColor`).
       {
         icone: 'supportRobot',
-        badgeClass: 'bg-orange-100 text-orange-600',
         titleKey: 'supportRobotTitle',
         subtitleKey: 'supportRobotSubtitle',
       },
       {
         icone: 'contactCall',
-        badgeClass: 'bg-emerald-100 text-emerald-600',
         titleKey: 'supportDirectTitle',
         subtitleKey: 'supportDirectSubtitle',
       },
@@ -444,35 +843,34 @@ export const PAGE_SECTIONS = {
       {
         icone: 'contactCall',
         labelKey: 'contactCall',
-        badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
-        rowClass: LIGNE_LIEN,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactWhatsapp',
         labelKey: 'contactWhatsapp',
-        badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
         value: CONTACT.phoneDisplay,
         external: true,
-        rowClass: LIGNE_LIEN,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactSendEmail',
         labelKey: 'contactSendEmail',
-        badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
         value: CONTACT.email,
         breakAll: true,
-        rowClass: LIGNE_LIEN,
+        rowClass: LIGNE_CONTACT,
       },
       {
+        // Cette ligne N'EST PAS un lien (elle n'a pas de `href`) : c'est elle
+        // qui décide, dans les deux canaux, qu'aucune flèche n'est peinte —
+        // une flèche promet une destination.
         icone: 'contactAddress',
         labelKey: 'contactAddress',
-        badgeClass: 'bg-gray-100 text-gray-600',
         value: CONTACT.address,
-        rowClass: LIGNE_INFO,
+        rowClass: LIGNE_CONTACT,
       },
     ],
     links: [
@@ -489,7 +887,8 @@ export const PAGE_SECTIONS = {
     // 25/09/2026 comme sur /jobs (deux canaux, deux tailles) : UNE SEULE
     // candidate, au premier paint (coquille t = 112 / 116 ms, React 88 / 112),
     // sur ce paragraphe, d'aire IDENTIQUE — 74 466 px² mobile, 80 262 px²
-    // desktop. C'est cette ÉGALITÉ qui tient la garantie : createRoot efface
+    // desktop ; re-mesuré le 26/09/2026 avec la police servie par le site :
+    // 82 940 / 79 540 px² (voir /login). C'est cette ÉGALITÉ qui tient la garantie : createRoot efface
     // #root, React reconstruit le même paragraphe, et un remplacement de MÊME
     // TAILLE n'enregistre aucun nouvel élément LCP.
     //
@@ -497,9 +896,15 @@ export const PAGE_SECTIONS = {
     // vite-plugins/prerender/shells-routes.js. `frameClass` porte la largeur
     // (donc le retour à la ligne du paragraphe), `introClass` sa hauteur, et
     // `titleClass` le seul autre texte qui puisse prendre le LCP.
-    frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
-    introClass: 'text-gray-600 mb-8',
+    frameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
+    titleClass: 'titre-page mb-4',
+    introClass: 'text-stone-600 mb-8',
+    // Le PAS de la carte (28/09/2026) : les trois promesses portaient
+    // `carte-editoriale p-6`, la MÊME chaîne écrite deux fois — ici la page, et
+    // dans la coquille. `carte-publique` est le pas commun aux cartes du site
+    // (src/index.css) ; ce qui reste propre à cette page est son dessin
+    // (`carte-editoriale`), jamais son rembourrage.
+    carteClass: 'carte-editoriale carte-publique',
     // Les trois promesses publiaient l'emoji de leur clé (`iconPromise*`) ;
     // l'accueil, lui, DESSINE déjà ces trois mêmes icônes (`icone:
     // 'promise*'`). Elles sont maintenant déclarées de la même façon ici, donc
@@ -561,10 +966,15 @@ export const PAGE_SECTIONS = {
     // la ligne) : elle vient de `frameClass`. `titleClass` porte le seul autre
     // texte capable de prendre le LCP au paragraphe (l'aire du titre grandit
     // avec lui), et `noteClass` le suit dans le flux.
-    frameClass: 'max-w-2xl mx-auto px-4 py-8',
-    titleClass: 'text-3xl font-bold text-gray-900 mb-2',
-    introClass: 'text-gray-600 mb-3',
-    noteClass: 'text-sm text-gray-500 mb-6',
+    frameClass: 'max-w-2xl mx-auto px-4 cadre-page',
+    titleClass: 'titre-page mb-2',
+    introClass: 'text-stone-600 mb-3',
+    noteClass: 'text-sm text-stone-500 mb-6',
+    // Le vocabulaire éditorial des quatre lignes de contact : le MÊME bloc que
+    // /support (`BLOC_CONTACT`, plus haut). Les deux pages publiaient la même
+    // ligne sous deux habillages — un cadre arrondi ici, un cadre arrondi
+    // là-bas — et les deux sont maintenant une entrée de liste.
+    ...BLOC_CONTACT,
     // ── La carte Google : un contrôle, pas un embed au premier écran ───────
     // La coquille publiait l'iframe elle-même (en `loading="lazy"`). Mesuré
     // (Lighthouse 12.6.1, pile de la CI, Chrome 152, /contact mobile, 3 runs) :
@@ -584,7 +994,7 @@ export const PAGE_SECTIONS = {
     // le résolvent par le registre, pas par le dictionnaire.
     icone: 'contactAddress',
     mapFrameClass:
-      'mt-6 w-full rounded-xl border border-gray-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
+      'mt-6 w-full rounded-xl border border-stone-200 bg-white flex h-80 flex-col items-center justify-center gap-3 px-4 text-center',
     mapControlClass:
       'inline-flex items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700',
     // Une ligne de contact = une donnée (icône, libellé, destination, valeur
@@ -592,10 +1002,10 @@ export const PAGE_SECTIONS = {
     // et la règle `mailto:` (sujet compris) n'existent qu'à cet endroit, donc la
     // page et sa coquille ne peuvent pas publier deux liens différents.
     //
-    // `badgeClass` / `breakAll` sont l'identité de LA LIGNE (un accent par moyen
-    // de contact, un e-mail qui se coupe proprement) et non la mise en page de la
-    // page : les deux canaux doivent rendre la même ligne, donc ils la lisent ici
-    // plutôt que de la réécrire chacun de leur côté.
+    // `breakAll` est l'identité de LA LIGNE (un e-mail qui se coupe proprement,
+    // sans déborder de sa colonne) et non la mise en page de la page : les deux
+    // canaux doivent rendre la même ligne, donc ils la lisent ici plutôt que de
+    // la réécrire chacun de leur côté.
     //
     // Les libellés sont des CLÉS i18n, et les QUATRE MÊMES que les lignes de
     // /support (`rows` plus haut) : « Appeler », « WhatsApp », « Envoyer un
@@ -607,33 +1017,33 @@ export const PAGE_SECTIONS = {
       {
         icone: 'contactCall',
         labelKey: 'contactCall',
-        badgeClass: 'bg-orange-100 text-orange-600',
         href: telHref,
         value: CONTACT.phoneDisplay,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactWhatsapp',
         labelKey: 'contactWhatsapp',
-        badgeClass: 'bg-emerald-100 text-emerald-600',
         href: CONTACT.whatsappUrl,
         value: CONTACT.phoneDisplay,
         external: true,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactSendEmail',
         labelKey: 'contactSendEmail',
-        badgeClass: 'bg-blue-100 text-blue-600',
         href: mailtoHref,
         value: CONTACT.email,
         breakAll: true,
+        rowClass: LIGNE_CONTACT,
       },
       {
         icone: 'contactAddress',
         labelKey: 'contactAddress',
-        badgeClass: 'bg-gray-100 text-gray-600',
         href: CONTACT.mapsUrl,
         value: CONTACT.address,
         external: true,
+        rowClass: LIGNE_CONTACT,
       },
     ],
     links: [
@@ -651,20 +1061,32 @@ export const PAGE_SECTIONS = {
     // CORPS d'une section (« Kojo conserve les données nécessaires à la mise
     // en relation… », mesuré le 25/09/2026 : UNE SEULE candidate au premier
     // paint, 84 360 px² mobile / 86 676 px² desktop, aire identique entre la
-    // coquille et React). La géométrie à déclarer est donc celle de la
+    // coquille et React ; re-mesuré le 26/09/2026 avec la police servie par le
+    // site : 91 630 / 100 788 px² — voir /login). La géométrie à déclarer est donc celle de la
     // section, pas seulement de son en-tête : `sectionBodyClass` porte
     // l'élément élu, `sectionTitleClass` l'en-tête qui le précède dans le
     // flux, et `frameClass` la largeur — c'est elle qui décide du retour à la
     // ligne, donc de la hauteur du corps.
     //
-    // Ces cinq chaînes étaient recopiées dans src/pages/Privacy.js et
+    // Ces six chaînes étaient recopiées dans src/pages/Privacy.js et
     // vite-plugins/prerender/shells-routes.js : une retouche d'un seul côté
     // faisait diverger les deux peintures en silence.
-    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-    titleClass: 'text-3xl font-bold text-gray-900 mb-4',
-    introClass: 'text-gray-600 mb-8',
-    sectionTitleClass: 'text-xl font-semibold text-gray-900 mb-2',
-    sectionBodyClass: 'text-gray-600',
+    //
+    // Refonte éditoriale du 28/09/2026 : le titre d'une section prend le dessin
+    // des titres d'entrée du site (serif, un cran sous `.titre-section`) et
+    // chaque section devient une ENTRÉE à filet (`.bloc-de-section`) — quatre
+    // paragraphes séparés par du vide se lisaient comme un document, quatre
+    // entrées à filet se lisent comme une liste ordonnée, le vocabulaire de
+    // l'accueil. La TAILLE du titre ne bouge pas (`1.25rem`, soit le `text-xl`
+    // qu'elle portait) : le plus grand texte peint reste le CORPS d'une
+    // section, donc l'élément LCP de la page reste celui sur lequel elle a été
+    // mesurée.
+    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
+    titleClass: 'titre-page mb-4',
+    introClass: 'text-stone-600 mb-8',
+    sectionTitleClass: 'titre-entree mb-2',
+    sectionBodyClass: 'text-stone-600',
+    sectionWrapClass: 'bloc-de-section',
     sections: [
       { titleKey: 'privacyDataTitle', bodyKey: 'privacyDataBody' },
       { titleKey: 'privacyRetentionTitle', bodyKey: 'privacyRetentionBody' },
@@ -674,6 +1096,37 @@ export const PAGE_SECTIONS = {
     links: [
       { to: '/contact', labelKey: 'contactTitle' },
       { to: '/about', labelKey: 'aboutTitle' },
+    ],
+  },
+
+  // ── Conditions générales d'utilisation ────────────────────────────────────
+  // Le pied de page renvoyait vers un .docx fusionné (confidentialité + CGU) :
+  // un crawler n'en lisait rien et un lecteur devait télécharger un fichier
+  // Word. Cette page existe pour publier les CGU en clair, à une adresse
+  // citable, avec la MÊME forme que la politique de confidentialité (le plan
+  // est lu par la page React ET par la coquille pré-rendue).
+  '/terms': {
+    titleKey: 'termsTitle',
+    introKey: 'termsIntro',
+    // Même géométrie que /privacy : le plus grand texte peint est le CORPS
+    // d'une section, c'est `sectionBodyClass` qui porte l'élément LCP.
+    // Même vocabulaire aussi : les deux pages se lisent d'un bout à l'autre
+    // comme un document — titre serif et sections à filet.
+    frameClass: 'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
+    titleClass: 'titre-page mb-4',
+    introClass: 'text-stone-600 mb-8',
+    sectionTitleClass: 'titre-entree mb-2',
+    sectionBodyClass: 'text-stone-600',
+    sectionWrapClass: 'bloc-de-section',
+    sections: [
+      { titleKey: 'termsServiceTitle', bodyKey: 'termsServiceBody' },
+      { titleKey: 'termsAccountTitle', bodyKey: 'termsAccountBody' },
+      { titleKey: 'termsPaymentTitle', bodyKey: 'termsPaymentBody' },
+      { titleKey: 'termsLiabilityTitle', bodyKey: 'termsLiabilityBody' },
+    ],
+    links: [
+      { to: '/privacy', labelKey: 'privacyTitle' },
+      { to: '/contact', labelKey: 'contactTitle' },
     ],
   },
 };

@@ -5,11 +5,11 @@ const dict = {
 fr: {
   backToDashboard: 'Retour au tableau de bord',
   title: 'Test mobile Kojo',
-  appInfo: '📱 Informations sur l’application mobile',
-  featuresImplemented: '✅ Fonctionnalités implémentées',
-  screensIntegrated: '📱 Écrans intégrés',
-  testOnMobile: '🚀 Pour tester sur mobile',
-  troubleshooting: '🔧 Dépannage',
+  appInfo: 'Informations sur l’application mobile',
+  featuresImplemented: 'Fonctionnalités implémentées',
+  screensIntegrated: 'Écrans intégrés',
+  testOnMobile: 'Pour tester sur mobile',
+  troubleshooting: 'Dépannage',
   feat1: '• Service de gestion d’images complet (ImageService)',
   feat2: '• Composant ProfilePhoto réutilisable',
   feat3: '• Intégration expo-image-picker pour caméra/galerie',
@@ -34,11 +34,11 @@ fr: {
 en: {
   backToDashboard: 'Back to dashboard',
   title: 'Kojo mobile test',
-  appInfo: '📱 Mobile app information',
-  featuresImplemented: '✅ Implemented features',
-  screensIntegrated: '📱 Integrated screens',
-  testOnMobile: '🚀 To test on mobile',
-  troubleshooting: '🔧 Troubleshooting',
+  appInfo: 'Mobile app information',
+  featuresImplemented: 'Implemented features',
+  screensIntegrated: 'Integrated screens',
+  testOnMobile: 'To test on mobile',
+  troubleshooting: 'Troubleshooting',
   feat1: '• Complete image management service (ImageService)',
   feat2: '• Reusable ProfilePhoto component',
   feat3: '• expo-image-picker integration for camera/gallery',
@@ -63,29 +63,29 @@ en: {
 };
 dict.wo = withBase(dict.fr, {
 backToDashboard: 'Dellu ci dashboard',
-  appInfo: '📱 Xibaar ci app mobile bi',
-  featuresImplemented: '✅ Fonkisiyon yu sampu',
-  screensIntegrated: '📱 Ekran yi dugal nañu leen',
-  testOnMobile: '🚀 Ngir test ci mobile',
-  troubleshooting: '🔧 Defar njuumte'
+  appInfo: 'Xibaar ci app mobile bi',
+  featuresImplemented: 'Fonkisiyon yu sampu',
+  screensIntegrated: 'Ekran yi dugal nañu leen',
+  testOnMobile: 'Ngir test ci mobile',
+  troubleshooting: 'Defar njuumte'
 });
 dict.bm = withBase(dict.fr, {
 backToDashboard: 'Segin ka taa dashboard la',
   title: 'Kojo mobile test',
-  appInfo: '📱 Mobile app kibaru',
-  featuresImplemented: '✅ Fɛɛrɛw minnu dafalen',
-  screensIntegrated: '📱 Écran minnu don',
-  testOnMobile: '🚀 Ka test kɛ mobile kan',
-  troubleshooting: '🔧 Dɛpannage'
+  appInfo: 'Mobile app kibaru',
+  featuresImplemented: 'Fɛɛrɛw minnu dafalen',
+  screensIntegrated: 'Écran minnu don',
+  testOnMobile: 'Ka test kɛ mobile kan',
+  troubleshooting: 'Dɛpannage'
 });
 dict.mos = withBase(dict.fr, {
 backToDashboard: 'Lebg n kẽ dashboard',
   title: 'Kojo mobile test',
-  appInfo: '📱 Mobile app kibare',
-  featuresImplemented: '✅ Noy sẽn ninge',
-  screensIntegrated: '📱 Écran sẽn paase',
-  testOnMobile: '🚀 N ges mobile pʋgẽ',
-  troubleshooting: '🔧 Songre'
+  appInfo: 'Mobile app kibare',
+  featuresImplemented: 'Noy sẽn ninge',
+  screensIntegrated: 'Écran sẽn paase',
+  testOnMobile: 'N ges mobile pʋgẽ',
+  troubleshooting: 'Songre'
 });
 
 export const makeScopedTranslator = (currentLanguage, fallbackT) =>

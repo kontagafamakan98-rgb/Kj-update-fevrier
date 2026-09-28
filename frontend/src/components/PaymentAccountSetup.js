@@ -6,6 +6,7 @@ import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { devLog, safeLog } from '../utils/env';
 import { api, handleApiError } from '../services/api';
 import CountryDisplay from './CountryDisplay';
+import { Landmark, Wallet, Waves, CheckCircle2, XCircle, Lightbulb, Lock, Smartphone } from 'lucide-react';
 
 const createDefaultAccounts = (initialAccounts = null) => ({
   orange_money: initialAccounts?.orange_money || '',
@@ -76,7 +77,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
       setDetectedCountry(country);
       setPhoneExample(getPhoneExampleForCountry(country));
       setPopularBanks(getPopularBanksByCountry(country));
-      devLog.info(`🌍 Pays détecté: ${country.nameFrench} ${country.flag}`);
+      devLog.info(`🌍 Pays détecté: ${country.nameFrench}`);
     } catch (error) {
       safeLog.error('Erreur détection pays:', error);
     }
@@ -260,7 +261,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          🏦 {t('paymentVerification')}
+          <Landmark className="inline h-7 w-7 mr-2 text-orange-600" aria-hidden="true" /> {t('paymentVerification')}
         </h2>
         <p className="text-gray-600">
           {userType === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
@@ -285,7 +286,15 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-red-100 text-red-800'
             }`}>
-              {linkedAccountsCount >= requiredMinimum ? `✅ ${t('validStatus')}` : `❌ ${t('insufficientStatus')}`}
+              {linkedAccountsCount >= requiredMinimum ? (
+                <>
+                  <CheckCircle2 className="inline h-4 w-4 mr-1" aria-hidden="true" />{t('validStatus')}
+                </>
+              ) : (
+                <>
+                  <XCircle className="inline h-4 w-4 mr-1" aria-hidden="true" />{t('insufficientStatus')}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -295,7 +304,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         {/* Orange Money */}
         <div className="border border-orange-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
-            <span className="text-2xl mr-3">🧡</span>
+            <Wallet className="h-6 w-6 mr-3 text-orange-500" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-gray-900">{t('orangeMoney')}</h3>
             <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
               {supportedOrangeMoneyCountries}
@@ -323,7 +332,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         {/* Wave */}
         <div className={`border rounded-lg p-4 ${isWaveUnavailable ? 'border-gray-200 bg-gray-50' : 'border-blue-200'}`}>
           <div className="flex items-center mb-3">
-            <span className="text-2xl mr-3">🌊</span>
+            <Waves className="h-6 w-6 mr-3 text-blue-500" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-gray-900">{t('wave')}</h3>
             <span className={`ml-2 text-xs px-2 py-1 rounded ${isWaveUnavailable ? 'bg-gray-200 text-gray-600' : 'bg-blue-100 text-blue-800'}`}>
               {t('availableAcrossWestAfrica')}
@@ -359,7 +368,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
         {/* Compte Bancaire */}
         <div className="border border-green-200 rounded-lg p-4">
           <div className="flex items-center mb-3">
-            <span className="text-2xl mr-3">🏦</span>
+            <Landmark className="h-6 w-6 mr-3 text-green-600" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-gray-900">{t('bankAccount')}</h3>
             <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
               {t('forBankTransfers')}
@@ -470,7 +479,7 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
           )}
           
           <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded text-xs text-green-800">
-            <p><strong>💡 {t('whyTheseInfo')}</strong></p>
+            <p className="flex items-start gap-1"><Lightbulb className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" /><strong>{t('whyTheseInfo')}</strong></p>
             <p>• {t('bankRequiredFieldsInfo')}</p>
             <p>• {t('bankOptionalFieldsInfo')}</p>
             <p>• {t('bankTransferDirectInfo')}</p>
@@ -485,8 +494,8 @@ const PaymentAccountSetup = ({ onComplete, userType = 'client', isRegistration =
 
         <div className="flex justify-between items-center pt-6">
           <div className="text-sm text-gray-600">
-            <p>🔐 {t('paymentInfoSecure')}</p>
-            <p>📱 {userType === 'worker' ? t('requiredToReceivePayments') : t('requiredToMakePayments')}</p>
+            <p className="flex items-center gap-1"><Lock className="h-4 w-4 shrink-0" aria-hidden="true" />{t('paymentInfoSecure')}</p>
+            <p className="flex items-center gap-1"><Smartphone className="h-4 w-4 shrink-0" aria-hidden="true" />{userType === 'worker' ? t('requiredToReceivePayments') : t('requiredToMakePayments')}</p>
           </div>
           
           <button

@@ -14,6 +14,7 @@ import ProfilePhoto from '../components/ProfilePhoto';
 import ProfilePhotoUploader from '../components/ProfilePhotoUploader';
 import TagInput from '../components/TagInput';
 import ConfirmModal from '../components/ConfirmModal';
+import { Users, CheckCircle2 } from 'lucide-react';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import PaymentAccountsManager from '../components/PaymentAccountsManager';
 import { usersAPI, reviewAPI, workerProfileAPI } from '../services/apiEndpoints';
@@ -23,6 +24,10 @@ import { WorkerTrustBadge, VerifiedBadge } from '../utils/workerTrustLevel';
 import { usePageTitle } from '../utils/seo';
 import { Skeleton } from '../components/SkeletonLoader';
 import { PHONE_NUMBER_MASK } from '../config/phone-format';
+// La carte du profil : une carte DIFFÉRÉE (montée seulement si le bloc entre
+// dans le viewport), dont les URL viennent de leur propriétaire.
+import DeferredMap from '../components/DeferredMap';
+import { countryMapFor } from '../utils/countryMap';
 
 const getLanguageLabel = (languageCode, t) => {
   const languageMap = {
@@ -61,6 +66,12 @@ export default function Profile() {
   const toast = useToast();
   const navigate = useNavigate();
   usePageTitle(t('profileMetaTitle'));
+
+  // La carte du PAYS DÉCLARÉ — la seule position qu'un profil possède (aucun
+  // modèle ne porte de coordonnées : voir `src/utils/countryMap.js`). `null`
+  // pour un pays hors des quatre couverts : la section n'est alors pas publiée
+  // du tout, plutôt que de peindre un cadre vide.
+  const cartePays = countryMapFor(user?.country);
 
   useEffect(() => {
     loadProfile();
@@ -134,7 +145,7 @@ export default function Profile() {
       await loadUser();
       requestAnimationFrame(() => setPhotoRefreshKey((prev) => prev + 1));
       setIsEditing(false);
-      toast.success(`${t('profileUpdated')} ✅`);
+      toast.success(t('profileUpdated'));
     } catch (updateError) {
       safeLog.error('Profile update error:', updateError);
       const errorMsg = handleApiError(updateError, t('error'));
@@ -209,7 +220,7 @@ export default function Profile() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="carte-editoriale overflow-hidden">
         <div className="bg-orange-600 px-6 py-8">
           <div className="flex items-center">
             <ProfilePhoto
@@ -222,7 +233,10 @@ export default function Profile() {
             />
             <div className="ml-6">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-white">{user.first_name} {user.last_name}</h1>
+                {/* Le nom est le titre d'un bandeau ORANGE : c'est donc
+                    `.titre-heros` (crème, serif) et non `.titre-page`, dont
+                    l'encre foncée disparaîtrait sur ce fond. */}
+                <h1 className="titre-heros">{user.first_name} {user.last_name}</h1>
                 <VerifiedBadge verified={user.is_verified} />
                 {user.user_type === 'worker' && <WorkerTrustBadge person={user} />}
               </div>
@@ -327,6 +341,27 @@ export default function Profile() {
           />
         </div>
 
+        {/* Localisation : le pays déclaré, sur une carte DIFFÉRÉE. Le bloc est
+            volontairement LOIN sous la ligne de flottaison (après le paiement,
+            avant l'aide et la zone dangereuse) : c'est la position qui donne
+            son sens à « aucune requête tant que le bloc n'est pas à l'écran »,
+            et le parcours e2e (`e2e/carte-facade.spec.js`) refuse une carte
+            qui serait montée au premier écran. */}
+        {cartePays && (
+          <div className="px-6 py-6 border-t border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">{t('location')}</h2>
+            <p className="mb-4 text-sm text-gray-500">
+              <CountryDisplay countryCode={user.country} className="inline-flex align-middle" />
+            </p>
+            <DeferredMap
+              src={cartePays.src}
+              href={cartePays.href}
+              title={t('mapIframeTitle').replace('{address}', cartePays.nom)}
+              label={t('mapShowMap')}
+            />
+          </div>
+        )}
+
         <ConfirmModal
           open={portfolioRemoveIndex !== null}
           title={t('portfolioTitle')}
@@ -416,7 +451,7 @@ function ProfileView({ profile, t, pageT }) {
         <div>
           <label className="block text-sm font-medium text-gray-700">{t('verified')}</label>
           <p className="mt-1">
-            <span className={`px-2 py-1 text-xs rounded-full ${profile.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            <span className={`px-2 py-1 text-xs rounded-lg ${profile.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {profile.is_verified ? t('verified') : `${t('no')} ${t('verified').toLowerCase()}`}
             </span>
           </p>
@@ -437,7 +472,7 @@ function ProfileView({ profile, t, pageT }) {
             {skills.map((skill, index) => (
               <span
                 key={`${skill}-${index}`}
-                className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm"
+                className="bg-orange-100 text-orange-800 px-3 py-1 rounded-lg text-sm"
               >
                 {skill}
               </span>
@@ -540,17 +575,17 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="first_name" className="block text-sm font-medium text-gray-700">{pageT('firstName')}</label>
-          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="first_name" name="first_name" autoComplete="given-name" value={formData.first_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="last_name" className="block text-sm font-medium text-gray-700">{pageT('lastName')}</label>
-          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="text" id="last_name" name="last_name" autoComplete="family-name" value={formData.last_name} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="phone" className="block text-sm font-medium text-gray-700">{t('phone')}</label>
-          <div className="mt-1 flex rounded-md shadow-sm">
+          <div className="mt-1 flex rounded-md">
             <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
               {getPhonePrefixByCountry(formData.country.toLowerCase())}
             </span>
@@ -573,7 +608,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
 
         <div>
           <label htmlFor="preferred_language" className="block text-sm font-medium text-gray-700">{t('preferredLanguage')}</label>
-          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500">
+          <select id="preferred_language" name="preferred_language" autoComplete="off" value={formData.preferred_language} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500">
             {getAvailableLanguagesForCountry(formData.country).map(lang => (
               <option key={lang} value={lang}>{getLanguageLabel(lang, t)}</option>
             ))}
@@ -599,7 +634,7 @@ export function ProfileEditForm({ profile, user, onSave, onCancel, pageT, t }) {
           <h3 className="text-lg font-medium text-gray-900">{pageT('professionalInfo')}</h3>
           <div>
             <label htmlFor="bio" className="block text-sm font-medium text-gray-700">{pageT('bio')}</label>
-            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+            <textarea id="bio" name="bio" autoComplete="off" rows={4} value={formData.bio} onChange={handleChange} placeholder={pageT('bioPlaceholder')} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
             <p className="mt-1 text-sm text-gray-500">{pageT('bioHelp')}</p>
           </div>
 
@@ -636,7 +671,7 @@ function WorkerProfileView({ profile, pageT, t }) {
           <label className="block text-sm font-medium text-gray-700">{pageT('specialties')}</label>
           <div className="mt-1 flex flex-wrap gap-2">
             {profile.specialties?.map((specialty, index) => (
-              <span key={index} className="bg-orange-100 text-orange-800 px-2 py-1 rounded-full text-sm">{specialty}</span>
+              <span key={index} className="bg-orange-100 text-orange-800 px-2 py-1 rounded-lg text-sm">{specialty}</span>
             ))}
           </div>
         </div>
@@ -649,7 +684,7 @@ function WorkerProfileView({ profile, pageT, t }) {
         <div>
           <label className="block text-sm font-medium text-gray-700">{pageT('availability')}</label>
           <p className="mt-1">
-            <span className={`px-2 py-1 text-xs rounded-full ${profile.availability ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            <span className={`px-2 py-1 text-xs rounded-lg ${profile.availability ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {profile.availability ? t('availableStatus') : t('unavailableStatus')}
             </span>
           </p>
@@ -685,7 +720,7 @@ function WorkerProfileCreate({ onCreate, pageT }) {
   };
 
   return (
-    <div className="bg-gray-50 p-6 rounded-lg">
+    <div className="fond-sable p-6 rounded-lg">
       <p className="text-gray-600 mb-4">{pageT('createWorkerProfileHelp')}</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -704,12 +739,12 @@ function WorkerProfileCreate({ onCreate, pageT }) {
 
         <div>
           <label htmlFor="experience_years" className="block text-sm font-medium text-gray-700">{pageT('yearsExperience')}</label>
-          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
+          <input type="number" id="experience_years" name="experience_years" autoComplete="off" min="0" required value={formData.experience_years} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" />
         </div>
 
         <div>
           <label htmlFor="description" className="block text-sm font-medium text-gray-700">{pageT('descriptionOptional')}</label>
-          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
+          <textarea id="description" name="description" autoComplete="off" rows={3} value={formData.description} onChange={handleChange} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder={pageT('descriptionPlaceholder')} />
         </div>
 
         <div className="flex items-center">
@@ -940,9 +975,9 @@ function FilleulsCard({ filleuls, t }) {
   return (
     <div className="mt-6">
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-        <span className="mr-2">👥</span>
+        <Users className="h-4 w-4 mr-2" aria-hidden="true" />
         {t('filleulsTitle')}
-        <span className="ml-2 rounded-full bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
+        <span className="ml-2 rounded bg-orange-100 text-orange-700 px-2 py-0.5 text-xs font-semibold">
           {filleuls.length}
         </span>
       </h3>
@@ -976,7 +1011,7 @@ function FilleulsCard({ filleuls, t }) {
             <div className="text-right shrink-0 ml-3">
               {filleul.completed_first_job ? (
                 <span className="inline-flex items-center text-xs font-semibold text-green-700">
-                  ✅ {t('filleulFirstJobDone')}
+                  <CheckCircle2 className="inline h-4 w-4 mr-1" aria-hidden="true" /> {t('filleulFirstJobDone')}
                 </span>
               ) : (
                 <span className="inline-flex items-center text-xs text-gray-400">
@@ -999,7 +1034,7 @@ function FilleulsCard({ filleuls, t }) {
 function ProfileSkeleton({ t, pageT }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="carte-editoriale overflow-hidden">
         {/* Header orange / photo / nom */}
         <div className="bg-orange-600 px-6 py-8">
           <div className="flex items-center">

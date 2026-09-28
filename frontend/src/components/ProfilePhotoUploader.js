@@ -7,6 +7,8 @@ import { buildBackendUrl } from '../utils/backendUrl';
 import profilePhotoService from '../services/ProfilePhotoService';
 import { handleApiError } from '../services/api';
 import { compressImage, validateImageFile, formatFileSize } from '../utils/imageOptimization';
+import { Zap } from 'lucide-react';
+import { Icone } from './chrome-icons';
 
 const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className = '' }) => {
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(null);
@@ -191,9 +193,9 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       {/* Photo Preview */}
       <div className="mb-4 text-center">
         <div className="relative inline-block">
-          <div className="w-32 h-32 rounded-full bg-gray-200 overflow-hidden border-4 border-white shadow-lg">
+          <div className="h-32 w-32 overflow-hidden rounded-full border-4 border-white bg-stone-200">
             {loading ? (
-              <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              <div className="flex h-full w-full items-center justify-center bg-stone-100">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
               </div>
             ) : currentPhoto ? (
@@ -207,8 +209,8 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
                 }}
               />
             ) : (
-              <div className="w-full h-full bg-orange-100 flex items-center justify-center">
-                <span className="text-orange-600 text-2xl font-bold">
+              <div className="flex h-full w-full items-center justify-center bg-orange-100">
+                <span className="text-2xl font-bold text-orange-800">
                   {profilePhotoService.getUserInitials(user)}
                 </span>
               </div>
@@ -216,7 +218,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
           </div>
           
           {(uploading || loading) && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             </div>
           )}
@@ -226,10 +228,10 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       {/* Upload Area - Show for current user OR if no target specified */}
       {(isCurrentUser || !targetUserId) && (
         <div
-          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-            dragOver 
-              ? 'border-orange-500 bg-orange-50' 
-              : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+          className={`rounded-[3px] border-2 border-dashed p-6 text-center transition-colors ${
+            dragOver
+              ? 'border-orange-500 bg-orange-50'
+              : 'border-stone-300 bg-stone-50 hover:bg-stone-100'
           }`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -245,21 +247,26 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
         />
 
         <div className="space-y-2">
-          <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          {/* Le dessin vient du registre du chrome : il partage donc sa grille de
+              24 et son épaisseur avec la barre de navigation et les toasts, au
+              lieu d'un tracé emprunté à une autre famille et redimensionné à la
+              main sur une grille de 48. h-12 = 48 px, donc épaisseur 1,75. */}
+          <Icone nom="photo" classe="mx-auto h-12 w-12 text-stone-400" epaisseur={1.75} />
           
-          <div className="text-gray-600">
+          <div className="text-stone-600">
             <p className="text-sm">
-              <span className="font-medium text-orange-600 hover:text-orange-500 cursor-pointer" onClick={triggerFileSelect}>
+              <span className="cursor-pointer font-medium text-orange-700 hover:text-orange-600" onClick={triggerFileSelect}>
                 {t('clickToChooseSimple')}
               </span> {t('or')} {t('dragImageHere').toLowerCase()}
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="mt-1 text-xs text-stone-500">
               {t('imageFormatsLimit')}
             </p>
-            <p className="text-xs text-orange-600 mt-1">
-              ✨ {t('autoOptimizedFastConnection')}
+            {/* L'éclair dit ce dont il s'agit (la compression) ; l'étincelle
+                décorait. La même taille et le même alignement qu'avant : c'est
+                le dessin qui change, pas la ligne sur laquelle il se pose. */}
+            <p className="mt-1 text-xs text-orange-700">
+              <Zap className="mr-1 inline h-4 w-4 align-[-0.15em]" aria-hidden="true" /> {t('autoOptimizedFastConnection')}
             </p>
           </div>
 
@@ -269,7 +276,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
           type="button"
           onClick={triggerFileSelect}
           disabled={uploading || loading}
-          className="mt-4 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bouton bouton-encre mt-4 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {uploading ? t('uploadInProgress') : t('choosePhoto')}
         </button>
@@ -279,7 +286,7 @@ const ProfilePhotoUploader = ({ onUploadSuccess, targetUserId = null, className 
       {/* Instructions */}
       {(isCurrentUser || !targetUserId) && (
         <div className="mt-4 text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-stone-500">
             {t('photoVisibleAllUsers')}
           </p>
         </div>

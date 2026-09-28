@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/countryAliases';
 import FlagIcon from './FlagIcon';
@@ -79,7 +80,7 @@ export default function CountryDisplay({
 
   return (
     <span className={`flex items-center space-x-2 ${className}`}>
-      {showFlag && <FlagIcon country={country.code} className="w-5 h-4" showEmoji={false} />}
+      {showFlag && <FlagIcon country={country.code} className="w-5 h-4" />}
       {showName && <span>{translatedName}</span>}
     </span>
   );
@@ -208,7 +209,7 @@ export function CountrySelect({
         aria-required={required}
       >
         <span className="flex items-center gap-3 min-w-0">
-          {activeCountry ? <FlagIcon country={activeCountry.code} className="w-6 h-4" showEmoji={false} /> : <span className="text-lg leading-none"><IconePage nom={iconeGlobe} classe={CLASSES_ICONE.paysGlobe} /></span>}
+          {activeCountry ? <FlagIcon country={activeCountry.code} className="w-6 h-4" /> : <span className="text-lg leading-none"><IconePage nom={iconeGlobe} classe={CLASSES_ICONE.paysGlobe} /></span>}
           <span className={`truncate ${activeCountry ? 'text-gray-900' : 'text-gray-400'}`}>
             {activeCountry ? getTranslatedCountryName(activeCountry, t) : resolvedPlaceholder}
           </span>
@@ -253,10 +254,10 @@ export function CountrySelect({
                   }`}
                 >
                   <span className="flex items-center gap-3 min-w-0">
-                    <FlagIcon country={country.code} className="w-6 h-4" showEmoji={false} />
+                    <FlagIcon country={country.code} className="w-6 h-4" />
                     <span className="truncate">{getTranslatedCountryName(country, t)}</span>
                   </span>
-                  {isSelected && <span className="text-sm font-semibold">✓</span>}
+                  {isSelected && <Check className="h-4 w-4 font-semibold" aria-hidden="true" />}
                 </button>
               );
             }) : (

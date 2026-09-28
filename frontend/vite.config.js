@@ -123,7 +123,7 @@ export default defineConfig(({ mode }) => {
       injectProductionCspPlugin({ env, mode, apiOrigin }),
       // PLUS D'ÉTAPE D'ÉLAGAGE, et c'est un choix, pas un oubli : les familles de
       // sélecteurs qu'aucun composant ne pose ont été RETIRÉES de leurs feuilles
-      // source (src/App.css, src/styles/kojo-pack-*.css), et
+      // source (src/index.css, src/App.css), et
       // `scripts/check-css-selecteurs-morts.js` interdit d'en réécrire une. Un
       // élagage au build ne pouvait que masquer la dette — la feuille servie
       // différait des sources, et le nettoyage se refaisait à chaque build, avec

@@ -102,6 +102,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
   const aboutPlan = pageSections['/about']
   const contactPlan = pageSections['/contact']
   const privacyPlan = pageSections['/privacy']
+  const termsPlan = pageSections['/terms']
   const supportPlan = pageSections['/support']
   const howItWorksPlan = pageSections['/how-it-works']
   const jobsPlan = pageSections['/jobs']
@@ -156,13 +157,13 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // statique différente décalerait tout le bloc au montage React
     // (CLS). La bascule est invisible : createRoot efface #root et
     // rend la même structure.
-    login: `<div class="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">`
+    login: `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
       + `<div class="max-w-md w-full space-y-8">`
       + `<div>`
-      + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">`
+      + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-lg bg-orange-600">`
       + `<span class="text-white text-xl font-bold">${esc(T('brandMark'))}</span>`
       + `</div>`
-      + `<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">${esc(T(loginPlan.titleKey))}</h1>`
+      + `<h1 class="mt-6 text-center titre-page">${esc(T(loginPlan.titleKey))}</h1>`
       + `</div>`
       + `<form class="mt-8 space-y-6">`
       + `<div class="space-y-4">`
@@ -183,14 +184,15 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div>`
       // `type="submit"` : le MÊME attribut que le bouton de React (le
       // `LoadingButton` de Login.js le déclare). Il décide de la hauteur :
-      // `[type="submit"]` (src/styles/kojo-pack-f-readability-no-color.css)
-      // porte `min-height: 48px` et l'emporte par spécificité sur le
+      // `[type="submit"]` (l'en-tête de src/index.css, où vivent désormais
+      // les déclarations d'ÉLÉMENT des cinq `kojo-pack-*.css` supprimés) porte
+      // `min-height: 48px` et l'emporte par spécificité sur le
       // `button { min-height: 44px }` de App.css — un `type="button"`
       // intermédiaire peindrait 4 px de moins que la page.
       + `<button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">${esc(T(loginPlan.titleKey))}</button>`
       + `</div>`
       + (googleAuth ? boutonGoogle({ esc, label: registerT(loginPlan.googleLoginKey) }) : '')
-      + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">`
+      + `<div class="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">`
       + `<p class="text-sm font-semibold text-orange-900">${svgDeLIcone(loginPlan.legalNoticeIcon, CLASSES_ICONE.notice)} ${esc(registerT('legalNoticeTitle'))}</p>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
       + `<p class="${loginPlan.legalContactClass}">${esc(registerT('legalContactLine'))}</p>`
@@ -210,17 +212,17 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // readonly (inertes jusqu'au boot) et TOUS les libellés sont résolus
     // par registerT(T) : le scope de la page, donc la même source que
     // src/pages/Register.js.
-    register: `<div class="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">`
+    register: `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
       + `<div class="max-w-md w-full space-y-8">`
       + `<div class="text-center mb-8">`
-      + `<div class="mx-auto h-16 w-16 bg-orange-600 rounded-full flex items-center justify-center shadow-lg">`
+      + `<div class="mx-auto h-16 w-16 bg-orange-600 rounded-lg flex items-center justify-center">`
       + `<span class="text-white text-2xl font-bold">${esc(T('brandMark'))}</span>`
       + `</div>`
-      + `<h1 class="mt-6 text-center text-3xl font-bold text-gray-900">${esc(registerT('title'))}</h1>`
+      + `<h1 class="mt-6 text-center text-3xl font-bold text-stone-900">${esc(registerT('title'))}</h1>`
       + `<p class="mt-2 text-sm text-gray-600">${esc(registerT('subtitle'))}</p>`
-      + `<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">`
+      + `<div class="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">`
       + `<div class="flex items-center justify-center py-2">`
-      + `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>`
+      + `<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500 mr-2"></div>`
       + `<span class="text-xs text-blue-700">${esc(T('detectingLocation'))}</span>`
       + `</div>`
       + `<div class="flex items-center gap-3 overflow-x-auto pb-1 text-xs sm:text-sm sm:justify-center sm:space-x-4">`
@@ -230,16 +232,16 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `<div class="w-12 h-1 bg-gray-200"></div>`
       + `<div class="flex items-center">`
-      + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step2NumberKey))}</div>`
+      + `<div class="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step2NumberKey))}</div>`
       + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepEmail'))}</span>`
       + `</div>`
       + `<div class="w-12 h-1 bg-gray-200"></div>`
       + `<div class="flex items-center">`
-      + `<div class="w-6 h-6 bg-gray-300 text-gray-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step3NumberKey))}</div>`
+      + `<div class="w-6 h-6 bg-stone-300 text-stone-600 rounded-full flex items-center justify-center text-xs font-medium">${esc(registerT(registerPlan.step3NumberKey))}</div>`
       + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepPayments'))}</span>`
       + `</div>`
       + `</div>`
-      + `<p class="${registerPlan.stepNoticeClass}">${svgDeLIcone(registerPlan.stepNoticeIcon, CLASSES_ICONE.notice)} ${esc(registerT('clientStepNotice'))}</p>`
+      + `<p class="${registerPlan.stepNoticeClass}">${svgDeLIcone(registerPlan.stepNoticeIcon, CLASSES_ICONE.noticePetite)} ${esc(registerT('clientStepNotice'))}</p>`
       + `</div>`
       + `</div>`
       + `<form class="mt-8 space-y-6 bg-white p-4 sm:p-8 rounded-xl shadow-md">`
@@ -253,7 +255,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`
       // Les deux cartes sont des `<label>` — l'ÉLÉMENT de React, pas un
       // `<div>` — et portent leur `<input class="sr-only">` :
-      // src/styles/kojo-pack-f-readability-no-color.css cible `p, label,
+      // L'en-tête de src/index.css cible `p, label,
       // small, li` pour leur donner `font-size: 0.98rem` et `line-height: 1.6`
       // sous 768 px. Un `<label>` transmet donc à ses descendants un strut de
       // 25,09 px là où un `<div>` en transmet un de 24 : mesuré à 412×823, le
@@ -308,20 +310,20 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `</div>`
       + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('password'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /><p class="mt-1 text-xs text-gray-500">${esc(registerT('passwordTooShort'))}</p></div>`
       + `<div><label class="block text-sm font-medium text-gray-700 mb-2">${esc(registerT('confirmPassword'))}</label><input readonly type="password" class="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm" /></div>`
-      + `<div class="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">`
-      + `<div class="flex items-center mb-4"><span class="text-2xl mr-3">${svgDeLIcone(registerPlan.photoIcon, CLASSES_ICONE.photoTitre)}</span><h3 class="text-lg font-semibold text-gray-900">${esc(registerT('profilePhotoOptional'))}</h3></div>`
-      + `<p class="text-sm text-gray-600 mb-4">${esc(registerT('profilePhotoHelps'))}</p>`
-      + `<div class="relative border-2 border-dashed rounded-lg p-6 border-gray-300">`
-      + `<div class="text-center"><div class="text-4xl mb-3">${svgDeLIcone(registerPlan.photoIcon, CLASSES_ICONE.photoZone)}</div><div class="text-sm text-gray-600"><p class="font-medium">${esc(registerT('addProfilePhoto'))}</p><p>${esc(registerT('clickToChooseOption'))}</p></div><div class="text-xs text-gray-500 mt-2">${esc(photoFormatsLine(registerT('upTo')))}</div></div>`
+      + `<div class="bloc-differe-photo carte-editoriale carte-publique mb-6">`
+      + `<div class="mb-4 flex items-center gap-3">${svgDeLIcone(registerPlan.photoIcon, CLASSES_ICONE.photoTitre)}<h3 class="titre-entree">${esc(registerT('profilePhotoOptional'))}</h3></div>`
+      + `<p class="mb-4 text-sm text-stone-600">${esc(registerT('profilePhotoHelps'))}</p>`
+      + `<div class="relative rounded-[3px] border-2 border-dashed border-stone-300 p-6">`
+      + `<div class="text-center"><div class="mb-3 flex justify-center">${svgDeLIcone(registerPlan.photoIcon, CLASSES_ICONE.photoZone)}</div><div class="text-sm text-stone-600"><p class="font-medium">${esc(registerT('addProfilePhoto'))}</p><p>${esc(registerT('clickToChooseOption'))}</p></div><div class="mt-2 text-xs text-stone-500">${esc(photoFormatsLine(registerT('upTo')))}</div></div>`
       + `</div>`
       // Les CONSEILS photo (src/components/ProfilePhotoUpload.js), publiés à
       // l'identique : la coquille les omettait, et ce bloc de 216,56 px
       // manquait à sa peinture — mesuré, tout ce qui le suit (dont le bloc
       // langue, 232 px plus bas) remontait au montage de React. Le rang de la
       // liste est de la PONCTUATION (`• `), qui n'appartient à aucun plan.
-      + `<div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">`
-      + `<h4 class="font-medium text-yellow-800 mb-1">${svgDeLIcone(registerPlan.photoTipsIcon, CLASSES_ICONE.notice)} ${esc(registerT(registerPlan.photoTipsTitleKey))}</h4>`
-      + `<ul class="text-xs text-yellow-700 space-y-1">`
+      + `<div class="mt-4 rounded-[3px] border border-orange-200 bg-orange-50 p-3">`
+      + `<h4 class="mb-1 font-medium text-orange-900">${svgDeLIcone(registerPlan.photoTipsIcon, CLASSES_ICONE.notice)} ${esc(registerT(registerPlan.photoTipsTitleKey))}</h4>`
+      + `<ul class="space-y-1 text-xs text-orange-800">`
       + registerPlan.photoTipsKeys.map((cle) => `<li>• ${esc(registerT(cle))}</li>`).join('')
       + `</ul>`
       + `</div>`
@@ -332,14 +334,14 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<span class="text-gray-600">${esc(registerT('detectingLanguage'))}</span>`
       + `</div>`
       + `</div>`
-      + `<div class="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`
+      + `<div class="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">`
       + `<div><h3 class="text-sm font-semibold text-orange-900">${svgDeLIcone(registerPlan.legalNoticeIcon, CLASSES_ICONE.notice)} ${esc(registerT('legalNoticeTitle'))}</h3><p class="text-xs text-orange-800 mt-1">${esc(registerT('legalConsentHelp'))}</p></div>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
       + `<label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" readonly class="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600" /><span class="text-sm text-gray-700">${esc(registerT('legalConsentLabel'))}</span></label>`
       + `<p class="text-xs text-gray-600">${esc(registerT('legalContactLine'))}</p>`
       + `</div>`
-      + `<div><button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600">${esc(registerT('continueButton'))}</button></div>`
-      + `<div class="text-center"><span class="text-sm text-gray-600">${esc(registerT('signInPrompt'))} <span class="font-medium text-orange-600">${esc(T('signIn'))}</span></span></div>`
+      + `<div class="bloc-differe-envoi"><button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-orange-600">${esc(registerT('continueButton'))}</button></div>`
+      + `<div class="bloc-differe-lien text-center"><span class="text-sm text-gray-600">${esc(registerT('signInPrompt'))} <span class="font-medium text-orange-600">${esc(T('signIn'))}</span></span></div>`
       + `</form>`
       + `</div></div>`,
     // ForgotPassword : réplique l'ÉTAPE EMAIL (par défaut) — la page
@@ -347,28 +349,28 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // statique différente décalerait tout le bloc au montage React
     // (CLS). Mêmes classes que le composant réel (thème BLEU),
     // inputs readonly (inertes jusqu'au boot), libellés français.
-    'forgot-password': `<div class="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">`
+    'forgot-password': `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
       + `<div class="max-w-md w-full space-y-8">`
       + `<div class="text-center">`
-      + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-full bg-blue-600 shadow-lg">`
-      + `<span class="text-white text-2xl font-bold">${svgDeLIcone(forgotPasswordPlan.badgeIcon, CLASSES_ICONE.badge)}</span>`
+      + `<div class="mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600">`
+      + `<span class="text-white text-2xl font-bold">${svgDeLIcone(forgotPasswordPlan.badgeIcon, CLASSES_ICONE.badgeEtape)}</span>`
       + `</div>`
-      + `<h1 class="mt-6 text-3xl font-extrabold text-gray-900">${esc(T(forgotPasswordPlan.titleKey))}</h1>`
+      + `<h1 class="mt-6 text-3xl font-bold text-stone-900">${esc(T(forgotPasswordPlan.titleKey))}</h1>`
       + `<p class="${forgotPasswordPlan.subtitleClass}">${esc(T(forgotPasswordPlan.subtitleKey))}</p>`
       + `</div>`
-      + `<div class="bg-white rounded-2xl shadow-md p-6 space-y-6">`
+      + `<div class="carte-editoriale carte-publique space-y-6">`
       + `<div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500">`
-      + `<span class="text-blue-600">1. ${esc(T(forgotPasswordPlan.stepEmailKey))}</span>`
-      + `<span class="text-gray-500">2. ${esc(T(forgotPasswordPlan.stepCodeKey))}</span>`
-      + `<span class="text-gray-500">3. ${esc(T(forgotPasswordPlan.stepPasswordKey))}</span>`
+      + `<span class="text-orange-600">1. ${esc(T(forgotPasswordPlan.stepEmailKey))}</span>`
+      + `<span class="text-stone-500">2. ${esc(T(forgotPasswordPlan.stepCodeKey))}</span>`
+      + `<span class="text-stone-500">3. ${esc(T(forgotPasswordPlan.stepPasswordKey))}</span>`
       + `</div>`
       + `<form class="space-y-5">`
       + `<div>`
       + `<label for="reset-email" class="block text-sm font-medium text-gray-700">${esc(T(forgotPasswordPlan.emailLabelKey))}</label>`
-      + `<input id="reset-email" type="email" autocomplete="email" readonly class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500" placeholder="${esc(T(loginPlan.emailLabelKey))}" />`
+      + `<input id="reset-email" type="email" autocomplete="email" readonly class="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-orange-500" placeholder="${esc(T(loginPlan.emailLabelKey))}" />`
       + `</div>`
       + `<p class="text-xs text-gray-500">${esc(T(forgotPasswordPlan.requestMessageKey))}</p>`
-      + `<button type="submit" class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">${esc(T(forgotPasswordPlan.sendCodeKey))}</button>`
+      + `<button type="submit" class="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">${esc(T(forgotPasswordPlan.sendCodeKey))}</button>`
       + `</form>`
       + `<div class="text-center">`
       + `<span class="text-sm font-medium text-orange-600 hover:text-orange-500">${esc(T(forgotPasswordPlan.backToLoginKey))}</span>`
@@ -385,7 +387,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     payment: `<div class="min-h-full bg-gray-50 py-8">`
       + `<div class="max-w-6xl mx-auto px-4 space-y-6">`
       + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">`
-      + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T(paymentPlan.titleKey))}</h1>`
+      + `<h1 class="titre-page mb-2">${esc(T(paymentPlan.titleKey))}</h1>`
       + `<p class="text-gray-600">${esc(T(paymentPlan.subtitleKey))}</p>`
       + `</div>`
       + `<div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">`
@@ -408,83 +410,95 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // src/pages/HowItWorks.js) : sans lui la coquille ne réserve pas 100vh, et
     // le pied de page remontait dès que le contenu tenait dans la fenêtre.
     'how-it-works': `<div class="min-h-screen">`
-      + `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white">`
+      + `<section class="${howItWorksPlan.bandePageClass}">`
       + `<div class="${howItWorksPlan.heroFrameClass}">`
       + `<h1 class="${howItWorksPlan.heroTitleClass}">${esc(T(howItWorksPlan.titleKey))}</h1>`
       + `<p class="${howItWorksPlan.heroSubtitleClass}">${esc(T(howItWorksPlan.heroKey))}</p>`
       + `</div>`
       + `</section>`
-      + `<section class="py-12 md:py-16 bg-white">`
+      + `<section class="${howItWorksPlan.sectionClass} ${howItWorksPlan.paperClass}">`
       + `<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">`
-      + `<div class="grid grid-cols-1 md:grid-cols-3 gap-8">`
+      + `<div class="${howItWorksPlan.listeClass}">`
       + howItWorksPlan.steps
         .map(
           // Le glyphe est une icône DESSINÉE (src/config/page-icons.js) : la
           // même que celle de la page, donc les deux canaux publient le même
           // dessin (la mesure emoji → SVG est consignée dans le plan et dans
-          // page-icons.js).
-          ({ icone, titleKey, descriptionKey: textKey }) =>
-            `<div class="rounded-2xl border border-gray-100 shadow-sm p-6">` +
-            `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">${svgDeLIcone(icone, CLASSES_ICONE.etape)}</div>` +
-            `<h2 class="text-lg font-semibold text-gray-900 text-center mb-3">${esc(T(titleKey))}</h2>` +
-            `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
+          // page-icons.js). Le NUMÉRO vient du dictionnaire (`numberKey`), comme
+          // sur l'accueil : la coquille ne recompte pas `index + 1`.
+          ({ icone, numberKey, titleKey, descriptionKey: textKey }) =>
+            `<div class="${howItWorksPlan.ligneEtapeClass}">` +
+            `<span class="${howItWorksPlan.pastilleCreuseClass}"><span class="text-lg font-bold">${esc(T(numberKey))}</span></span>` +
+            `<span class="${howItWorksPlan.pastilleClass}">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
+            `<div>` +
+            `<h2 class="${howItWorksPlan.nomLigneClass}">${esc(T(titleKey))}</h2>` +
+            `<p class="${howItWorksPlan.noteLigneClass}">${esc(T(textKey))}</p>` +
+            `</div>` +
+            `${svgDeLIcone('flecheBas', `${CLASSES_ICONE.flecheLigne} ${howItWorksPlan.flecheLigneClass}`)}` +
             `</div>`
         )
         .join('')
       + `</div>`
       + `</div>`
       + `</section>`
-      + `<section class="py-12 md:py-16 bg-gray-50">`
-      + `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`
-      + `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10">`
-      + `<div class="flex flex-col md:flex-row items-center gap-6">`
-      + `<div>${svgDeLIcone(howItWorksPlan.icone, CLASSES_ICONE.sequestre)}</div>`
+      // Le panneau de séquestre : les MÊMES classes que celui de l'accueil, y
+      // compris son illustration (le fichier est déclaré dans le plan) et son
+      // estampille, qui reprend un texte que la page publie déjà.
+      + `<section class="${howItWorksPlan.sectionClass} ${howItWorksPlan.sandClass}">`
+      + `<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">`
+      + `<div class="${howItWorksPlan.panneauClass}">`
+      + `<div class="${howItWorksPlan.panneauArtClass}">`
+      + `<span class="${howItWorksPlan.panneauOrbeClass}" aria-hidden="true"></span>`
+      + `<img src="${howItWorksPlan.panneauImageSrc}" alt="" width="620" height="500" loading="lazy" decoding="async" class="${howItWorksPlan.panneauImageClass}">`
+      + `<span class="${howItWorksPlan.panneauEstampilleClass}">${svgDeLIcone(howItWorksPlan.icone, CLASSES_ICONE.heros)}${esc(T(howItWorksPlan.estampilleKey))}</span>`
+      + `</div>`
       + `<div>`
-      + `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T(howItWorksPlan.escrowTitleKey))}</h2>`
-      + `<p class="text-emerald-800">${esc(T(howItWorksPlan.escrowTextKey))}</p>`
-      + `<ul class="mt-4 space-y-2 text-emerald-800 text-sm">`
+      + `<h2 class="${howItWorksPlan.headClass} mb-4">${esc(T(howItWorksPlan.escrowTitleKey))}</h2>`
+      + `<p class="${howItWorksPlan.sectionIntroClass} mb-4">${esc(T(howItWorksPlan.escrowTextKey))}</p>`
+      + `<ul class="${howItWorksPlan.listeGarantiesClass}">`
       + howItWorksPlan.guaranteeKeys
-        .map((key) => `<li>${esc(T(key))}</li>`)
+        .map((key) => `<li>${svgDeLIcone(howItWorksPlan.garantieIcon, CLASSES_ICONE.pastille)}${esc(T(key))}</li>`)
         .join('')
       + `</ul>`
       + `</div>`
       + `</div>`
       + `</div>`
-      + `</div>`
       + `</section>`
-      + `<section class="py-12 md:py-16 bg-white">`
+      + `<section class="${howItWorksPlan.sectionClass} ${howItWorksPlan.paperClass}">`
       + `<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">`
-      + `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 text-center mb-8">${esc(T(howItWorksPlan.faqTitleKey))}</h2>`
-      + `<div class="space-y-4">`
+      + `<div class="${howItWorksPlan.entreeSectionClass}">`
+      + `<h2 class="${howItWorksPlan.headClass}">${esc(T(howItWorksPlan.faqTitleKey))}</h2>`
+      + `</div>`
+      + `<div class="${howItWorksPlan.faqListeClass}">`
       + howItWorksPlan.faq
         .map(
           ({ questionKey, answerKey }) =>
-            `<details class="rounded-2xl border border-gray-100 bg-gray-50 px-5 py-4 group">` +
-            `<summary class="cursor-pointer font-semibold text-gray-900 list-none flex items-center justify-between gap-4">` +
+            `<details class="${howItWorksPlan.faqLigneClass}">` +
+            `<summary>` +
             `${esc(T(questionKey))}` +
-            `<span class="text-orange-600 transition-transform group-open:rotate-45 text-xl leading-none">${esc(T(howItWorksPlan.faqMarkerKey))}</span>` +
+            `<span class="${howItWorksPlan.faqMarqueClass}" aria-hidden="true">${esc(T(howItWorksPlan.faqMarkerKey))}</span>` +
             `</summary>` +
-            `<p class="mt-3 text-sm text-gray-600">${esc(T(answerKey))}</p>` +
+            `<p>${esc(T(answerKey))}</p>` +
             `</details>`
         )
         .join('')
       + `</div>`
       + `</div>`
       + `</section>`
-      + `<section class="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">`
-      + `<div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">`
-      + `<h2 class="text-2xl md:text-3xl font-bold mb-4">${esc(T(howItWorksPlan.readyTitleKey))}</h2>`
-      + `<div class="flex flex-col sm:flex-row gap-4 justify-center">`
-      + `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-gray-100 px-8 py-4 rounded-xl font-semibold transition">${esc(T(howItWorksPlan.lookingKey))}</a>`
-      + `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T(howItWorksPlan.offerKey))}</a>`
+      + `<section class="${howItWorksPlan.ctaClass} bg-gradient-to-br from-orange-600 to-orange-700 text-white">`
+      + `<div class="${howItWorksPlan.ctaInnerClass}">`
+      + `<h2 class="titre-section mb-6">${esc(T(howItWorksPlan.readyTitleKey))}</h2>`
+      + `<div class="${howItWorksPlan.ctaActionsClass}">`
+      + `<a href="/register?type=client" class="${howItWorksPlan.boutonClass}">${esc(T(howItWorksPlan.lookingKey))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`
+      + `<a href="/register?type=worker" class="${howItWorksPlan.boutonSecondClass}">${esc(T(howItWorksPlan.offerKey))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`
       + `</div>`
       // Maillage interne : mêmes liens que ceux ajoutés au composant
       // (HowItWorks.js) — les crawlers atteignent la liste des missions
       // et le support depuis cette page de contenu.
-      + `<p class="mt-6 text-sm opacity-90">`
-      + `<a href="/jobs" class="underline underline-offset-2">${esc(T('viewJobs'))}</a>`
+      + `<p class="mt-6 text-sm">`
+      + `<a href="/jobs" class="${howItWorksPlan.lienFlecheClairClass}">${esc(T('viewJobs'))}</a>`
       + ` · `
-      + `<a href="/support" class="underline underline-offset-2">${esc(T('support'))}</a>`
+      + `<a href="/support" class="${howItWorksPlan.lienFlecheClairClass}">${esc(T('support'))}</a>`
       + `</p>`
       + `</div>`
       + `</section>`
@@ -504,51 +518,67 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // Les `aria-label` portent LES MÊMES clés que les placeholders : c'est
     // ce que fait src/components/TicketTracker.js, donc la coquille et le
     // runtime ne peuvent plus annoncer deux libellés différents.
-    support: `<div class="max-w-2xl mx-auto px-4 py-8">`
+    support: `<div class="${supportPlan.frameClass}">`
       + `<div class="mb-6 text-center">`
-      + `<h1 class="text-3xl font-bold text-gray-900 mb-2">${esc(T(supportPlan.titleKey))}</h1>`
+      + `<h1 class="titre-page mb-2">${esc(T(supportPlan.titleKey))}</h1>`
       + `<p class="${supportPlan.subtitleClass}">${esc(T(supportPlan.subtitleKey))}</p>`
       + `</div>`
-      + `<div class="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">`
-      + `<h2 class="text-lg font-semibold text-gray-900 mb-1">${esc(T(supportPlan.tracker.titleKey))}</h2>`
-      + `<p class="text-sm text-gray-500 mb-4">${esc(T(supportPlan.tracker.subtitleKey))}</p>`
+      // ── Le vocabulaire éditorial, LU dans le plan (28/09/2026) ────────────
+      // Cette page portait les trois dernières cartes à OMBRE du site
+      // (`shadow-sm`), quatre pastilles de teinte empruntée (`bg-blue-100`,
+      // `bg-emerald-100`) et du gris froid. Elle publie maintenant la carte à
+      // filet, la ligne à filet et la pastille ronde de l'accueil — les mêmes
+      // chaînes que src/pages/Support.js, lues au même endroit que lui.
+      // La carte de suivi ci-dessous est l'état INITIAL de
+      // src/components/TicketTracker.js : mêmes classes, mêmes attributs, et
+      // les deux champs y portent le rayon du socle de formulaire (0,5 rem),
+      // qu'ils n'héritent pas de `form :is(input…)` puisqu'ils vivent hors
+      // d'un `<form>`.
+      + `<div class="mb-6 carte-editoriale carte-publique">`
+      + `<h2 class="titre-entree mb-1">${esc(T(supportPlan.tracker.titleKey))}</h2>`
+      + `<p class="text-sm text-stone-500 mb-4">${esc(T(supportPlan.tracker.subtitleKey))}</p>`
       + `<div class="flex flex-col sm:flex-row gap-2">`
-      + `<input type="text" readonly placeholder="${esc(T(supportPlan.tracker.idPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.idPlaceholderKey))}" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
-      + `<input type="email" readonly placeholder="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm" />`
+      + `<input type="text" readonly placeholder="${esc(T(supportPlan.tracker.idPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.idPlaceholderKey))}" class="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm" />`
+      + `<input type="email" readonly placeholder="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" aria-label="${esc(T(supportPlan.tracker.emailPlaceholderKey))}" class="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm" />`
       // Sans attribut `type` : ni TicketTracker.js ni les deux cartes de mode
       // n'en déclarent — or `[type="button"]` porterait `min-height: 48px` au
       // lieu des 44 px d'un `<button>` nu, et la carte de suivi peindrait 4 px
       // de trop (mesuré : tout le reste de /support remontait de 4 px).
-      + `<button class="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white opacity-50">${esc(T(supportPlan.tracker.ctaKey))}</button>`
+      + `<button class="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white opacity-50">${esc(T(supportPlan.tracker.ctaKey))}</button>`
       + `</div>`
       + `</div>`
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">`
       + supportPlan.modes
           .map(
-            ({ icone, badgeClass, titleKey, subtitleKey }) =>
+            ({ icone, titleKey, subtitleKey }) =>
               // Un `<button>` : chez React ces deux cartes SONT des commandes
               // (« Parler avec le robot », « Contacter directement le
               // support »). Publiées en `<div>`, elles mesuraient 4 px de moins
               // (py-6 au lieu de la barre tactile de 44 px) et décalaient tout
-              // ce qui suit. Le glyphe est dessiné, comme sur la page.
-              `<button class="flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-sm transition-all">` +
-              `<span class="flex h-12 w-12 items-center justify-center rounded-full ${badgeClass}">${svgDeLIcone(icone, CLASSES_ICONE.mode)}</span>` +
-              `<span class="font-semibold text-gray-900">${esc(T(titleKey))}</span>` +
-              `<span class="text-xs text-gray-500">${esc(T(subtitleKey))}</span>` +
+              // ce qui suit. Le glyphe est dessiné, comme sur la page, et il
+              // n'y a plus de `hover:` à reproduire : le survol d'une carte
+              // cliquable appartient à la classe (`carte-editoriale-cliquable`).
+              `<button class="${supportPlan.carteModeClass}">` +
+              `<span class="${supportPlan.pastilleModeClass}">${svgDeLIcone(icone, CLASSES_ICONE.mode)}</span>` +
+              `<span class="${supportPlan.titreEntreeClass}">${esc(T(titleKey))}</span>` +
+              `<span class="text-xs text-stone-500">${esc(T(subtitleKey))}</span>` +
               `</button>`
           )
           .join('') +
       `</div>`
-      + `<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">`
-      + `<h2 class="text-xl font-semibold text-gray-900 mb-1">${esc(T(supportPlan.directCard.titleKey))}</h2>`
-      + `<p class="text-sm text-gray-500 mb-5">${esc(T(supportPlan.directCard.subtitleKey))}</p>`
-      + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
+      + `<div class="${supportPlan.carteClass}">`
+      + `<h2 class="${supportPlan.titreEntreeClass} mb-1">${esc(T(supportPlan.directCard.titleKey))}</h2>`
+      + `<p class="text-sm text-stone-500 mb-5">${esc(T(supportPlan.directCard.subtitleKey))}</p>`
+      + `<div class="${supportPlan.listeContactClass}">`
       + supportPlan.rows
           .map((row) => {
             const interieur =
-              `<span class="flex h-10 w-10 items-center justify-center rounded-full ${row.badgeClass}">${svgDeLIcone(row.icone, CLASSES_ICONE.ligne)}</span>` +
-              `<div><div class="text-sm font-semibold text-gray-900">${esc(T(row.labelKey))}</div>` +
-              `<div class="text-xs text-gray-500${row.breakAll ? ' break-all' : ''}">${esc(row.value)}</div></div>`
+              `<span class="${supportPlan.pastilleContactClass}">${svgDeLIcone(row.icone, CLASSES_ICONE.ligne)}</span>` +
+              `<span><span class="${supportPlan.etiquetteContactClass}">${esc(T(row.labelKey))}</span>` +
+              `<span class="${supportPlan.valeurContactClass}${row.breakAll ? ' break-all' : ''}">${esc(row.value)}</span></span>` +
+              // La flèche suit la MÊME condition que la page : une ligne sans
+              // destination n'en promet pas.
+              (row.href ? svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne) : '')
             return row.href
               ? `<a href="${esc(row.href)}"${row.external ? ' target="_blank" rel="noreferrer"' : ''} class="${row.rowClass}">${interieur}</a>`
               : `<div class="${row.rowClass}">${interieur}</div>`
@@ -559,7 +589,7 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // Maillage interne : le support mène au fonctionnement du service
       // et à la liste des missions (page utile pour un crawler qui
       // arrive ici depuis une recherche de contact).
-      + liensDePage(supportPlan, 'mt-6 text-center text-sm text-gray-500')
+      + liensDePage(supportPlan, 'mt-6 text-center text-sm text-stone-500')
       + `</div>`,
     // ── Les trois pages de CONFIANCE ─────────────────────────────
     // /about, /contact, /privacy : ce qu'un moteur (et une régie
@@ -572,36 +602,40 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // sections, mêmes classes, mêmes textes via les clés i18n) : un
     // crawler sans JavaScript lit la page entière, et createRoot efface
     // ce contenu au montage sans décaler quoi que ce soit.
-    // Le conteneur RACINE de la page React (`min-h-screen bg-gray-50`, cf.
-    // src/pages/About.js) : la coquille publiait directement le contenu, donc
-    // sur un écran où le texte tient dans la fenêtre (mesuré en desktop :
-    // 1350×940), le pied de page remontait de 146 px au montage de React.
+    // Le conteneur RACINE de la page React (un conteneur pleine hauteur sur le
+    // fond papier du site, cf. src/pages/About.js) : la coquille publiait
+    // directement le contenu, donc sur un écran où le texte tient dans la
+    // fenêtre (mesuré en desktop : 1350×940), le pied de page remontait de
+    // 146 px au montage de React.
     // La géométrie du plus grand texte peint (le paragraphe d'introduction,
     // élément LCP de /about) est LUE dans le plan, jamais recopiée — même
     // raison que /contact et /jobs : une divergence d'un seul côté ré-élit un
     // élément LCP et fait entrer la chaîne JavaScript dans le graphe du LCP.
-    about: `<div class="min-h-screen bg-gray-50">`
+    about: `<div class="min-h-screen fond-papier">`
       + `<div class="${aboutPlan.frameClass}">`
       + `<h1 class="${aboutPlan.titleClass}">${esc(T(aboutPlan.titleKey))}</h1>`
       + `<p class="${aboutPlan.introClass}">${esc(T(aboutPlan.introKey))}</p>`
+      // Le vocabulaire éditorial de la page : la même carte à filet que
+      // l'accueil (avec le glyphe dans la pastille ronde) et l'encart à filet
+      // gauche qui remplace la tache verte.
       + `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">`
       + aboutPlan.cards
           .map(
             ({ icone, titleKey, descriptionKey }) =>
-              `<div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">` +
-              `<div class="mb-3">${svgDeLIcone(icone, CLASSES_ICONE.carte)}</div>` +
-              `<h2 class="text-lg font-semibold text-gray-900 mb-2">${esc(T(titleKey))}</h2>` +
-              `<p class="text-sm text-gray-600">${esc(T(descriptionKey))}</p>` +
+              `<div class="${aboutPlan.carteClass}">` +
+              `<span class="pastille-rond mb-4">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
+              `<h2 class="nom-de-ligne mb-2">${esc(T(titleKey))}</h2>` +
+              `<p class="note-de-ligne">${esc(T(descriptionKey))}</p>` +
               `</div>`
           )
           .join('') +
       `</div>`
-      + `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 mb-10">`
-      + `<h2 class="text-xl font-bold text-emerald-900 mb-3">${esc(T(aboutPlan.highlight.titleKey))}</h2>`
-      + `<p class="text-emerald-800">${esc(T(aboutPlan.highlight.textKey))}</p>`
-      + `<p class="text-emerald-700 mt-3 text-sm">${esc(T(aboutPlan.highlight.bulletsKey))}</p>`
+      + `<div class="encart mb-10">`
+      + `<h2 class="titre-section mb-3">${esc(T(aboutPlan.highlight.titleKey))}</h2>`
+      + `<p class="text-stone-600">${esc(T(aboutPlan.highlight.textKey))}</p>`
+      + `<p class="note-de-ligne mt-3">${esc(T(aboutPlan.highlight.bulletsKey))}</p>`
       + `</div>`
-      + liensDePage(aboutPlan, 'text-sm text-gray-500')
+      + liensDePage(aboutPlan, 'text-sm text-stone-500')
       + `</div>`
       + `</div>`,
     // La géométrie du plus grand texte peint (le paragraphe d'introduction,
@@ -613,21 +647,27 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     // Conteneur RACINE de src/pages/Contact.js, comme pour /about : sans lui
     // le pied de page se décalait de 101,62 px en desktop, où la page tient
     // dans la fenêtre.
-    contact: `<div class="min-h-screen bg-gray-50">`
+    contact: `<div class="min-h-screen fond-papier">`
       + `<div class="${contactPlan.frameClass}">`
       + `<h1 class="${contactPlan.titleClass}">${esc(T(contactPlan.titleKey))}</h1>`
       + `<p class="${contactPlan.introClass}">${esc(T(contactPlan.introKey))}</p>`
       + `<p class="${contactPlan.noteClass}">${esc(T(contactPlan.noteKey))}</p>`
-      + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">`
+      // Les quatre moyens de contact : la liste en lignes de l'accueil, lue dans
+      // le plan — la pastille ronde (sable et orange du site, plus de bleu ni de
+      // vert d'eau), le libellé, la valeur, et la flèche de la dernière colonne.
+      // Les quatre lignes de cette page mènent quelque part (la quatrième à la
+      // fiche Google), donc la page peint quatre flèches : la coquille aussi.
+      + `<div class="${contactPlan.listeContactClass}">`
       + contactPlan.actions
           .map(
-            ({ icone, labelKey, badgeClass, href, value, external, breakAll }) =>
+            ({ icone, labelKey, href, value, external, breakAll, rowClass }) =>
               `<a href="${esc(href)}"` +
               (external ? ` target="_blank" rel="noreferrer"` : '') +
-              ` class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">` +
-              `<span class="flex h-10 w-10 items-center justify-center rounded-full ${badgeClass}">${svgDeLIcone(icone, CLASSES_ICONE.ligne)}</span>` +
-              `<div><div class="text-sm font-semibold text-gray-900">${esc(T(labelKey))}</div>` +
-              `<div class="text-xs text-gray-500${breakAll ? ' break-all' : ''}">${esc(value)}</div></div>` +
+              ` class="${rowClass}">` +
+              `<span class="${contactPlan.pastilleContactClass}">${svgDeLIcone(icone, CLASSES_ICONE.ligne)}</span>` +
+              `<span><span class="${contactPlan.etiquetteContactClass}">${esc(T(labelKey))}</span>` +
+              `<span class="${contactPlan.valeurContactClass}${breakAll ? ' break-all' : ''}">${esc(value)}</span></span>` +
+              svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne) +
               `</a>`
           )
           .join('') +
@@ -645,27 +685,45 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + svgDeLIcone(contactPlan.icone, CLASSES_ICONE.carteContact)
       + `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" title="${esc(T('mapIframeTitle').replace('{address}', contact.address))}" class="${contactPlan.mapControlClass}">${esc(T(contactPlan.mapButtonKey))}</a>`
       + `</div>`
-      + liensDePage(contactPlan, 'mt-6 text-sm text-gray-500')
+      + liensDePage(contactPlan, 'mt-6 text-sm text-stone-500')
       + `</div>`
       + `</div>`,
     // Conteneur RACINE de src/pages/Privacy.js (même raison que /about).
     // Sur /privacy, le plus grand texte peint est le CORPS d'une section (pas
     // l'introduction) : c'est `sectionBodyClass` qui porte l'élément LCP. Tout
     // est lu dans le plan, comme sur /contact et /about.
-    privacy: `<div class="min-h-screen bg-gray-50">`
+    privacy: `<div class="min-h-screen fond-papier">`
       + `<div class="${privacyPlan.frameClass}">`
       + `<h1 class="${privacyPlan.titleClass}">${esc(T(privacyPlan.titleKey))}</h1>`
       + `<p class="${privacyPlan.introClass}">${esc(T(privacyPlan.introKey))}</p>`
       + privacyPlan.sections
           .map(
             ({ titleKey, bodyKey }) =>
-              `<section class="mb-8">` +
+              `<section class="${privacyPlan.sectionWrapClass}">` +
               `<h2 class="${privacyPlan.sectionTitleClass}">${esc(T(titleKey))}</h2>` +
               `<p class="${privacyPlan.sectionBodyClass}">${esc(T(bodyKey))}</p>` +
               `</section>`
           )
           .join('') +
-      liensDePage(privacyPlan, 'text-sm text-gray-500')
+      liensDePage(privacyPlan, 'text-sm text-stone-500')
+      + `</div>`
+      + `</div>`,
+    // Les CGU : même forme que /privacy (le plus grand texte peint est le CORPS
+    // d'une section), tout est lu dans le plan.
+    terms: `<div class="min-h-screen fond-papier">`
+      + `<div class="${termsPlan.frameClass}">`
+      + `<h1 class="${termsPlan.titleClass}">${esc(T(termsPlan.titleKey))}</h1>`
+      + `<p class="${termsPlan.introClass}">${esc(T(termsPlan.introKey))}</p>`
+      + termsPlan.sections
+          .map(
+            ({ titleKey, bodyKey }) =>
+              `<section class="${termsPlan.sectionWrapClass}">` +
+              `<h2 class="${termsPlan.sectionTitleClass}">${esc(T(titleKey))}</h2>` +
+              `<p class="${termsPlan.sectionBodyClass}">${esc(T(bodyKey))}</p>` +
+              `</section>`
+          )
+          .join('') +
+      liensDePage(termsPlan, 'text-sm text-stone-500')
       + `</div>`
       + `</div>`,
   }

@@ -14,9 +14,13 @@ const jobs = Array.from({ length: 25 }, (_, index) => ({
   client: { full_name: 'Client de démonstration' },
 }));
 
+// `country` est REQUIS par le modèle réel (`backend/kojo_models.py`, `country:
+// Country`) et la fixture ne l'omettait pas par choix : elle l'ignorait, donc
+// `/profile` n'avait aucun pays à montrer — ni, par conséquent, aucune carte de
+// localisation à différer (`e2e/helpers/parcours-carte.js` lit ce même pays).
 const users = new Map([
-  ['demo@example.com', { id: 'demo-user', email: 'demo@example.com', password: 'password', user_type: 'worker', first_name: 'Demo', last_name: 'Worker', is_verified: true, payment_accounts_count: 2 }],
-  ['client@example.com', { id: 'demo-client', email: 'client@example.com', password: 'password', user_type: 'client', first_name: 'Demo', last_name: 'Client', is_verified: true, payment_accounts_count: 2 }],
+  ['demo@example.com', { id: 'demo-user', email: 'demo@example.com', password: 'password', user_type: 'worker', country: 'senegal', first_name: 'Demo', last_name: 'Worker', is_verified: true, payment_accounts_count: 2 }],
+  ['client@example.com', { id: 'demo-client', email: 'client@example.com', password: 'password', user_type: 'client', country: 'senegal', first_name: 'Demo', last_name: 'Client', is_verified: true, payment_accounts_count: 2 }],
 ]);
 const sessions = new Map();
 const proposals = [];
@@ -146,8 +150,15 @@ const server = http.createServer(async (req, res) => {
       users.set(user.email, user); const token = `fixture-${user.id}`; sessions.set(token, user);
       return send(res, 201, { user, token, access_token: token, token_expires_at: Date.now() + 3600000 });
     }
+    // Le VRAI backend renvoie l'utilisateur NU (`return current_user.model_dump(...)`,
+    // kojo_routers_auth.py), et le frontend le pose tel quel (`setUser(userData)`
+    // dans AuthContext.loadUser). La fixture l'enveloppait dans `{ user }` :
+    // `ProtectedRoute` lisait alors `is_verified: undefined` sur l'enveloppe et
+    // renvoyait TOUTE page protégée vers /payment-verification — /profile,
+    // /dashboard, /messages compris. Aucun parcours ne l'avait vu parce
+    // qu'aucun n'avait besoin d'y arriver.
     if (req.method === 'GET' && path === '/auth/me') {
-      const user = currentUser(req); return user ? send(res, 200, { user }) : send(res, 401, { detail: 'Session expirée' });
+      const user = currentUser(req); return user ? send(res, 200, user) : send(res, 401, { detail: 'Session expirée' });
     }
     if (req.method === 'POST' && path === '/auth/logout') return send(res, 200, { success: true });
     if (req.method === 'GET' && path === '/proposals/mine') return send(res, 200, { data: proposals.filter((item) => item.worker_id === currentUser(req)?.id) });

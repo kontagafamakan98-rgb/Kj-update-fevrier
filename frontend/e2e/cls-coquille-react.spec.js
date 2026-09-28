@@ -3,7 +3,13 @@ import { test, expect } from '@playwright/test';
 // et la liste des routes appartiennent au harnais partagé : la table unique
 // `src/config/page-meta.js` en est la source.
 import { ROUTES, TAILLES, attendreLaStabilite, ouvrirLaPage } from './helpers/geometrie.js';
-import { ESPION_CLS, clsDesDecalages, decrireCls, decrireDecalage } from './helpers/cls.js';
+import {
+  ESPION_CLS,
+  attendreLaFenetreDeSession,
+  clsDesDecalages,
+  decrireCls,
+  decrireDecalage,
+} from './helpers/cls.js';
 // LE BUDGET EST LU ICI, JAMAIS RECOPIÉ : `scripts/lhci-cls-budgets.cjs` porte la
 // table mesurée (un plafond par route, avec son relevé) et c'est elle que la CI
 // applique — les deux passes Lighthouse, mobile et desktop. Deux tables de
@@ -102,9 +108,11 @@ async function relever(browser, route, { peinture, viewport }) {
     await page.addInitScript(ESPION_CLS);
     await page.goto(route);
     // La mise en page doit se stabiliser, PUIS la fenêtre de session se fermer
-    // (1 s sans décalage) pour que le relevé couvre tout le chargement.
+    // (1 s sans décalage) pour que le relevé couvre tout le chargement : c'est
+    // la règle de la MÉTRIQUE, pas une marge d'attente — et elle se termine dès
+    // qu'elle est vraie (voir `attendreLaFenetreDeSession`).
     await attendreLaStabilite(page);
-    await page.waitForTimeout(1200);
+    await attendreLaFenetreDeSession(page);
     const releve = await page.evaluate(() => ({
       url: location.pathname,
       decalages: window.__kojoCls.decalages,

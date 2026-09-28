@@ -65,9 +65,9 @@ describe('usePageMeta — le runtime annonce la table', () => {
 
     // Les routes autrefois MUETTES au runtime, nommées : sans elles, une table
     // vide ferait passer la boucle précédente pour une preuve.
-    expect(annonces).toContain('/register → Créer un compte — Kojo');
-    expect(annonces).toContain('/forgot-password → Mot de passe oublié — Kojo');
-    expect(annonces).toContain('/payment → Paiements sécurisés — Kojo');
+    expect(annonces).toContain('/register → Créer un compte · Kojo');
+    expect(annonces).toContain('/forgot-password → Mot de passe oublié · Kojo');
+    expect(annonces).toContain('/payment → Paiements sécurisés · Kojo');
   });
 
   it('public la carte et le canonical de la route courante', () => {

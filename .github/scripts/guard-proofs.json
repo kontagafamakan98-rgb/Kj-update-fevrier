@@ -76,6 +76,23 @@
       "runner": "vitest"
     },
     {
+      "chemin": "frontend/scripts/check-formulaire-differe.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-formulaire-differe.test.js",
+      "runner": "vitest",
+      "motif": "le levier `content-visibility` du formulaire de /register reste en parité entre les DEUX canaux (src/pages/Register.js et vite-plugins/prerender/shells-routes.js) : les quatre blocs différés (photo, légal, envoi, lien) doivent être posés des deux côtés ET porter leur `contain-intrinsic-size: auto <hauteur de contenu>px` dans src/App.css. Une classe posée d'un seul côté ferait diverger les deux peintures — la parité coquille↔React n'est mesurée que sur les routes DÉCLARÉES, donc le garde refuse la divergence à la source ; une constante disparue ou mal formée (virgule décimale) ferait retomber le bloc sur la taille de repli (0) et effondrerait le document, ce que la sonde du document (frontend/e2e/style-layout-document.spec.js) mesurerait trop tard. Preuve d'échec rejouée à la main le 27/09/2026 : renommer `bloc-differe-legal` dans shells-routes.js fait sortir le garde en 1 en nommant la classe et le canal (« coquille (vite-plugins/prerender/shells-routes.js) ne le pose pas — les DEUX canaux doivent poser la même classe »), fichier restauré au SHA-1 identique (8f702d7a…)"
+    },
+    {
+      "chemin": "frontend/scripts/formulaire-differe.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-formulaire-differe.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (lecture des classes différées citées par la feuille et les deux canaux, extraction des constantes `contain-intrinsic-size` par classe, contrôle de forme « auto <nombre>px », comparaison LISTE↔feuille↔canaux) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la règle éprouvable par mutation de chaîne",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : la règle de ce module est verrouillée par ses cas unitaires directs (les quatre blocs des deux canaux, les constantes par classe, la forme « auto <nombre>px », la comparaison LISTE↔feuille↔canaux), et la mutation qui prouve le VERDICT porte sur la ligne du GARDE qui l'énonce (verdict du CLI neutralisé)"
+    },
+    {
       "chemin": "frontend/scripts/check-generated-icons.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -134,6 +151,56 @@
       "runner": null,
       "motif": "outil de MESURE, pas un garde : il chiffre ce que coûterait le retrait de `.App { text-align: center }` (encre déplacée par route et par taille) et n'imprime aucun verdict. La décision qu'il documente — garder la règle — est vérifiée par des gardes : scripts/__tests__/check-app-chrome.test.js et scripts/check-prerender-shells.js",
       "hors_mutation": "le retirer ne fait rien rougir : aucun garde ne l'importe, et le seul test qui pourrait le nommer serait un test de lui-même — ce qui ne prouverait rien du dépôt. Sa vérité est mesurée à l'exécution (relevé du 25/09/2026 : 11 routes × 2 tailles, 231 déplacements d'encre), pas par mutation"
+    },
+    {
+      "chemin": "frontend/scripts/check-origines-bundles.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-origines-bundles.test.js",
+      "runner": "vitest",
+      "motif": "la troisième vue statique de « aucun tiers » : les deux voisines lisent le HTML des coquilles (shell-remote-resources.js) et ce que le navigateur DEMANDE avant un geste (tiers-avant-interaction.js + son parcours) — celle-ci lit les FICHIERS LIVRÉS (`build/assets/*.js` et `*.css`), là où vit l'URL qu'un composant écrit en clair (`script.src = 'https://…'`). Elle refuse (1) une origine tierce non classée, (2) une entrée PÉRIMÉE du classement qu'aucun fichier livré ne porte plus (une exemption que plus rien ne justifie finira par justifier autre chose), (3) un motif vide. Le contrat de « tiers » n'est pas redéclaré : il vient d'`estTiers()`. Planchers de lecture (fichiers, occurrences, origines classées) pour refuser de juger un build absent ou un lecteur cassé. Relevé du 27/09/2026 sur un build de production : 62 fichiers livrés, 40 occurrences d'URL absolue, 3 origines nôtres (api.kojoforafrica.cc.cd, 127.0.0.1:8123, localhost) et 14 origines tierces classées, 0 non classée, 0 périmée."
+    },
+    {
+      "chemin": "frontend/scripts/origines-bundles.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-origines-bundles.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (lecture des URL absolues écrites en clair et réduction à l'ORIGINE par `new URL()`, contrat de « tiers » délégué à `estTiers()`, et surtout la TABLE DE CLASSEMENT motivée : 14 origines tierces, chacune avec sa sorte (identifiant / message de bibliothèque / lien rendu / chargé après interaction / chargé si la variable de build le demande), son motif et sa preuve — 14 après retrait de `picsum.photos`, dont le chunk `/mobile-test` n'est plus émis) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la table éprouvable — y compris sa FORME, testable sans build",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : la règle de ce module (réduction à l'origine, contrat de « tiers » délégué à `estTiers()`, comptage occurrences/fichiers, refus d'une entrée périmée et d'un motif vide) est verrouillée par ses cas unitaires directs, et la mutation qui prouve le VERDICT porte sur la ligne du GARDE (verdict du CLI neutralisé)"
+    },
+    {
+      "chemin": "frontend/scripts/check-drapeaux-emoji.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-drapeaux-emoji.test.js",
+      "runner": "vitest",
+      "motif": "refuse qu'un drapeau redevienne un CARACTÈRE dans les données pays/langue/géolocalisation : (1) tout emoji de drapeau écrit dans le CODE de `src/` (`.js`/`.jsx`/`.json`), une paire d'indicateurs régionaux (U+1F1E6–U+1F1FF) comptée pour UN SEUL drapeau, ou le drapeau blanc (U+1F3F3) ; (2) toute propriété `flag` dans les cinq modules de données DÉCLARÉS — chacun justifié par son rôle dans `MODULES_DONNEES` —, quelle que soit sa valeur. Les commentaires sont masqués (plages de `@babel/parser`, sans se tromper sur un `//` qui appartient à une URL) : le dépôt CITE les emoji qu'il raconte (`src/config/flags.js`, `FlagIcon.js`), et une règle qui refuserait sa propre documentation ferait effacer la mémoire du projet pour rester verte. Planchers de lecture (120 fichiers de `src/`, les cinq modules doivent EXISTER) pour refuser de juger un balayage cassé. Preuve d'échec rejouée à la main le 27/09/2026 : un `flag: '🇲🇱'` remis dans `src/config/countries.js` fait sortir le garde en 1 en nommant `src/config/countries.js:25` — les DEUX refus (emoji ET champ) —, fichier restauré au SHA-1 identique (55ce74f6…). Relevé du 27/09/2026 : 178 fichiers de `src/` jugés, 5 modules de données surveillés, 0 emoji, 0 champ."
+    },
+    {
+      "chemin": "frontend/scripts/drapeaux-emoji.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-drapeaux-emoji.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (masquage des plages de commentaires par `@babel/parser` sans confondre un `//` d'URL, repérage de l'emoji de drapeau avec la paire d'indicateurs GROUPÉE en une seule occurrence pour que la ligne ne soit pas nommée deux fois, lecture des propriétés `flag` de clé d'objet ET d'attribut JSX — un `JSXIdentifier`, jamais un `Identifier` —, énumération des modules de données) : le garde prononce le verdict, ce module ne fait aucune E/S et rend la règle éprouvable par mutation de chaîne",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : la règle de ce module (masquage des commentaires, groupement de la paire d'indicateurs régionaux en UNE occurrence, lecture des `flag` d'objet ET d'attribut JSX, énumération des modules de données) est verrouillée par ses cas unitaires directs, et la mutation qui prouve le VERDICT porte sur la ligne du GARDE (verdict du CLI neutralisé)"
+    },
+    {
+      "chemin": "frontend/scripts/check-keyframes-animations.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-keyframes-animations.test.js",
+      "runner": "vitest",
+      "motif": "refuse les deux directions de l'angle mort que le garde « aucun sélecteur sans porteur » laisse ouvert (il juge des SÉLECTEURS, jamais un nom d'ANIMATION) : (1) une `@keyframes` DÉCLARÉE ET JAMAIS JOUÉE — du poids mort, la feuille décrivant un site qui n'existe pas (le nettoyage du 25/09/2026 avait dû retirer À LA MAIN `fadeIn`, `slideUp` et `loading`) ; (2) une animation JOUÉE ET DÉCLARÉE NULLE PART — le cas SILENCIEUX, car un `@keyframes` manquant n'est pas une erreur pour un navigateur : l'animation ne tourne plus et aucun test n'échoue. Il lit `src/` sans build, donc il rougit avant qu'une coquille ne publie l'animation morte. Il est CONSCIENT DU JAVASCRIPT parce que DEUX des quatre `@keyframes` de cet arbre (27/09/2026) vivent dans des littéraux de gabarit de composants (`ToastContainer.js` via `<style>{`@keyframes slideInRight {…}`}</style>`, `serviceWorkerRegistration.js` via un `textContent`, plus un `cssText` qui joue `slideUp`) et leurs deux usages sont un objet de style JSX et un `cssText` — un lecteur CSS seul ne les verrait NI comme déclaration NI comme usage, et rendrait un vert PARTIEL, les deux `kojo-vue-*` de `src/index.css` étant, elles, du CSS franc qu'il lirait. Les trois faux positifs historiques de la sonde naïve sont verrouillés : `animationFillMode`, `animationDelay`, `animation-duration`/`animation-iteration-count` ne sont pas des usages, et la prose d'un commentaire n'est jamais jugée (un AST, pas une expression régulière). Planchers de lecture (120 fichiers de `src/`, au moins 1 déclaration ET 1 usage) pour refuser de juger un décodeur muet, et un fichier que `@babel/parser` refuse est compté, jamais déclaré propre."
+    },
+    {
+      "chemin": "frontend/scripts/keyframes-animations.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-keyframes-animations.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même, sans aucune E/S : décodage d'un raccourci `animation` où le NOM est le seul jeton qui ne soit ni un temps, ni un nombre, ni un mot-clé connu, ni un appel de fonction (`steps()`, `cubic-bezier()`, `var()`) ; clés EXACTES `animation`/`animation-name` (CSS) et `animation`/`animationName` (JS), jamais un préfixe ; lecture des `@keyframes` d'un littéral de gabarit et des usages d'un objet de style JSX, d'une affectation `el.style.animation`, d'un `setProperty(…, …)` ou d'un `cssText` ; porte de FORME qui n'envoie à `postcss` qu'un vrai fragment (`@keyframes`, ou une déclaration d'animation terminée), pour que la prose française `'animation : un effet'` ne soit jamais lue comme du CSS ; énumération des deux verdicts par NOM (une déclaration jouée une fois est vivante)"
     },
     {
       "chemin": "frontend/scripts/check-pack2-chunks.js",
@@ -203,7 +270,7 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
       "runner": "vitest",
-      "motif": "refuse en fin de passe un serveur de test encore ouvert, une URL de Preview injoignable, et relaie l'hygiene git (branches locales fusionnees, refs distantes orphelines) deleguee a scripts/check-git-branches.js ; NOMME SANS BLOQUER le travail qui n'existe que sur ce disque — branche locale dont la tete n'est contenue dans AUCUNE ref distante, mesuree par une lecture par branche (`rev-list --count <branche> --not --remotes`), avec sa marche a suivre (git push, ou git branch -D si le contenu a ete livre autrement) — et nomme l'etat au lieu de juger quand aucune ref distante n'existe (plancher de lecture) ; la liste des ports vient de playwright.config.js et du serveur de rewrites"
+      "motif": "refuse en fin de passe un serveur de test encore ouvert, une URL de Preview injoignable, et relaie l'hygiene git (branches locales fusionnees, refs distantes orphelines) deleguee a scripts/check-git-branches.js ; NOMME SANS BLOQUER le travail qui n'existe que sur ce disque — branche locale dont la tete n'est contenue dans AUCUNE ref distante, mesuree par une lecture par branche (`rev-list --count <branche> --not --remotes`), avec sa marche a suivre (git push, ou git branch -D si le contenu a ete livre autrement) — et nomme l'etat au lieu de juger quand aucune ref distante n'existe (plancher de lecture)la liste des ports vient de playwright.config.js et du serveur de rewrites"
     },
     {
       "chemin": "frontend/scripts/check-git-branches.js",
@@ -542,12 +609,21 @@
       "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : le classement de ce module est verrouillé par ses cas unitaires directs (cinq familles de balises, srcset candidat par candidat, rel à deux mots, rel inconnu refusé, navigation et JSON-LD ignorés, entités résolues, origines relatives/absolues/sans protocole, url()/@import/image-set(), feuille relais suivie), et les mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict neutralisé, plancher neutralisé)"
     },
     {
+      "chemin": "frontend/scripts/tiers-avant-interaction.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/tiers-avant-interaction.test.js",
+      "runner": "vitest",
+      "motif": "le pendant DYNAMIQUE de shell-remote-resources.js : la règle qui classe ce que le navigateur a RÉELLEMENT demandé avant toute interaction (nôtres : origine de la page, SITE_ORIGIN/API_ORIGIN de site-meta.js, toute adresse loopback ; tiers : tout le reste ; schémas locaux non jugés) — le VERDICT est prononcé par le parcours Chromium frontend/e2e/aucun-tiers-avant-interaction.spec.js, hors du périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/), donc ce module se déclare outil ; sa preuve fixe le contrat et le compare au garde statique",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : le VERDICT de cette règle est prononcé par le parcours Chromium frontend/e2e/aucun-tiers-avant-interaction.spec.js, hors de la table, et son contrat de « tiers » est verrouillé par ses cas unitaires directs (contrepartie comparée à shell-remote-resources.js) — il n'y a pas de ligne de verdict à neutraliser dans un module qui ne sort jamais en 1"
+    },
+    {
       "chemin": "frontend/scripts/check-css-selecteurs-morts.js",
       "role": "garde",
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
       "runner": "vitest",
-      "motif": "une classe ou un id nommé par un sélecteur doit être POSÉ par l'artefact livré — les littéraux de className du JavaScript du build, ou le HTML des coquilles pré-rendues ; sinon le sélecteur ne peut rien peindre et la feuille décrit un site qui n'existe pas. Le garde remplace l'ÉLAGAGE AU BUILD (`vite-plugins/purge-css-mort.js`, supprimé) et rend DEUX verdicts : les feuilles SOURCE (fichier, ligne, nom mort, sélecteur, et position obligatoire vs alternative de :is()/:where()) et la feuille LIVRÉE (une règle servie dont aucun sélecteur n'a de porteur — l'utilitaire qu'un composant éliminé du bundle, une branche import.meta.env.DEV, fait générer à Tailwind ; mesuré le 25/09/2026 : 2 utilitaires, 199 o par page). Le corpus des POSEURS exclut délibérément les feuilles du build : une feuille ne peut que se justifier elle-même. Mesures du 25/09/2026 : 36 règles mortes, 131 sélecteurs inapplicables et 148 arguments morts de :is()/:where() retirés des sources (six feuilles touchées : 30 676 → 19 636 o ; sept feuilles source : 33 215 → 22 175 o, mesuré contre HEAD), 105 noms morts (4 769 o, 6,85 % de la feuille servie) que l'élagage laissait passer, feuille servie 69 432 → 60 929 o, 7 feuilles source et 13 pages jugées, 0 divergence."
+      "motif": "une classe ou un id nommé par un sélecteur doit être POSÉ par l'artefact livré — les littéraux de className du JavaScript du build, ou le HTML des coquilles pré-rendues ; sinon le sélecteur ne peut rien peindre et la feuille décrit un site qui n'existe pas. Le garde remplace l'ÉLAGAGE AU BUILD (`vite-plugins/purge-css-mort.js`, supprimé) et rend DEUX verdicts : les feuilles SOURCE (fichier, ligne, nom mort, sélecteur, et position obligatoire vs alternative de :is()/:where()) et la feuille LIVRÉE (une règle servie dont aucun sélecteur n'a de porteur — l'utilitaire qu'un composant éliminé du bundle, une branche import.meta.env.DEV, fait générer à Tailwind ; mesuré le 25/09/2026 : 2 utilitaires, 199 o par page). Le corpus des POSEURS exclut délibérément les feuilles du build : une feuille ne peut que se justifier elle-même. SA LECTURE A ÉTÉ RESSERRÉE le 28/09/2026, et c'est une mesure qui l'a imposée : cinq feuilles importées (`src/styles/kojo-pack-*.css`, 292 lignes d'un système de design étranger, 39 classes, plus les attributs `[data-screen=…]`) étaient LIVRÉES sans qu'AUCUN élément porte leurs noms, et ce verdict était VERT — le corpus comptait alors les jetons de tout le texte du build, donc `card` était « porté » par `<meta name=twitter:card>`, `dialog` par `role=dialog`, `overlay` par sept occurrences de Leaflet, `header` par un en-tête HTTP de Sentry, `toast` par une variable, et `dashboard`/`settings`/`jobs`/`profile` par les noms de routes du routeur — aucune de ces occurrences ne peut peindre un `.card`. Le verdict 1 ne retient donc plus que les POSITIONS DE CLASSE (attribut `class=` d'une page, `className`/`class`/`classe`/`…Class`, `classList.add`, `setAttribute('class', …)`, affectation `el.className =`, variable locale nommée dans une de ces positions, lue par AST — un motif ne distingue pas une valeur de `className` d'un argument de `console.log`) ; le verdict 2 garde la lecture large, parce que Tailwind y génère un utilitaire depuis n'importe quel jeton (312 règles servies par `.container` et `.ease-out`, dette d'un autre propriétaire, comptée et publiée, pas tue). Mesures du 25/09/2026 : 36 règles mortes, 131 sélecteurs inapplicables et 148 arguments morts de :is()/:where() retirés des sources (six feuilles touchées : 30 676 → 19 636 o ; sept feuilles source : 33 215 → 22 175 o, mesuré contre HEAD), 105 noms morts (4 769 o, 6,85 % de la feuille servie) que l'élagage laissait passer, feuille servie 69 432 → 60 929 o, 7 feuilles source et 13 pages jugées, 0 divergence. Mesures du 28/09/2026, après retrait des cinq feuilles : 2 feuilles source (214 règles) et 14 pages (12 135 règles livrées) lues, corpus des poseurs 75 fichiers/791 jetons issus de 2 713 valeurs de classe, 0 nom mort et 0 règle servie sans porteur ; le plancher des feuilles source est descendu de 6 à 2, parce qu'un plancher qu'une dette suffit à satisfaire n'est pas un plancher."
     },
     {
       "chemin": "frontend/scripts/css-selecteurs-morts.js",
@@ -555,8 +631,8 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
       "runner": "vitest",
-      "motif": "la règle elle-même (ce qu'est un nom de classe dans un sélecteur — échappements CSS résolus par un SCANNER, pas par une expression régulière dont le motif hérité déclarait sans porteur la classe que le JavaScript livre pourtant, valeurs arbitraires, chaînes entre guillemets ignorées ; ce qu'est un PORTEUR — ensemble de jetons ET revérification en texte avec bornes de nom, pour que `container` ne compte pas dans `containerRef` ; le corpus des poseurs ; les planchers de lecture) : le garde prononce le verdict, ce module fournit le classement",
-      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (valeur arbitraire échappée, nom à crochets et deux-points, variantes hover:/md:, id, liste de sélecteurs, point entre guillemets, crochet nu, bornes de nom, corpus vide, ligne et sélecteur du nom mort, position obligatoire vs alternative, règle livrée sans porteur, règle livrée gardée par UN porteur), et les cinq mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict, lecture des feuilles source, trois planchers de lecture)"
+      "motif": "la règle elle-même (ce qu'est un nom de classe dans un sélecteur — échappements CSS résolus par un SCANNER, pas par une expression régulière dont le motif hérité déclarait sans porteur la classe que le JavaScript livre pourtant, valeurs arbitraires, chaînes entre guillemets ignorées ; ce qu'est un PORTEUR — ensemble de jetons ET revérification en texte avec bornes de nom, pour que `container` ne compte pas dans `containerRef` ; DEUX corpus, et l'asymétrie est mesurée — `corpusPoseurs` ne lit que les POSITIONS DE CLASSE d'un JavaScript compilé (AST `@babel/parser`) et les attributs `class=` d'une page, `corpusPoseursLarge` garde la lecture large pour le seul verdict de la feuille LIVRÉE ; les planchers de lecture) : le garde prononce le verdict, ce module fournit le classement",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (valeur arbitraire échappée, nom à crochets et deux-points, variantes hover:/md:, id, liste de sélecteurs, point entre guillemets, crochet nu, bornes de nom, corpus vide, ligne et sélecteur du nom mort, position obligatoire vs alternative, règle livrée sans porteur, règle livrée gardée par UN porteur), et les six mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict, lecture des feuilles source, corpus des feuilles source — large au lieu de serré, trois planchers de lecture), et le module est verrouillé en outre par ses cas directs sur ce qui POSE VRAIMENT une classe (tableau de chaînes, prose, clé i18n, `role`, en-tête HTTP : rien de tout cela ne porte ; `className`, attribut JSX, `classList.add`, `setAttribute('class')`, `el.className =`, clé `…Class`, littéraux descendus d'un gabarit/condition/appel)"
     },
     {
       "chemin": "frontend/scripts/check-shell-text-provenance.js",
@@ -576,6 +652,15 @@
       "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les règles de ce module sont verrouillées par leurs cas unitaires directs (texte entier, composition, valeur dérivée, mot inventé, texte commenté, recopie d'un glyphe, exemption périmée, clé de glyphe inconnue, marqueur sans porteur, copie en dur, lecteur de littéraux), et la mutation qui prouve le VERDICT porte sur les lignes du garde qui l'énoncent (trois mutations déclarées)"
     },
     {
+      "chemin": "frontend/scripts/texte-visible.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/texte-visible.test.js",
+      "runner": "vitest",
+      "motif": "la LECTURE du texte visible d'un fragment HTML (balises, scripts, styles et commentaires retirés, blancs et espaces insécables réduits), partagée par le garde de shell (scripts/check-home-shell.js) et par le refus de corps déclaré du build (vite-plugins/prerender/declared-body.js) : le garde prononce le verdict, ce module fournit la lecture. Deux lectures différentes avaient déjà fait refuser une coquille pour un titre qu'un lecteur voyait ENTIER (27/09/2026 : le titre du héros, coupé en deux lignes par un <br> et un <em>, était cherché en chaîne BRUTE dans le HTML)",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : cette lecture est verrouillée par son test direct (frontend/scripts/__tests__/texte-visible.test.js — cinq cas : balises retirées, scripts et styles, commentaires, blancs et espaces insécables, ni mot ajouté ni mot manquant) et par les deux gardes qui l'exécutent sur l'arbre réel"
+    },
+    {
       "chemin": "frontend/scripts/mesure-lighthouse-locale.mjs",
       "role": "outil",
       "invoque_par": "ci",
@@ -590,7 +675,31 @@
       "invoque_par": "test",
       "preuve": "frontend/scripts/__tests__/style-layout-budgets.test.js",
       "runner": "vitest",
-      "motif": "la TABLE de la STRUCTURE du document pré-rendu, et le COÛT qu'elle publie. Ce module n'est pas un garde : il ne lit pas le dépôt et ne sort jamais en 1 — il fournit la structure de RÉFÉRENCE (nœuds par route, hauteur par route et par condition), le plancher DÉRIVÉ de cette structure (0,8), et les deux relevés de coût avec leur hôte. Le verdict est prononcé par la sonde frontend/e2e/style-layout-document.spec.js (22 cases + la couverture exacte des routes), qui n'entre PAS dans le périmètre de ce registre — le périmètre est frontend/scripts/, .github/scripts/, backend/scripts/ — et qui roule dans le job e2e de la CI via `npm run test:e2e`. CE QUE LE PREMIER VERDICT A COÛTÉ, ET C'EST LA MESURE QUI L'A CORRIGÉ : il portait sur le TEMPS (0,6 × à 1,5 × le relevé d'un poste partagé) et le premier passage du runner Linux a rendu 18 des 22 cases rouges sur le MÊME artefact (run 36188879161 : 18 failed, 123 passed) — / mobile 662 ms sur le poste contre 80,4 ms dans la CI (×8,2), /contact desktop 46 contre 23,3, /jobs mobile 155 contre 45,9, /register mobile 452 contre 74,6 — toutes sur la borne basse, aucune borne haute franchie. Une borne en millisecondes n'y borne pas une régression, elle borne la MACHINE : le même artefact coûte de 1,85 à 8,2 fois moins cher selon l'hôte, et aucune marge ne couvre les deux. Le verdict porte donc sur la STRUCTURE, qui est une propriété de l'artefact : les NŒUDS sont mesurés IDENTIQUES sur les deux hôtes, sur les 11 routes (279, 112, 120, 108, 157, 103, 114, 98, 106, 203, 135), et la HAUTEUR s'accorde à 0,9 % près là où les deux hôtes l'ont imprimée (7 075 → 7 107 px sur l'accueil mobile, 4 782 → 4 807 en desktop, 2 957 → 2 982 sur /how-it-works, 926 → 926 sur /forgot-password). La marge est de 20 points, soit 22 fois cet écart, et la mutation la franchit deux fois et demie : accueil amputé de ses neuf dernières sections → 279 → 105 nœuds et 7 075 → 1 125 px (shell bâti 94 329 o / SHA-1 997b3d3c… → 75 601 o / dbb86205…, restauré à l'identique), les DEUX cases de l'accueil rouges, en nommant « 105 nœuds peints, sous le plancher de 223 ». Ce que la mesure du coût a appris reste PUBLIÉ, table comprise : le STYLE n'est jamais le sujet (2 à 6 % du total — l'élagage du CSS était justifié, poids mort et sources menteuses, mais il n'était PAS le coût du document), le coût est dans le HAUT du document avec une PART FIXE de 250 à 300 ms sur l'accueil mobile (balayage 1→10 sections : 339 / 366 / 494 / 558 / 558 / 569 / 618 / 628 / 622 / 650 ms), et le contenu AJOUTÉ est quasi gratuit (+6 000 px vides en tête = 0 ms, tout <main> republié = ×0,99, héros publié trois fois = +3 %). CONSÉQUENCE ASSUMÉE : le coût du document n'est plus un gate de PR — il est couvert là où il se voit vraiment, par les budgets Lighthouse du déploiement (job lighthouse-ci, `lighthouserc*.cjs`) et par les gardes de POIDS (`check-bundle-size.js`, `check-home-shell.js`), dont la grandeur ne dépend pas de la machine qui les lit. La sonde garde ses deux refus de faux vert (React monté = blocage du bundle cassé ; relevé nul), et la table comme le verdict sont éprouvés à l'unité par frontend/scripts/__tests__/style-layout-budgets.test.js (8 cas : couverture exacte de `src/config/page-meta.js`, plancher dérivé et strictement ordonné, mutation mesurée qui franchit la borne, non-portabilité du temps verrouillée sur les deux relevés) et par deux mutations du registre."
+      "motif": "la TABLE de la STRUCTURE du document pré-rendu, et le COÛT qu'elle publie. Ce module n'est pas un garde : il ne lit pas le dépôt et ne sort jamais en 1 — il fournit la structure de RÉFÉRENCE (nœuds par route, hauteur par route et par condition), le plancher DÉRIVÉ de cette structure (0,8), et les deux relevés de coût avec leur hôte. Le verdict est prononcé par la sonde frontend/e2e/style-layout-document.spec.js (22 cases + la couverture exacte des routes), qui n'entre PAS dans le périmètre de ce registre — le périmètre est frontend/scripts/, .github/scripts/, backend/scripts/ — et qui roule dans le job e2e de la CI via `npm run test:e2e`. CE QUE LE PREMIER VERDICT A COÛTÉ, ET C'EST LA MESURE QUI L'A CORRIGÉ : il portait sur le TEMPS (0,6 × à 1,5 × le relevé d'un poste partagé) et le premier passage du runner Linux a rendu 18 des 22 cases rouges sur le MÊME artefact (run 36188879161 : 18 failed, 123 passed) — / mobile 662 ms sur le poste contre 80,4 ms dans la CI (×8,2), /contact desktop 46 contre 23,3, /jobs mobile 155 contre 45,9, /register mobile 452 contre 74,6 — toutes sur la borne basse, aucune borne haute franchie. Une borne en millisecondes n'y borne pas une régression, elle borne la MACHINE : le même artefact coûte de 1,85 à 8,2 fois moins cher selon l'hôte, et aucune marge ne couvre les deux. Le verdict porte donc sur la STRUCTURE, qui est une propriété de l'artefact : les NŒUDS sont mesurés IDENTIQUES sur les deux hôtes, sur les 11 routes (279, 112, 120, 108, 157, 103, 114, 98, 106, 203, 135), et la HAUTEUR s'accorde à 0,9 % près là où les deux hôtes l'ont imprimée (7 075 → 7 107 px sur l'accueil mobile, 4 782 → 4 807 en desktop, 2 957 → 2 982 sur /how-it-works, 926 → 926 sur /forgot-password). La marge est de 20 points, soit 22 fois cet écart, et la mutation la franchit deux fois et demie : accueil amputé de ses dix dernières sections → 443 → 123 nœuds et 7 726 → 1 236 px (mobile) / 5 407 → 1 086 px (desktop), les DEUX cases de l'accueil rouges sur les DEUX axes. Le rejeu est VIVANT depuis le 26/09/2026 (e2e/style-layout-preuve-echec.spec.js) : il intercepte la navigation et sert le corps amputé AU VOL — build/index.html n'est jamais réécrit — et il rejoue une SECONDE mutation qui fixe la LIMITE de la sonde : casser les `contain-intrinsic-size: auto Npx` en `auto 4px` ne fait PAS baisser la hauteur jusqu'au plancher (re-mesuré le 27/09/2026 : Δ 0 px dans les deux tailles, 7 726 et 5 407 px INCHANGÉS), parce que les sections se sont RENDUES entre-temps et que `auto` a mémorisé leurs tailles — les constantes ne gouvernent que la PREMIÈRE mise en page (mesuré au premier commit, en desktop : 5 407 → 1 819 px) — donc la sonde n'a qu'une borne basse, elle n'attrape jamais une taille cassée vers le bas. (Premier rejeu à la main, 25/09/2026, artefact d'avant les icônes SVG : 279 → 105 nœuds, hauteurs identiques, shell bâti 94 329 o / SHA-1 997b3d3c… → 75 601 o / dbb86205…, restauré à l'identique.) Ce que la mesure du coût a appris reste PUBLIÉ, table comprise : le STYLE n'est jamais le sujet (2 à 6 % du total — l'élagage du CSS était justifié, poids mort et sources menteuses, mais il n'était PAS le coût du document), le coût est dans le HAUT du document avec une PART FIXE de 250 à 300 ms sur l'accueil mobile (balayage 1→10 sections : 339 / 366 / 494 / 558 / 558 / 569 / 618 / 628 / 622 / 650 ms), et le contenu AJOUTÉ est quasi gratuit (+6 000 px vides en tête = 0 ms, tout <main> republié = ×0,99, héros publié trois fois = +3 %). CONSÉQUENCE ASSUMÉE : le coût du document n'est plus un gate de PR — il est couvert là où il se voit vraiment, par les budgets Lighthouse du déploiement (job lighthouse-ci, `lighthouserc*.cjs`) et par les gardes de POIDS (`check-bundle-size.js`, `check-home-shell.js`), dont la grandeur ne dépend pas de la machine qui les lit. La sonde garde ses deux refus de faux vert (React monté = blocage du bundle cassé ; relevé nul), et la table comme le verdict sont éprouvés à l'unité par frontend/scripts/__tests__/style-layout-budgets.test.js (8 cas : couverture exacte de `src/config/page-meta.js`, plancher dérivé et strictement ordonné, mutation mesurée qui franchit la borne, non-portabilité du temps verrouillée sur les deux relevés) et par deux mutations du registre."
+    },
+    {
+      "chemin": "frontend/scripts/check-juges-de-temps.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "runner": "vitest",
+      "motif": "refuse qu'un verdict porte sur un TEMPS ABSOLU sans être déclaré et classé — le défaut d'origine étant un garde qui jugeait la hauteur du document pré-rendu contre un nombre de pixels absolu relevé sur une machine : vert sur un poste, rouge sur un autre, parce que le verdict portait sur l'HÔTE et non sur l'artefact. Le module des règles (scripts/juges-de-temps.js) inventorie les bornes de temps des surfaces de verdict déclarées (budgets Lighthouse, délais de test Vitest/Playwright, plafond HTTP de la sonde OG) et exige, pour chacune, une classe d'un vocabulaire FERMÉ (PROPRIETE = plafond d'attente, VIVACITE = borne de blocage dimensionnée par le travail, HOTE = délai qui décide et suit la machine, MESURE = métrique en millisecondes) et une justification de plus de 40 caractères. Une borne qui DÉCIDE (HOTE ou MESURE) n'est tolérée que si un ANGLE ACCEPTÉ nomme ce qui la compense ; une borne NOUVELLE rougit ; une borne DISPARUE ou dont le nombre d'occurrences a changé rougit (registre périmé) ; un fichier de surface introuvable rougit. Une surface peut être un DOSSIER (`frontend/e2e`, `dossier: true`) : le bras la développe en ses fichiers JavaScript, lus ET NOMMÉS un par un — donc un parcours AJOUTÉ demain est jugé sans être inscrit nulle part, et le motif `attenteFixe` y est déclaré VIDE : toute `waitForTimeout(N)` sous `e2e/` est une borne NON DÉCLARÉE, refusée en nommant le fichier, la ligne et la valeur (dix-neuf attentes fixes recensées le 27/09/2026, converties en attentes de condition le 28/09/2026 — part (a) de l'angle 19 de CI-COVERAGE.md, fermée ; relevé : 24 surfaces lues). Planchers de lecture (5 surfaces, 4 bornes) : sous eux, le garde refuse de juger plutôt que de rendre un vert vide. Angles morts publiés, mesurés et non devinés : les `{ timeout: N }` d'attente de CONDITION de `e2e/` (classe PROPRIETE par construction), les `timeout-minutes` des workflows, les attentes de CONDITION de `e2e/` (`waitForSelector`, `waitForFunction`, `e2e/helpers/attentes.js` — les inventorier ferait crier le garde à chaque condition écrite), les bornes calculées (dont le TBT de la coquille, écrit `targetIsLocal ? 1600 : 1200` : deux seuils, un par hôte, la forme portable), les tables mesurées (CLS, TBT desktop) gouvernées par leurs propres tests, et le fait que le relevé est TEXTUEL — une borne citée dans un commentaire compte, donc le garde surestime toujours, jamais l'inverse."
+    },
+    {
+      "chemin": "frontend/scripts/juges-de-temps.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "runner": "vitest",
+      "motif": "les RÈGLES du garde des temps absolus, sans aucune E/S : classes (vocabulaire fermé), motifs de relevé, surfaces déclarées, JUGES (la déclaration), angles acceptés, relevé, inventaire, confrontation et délits de déclaration. Les fonctions sont pures parce qu'elles reçoivent le TEXTE des fichiers : c'est ce qui les rend éprouvables par mutation de chaîne, et ce qui permet à la preuve de fabriquer une borne nouvelle, une borne disparue, une classe inconnue et une justification trop courte sans toucher aux vrais budgets. Elle porte aussi la RÈGLE du harnais e2e : `frontend/e2e` est une surface (`dossier: true`) sur le seul motif `attenteFixe`, avec une déclaration VIDE — l'inventaire développe un dossier en ses fichiers À LEUR NOM (le refus nomme le fichier), ce qui rend toute `waitForTimeout(N)` refusée, y compris dans un parcours écrit demain — et c'est CETTE ligne de développement qu'une mutation neutralise pour prouver les deux cas neufs."
+    },
+    {
+      "chemin": "frontend/scripts/budget-de-vivacite.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/import-health.test.js",
+      "runner": "vitest",
+      "motif": "la correction du verdict non portable du parcours d'import : le budget n'est plus emprunté aux 20 s de `vite.config.js` (marge taillée pour des gardes qui LANCENT un sous-processus), il est DÉRIVÉ d'une mesure prise à l'exécution (temps d'import d'un échantillon de 10 modules, extrapolé au nombre total de modules du périmètre), avec un plancher pour la zone de flottement connue, un plafond pour qu'un vrai blocage meure encore, et une marge couvrant la non-linéarité. Un budget épuisé lève `BudgetDeVivaciteEpuise` et n'accuse JAMAIS le code : c'est la distinction que la mutation « le budget ne suit plus la mesure » fait rougir."
     }
   ],
   "rejeux": [
@@ -630,6 +739,126 @@
       "cwd": "frontend",
       "attend": [
         "un marqueur URL lazy"
+      ]
+    },
+    {
+      "id": "formulaire-differe: verdict du CLI neutralise",
+      "garde": "frontend/scripts/check-formulaire-differe.js",
+      "cible": "frontend/scripts/check-formulaire-differe.js",
+      "trouve": "  if (problemes.length > 0) {",
+      "remplace": "  if (false && problemes.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-formulaire-differe.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-formulaire-differe.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le CLI refuse une classe retirée"
+      ]
+    },
+    {
+      "id": "origines-bundles: verdict du CLI neutralise",
+      "garde": "frontend/scripts/check-origines-bundles.js",
+      "cible": "frontend/scripts/check-origines-bundles.js",
+      "trouve": "  if (refus.length > 0) {",
+      "remplace": "  if (false && refus.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-origines-bundles.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-origines-bundles.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "occurrences et ses fichiers"
+      ]
+    },
+    {
+      "id": "drapeaux-emoji: verdict du CLI neutralise",
+      "garde": "frontend/scripts/check-drapeaux-emoji.js",
+      "cible": "frontend/scripts/check-drapeaux-emoji.js",
+      "trouve": "  if (refus.length > 0) {",
+      "remplace": "  if (false && refus.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-drapeaux-emoji.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-drapeaux-emoji.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 en NOMMANT le fichier et la ligne"
+      ]
+    },
+    {
+      "id": "keyframes: verdict du CLI neutralise",
+      "garde": "frontend/scripts/check-keyframes-animations.js",
+      "cible": "frontend/scripts/check-keyframes-animations.js",
+      "trouve": "  if (refus.length > 0) {",
+      "remplace": "  if (false && refus.length > 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-keyframes-animations.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-keyframes-animations.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 en nommant une @keyframes déclarée et jamais jouée"
+      ]
+    },
+    {
+      "id": "keyframes: une @keyframes orpheline n'est plus signalee",
+      "garde": "frontend/scripts/keyframes-animations.js",
+      "cible": "frontend/scripts/keyframes-animations.js",
+      "trouve": "    jamaisJouees: declarations.filter((d) => !jouees.has(d.nom)),",
+      "remplace": "    jamaisJouees: [],",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-keyframes-animations.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-keyframes-animations.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une @keyframes déclarée et jamais jouée"
+      ]
+    },
+    {
+      "id": "keyframes: une animation pendante n'est plus signalee",
+      "garde": "frontend/scripts/keyframes-animations.js",
+      "cible": "frontend/scripts/keyframes-animations.js",
+      "trouve": "    jamaisDeclarees: references.filter((r) => !declarees.has(r.nom)),",
+      "remplace": "    jamaisDeclarees: [],",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-keyframes-animations.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-keyframes-animations.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une animation jouée et déclarée nulle part"
       ]
     },
     {
@@ -1923,6 +2152,46 @@
       ]
     },
     {
+      "id": "prerender-shells: equilibre des balises non verifie",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "    for (const probleme of desequilibresDesBalises(contenu)) {",
+      "remplace": "    for (const probleme of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-prerender-shells.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : coquille de /jobs aux balises déséquilibrées (hors accueil)"
+      ]
+    },
+    {
+      "id": "prerender-shells: artefacts hors routes non lus",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "for (const fichier of [...pagesPreRendues, ...artefactsHorsRoutes]) {",
+      "remplace": "for (const fichier of pagesPreRendues) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-prerender-shells.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : page 404 statique aux balises déséquilibrées (hors routes)"
+      ]
+    },
+    {
       "id": "prerender-shells: verdict d'apostrophe non rapporte",
       "garde": "frontend/scripts/check-prerender-shells.js",
       "cible": "frontend/scripts/check-prerender-shells.js",
@@ -2046,10 +2315,30 @@
       ]
     },
     {
+      "id": "css-selecteurs-morts: corpus large pour les feuilles source",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "const corpus = corpusPoseurs(RACINE);",
+      "remplace": "const corpus = corpusPoseursLarge(RACINE);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "ne se laisse PAS convaincre par un nom écrit ailleurs que dans une classe"
+      ]
+    },
+    {
       "id": "css-selecteurs-morts: plancher du corpus neutralise",
       "garde": "frontend/scripts/check-css-selecteurs-morts.js",
       "cible": "frontend/scripts/check-css-selecteurs-morts.js",
-      "trouve": "if (corpus.fichiers.length < MIN_FICHIERS_CORPUS || corpus.jetons.size < MIN_JETONS_CORPUS) {",
+      "trouve": "if (corpusLarge.fichiers.length < MIN_FICHIERS_CORPUS || corpusLarge.jetons.size < MIN_JETONS_CORPUS) {",
       "remplace": "if (false) {",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
@@ -2285,6 +2574,167 @@
       "cwd": "frontend",
       "attend": [
         "refuse de juger si le nombre de contrôles analysés est sous le plancher"
+      ]
+    },
+    {
+      "id": "temps absolus: une borne qui DECIDE passe pour inoffensive",
+      "garde": "frontend/scripts/juges-de-temps.js",
+      "cible": "frontend/scripts/juges-de-temps.js",
+      "trouve": "export const decideParElleMeme = (classe) => Boolean(CLASSES[classe]?.decisions);",
+      "remplace": "export const decideParElleMeme = (classe) => false;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le vocabulaire est FERMÉ, et dit quelles classes décident"
+      ]
+    },
+    {
+      "id": "temps absolus: une borne non declaree n'est plus signalee",
+      "garde": "frontend/scripts/juges-de-temps.js",
+      "cible": "frontend/scripts/juges-de-temps.js",
+      "trouve": "if (!declarees.has(`${borne.chemin}|${borne.motif}|${borne.valeur}`)) nonDeclarees.push(borne);",
+      "remplace": "if (false) nonDeclarees.push(borne);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "la DÉCLARATION est ce qui rend le vert"
+      ]
+    },
+    {
+      "id": "temps absolus: une declaration perimee n'est plus signalee",
+      "garde": "frontend/scripts/juges-de-temps.js",
+      "cible": "frontend/scripts/juges-de-temps.js",
+      "trouve": "        if (reelles !== attendues) {",
+      "remplace": "        if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "une borne DISPARUE rend la déclaration périmée"
+      ]
+    },
+    {
+      "id": "temps absolus: une justification courte passe pour une justification",
+      "garde": "frontend/scripts/juges-de-temps.js",
+      "cible": "frontend/scripts/juges-de-temps.js",
+      "trouve": "return String(declaration?.pourquoi || '').trim().length < MIN_JUSTIFICATION;",
+      "remplace": "return false;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "une justification courte n’est pas une justification"
+      ]
+    },
+    {
+      "id": "budget de vivacite: le budget ne suit plus la mesure",
+      "garde": "frontend/scripts/budget-de-vivacite.js",
+      "cible": "frontend/scripts/budget-de-vivacite.js",
+      "trouve": "  return Math.min(plafond, Math.max(plancher, Math.round(estimation * marge)));",
+      "remplace": "  return plancher;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/import-health.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/import-health.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "le budget de vivacité SUIT la mesure au lieu d’être une constante"
+      ]
+    },
+    {
+      "id": "temps absolus: une surface introuvable n'est plus refusee",
+      "garde": "frontend/scripts/check-juges-de-temps.js",
+      "cible": "frontend/scripts/check-juges-de-temps.js",
+      "trouve": "  if (absentes.length > 0) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une surface déclarée INTROUVABLE"
+      ]
+    },
+    {
+      "id": "temps absolus: une attente fixe dans e2e passe pour une condition",
+      "garde": "frontend/scripts/juges-de-temps.js",
+      "cible": "frontend/scripts/juges-de-temps.js",
+      "trouve": "      ? [...parChemin.keys()].filter((chemin) => chemin.startsWith(`${surface.chemin}/`))",
+      "remplace": "      ? []",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "la surface `frontend/e2e` est un DOSSIER : chaque fichier est lu À SON NOM",
+        "une attente fixe, MÊME dans un parcours qui n’est listé nulle part, est REFUSÉE et NOMMÉE"
+      ]
+    },
+    {
+      "id": "temps absolus: le plancher de lecture est neutralise",
+      "garde": "frontend/scripts/check-juges-de-temps.js",
+      "cible": "frontend/scripts/check-juges-de-temps.js",
+      "trouve": "  if (confrontation.occurrencesReelles < MIN_MESURES) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-juges-de-temps.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-juges-de-temps.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse de juger quand le relevé ne lit plus assez de bornes"
       ]
     },
     {

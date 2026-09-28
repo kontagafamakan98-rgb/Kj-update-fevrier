@@ -3,7 +3,7 @@ import { createScopedTranslator } from './core.js';
 const withBase = (base, overrides) => ({ ...base, ...overrides });
 const dict = {
 fr: {
-  title: '🧪 Test photo de profil',
+  title: 'Test photo de profil',
   subtitle: 'Page de debug pour tester le système de photos',
   userInfo: 'Informations utilisateur',
   photoComponent: 'Test du composant photo',
@@ -23,14 +23,14 @@ fr: {
   fileApi: 'Support File API',
   canvas: 'Support Canvas',
   localStorage: 'Support LocalStorage',
-  supported: '✅ Supporté',
-  unsupported: '❌ Non supporté',
+  supported: 'Supporté',
+  unsupported: 'Non supporté',
   noFileSelected: 'Aucun fichier sélectionné',
   fileInputTesting: 'Test de sélection manuelle de fichier...',
   manualLogEntry: 'Entrée de log manuelle'
 },
 en: {
-  title: '🧪 Profile photo test',
+  title: 'Profile photo test',
   subtitle: 'Debug page to test the photo system',
   userInfo: 'User information',
   photoComponent: 'Photo component test',
@@ -50,15 +50,14 @@ en: {
   fileApi: 'File API support',
   canvas: 'Canvas support',
   localStorage: 'LocalStorage support',
-  supported: '✅ Supported',
-  unsupported: '❌ Not supported',
+  supported: 'Supported',
+  unsupported: 'Not supported',
   noFileSelected: 'No file selected',
   fileInputTesting: 'Testing manual file input...',
   manualLogEntry: 'Manual log entry'
 }
 };
-dict.wo = withBase(dict.fr, {
-title: '🧪 Test nataalu profil',
+dict.wo = withBase(dict.fr, {  title: 'Test nataalu profil',
   subtitle: 'Xët bu debug ngir seet sistem nataal bi',
   userInfo: 'Xibaaru jëfandikookat',
   photoComponent: 'Test bu kompozaŋ nataal',
@@ -71,8 +70,7 @@ title: '🧪 Test nataalu profil',
   clearLogs: 'Far logs yi',
   testLogs: 'Logs yu test'
 });
-dict.bm = withBase(dict.fr, {
-title: '🧪 Profil foto test',
+dict.bm = withBase(dict.fr, {  title: 'Profil foto test',
   subtitle: 'Debug duw ka foto system filɛ',
   userInfo: 'Baarakɛla kibaru',
   photoComponent: 'Foto composant test',
@@ -85,8 +83,7 @@ title: '🧪 Profil foto test',
   clearLogs: 'Logw bɔ',
   testLogs: 'Test logw'
 });
-dict.mos = withBase(dict.fr, {
-title: '🧪 Profil pɩture test',
+dict.mos = withBase(dict.fr, {  title: 'Profil pɩture test',
   subtitle: 'Debug page n ges pɩture system',
   userInfo: 'Ned kibare',
   photoComponent: 'Pɩture composant test',

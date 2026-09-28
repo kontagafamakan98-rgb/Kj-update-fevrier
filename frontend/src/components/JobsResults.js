@@ -88,12 +88,20 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
 
   // La carte entière est le lien : la cible est donc énorme au doigt, et le
   // contour de focus (`focus-visible`) dit où l'on est au clavier. Le survol
-  // soulève la carte d'un demi-pixel de grille et teinte la bordure — assez
-  // pour dire « c'est cliquable » sans faire sauter la liste.
+  // soulève la carte de 2 px et teinte la bordure en orange — assez pour dire
+  // « c'est cliquable » sans faire sauter la liste. Les deux viennent de la
+  // feuille (`.carte-editoriale-cliquable`) : la même réponse au survol que
+  // toutes les autres cartes cliquables du site.
   return (
     <Link
       to={`/jobs/${job.id}`}
-      className="block rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+      // La CARTE du vocabulaire éditorial (src/index.css) : un filet de 1 px,
+      // un rayon de 8 px, aucune ombre large — c'est ce qui distingue une carte
+      // d'un bouton sur ce site. Le survol reste porté par la feuille
+      // (`.carte-editoriale-cliquable`), donc il ne peut pas diverger d'une
+      // autre carte cliquable. NI le rayon ni l'ombre ne participent à la mise
+      // en page : la hauteur calibrée par `JobCardSkeleton` ne bouge pas.
+      className="carte-editoriale carte-editoriale-cliquable block p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-6">
         <div className="min-w-[240px] flex-1">
@@ -101,13 +109,13 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
               ligne que le squelette (titre text-lg, pastille 24 px). */}
           <div className="mb-2 flex flex-wrap items-center gap-3">
             <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2 py-1 text-xs text-orange-700">
+            <span className="inline-flex items-center gap-1.5 rounded border border-orange-200 bg-orange-50 px-2 py-1 text-xs text-orange-700">
               <span className="h-1.5 w-1.5 rounded-full bg-orange-500" aria-hidden="true"></span>
               {formatJobStatus(job.status, t)}
             </span>
           </div>
-          <p className="mb-4 line-clamp-2 text-gray-600">{job.description}</p>
-          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+          <p className="mb-4 line-clamp-2 text-stone-600">{job.description}</p>
+          <div className="flex flex-wrap gap-4 text-sm text-stone-500">
             <span className="inline-flex items-center gap-1.5"><IconeCalendrier />{formatJobDate(job.posted_at || job.created_at)}</span>
             <span className="inline-flex items-center gap-1.5"><IconeEpingle />{locationText}</span>
             {job.category && <span className="inline-flex items-center gap-1.5"><IconeEtiquette />{job.category}</span>}
@@ -115,9 +123,9 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
         </div>
         <div className="ml-0 min-w-[170px] text-right md:ml-6">
           <div className="text-2xl font-bold text-orange-600">{formatBudgetRange(job.budget_min, job.budget_max)}</div>
-          {job.estimated_duration && <div className="mt-1 text-sm text-gray-500">{job.estimated_duration}</div>}
-          {userType === 'worker' && job.status === 'open' && !hasApplied && <div className="mt-2 inline-flex rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">{t('applyAvailable')}</div>}
-          {hasApplied && <div className="mt-2 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{t('proposalSent')}</div>}
+          {job.estimated_duration && <div className="mt-1 text-sm text-stone-500">{job.estimated_duration}</div>}
+          {userType === 'worker' && job.status === 'open' && !hasApplied && <div className="mt-2 inline-flex rounded border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">{t('applyAvailable')}</div>}
+          {hasApplied && <div className="mt-2 inline-flex rounded border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">{t('proposalSent')}</div>}
         </div>
       </div>
     </Link>

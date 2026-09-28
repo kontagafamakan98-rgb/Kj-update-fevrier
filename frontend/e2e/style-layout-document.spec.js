@@ -43,7 +43,11 @@
  *     l'accueil. Mesuré entrelacé (15 tours, mobile cpu×4) : 419,8 → 319,3 ms,
  *     −100,5 ms (−24 %) ; hauteur du document inchangée (7 080 / 4 783 px contre
  *     une référence de 7 079 / 4 782), et la sonde ci-dessous republie ce coût à
- *     chaque passage (~316 ms mobile) sans le juger.
+ *     chaque passage (~316 ms mobile) sans le juger. Depuis que la police est
+ *     SERVIE par le site (26/09/2026), les constantes de repli ont été
+ *     re-mesurées : le document mesure 7 187 px (mobile) et 4 868 px (desktop)
+ *     avec la règle (le titre du héros rendu concret a ajouté ~60 px en desktop
+ *     le 26/09/2026).
  *   • CE QUI SE MESURE S'ENTRELACE. Une variante mesurée à la suite d'une autre
  *     hérite de la DÉRIVE de l'hôte : la réorganisation de la pile de polices
  *     montrait −54 ms en séquentiel, et +15 ms en ENTRELACÉ (25 runs) — c'était
@@ -76,7 +80,7 @@
  * `src/config/page-meta.js` : une route ajoutée sans référence rougit ici.
  */
 import { test, expect } from '@playwright/test';
-import { ROUTES, ouvrirLaPage } from './helpers/geometrie.js';
+import { ROUTES, ouvrirLaPage, attendreLaStabilite } from './helpers/geometrie.js';
 import budgets from '../scripts/style-layout-budgets.cjs';
 
 const { CONDITIONS, MESURE, MESURE_CI, NOEUDS, HAUTEUR, plancherNoeudsDe, plancherHauteurDe } = budgets;
@@ -94,7 +98,7 @@ async function relever(browser, chemin, condition) {
   await session.send('Performance.enable');
   if (condition.cpu > 1) await session.send('Emulation.setCPUThrottlingRate', { rate: condition.cpu });
   await page.goto(chemin, { waitUntil: 'load' });
-  await page.waitForTimeout(400);
+  await attendreLaStabilite(page);
   const dom = await page.evaluate(() => ({
     noeuds: document.querySelectorAll('*').length,
     hauteur: document.documentElement.scrollHeight,
@@ -155,14 +159,15 @@ test.describe('le document pré-rendu : sa structure publiée, son coût publié
         // ── La coquille publie-t-elle toujours son corps ? ────────────────
         // Un document qui perd sa matière perd d'abord ses NŒUDS, et c'est la
         // seule direction que les mutations savent faire rougir : l'accueil
-        // amputé de ses neuf dernières sections tombe de 279 à 27 nœuds.
+        // amputé de ses DIX dernières sections tombe de 443 à 123 nœuds (le
+        // rejeu est dans e2e/style-layout-preuve-echec.spec.js).
         const plancherNoeuds = plancherNoeudsDe(noeudsReference);
         expect(
           mesure.noeuds,
           `${chemin} (${condition.nom}) : ${mesure.noeuds} nœuds peints, sous le plancher de ${plancherNoeuds} ` +
             `(${budgets.BORNE_STRUCTURE} × les ${noeudsReference} nœuds du relevé) — la coquille a perdu son corps, ` +
-            'et c’est une régression du contrat SEO / sans-JavaScript (mesuré : accueil amputé de ses neuf dernières ' +
-            `sections, 279 → 105 nœuds et 7 075 → 1 125 px). La hauteur, elle, mesure ${mesure.hauteur} px ` +
+            'et c’est une régression du contrat SEO / sans-JavaScript (mesuré : accueil amputé de ses dix dernières ' +
+            `sections, 443 → 123 nœuds et 7 726 → 1 236 px). La hauteur, elle, mesure ${mesure.hauteur} px ` +
             `(plancher ${plancherHauteurDe(hauteurReference)} px). ` +
             'Un nœud ne dépend pas de la machine : c’est ce qui décide ici.'
         ).toBeGreaterThanOrEqual(plancherNoeuds);

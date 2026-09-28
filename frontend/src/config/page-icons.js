@@ -69,6 +69,13 @@ import { createElement } from 'react';
  */
 const ICONES = {
   escrow: `<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path>`,
+  // Les deux flèches des LISTES EN LIGNES de l'accueil (27/09/2026). Elles ne
+  // sont pas décoratives : une ligne est un lien, et la flèche dit dans quel
+  // sens il mène. Deux dessins — vers la droite pour un métier (une page), vers
+  // le bas pour une étape (la suivante) — parce que les deux listes ne racontent
+  // pas la même chose.
+  flecheDroite: `<path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>`,
+  flecheBas: `<path d="M12 5v14"></path><path d="m6 13 6 6 6-6"></path>`,
   promiseFindWork: `<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect>`,
   promiseConnect: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><path d="M16 3.128a4 4 0 0 1 0 7.744"></path><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><circle cx="9" cy="7" r="4"></circle>`,
   promiseSecurePayments: `<rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>`,
@@ -102,6 +109,12 @@ const ICONES = {
   // pour le bloc de séquestre de la MÊME page.
   howStep1: `<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path>`,
   howStep3: `<path d="M20 6 9 17l-5-5"></path>`,
+  // Le repère des listes de GARANTIES (les quatre garanties de séquestre de
+  // /how-it-works) : c'est le MÊME dessin que `howStep3`, déclaré à part parce
+  // que les deux s'emploient dans deux sens différents — l'un est « l'étape 3
+  // est franchie », l'autre « cette promesse est tenue ». Un dessin, deux
+  // noms : les remplacer l'un sans l'autre resterait possible.
+  check: `<path d="M20 6 9 17l-5-5"></path>`,
   // ── Les écrans de compte (26/09/2026, DERNIÈRE vague emoji→SVG) : /login,
   // /register, /forgot-password et /payment publiaient encore les emoji de
   // leurs clés `*IconKey` (📜 ⚠️ 👤 🔧 📸 💡 🌍 ▼ ✉️ 💼). Trois dessins sont
@@ -121,10 +134,20 @@ const ICONES = {
 
 /**
  * Les CLASSES des emplacements d'icône du corps de l'accueil, par rôle. Elles
- * remplacent le `text-3xl` / `text-2xl` / `text-5xl` qui dimensionnait l'emoji :
- * un SVG ne suit pas la taille de police, il lui faut une taille explicite, et
- * c'est ICI qu'elle a un propriétaire (les deux canaux la lisent, Tailwind la
- * voit). Le `currentColor` du trait suit la couleur de texte de l'emplacement.
+ * remplacent les trois PALIERS DE TAILLE DE POLICE qui dimensionnaient l'emoji :
+ * un SVG ne suit pas `font-size`, il lui faut une taille explicite, et c'est ICI
+ * qu'elle a un propriétaire (les deux canaux la lisent, Tailwind la voit). Le
+ * `currentColor` du trait suit la couleur de texte de l'emplacement.
+ *
+ * NOTE : ces paliers ne sont plus cités littéralement, et c'est un correctif du
+ * 28/09/2026. Tailwind lit AUSSI la prose de ses fichiers scannés : un nom
+ * d'utilitaire CITÉ dans un commentaire est GÉNÉRÉ dans la feuille servie, et
+ * s'il n'est posé nulle part, `check-css-selecteurs-morts.js` refuse le build
+ * (« règle servie sans porteur »). Ces citations-ci ne faisaient pas rougir le
+ * garde — le grand palier se retrouvait par SEGMENT dans un utilitaire
+ * responsive du titre du héros (`md:` + ce palier), que la refonte éditoriale a
+ * retiré : la dette dormait sous un autre nom, et elle s'est réveillée le jour
+ * où ce nom a disparu.
  */
 export const CLASSES_ICONE = {
   // Dans les pastilles rondes `h-14 w-14` des catégories (fond orange-50).
@@ -134,23 +157,30 @@ export const CLASSES_ICONE = {
   etape: 'h-7 w-7 text-orange-600',
   // Le grand bouclier du bloc séquestre (fond emerald-50).
   sequestre: 'h-12 w-12 text-emerald-600',
+  // Les trois pastilles rondes de 40 px de l'accueil (métiers, promesses,
+  // étapes) : la couleur vient de la pastille qui les porte
+  // (`.pastille-rond`, src/index.css), donc le trait suit `currentColor`.
+  pastille: 'h-5 w-5',
+  // La flèche d'une ligne cliquable, dans la dernière colonne de la ligne.
+  flecheLigne: 'h-4 w-4',
   // Les trois petits repères du héros, sur fond coloré (trait blanc hérité).
   heros: 'h-5 w-5',
   // ── Les emplacements des quatre pages qui publiaient encore des emoji
   // (26/09/2026). Comme pour l'accueil, la classe REMPLACE la taille de police
-  // qui dimensionnait le caractère (`text-2xl`, `text-5xl`) : un SVG ne suit pas
-  // `font-size`, il lui faut une taille explicite, et elle est écrite ici UNE
-  // fois pour les deux canaux.
+  // qui dimensionnait le caractère : un SVG ne suit pas `font-size`, il lui faut
+  // une taille explicite, et elle est écrite ici UNE fois pour les deux canaux.
+  // (Les deux paliers concernés ne sont pas cités — voir la note ci-dessus.)
   // Les cartes de /about (l'ancien `text-2xl mb-3` d'un emoji).
   carte: 'h-6 w-6 text-orange-600',
   // La pastille du contrôle de carte de /contact (l'ancien `text-2xl`) : elle
   // est grise, comme le contrôle qu'elle accompagne.
   carteContact: 'h-6 w-6 text-gray-500',
-  // La pastille d'un mode de /support (`h-12 w-12`) — la couleur vient du
-  // `badgeClass` de la ligne, donc le trait suit `currentColor`.
+  // La pastille d'un mode de /support (`pastille-rond-large`, 3 rem depuis le
+  // 28/09/2026) — la couleur vient de la pastille, donc le trait suit
+  // `currentColor`.
   mode: 'h-6 w-6',
-  // La pastille d'une ligne de contact (`h-10 w-10`, /contact comme /support) :
-  // même héritage de couleur par `currentColor`.
+  // La pastille d'une ligne de contact (`pastille-rond`, 2,5 rem — /contact
+  // comme /support) : même héritage de couleur par `currentColor`.
   ligne: 'h-5 w-5',
   // ── Les emplacements des quatre écrans de compte (26/09/2026). Le SVG remplace
   // le CARACTÈRE, il ne suit donc pas `font-size` : la taille est écrite ici, une
@@ -158,15 +188,41 @@ export const CLASSES_ICONE = {
   // Le glyphe en TÊTE DE PHRASE (bloc légal, notice d'étape, conseils photo), dans
   // un `text-sm` : il s'aligne sur la ligne de texte au lieu de la décaler.
   notice: 'inline h-4 w-4 align-[-0.15em]',
+  // LA MÊME icône en tête de phrase, mais dans un `text-xs` (12 px — la notice
+  // d'étape de /register, `stepNoticeClass`). L'icône garde sa taille de 16 px
+  // alors que la ligne rétrécit : l'`align-[-0.15em]` de `notice`, calibré sur
+  // `text-sm`/`text-base`, y laissait le centre 1,7 px AU-DESSUS de celui de la
+  // ligne — mesuré en navigateur le 26/09/2026, coquille ET React identiques au
+  // pixel (aucune divergence de canal : c'est bien l'alignement de l'icône sur
+  // la ligne qui divergeait). La valeur ramène le centre de l'icône sur celui de
+  // la ligne, dans ce contexte-là seulement : un `align` en `em` ne peut pas
+  // convenir aux trois tailles avec une icône de taille FIXE.
+  noticePetite: 'inline h-4 w-4 align-[-0.29em]',
+  // Le repère d'un BADGE (11 px, `workerTrustLevel.js`) : 12 px et un
+  // alignement qui le pose sur la ligne de base du libellé qu'il précède.
+  //
+  // Il s'appelait `badge`, et `badge` était déclaré DEUX fois dans cet objet :
+  // la seconde déclaration (celle de l'étape de /forgot-password, 24 px et
+  // blanche) écrasait celle-ci, et le repère du badge de confiance se peignait
+  // donc en BLANC de 24 px dans une pastille orange pâle — invisible, et personne
+  // ne le voyait parce qu'un doublon de clé ne fait qu'avertir à la compilation.
+  // Deux emplacements, deux noms : `badgeRepere` (dans une phrase) et
+  // `badgeEtape` (dans une tuile).
+  badgeRepere: 'inline h-3 w-3 align-[-0.125em]',
   // Les deux cartes de type de compte de /register (l'ancien `text-2xl` d'un
   // emoji, centré par le `text-center` du parent).
   carteUserType: 'h-8 w-8 text-orange-600',
-  // La pastille d'étape de /forgot-password, dans le rond bleu `h-14 w-14` :
-  // l'ancien `text-white text-2xl` devient un trait blanc.
-  badge: 'h-6 w-6 text-white',
+  // La pastille d'étape de /forgot-password, dans la tuile `h-14 w-14` :
+  // l'ancien `text-white text-2xl` devient un trait blanc. Nommée `badgeEtape`
+  // (et non `badge`) pour ne plus écraser le repère du badge de confiance.
+  badgeEtape: 'h-6 w-6 text-white',
   // Les deux emplacements photo de /register : l'en-tête `text-2xl` et la zone de
   // dépôt `text-4xl` (l'ancien emoji, dans un `text-center`).
-  photoTitre: 'inline h-6 w-6 align-[-0.2em] text-gray-500',
+  // Depuis le 28/09/2026, il est posé DANS la rangée d'un titre de section
+  // (`titre-entree`) : plus de glyphe en ligne dans un `text-2xl`, donc la
+  // hauteur de ligne ne le dimensionne plus et l'alignement par `em` n'a plus
+  // d'objet. La teinte suit celle de la section, c'est-à-dire l'orange du site.
+  photoTitre: 'h-6 w-6 text-orange-700',
   photoZone: 'h-10 w-10 text-gray-400',
   // Le globe et le chevron du sélecteur de pays, dans un `text-lg`/`text-xs`.
   paysGlobe: 'h-5 w-5 text-gray-500',

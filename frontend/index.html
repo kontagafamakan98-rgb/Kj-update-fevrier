@@ -7,6 +7,46 @@
          de partage sur fond foncé) : fond graphite + K dégradé, là où
          l'icône claire disparaîtrait. Généré par scripts/gen-og-images.py. -->
     <link rel="icon" media="(prefers-color-scheme: dark)" href="/icons/icon-dark.png" />
+    <!-- LES DEUX POLICES DU SITE SONT PRÉCHARGÉES ICI, ET CETTE PAGE EST LA
+         SOURCE DES COQUILLES PRÉ-RENDUES :
+         `vite-plugins/prerender-route-meta.js` reconstruit chaque coquille
+         depuis ce HTML (méta + corps), donc les treize pages héritent de ces
+         préchargements. La feuille est INLINÉE (66 ko de CSS avant le corps) :
+         sans eux, le navigateur ne découvre un fichier de police qu'après avoir
+         analysé la feuille, c'est-à-dire après le premier paint — la police
+         arriverait systématiquement en retard et le texte serait peint deux
+         fois (repli puis dessin servi). C'est vrai du texte courant (Inter) et
+         PLUS ENCORE du TITRE DU HÉROS, qui est l'élément LCP de « / » : c'est
+         la raison pour laquelle la police de titrage est préchargée elle
+         aussi, et pas seulement téléchargée à la première peinture de titre.
+         NE PAS écrire de balise en toutes lettres dans ce commentaire : il est
+         PUBLIÉ tel quel, et le garde des ressources (`check-shell-remote-resources`)
+         lit le HTML publié, commentaires compris — un exemple écrit ici était
+         refusé comme une déclaration non classée (vécu le 26/09/2026).
+         `crossorigin` est obligatoire même en même-origine : les polices se
+         téléchargent toujours en mode CORS, et sans cet attribut le
+         préchargement est IGNORÉ en silence (double téléchargement mesurable
+         dans le journal réseau). Deux fichiers sont préchargés, UN PAR FAMILLE,
+         et chacun le sous-ensemble `latin` — celui dont toutes les pages ont
+         besoin ; `latin-ext` (œ, ɛ, ɔ, ŋ des dictionnaires bambara/mooré/wolof)
+         reste découvert par son `unicode-range`, sans payer 85 ko (Inter) ni
+         34 ko (titrage) quand la page ne l'utilise pas. Le titrage ne pèse que
+         37 640 o, soit moins que les 48 256 o d'Inter : la seconde requête est
+         plus petite que la première. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/inter-variable-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="/fonts/cormorant-garamond-variable-latin.woff2"
+      crossorigin
+    />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"

@@ -1,51 +1,51 @@
 {
   "assets": [
     {
-      "bytes": 41507,
+      "bytes": 41462,
       "file": "og-image-1200x630.png",
       "format": "wide",
       "height": 630,
-      "sha256": "a01110259403cfa2755fba5a5da5e6554bcb2a52c6928576abf8e2036a017c86",
+      "sha256": "a8e908c3b33fc4bc9a48c13f01591f32b5916aafa2ddfe4f35351a9dbec54cec",
       "width": 1200
     },
     {
-      "bytes": 48861,
+      "bytes": 48841,
       "file": "og-square-1200x1200.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "30a6b242833c5cc060c7b8e1777ac8e7d34029ecb224fd6d14a2e1736451dbf3",
+      "sha256": "4a46521222836faf5948646907d9ed92c5ad6e917fc3a78f864615d34a57de32",
       "width": 1200
     },
     {
-      "bytes": 34765,
+      "bytes": 34774,
       "file": "og-jobs.png",
       "format": "wide",
       "height": 630,
-      "sha256": "1fcf312e46cdf65bac28f978c3150c0daf1e8a554b9903b9aaa8272685b91610",
+      "sha256": "6d285384ba03be01ade6d503aea63841e23132c2ba101a3d75e49d7455512307",
       "width": 1200
     },
     {
-      "bytes": 40109,
+      "bytes": 40068,
       "file": "og-jobs-square.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "b88da96eabe58b74af2e00ee755ed163face169e4f2c23d41e1f8c7c2f0a9d26",
+      "sha256": "51a4f33c057557a5feb5befc2e5cf2f328218cb9d3859dad031bdc4b021cb127",
       "width": 1200
     },
     {
-      "bytes": 30398,
+      "bytes": 30376,
       "file": "og-login.png",
       "format": "wide",
       "height": 630,
-      "sha256": "ff3b2dafa9b813ae45fe1e942c0247734f1274985d181d0df3bdcf789a5d3a4a",
+      "sha256": "eabe321930260ae68fa42116a5215e4781400fbba6a9df714212f94db9245652",
       "width": 1200
     },
     {
-      "bytes": 35429,
+      "bytes": 35406,
       "file": "og-login-square.png",
       "format": "carré",
       "height": 1200,
-      "sha256": "6d3a6d485888ad251e8ba8f651c3b547b462e8d1c15379c62bd519874bf54ebd",
+      "sha256": "8ad635846d2e0fd86715af41932e64abc43f04a15ce7d06ada0704cb232b19af",
       "width": 1200
     },
     {
@@ -67,7 +67,7 @@
             "toute sécurité."
           ],
           "title": [
-            "Kojo — Services et travailleurs en",
+            "Kojo · Services et travailleurs en",
             "Afrique de l’Ouest"
           ]
         },
@@ -78,8 +78,8 @@
             "mission en toute sécurité."
           ],
           "title": [
-            "Kojo — Services et travailleurs",
-            "en Afrique de l’Ouest"
+            "Kojo · Services et travailleurs en",
+            "Afrique de l’Ouest"
           ]
         }
       },
@@ -93,7 +93,7 @@
             "et talents disponibles dans toute l’Afrique de l’Ouest."
           ],
           "title": [
-            "Emplois disponibles — Kojo"
+            "Emplois disponibles · Kojo"
           ]
         },
         "wide": {
@@ -102,7 +102,7 @@
             "missions et talents disponibles dans toute l’Afrique de l’Ouest."
           ],
           "title": [
-            "Emplois disponibles — Kojo"
+            "Emplois disponibles · Kojo"
           ]
         }
       },
@@ -116,7 +116,7 @@
             "missions en un clic."
           ],
           "title": [
-            "Connexion — Kojo"
+            "Connexion · Kojo"
           ]
         },
         "wide": {
@@ -125,7 +125,7 @@
             "missions en un clic."
           ],
           "title": [
-            "Connexion — Kojo"
+            "Connexion · Kojo"
           ]
         }
       },

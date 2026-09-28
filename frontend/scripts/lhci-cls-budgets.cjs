@@ -158,6 +158,10 @@ const CLS_BUDGETS = {
   '/about': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 3 runs (repli local)' },
   '/contact': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 3 runs (repli local)' },
   '/privacy': { max: 0.01, pireMediane: 0, mesure: '0,0000 sur 3 runs (repli local)' },
+  // Nouvelle page pré-rendue (mêmes sections et même forme que /privacy) : le
+  // budget suit celui de /privacy tant qu'un run de main n'a pas publié son
+  // propre relevé. 0,01 est 10× plus strict que le seuil « bon » de Lighthouse.
+  '/terms': { max: 0.01, pireMediane: 0, mesure: '0,01 exigé, comme /privacy (relevé de main à publier)' },
 };
 
 /**

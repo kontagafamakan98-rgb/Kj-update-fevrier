@@ -190,13 +190,28 @@
    `scripts/check-css-selecteurs-morts.js` interdit d'en réécrire : une classe ou
    un id nommé par un sélecteur doit être POSÉ par le livré. */
 
-/* Custom scrollbar for webkit browsers */
+/* ── LA BARRE DE DÉFILEMENT (28/09/2026) ────────────────────────────────────
+
+   Deux retouches, et la seconde est un défaut MESURÉ à l'œil :
+
+     • `height` MANQUAIT. Seule la largeur était réglée, donc toute barre
+       HORIZONTALE gardait la hauteur native du navigateur (mesurée ~15 px sur
+       Chromium) avec la même gomme orange — et /jobs en a une, sous la rangée
+       de puces de catégorie (`overflow-x-auto`), où elle dessinait un aplat
+       orange de 1 200 px de large au milieu du panneau de filtres. Elle reçoit
+       la même épaisseur que la verticale.
+
+     • la piste était `#f1f1f1`, un gris FROID : c'est la seule teinte du site
+       qui ne venait pas de la gamme chaude (encre, sable, filet, papier), et
+       elle se voyait sur le fond sable des panneaux. Elle prend le filet du
+       site, qui est déjà la couleur du trait le plus discret de l'interface. */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--kojo-filet);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -208,15 +223,19 @@
   background: #c2410c;
 }
 
-/* Focus styles for accessibility */
-button:focus,
-input:focus,
-textarea:focus,
-select:focus,
-a:focus {
-  outline: 2px solid #ea580c;
-  outline-offset: 2px;
-}
+/* ── L'ANNEAU DE FOCUS N'EST PLUS CELUI DU CLIC (27/09/2026) ─────────────────
+
+   Le bloc qui vivait ici ciblait `:focus` — c'est-à-dire AUSSI le focus posé
+   par un CLIC. Conséquence mesurable à l'œil : chaque appui sur un bouton ou un
+   lien du chrome laissait un anneau orange accroché à la commande, comme un
+   état sélectionné qu'on n'a pas demandé. C'est le contraire de ce qu'on veut
+   montrer : au doigt ou à la souris, la commande est actionnée, pas "focalisée".
+
+   Le repli `:focus-visible` vit désormais à un seul endroit, `src/index.css`
+   (couche `base`) : il ne se déclenche QUE pour le clavier (et pour les champs
+   de saisie, où le navigateur le conserve à juste titre puisqu'on va y écrire).
+   Ce fichier n'en garde AUCUNE copie : deux porteurs auraient divergé en
+   silence, et c'est déjà la règle appliquée ici à `body` (voir plus haut). */
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
@@ -234,11 +253,12 @@ a:focus {
 }
 
 /* ── MISE EN PAGE DIFFÉRÉE des sections sous la ligne de flottaison ────────
-   L'accueil pré-rendu publie dix sections, dont une seule (le héros) tient dans
-   le premier écran. Les neuf autres étaient mises en page AVANT que le visiteur
-   les regarde. Mesuré le 26/09/2026 (minima entrelacés, 412×823 cpu×4, sondes
-   `_sonde-cv.mjs`) : `content-visibility: auto` sur ces neuf sections retire
-   **−100,5 ms** de « Style & Layout » (419,8 → 319,3 ms, −24 %).
+   L'accueil pré-rendu publie ONZE sections (27/09/2026 ; dix avant la galerie),
+   dont une seule (le héros) tient dans le premier écran. Les dix autres étaient
+   mises en page AVANT que le visiteur les regarde. Mesuré le 26/09/2026 (minima
+   entrelacés, 412×823 cpu×4, sondes `_sonde-cv.mjs`, sur les NEUF sections
+   d'alors) : `content-visibility: auto` sur ces sections retire **−100,5 ms** de
+   « Style & Layout » (419,8 → 319,3 ms, −24 %).
 
    LE PRIX, MESURÉ AUSSI : sans taille intrinsèque, le navigateur ne connaît pas
    la hauteur d'une section non rendue et le document annonce une hauteur FAUSSE
@@ -253,23 +273,33 @@ a:focus {
    POURQUOI PAR SECTION : les hauteurs de contenu vont de 216 à 866 px — un repli
    unique se trompe de plusieurs centaines de px sur chacune.
 
-   CE SONT DES VALEURS D'UN POSTE, ET C'EST ASSUMÉ (mesuré le 26/09/2026) : la
-   hauteur d'un bloc de texte suit les POLICES de l'hôte, et le nombre de lignes
-   repliées n'est pas connaissable avant la mise en page. Sous une police
-   étrangère (Verdana, sonde d'atelier `_sonde-carte-police.spec.js`), le
-   document gagne de la hauteur au moment où les sections se posent et le bloc de
-   carte se déplace de 99,1 px (1350×940) / 135,3 px (412×823) ; sur le runner
-   Linux de la CI, de 25,5 px (run 36254013043). AUCUNE constante CSS ne peut
-   fermer cet écart — c'est le prix du levier, et il est PUBLIÉ par les sondes
-   plutôt que caché. Ce qui est VÉRIFIÉ, c'est la STRUCTURE que la coquille doit
-   garder : les nœuds et la hauteur du document, à 20 % près (`BORNE_STRUCTURE`),
-   par `e2e/style-layout-document.spec.js`, et la position du bloc de carte dans
-   une mise en page POSÉE (`e2e/carte-accueil.spec.js`, qui amène le bloc dans la
-   vue avant de mesurer l'appui). Un repli OUBLIÉ, lui, n'est pas un écart de
-   quelques dizaines de px : c'est un document qui s'effondre de 3 040 px sur le
-   repli uniforme, et cette sonde-là le refuse.
+   CES VALEURS SUIVENT LA POLICE, ET LA POLICE EST SERVIE PAR LE SITE (26/09/2026).
+   C'était le défaut de ce levier tant que le texte était rendu par la police de
+   l'hôte : la hauteur d'un bloc suit les POLICES, et le nombre de lignes
+   repliées n'est pas connaissable avant la mise en page — les constantes ne
+   pouvaient donc être justes que sur le poste qui les avait mesurées. Mesuré le
+   26/09/2026 : sous une police étrangère (Verdana, sonde d'atelier
+   `_sonde-carte-police.spec.js`), le document gagnait de la hauteur au moment où
+   les sections se posaient et le bloc de carte se déplaçait de 99,1 px
+   (1350×940) / 135,3 px (412×823) ; sur le runner Linux de la CI, de 25,5 px
+   (run 36254013043). Depuis que `src/index.css` sert Inter et que toutes les
+   pages la préchargent, les cinq valeurs réécrites ci-dessus (§6, §7 et §9 en
+   mobile, §9 en desktop) sont celles de CETTE police, mesurées section par
+   section différée désactivée : le document mesure 7 187 px (mobile) et 4 868 px
+   (desktop) avec la règle (le titre du héros rendu concret a ajouté ~60 px en
+   desktop le 26/09/2026), et la dérive publiée par
+   `e2e/carte-facade.spec.js` retombe à 0,0 px sur cet hôte (et publie la dérive
+   par route : −88,0 px sur / mobile, 0,0 px sur /contact). Ce qui est VÉRIFIÉ,
+   c'est aussi la STRUCTURE que la coquille doit garder : les nœuds et la hauteur
+   du document, à 20 % près (`BORNE_STRUCTURE`), par
+   `e2e/style-layout-document.spec.js`. Un repli OUBLIÉ, lui, n'est pas un écart
+   de quelques dizaines de px : c'est un document qui s'effondre de 3 040 px sur
+   le repli uniforme, et cette sonde-là le refuse.
 
-   LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : il est
+   LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : depuis
+   la refonte du 27/09/2026 l'élément élu de « / » est l'ILLUSTRATION du héros
+   (62 700 px² en mobile, 139 733 en desktop, mesuré identique dans les deux
+   canaux), et un élément LCP ne se met pas derrière une hauteur estimée. Il est
    peint au premier écran, donc jamais « différé » — mesuré, la règle ne change
    ni l'élément élu ni son horodatage.
 
@@ -282,29 +312,166 @@ a:focus {
 .sections-differees > section:not(:first-of-type) {
   content-visibility: auto;
 }
-.sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 442.2px; }
-.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 865.1px; }
-.sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 744.6px; }
-.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 866.2px; }
-.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 462.6px; }
-.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 276px; }
-.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 216px; }
-.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 554.6px; }
-.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 841.4px; }
+/* RE-MESURÉES le 27/09/2026 avec la refonte éditoriale (protocole ci-dessus :
+   levier neutralisé par une feuille injectée, hauteur de la boîte de bordure
+   moins les deux paddings, 412×823 et 1350×940). CE QUI A CHANGÉ, et pourquoi
+   la remesure était obligatoire plutôt qu'un ajustement à vue : les titres de
+   section passent d'une échelle en PALIERS à une échelle fluide, et les cartes
+   troquent l'anneau contre une bordure de 1 px — deux effets de quelques pixels
+   par section. Le §8 (les chiffres) perdait en réalité 86 px sur des constantes
+   périmées : elles dataient des compteurs fabriqués retirés le 26/09/2026, et
+   personne ne les avait reprises depuis.
+
+   RE-MESURÉES le 27/09/2026 avec la POLICE DE TITRAGE (même protocole, sonde
+   d'atelier `_sonde-sections-differees.spec.js`), et c'est la condition n°2 écrite
+   plus haut : « re-mesure à chaque changement de contenu, de padding, de
+   BORDURE ou de POLICE ». UNE SEULE section bouge — §7, −27,1 px sur mobile —
+   parce qu'un de ses titres se replie sur une ligne de moins avec le serif ;
+   les huit autres valeurs sont inchangées au dixième près. C'est le résultat
+   attendu, et il dit POURQUOI le protocole est stable : les titres portent une
+   `line-height` SANS UNITÉ, donc la hauteur d'une ligne de titre ne dépend
+   d'aucune métrique de police. Seule la LARGEUR — donc le nombre de lignes —
+   pouvait déplacer quelque chose, et c'est exactement ce qui a bougé. */
+/* RE-MESURÉES le 27/09/2026, APRÈS LA GALERIE ET LA PHOTO DU PARCOURS (même
+   protocole : sonde d'atelier, 412×823 et 1350×940, les deux canaux, le levier
+   NEUTRALISÉ pour lire les hauteurs réelles — et la vérification faite AVANT de
+   descendre la page, sinon `auto` a déjà mémorisé la taille rendue et l'égalité
+   serait vraie par construction). Deux sections sont NEUVES (la galerie, et la
+   photo sous l'entête des étapes), donc tous les rangs à partir du quatrième
+   changent de sujet : la constante du rang 11 (le contact) n'existait pas, et
+   une section sans constante retombe sur une taille de repli de 0. C'est
+   mesuré, pas supposé : sur ce document le levier ACTIF réservait 6 802 px en
+   mobile et 5 035 en desktop là où le document rendu en mesure 7 726 et 5 407,
+   soit 924 et 372 px de matière MANQUANTE. Après re-accord, les deux hauteurs
+   sont égales au pixel dans les deux canaux.
+
+   Les dix constantes, hauteur de CONTENU (boîte de bordure moins les paddings et
+   les bordures, mêmes règles que ci-dessus) :
+
+     section            boîte de bordure   − padding − bordure = CONSTANTE
+                         mob. / desk.        mob. / desk.
+       2  ruban          159,0 /  81,5       159,0 /  81,5   (aucun padding)
+       3  métiers        937,1 / 636,5       841,14 / 508,47
+       4  galerie        813,0 / 715,6       717,0 / 587,63
+       5  promesses      707,3 / 318,0       611,34 / 189,98
+       6  étapes         774,0 / 489,0       678,0 / 361,0
+       7  séquestre      786,3 / 500,8       690,3 / 372,84
+       8  clôture        385,1 / 302,9       385,05 / 302,88  (aucun padding)
+       9  chiffres       218,8 / 250,8       122,8 / 122,8
+      10  à propos       772,9 / 566,8       676,92 / 438,81
+      11  contact        936,4 / 791,1       839,42 / 662,06  (1 px de bordure)
+
+   LES ÉTAPES PERDENT 148 px EN DESKTOP (509,5 → 361) : elles passent d'une
+   entête pleine largeur à deux colonnes, et la photo de la colonne de gauche
+   tient dans la hauteur des trois marches. En MOBILE elles GAGNENT 207 px
+   (471,4 → 678) : la photo s'ajoute sous l'entête, et la grille retombe sur une
+   seule colonne. Les deux sens sont mesurés, et c'est la même page. */
+.sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 159px; }
+.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 841.14px; }
+.sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 717px; }
+.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 611.34px; }
+.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 678px; }
+.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 690.3px; }
+.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 385.05px; }
+.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 122.8px; }
+.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 676.92px; }
+.sections-differees > section:nth-of-type(11) { contain-intrinsic-size: auto 839.42px; }
 
 /* Au-delà de 768 px, `py-12` devient `py-16` (128 px) et les contenus prennent
    une autre forme : les tailles de contenu sont donc déclarées À PART, jamais
    déduites de celles du mobile. */
 @media (min-width: 768px) {
-  .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 285.6px; }
-  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 429.6px; }
-  .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 233.2px; }
-  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 349.6px; }
-  .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 296.8px; }
-  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 184px; }
-  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 136px; }
-  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 316.8px; }
-  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 640.2px; }
+  .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 81.5px; }
+  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 508.47px; }
+  .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 587.63px; }
+  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 189.98px; }
+  .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 361px; }
+  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 372.84px; }
+  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 302.88px; }
+  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 122.8px; }
+  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 438.81px; }
+  .sections-differees > section:nth-of-type(11) { contain-intrinsic-size: auto 662.06px; }
+}
+
+/* ── LE FORMULAIRE DE /register : LE MÊME LEVIER, MESURÉ AVANT D'ÊTRE POSÉ ───
+
+   Question posée le 27/09/2026 : `content-visibility: auto` (le levier de
+   l'accueil) rapporte-t-il quelque chose sur les AUTRES pages longues ? Mesure
+   ENTRELACÉE, protocole identique à `e2e/style-layout-document.spec.js` (page
+   neuve, bundle d'entrée bloqué, bridage CPU avant navigation, compteurs du
+   renderer au CDP, MINIMUM de N tours) :
+     • `/` (le contrôle, où le levier est déjà livré) : 351,9 → 288,6 ms,
+       −63,3 ms (−18,0 %) mobile — le harnais reproduit bien le levier.
+     • `/register` : −20,1 ms (−8,2 %) mobile — le plus gros gain des pages
+       longues, et son élément LCP n'est PAS dans le périmètre différé.
+     • `/how-it-works` (4 sections) : −9,8 ms (−5,1 %) ; `/privacy` et `/terms`
+       (moins de trois écrans) : +0,4 % et +1,6 %, c'est-à-dire RIEN.
+   La loi qui sort de ces quatre mesures : le gain suit les ÉCRANS sous la ligne
+   de flottaison et le POIDS de ce qu'on y saute. Une page de moins de trois
+   écrans n'a presque rien à différer, et poser le levier y coûterait des
+   constantes pour zéro.
+
+   RE-MESURE DU 27/09/2026, sur les QUATRE blocs exacts finalement retenus (et non
+   plus sur le périmètre large qui avait donné les −20,1 ms ci-dessus). Quatre
+   passages entrelacés, 25 à 40 tours, variantes `off` / `quatre` / `photo
+   neutralisée`, MINIMUM par variante : mobile −5,1 % à −25,0 % (−12,9 à
+   −70,7 ms sur une référence de 251 à 282 ms) — un seul passage, à froid, est
+   sorti POSITIF (+3,6 %) et trois sur quatre sont dans la fourchette ; desktop
+   +0,4 à +0,5 ms, c'est-à-dire le bruit, comme pour toutes les pages longues.
+   La hauteur du document reste 2 996 px (mobile) / 2 532 px (desktop) dans
+   TOUTES les variantes, levier actif ou neutralisé : c'est la preuve que les
+   constantes sont exactes. Le sous-ensemble « photo neutralisée » rend MOINS
+   (−9,1 % et −5,8 % selon les passages) que les quatre blocs : le bloc photo
+   (1 584 px, sous la ligne de flottaison de 823 px) est donc bien sauté, et le
+   différer paie. Conclusion honnête : gain NET sur mobile, neutre au desktop —
+   le levier suit les écrans sous la ligne de flottaison, pas la machine.
+
+   CE QUI EST DIFFÉRÉ ICI, ET CE QUI NE L'EST PAS. Les quatre blocs choisis sont
+   ceux dont le contenu est le MÊME dans les deux canaux et à l'écran suivant :
+   le bloc photo (539,8 px de contenu en mobile, 454,7 en desktop), le bloc légal
+   (221), le bouton d'envoi (48) et la ligne de renvoi vers /login (24).
+
+   LA CONSTANTE EST LA HAUTEUR DE CONTENU, PADDING **ET BORDURE** RETRANCHÉS — et
+   la bordure est le piège mesuré : `contain-intrinsic-size` porte la boîte de
+   CONTENU, or le bloc photo et le bloc légal ont une bordure de 1 px. Une
+   première écriture avait retranché le seul padding (541,8 et 223 au lieu de
+   539,8 et 221) : mesuré le 27/09/2026, le document gagnait alors 2 px avec le
+   levier, exactement la différence sur le bloc légal (257 px rendus contre 255
+   levier désactivé). Corrigé, les quatre blocs rendent la MÊME hauteur levier
+   activé et levier désactivé, et le document mesure 2 996 px dans les deux cas
+   (mobile) / 2 532 px (desktop). Mesure rejouable : levier neutralisé par une
+   feuille injectée, `class*="bloc-differe"` — c'est le protocole qui a servi à
+   écrire ces constantes, et non l'inverse.
+
+   LE BLOC DE LANGUE EST EXCLU, ET C'EST UNE DÉCISION MESURÉE : la coquille
+   publie son ÉTAT DE CHARGEMENT (« Détection de votre langue… », 98 px) quand
+   React peint le vrai sélecteur (672 px). Une constante réservée y mentirait de
+   574 px sur l'un des deux canaux ; on laisse donc ce bloc se mettre en page
+   normalement (98 px, c'est peu) plutôt que de figer une hauteur fausse. La
+   même raison fait exclure le HAUT du formulaire : l'élément LCP de /register
+   est l'avis d'étape (`stepNoticeClass`), AU-DESSUS du formulaire — le levier ne
+   peut pas le toucher.
+
+   UN SEUL PROPRIÉTAIRE : les quatre classes sont posées par les DEUX canaux
+   (src/pages/Register.js et vite-plugins/prerender/shells-routes.js), et un
+   garde unitaire (`scripts/__tests__/check-formulaire-differe.test.js`) refuse
+   une classe posée d'un seul côté ou une constante disparue. */
+.bloc-differe-photo,
+.bloc-differe-legal,
+.bloc-differe-envoi,
+.bloc-differe-lien {
+  content-visibility: auto;
+}
+.bloc-differe-photo { contain-intrinsic-size: auto 539.8px; }
+.bloc-differe-legal { contain-intrinsic-size: auto 221px; }
+.bloc-differe-envoi { contain-intrinsic-size: auto 48px; }
+.bloc-differe-lien { contain-intrinsic-size: auto 24px; }
+
+/* Au-delà de 768 px, seul le bloc photo change de hauteur de contenu : le bloc
+   légal, le bouton d'envoi et la ligne de renvoi mesurent la même chose aux deux
+   tailles. Déclaré À PART, jamais déduit du mobile. */
+@media (min-width: 768px) {
+  .bloc-differe-photo { contain-intrinsic-size: auto 454.7px; }
 }
 
 /* Reduced motion support */

@@ -46,6 +46,13 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  ÉCHANTILLON_DE_CALIBRATION,
+  PLANCHER_DE_VIVACITE,
+  PLAFOND_DE_VIVACITE,
+  budgetDeVivacite,
+  BudgetDeVivaciteEpuise,
+} from '../budget-de-vivacite.js';
 
 const FRONTEND = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SOURCE_DIRS = ['src', 'scripts'];
@@ -113,14 +120,31 @@ const importedModules = () => {
   return [...targets].sort();
 };
 
-/** [(étiquette, erreur)] pour chaque module qui ne s'importe pas. */
-const importFailures = async (files = importedModules()) => {
+/**
+ * [(étiquette, erreur)] pour chaque module qui ne s'importe pas.
+ *
+ * `budget` (ms, `Infinity` par défaut) est une borne de VIVACITÉ : dépassée, elle
+ * lève un `BudgetDeVivaciteEpuise` — jamais une erreur de module. Confondre les
+ * deux ferait accuser le code pour la lenteur de la machine, ce qui est
+ * exactement le défaut que ce budget dérivé corrige.
+ */
+const importFailures = async (files = importedModules(), { budget = Infinity } = {}) => {
   const failures = [];
+  const debut = Date.now();
+  let faits = 0;
   for (const file of files) {
     try {
       await import(pathToFileURL(file).href);
     } catch (error) {
       failures.push([relative(file), `${error.name}: ${error.message}`]);
+    }
+    faits += 1;
+    if (Date.now() - debut > budget) {
+      throw new BudgetDeVivaciteEpuise(
+        `budget de vivacité épuisé : ${Date.now() - debut} ms pour ${faits} module(s) sur ` +
+          `${files.length} (budget ${budget} ms) — le blocage est tué, le code n'est PAS accusé`,
+        { budget, modules: faits, ecoules: Date.now() - debut }
+      );
     }
   }
   return failures;
@@ -195,11 +219,32 @@ describe("santé d'import des modules frontend", () => {
     expect(files.some((name) => name.includes('__tests__'))).toBe(false);
   });
 
-  it('tous les modules importés s\u2019importent', async () => {
+  it('tous les modules importés s\u2019importent', { timeout: PLAFOND_DE_VIVACITE + 30_000 }, async () => {
     // Le verdict est publié AVANT l'assertion : un module cassé est nommé dans
     // une annotation `::error` de la PR, pas seulement dans le journal du job.
     // Un vert doit dire sur QUOI il porte — et sur quoi il ne porte PAS.
-    const failures = await importFailures();
+    const modules = importedModules();
+    // ── La mesure qui remplace la constante ────────────────────────────────
+    // L'échantillon est importé AVANT le parcours : ces modules sont donc dans
+    // le cache quand le parcours passe dessus (il n'y a pas de double coût), et
+    // le temps mesuré est celui du vrai travail — charger et évaluer des modules,
+    // pas lire des fichiers.
+    const echantillon = modules.slice(0, Math.min(ÉCHANTILLON_DE_CALIBRATION, modules.length));
+    const t0 = Date.now();
+    await importFailures(echantillon);
+    const budget = budgetDeVivacite({
+      tempsEchantillonMs: Date.now() - t0,
+      modulesEchantillon: echantillon.length,
+      modulesTotal: modules.length,
+    });
+    // La mesure est PUBLIÉE : un budget dérivé qu'on ne lit pas ne se distingue
+    // pas d'une constante — c'est la ligne qui rend la dérivation vérifiable.
+    console.log(
+      `budget de vivacité dérivé : ${budget} ms pour ${modules.length} module(s), ` +
+        `d'après ${Date.now() - t0} ms sur ${echantillon.length} module(s) ` +
+        `(plancher ${PLANCHER_DE_VIVACITE}, plafond ${PLAFOND_DE_VIVACITE})`
+    );
+    const failures = await importFailures(modules, { budget });
     // La ligne vide est NÉCESSAIRE : le rédacteur de vitest écrit son en-tête
     // (`stdout | … > nom du test`) sans saut de ligne quand le test échoue, donc
     // la première annotation serait collée derrière — et GitHub ne lit une
@@ -275,5 +320,28 @@ describe("santé d'import des modules frontend", () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('le budget de vivacité SUIT la mesure au lieu d’être une constante', () => {
+    // Non-vacuité de la correction : si la dérivation retournait le plancher quel
+    // que soit le temps mesuré, le budget serait une constante de plus — le même
+    // défaut, en plus large. Les deux nombres ci-dessous sont choisis DANS la
+    // fenêtre vivante (entre plancher et plafond) pour que la dérivation, et
+    // elle seule, décide.
+    const base = { modulesEchantillon: 10, modulesTotal: 100 };
+    expect(budgetDeVivacite({ ...base, tempsEchantillonMs: 5000 })).toBe(100_000);
+    // Un hôte deux fois plus lent obtient un budget deux fois plus grand.
+    expect(budgetDeVivacite({ ...base, tempsEchantillonMs: 10_000 })).toBe(200_000);
+    // L'élasticité est bornée des deux côtés.
+    expect(budgetDeVivacite({ ...base, tempsEchantillonMs: 100_000 })).toBe(PLAFOND_DE_VIVACITE);
+    expect(budgetDeVivacite({ ...base, tempsEchantillonMs: 1 })).toBe(PLANCHER_DE_VIVACITE);
+    // Sans horloge exploitable, on ne prétend pas calibrer : c'est le plancher,
+    // et c'est un fait, pas un silence.
+    expect(budgetDeVivacite({})).toBe(PLANCHER_DE_VIVACITE);
+    expect(budgetDeVivacite({ ...base, tempsEchantillonMs: NaN })).toBe(PLANCHER_DE_VIVACITE);
+    // Et un échantillon VIDE ne divise pas par zéro : il retombe sur le plancher.
+    expect(budgetDeVivacite({ tempsEchantillonMs: 500, modulesEchantillon: 0, modulesTotal: 100 })).toBe(
+      PLANCHER_DE_VIVACITE
+    );
   });
 });

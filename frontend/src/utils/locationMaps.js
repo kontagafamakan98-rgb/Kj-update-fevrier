@@ -129,6 +129,62 @@ export const buildOpenStreetMapPageUrl = (location = {}, zoom = 17) => {
   return `https://www.openstreetmap.org/?mlat=${coordinates.lat}&mlon=${coordinates.lng}#map=${zoom}/${coordinates.lat}/${coordinates.lng}`;
 };
 
+/**
+ * L'URL d'embed pour un CADRE (`{north, south, east, west}`), pas un point.
+ *
+ * ── Pourquoi une seconde forme, et pas une réutilisation ────────────────────
+ * `buildOpenStreetMapEmbedUrl` ci-dessus cadre un POINT (±0,006°, ~1,3 km) :
+ * c'est la bonne échelle pour « l'adresse d'une mission ». Le bloc de carte du
+ * profil, lui, n'a AUCUNE coordonnée à montrer — aucun modèle ne porte la
+ * position d'un utilisateur (ni `User` : seulement `country`, ni
+ * `WorkerProfile` : aucun champ de localisation). Ce qu'il a, c'est le PAYS
+ * déclaré, dont la base géographique (`services/geolocation-database.js`, servie
+ * par `/api/geolocation/cities`) publie les bornes. Les deux URL vivent ici
+ * parce qu'elles ont le même propriétaire — le cadrage d'une carte — et
+ * divergent d'une ligne : recopier l'une des deux ailleurs les ferait diverger
+ * au premier correctif.
+ *
+ * Les bornes sont REFUSÉES si elles ne forment pas un rectangle strictement
+ * positif : une base corrompue (`south > north`) produirait sinon une carte
+ * vide, c'est-à-dire un bloc qui prétend montrer quelque chose.
+ *
+ * @param {{ north?: number, south?: number, east?: number, west?: number }} bounds
+ *   Les bornes d'un pays, telles que la base géographique les publie.
+ * @returns {string} L'URL d'embed, ou la chaîne vide si le cadre est inutilisable.
+ */
+export const buildOpenStreetMapBoundsEmbedUrl = (bounds = {}) => {
+  const nord = toFiniteNumber(bounds?.north);
+  const sud = toFiniteNumber(bounds?.south);
+  const est = toFiniteNumber(bounds?.east);
+  const ouest = toFiniteNumber(bounds?.west);
+
+  if (nord === null || sud === null || est === null || ouest === null) return '';
+  if (!(sud < nord) || !(ouest < est)) return '';
+
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${ouest}%2C${sud}%2C${est}%2C${nord}&layer=mapnik`;
+};
+
+/**
+ * La MÊME carte, mais sur le site — la destination du lien que le bloc publie
+ * tant que le cadre n'est pas monté (et pour toujours si le navigateur n'a pas
+ * `IntersectionObserver`). Elle a le même propriétaire que l'embed, donc elle
+ * vit ici : deux cadrages recopiés divergeraient.
+ *
+ * @param {{ north?: number, south?: number, east?: number, west?: number }} bounds
+ * @returns {string} L'URL de la page, ou la chaîne vide si le cadre est inutilisable.
+ */
+export const buildOpenStreetMapBoundsPageUrl = (bounds = {}) => {
+  const nord = toFiniteNumber(bounds?.north);
+  const sud = toFiniteNumber(bounds?.south);
+  const est = toFiniteNumber(bounds?.east);
+  const ouest = toFiniteNumber(bounds?.west);
+
+  if (nord === null || sud === null || est === null || ouest === null) return '';
+  if (!(sud < nord) || !(ouest < est)) return '';
+
+  return `https://www.openstreetmap.org/?bbox=${ouest}%2C${sud}%2C${est}%2C${nord}`;
+};
+
 
 const LOCATION_PRECISION_LABELS = {
   fr: {

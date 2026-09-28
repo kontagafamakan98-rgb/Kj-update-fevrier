@@ -47,6 +47,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { CONTACT } from '../src/config/contact.js';
+import { PAGE_SECTIONS, couperLeTitre } from '../src/config/page-sections.js';
 import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
 import {
   PHONE_NUMBER_MASK,
@@ -320,6 +321,20 @@ export const valeursDerivees = (frontendDir) => {
     for (const valeur of Object.values(dictionnaire)) {
       if (typeof valeur === 'string') mots.add(valeur);
     }
+    // ── LES DEUX MOITIÉS DU TITRE DU HÉROS ─────────────────────────────
+    // Le titre de l'accueil est publié en DEUX fragments par les deux canaux
+    // (le plan le coupe sur sa virgule pour porter la seconde moitié en
+    // italique : voir `couperLeTitre`, src/config/page-sections.js). Ce ne sont
+    // pas des textes nouveaux : c'est le texte du dictionnaire, coupé par la
+    // MÊME fonction des deux côtés — la moitié n'est donc pas une copie
+    // écrite à la main, c'est une valeur CALCULÉE, et elle se déclare ici comme
+    // les exemples de téléphone ou la date du jour.
+    const titreDuHeros = dictionnaire[PAGE_SECTIONS['/'].titleKey];
+    if (typeof titreDuHeros === 'string') {
+      for (const moitie of couperLeTitre(titreDuHeros)) {
+        if (moitie) derivees.add(normaliser(moitie));
+      }
+    }
   }
   for (const prefixe of ['', PHONE_PREFIX_FALLBACK, PHONE_NUMBER_MASK]) {
     mots.add(prefixe);
@@ -592,14 +607,10 @@ const sourcesDesCanaux = (frontendDir) => {
 };
 
 export const MARQUEURS_EN_EXEMPTION = [
-  {
-    valeur: '+',
-    sorte: 'plan',
-    motif:
-      "suffixe d'un chiffre, dans la composition d'un chiffre affiché (`1 000+`, `500+`) : " +
-      "ce n'est pas un glyphe mais une partie du NOMBRE, donc il reste au plan — le repère " +
-      'du dépliant de la FAQ, lui, est la clé `faqMarker`',
-  },
+  // L'exemption de « + » (suffixe d'un chiffre : `1 000+`, `500+`) a été RETIRÉE
+  // avec les compteurs inventés de l'accueil (26/09/2026, règle « pas de faux
+  // compteurs ») : plus aucun « + » n'est publié ni déclaré, donc l'exemption
+  // était devenue PÉRIMÉE — et le garde la refuse précisément pour ça.
   {
     valeur: '·',
     sorte: 'publie',

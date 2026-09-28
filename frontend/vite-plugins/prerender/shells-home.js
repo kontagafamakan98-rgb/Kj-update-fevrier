@@ -10,7 +10,12 @@
 
 import { COUNTRIES } from '../../src/config/countries.js'
 import { CLASSES_ICONE } from '../../src/config/page-icons.js'
-import { svgDeLIcone } from './icons-serveur.js'
+import { nomDuDrapeau } from '../../src/config/flags.js'
+// La COUPURE du titre du héros appartient au plan : la coquille peint les deux
+// mêmes moitiés que src/pages/Home.js, sur les cinq langues, sans recopier la
+// règle (voir `couperLeTitre`, src/config/page-sections.js).
+import { couperLeTitre } from '../../src/config/page-sections.js'
+import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // ── Shell statique de l'ACCUEIL (index.html) ────────────────────
@@ -40,12 +45,71 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
   // ne rougisse. Même classes d'un côté et de l'autre : mesuré, un
   // remplacement de même taille ne ré-élit pas d'élément LCP (la peinture de la
   // coquille reste celle du navigateur), un remplacement plus grand si.
-  const { titleKey, subtitleKey, heroTitleClass, heroSubtitleClass } = homePlan
+  // Le vocabulaire éditorial des sections sort du MÊME plan : les classes du
+  // dessin (`headClass`, `cardClass`…) n'ont donc pas de porteur recopié ici,
+  // et une retouche de la page ne peut pas laisser la coquille derrière elle.
+  const {
+    titleKey, subtitleKey, heroTitleClass, heroSubtitleClass,
+    heroKickerClass, headClass, sectionIntroClass, cardClass, cardLinkClass, paperClass,
+    sandClass,
+    // ── La seconde passe éditoriale (27/09/2026) : le héros en deux colonnes,
+    // le ruban des pays, les listes en lignes, le panneau du séquestre et la
+    // clôture. Les noms sont lus dans le MÊME plan que la page — sans cette
+    // liste, la coquille réécrirait la moitié du dessin en littéral, et une
+    // retouche de la page la laisserait derrière elle.
+    heroGrilleClass, heroCopieClass, heroActionsClass, heroBoutonClass,
+    heroBoutonSecondClass, heroReperesClass, heroIllustrationClass,
+    heroIllustrationFondClass, heroIllustrationImageClass, heroAccentClass,
+    rubanClass, rubanInnerClass, rubanEtiquetteClass, rubanJetonsClass, rubanJetonClass,
+    entreeSectionClass, listeClass, listeColonnesClass, ligneMetierClass, ligneEtapeClass,
+    // Le RYTHME (28/09/2026) : le pas d'une section et celui d'une carte, les
+    // mêmes qu'en React. Neuf sections et deux cartes portaient ici les
+    // littéraux `py-12 md:py-16` et `p-6` — les recopier était la seule façon
+    // de les tenir d'accord, et rien ne rougissait quand elles ne l'étaient
+    // plus. Ils sont lus dans le plan comme le reste.
+    sectionClass, carteClass,
+    pastilleClass, pastilleCreuseClass, nomLigneClass, noteLigneClass, flecheLigneClass,
+    panneauClass, panneauArtClass, panneauOrbeClass, panneauImageClass, panneauEstampilleClass,
+    bandeClass, chiffreClass, ctaClass, ctaInnerClass, ctaActionsClass,
+    lienFlecheClass, lienFlecheClairClass,
+    galerieGrilleClass, galerieCarteClass, galerieLegendeClass,
+    etapesGrilleClass, etapesTeteClass, cadrePhotoClass, photoEtapes,
+  } = homePlan
+  const champsEditoriaux = {
+    heroKickerClass, headClass, sectionIntroClass, cardClass, cardLinkClass, paperClass, sandClass,
+    heroGrilleClass, heroCopieClass, heroActionsClass, heroBoutonClass, heroBoutonSecondClass,
+    heroReperesClass, heroIllustrationClass, heroIllustrationFondClass,
+    heroIllustrationImageClass, heroAccentClass, rubanClass, rubanInnerClass,
+    rubanEtiquetteClass, rubanJetonsClass, rubanJetonClass, entreeSectionClass, sectionClass,
+    carteClass, listeClass,
+    listeColonnesClass, ligneMetierClass, ligneEtapeClass, pastilleClass, pastilleCreuseClass,
+    nomLigneClass, noteLigneClass, flecheLigneClass, panneauClass, panneauArtClass,
+    panneauOrbeClass, panneauImageClass, panneauEstampilleClass, bandeClass, chiffreClass,
+    ctaClass, ctaInnerClass, ctaActionsClass, lienFlecheClass, lienFlecheClairClass,
+    galerieGrilleClass, galerieCarteClass, galerieLegendeClass,
+    etapesGrilleClass, etapesTeteClass, cadrePhotoClass,
+  }
+  // Les quatre lignes de contact sont des LIENS : elles portent la carte
+  // cliquable du vocabulaire éditorial (le même survol que les cartes de la
+  // page), exactement comme src/pages/Home.js.
+  const ligneDeContactClass = `${cardLinkClass} flex items-center gap-3 px-4 py-3`
+
+  // Le titre du héros, coupé comme dans src/pages/Home.js : les deux moitiés
+  // sont publiées par les deux canaux, ou par aucun (voir `couperLeTitre`).
+  const [titreTete, titreQueue] = couperLeTitre(T(titleKey))
   if (!titleKey || !subtitleKey || !heroTitleClass || !heroSubtitleClass) {
     throw new Error(
       "prerender-shells : / ne déclare plus son héros (titleKey, subtitleKey, heroTitleClass, " +
         "heroSubtitleClass dans src/config/page-sections.js) — la coquille de l'accueil ne peut pas " +
         "le publier, et l'élément LCP de « / » repasserait au JavaScript."
+    )
+  }
+  const champEditorialManquant = Object.keys(champsEditoriaux).find((nom) => !champsEditoriaux[nom])
+  if (champEditorialManquant) {
+    throw new Error(
+      `prerender-shells : / ne déclare plus « ${champEditorialManquant} » (src/config/page-sections.js) — ` +
+        "la coquille de l'accueil publierait un `undefined` littéral à la place d'une classe, et " +
+        "les deux peintures divergeraient au montage de React."
     )
   }
 
@@ -97,65 +161,115 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // exactes, héros exclu). La page porte la MÊME classe sur son conteneur.
     `<div class="min-h-screen sections-differees">`,
 
-    // Hero : le h1 est l'élément LCP de l'accueil.
-    `<section class="bg-gradient-to-br from-orange-600 via-orange-700 to-red-600 text-white relative overflow-hidden">`,
-    `<div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-24">`,
-    `<div class="text-center">`,
-    `<span class="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-1.5 text-xs sm:text-sm font-medium text-white ring-1 ring-inset ring-white/25 mb-6">`,
+    // Hero : le héros porte l'élément LCP de l'accueil — l'ILLUSTRATION depuis
+    // la refonte du 27/09/2026, le titre restant le plus grand bloc de texte
+    // (les deux mesurés identiques à ceux de React, une seule candidate au
+    // premier paint). La composition (deux
+    // colonnes, illustration encadrée) et les classes sont celles de
+    // src/pages/Home.js, lues dans le plan : la bascule coquille → React ne
+    // déplace rien, et c'est cette égalité qui empêche Chrome de ré-élire un
+    // second élément LCP plus tardif.
+    `<section class="bg-gradient-to-br from-orange-600 via-orange-600 to-orange-700 text-white relative overflow-hidden">`,
+    `<div class="absolute inset-0 bg-black bg-opacity-5"></div>`,
+    `<div class="${heroGrilleClass}">`,
+    `<div class="${heroCopieClass}">`,
+    `<span class="${heroKickerClass} mb-6">`,
     svgDeLIcone('escrow', CLASSES_ICONE.heros),
     `${esc(T('escrowBannerTitle'))}`,
     `</span>`,
-    `<h1 class="${heroTitleClass}">${esc(T(titleKey))}</h1>`,
+    `<h1 class="${heroTitleClass}">${esc(titreTete)}`,
+    titreQueue ? `<br><em class="${heroAccentClass}">${esc(titreQueue)}</em>` : '',
+    `</h1>`,
     `<p class="${heroSubtitleClass}">${esc(T(subtitleKey))}</p>`,
-    `<div class="flex flex-col sm:flex-row gap-4 justify-center items-center">`,
-    `<a href="/register" class="w-full sm:w-auto bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-semibold text-lg shadow-xl transform transition hover:-translate-y-0.5">${esc(T('getStarted'))}</a>`,
-    `<a href="/jobs" class="w-full sm:w-auto border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold text-lg transition">${esc(T('viewJobs'))}</a>`,
+    `<div class="${heroActionsClass}">`,
+    `<a href="/register" class="${heroBoutonClass}">${esc(T('getStarted'))}</a>`,
+    `<a href="/jobs" class="${heroBoutonSecondClass}">${esc(T('viewJobs'))}</a>`,
     `</div>`,
     // Bandeau de confiance (mêmes clés i18n que src/pages/Home.js).
-    `<div class="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-white/90">`,
-    `<span class="inline-flex items-center gap-2">${svgDeLIcone('escrow', CLASSES_ICONE.heros)}${esc(T('escrowTrustTitle'))}</span>`,
-    `<span class="inline-flex items-center gap-2">${svgDeLIcone('promiseSecurePayments', CLASSES_ICONE.heros)}${esc(T('securePayments'))}</span>`,
-    `<a href="/how-it-works" class="font-semibold text-white underline underline-offset-4 hover:text-orange-100">${esc(T('howItWorksLink'))}</a>`,
+    `<div class="${heroReperesClass}">`,
+    `<span>${svgDeLIcone('escrow', CLASSES_ICONE.heros)}${esc(T('escrowTrustTitle'))}</span>`,
+    `<span>${svgDeLIcone('promiseSecurePayments', CLASSES_ICONE.heros)}${esc(T('securePayments'))}</span>`,
+    `<a href="/how-it-works" class="${lienFlecheClairClass}">${esc(T('howItWorksLink'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
     `</div>`,
+    `</div>`,
+    // L'illustration : même fichier, mêmes attributs et mêmes classes que la
+    // page. `alt=""` des deux côtés (l'illustration illustre le texte qui la
+    // précède ; un texte de remplacement est un texte publié, donc il
+    // appartiendrait au dictionnaire).
+    `<div class="${heroIllustrationClass}">`,
+    `<span class="${heroIllustrationFondClass}" aria-hidden="true"></span>`,
+    `<img src="/assets/kojo-hero.svg" alt="" width="960" height="720" fetchpriority="high" decoding="async" class="${heroIllustrationImageClass}">`,
     `</div>`,
     `</div>`,
     `</section>`,
 
-    // Pays couverts
-    `<section class="py-12 md:py-16 bg-white">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('availableIn4Countries'))}</h2>`,
-    `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('kojoConnectsDescription'))}</p>`,
+    // Le RUBAN DES PAYS : les quatre noms du référentiel partagé, dans l'ordre
+    // que la page publie, avec le MÊME dessin de drapeau et les MÊMES classes
+    // des deux côtés — c'est la classe du drapeau qui fixe la hauteur du jeton,
+    // donc la géométrie du ruban.
+    `<section class="${rubanClass}">`,
+    `<div class="${rubanInnerClass}">`,
+    `<span class="${rubanEtiquetteClass}">${svgDeLIcone('countryGlobe', CLASSES_ICONE.pastille)}${esc(T('availableIn4Countries'))}</span>`,
+    `<div class="${rubanJetonsClass}">`,
+    ...COUNTRIES.map((country) => {
+      // Le drapeau est DESSINÉ, comme chez React (`FlagIcon`, qui passe par le
+      // même registre) : c'était le dernier emoji de cette coquille, et la seule
+      // chose qui dépendît de la police du VISITEUR. Un pays sans dessin fait
+      // ÉCHOUER le build — le HTML pré-rendu n'a pas le droit de peindre un
+      // drapeau qu'il ne sait pas dessiner (il en publiait un blanc, « 🏳️ »).
+      const drapeau = nomDuDrapeau(country.code)
+      if (!drapeau) {
+        throw new Error(
+          `prerender-home : le pays « ${country.code} » (${country.name}) n’a pas de drapeau dessiné — ` +
+            'déclarez-le dans src/config/flags.js (registre DRAPEAUX), sinon la coquille ' +
+            'publierait un drapeau vide ou un emoji selon la police de l’hôte.'
+        )
+      }
+      return (
+        `<span class="${rubanJetonClass}">` +
+        svgDuDrapeau(drapeau, 'h-4 w-6 rounded-sm') +
+        `${esc(country.name)}` +
+        `</span>`
+      )
+    }),
     `</div>`,
-    `<div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">`,
-    ...COUNTRIES.map(
-      (country) =>
-        `<div class="${country.color} rounded-2xl p-6 text-center shadow-md ring-1 ring-inset ring-black/5">` +
-        `<div class="flex justify-center mb-3">` +
-        `<div class="w-14 h-10 md:w-20 md:h-14 rounded shadow-sm flex items-center justify-center text-3xl">${country.flag}</div>` +
-        `</div>` +
-        `<h3 class="font-semibold text-gray-900 text-sm md:text-base">${esc(country.name)}</h3>` +
-        `<p class="text-xs text-gray-600 mt-1">${esc(T('servicesAvailable'))}</p>` +
-        `</div>`
+    `</div>`,
+    `</section>`,
+
+    // Catégories (liens INTERNES réels, avec le filtre de la liste) : des
+    // LIGNES, comme la page.
+    `<section class="${sectionClass} ${paperClass}">`,
+    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
+    `<div class="${entreeSectionClass}">`,
+    `<h2 class="${headClass}">${esc(T('popularServices'))}</h2>`,
+    `<p class="${sectionIntroClass}">${esc(T('findServiceYouNeed'))}</p>`,
+    `</div>`,
+    `<div class="${listeColonnesClass}">`,
+    ...homePlan.categories.map(
+      (category) =>
+        `<a href="/jobs?category=${category.labelKey}" class="${ligneMetierClass}">` +
+        `<span class="${pastilleClass}">${svgDeLIcone(category.icone, CLASSES_ICONE.pastille)}</span>` +
+        `<span class="${nomLigneClass}">${esc(T(category.labelKey))}</span>` +
+        svgDeLIcone('flecheDroite', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
+        `</a>`
     ),
     `</div>`,
     `</div>`,
     `</section>`,
 
-    // Catégories (liens INTERNES réels, avec le filtre de la liste)
-    `<section class="py-12 md:py-16 bg-gray-50">`,
+    // La GALERIE : trois photos, chacune un lien vers la liste filtrée de son
+    // métier. Les libellés sont les NOMS DE MÉTIER du dictionnaire (mêmes clés
+    // que la liste ci-dessus) et les images sont déclarées par le plan — la
+    // coquille publie donc exactement ce que React publie, y compris les
+    // attributs de dimension qui réservent la boîte (aucun décalage au chargement).
+    `<section class="${sectionClass} ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('popularServices'))}</h2>`,
-    `<p class="text-gray-600">${esc(T('findServiceYouNeed'))}</p>`,
-    `</div>`,
-    `<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">`,
-    ...homePlan.categories.map(
-      (category) =>
-        `<a href="/jobs?category=${category.labelKey}" class="group bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 text-center transition hover:shadow-lg hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500">` +
-        `<div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-50 transition group-hover:scale-110">${svgDeLIcone(category.icone, CLASSES_ICONE.categorie)}</div>` +
-        `<h3 class="font-medium text-gray-900 text-sm md:text-base">${esc(T(category.labelKey))}</h3>` +
+    `<div class="${galerieGrilleClass}">`,
+    ...homePlan.galerie.map(
+      ({ labelKey, image }) =>
+        `<a href="/jobs?category=${labelKey}" class="${galerieCarteClass}">` +
+        `<img src="${esc(image)}" alt="" width="800" height="1000" loading="lazy" decoding="async">` +
+        `<span class="${galerieLegendeClass}">${esc(T(labelKey))}</span>` +
         `</a>`
     ),
     `</div>`,
@@ -163,83 +277,96 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</section>`,
 
     // Trois promesses
-    `<section class="py-12 md:py-16 bg-white">`,
+    `<section class="${sectionClass} ${paperClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
     `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
     ...homePlan.promises.map(
       ({ icone, titleKey, descriptionKey: textKey }) =>
-        `<div class="rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center shadow-sm transition hover:shadow-md hover:bg-white">` +
-        `<div class="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">${svgDeLIcone(icone, CLASSES_ICONE.promesse)}</div>` +
-        `<h3 class="text-xl font-semibold mb-4 text-gray-900">${esc(T(titleKey))}</h3>` +
-        `<p class="text-gray-600">${esc(T(textKey))}</p>` +
+        `<div class="${cardClass} ${carteClass}">` +
+        `<span class="${pastilleClass} mb-5">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
+        `<h3 class="${nomLigneClass} mb-3">${esc(T(titleKey))}</h3>` +
+        `<p class="${noteLigneClass}">${esc(T(textKey))}</p>` +
         `</div>`
     ),
     `</div>`,
     `</div>`,
     `</section>`,
 
-    // Comment ça marche
-    `<section class="py-12 md:py-16 bg-gray-50">`,
+    // Comment ça marche : trois LIGNES numérotées (le numéro vient du
+    // dictionnaire, `numberKey` — jamais recompté par `index + 1`), sous
+    // l'entête de la même grille — dont la première colonne porte la photo du
+    // parcours, dont le chemin est lu dans le plan.
+    `<section class="${sectionClass} ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('howItWorksTitle'))}</h2>`,
-    `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeHowItWorksSubtitle'))}</p>`,
+    `<div class="${etapesGrilleClass}">`,
+    `<div class="${etapesTeteClass}">`,
+    `<h2 class="${headClass}">${esc(T('howItWorksTitle'))}</h2>`,
+    `<p class="${sectionIntroClass}">${esc(T('homeHowItWorksSubtitle'))}</p>`,
+    `<div class="${cadrePhotoClass}">`,
+    `<img src="${esc(photoEtapes)}" alt="" width="800" height="1000" loading="lazy" decoding="async">`,
     `</div>`,
-    `<div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">`,
+    `</div>`,
+    `<div class="${listeClass}">`,
     ...homePlan.steps.map(
       ({ icone, numberKey, titleKey, descriptionKey: textKey }) =>
-        `<div class="relative bg-white rounded-2xl shadow-md ring-1 ring-inset ring-black/5 p-6 pt-8 text-center">` +
-        `<span class="absolute -top-4 left-1/2 -translate-x-1/2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-orange-600 text-sm font-bold text-white shadow-md">${esc(T(numberKey))}</span>` +
-        `<div class="bg-orange-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">${svgDeLIcone(icone, CLASSES_ICONE.etape)}</div>` +
-        `<h3 class="text-lg font-semibold mb-2 text-gray-900">${esc(T(titleKey))}</h3>` +
-        `<p class="text-gray-600 text-sm">${esc(T(textKey))}</p>` +
+        `<div class="${ligneEtapeClass}">` +
+        `<span class="${pastilleCreuseClass}"><span class="text-lg font-bold">${esc(T(numberKey))}</span></span>` +
+        `<span class="${pastilleClass}">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
+        `<div>` +
+        `<h3 class="${nomLigneClass}">${esc(T(titleKey))}</h3>` +
+        `<p class="${noteLigneClass}">${esc(T(textKey))}</p>` +
+        `</div>` +
+        svgDeLIcone('flecheBas', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
         `</div>`
     ),
     `</div>`,
     `</div>`,
-    `</section>`,
-
-    // Séquestre (confiance)
-    `<section class="py-12 md:py-16 bg-white">`,
-    `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="rounded-3xl border-2 border-emerald-200 bg-emerald-50 p-8 md:p-10 shadow-sm">`,
-    `<div class="flex flex-col md:flex-row items-center gap-6">`,
-    `<div>${svgDeLIcone(homePlan.icone, CLASSES_ICONE.sequestre)}</div>`,
-    `<div class="text-center md:text-left">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-emerald-900 mb-3">${esc(T('escrowTrustTitle'))}</h2>`,
-    `<p class="text-emerald-800">${esc(T('escrowTrustText'))}</p>`,
-    `<p class="text-emerald-700 mt-3 text-sm">${esc(T('escrowTrustBullets'))}</p>`,
-    `<a href="/how-it-works" class="mt-4 inline-block rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">${esc(T('learnMore'))}</a>`,
-    `</div>`,
-    `</div>`,
-    `</div>`,
     `</div>`,
     `</section>`,
 
-    // Appel à l'action
-    `<section class="py-12 md:py-16 bg-gradient-to-r from-orange-600 to-red-600 text-white">`,
-    `<div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">`,
-    `<h2 class="text-2xl md:text-3xl lg:text-4xl font-bold mb-6">${esc(T('joinThousands'))}</h2>`,
-    `<p class="text-lg md:text-xl mb-8 opacity-90">${esc(T('startConnectingToday'))}</p>`,
-    `<div class="flex flex-col sm:flex-row gap-4 justify-center">`,
-    `<a href="/register?type=client" class="bg-white text-orange-600 hover:bg-orange-50 px-8 py-4 rounded-xl font-semibold shadow-xl transform transition hover:-translate-y-0.5">${esc(T('lookingForServices'))}</a>`,
-    `<a href="/register?type=worker" class="border-2 border-white text-white hover:bg-white hover:text-orange-600 px-8 py-4 rounded-xl font-semibold transition">${esc(T('offerServices'))}</a>`,
+    // Séquestre (confiance) : un PANNEAU en deux moitiés, l'illustration sur
+    // son sol, l'estampille orange à l'angle.
+    `<section class="${sectionClass} ${paperClass}">`,
+    `<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">`,
+    `<div class="${panneauClass}">`,
+    `<div class="${panneauArtClass}">`,
+    `<span class="${panneauOrbeClass}" aria-hidden="true"></span>`,
+    `<img src="/assets/kojo-paiement-securise.svg" alt="" width="620" height="500" loading="lazy" decoding="async" class="${panneauImageClass}">`,
+    `<span class="${panneauEstampilleClass}">${svgDeLIcone(homePlan.icone, CLASSES_ICONE.heros)}${esc(T('securePayments'))}</span>`,
+    `</div>`,
+    `<div>`,
+    `<h2 class="${headClass} mb-4">${esc(T('escrowTrustTitle'))}</h2>`,
+    `<p class="${sectionIntroClass} mb-4">${esc(T('escrowTrustText'))}</p>`,
+    `<p class="${noteLigneClass} mb-6">${esc(T('escrowTrustBullets'))}</p>`,
+    `<a href="/how-it-works" class="bouton bouton-encre">${esc(T('learnMore'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
+    `</div>`,
     `</div>`,
     `</div>`,
     `</section>`,
 
-    // Chiffres (valeurs de repli de Home.js avant /public/stats, pour
-    // que le remplacement par React ne décale rien). Le texte publié
-    // ici et le repli que lit Home.js sortent de la MÊME déclaration
-    // (homePlan.stats) : une seule liste, deux rendus.
-    `<section class="py-12 md:py-16 bg-gray-50">`,
+    // Appel à l'action : la clôture orange, deux anneaux qui débordent du cadre.
+    `<section class="${ctaClass} bg-gradient-to-br from-orange-600 to-orange-700 text-white">`,
+    `<div class="${ctaInnerClass}">`,
+    `<h2 class="titre-section mb-6">${esc(T('joinThousands'))}</h2>`,
+    `<p class="text-lg md:text-xl opacity-90">${esc(T('startConnectingToday'))}</p>`,
+    `<div class="${ctaActionsClass}">`,
+    `<a href="/register?type=client" class="bouton bouton-creme">${esc(T('lookingForServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
+    `<a href="/register?type=worker" class="bouton bouton-contour">${esc(T('offerServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
+    `</div>`,
+    `</div>`,
+    `</section>`,
+
+    // Faits vérifiables (pays couverts, support) : la MÊME déclaration
+    // (homePlan.stats) est lue par Home.js et par cette coquille — une seule
+    // liste, deux rendus, et aucun compteur inventé (cf. page-sections.js).
+    `<section class="${sectionClass} ${sandClass}">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 text-center rounded-2xl bg-white p-8 shadow-md ring-1 ring-inset ring-black/5">`,
+    `<div class="${bandeClass}">`,
     ...homePlan.stats.map(
       ({ labelKey, shellText }) =>
         `<div>` +
-        `<div class="text-3xl md:text-4xl font-bold text-orange-600 mb-2">${esc(shellText)}</div>` +
-        `<div class="text-sm md:text-base text-gray-600">${esc(T(labelKey))}</div>` +
+        `<div class="${chiffreClass} mb-2">${esc(shellText)}</div>` +
+        `<div class="${noteLigneClass}">${esc(T(labelKey))}</div>` +
         `</div>`
     ),
     `</div>`,
@@ -251,17 +378,23 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // trouvait pas de quoi comprendre QUI édite le site. Mêmes clés i18n
     // et mêmes classes que la section équivalente de src/pages/Home.js :
     // le crawler sans JavaScript et le navigateur lisent un seul texte.
-    `<section class="py-12 md:py-16 bg-white">`,
+    `<section class="${sectionClass} ${paperClass}">`,
     `<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('homeAboutTitle'))}</h2>`,
-    `<p class="text-gray-600 mb-4">${esc(T('homeAboutText1'))}</p>`,
-    `<p class="text-gray-600">${esc(T('homeAboutText2'))}</p>`,
+    `<div class="${entreeSectionClass}">`,
+    `<h2 class="${headClass}">${esc(T('homeAboutTitle'))}</h2>`,
+    `</div>`,
+    `<p class="${sectionIntroClass} mb-4">${esc(T('homeAboutText1'))}</p>`,
+    `<p class="${sectionIntroClass} mb-4">${esc(T('homeAboutText2'))}</p>`,
+    // La phrase de couverture géographique : elle nommait les quatre pays dans
+    // une section à part (les quatre cartes à drapeau) ; le ruban du héros les
+    // nomme désormais un par un, et la phrase survit ici, où elle appartient.
+    `<p class="${sectionIntroClass}">${esc(T('kojoConnectsDescription'))}</p>`,
     `<p class="mt-6 text-sm">`,
-    `<a href="/about" class="text-orange-600 underline underline-offset-2">${esc(T('aboutTitle'))}</a>`,
+    `<a href="/about" class="${lienFlecheClass}">${esc(T('aboutTitle'))}</a>`,
     ` · `,
-    `<a href="/contact" class="text-orange-600 underline underline-offset-2">${esc(T('contactTitle'))}</a>`,
+    `<a href="/contact" class="${lienFlecheClass}">${esc(T('contactTitle'))}</a>`,
     ` · `,
-    `<a href="/privacy" class="text-orange-600 underline underline-offset-2">${esc(T('privacyTitle'))}</a>`,
+    `<a href="/privacy" class="${lienFlecheClass}">${esc(T('privacyTitle'))}</a>`,
     `</p>`,
     `</div>`,
     `</section>`,
@@ -278,28 +411,28 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // y=5948,69 côté coquille contre 5949,69 côté React, puis les 60 textes
     // suivants au même écart). Une classe d'un seul token suffisait à décaler
     // la moitié basse de la page.
-    `<section class="py-12 md:py-16 bg-white border-t border-gray-100">`,
+    `<section class="${sectionClass} ${sandClass} border-t border-stone-100">`,
     `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="text-center mb-12">`,
-    `<h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-4">${esc(T('contactTitle'))}</h2>`,
-    `<p class="text-gray-600 max-w-2xl mx-auto">${esc(T('homeContactText'))}</p>`,
+    `<div class="${entreeSectionClass}">`,
+    `<h2 class="${headClass}">${esc(T('contactTitle'))}</h2>`,
+    `<p class="${sectionIntroClass}">${esc(T('homeContactText'))}</p>`,
     `</div>`,
     `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">`,
-    `<a href="tel:${esc(contact.phone)}" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+    `<a href="tel:${esc(contact.phone)}" class="${ligneDeContactClass}">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">${glypheDeContact('contactCall')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('homeContactCall'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('homeContactCall'))}</div><div class="text-xs text-stone-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
-    `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+    `<a href="${esc(contact.whatsappUrl)}" target="_blank" rel="noreferrer" class="${ligneDeContactClass}">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">${glypheDeContact('contactWhatsapp')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactWhatsapp'))}</div><div class="text-xs text-gray-500">${esc(contact.phoneDisplay)}</div></div>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactWhatsapp'))}</div><div class="text-xs text-stone-500">${esc(contact.phoneDisplay)}</div></div>`,
     `</a>`,
-    `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
+    `<a href="mailto:${esc(contact.email)}?subject=Contact%20KOJO" class="${ligneDeContactClass}">`,
     `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">${glypheDeContact('contactSendEmail')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-gray-500 break-all">${esc(contact.email)}</div></div>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactSendEmail'))}</div><div class="text-xs text-stone-500 break-all">${esc(contact.email)}</div></div>`,
     `</a>`,
-    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 hover:bg-gray-50 transition-colors">`,
-    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-600">${glypheDeContact('contactAddress')}</span>`,
-    `<div><div class="text-sm font-semibold text-gray-900">${esc(T('contactAddress'))}</div><div class="text-xs text-gray-500">${esc(contact.address)}</div></div>`,
+    `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" aria-label="Google Maps" title="Google Maps" class="${ligneDeContactClass}">`,
+    `<span class="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-600">${glypheDeContact('contactAddress')}</span>`,
+    `<div><div class="text-sm font-semibold text-stone-900">${esc(T('contactAddress'))}</div><div class="text-xs text-stone-500">${esc(contact.address)}</div></div>`,
     `</a>`,
     `</div>`,
     // Bloc social : les MÊMES profils que le footer React et que le
@@ -311,8 +444,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // JavaScript n'a pas d'autre moyen de voir ces liens.
     ...(socialLinks.length
       ? [
-          `<div class="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-6 text-center">`,
-          `<h3 class="text-lg font-semibold text-gray-900 mb-3">${esc(T('homeContactFollow'))}</h3>`,
+          `<div class="mt-8 ${cardClass} bg-stone-50 ${carteClass} text-center">`,
+          `<h3 class="text-lg font-semibold text-stone-900 mb-3">${esc(T('homeContactFollow'))}</h3>`,
           `<div class="flex flex-wrap items-center justify-center gap-4 text-sm text-orange-700">`,
           ...socialLinks.map(
             (social) =>

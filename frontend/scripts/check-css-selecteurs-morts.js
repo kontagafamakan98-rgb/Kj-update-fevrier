@@ -18,6 +18,15 @@
  * ── Les deux verdicts, et pourquoi il en faut deux ──────────────────────────
  *   1. FEUILLES SOURCE (`src/**\/*.css`) — le verdict ACTIONNABLE : il nomme le
  *      fichier, la ligne, le nom mort et le sélecteur qui l'écrit.
+ *
+ *      SA LECTURE A ÉTÉ RESSERRÉE le 28/09/2026, et c'est la mesure qui l'a
+ *      imposée : cinq feuilles importées (`src/styles/kojo-pack-*.css`, 292
+ *      lignes d'un système de design étranger) nommaient 39 classes dont AUCUNE
+ *      n'était portée par un élément, et ce verdict était VERT — le corpus
+ *      comptait alors les noms n'importe où dans l'artefact. La feuille LIVRÉE a
+ *      gardé cette lecture large (cf. `corpusPoseursLarge`), parce que Tailwind y
+ *      génère des utilitaires depuis n'importe quel jeton ; les feuilles SOURCE,
+ *      elles, sont désormais jugées sur les POSITIONS DE CLASSE seules.
  *   2. FEUILLE LIVRÉE (les blocs `<style>` des pages du build) — le verdict qui
  *      préserve la garantie de l'élagage : AUCUNE règle servie ne doit rester
  *      sans porteur. Il attrape ce que le premier ne peut pas voir, puisqu'aucune
@@ -48,6 +57,7 @@ import {
   MIN_REGLES_LUES,
   MIN_PAGES_LIVREES,
   corpusPoseurs,
+  corpusPoseursLarge,
   feuillesDe,
   nomsMortsDeLaFeuille,
   reglesSansPorteurDeLaFeuille,
@@ -93,10 +103,15 @@ function main() {
       `dossier de build introuvable (« ${RACINE} ») : lancer \`npm run build\` — un garde qui n'a rien lu n'a rien vérifié`
     );
   }
+  // DEUX lectures du même artefact, et l'asymétrie est mesurée : le verdict des
+  // feuilles SOURCE se prononce sur ce qui POSE VRAIMENT une classe (positions de
+  // classe), celui de la feuille LIVRÉE garde la lecture large (Tailwind génère
+  // un utilitaire depuis n'importe quel jeton) — voir corpusPoseursLarge.
   const corpus = corpusPoseurs(RACINE);
-  if (corpus.fichiers.length < MIN_FICHIERS_CORPUS || corpus.jetons.size < MIN_JETONS_CORPUS) {
+  const corpusLarge = corpusPoseursLarge(RACINE);
+  if (corpusLarge.fichiers.length < MIN_FICHIERS_CORPUS || corpusLarge.jetons.size < MIN_JETONS_CORPUS) {
     throw new Error(
-      `corpus illisible (${corpus.fichiers.length} fichier(s), ${corpus.jetons.size} jeton(s)) — ` +
+      `corpus illisible (${corpusLarge.fichiers.length} fichier(s), ${corpusLarge.jetons.size} jeton(s)) — ` +
         'juger avec un corpus vide déclarerait mortes des règles qui vivent ; vérifier la racine de build'
     );
   }
@@ -134,7 +149,7 @@ function main() {
     const html = fs.readFileSync(path.join(RACINE, page), 'utf8');
     for (const feuille of feuillesDe(html)) {
       reglesLivrees += compterRegles(feuille);
-      for (const divergence of reglesSansPorteurDeLaFeuille(feuille, corpus)) {
+      for (const divergence of reglesSansPorteurDeLaFeuille(feuille, corpusLarge)) {
         // Déjà nommé par le verdict 1 (« alias mort écrit dans une feuille ») :
         // on ne le répète pas, la source est l'endroit où l'on répare.
         if (divergence.noms.length && divergence.noms.every((nom) => nomsSourceMorts.has(nom))) continue;
@@ -144,7 +159,8 @@ function main() {
   }
 
   console.log(
-    `::notice::aucun sélecteur sans porteur — corpus ${corpus.fichiers.length} fichier(s)/${corpus.jetons.size} jetons ; ` +
+    `::notice::aucun sélecteur sans porteur — corpus des POSEURS ${corpus.fichiers.length} fichier(s)/${corpus.jetons.size} jetons ` +
+      `issus de ${corpus.valeurs} valeur(s) de classe ; corpus LARGE ${corpusLarge.jetons.size} jetons ; ` +
       `${feuilles.length} feuille(s) source, ${reglesLues} règle(s) ; ${pages.length} page(s), ${reglesLivrees} règle(s) livrée(s)`
   );
 

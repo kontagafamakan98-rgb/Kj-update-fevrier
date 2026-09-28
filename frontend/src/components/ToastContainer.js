@@ -2,6 +2,7 @@ import React from 'react';
 import { useToast } from '../contexts/ToastContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { makeToastTranslator } from '../utils/toastScopedI18n';
+import { Icone } from './chrome-icons';
 
 const ToastContainer = () => {
   const { toasts, removeToast } = useToast();
@@ -23,33 +24,20 @@ const ToastContainer = () => {
     }
   };
 
+  // Le DESSIN vient du registre du chrome ; c'est ici que reste la COULEUR, qui
+  // dépend du type de message et non de l'icône. Le trait suit `currentColor`,
+  // donc la teinte portée par la classe descend jusqu'aux tracés.
   const getIcon = (type) => {
     switch (type) {
       case 'success':
-        return (
-          <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
+        return <Icone nom="succes" classe="w-6 h-6 text-green-600" />;
       case 'error':
-        return (
-          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
+        return <Icone nom="erreur" classe="w-6 h-6 text-red-600" />;
       case 'warning':
-        return (
-          <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        );
+        return <Icone nom="avertissement" classe="w-6 h-6 text-yellow-600" />;
       case 'info':
       default:
-        return (
-          <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        );
+        return <Icone nom="information" classe="w-6 h-6 text-blue-600" />;
     }
   };
 
@@ -67,10 +55,17 @@ const ToastContainer = () => {
   };
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+    /* `role="status"` : une confirmation qui apparaît à l'écran sans être annoncée
+       n'existe pas pour un lecteur d'écran — le dépôt n'avait QU'UN seul point
+       `aria-live` (le compteur de la cloche), et les retours de formulaire, les
+       erreurs d'API et les succès de publication passent TOUS par ce conteneur.
+       `polite` et non `assertive` : un empilement de messages ne doit pas couper
+       la lecture en cours. */
+    <div role="status" aria-live="polite" className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
       {toasts.map((toast, index) => (
         <div
           key={toast.id}
+          data-kojo-toast
           className={getToastStyles(toast.type)}
           style={{
             animation: 'slideInRight 0.3s ease-out',
@@ -93,9 +88,7 @@ const ToastContainer = () => {
             className="flex-shrink-0 ml-2 text-gray-400 hover:text-gray-600 transition-colors"
             aria-label={t('toastCloseAria')}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <Icone nom="fermer" classe="w-5 h-5" />
           </button>
         </div>
       ))}
@@ -109,6 +102,20 @@ const ToastContainer = () => {
           to {
             transform: translateX(0);
             opacity: 1;
+          }
+        }
+        /* Le glissement est un AGRÉMENT : sous « animations réduites », la carte
+           apparaît immédiatement à sa place. La règle est écrite ici, à côté de
+           la déclaration qu’elle neutralise, plutôt que dans une feuille globale
+           qui ne saurait pas quel élément elle vise. Le sélecteur est un
+           ATTRIBUT, pas une classe : il reste hors du garde « aucun sélecteur
+           sans porteur », qui ne juge que des noms de classes et d’ids. Les
+           délais sont remis à zéro aussi, sinon une pile de trois messages
+           continuerait d’apparaître en cascade. */
+        @media (prefers-reduced-motion: reduce) {
+          [data-kojo-toast] {
+            animation: none !important;
+            animation-delay: 0s !important;
           }
         }
       `}</style>

@@ -5,6 +5,17 @@
 import React, { useState, useEffect } from 'react';
 import networkOptimizer from '../utils/networkOptimizer';
 import { useLanguage } from '../contexts/LanguageContext';
+import { SignalHigh, SignalMedium, SignalLow, SignalZero, Wifi, WifiOff } from 'lucide-react';
+
+// L'icône est choisie sur la QUALITÉ, ici, en SVG : la table d'emoji qui vivait
+// dans `networkOptimizer.getStatusDisplay()` est partie (voir ce fichier).
+const ICONE_QUALITE = {
+  excellent: SignalHigh,
+  good: SignalMedium,
+  moderate: SignalLow,
+  poor: SignalZero,
+  offline: WifiOff
+};
 
 const NetworkStatus = ({ showDetails = false, className = '' }) => {
   const [networkStatus, setNetworkStatus] = useState(networkOptimizer.getStatusDisplay());
@@ -98,11 +109,15 @@ const NetworkStatus = ({ showDetails = false, className = '' }) => {
     }
   };
 
+  const IconeQualite = ICONE_QUALITE[networkStatus.quality] || Wifi;
+
   if (showDetails) {
     return (
       <div className={`rounded-lg border p-4 ${getBackgroundColor()} ${className}`}>
         <div className="flex items-start space-x-3">
-          <div className="text-2xl">{networkStatus.emoji}</div>
+          <div className={getTextColor()}>
+            <IconeQualite className="h-6 w-6" aria-hidden="true" />
+          </div>
           <div className="flex-1">
             <h3 className={`font-medium ${getTextColor()}`}>
               {t('networkStatusLabel')} : {networkStatus.text}
@@ -127,7 +142,7 @@ const NetworkStatus = ({ showDetails = false, className = '' }) => {
     <div className={`fixed top-16 right-4 z-50 ${className}`}>
       <div className={`rounded-lg border px-3 py-2 shadow-lg ${getBackgroundColor()}`}>
         <div className="flex items-center space-x-2">
-          <span className="text-lg">{networkStatus.emoji}</span>
+          <IconeQualite className="h-5 w-5" aria-hidden="true" />
           <span className={`text-sm font-medium ${getTextColor()}`}>
             {networkStatus.text}
           </span>

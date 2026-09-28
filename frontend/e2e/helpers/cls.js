@@ -93,6 +93,43 @@ export const ESPION_CLS = () => {
 };
 
 /**
+ * Attend la FERMETURE de la fenêtre de session CLS courante.
+ *
+ * Le CLS n'est pas la somme des décalages : Chrome découpe le chargement en
+ * fenêtres (décalages à moins de 1 000 ms l'un de l'autre) et retient la plus
+ * grande. Un relevé pris avant la fermeture de la fenêtre peut donc manquer un
+ * décalage qui appartient à la fenêtre DÉJÀ commencée — et le budget serait
+ * jugé sur une fenêtre incomplète.
+ *
+ * La condition est celle de la MÉTRIQUE elle-même (`FENETRE_ENTRE_DECALAGES_MS`),
+ * calculée sur les instants des décalages déjà relevés : elle se termine dès
+ * qu'elle est vraie (et elle est vraie d'emblée pour une page qui n'a jamais
+ * bougé). Un plafond la borne — `FENETRE_SESSION_MAX_MS`, la durée maximale d'une
+ * fenêtre — et le dépassement rend la main au LIEU de lever : une page qui ne se
+ * calme pas doit se juger sur son relevé, jamais sur une attente muette.
+ *
+ * @param {import('@playwright/test').Page} page Page où l'espion CLS est posé.
+ * @param {number} [maxMs] Plafond d'attente.
+ * @returns {Promise<boolean>} `true` si la fenêtre s'est fermée.
+ */
+export async function attendreLaFenetreDeSession(page, maxMs = FENETRE_SESSION_MAX_MS) {
+  try {
+    await page.waitForFunction(
+      (fenetre) => {
+        const decalages = (window.__kojoCls && window.__kojoCls.decalages) || [];
+        const dernier = decalages.reduce((max, decalage) => Math.max(max, decalage.debut), 0);
+        return performance.now() - dernier >= fenetre;
+      },
+      FENETRE_ENTRE_DECALAGES_MS,
+      { timeout: maxMs }
+    );
+    return true;
+  } catch (_erreur) {
+    return false;
+  }
+}
+
+/**
  * Le CLS d'un relevé : la plus GRANDE fenêtre de session, comme Chrome.
  *
  * @param {Array<{debut: number, valeur: number, sources: Array<object>}>} decalages

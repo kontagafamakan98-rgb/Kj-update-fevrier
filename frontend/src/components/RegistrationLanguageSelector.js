@@ -10,6 +10,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
 import FlagIcon from './FlagIcon';
+import { Languages, Lightbulb, MapPin, Info } from 'lucide-react';
 
 const COUNTRY_PREFERENCE_KEYS = {
   mali: 'maliLanguagePreference',
@@ -95,7 +96,7 @@ const RegistrationLanguageSelector = ({
   return (
     <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-lg p-6">
       <div className="flex items-center mb-4">
-        <span className="text-2xl mr-3">🗣️</span>
+        <Languages className="h-6 w-6 mr-3 text-orange-600" aria-hidden="true" />
         <h3 className="text-lg font-semibold text-orange-900">
           {t('choosePreferredLanguage') || 'Choisissez votre langue préférée'}
         </h3>
@@ -105,10 +106,10 @@ const RegistrationLanguageSelector = ({
       {country && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-start">
-            <span className="text-blue-500 text-lg mr-2">💡</span>
+            <Lightbulb className="h-5 w-5 text-blue-500 mr-2 shrink-0" aria-hidden="true" />
             <div className="flex-1">
               <p className="text-sm text-blue-800 font-medium">
-                📍 {isManualSelection ? (t('basedOnSelectedCountry') || 'Basé sur le pays sélectionné') : (t('basedOnLocation') || 'Basé sur votre position')} (<span className="inline-flex items-center gap-2"><FlagIcon country={normalizedCountryCode || country.code} className="w-5 h-4" showEmoji={false} /><span>{getTranslatedCountryName(normalizedCountryCode, t) || stripLeadingFlag(country.nameFrench || country.name || '')}</span></span>)
+                <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {isManualSelection ? (t('basedOnSelectedCountry') || 'Basé sur le pays sélectionné') : (t('basedOnLocation') || 'Basé sur votre position')} (<span className="inline-flex items-center gap-2"><FlagIcon country={normalizedCountryCode || country.code} className="w-5 h-4" /><span>{getTranslatedCountryName(normalizedCountryCode, t) || stripLeadingFlag(country.nameFrench || country.name || '')}</span></span>)
               </p>
               <p className="text-xs text-blue-700 mt-1">
                 {COUNTRY_PREFERENCE_KEYS[normalizedCountryCode]
@@ -147,7 +148,7 @@ const RegistrationLanguageSelector = ({
                 {/* Badge pour les langues du pays */}
                 {isCountryLanguage && !isSelected && (
                   <div className="absolute -top-2 -right-2 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                    📍
+                    <MapPin className="h-3 w-3" aria-hidden="true" />
                   </div>
                 )}
                 
@@ -159,7 +160,7 @@ const RegistrationLanguageSelector = ({
                 )}
 
                 <div className="text-center">
-                  <div className="flex justify-center mb-2"><FlagIcon country={language.code} className="w-8 h-6" showEmoji={false} /></div>
+                  <div className="flex justify-center mb-2"><FlagIcon country={language.code} className="w-8 h-6" /></div>
                   <div className="font-medium text-gray-900 text-sm">
                     {language.name}
                   </div>
@@ -187,7 +188,7 @@ const RegistrationLanguageSelector = ({
             <span className="text-green-500 text-lg mr-2">✓</span>
             <div>
               <p className="text-sm font-medium text-green-800">
-                {t('selectedLanguage') || 'Langue sélectionnée'} : <span className="inline-flex items-center gap-2"><FlagIcon country={selectedLanguage} className="w-5 h-4" showEmoji={false} /><span>{AVAILABLE_LANGUAGES[selectedLanguage]?.name}</span></span>
+                {t('selectedLanguage') || 'Langue sélectionnée'} : <span className="inline-flex items-center gap-2"><FlagIcon country={selectedLanguage} className="w-5 h-4" /><span>{AVAILABLE_LANGUAGES[selectedLanguage]?.name}</span></span>
               </p>
               <p className="text-xs text-green-700">
                 {t('interfaceAndProfileUpdated') || 'Interface et profil mis à jour'}
@@ -199,8 +200,7 @@ const RegistrationLanguageSelector = ({
 
       {/* Information importante */}
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <div className="flex items-start">
-          <span className="text-yellow-600 text-lg mr-2">ℹ️</span>
+        <div className="flex items-start">            <Info className="h-5 w-5 text-yellow-600 mr-2 shrink-0" aria-hidden="true" />
           <div className="text-xs text-yellow-800">
             <p className="font-medium mb-1">{t('aboutSelection') || 'À propos de votre sélection :'}</p>
             <ul className="space-y-1">

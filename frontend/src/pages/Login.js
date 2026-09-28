@@ -39,7 +39,7 @@ export default function Login() {
   const displayedError = useMemo(() => (errorKey ? t(errorKey) : error), [error, errorKey, t]);
   const pageT = makeScopedTranslator(currentLanguage, t);
   const pagePlan = PAGE_SECTIONS['/login'];
-  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
+  const legalDocumentUrl = '/terms';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +60,7 @@ export default function Login() {
           }
         });
       } else {
-        toast.success(t('loginSuccess') + ' 🎉');
+        toast.success(t('loginSuccess'));
         navigate('/dashboard');
       }
     } else {
@@ -105,7 +105,7 @@ export default function Login() {
           }
         });
       } else {
-        toast.success(t('loginSuccess') + ' 🎉');
+        toast.success(t('loginSuccess'));
         navigate('/dashboard');
       }
       return;
@@ -122,10 +122,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-orange-600">
+          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-lg bg-orange-600">
             <span className="text-white text-xl font-bold">{t('brandMark')}</span>
           </div>
           {/* Titre de PAGE en h1 (et non h2) : un audit SEO exige un h1 unique
@@ -133,7 +133,7 @@ export default function Login() {
               niveau que le shell statique pré-rendu (login.html). Les classes
               Tailwind sont identiques à celles d'origine — le rendu ne change
               pas, seule la sémantique est corrigée. */}
-          <h1 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h1 className="mt-6 text-center titre-page">
             {t(pagePlan.titleKey)}
           </h1>
         </div>
@@ -209,12 +209,10 @@ export default function Login() {
 
           <GoogleButton onClick={handleGoogle} label={pageT(pagePlan.googleLoginKey)} />
 
-          <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-2">
+          <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">
             <p className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} classe={CLASSES_ICONE.notice} /> {pageT(pagePlan.legalNoticeTitleKey)}</p>
             <a
               href={legalDocumentUrl}
-              target="_blank"
-              rel="noreferrer"
               className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"
             >
               {pageT(pagePlan.legalConsentLinkKey)}

@@ -6,11 +6,19 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const STATUS_OPTIONS = ['Nouveau', 'En cours', 'Résolu'];
 
+// Les trois états d'une demande GARDENT leur teinte : elles ne décorent pas,
+// elles disent quelque chose (à traiter / en cours / clos), comme les statuts
+// de /jobs/:id et du tableau de bord. Ce qui change avec la refonte, c'est le
+// DESSIN : le badge était une PILULE (`rounded-full`, la forme interdite du
+// site), il prend le rayon des boutons et des puces.
 const STATUS_STYLES = {
   'Nouveau': 'bg-orange-50 text-orange-700 border-orange-200',
   'En cours': 'bg-blue-50 text-blue-700 border-blue-200',
   'Résolu': 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
+
+/** Le rayon du site pour un contrôle : 3 px, jamais une pilule. */
+const RAYON = 'rounded-[3px]';
 
 const statusLabel = (status, t) => {
   const map = {
@@ -80,74 +88,89 @@ const SupportAdmin = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <MessageSquareText size={24} className="text-orange-600" />
+          <span className="sur-titre">{t('supportRequestsTitle')}</span>
+          <h1 className="titre-page mt-3 flex items-center gap-3">
+            <MessageSquareText size={26} className="text-orange-600" aria-hidden="true" />
             {t('supportRequestsTitle')}
           </h1>
-          <p className="text-sm text-gray-500">{tickets.length} {tickets.length > 1 ? t('requestsPlural') : t('requestsSingular')}{statusFilter ? ` · ${statusLabel(statusFilter, t)}` : ''}</p>
+          <p className="mt-3 text-sm text-stone-500">{tickets.length} {tickets.length > 1 ? t('requestsPlural') : t('requestsSingular')}{statusFilter ? ` · ${statusLabel(statusFilter, t)}` : ''}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+        <button onClick={loadTickets} className={`${RAYON} border border-stone-200 p-2 text-stone-600 transition-colors hover:border-orange-600 hover:text-orange-700`} aria-label={t('refresh')}>
+          <RefreshCcw size={16} />
+        </button>
+      </div>
+
+      {/* Le filtre d'état était un `<select>` nu à côté d'une pastille : il
+          devient la rangée de PUCES CARRÉES de /jobs (`.puce-filtre`), qui dit
+          l'état courant sans qu'on ait à ouvrir un menu — et qui se replie en
+          desktop au lieu de défiler (`puces-defilantes`). */}
+      <div className="puces-defilantes mb-6">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('')}
+          className={`puce-filtre ${statusFilter === '' ? 'puce-filtre-active' : ''}`}
+        >
+          {t('allStatuses')}
+        </button>
+        {STATUS_OPTIONS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={`puce-filtre ${statusFilter === s ? 'puce-filtre-active' : ''}`}
           >
-            <option value="">{t('allStatuses')}</option>
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{statusLabel(s, t)}</option>)}
-          </select>
-          <button onClick={loadTickets} className="rounded-xl border border-gray-200 p-2 text-gray-600 hover:bg-gray-50" aria-label={t('refresh')}>
-            <RefreshCcw size={16} />
+            {statusLabel(s, t)}
           </button>
-        </div>
+        ))}
       </div>
 
       {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className={`mb-4 ${RAYON} border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700`}>{error}</div>
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">{t('loading')}</div>
+        <div className="py-12 text-center text-stone-500">{t('loading')}</div>
       ) : tickets.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 px-4 py-12 text-center text-sm text-gray-500">
+        <div className={`${RAYON} border border-dashed border-stone-300 px-4 py-12 text-center text-sm text-stone-500`}>
           {t('noSupportRequests')}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="liste-editoriale">
           {tickets.map((ticket) => (
-            <div key={ticket.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div key={ticket.id} className="ligne-editoriale py-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="font-semibold text-gray-900">{ticket.full_name}</div>
-                  <div className="text-xs text-gray-500">{formatDate(ticket.created_at)} · {ticket.channel === 'direct' ? t('directContact') : t('robotAssistant')}</div>
+                  <div className="titre-entree">{ticket.full_name}</div>
+                  <div className="mt-1 text-xs text-stone-500">{formatDate(ticket.created_at)} · {ticket.channel === 'direct' ? t('directContact') : t('robotAssistant')}</div>
                 </div>
                 <select
                   value={ticket.status}
                   disabled={updatingId === ticket.id}
                   onChange={(e) => handleStatusChange(ticket.id, e.target.value)}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 ${STATUS_STYLES[ticket.status] || 'bg-gray-50 text-gray-700 border-gray-200'}`}
+                  className={`${RAYON} border px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-orange-500 ${STATUS_STYLES[ticket.status] || 'bg-stone-50 text-stone-700 border-stone-200'}`}
                 >
                   {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{statusLabel(s, t)}</option>)}
                 </select>
               </div>
 
-              <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
-                <a href={`tel:${ticket.phone}`} className="flex items-center gap-1 hover:text-orange-600">
-                  <Phone size={14} /> {ticket.phone}
+              <div className="mt-3 flex flex-wrap gap-4 text-sm text-stone-600">
+                <a href={`tel:${ticket.phone}`} className="flex items-center gap-1.5 transition-colors hover:text-orange-700">
+                  <Phone size={14} aria-hidden="true" /> {ticket.phone}
                 </a>
-                <a href={`mailto:${ticket.email}`} className="flex items-center gap-1 hover:text-orange-600">
-                  <Mail size={14} /> {ticket.email}
+                <a href={`mailto:${ticket.email}`} className="flex items-center gap-1.5 transition-colors hover:text-orange-700">
+                  <Mail size={14} aria-hidden="true" /> {ticket.email}
                 </a>
               </div>
 
-              <div className="mb-2">
-                <span className="text-xs font-semibold uppercase text-gray-400">{t('reason')}</span>
-                <p className="text-sm text-gray-800">{ticket.reason}</p>
+              <div className="mt-4">
+                <span className="sur-titre">{t('reason')}</span>
+                <p className="mt-2 text-sm text-stone-700">{ticket.reason}</p>
               </div>
-              <div>
-                <span className="text-xs font-semibold uppercase text-gray-400">{t('message')}</span>
-                <p className="text-sm text-gray-800 whitespace-pre-line">{ticket.message}</p>
+              <div className="mt-3">
+                <span className="sur-titre">{t('message')}</span>
+                <p className="mt-2 whitespace-pre-line text-sm text-stone-700">{ticket.message}</p>
               </div>
             </div>
           ))}

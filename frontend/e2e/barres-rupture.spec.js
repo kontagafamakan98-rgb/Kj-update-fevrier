@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { MARQUEUR_DE_MONTAGE } from './helpers/geometrie.js';
+import {
+  attendreLaStabiliteDuDefilement,
+  attendreLeRenduApresRedimensionnement,
+} from './helpers/attentes.js';
+// Les attentes de CONDITION (et pourquoi il n'y en a plus une seule d'horloge
+// ici) : `e2e/helpers/attentes.js`. Un franchissement de point de rupture
+// attend la PEINTURE du nouveau rendu, un geste de molette attend l'arrêt du
+// DÉFILEMENT — jamais « 100 ms, on verra bien ».
 
 /**
  * LES DEUX BARRES, LE POINT DE RUPTURE, ET LA QUESTION DE L'INSTANCE DUPLIQUÉE.
@@ -123,7 +131,7 @@ test.describe('les barres et le point de rupture', () => {
     // LU, puis jugé — un `toHaveCount(0)` aurait rougi sans dire pourquoi, et
     // un rouge qui n'est pas nommé n'est pas réparable.
     await page.setViewportSize(DESKTOP);
-    await page.waitForTimeout(100);
+    await attendreLeRenduApresRedimensionnement(page);
 
     const apres = await etatDeLaPage(page);
     expect(
@@ -137,7 +145,11 @@ test.describe('les barres et le point de rupture', () => {
     expect(apres.hauteurDeDefilement, 'la page doit avoir de quoi défiler, sinon le cas ne prouverait rien').toBeGreaterThan(300);
     await page.mouse.move(DESKTOP.width / 2, DESKTOP.height / 2);
     await page.mouse.wheel(0, 900);
-    await page.waitForTimeout(200);
+    // Ce qu'on attend ici n'est pas l'effet jugé (« la page a défilé ») mais
+    // l'arrêt du geste : une position lue en plein défilement amorti mesurerait
+    // un instant du mouvement. Un défilement verrouillé reste à 0, et c'est
+    // l'assertion suivante qui le dit.
+    await attendreLaStabiliteDuDefilement(page);
     const defile = await etatDeLaPage(page);
     expect(
       defile.positionDeDefilement,
@@ -152,9 +164,9 @@ test.describe('les barres et le point de rupture', () => {
     await ouvrirLeMenuMobile(page);
 
     await page.setViewportSize(DESKTOP);
-    await page.waitForTimeout(100);
+    await attendreLeRenduApresRedimensionnement(page);
     await page.setViewportSize(MOBILE);
-    await page.waitForTimeout(100);
+    await attendreLeRenduApresRedimensionnement(page);
 
     // Le hamburger est le seul juge de l'état : son libellé vient de
     // `isMobileMenuOpen`, donc la commande doit être l'OUVERTURE, pas la
@@ -181,7 +193,7 @@ test.describe('les barres et le point de rupture', () => {
     expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toEqual({ barre: 0, select: 1, total: 1 });
 
     await page.setViewportSize(DESKTOP);
-    await page.waitForTimeout(100);
+    await attendreLeRenduApresRedimensionnement(page);
     expect(await controlesDeLangue(page), 'barre desktop').toEqual({ barre: 1, select: 0, total: 1 });
   });
 
@@ -197,7 +209,7 @@ test.describe('les barres et le point de rupture', () => {
     expect((await controlesDeLangue(page)).barre).toBeGreaterThan(1); // déclencheur + la liste
 
     await page.setViewportSize(MOBILE);
-    await page.waitForTimeout(150);
+    await attendreLeRenduApresRedimensionnement(page);
     expect(await controlesDeLangue(page), 'la barre masquée ne doit plus rien peindre').toEqual({
       barre: 0,
       select: 0,
