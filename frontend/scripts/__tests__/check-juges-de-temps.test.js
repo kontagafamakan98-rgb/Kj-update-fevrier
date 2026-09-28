@@ -34,7 +34,7 @@ import {
   toutesLesDeclarations,
   MIN_JUSTIFICATION,
 } from '../juges-de-temps.js';
-import { executerVerification } from '../check-juges-de-temps.js';
+import { executerVerification, lireSurfaces } from '../check-juges-de-temps.js';
 
 const ICI = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND = path.resolve(ICI, '..', '..');
@@ -46,6 +46,12 @@ const FICHIERS_DECLARES = {
   'frontend/vite.config.js': 'testTimeout: 20000\n',
   'frontend/playwright.config.js': 'timeout: 30000\ntimeout: 30000\ntimeout: 30000\n',
   'frontend/scripts/check-job-og-contract.js': 'timeout: 20000\n',
+  // Le dossier e2e est une surface : la racine temporaire doit en contenir un
+  // fichier, sinon le garde refuse une surface INTROUVABLE (ce qu'il doit faire).
+  // Son contenu ne porte AUCUNE attente fixe — c'est la déclaration VIDE du
+  // registre, et le cas « une attente fixe dans e2e est refusée » plus bas la met
+  // à l'épreuve sur un fichier inventé.
+  'frontend/e2e/exemple.spec.js': 'await page.waitForSelector("nav a");\nawait attendreLaStabilite(page);\n',
 };
 
 /** Écrit une racine temporaire DANS le projet, et la retire ensuite. */
@@ -256,6 +262,57 @@ describe('classes et angles acceptés', () => {
   });
 });
 
+describe('aucune attente FIXE dans le harnais e2e (angle mort 19a, fermé le 28/09/2026)', () => {
+  const inventaireDes = (fichiers) => inventorier({ fichiers });
+
+  it('la surface `frontend/e2e` est un DOSSIER : chaque fichier est lu À SON NOM', () => {
+    // Sans ce développement, la surface ne lirait rien (aucun fichier ne porte ce
+    // chemin) et le garde serait vert sur un sujet qu'il ne regarde pas — le faux
+    // vert que l'angle mort 19 recensait : les attentes fixes vivaient dans des
+    // specs, hors de toute surface déclarée.
+    const inventaire = inventaireDes([
+      { chemin: 'frontend/e2e/un.spec.js', texte: 'await attendreLaStabilite(page);\n' },
+      { chemin: 'frontend/e2e/helpers/deux.js', texte: 'export const rien = 1;\n' },
+      { chemin: 'frontend/src/pas-une-surface.js', texte: 'waitForTimeout(999);\n' },
+    ]);
+    expect(Object.keys(inventaire.parSurface).sort()).toEqual([
+      'frontend/e2e/helpers/deux.js',
+      'frontend/e2e/un.spec.js',
+    ]);
+    expect(inventaire.parSurface['frontend/e2e/un.spec.js']).toEqual({ attenteFixe: [] });
+  });
+
+  it('une attente fixe, MÊME dans un parcours qui n’est listé nulle part, est REFUSÉE et NOMMÉE', () => {
+    // Le fichier n'existe pas dans `SURFACES` en tant que tel : il est couvert
+    // parce qu'il est SOUS la surface. Un parcours ajouté demain est donc jugé
+    // sans que personne y pense, et le refus dit lequel.
+    const inventaire = inventaireDes([
+      { chemin: 'frontend/e2e/tresor.spec.js', texte: 'await page.waitForTimeout(120);\n' },
+    ]);
+    expect(inventaire.parSurface['frontend/e2e/tresor.spec.js'].attenteFixe).toEqual([
+      { valeur: 120, ligne: 1 },
+    ]);
+    expect(confronterInventaire(inventaire, JUGES).nonDeclarees).toEqual([
+      { chemin: 'frontend/e2e/tresor.spec.js', motif: 'attenteFixe', valeur: 120, occurrences: 1 },
+    ]);
+  });
+
+  it('l’arbre RÉEL n’en porte AUCUNE — et le dossier est bien lu (plancher)', () => {
+    const inventaire = inventorier(lireSurfaces());
+    const e2e = Object.entries(inventaire.parSurface).filter(([chemin]) =>
+      chemin.startsWith('frontend/e2e/')
+    );
+    // Plancher de lecture : un dossier vide, un nom d’extension changé ou un
+    // développement cassé rendraient « aucune attente fixe » VRAI pour la
+    // mauvaise raison — le mode d’échec exact de ce garde.
+    expect(e2e.length).toBeGreaterThan(10);
+    const attentes = e2e.flatMap(([chemin, parMotif]) =>
+      parMotif.attenteFixe.map((occurrence) => `${chemin}:${occurrence.ligne} → ${occurrence.valeur} ms`)
+    );
+    expect(attentes).toEqual([]);
+  });
+});
+
 describe('bras de la CI', () => {
   it('juge l’arbre RÉEL : aucune borne non déclarée, aucune déclaration périmée', () => {
     const rapport = executerVerification();
@@ -263,7 +320,12 @@ describe('bras de la CI', () => {
     expect(rapport.confrontation.perimees).toEqual([]);
     expect(rapport.delits).toEqual([]);
     expect(rapport.confrontation.occurrencesReelles).toBe(rapport.confrontation.occurrencesAttendues);
-    expect(rapport.surfacesLues).toBe(SURFACES.length);
+    // Les surfaces sont lues UNE PAR FICHIER : la surface `frontend/e2e` est un
+    // DOSSIER, développé en ses fichiers JavaScript. Comparer à `SURFACES.length`
+    // ne dirait plus rien ; ce qui doit être vrai est que le verdict a lu TOUT ce
+    // que la lecture sait lire, et rien de moins.
+    expect(rapport.surfacesLues).toBe(lireSurfaces().fichiers.length);
+    expect(rapport.surfacesLues).toBeGreaterThanOrEqual(SURFACES.length);
   });
 
   it('rend le même verdict sur une racine qui reproduit la déclaration', () => {

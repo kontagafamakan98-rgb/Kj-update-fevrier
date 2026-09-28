@@ -65,6 +65,9 @@ import { countryMapFor } from '../../src/utils/countryMap.js';
 // Node n'exécute plus un import JSON sans attribut de type (convention du dépôt).
 import fr from '../../src/i18n/fr.json' with { type: 'json' };
 import { MARQUEUR_DE_MONTAGE, attendreLaStabilite } from './geometrie.js';
+// Les attentes de CONDITION : le silence du journal des requêtes remplace les
+// deux `waitForTimeout(N)` qui espéraient « le chargement est fini ».
+import { attendreLeSilenceDesRequetes } from './attentes.js';
 
 /** Le libellé du contrôle, lu au propriétaire du plan et au dictionnaire. */
 export const LIBELLE = fr[PAGE_SECTIONS['/contact'].mapButtonKey];
@@ -230,8 +233,9 @@ export async function verifierLaFacadeDeCarte(page, requetes, { route, taille, t
   await attendreLaStabilite(page);
   // Le chargement doit être FINI : une iframe montée par un `useEffect` tardif
   // doit tomber dans cette fenêtre, sinon le parcours ne mesurerait que les
-  // premières centaines de millisecondes.
-  await page.waitForTimeout(700);
+  // premières centaines de millisecondes. La condition porte sur le JOURNAL que
+  // le verdict utilise (silence des requêtes, plafonné), jamais sur une horloge.
+  await attendreLeSilenceDesRequetes(() => requetes.length);
 
   // ── 1a. Rien du tiers AU CHARGEMENT ─────────────────────────────────────
   refuserTouteCarte(requetes, 'AU CHARGEMENT');
@@ -345,7 +349,10 @@ export async function verifierLaFacadeDeCarte(page, requetes, { route, taille, t
  */
 export async function verifierLaFacadeEnCoquille(page, requetes, { route, taille }) {
   await page.goto(route);
-  await page.waitForTimeout(200);
+  // Coquille SANS JavaScript : rien à monter, rien à charger au-delà du
+  // document — la condition est donc que la mise en page soit posée (les
+  // assertions qui suivent lisent des comptes, pas des attentes).
+  await attendreLaStabilite(page);
 
   expect(
     requetes.filter((url) => CARTE_TIERS.test(url) || url.includes('output=embed')),
@@ -421,7 +428,9 @@ export async function verifierLaCarteDifferee(page, requetes, { route, taille, c
   await page.goto(route);
   await page.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
   await attendreLaStabilite(page);
-  await page.waitForTimeout(700);
+  // Puis le chargement doit être fini (même condition qu'au point 1 du parcours
+  // de façade) : la carte différée doit avoir eu sa chance de partir.
+  await attendreLeSilenceDesRequetes(() => requetes.length);
 
   // ── 1. Rien de la carte AU CHARGEMENT ────────────────────────────────────
   refuserTouteCarte(requetes, 'AU CHARGEMENT');

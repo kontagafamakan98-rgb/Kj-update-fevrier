@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ROUTES } from './helpers/geometrie.js'
+import { attendreLeSilenceDesRequetes } from './helpers/attentes.js'
 import { shellFileFor } from '../scripts/site-meta.js'
 import {
   CE_QUE_LE_GARDE_STATIQUE_VOIT,
@@ -60,13 +61,25 @@ import {
  */
 
 /**
- * Laisse partir les requêtes du chargement sans le moindre appui. Un délai fixe
- * plutôt que `networkidle` : l'application peut interroger son API en boucle, et
- * une attente de « réseau au repos » qui ne vient jamais serait un rouge sur la
- * montre, pas sur le fond.
+ * Laisse partir les requêtes du chargement sans le moindre appui.
+ *
+ * C'ÉTAIT une seconde fixe, et elle était choisie CONTRE `networkidle` :
+ * l'application interroge son API, et une attente de « réseau au repos » qui ne
+ * vient jamais serait un rouge sur la montre, pas sur le fond. Le remède n'était
+ * donc pas de revenir à `networkidle`, mais d'écrire la condition sur le JOURNAL
+ * QUE LE VERDICT UTILISE DÉJÀ : il se tait (plus une seule requête nouvelle
+ * pendant la durée de calme du harnais), avec un plafond. Un chargement rapide
+ * rend la main plus tôt ; une application qui interroge en boucle est attendue
+ * jusqu'au plafond, au lieu d'être jugée sur une seconde qui ne veut rien dire.
+ *
+ * Le pas de sondage, la durée de calme et le plafond sont des paramètres NOMMÉS
+ * de `e2e/helpers/attentes.js`, jamais des littéraux de spec (angle mort 19 de
+ * CI-COVERAGE.md, refermé le 28/09/2026). Ce qui reste vrai et l'est toujours :
+ * le cas PUBLIE le nombre de requêtes observées et ne juge jamais sur ce nombre.
  */
-async function laisserChargerSansAppuyer(page) {
-  await page.waitForTimeout(1000)
+async function laisserChargerSansAppuyer(page, requetes) {
+  await page.waitForLoadState('load')
+  return attendreLeSilenceDesRequetes(() => requetes.length)
 }
 
 /**
@@ -105,7 +118,7 @@ test.describe('Aucun tiers contacté avant toute interaction', () => {
       const reponse = await page.goto(route, { waitUntil: 'load' })
       expect(reponse?.status(), `${route} n'a servi aucune page (${shellFileFor(route)})`).toBe(200)
 
-      await laisserChargerSansAppuyer(page)
+      await laisserChargerSansAppuyer(page, requetes)
 
       // Plancher de lecture : 14 mesurées au minimum le 26/09/2026, on exige 8.
       // Un écouteur cassé (0) ou à moitié branché passerait sinon pour un vert.
@@ -190,7 +203,7 @@ test.describe('Aucun tiers contacté avant toute interaction', () => {
 
     const { requetes } = await ecouterLesRequetes(page)
     await page.goto('/', { waitUntil: 'load' })
-    await laisserChargerSansAppuyer(page)
+    await laisserChargerSansAppuyer(page, requetes)
 
     const divergences = divergencesDeTiers(requetes, { origineDeLaPage: page.url() })
     const noms = divergences.map((d) => d.url)
@@ -222,7 +235,7 @@ test.describe('Aucun tiers contacté avant toute interaction', () => {
 
     const { requetes } = await ecouterLesRequetes(page)
     await page.goto('/', { waitUntil: 'load' })
-    await laisserChargerSansAppuyer(page)
+    await laisserChargerSansAppuyer(page, requetes)
 
     const divergences = divergencesDeTiers(requetes, { origineDeLaPage: page.url() })
     const declaree = divergences.find((d) => d.url === 'https://tiers.test/declare.js')

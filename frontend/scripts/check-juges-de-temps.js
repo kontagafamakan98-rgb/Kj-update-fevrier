@@ -46,9 +46,34 @@ const RACINE = path.resolve(ICI, '..', '..');
 const MIN_SURFACES = 5;
 const MIN_MESURES = 4;
 
+/** Les fichiers JavaScript d'un dossier, récursivement, triés (chemins absolus). */
+function fichiersJavaScript(dossier) {
+  const trouves = [];
+  const parcourir = (courant) => {
+    const entrees = fs
+      .readdirSync(courant, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    for (const entree of entrees) {
+      const complet = path.join(courant, entree.name);
+      if (entree.isDirectory()) { parcourir(complet); continue; }
+      if (entree.name.endsWith('.js')) trouves.push(complet);
+    }
+  };
+  parcourir(dossier);
+  return trouves;
+}
+
 /**
  * Les surfaces déclarées, en clair. Un fichier déclaré ABSENT est un refus : un
  * registre qui décrit un fichier disparu est un registre périmé.
+ *
+ * Une surface déclarée comme DOSSIER (`dossier: true`, cf. `frontend/e2e`) est
+ * développée en ses fichiers JavaScript : chacun est lu ET NOMMÉ séparément — un
+ * refus qui ne dit pas quel fichier porte l'attente ne serait pas réparable — et
+ * aucun n'a besoin d'être inscrit au registre à la main, donc un parcours ajouté
+ * demain est jugé sans que personne y pense. Le développement se fait ICI et non
+ * dans la règle : `juges-de-temps.js` reste sans aucune E/S, ce qui est ce qui
+ * rend ses fonctions éprouvables par mutation de chaîne.
  */
 export function lireSurfaces(racine = RACINE) {
   const fichiers = [];
@@ -59,7 +84,14 @@ export function lireSurfaces(racine = RACINE) {
       absentes.push(surface.chemin);
       continue;
     }
-    fichiers.push({ chemin: surface.chemin, texte: fs.readFileSync(complet, 'utf8') });
+    if (!surface.dossier) {
+      fichiers.push({ chemin: surface.chemin, texte: fs.readFileSync(complet, 'utf8') });
+      continue;
+    }
+    for (const fichier of fichiersJavaScript(complet)) {
+      const chemin = path.relative(racine, fichier).split(path.sep).join('/');
+      fichiers.push({ chemin, texte: fs.readFileSync(fichier, 'utf8') });
+    }
   }
   return { fichiers, absentes };
 }

@@ -46,11 +46,15 @@
 //     chaque assertion ajoutée — un garde qui crie pour rien ne se lit plus.
 //   • Les `timeout-minutes` des workflows : ce sont les bornes de VIVACITÉ du
 //     runner lui-même (un job bloqué doit mourir), pas des verdicts.
-//   • Les 19 `waitForTimeout(N)` d'attente de stabilisation dans `e2e/` : eux
+//   • Les `waitForTimeout(N)` d'attente de stabilisation dans `e2e/` : eux
 //     DÉCIDENT (la mesure est prise après le délai), donc ils appartiennent bien
-//     à la classe HOTE — ils sont recensés comme angle accepté, avec leur
-//     remède (une attente de condition, cf. `e2e/helpers/geometrie.js` qui sait
-//     déjà attendre une mise en page STABLE sans horloge).
+//     à la classe HOTE. Ils n'étaient que RECENSÉS (angle mort 19) ; depuis le
+//     28/09/2026 ils sont REFUSÉS : `frontend/e2e` est une surface déclarée
+//     (`dossier: true`) sur le motif `attenteFixe`, avec une déclaration VIDE —
+//     toute `waitForTimeout(N)` y est donc une borne non déclarée, nommée avec
+//     son fichier. Le remède est une attente de CONDITION, et il vit dans
+//     `e2e/helpers/attentes.js` (pas d'échantillonnage NOMMÉ, plafonds bornés) :
+//     `e2e/helpers/geometrie.js` en portait déjà une (`attendreLaStabilite`).
 
 /** Classes de borne. Vocabulaire FERMÉ : une classe inconnue est un refus. */
 export const CLASSES = {
@@ -135,6 +139,18 @@ export const SURFACES = [
     motifs: ['timeout'],
     quoi: 'plafond HTTP de la sonde de contrat OG',
   },
+  {
+    // Une surface peut être un DOSSIER : ses fichiers JavaScript sont lus un par
+    // un (le refus NOMME le fichier), et aucun n'a besoin d'être listé ici pour
+    // être jugé — un parcours e2e AJOUTÉ demain est donc couvert sans que
+    // personne y pense. C'est ce qui manquait aux dix-neuf attentes fixes
+    // recensées le 27/09/2026 : elles vivaient dans des specs, hors de toute
+    // surface déclarée.
+    chemin: 'frontend/e2e',
+    dossier: true,
+    motifs: ['attenteFixe'],
+    quoi: 'les parcours Chromium : aucune attente FIXE (un cas attend une CONDITION, ou un FAIT peint)',
+  },
 ];
 
 /**
@@ -209,6 +225,27 @@ export const JUGES = {
       },
     ],
   },
+  /**
+   * LE HARNAIS e2e N'A DROIT À AUCUNE ATTENTE FIXE, et la déclaration VIDE est
+   * la règle : toute `waitForTimeout(N)` sous `frontend/e2e/` est une borne NON
+   * DÉCLARÉE, donc un refus qui NOMME le fichier et la valeur.
+   *
+   * Les dix-neuf attentes recensées le 27/09/2026 (angle mort 19 de
+   * CI-COVERAGE.md) ont été converties en attentes de CONDITION le 28/09/2026 :
+   * un fait observé (peinture d'un nouveau rendu, arrêt d'un défilement, silence
+   * du journal des requêtes, fermeture d'une fenêtre de session) ou une grandeur
+   * sondée jusqu'à deux lectures égales. Le pas de sondage, les durées de calme
+   * et les plafonds vivent dans `e2e/helpers/attentes.js`, nommés — plus aucun
+   * littéral au milieu d'un cas.
+   *
+   * Rien n'est toléré ici, mais rien n'est interdit À JAMAIS : une valeur
+   * réellement nécessaire s'écrit ICI, avec sa classe (HOTE ou MESURE), sa
+   * justification et son angle accepté — c'est-à-dire qu'elle ne peut pas
+   * arriver en silence, ce qui est tout l'objet de ce garde.
+   */
+  'frontend/e2e': {
+    attenteFixe: [],
+  },
 };
 
 /**
@@ -229,7 +266,7 @@ export const ANGLES_ACCEPTES = [
     motifs: ['timeout', 'testTimeout'],
     classe: 'HOTE',
     compensation:
-      "Ces délais tuent un blocage, ils ne classent pas l'artefact : ce qui décide reste une propriété (un test unitaire rendu, une URL atteinte, un sélecteur monté). Là où le travail est le plus lourd et le plus inégal selon l'hôte, la borne a été DÉRIVÉE d'une mesure prise à l'exécution (import-health) au lieu d'être empruntée. Les 19 attentes de stabilisation de `e2e/` relèvent de la même classe et restent l'angle ouvert : leur remède est une attente de CONDITION (cf. CE_QUE_CE_GARDE_VOIT).",
+      "Ces délais tuent un blocage, ils ne classent pas l'artefact : ce qui décide reste une propriété (un test unitaire rendu, une URL atteinte, un sélecteur monté). Là où le travail est le plus lourd et le plus inégal selon l'hôte, la borne a été DÉRIVÉE d'une mesure prise à l'exécution (import-health) au lieu d'être empruntée. Les attentes de stabilisation de `e2e/` relevaient de la même classe et n'étaient que RECENSÉES : elles sont CONVERTIES depuis le 28/09/2026 (angle mort 19a fermé) et leur survivante éventuelle serait refusée, parce que `frontend/e2e` est une surface déclarée sur `attenteFixe` avec une déclaration VIDE.",
   },
 ];
 
@@ -251,6 +288,12 @@ export function relever(texte, motif) {
  * L'inventaire complet d'une surface, sans aucune E/S : les fichiers sont passés
  * en clair, ce qui rend la règle éprouvable par mutation de chaîne.
  *
+ * Une surface peut être un DOSSIER (`dossier: true`) : chacun des fichiers
+ * fournis SOUS ce chemin est alors inventorié À SON PROPRE NOM (la clé de
+ * `parSurface` est le chemin du fichier) — c'est la condition pour qu'un refus
+ * nomme le fichier fautif, et pour qu'un parcours ajouté demain soit couvert
+ * sans être listé nulle part.
+ *
  * @param {{fichiers: Array<{chemin: string, texte: string}>}} sources
  * @returns {{parSurface: Record<string, Record<string, Array<{valeur, ligne}>>>, lues: string[], motifsLus: string[]}}
  */
@@ -260,14 +303,21 @@ export function inventorier({ fichiers }) {
   const motifsLus = [];
   const parChemin = new Map((fichiers || []).map((f) => [f.chemin, f.texte]));
 
+  const cibles = (surface) =>
+    surface.dossier
+      ? [...parChemin.keys()].filter((chemin) => chemin.startsWith(`${surface.chemin}/`))
+      : [surface.chemin];
+
   for (const surface of SURFACES) {
-    const texte = parChemin.get(surface.chemin);
-    if (typeof texte !== 'string') continue;
-    lues.push(surface.chemin);
-    parSurface[surface.chemin] = {};
-    for (const motif of surface.motifs) {
-      parSurface[surface.chemin][motif] = relever(texte, motif);
-      if (!motifsLus.includes(motif)) motifsLus.push(motif);
+    for (const chemin of cibles(surface)) {
+      const texte = parChemin.get(chemin);
+      if (typeof texte !== 'string') continue;
+      lues.push(chemin);
+      parSurface[chemin] = {};
+      for (const motif of surface.motifs) {
+        parSurface[chemin][motif] = relever(texte, motif);
+        if (!motifsLus.includes(motif)) motifsLus.push(motif);
+      }
     }
   }
   return { parSurface, lues, motifsLus };
@@ -408,7 +458,7 @@ export const CE_QUE_CE_GARDE_VOIT = {
   nePeutPasVoir: [
     'les `{ timeout: N }` d’attente de CONDITION de `e2e/` (`toHaveURL`, `waitForSelector`) : leur classe est PROPRIETE par construction, et les inventorier ferait crier ce garde à chaque assertion ajoutée',
     'les `timeout-minutes` des workflows : bornes de vivacité du runner lui-même, pas verdicts',
-    'les 19 `waitForTimeout(N)` d’attente de stabilisation de `e2e/` : non inventoriés ligne à ligne par ce garde, mais NOMMÉS comme angle accepté (classe HOTE, remède : une attente de condition — cf. `e2e/helpers/geometrie.js`)',
+    'les attentes de CONDITION de `e2e/` (`waitForSelector`, `waitForFunction`, les attentes de `e2e/helpers/attentes.js`) : ce ne sont pas des bornes qui décident, et les inventorier ferait crier ce garde à chaque condition écrite',
     'une borne calculée à l’exécution : seule une valeur LITTÉRALE est relevée. C’est le cas du TBT de la coquille, écrit `maxNumericValue: targetIsLocal ? 1600 : 1200` — deux seuils, un par hôte, et c’est justement la forme portable (le budget suit l’hôte au lieu de le supposer). Elle est donc NOMMÉE dans la compensation de l’angle accepté, pas relevée ligne à ligne',
     'les TABLES MESURÉES (`CLS_BUDGETS`, `TBT_DESKTOP_BUDGETS` de `scripts/lhci-cls-budgets.cjs`) : l’unité d’une entrée de table n’est pas syntaxique (un score sans unité voisine des millisecondes), donc elles ne sont pas balayées clé à clé — elles sont gouvernées par leurs propres tests (`lhci-cls-budgets.test.js`, `lhci-desktop-tbt.test.js`)',
     'une borne écrite ailleurs que dans les surfaces déclarées (un helper, une spec isolée) : elle n’est jugée que si sa surface entre au registre',
