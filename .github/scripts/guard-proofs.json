@@ -652,6 +652,15 @@
       "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les règles de ce module sont verrouillées par leurs cas unitaires directs (texte entier, composition, valeur dérivée, mot inventé, texte commenté, recopie d'un glyphe, exemption périmée, clé de glyphe inconnue, marqueur sans porteur, copie en dur, lecteur de littéraux), et la mutation qui prouve le VERDICT porte sur les lignes du garde qui l'énoncent (trois mutations déclarées)"
     },
     {
+      "chemin": "frontend/scripts/texte-visible.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/texte-visible.test.js",
+      "runner": "vitest",
+      "motif": "la LECTURE du texte visible d'un fragment HTML (balises, scripts, styles et commentaires retirés, blancs et espaces insécables réduits), partagée par le garde de shell (scripts/check-home-shell.js) et par le refus de corps déclaré du build (vite-plugins/prerender/declared-body.js) : le garde prononce le verdict, ce module fournit la lecture. Deux lectures différentes avaient déjà fait refuser une coquille pour un titre qu'un lecteur voyait ENTIER (27/09/2026 : le titre du héros, coupé en deux lignes par un <br> et un <em>, était cherché en chaîne BRUTE dans le HTML)",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : cette lecture est verrouillée par son test direct (frontend/scripts/__tests__/texte-visible.test.js — cinq cas : balises retirées, scripts et styles, commentaires, blancs et espaces insécables, ni mot ajouté ni mot manquant) et par les deux gardes qui l'exécutent sur l'arbre réel"
+    },
+    {
       "chemin": "frontend/scripts/mesure-lighthouse-locale.mjs",
       "role": "outil",
       "invoque_par": "ci",
@@ -2140,6 +2149,46 @@
       "cwd": "frontend",
       "attend": [
         "refuse : glyphe publié recopié dans un module de pré-rendu"
+      ]
+    },
+    {
+      "id": "prerender-shells: equilibre des balises non verifie",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "    for (const probleme of desequilibresDesBalises(contenu)) {",
+      "remplace": "    for (const probleme of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-prerender-shells.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : coquille de /jobs aux balises déséquilibrées (hors accueil)"
+      ]
+    },
+    {
+      "id": "prerender-shells: artefacts hors routes non lus",
+      "garde": "frontend/scripts/check-prerender-shells.js",
+      "cible": "frontend/scripts/check-prerender-shells.js",
+      "trouve": "for (const fichier of [...pagesPreRendues, ...artefactsHorsRoutes]) {",
+      "remplace": "for (const fichier of pagesPreRendues) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-prerender-shells.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-prerender-shells.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse : page 404 statique aux balises déséquilibrées (hors routes)"
       ]
     },
     {

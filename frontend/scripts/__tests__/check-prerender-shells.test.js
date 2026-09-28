@@ -52,8 +52,16 @@ import { photoFormatsLine } from '../../src/config/photo-formats.js';
 import { CONTACT } from '../../src/config/contact.js';
 // Le chrome de l'app (navbar + .App + main.flex-1) : la fixture des coquilles
 // le matérialise depuis SA source, comme le garde l'exige — une chaîne
-// recopiée ici pourrait diverger du build sans que rien ne rougisse.
-import { CHROME_OUVERTURE } from '../../vite-plugins/prerender/app-chrome.js';
+// recopiée ici pourrait diverger du build sans que rien ne rougisse. Et il le
+// FERME : depuis que les douze pages pré-rendues sont lues à l'équilibre de
+// leurs balises (scripts/check-prerender-shells.js, section 9), une fixture
+// dont le `main` et les conteneurs resteraient ouverts ne serait plus un
+// document — elle ne prouverait plus rien de ce que le garde refuse.
+import {
+  CHROME_FERMETURE,
+  CHROME_OUVERTURE,
+  FERMETURE_DE_L_APPLICATION,
+} from '../../vite-plugins/prerender/app-chrome.js';
 // Les coquilles /login et /register : elles aussi matérialisées depuis LEUR
 // source (le module que le build appelle), jamais recopiées.
 import { buildRouteShells } from '../../vite-plugins/prerender/shells-routes.js';
@@ -142,6 +150,9 @@ const preload = (chunk) => `<link rel="modulepreload" crossorigin href="/assets/
  */
 const TETE_SHELL = '<!doctype html><html><head><style>.App{display:block}</style>';
 
+/** La fermeture du chrome, ÉCRITE DEPUIS SA SOURCE (jamais recopiée). */
+const FIN_DE_PAGE = CHROME_FERMETURE + FERMETURE_DE_L_APPLICATION;
+
 /** HTML minimal mais CONFORME à chaque attente du garde. */
 const pages = () => ({
   'index.html':
@@ -156,7 +167,9 @@ const pages = () => ({
     `<a href="/carte">${fr.footerItinerary}</a>` +
     `<a href="/legal">${fr.footerTerms}</a>` +
     `<iframe title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}"></iframe>` +
-    `<a href="https://exemple.test" rel="me noreferrer">Réseau</a></div>` +
+    `<a href="https://exemple.test" rel="me noreferrer">Réseau</a>` +
+    FIN_DE_PAGE +
+    '</div>' +
     preload('Home') +
     '<script type="module" src="/assets/index.js"></script></body></html>',
   'jobs.html':
@@ -168,12 +181,14 @@ const pages = () => ({
     // passée à `.titre-page`, et recopier l'ancienne valeur ici faisait rougir
     // la fixture conforme.
     '<h1 class="titre-page">Emplois disponibles</h1>' +
+    FIN_DE_PAGE +
     '</div></body></html>',
   'login.html':
     TETE_SHELL +
     ogTagFor('login.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
     COQUILLES_ROUTES.login +
+    FIN_DE_PAGE +
     '</div>' +
     preload('Login') +
     '</body></html>',
@@ -182,6 +197,7 @@ const pages = () => ({
     ogTagFor('register.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
     COQUILLES_ROUTES.register +
+    FIN_DE_PAGE +
     '</div>' +
     preload('Register') +
     '</body></html>',
@@ -189,9 +205,10 @@ const pages = () => ({
     TETE_SHELL +
     ogTagFor('forgot-password.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
-    '<h1 class="mt-6 text-3xl font-extrabold text-gray-900">Mot de passe oublié</h1>' +
+    '<h1 class="mt-6 text-3xl font-bold text-stone-900">Mot de passe oublié</h1>' +
     '<input id="reset-email" />' +
-    '<div class="bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Envoyer le code</div>' +
+    '<div class="bg-orange-600 px-4 py-2 text-sm font-semibold text-white">Envoyer le code</div>' +
+    FIN_DE_PAGE +
     '</div>' +
     preload('ForgotPassword') +
     '</body></html>',
@@ -199,10 +216,11 @@ const pages = () => ({
     TETE_SHELL +
     ogTagFor('payment.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
-    '<h1 class="text-3xl font-bold text-gray-900 mb-2">KOJO Paiements réels</h1>' +
+    '<h1 class="titre-page mb-2">KOJO Paiements réels</h1>' +
     '<p>Un paiement doit être rattaché à une mission</p>' +
     `<p>${fr.paymentPageNoJobText}</p>` +
     '<a href="/jobs">Voir les missions disponibles</a>' +
+    FIN_DE_PAGE +
     '</div>' +
     preload('Payment') +
     '</body></html>',
@@ -214,6 +232,7 @@ const pages = () => ({
     '<h1 class="titre-page mb-4">Comment ça marche ?</h1>' +
     '<details><summary>FAQ</summary>Réponse</details>' +
     '<a href="/jobs">Missions</a><a href="/support">Support</a>' +
+    FIN_DE_PAGE +
     '</div>' +
     preload('HowItWorks') +
     '</body></html>',
@@ -229,6 +248,7 @@ const pages = () => ({
     '<div class="mt-6 w-full rounded-xl border border-gray-200 bg-white">' +
     `<a href="${CONTACT.mapsUrl}" title="${fr.mapIframeTitle.replace('{address}', CONTACT.address)}">${fr.mapShowMap}</a>` +
     '</div>' +
+    FIN_DE_PAGE +
     '</div>' +
     preload('Contact') +
     '</body></html>',
@@ -237,12 +257,52 @@ const pages = () => ({
     `<link rel="canonical" href="${SITE_ORIGIN}/support" />` +
     ogTagFor('support.html') +
     '</head><body><div id="root">' + CHROME_OUVERTURE +
-    '<h1 class="text-3xl font-bold text-gray-900 mb-2">Support</h1>' +
+    '<h1 class="titre-page mb-2">Support</h1>' +
     '<p>Suivre une demande existante</p>' +
     '<a href="tel:+221000000000">Appeler</a><a href="mailto:x@kojo.app">Écrire</a>' +
     '<a href="https://wa.me/221000000000">WhatsApp</a><a href="/how-it-works">Comment ça marche</a>' +
+    FIN_DE_PAGE +
     '</div>' +
     preload('Support') +
+    '</body></html>',
+  // Les trois pages de CONFIANCE ont leur propre coquille pré-rendue (elles
+  // sont déclarées dans src/config/page-meta.js) : la fixture les écrit donc
+  // aussi, sans quoi le compte des pages lues par le contrôle d'équilibre
+  // (dérivé de la table) ne tomberait pas sur les douze, et c'est cet écart-là
+  // que la section 9 refuse.
+  'about.html':
+    TETE_SHELL +
+    `<link rel="canonical" href="${SITE_ORIGIN}/about" />` +
+    ogTagFor('about.html') +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
+    '<h1 class="titre-page mb-2">Qui édite Kojo</h1>' +
+    '<p>Kojo met en relation des clients et des travailleurs</p>' +
+    '<a href="/contact">Nous écrire</a>' +
+    FIN_DE_PAGE +
+    '</div>' +
+    preload('About') +
+    '</body></html>',
+  'privacy.html':
+    TETE_SHELL +
+    `<link rel="canonical" href="${SITE_ORIGIN}/privacy" />` +
+    ogTagFor('privacy.html') +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
+    '<h1 class="titre-page mb-2">Données personnelles</h1>' +
+    '<h2>Responsable du traitement</h2>' +
+    FIN_DE_PAGE +
+    '</div>' +
+    preload('Privacy') +
+    '</body></html>',
+  'terms.html':
+    TETE_SHELL +
+    `<link rel="canonical" href="${SITE_ORIGIN}/terms" />` +
+    ogTagFor('terms.html') +
+    '</head><body><div id="root">' + CHROME_OUVERTURE +
+    '<h1 class="titre-page mb-2">Conditions générales</h1>' +
+    '<h2>Objet du service</h2>' +
+    FIN_DE_PAGE +
+    '</div>' +
+    preload('Terms') +
     '</body></html>',
   'app.html':
     TETE_SHELL +
@@ -608,6 +668,65 @@ describe('check-prerender-shells — chaque refus sait mordre', () => {
       nom: 'vercel.json illisible',
       mutate: () => ({ config: null }),
       attendu: 'frontend/vercel.json illisible',
+    },
+    {
+      // L'ÉQUILIBRE DES BALISES, sur une page AUTRE QUE L'ACCUEIL : c'est la
+      // mesure que ce chantier a ajoutée (le défaut du 27/09/2026 avait été
+      // trouvé sur l'accueil, et les onze autres pages n'étaient vérifiées par
+      // personne). Le `</main>` retiré est refermé en portée par le `</div>` du
+      // chrome — exactement la façon dont ce défaut se cache d'une sonde de
+      // navigateur, qui répare en silence.
+      nom: 'coquille de /jobs aux balises déséquilibrées (hors accueil)',
+      mutate: ({ html }) => {
+        html['jobs.html'] = html['jobs.html'].replace('</main>', '');
+      },
+      attendu: '`<main>`',
+    },
+    {
+      // LES DEUX ARTEFACTS QUI NE SONT PAS DES ROUTES : le gabarit des routes
+      // privées et la 404 statique sont bâtis par le même plugin, écrits dans le
+      // même `build/`, et lus par personne avant le 28/09/2026. Le `</nav>`
+      // retiré est refermé en portée par le `</main>` du document — la façon
+      // exacte dont ce défaut se cache : le parseur répare, donc aucune sonde de
+      // navigateur ne le voit, et la 404 est de toute façon servie SANS
+      // navigateur (c'est une page pour un crawler qui n'exécute pas de JS).
+      nom: 'page 404 statique aux balises déséquilibrées (hors routes)',
+      mutate: ({ html }) => {
+        html['404.html'] = html['404.html'].replace('</nav>', '');
+      },
+      attendu: 'build/404.html',
+    },
+    {
+      // Le gabarit app.html est obtenu par RETRAIT (canonical, JSON-LD, méta) :
+      // une expression régulière qui emporte une ouvrante sans sa fermante suffit
+      // à le déséquilibrer, et le document reste plausible à l'œil.
+      nom: 'gabarit app.html aux balises déséquilibrées (hors routes)',
+      mutate: ({ html }) => {
+        html['app.html'] = html['app.html'].replace('</body>', '');
+      },
+      attendu: 'build/app.html',
+    },
+    {
+      // Un artefact absent n'est pas seulement un document non vérifié : sans
+      // `404.html`, une URL inconnue est servie sans page d'erreur. Le NOM du
+      // fichier vient du module qui l'écrit (not-found.js), donc l'absence est
+      // vue comme un fichier introuvable, jamais comme un artefact renommé.
+      nom: 'page 404 absente du build',
+      mutate: ({ html }) => {
+        delete html['404.html'];
+      },
+      attendu: 'build/404.html introuvable',
+    },
+    {
+      // Le périmètre du contrôle est DÉRIVÉ de la table des routes : retirer un
+      // fichier du build doit rendre le contrôle exigeant (moins de pages lues
+      // que de pages déclarées), et non plus court. Sans cette règle, une page
+      // ajoutée demain pourrait ne jamais être lue sans que rien ne rougisse.
+      nom: 'page pré-rendue soustraite au contrôle des balises',
+      mutate: ({ html }) => {
+        delete html['terms.html'];
+      },
+      attendu: 'ne sont vérifiées par personne',
     },
     {
       // Le motif de ce découpage : un fragment publié recopié au lieu d'être lu

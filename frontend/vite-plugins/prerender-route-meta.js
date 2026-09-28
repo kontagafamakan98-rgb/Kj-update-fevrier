@@ -2,9 +2,10 @@
 //
 // Ce fichier ne fait que COMPOSER : chaque concern vit dans son module de
 // vite-plugins/prerender/ — les coquilles (shells-home.js, shells-routes.js),
-// le refus d'une coquille incomplète (declared-body.js), les méta de route et
-// les cartes OG (route-meta.js), le gabarit app.html (app-template.js) et la
-// page 404 (not-found.js).
+// le refus d'une coquille incomplète (declared-body.js), le refus d'une
+// coquille DÉSÉQUILIBRÉE (balises.js), les méta de route et les cartes OG
+// (route-meta.js), le gabarit app.html (app-template.js) et la page 404
+// (not-found.js).
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -13,9 +14,10 @@ import { buildHomeShell } from './prerender/shells-home.js'
 import { buildRouteShells } from './prerender/shells-routes.js'
 import { chromeDePage, piedDePage } from './prerender/app-chrome.js'
 import { makeDeclaredBodyGuard } from './prerender/declared-body.js'
+import { makeEquilibreGuard } from './prerender/balises.js'
 import { makeWriteRouteText, applyOgCard, setMeta } from './prerender/route-meta.js'
-import { buildAppTemplate } from './prerender/app-template.js'
-import { buildNotFoundPage } from './prerender/not-found.js'
+import { buildAppTemplate, NOM_DU_GABARIT_APP } from './prerender/app-template.js'
+import { buildNotFoundPage, NOM_DE_LA_PAGE_404 } from './prerender/not-found.js'
 // Les dictionnaires de PAGE (scopes pack2) : ce sont EUX que lisent
 // src/pages/Register.js et src/pages/Jobs.js (pageT), pas le dictionnaire
 // global. Les coquilles pré-rendues publiaient les mêmes mots en littéral,
@@ -123,6 +125,12 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         esc, T, registerT, jobsT, pageSections, pageSectionParts,
         conditions: googleAuth ? new Set(['google-auth']) : new Set(),
       })
+      // Le refus d'une coquille dont les BALISES ne se referment pas. Il est lu
+      // par les deux canaux de lecture (ce plugin au build, les gardes de
+      // scripts/), et il porte sur les DOUZE pages pré-rendues — pas seulement
+      // sur l'accueil, où le défaut avait été trouvé le 27/09/2026 alors qu'il
+      // était INVISIBLE à toutes les sondes de navigateur (le parseur répare).
+      const exigerBalisesEquilibrees = makeEquilibreGuard({ origine: 'prerender-route-meta' })
       const writeRouteText = makeWriteRouteText({ pageMeta, T })
       // Le PIED DE PAGE appartient au CHROME : React le rend après `</main>`
       // sur toutes les routes, donc les coquilles le publient de la même
@@ -196,6 +204,10 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
         // l'origine) — peint immédiatement, effacé au montage React.
         const shell = SHELLS[route] || ''
         exigerCorpsDeclare(routePath, route, shell)
+        // Le CORPS d'abord (il appartient à shells-routes.js : le refus nomme le
+        // module à corriger), puis le document ÉCRIT plus bas (une enveloppe de
+        // chrome mal refermée est un défaut d'injection, pas de coquille).
+        exigerBalisesEquilibrees(`le corps de la page ${routePath}`, shell)
         if (shell) {
           // Le corps est enveloppé dans le CHROME de l'app (navbar, `.App`,
           // `main.flex-1`) : les coquilles ne publiaient pas ces conteneurs,
@@ -214,6 +226,7 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
             `<meta charset="utf-8" />${link}`
           )
         }
+        exigerBalisesEquilibrees(`la coquille pré-rendue ${routePath} → ${shellFileFor(routePath)}`, out)
         fs.writeFileSync(path.join(outDir, shellFileFor(routePath)), out, 'utf8')
       }
 
@@ -231,6 +244,11 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // sans cet appel, l'accueil serait le seul corps non vérifié — et
       // c'est exactement par là que la dérive silencieuse rentrerait.
       exigerCorpsDeclare('/', 'home', homeShell)
+      // L'accueil passe par le MÊME refus que les onze autres : il n'est pas
+      // « déjà couvert » par le garde de scripts/check-home-shell.js, qui lit
+      // l'artefact APRÈS le build — ici, la coquille déséquilibrée n'est pas
+      // écrite du tout.
+      exigerBalisesEquilibrees("le corps de l'accueil (shells-home.js)", homeShell)
       // Même chrome que les routes (cf. app-chrome.js) : l'accueil ne peut pas
       // être la seule page dont la coquille hérite d'un autre alignement que
       // celui que React applique au même corps.
@@ -243,19 +261,32 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
           'prerender-route-meta : <div id="root"></div> introuvable dans index.html — shell accueil NON injecté'
         )
       }
+      const indexFinal = writeRouteText(withHomeShell, '/')
+      exigerBalisesEquilibrees('la page pré-rendue / → index.html', indexFinal)
       // index.html porte le texte de « / » : même fonction que les sept
       // coquilles, donc les deux canaux ne peuvent pas diverger.
-      fs.writeFileSync(indexPath, writeRouteText(withHomeShell, '/'), 'utf8')
+      fs.writeFileSync(indexPath, indexFinal, 'utf8')
 
 
       // Gabarit des routes privées (/dashboard, /profile…) : nu, non
       // indexable, sans canonical ni JSON-LD (buildAppTemplate le refuse).
       const appHtml = buildAppTemplate({ html, T, setMeta })
-      fs.writeFileSync(path.join(outDir, 'app.html'), appHtml, 'utf8')
+      // Les DEUX artefacts bâtis par ce plugin qui ne sont PAS des routes
+      // passent le MÊME refus que les douze pages : ils étaient construits,
+      // écrits, et lus par personne. C'est l'angle que ce contrôle ferme — un
+      // document déséquilibré n'est PAS une erreur visible (le parseur le
+      // RÉPARE), donc son défaut n'existe que pour qui LIT le fichier livré :
+      // un crawler sans JavaScript, un lecteur d'accessibilité, l'extraction du
+      // `#root`. Le gabarit app.html y est d'autant plus exposé qu'il est obtenu
+      // par RETRAIT (canonical, JSON-LD, méta) : une expression régulière qui
+      // emporte une ouvrante sans sa fermante suffit.
+      exigerBalisesEquilibrees(`le gabarit des routes privées → ${NOM_DU_GABARIT_APP}`, appHtml)
+      fs.writeFileSync(path.join(outDir, NOM_DU_GABARIT_APP), appHtml, 'utf8')
 
       // La 404 statique : servie par Vercel pour une URL sans rewrite.
       const notFoundPage = buildNotFoundPage({ T, contact })
-      fs.writeFileSync(path.join(outDir, '404.html'), notFoundPage, 'utf8')
+      exigerBalisesEquilibrees(`la page 404 → ${NOM_DE_LA_PAGE_404}`, notFoundPage)
+      fs.writeFileSync(path.join(outDir, NOM_DE_LA_PAGE_404), notFoundPage, 'utf8')
     },
   }
 }
