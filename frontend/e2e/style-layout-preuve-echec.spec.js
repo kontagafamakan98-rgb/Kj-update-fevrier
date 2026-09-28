@@ -48,6 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import budgets from '../scripts/style-layout-budgets.cjs';
+import { attendreLaStabilite } from './helpers/geometrie.js';
 
 const { CONDITIONS, NOEUDS, HAUTEUR, plancherNoeudsDe, plancherHauteurDe, BORNE_STRUCTURE } = budgets;
 
@@ -122,7 +123,7 @@ async function relever(browser, condition, html) {
       : route.fallback()
   );
   await page.goto('/', { waitUntil: 'load' });
-  await page.waitForTimeout(400);
+  await attendreLaStabilite(page);
   const dom = await page.evaluate(() => ({
     noeuds: document.querySelectorAll('*').length,
     hauteur: document.documentElement.scrollHeight,

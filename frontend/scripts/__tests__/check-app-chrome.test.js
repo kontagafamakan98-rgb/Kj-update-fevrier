@@ -65,7 +65,12 @@ describe('app-chrome — le chrome est la copie de celui de l’app', () => {
     // coquille ne peut plus peindre une autre géométrie que la page.
     for (const classes of [
       'className="App"',
-      'className="min-h-screen bg-gray-50 relative flex flex-col"',
+      // 28/09/2026 : le fond de l'application prend le SABLE du site
+      // (`fond-sable`, src/index.css) au lieu du gris froid `bg-gray-50`. La
+      // chaîne reste écrite ICI en clair, comme les deux autres : c'est ce qui
+      // fait rougir ce test le jour où l'app change d'habillage sans que la
+      // coquille suive.
+      'className="min-h-screen fond-sable relative flex flex-col"',
       'className="flex-1 pb-24 md:pb-0"',
     ]) {
       expect(APP, `src/App.js ne contient plus ${classes}`).toContain(classes);
@@ -73,7 +78,7 @@ describe('app-chrome — le chrome est la copie de celui de l’app', () => {
     // Et le chrome les publie en HTML (class=, pas className=).
     expect(CHROME_OUVERTURE).toContain('<div class="App">');
     expect(CHROME_OUVERTURE).toContain(
-      '<div class="min-h-screen bg-gray-50 relative flex flex-col">'
+      '<div class="min-h-screen fond-sable relative flex flex-col">'
     );
     expect(CHROME_OUVERTURE).toContain('<main class="flex-1 pb-24 md:pb-0">');
     expect(CHROME_FERMETURE).toBe('</main>');

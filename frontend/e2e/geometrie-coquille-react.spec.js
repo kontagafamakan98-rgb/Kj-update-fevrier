@@ -70,7 +70,7 @@ test.describe('Garde de géométrie — la coquille et React peignent les mêmes
         let coquille;
         try {
           await pageCoquille.goto(route);
-          await pageCoquille.waitForTimeout(200);
+          await attendreLaStabilite(pageCoquille);
           coquille = await pageCoquille.evaluate(RELEVE_GEOMETRIE);
         } finally {
           await pageCoquille.close();

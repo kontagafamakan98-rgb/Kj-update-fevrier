@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TAILLES } from './helpers/geometrie.js';
+import { TAILLES, MARQUEUR_DE_MONTAGE, attendreLaStabilite } from './helpers/geometrie.js';
 // Le plan est LE propriétaire de la géométrie du plus grand texte (voir le
 // fichier et `scripts/__tests__/check-lcp-geometrie.test.js`) : cette sonde le
 // lit au lieu de recopier les classes attendues, sinon elle vérifierait sa
@@ -97,14 +97,36 @@ const ROUTES_DECLAREES = [
   // Sur cette page, le plus grand texte peint est un CORPS de section : c'est
   // `sectionBodyClass` qui porte l'élément élu, pas l'introduction.
   { route: '/privacy', champ: 'sectionBodyClass', plancher: 64000 }, // 91 630 / 100 788
-  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 26 334 / 32 928
+  // Re-mesuré le 28/09/2026 au port du vocabulaire éditorial : 29 260 / 32 830
+  // px² (la veille : 26 334 / 32 928 — le mobile gagne de l'encre parce que le
+  // paragraphe remonte entièrement au-dessus de la ligne de flottaison, voir le
+  // commentaire du plan). Le plancher reste à 18 000 : il vaut ≈ 62 % du plus
+  // petit des deux relevés, donc il attrape une page vidée de son texte sans
+  // devenir un test de police.
+  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 29 260 / 32 830
   // Le plus grand texte peint de ces quatre pages est un paragraphe secondaire,
   // pas le titre : ligne légale de /login, notice d'étape de /register,
   // sous-titres de /forgot-password et de /support (voir la mesure en tête).
   { route: '/login', champ: 'legalContactClass', plancher: 8900 }, // 15 040 / 12 834
   { route: '/register', champ: 'stepNoticeClass', plancher: 6600 }, // 9 548 / 12 338
   { route: '/forgot-password', champ: 'subtitleClass', plancher: 9500 }, // 13 690 / 16 095
-  { route: '/support', champ: 'subtitleClass', plancher: 6600 }, // 16 720 / 9 480
+  // /support a DEUX élus selon la taille depuis le 28/09/2026 : en mobile le
+  // sous-titre du héros, en desktop le TITRE d'entrée de la première carte, qui
+  // passe devant depuis que les titres d'entrée ont pris l'échelle serif
+  // (1,25 rem contre 1 rem : le plus grand texte peint a changé de camp). Le
+  // plan déclare LES DEUX classes — le sujet et le titre d'entrée — donc
+  // l'unique propriétaire existe toujours ; ce que la sonde doit dire, c'est
+  // laquelle il attend à chaque taille, sans quoi elle accuserait le canal
+  // d'avoir recopié une classe alors que c'est le plan qui en a deux.
+  // Les deux planchers valent ≈ 62 % de LEUR relevé, chacun à sa taille (la
+  // règle du fichier) : 10 000 pour 16 632 px² en mobile, 5 900 pour 9 648 px²
+  // en desktop. Un plancher unique aurait dû descendre à celui du desktop, donc
+  // n'aurait plus attrapé une page mobile vidée de son texte.
+  {
+    route: '/support',
+    champ: { mobile: 'subtitleClass', desktop: 'titreEntreeClass' },
+    plancher: { mobile: 10000, desktop: 5900 },
+  },
 ];
 
 /**
@@ -144,8 +166,13 @@ const ensembleDeClasses = (valeur) =>
 test.describe('Parcours E2E — le LCP déclaré de chaque route reste la peinture de la coquille', () => {
   test.describe.configure({ mode: 'serial' });
 
-  for (const { route, champ, plancher } of ROUTES_DECLAREES) {
+  for (const entree of ROUTES_DECLAREES) {
+    const { route } = entree;
     for (const { nom: taille, viewport } of TAILLES) {
+      // Une déclaration par TAILLE quand la plus grande peinture change de camp
+      // entre le mobile et le desktop ; une seule valeur sinon.
+      const champ = typeof entree.champ === 'string' ? entree.champ : entree.champ[taille];
+      const plancher = typeof entree.plancher === 'number' ? entree.plancher : entree.plancher[taille];
       test(`${route} — ${taille} : l'élément élu porte la géométrie déclarée (${champ})`, async ({ browser }) => {
         const declare = PAGE_SECTIONS[route]?.[champ];
         expect(
@@ -159,8 +186,9 @@ test.describe('Parcours E2E — le LCP déclaré de chaque route reste la peintu
           await page.addInitScript(ESPION_LCP);
           await page.goto(route);
           // Laisse le temps à createRoot, à la reconstruction de la page et au
-          // repaint : une seconde candidate, si elle existe, apparaît ici.
-          await page.waitForTimeout(1500);
+          // repaint : une seconde candidate, si elle existe, apparaîtrait lors du montage.
+          await page.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
+          await attendreLaStabilite(page);
           const releve = await page.evaluate(() => window.__kojoLcp);
 
           expect(

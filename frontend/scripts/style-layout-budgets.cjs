@@ -145,7 +145,14 @@ const MESURE = {
   //   /support         254,7 → 209,0 (−45,7)     49,4 → 39,2 (−10,2)
   '/': { mobile: 424, desktop: 82 },
   '/about': { mobile: 231, desktop: 44 },
-  '/contact': { mobile: 169, desktop: 33 },
+  // Relevé du 28/09/2026, après la refonte éditoriale des quatre pages de
+  // confiance (mêmes conditions, mêmes 3 runs) : /contact 169 → 158,4 ms mobile
+  // et 33 → 26 ms desktop, /support 209 → 161,6 et 39 → 28,5, /privacy 169 →
+  // 105,7 et 33 → 20,7, /terms 142,4 → 136,7 et 23,3 → 19,9. Le coût du
+  // document change avec sa matière : ces quatre cases sont re-publiées ici
+  // parce qu'elles décrivent l'artefact livré, les autres restant celles du
+  // 26/09 (le TEMPS ne juge rien — voir l'en-tête).
+  '/contact': { mobile: 158.4, desktop: 26 },
   // 26/09/2026, dernière vague emoji→SVG (les quatre écrans de compte). Relevés
   // de la sonde ci-dessus, après la migration : /login 230 → 176 (mobile) /
   // 45 → 35 (desktop), /register 452 → 294 / 86 → 52, /forgot-password 255 → 165
@@ -163,11 +170,11 @@ const MESURE = {
   '/jobs': { mobile: 155, desktop: 30 },
   '/login': { mobile: 176, desktop: 35 },
   '/payment': { mobile: 165, desktop: 33 },
-  '/privacy': { mobile: 169, desktop: 33 },
+  '/privacy': { mobile: 105.7, desktop: 20.7 },
   '/register': { mobile: 294, desktop: 52 },
-  '/support': { mobile: 209, desktop: 39 },
+  '/support': { mobile: 161.6, desktop: 28.5 },
   // Page CGU (26/09/2026, relevée par la sonde) : même famille que /privacy.
-  '/terms': { mobile: 142.4, desktop: 23.3 },
+  '/terms': { mobile: 136.7, desktop: 19.9 },
 };
 
 /**
@@ -246,19 +253,40 @@ const NOEUDS = {
   // les trois étapes plus le séquestre de « Comment ça marche » (157 → 169) et
   // les six pastilles de /support (135 → 154).
   '/about': 126,
-  '/contact': 135,
+  // 135 → 147 (28/09/2026) : les quatre lignes de contact quittent le cadre
+  // arrondi pour la LIGNE À FILET de l'accueil, qui porte en plus la FLÈCHE de
+  // sa dernière colonne. Chaque flèche est un `<svg>` et ses deux tracés, donc
+  // +3 nœuds par ligne, +12 pour les quatre — le compte est vérifié par la
+  // mesure, pas déduit.
+  '/contact': 147,
   // +3 nœuds chacun pour l'enveloppe de la réinitialisation (108 → 111) et pour
   // la mallette de /payment (98 → 101) : un `<svg>` plus ses tracés là où un
   // emoji tenait un seul nœud. /login +5 (114 → 119) et /register +30 (203 → 233,
   // ses huit glyphes). La structure s'accorde toujours entre les deux hôtes.
   '/forgot-password': 114,
-  '/how-it-works': 172,
+  // 172 → 207 (28/09/2026) : le vocabulaire éditorial porté sur /how-it-works
+  // (les trois étapes en lignes numérotées, le panneau de séquestre avec son
+  // illustration, son estampille et ses quatre garanties, la FAQ en lignes). Le
+  // solde est +35 nœuds : les trois flèches des lignes d'étape, les quatre
+  // pastilles de garantie, l'illustration du panneau et son orbe s'ajoutent ;
+  // les trois cartes à ombre de l'ancienne grille retirent les leurs. Mesuré
+  // sur la coquille pré-rendue, pas déduit.
+  '/how-it-works': 207,
   '/jobs': 106,
   '/login': 122,
   '/payment': 104,
+  // 109 : INCHANGÉ par la refonte du 28/09/2026. La section de /privacy (comme
+  // celle de /terms) garde son `<section>`, un `<h2>` et un `<p>` ; seul le
+  // DESSIN change (titre serif, filet qui ouvre l'entrée) — et un filet ne se
+  // compte pas en nœuds.
   '/privacy': 109,
   '/register': 236,
-  '/support': 157,
+  // 157 → 166 (28/09/2026) : les quatre lignes de contact prennent la ligne à
+  // filet. Les trois lignes qui mènent quelque part gagnent la flèche (un
+  // `<svg>` + ses deux tracés = 3 nœuds chacune) ; la quatrième — l'adresse
+  // postale, sans destination — n'en a pas, et c'est pour ça que le compte est
+  // +9 et non +12.
+  '/support': 166,
   // Même squelette que /privacy (une enveloppe racine, un cadre, un titre, une
   // intro, quatre sections et le paragraphe de liens) : 108 nœuds mesurés par
   // la sonde le 26/09/2026.
@@ -325,12 +353,34 @@ const HAUTEUR = {
   '/': { mobile: 7726, desktop: 5407 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
-  '/about': { mobile: 1718, desktop: 1086 },
-  '/contact': { mobile: 1385, desktop: 1086 },
+  // 1 718 → 1 721 px en mobile (28/09/2026) : la page prend le vocabulaire
+  // éditorial (carte à filet, titre serif, encart à filet gauche à la place du
+  // bloc vert). Les NŒUDS ne bougent pas d'un : la pastille ronde remplace le
+  // `<div>` qui portait le glyphe. Le desktop ne bouge pas non plus, les trois
+  // cartes y tenant sur une rangée dans les deux dessins.
+  '/about': { mobile: 1721, desktop: 1086 },
+  // 1 385 → 1 370 px en mobile et 1 086 → 1 139 en desktop (28/09/2026) : les
+  // quatre moyens de contact passent de la grille (`grid-cols-1 sm:grid-cols-2`)
+  // à la liste JOINTIVE. En mobile la grille empilait déjà les quatre lignes,
+  // mais avec trois gouttières de 12 px que la liste n'a plus : −15 px. En
+  // desktop la grille tenait sur DEUX rangées (l'ancienne page tenait dans la
+  // fenêtre, sa hauteur était celle de la fenêtre : 940 px, d'où les 1 086 px
+  // du relevé) ; quatre lignes de 72 px la font dépasser la fenêtre, et la page
+  // suit son contenu : +53 px.
+  '/contact': { mobile: 1370, desktop: 1139 },
   '/forgot-password': { mobile: 926, desktop: 940 },
   // 2 982 → 3 002 px en mobile : une ligne de plus dans une étape ; desktop
   // inchangé (la largeur y évite le repli).
-  '/how-it-works': { mobile: 3002, desktop: 2124 },
+  // 3 002 → 2 957 px en mobile et 2 124 → 2 398 px en desktop (28/09/2026) :
+  // port du vocabulaire éditorial de l'accueil sur la page. Les trois étapes
+  // quittent une GRILLE DE TROIS CARTES pour une LISTE DE TROIS LIGNES :
+  // c'est ce qui explique les deux signes opposés, et c'est mesuré, pas
+  // supposé. En desktop les trois cartes tenaient sur UNE rangée (≈ 260 px) là
+  // où trois lignes de 104 px en font 312, et le panneau de séquestre à deux
+  // moitiés est plus haut que l'ancien bloc vert à ligne unique : +274 px. En
+  // mobile la grille empilait DÉJÀ les trois cartes, et le panneau en deux
+  // moitiés y est plus compact que le bloc vert qu'il remplace : −45 px.
+  '/how-it-works': { mobile: 2957, desktop: 2398 },
   // 823 → 1 125 px en mobile (940 → 1 086 en desktop), 27/09/2026 : la coquille
   // /jobs réserve désormais la viewport (`min-h-screen` sur son cadre, voir
   // src/config/page-sections.js). Son pied de page tombait sinon EXACTEMENT au
@@ -339,19 +389,45 @@ const HAUTEUR = {
   '/jobs': { mobile: 1125, desktop: 1086 },
   // 965 → 981 px en mobile : la ligne légale de contact se replie une fois de
   // plus ; desktop inchangé.
-  '/login': { mobile: 981, desktop: 940 },
+  // 981 → 978 px (28/09/2026) : le titre de page passe au dessin serif du site
+  // (`titre-page`, src/index.css). À 30 px le serif a une interligne de 1,04 là
+  // où l'ancien sans en avait 1,2 : le titre est 4,8 px plus court en mobile,
+  // d'où les 3 px du document. Le desktop ne bouge pas — cette page est centrée
+  // dans la fenêtre, donc sa hauteur est celle de la fenêtre, pas celle du
+  // contenu (elle rejoint la valeur de /forgot-password, 940 px).
+  '/login': { mobile: 978, desktop: 940 },
   // 893 → 918 px en mobile : le registre de la mallette grandit d'une ligne.
-  '/payment': { mobile: 918, desktop: 940 },
+  // 918 → 914 px (28/09/2026) : même cause que /login (titre de page au dessin
+  // serif, 4,8 px de moins en mobile) ; desktop inchangé, pour la même raison.
+  '/payment': { mobile: 914, desktop: 940 },
   // 1 627 → 1 702 px en mobile et 1 104 → 1 181 px en desktop : +1 ligne dans les
   // deux cas (le corps de section est le plus long texte du site).
-  '/privacy': { mobile: 1702, desktop: 1181 },
+  // 1 702 → 1 720 px en mobile et 1 181 → 1 212 en desktop (28/09/2026) :
+  // chaque section devient une ENTRÉE à filet (20 px de respiration en haut,
+  // 20 en bas, moins les 32 px de marge qu'elle portait) et le titre d'entrée
+  // est 4 px plus court que l'en-tête qu'il remplace. Les quatre sections
+  // s'additionnent, mesurées, pas déduites.
+  '/privacy': { mobile: 1720, desktop: 1212 },
   // 2 947 → 2 997 px en mobile, 2 517 → 2 534 en desktop.
   '/register': { mobile: 2997, desktop: 2534 },
   // 1 652 px en mobile (inchangé) et 990 → 1 014 px en desktop.
-  '/support': { mobile: 1652, desktop: 1014 },
+  // 1 652 → 1 649 px en mobile et 1 014 → 1 023 px en desktop (28/09/2026) : le
+  // titre de page passe au dessin serif du site. Ici les DEUX tailles suivent le
+  // contenu (la page n'est pas centrée dans la fenêtre) : le serif est 4,8 px
+  // plus court à 30 px en mobile et 9,8 px plus haut à 44 px en desktop.
+  // 1 649 → 1 630 px en mobile et 1 023 → 1 172 en desktop (28/09/2026) : même
+  // cause qu'à /contact pour les quatre lignes de contact, et même asymétrie —
+  // en mobile la liste jointive est plus COURTE que la grille empilée (−19 px,
+  // moins les 4 px gagnés par les deux titres de carte), en desktop ses quatre
+  // lignes remplacent deux rangées de la grille (+149 px, titres compris).
+  '/support': { mobile: 1630, desktop: 1172 },
   // Page CGU : 1 563 px en mobile et 1 086 px en desktop, mesurés par la sonde
   // le 26/09/2026.
-  '/terms': { mobile: 1563, desktop: 1086 },
+  // 1 563 → 1 577 px en mobile et 1 086 → 1 109 en desktop (28/09/2026) : même
+  // passage des quatre sections en entrées à filet qu'à /privacy. Les deux
+  // valeurs diffèrent des siennes parce que les textes ne se replient pas sur le
+  // même nombre de lignes.
+  '/terms': { mobile: 1577, desktop: 1109 },
 };
 
 /**

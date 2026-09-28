@@ -77,7 +77,7 @@ test.describe('Parcours E2E — sans JavaScript, chaque coquille publie mot pour
         let coquille;
         try {
           await pageCoquille.goto(route);
-          await pageCoquille.waitForTimeout(200);
+          await attendreLaStabilite(pageCoquille);
           coquille = await pageCoquille.evaluate(INVENTAIRE_PEINT);
         } finally {
           await pageCoquille.close();

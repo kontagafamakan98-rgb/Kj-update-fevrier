@@ -80,7 +80,7 @@
  * `src/config/page-meta.js` : une route ajoutée sans référence rougit ici.
  */
 import { test, expect } from '@playwright/test';
-import { ROUTES, ouvrirLaPage } from './helpers/geometrie.js';
+import { ROUTES, ouvrirLaPage, attendreLaStabilite } from './helpers/geometrie.js';
 import budgets from '../scripts/style-layout-budgets.cjs';
 
 const { CONDITIONS, MESURE, MESURE_CI, NOEUDS, HAUTEUR, plancherNoeudsDe, plancherHauteurDe } = budgets;
@@ -98,7 +98,7 @@ async function relever(browser, chemin, condition) {
   await session.send('Performance.enable');
   if (condition.cpu > 1) await session.send('Emulation.setCPUThrottlingRate', { rate: condition.cpu });
   await page.goto(chemin, { waitUntil: 'load' });
-  await page.waitForTimeout(400);
+  await attendreLaStabilite(page);
   const dom = await page.evaluate(() => ({
     noeuds: document.querySelectorAll('*').length,
     hauteur: document.documentElement.scrollHeight,

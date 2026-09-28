@@ -27,6 +27,8 @@ import { fileURLToPath } from 'node:url';
 //   /about           <p> l'introduction                        74 466 / 80 262 px²
 //   /privacy         <p> le CORPS d'une section                84 360 / 86 676 px²
 //   /how-it-works    <p> le sous-titre du héros                30 320 / 32 656 px²
+//                    (sa couleur a changé le 28/09/2026 — voir plus bas —, sa
+//                    géométrie est celle de ce relevé)
 //
 // ── Puis le 26/09/2026, les quatre routes restantes ───────────────────────
 // Chrome 152, sonde des candidates `largest-contentful-paint`, NAVIGATION
@@ -127,13 +129,22 @@ export const ROUTES_LCP = [
       { champ: 'introClass', page: 'className={introClass}', coquille: 'class="${privacyPlan.introClass}"' },
       { champ: 'sectionTitleClass', page: 'className={sectionTitleClass}', coquille: 'class="${privacyPlan.sectionTitleClass}"' },
       { champ: 'sectionBodyClass', page: 'className={sectionBodyClass}', coquille: 'class="${privacyPlan.sectionBodyClass}"' },
+      // Ajouté le 28/09/2026 : le filet qui fait d'une section une ENTRÉE
+      // (`.bloc-de-section`) change la boîte de la section, donc il fait partie
+      // de la géométrie déclarée et les deux canaux doivent le lire.
+      { champ: 'sectionWrapClass', page: 'className={sectionWrapClass}', coquille: 'class="${privacyPlan.sectionWrapClass}"' },
     ],
     classes: [
       'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
       'titre-page mb-4',
       'text-stone-600 mb-8',
-      'text-xl font-semibold text-stone-900 mb-2',
+      // 28/09/2026 : le titre d'une section quitte la typographie d'un tableau
+      // de bord (`text-xl font-semibold text-stone-900`) pour le titre serif
+      // d'entrée du site. La TAILLE est la même (`1.25rem`), donc le CORPS d'une
+      // section reste le plus grand texte peint — l'élément LCP de la page.
+      'titre-entree mb-2',
       'text-stone-600',
+      'bloc-de-section',
     ],
   },
   {
@@ -150,7 +161,14 @@ export const ROUTES_LCP = [
     classes: [
       'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
       'titre-page mb-4',
-      'text-lg text-stone-600 max-w-2xl mx-auto',
+      // 28/09/2026 : la COULEUR du sous-titre est corrigée — il était publié en
+      // `text-stone-600` sur le fond orange du héros, soit 2,6:1 de contraste,
+      // depuis la mise en ligne de la page. La géométrie, elle, ne bouge pas
+      // d'un caractère : `text-lg` et `max-w-2xl` décident seuls du retour à la
+      // ligne, donc de l'aire mesurée (rejoué après la correction :
+      // `e2e/lcp-geometrie.spec.js`, une seule candidate, aire identique entre
+      // les deux canaux).
+      'text-lg text-orange-50 max-w-2xl mx-auto',
     ],
   },
   // ── Les quatre routes de la seconde passe (26/09/2026) ───────────────────
@@ -215,11 +233,22 @@ export const ROUTES_LCP = [
         page: 'className={subtitleClass}',
         coquille: 'class="${supportPlan.subtitleClass}"',
       },
+      // Le 28/09/2026, la sonde e2e de /support a DÛ apprendre à attendre une
+      // classe différente selon la taille : en desktop, le plus grand texte
+      // peint est le TITRE d'entrée de la première carte (`titreEntreeClass`),
+      // passé devant le sous-titre depuis qu'il a pris l'échelle serif. La
+      // sonde ne peut le désigner que si ce champ a bien UN domicile : il est
+      // donc vérifié ici comme le sous-titre — lu du plan dans les deux canaux.
+      {
+        champ: 'titreEntreeClass',
+        page: 'className={titreEntreeClass}',
+        coquille: 'class="${supportPlan.titreEntreeClass}"',
+      },
     ],
-    // `text-stone-600` tout court ne suffirait PAS : cette chaîne vit aussi
-    // dans les `badgeClass` de /support et /contact, donc une recherche nue
-    // passerait même si le sous-titre changeait de dessin. La borne est le
-    // couple « couleur + rôle » : c'est le sous-titre qui porte le corps chaud.
+    // La borne est le couple « couleur + rôle » : c'est le sous-titre qui porte
+    // le corps chaud de la page, et la chaîne doit vivre dans SON plan — pas
+    // dans Support.js ni dans le corps de sa coquille, où les lignes de contact
+    // portaient autrefois la même teinte sous un autre nom.
     classes: ['text-stone-600'],
   },
 ];

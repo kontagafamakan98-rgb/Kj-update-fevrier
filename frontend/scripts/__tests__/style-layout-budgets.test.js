@@ -53,8 +53,13 @@ const {
 const ROUTES = Object.keys(PAGE_META).sort();
 const CONDITIONS_NOMS = CONDITIONS.map((c) => c.nom);
 
-/** Le plancher sous lequel un relevé de temps n'est plus une mesure (ms). */
-const PLANCHER_MESURE = 20;
+/** Le plancher sous lequel un relevé de temps n'est plus une mesure (ms).
+ *  Il ne BORNE pas le coût de l'artefact : il refuse un zéro de repli, et il est
+ *  calibré pour ça — pas pour le document le plus léger. /terms en desktop
+ *  (cpu×1) descend légitimement sous les 20 ms : la refonte éditoriale du
+ *  28/09/2026 l'a mesuré à 19,9 ms (minimum de 3 runs), et un plancher qui
+ *  refuserait une mesure vraie serait un plancher faux. */
+const PLANCHER_MESURE = 10;
 /** Le plus petit document de la table (ne doit pas devenir un cas dégénéré). */
 const PLANCHER_NOEUDS = 20;
 const PLANCHER_HAUTEUR = 200;
@@ -174,6 +179,11 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
     // /contact, /how-it-works et /support (26/09/2026), puis les quatre écrans de
     // compte /login, /register, /forgot-password et /payment (dernière vague,
     // même jour) : leur relevé CI porte sur l'artefact d'AVANT.
+    // 28/09/2026 : /privacy et /terms rejoignent l'ensemble — la refonte
+    // éditoriale des pages de confiance a changé LEUR document (sections à filet,
+    // titres serif), donc leur rapport poste/CI comparerait deux artefacts
+    // différents. Leurs nouveaux relevés sont dans la table : /privacy
+    // 169 → 105,7 ms en mobile, /terms 142,4 → 136,7.
     const ARTEFACT_CHANGE = new Set([
       '/',
       '/about',
@@ -184,6 +194,8 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
       '/register',
       '/forgot-password',
       '/payment',
+      '/privacy',
+      '/terms',
     ]);
     const routesComparables = ROUTES.filter((route) => !ARTEFACT_CHANGE.has(route));
     const ecarts = [];
@@ -198,14 +210,16 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
       }
     }
     // Le fait mesuré, nommé une fois : sur ces routes à artefact inchangé, le
-    // runner de la CI est TOUJOURS moins cher, de 3,4 × (/jobs mobile : 155 →
-    // 45,9 ms) à 4,1 × (/privacy mobile : 169 → 41,2 ms). Le rapport le plus
-    // spectaculaire des premiers relevés venait de /register (452 → 74,6 ms,
-    // 6,1 ×), dont le document a changé depuis — il est donc exclu comme les
-    // autres routes re-mesurées, et l'ancrage haut de la non-portabilité suit les
-    // routes restantes.
+    // runner de la CI est TOUJOURS moins cher — il ne reste que /jobs mobile
+    // (155 → 45,9 ms, 3,4 ×) depuis que les onze autres routes ont changé de
+    // document, une par une. L'ancrage suit donc ce qui reste comparable au lieu
+    // de citer une route re-mesurée : c'est la même leçon, elle repose sur une
+    // paire au lieu de quatre, et TOUT l'historique des autres paires (de 1,85 ×
+    // à 8,2 ×, deux hôtes, un seul artefact) est publié en tête de
+    // scripts/style-layout-budgets.cjs — le fait n'a pas besoin d'être rejoué
+    // pour être vrai, mais il ne doit pas être recopié d'une route à l'autre.
     expect(Math.min(...ecarts)).toBeGreaterThan(1.8);
-    expect(Math.max(...ecarts)).toBeGreaterThan(4);
+    expect(Math.max(...ecarts)).toBeGreaterThan(3);
     // Et l'ancrage du verdict — la structure — n'a, lui, rien de commun avec la
     // machine : les nœuds sont identiques sur les deux hôtes, mesuré sur les 11
     // routes, et c'est ce que la sonde compare.
