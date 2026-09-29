@@ -280,7 +280,13 @@ const NOEUDS = {
   // DESSIN change (titre serif, filet qui ouvre l'entrée) — et un filet ne se
   // compte pas en nœuds.
   '/privacy': 109,
-  '/register': 236,
+  // 236 → 249 (28/09/2026) : la JAUGE du formulaire (la piste et son jaugeant)
+  // s'ajoute sous les trois pastilles de parcours, qui restaient statiques —
+  // +2 nœuds — et la marque de la page est désormais un DESSIN partagé
+  // (src/config/marque-kojo.js) au lieu d'un `<div>` et de son `<span>`, ce que
+  // la page gagne en nœuds (la marque porte un `<svg>` et ses tracés). Compte
+  // MESURÉ sur l'artefact livré par la sonde, jamais déduit.
+  '/register': 249,
   // 157 → 166 (28/09/2026) : les quatre lignes de contact prennent la ligne à
   // filet. Les trois lignes qui mènent quelque part gagnent la flèche (un
   // `<svg>` + ses deux tracés = 3 nœuds chacune) ; la quatrième — l'adresse
@@ -409,7 +415,12 @@ const HAUTEUR = {
   // s'additionnent, mesurées, pas déduites.
   '/privacy': { mobile: 1720, desktop: 1212 },
   // 2 947 → 2 997 px en mobile, 2 517 → 2 534 en desktop.
-  '/register': { mobile: 2997, desktop: 2534 },
+  // 2 997 → 2 964 et 2 534 → 2 513 (28/09/2026) : re-mesure de la case après la
+  // jauge du formulaire et la marque DESSINÉE (le « K » typographique de
+  // l'en-tête laisse la place au tracé partagé, dont la boîte de 64 px n'a pas
+  // la même hauteur de ligne que l'ancien `<div>`). La jauge, elle, ajoute une
+  // hauteur de rail et son écart — le solde est mesuré, pas déduit.
+  '/register': { mobile: 2964, desktop: 2513 },
   // 1 652 px en mobile (inchangé) et 990 → 1 014 px en desktop.
   // 1 652 → 1 649 px en mobile et 1 014 → 1 023 px en desktop (28/09/2026) : le
   // titre de page passe au dessin serif du site. Ici les DEUX tailles suivent le

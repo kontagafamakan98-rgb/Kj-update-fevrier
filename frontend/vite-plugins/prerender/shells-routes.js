@@ -5,7 +5,7 @@ import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../../src/config/phon
 import { COUNTRY_PLACEHOLDER } from '../../src/config/country-placeholder.js'
 import { photoFormatsLine } from '../../src/config/photo-formats.js'
 import { CLASSES_ICONE } from '../../src/config/page-icons.js'
-import { svgDeLIcone } from './icons-serveur.js'
+import { svgDeLIcone, svgDeLaMarque } from './icons-serveur.js'
 
 // Le TEXTE vient du dictionnaire global (T), des dictionnaires de page
 // (registerT/jobsT) et des configs partagées avec les pages (préfixe et
@@ -160,12 +160,28 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     login: `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
       + `<div class="max-w-md w-full space-y-8">`
       + `<div>`
-      + `<div class="mx-auto h-12 w-12 flex items-center justify-center rounded-lg bg-orange-600">`
-      + `<span class="text-white text-xl font-bold">${esc(T('brandMark'))}</span>`
-      + `</div>`
+      // La marque : le tracé partagé, pas la lettre `brandMark` du dictionnaire
+      // — `svgDeLaMarque` lit la MÊME déclaration que le composant React
+      // (src/config/marque-kojo.js), donc la coquille et la page peignent la
+      // même pastille et le même dessin.
+      + svgDeLaMarque('entete')
       + `<h1 class="mt-6 text-center titre-page">${esc(T(loginPlan.titleKey))}</h1>`
       + `</div>`
       + `<form class="mt-8 space-y-6">`
+      // ── LES RÉSEAUX D'ABORD (28/09/2026) : le même ORDRE que /login
+      // (src/pages/Login.js) — le bouton avant les champs, puis le séparateur.
+      // Le séparateur coupe la ligne avec la couleur de la SURFACE (`fond-sable`),
+      // /login étant la seule page de compte sans carte blanche.
+      // Le séparateur est SOUS la même condition que le bouton : sans client_id
+      // Google, il ne reste pas une ligne barrée d'un « ou » suspendu (la page
+      // le conditionne par le même `VITE_GOOGLE_CLIENT_ID`).
+      + (googleAuth ? boutonGoogle({ esc, label: registerT(loginPlan.googleLoginKey) }) : '')
+      + (googleAuth
+        ? `<div class="relative">`
+          + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
+          + `<div class="relative flex justify-center text-sm"><span class="fond-sable px-3 text-gray-400">${esc(T('orSeparator'))}</span></div>`
+          + `</div>`
+        : '')
       + `<div class="space-y-4">`
       + `<div>`
       + `<label for="email" class="block text-sm font-medium text-gray-700">${esc(T(loginPlan.emailLabelKey))}</label>`
@@ -191,7 +207,6 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       // intermédiaire peindrait 4 px de moins que la page.
       + `<button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600">${esc(T(loginPlan.titleKey))}</button>`
       + `</div>`
-      + (googleAuth ? boutonGoogle({ esc, label: registerT(loginPlan.googleLoginKey) }) : '')
       + `<div class="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">`
       + `<p class="text-sm font-semibold text-orange-900">${svgDeLIcone(loginPlan.legalNoticeIcon, CLASSES_ICONE.notice)} ${esc(registerT('legalNoticeTitle'))}</p>`
       + `<span class="inline-flex items-center text-sm font-medium text-orange-700 underline">${esc(registerT('legalConsentLink'))}</span>`
@@ -215,9 +230,8 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
     register: `<div class="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">`
       + `<div class="max-w-md w-full space-y-8">`
       + `<div class="text-center mb-8">`
-      + `<div class="mx-auto h-16 w-16 bg-orange-600 rounded-lg flex items-center justify-center">`
-      + `<span class="text-white text-2xl font-bold">${esc(T('brandMark'))}</span>`
-      + `</div>`
+      // La marque de /register : 64 px, même déclaration que React.
+      + svgDeLaMarque('enregistrement')
       + `<h1 class="mt-6 text-center text-3xl font-bold text-stone-900">${esc(registerT('title'))}</h1>`
       + `<p class="mt-2 text-sm text-gray-600">${esc(registerT('subtitle'))}</p>`
       + `<div class="mt-6 bg-orange-50 border border-orange-200 rounded-lg p-4">`
@@ -241,15 +255,24 @@ export function buildRouteShells({ esc, T, registerT, jobsT, contact, frDate, pa
       + `<span class="ml-2 text-gray-500 font-medium whitespace-nowrap">${esc(registerT('stepPayments'))}</span>`
       + `</div>`
       + `</div>`
-      + `<p class="${registerPlan.stepNoticeClass}">${svgDeLIcone(registerPlan.stepNoticeIcon, CLASSES_ICONE.noticePetite)} ${esc(registerT('clientStepNotice'))}</p>`
+      // La jauge du formulaire, peinte VIDE : c'est l'état du document
+      // pré-rendu (aucun champ n'est rempli), et c'est aussi la boîte que
+      // React reconstruit au premier rendu — la largeur ne bouge rien d'autre
+      // qu'elle-même, la géométrie des deux canaux reste donc identique.
+      + `<div class="${registerPlan.progressTrackClass}" role="progressbar" aria-labelledby="inscription-notice" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">`
+      + `<span class="${registerPlan.progressFillClass}" data-etat="vide" style="width:0%"></span>`
+      + `</div>`
+      + `<p id="inscription-notice" class="${registerPlan.stepNoticeClass}">${svgDeLIcone(registerPlan.stepNoticeIcon, CLASSES_ICONE.noticePetite)} ${esc(registerT('clientStepNotice'))}</p>`
       + `</div>`
       + `</div>`
       + `<form class="mt-8 space-y-6 bg-white p-4 sm:p-8 rounded-xl shadow-md">`
       + (googleAuth ? boutonGoogle({ esc, label: registerT('googleSignup') }) : '')
-      + `<div class="relative">`
-      + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
-      + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-gray-400">${esc(registerT('orSeparator'))}</span></div>`
-      + `</div>`
+      + (googleAuth
+        ? `<div class="relative">`
+          + `<div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>`
+          + `<div class="relative flex justify-center text-sm"><span class="bg-white px-3 text-gray-400">${esc(registerT('orSeparator'))}</span></div>`
+          + `</div>`
+        : '')
       + `<fieldset>`
       + `<legend class="block text-sm font-medium text-gray-700 mb-3">${esc(registerT('userType'))}</legend>`
       + `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">`

@@ -226,10 +226,14 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         )
       }
       return (
-        `<span class="${rubanJetonClass}">` +
+        // LE JETON EST UN LIEN (même adresse que la page : `/jobs` filtré sur
+        // le pays, `country` étant un paramètre que `GET /api/jobs` accepte
+        // depuis toujours). Un crawler qui ne lit pas le JavaScript atteint
+        // donc les offres de chaque pays sans passer par l'accueil React.
+        `<a href="/jobs?country=${esc(country.code)}" class="${rubanJetonClass}">` +
         svgDuDrapeau(drapeau, 'h-4 w-6 rounded-sm') +
         `${esc(country.name)}` +
-        `</span>`
+        `</a>`
       )
     }),
     `</div>`,
@@ -309,15 +313,19 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="${listeClass}">`,
     ...homePlan.steps.map(
       ({ icone, numberKey, titleKey, descriptionKey: textKey }) =>
-        `<div class="${ligneEtapeClass}">` +
+        // La ligne d'étape est un LIEN vers la page du parcours, comme chez
+        // React : elle porte la classe des lignes cliquables (état de survol
+        // compris), donc un `<div>` y peignait une affordance qui n'existait
+        // pas. La flèche suit : à DROITE, puisqu'elle mène quelque part.
+        `<a href="/how-it-works" class="${ligneEtapeClass}">` +
         `<span class="${pastilleCreuseClass}"><span class="text-lg font-bold">${esc(T(numberKey))}</span></span>` +
         `<span class="${pastilleClass}">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
         `<div>` +
         `<h3 class="${nomLigneClass}">${esc(T(titleKey))}</h3>` +
         `<p class="${noteLigneClass}">${esc(T(textKey))}</p>` +
         `</div>` +
-        svgDeLIcone('flecheBas', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
-        `</div>`
+        svgDeLIcone('flecheDroite', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
+        `</a>`
     ),
     `</div>`,
     `</div>`,

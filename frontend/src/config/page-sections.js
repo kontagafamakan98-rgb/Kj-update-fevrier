@@ -664,6 +664,18 @@ export const PAGE_SECTIONS = {
     step1NumberKey: 'stepNumber1',
     step2NumberKey: 'stepNumber2',
     step3NumberKey: 'stepNumber3',
+    // ── LA JAUGE DU FORMULAIRE (28/09/2026) ───────────────────────────────
+    // Les trois pastilles ci-dessus montrent le PARCOURS (trois pages) et ne
+    // bougeaient jamais : quelqu'un qui avait rempli sept champs sur neuf n'y
+    // voyait aucun avancement. Sous elles, une jauge dit ce qui reste à remplir
+    // ICI — sa largeur est une donnée de l'écran (le pré-rendu la peint vide,
+    // et les deux canaux lui donnent donc la même boîte) et sa couleur un
+    // verdict : gris, orange pendant la saisie, vert quand les champs exigés
+    // sont tous remplis. Ces deux classes sont DÉCLARÉES ici parce que la
+    // coquille les publie aussi : sans porteur des deux côtés, la bascule
+    // coquille → React ferait sauter la jauge et remonterait toute la notice.
+    progressTrackClass: 'jauge-inscription',
+    progressFillClass: 'jauge-inscription-remplie',
     stepNoticeKey: 'clientStepNotice',
     // La chaîne de la notice d'étape EST l'élément LCP de la page (mesuré :
     // 10 048 px² mobile / 12 544 desktop après le passage de son ⚠️ de l'emoji

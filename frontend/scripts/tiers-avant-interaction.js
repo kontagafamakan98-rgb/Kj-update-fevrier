@@ -107,18 +107,40 @@ export function estTiers(url, { origineDeLaPage = null, origines = ORIGINES_AUTO
 }
 
 /**
- * Le nom LISIBLE de l'initiateur d'une requête Playwright
- * (`request.initiator()` → `{ type, url, lineNumber }`).
+ * Le nom LISIBLE de l'initiateur d'une requête, tel que le protocole le donne
+ * (`Network.requestWillBeSent` → `{ type, url, lineNumber, stack }`).
  *
  * C'est la moitié utile du refus : un rouge qui dit « une requête tierce » sans
  * dire QUI l'a lancée oblige à instrumenter à la main. On nomme donc la sorte,
  * puis l'URL et la ligne quand elles existent.
  *
- * @param {{ type?: string, url?: string, lineNumber?: number }|undefined} initiateur
+ * ── Pourquoi `cadre` existe, et ce qu'il répare (28/09/2026) ────────────────
+ * Pour une iframe ou une image créée PAR UN SCRIPT, Chromium ne remplit RIEN :
+ * mesuré sur la façade de carte, `initiator` vaut exactement `{"type":"other"}`
+ * — ni URL, ni pile. Le verdict disait donc « une source non nommée » sur la
+ * requête la plus intéressante du site, celle que la sonde existe pour nommer.
+ * Ce que le protocole sait, en revanche, c'est QUELLE PAGE a demandé : on lui
+ * passe donc le document demandeur (`cadre`), relevé par l'écoute
+ * (`e2e/helpers/requetes.js`, arbre des cadres du CDP). Le nom devient « le
+ * document http://…/contact », qui est vrai et vérifiable — plutôt qu'un
+ * « inconnu » qui n'apprend rien. Ce n'est PAS une devinette sur l'auteur du
+ * geste : c'est le document qui a émis la requête, et rien de plus.
+ *
+ * Le document ne REMPLACE jamais une sorte informative : « l’analyseur HTML » et
+ * « le préchargeur » disent mieux que le document d'où part la requête, et les
+ * écraser ferait reculer les verdicts déjà écrits (le parcours d'avant exige que
+ * le tiers DÉCLARÉ dans une coquille soit nommé par l'analyseur).
+ *
+ * @param {{ type?: string, url?: string, lineNumber?: number, stack?: Object }|undefined} initiateur
+ * @param {{ cadre?: string }} [options] URL du document qui a émis la requête.
  * @returns {string} Une phrase courte, jamais vide.
  */
-export function nommerInitiateur(initiateur) {
-  if (!initiateur || typeof initiateur !== 'object') return 'initiateur inconnu';
+export function nommerInitiateur(initiateur, { cadre = '' } = {}) {
+  const documentDemandeur = String(cadre || '').trim();
+  const parLeDocument = documentDemandeur ? `le document ${documentDemandeur}` : null;
+  if (!initiateur || typeof initiateur !== 'object') {
+    return parLeDocument || 'initiateur inconnu';
+  }
   const sorte = {
     parser: 'l’analyseur HTML',
     script: 'un script',
@@ -129,6 +151,20 @@ export function nommerInitiateur(initiateur) {
     const ligne = Number.isFinite(initiateur.lineNumber) ? `:${initiateur.lineNumber}` : '';
     return `${sorte} ${initiateur.url}${ligne}`;
   }
+  // La PILE quand le protocole la donne : le premier cadre d'appel nomme le
+  // fichier et la ligne, ce que `url` ne fait pas toujours.
+  const premierAppel = initiateur.stack?.callFrames?.[0];
+  if (premierAppel?.url) {
+    const ligne = Number.isFinite(premierAppel.lineNumber) ? `:${premierAppel.lineNumber}` : '';
+    return `${sorte} ${premierAppel.url}${ligne}`;
+  }
+  // Sinon, et SEULEMENT quand le protocole ne dit rien d'autre que « autre »
+  // (c'est le cas d'une iframe ou d'une image montée par un script), le document
+  // demandeur — un fait, pas une supposition. Une sorte INFORMATIVE (« l'analyseur
+  // HTML », « le préchargeur ») n'est jamais remplacée : elle est plus précise
+  // que le document, et l'écraser ferait reculer le verdict.
+  const sorteSansDetails = !initiateur.type || initiateur.type === 'other';
+  if (parLeDocument && sorteSansDetails) return parLeDocument;
   return sorte;
 }
 
@@ -146,7 +182,9 @@ export function divergencesDeTiers(requetes, options = {}) {
     if (!estTiers(requete?.url, options)) continue;
     divergences.push({
       url: String(requete.url || ''),
-      initiateur: nommerInitiateur(requete.initiateur),
+      initiateur: nommerInitiateur(requete.initiateur, {
+        cadre: requete.cadre || options.origineDeLaPage || '',
+      }),
       sorte: String(requete.sorte || 'requête'),
     });
   }

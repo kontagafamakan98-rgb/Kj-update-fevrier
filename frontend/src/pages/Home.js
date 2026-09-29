@@ -1,4 +1,11 @@
-import { Link } from 'react-router-dom';
+// Le lien interne du site, PAS le `Link` de React Router : c'est lui qui ouvre
+// la transition de vue native (`components/LienVue.js`). L'accueil portait
+// jusque-là le `Link` brut, donc TOUS ses liens de contenu — les dix métiers,
+// les trois photos, les deux appels du héros — changeaient de page d'un coup,
+// sans le raccord que le chrome avait déjà. Le composant se comporte comme le
+// `Link` d'origine (mêmes propriétés, même `<a href>` réel pour un crawler et
+// pour « ouvrir dans un nouvel onglet »).
+import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
@@ -269,13 +276,23 @@ export default function Home() {
             {t('availableIn4Countries')}
           </span>
           <div className={rubanJetonsClass}>
-            {countries.map((country, index) => (
-              /* Jeton informatif : ni curseur main ni effet de survol — il ne
-                 mène nulle part. */
-              <span key={index} className={rubanJetonClass}>
+            {countries.map((country) => (
+              /* CES QUATRE JETONS SONT DES LIENS, et ils ne l'étaient pas : le
+                 backend accepte `GET /jobs?country=mali` depuis toujours, mais
+                 l'interface n'offrait aucun moyen de le poser — un visiteur qui
+                 voulait les offres d'un autre pays que le sien n'avait aucun
+                 chemin, et quatre pastilles colorées restaient inertes au
+                 survol comme au doigt. Le lien porte la MÊME classe que le
+                 jeton : la forme ne change pas, c'est l'affordance qui
+                 apparaît (état de survol et de focus dans src/index.css). */
+              <Link
+                key={country.code}
+                to={`/jobs?country=${country.code}`}
+                className={rubanJetonClass}
+              >
                 <FlagIcon country={country.code} className="h-4 w-6 rounded-sm" />
                 {country.name}
-              </span>
+              </Link>
             ))}
           </div>
         </div>
@@ -382,7 +399,15 @@ export default function Home() {
 
             <div className={listeClass}>
               {steps.map(({ icone, numberKey, titleKey, descriptionKey }) => (
-                <div key={titleKey} className={ligneEtapeClass}>
+                /* CHAQUE MARCHE EST UN LIEN. Ces lignes portent la classe des
+                   lignes CLIQUABLES (`.ligne-editoriale` : c'est elle qui donne
+                   le fond au survol, le décalage du rembourrage et la flèche
+                   qui s'allume et se décale — voir src/index.css), mais
+                   c'étaient des `<div>` : la page réagissait au survol comme si
+                   l'on pouvait appuyer, et l'appui ne faisait rien. Elles
+                   mènent à la page qui détaille le parcours, comme les lignes
+                   de métier mènent à la liste filtrée. */
+                <Link key={titleKey} to="/how-it-works" className={ligneEtapeClass}>
                   <span className={pastilleCreuseClass}>
                     <span className="text-lg font-bold">{t(numberKey)}</span>
                   </span>
@@ -394,10 +419,10 @@ export default function Home() {
                     <p className={noteLigneClass}>{t(descriptionKey)}</p>
                   </div>
                   <IconePage
-                    nom="flecheBas"
+                    nom="flecheDroite"
                     classe={`${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`}
                   />
-                </div>
+                </Link>
               ))}
             </div>
           </div>
