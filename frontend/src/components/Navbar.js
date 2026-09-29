@@ -98,30 +98,32 @@ export default function Navbar() {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             {/* ── Le verrou de marque ────────────────────────────────────────────
-                Trois décisions, et aucune n'est cosmétique :
-                • la pastille fait 36 px (h-9) avec un rayon de 12 (rounded-xl) —
-                  à 32 px et 8 de rayon, elle se lisait comme un bouton parmi les
-                  autres de la barre, alors que c'est la SEULE surface de marque ;
-                • le mot est en GRAPHITE et non en orange : la couleur de marque vit
-                  dans le symbole, le nom gagne le contraste maximal. Peinte en
-                  orange sur un fond presque blanc, le mot rivalisait avec les
-                  boutons d'action juste à côté ;
-                • l'interlettrage se resserre (tracking-tight) et le mot est calé
-                  sur `leading-none`, sinon il flotte de 1 px sous l'axe optique
-                  de la marque à côté — le genre de détail qui fait « presque
-                  juste » sans qu'on sache pourquoi.
+                Il n'y a plus QU'UNE chose à gauche : la marque. Le mot « Kojo »
+                qui l'accompagnait depuis l'origine a été retiré le 28/09/2026 —
+                il redisait ce que le dessin disait, et il occupait 64 px de la
+                barre à côté d'une pastille de 36 px : le symbole avait l'air
+                d'une puce devant un titre, alors que c'est la marque du site.
 
-                Le symbole, lui, n'est plus dessiné ici : c'était un CARACTÈRE
+                Ce que la disparition du mot oblige à faire, et qui n'est pas
+                facultatif : le dessin est `aria-hidden` (un tracé n'a pas de
+                nom à annoncer), donc c'est LE LIEN qui porte le nom — sans cet
+                `aria-label`, le retour à l'accueil devenait le seul lien sans
+                nom du site. Il est écrit en clair et non par `t()` : « Kojo »
+                est un nom propre, il s'écrit « Kojo » dans les cinq dictionnaires
+                (voir `homeMetaTitle`, « Kojo · Services et travailleurs en
+                Afrique de l'Ouest ») et ne se traduit pas.
+
+                Le symbole, lui, n'est pas dessiné ici : c'était un CARACTÈRE
                 (`t('brandMark')`) dans un carré, recopié à six endroits du site.
                 Il vient de src/config/marque-kojo.js, avec les deux canaux — voir
                 l'en-tête de ce module. */}
-            <Link to="/" className="flex-shrink-0 flex items-center" onClick={closeMobileMenu}>
-              <div className="flex items-center gap-2.5">
-                <MarqueKojo emplacement="barre" />
-                <div className="text-[19px] font-extrabold leading-none tracking-tight text-gray-900">
-                  Kojo
-                </div>
-              </div>
+            <Link
+              to="/"
+              aria-label="Kojo"
+              className="flex-shrink-0 flex items-center"
+              onClick={closeMobileMenu}
+            >
+              <MarqueKojo emplacement="barre" />
             </Link>
           </div>
 

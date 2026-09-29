@@ -24,23 +24,53 @@
 // compose, il ne peut pas hériter de la couleur de son emplacement, et il ne
 // survit pas au changement de taille. Un tracé, lui, est le même partout.
 //
-// ── Ce que « redessiner » a changé (mesuré sur l'original, 512 px) ────────
-// Le disque occupe 481 px de diamètre, l'anneau blanc 27 px (11 % du rayon), le
-// « K » 102 px de hauteur (21,6 % du disque) pour un fût d'environ 27 px (26 % de
-// la hauteur du K — un gras géométrique, à bouts plats). Trois corrections, et
-// aucune n'est cosmétique :
+// ── LE DESSIN RETENU : « LE POINÇON » (28/09/2026) ────────────────────────
+// La première version de ce module reproduisait le profil envoyé : le disque
+// cerclé de blanc, la tache de lumière, le K. Soumise au propriétaire du site
+// avec trois autres pistes, elle a été jugée décevante — comme les trois autres.
+// Le dessin retenu est le quatrième, « le poinçon » : le disque PLAT, la lettre
+// GRASSE, et deux détails qui disent qu'un objet a été frappé.
 //
-//   • le K GRANDIT à 30 % du disque (14,2 unités sur 48). À 21,6 %, le K de la
-//     barre (36 px) ne mesurait que 7,8 px de haut : illisible, alors que c'est
-//     l'emplacement le plus petit du site. La proportion d'origine est tenue à
-//     48 et 64 px ; elle ne l'était pas à 36 ;
-//   • la tache de lumière devient un DÉGRADÉ RADIAL au lieu d'un aplat flou :
-//     un raster ne se met pas à l'échelle, un dégradé si ;
-//   • les deux ÉTINCELLES sont RETIRÉES. Elles valaient 1,3 unité sur 48 dans
-//     l'original (soit 1 px à 36 px) : reproduites, elles se lisaient comme deux
-//     poussières blanches posées sur le disque, et agrandies elles devenaient
-//     un ornement — un repère de vignette, pas de marque. Le halo porte seul la
-//     lumière, et la marque y gagne à toutes les tailles.
+//   • LE COLLET (r 21,0) ET LE PLATEAU (r 20,2) : un filet sombre et un filet
+//     clair, concentriques, à 2 unités du bord — la gorge d'une pièce frappée,
+//     et la face qui se relève à l'intérieur. C'est la seule raison pour
+//     laquelle la lettre a l'air POSÉE SUR la matière au lieu d'y être
+//     imprimée ;
+//   • LE CERCLAGE (r 22,2) ET LE GLACIS (r 22,85) : un arc de lumière large et
+//     un trait net, tous deux en haut à gauche, effilés aux DEUX bouts par un
+//     dégradé — la lumière vient d'une seule direction, comme sur un objet
+//     bombé. Rien n'est éclairé en bas : c'est l'arc d'ombre (18° → 162°) qui
+//     s'en charge.
+//
+// La LETTRE GRANDIT de 14,2 à 18,6 unités de capitale (30 % → 39 % de la
+// grille) et son trait passe de 3,8 à 4,9. À 21,6 % puis 30 %, le K de la barre
+// (36 px) mesurait 7,8 puis 10,7 px de haut ; à 39 % il en mesure 14. C'est
+// l'emplacement le plus PETIT du site qui commande la proportion, pas le plus
+// grand.
+//
+// La MATIÈRE DESCEND, et c'est une correction de lisibilité, pas de goût. Le
+// dégradé de la première version partait d'un orange très clair (#ff8a3d) posé
+// juste sous le coin haut-gauche de la lettre : mesuré le long du tracé de la
+// lettre (un « tube » de rayon trait/2 promené sur les trois segments,
+// échantillonné tous les quarts d'unité sur huit directions, contraste relatif
+// WCAG), le blanc du K n'y tenait plus que 2,67:1 — l'attribut le plus visible
+// de la marque était le moins lisible. Le dégradé part maintenant du BORD
+// (cœur #f97c22 dans le coin,
+// #ee6320 à 16 %, #dc4620 à 45 %, #bb231c à 75 %, #8a1418 au bord) : le point le
+// plus défavorable de la lettre passe à 3,29:1, et sa moyenne à 4,29:1. La
+// marque reste orange — le cœur chaud est simplement ramené DANS le coin, où il
+// se lit comme une lumière (et il tombe sur le cerclage, là où elle tombe), au
+// lieu de s'étaler sous la lettre.
+//
+// Le cœur n'est JAMAIS blanc (#f97c22, pas #ffd9b0) : une spéculaire blanche
+// fait lire une bille, pas une pièce frappée. C'est la § IV de la philosophie
+// d'atelier (HARMATTAN-LEDGER : « pas de dégradé radial qui simule un volume »)
+// tenue par la mesure — la matière descend d'un cran vers le bord, la lumière
+// est une LIGNE (le cerclage et le glacis), et rien ne brille.
+//
+// Les ÉTINCELLES du profil restent absentes : 1,3 unité sur 48 (1 px à 36 px),
+// elles se lisaient comme deux poussières blanches sur le disque, et agrandies
+// elles devenaient un ornement — un repère de vignette, pas de marque.
 //
 // ── Un propriétaire, deux canaux ─────────────────────────────────────────
 // La PAGE (React) passe par `MarqueKojo`, la COQUILLE (Node) par
@@ -61,44 +91,65 @@ export const GRILLE_MARQUE = '0 0 48 48';
 /** Le repère du build et des sondes : la marque est vérifiable, pas décorative. */
 export const MARQUEUR_DE_LA_MARQUE = 'data-marque="kojo"';
 
-/** Le disque : plein cadre (r = 23,6 sur 24) — la marque EST la pastille. */
-const DISQUE_R = 23.6;
-/** L'anneau blanc : la bande mesurée sur l'original (20,9 → 23,6 du rayon). */
-const ANNEAU_R = 22.25;
-const ANNEAU_LARGEUR = 2.7;
-
 /**
- * LE « K » : trois traits à bouts PLATS (le gras géométrique de l'original), la
- * hauteur de capitale à 14,2 unités, centrée sur (24, 24). Les deux bras
- * s'appuient sur le tronc au MÊME point (20, 24) — c'est ce point de rencontre
- * qui donne à la lettre son axe ; ils le dépassent vers l'intérieur du tronc
- * (20 < 21,15, le bord droit du fût) pour qu'aucune couture blanche n'apparaisse
- * au raccord.
+ * ── LA GÉOMÉTRIE DU POINÇON, en unités de la grille 48 ────────────────────
+ * Cinq rayons, tous mesurés du centre : le disque, la gorge sombre du collet,
+ * le filet clair du plateau, le cerclage de lumière et le trait de glacis.
+ * L'arc d'ombre se pose à 0,2 unité du cerclage, de l'autre côté du disque.
+ * À 36 px (la barre), 1 unité vaut 0,75 px : le disque en mesure 34,8,
+ * le collet 31,5 et le plateau 30,3 — les trois tiennent dans l'épaisseur d'un
+ * cheveu du bord, et c'est voulu : ces filets sont une MATIÈRE, pas un motif.
  */
-const K_TRONC = 'M19.2 16.6V31.4';
-const K_BRAS_HAUT = 'M20 24 30.6 17.2';
-const K_BRAS_BAS = 'M20 24 30.6 30.8';
-const K_LARGEUR = 3.8;
-
+const POINCON_R = 23.2;
+/** La gorge : le collet de la pièce frappée, à 2 unités du bord. */
+const COLLET_R = 21.0;
+/** Le filet clair : l'arête du plateau, à l'intérieur du collet. */
+const PLATEAU_R = 20.2;
+/** Le cerclage : l'arc de lumière, large et doux, en haut à gauche. */
+const CERCLAGE_R = 22.2;
+/** Le glacis : le trait net qui finit le bord, juste dedans le disque. */
+const GLACIS_R = 22.85;
 /**
- * L'arc de lumière du bord supérieur-gauche, en coordonnées de la grille.
- *
- * Il est DESSINÉ (deux points et un arc) plutôt que posé en anneau complet : un
- * anneau éclairerait aussi le bas, où la lumière ne vient pas — et c'est
- * exactement ce que l'original évitait.
+ * L'ombre : l'arc du bas, qui dit d'où vient la lumière. Son rayon PLUS son
+ * demi-trait tiennent dans le disque (22,0 + 1,15 = 23,15 ≤ 23,2) : un trait
+ * n'est pas rogné par le cercle qui le porte, donc un arc posé à 22,6 aurait
+ * peint 0,6 unité de rouge sombre DEHORS, sur le fond — un liseré que personne
+ * n'a demandé, et le seul défaut de ce dessin qui se voie à l'œil nu.
  */
-const arcDeLumiere = () => {
-  const rayon = 20.5;
-  const point = (degres) => {
-    const angle = (degres * Math.PI) / 180;
-    return `${(24 + rayon * Math.cos(angle)).toFixed(2)} ${(24 + rayon * Math.sin(angle)).toFixed(2)}`;
-  };
-  // De 186° à 316° : du bord gauche au haut-droite, en passant par le sommet.
-  return (
-    `<path d="M${point(186)}A${rayon} ${rayon} 0 0 1 ${point(316)}" fill="none" ` +
-    `stroke="#ffffff" stroke-opacity="0.22" stroke-width="2"></path>`
-  );
+const OMBRE_R = 22.0;
+
+/** Un point de la grille, sur un cercle de rayon donné, à l'angle donné (SVG :
+ * l'axe des ordonnées descend, donc 0° est à droite et 90° en BAS). */
+const surLeCercle = (degres, rayon) => {
+  const angle = (degres * Math.PI) / 180;
+  return `${(24 + rayon * Math.cos(angle)).toFixed(2)} ${(24 + rayon * Math.sin(angle)).toFixed(2)}`;
 };
+
+/**
+ * UN ARC DE LA MARQUE, dessiné par deux points et un balayage (`sweep` 1 : les
+ * angles CROISSENT, donc l'arc va de la gauche vers la droite en passant par son
+ * sommet). Les deux arcs de lumière et d'ombre se lisent ainsi comme deux
+ * morceaux d'un même cercle, et non comme des anneaux complets qu'on aurait
+ * recouverts : rien à masquer, rien à décaler.
+ */
+const arc = (debut, fin, rayon) =>
+  `M${surLeCercle(debut, rayon)}A${rayon} ${rayon} 0 0 1 ${surLeCercle(fin, rayon)}`;
+
+/**
+ * LE « K » : trois traits à bouts PLATS (le gras géométrique), la hauteur de
+ * capitale à 18,6 unités, centrée sur (24, 24). Les deux bras s'appuient sur le
+ * tronc au MÊME point (18,8, 24) — c'est ce point de rencontre qui donne à la
+ * lettre son axe ; il est À L'INTÉRIEUR du tronc (17,3 ± 2,45, soit 14,85 →
+ * 19,75) pour qu'aucune couture ne sépare un bras du fût au raccord.
+ *
+ * L'encre de la lettre va de x 14,85 à 33,25 et de y 14,7 à 33,3 : son coin le
+ * plus éloigné du centre est à 13,05 unités, donc à 7 unités du plateau (r 20,2)
+ * au plus court. Le dessin a de la réserve — c'est la § VII de la philosophie.
+ */
+const K_TRONC = 'M17.3 14.7V33.3';
+const K_BRAS_HAUT = 'M18.8 24 30.8 15.7';
+const K_BRAS_BAS = 'M18.8 24 30.8 32.3';
+const K_LARGEUR = 4.9;
 
 const leK = (couleur) =>
   `<g fill="none" stroke="${couleur}" stroke-width="${K_LARGEUR}">` +
@@ -108,55 +159,109 @@ const leK = (couleur) =>
   `</g>`;
 
 /**
+ * LA MATIÈRE : un dégradé RADIAL (un raster ne se met pas à l'échelle, un
+ * dégradé si), dont le centre n'est PAS au milieu du disque — la lumière vient
+ * du haut-gauche, et son point le plus clair tombe SUR LE CERCLAGE (cx 0,17 →
+ * 8,7 unités, le cerclage passe à 8,3 dans cette direction) : sur un objet
+ * verni, le reflet ne flotte pas au milieu, il touche le bord. La progression
+ * des cinq arrêts est celle qui a été MESURÉE pour la lettre (voir l'en-tête et
+ * même protocole que l'en-tête) : le cœur chaud tient dans le coin (16 %), puis la
+ * matière descend en plateau jusqu'au bord, où elle devient un rouge laqué.
+ * C'est ce bord sombre qui fait tenir la silhouette sur un fond crème à 16 px,
+ * sans anneau de séparation.
+ *
+ * `r` à 1,02 plutôt que 1,00 : la portée du dégradé est de 47,3 unités, donc le
+ * point du disque le plus éloigné du reflet est à 0,95 — il atteint le dernier
+ * arrêt sans le dépasser. À 1,00 il tombait juste dessus (bord mou), à 1,12 il
+ * s'arrêtait à 0,89 et le bord gardait un rouge plus clair que voulu.
+ */
+const MATIERE = (id) =>
+  `<radialGradient id="${id}" cx="0.17" cy="0.17" r="1.02">` +
+  `<stop offset="0" stop-color="#f97c22"></stop>` +
+  `<stop offset="0.16" stop-color="#ee6320"></stop>` +
+  `<stop offset="0.45" stop-color="#dc4620"></stop>` +
+  `<stop offset="0.75" stop-color="#bb231c"></stop>` +
+  `<stop offset="1" stop-color="#8a1418"></stop>` +
+  `</radialGradient>`;
+
+/**
+ * LA LUMIÈRE : un dégradé LINÉAIRE en coordonnées de la grille, posé sur le
+ * TRAIT des deux arcs du haut (le cerclage et le glacis). Il s'éteint aux deux
+ * bouts, donc l'arc n'a pas d'extrémité — le défaut le plus visible d'un arc au
+ * trait blanc : un bout net, au milieu du disque, qui ne ressemble à rien.
+ * L'axe va du bord gauche-bas vers le haut-droite, c'est-à-dire qu'il suit le
+ * sens de la lumière.
+ *
+ * Son maximum est 0,72 et non 1 : à pleine opacité, l'arc du cerclage ne se lit
+ * plus comme une arête mais comme un reflet de plastique. C'est le glacis —
+ * 0,55 unité, le trait le plus fin du dessin — qui porte l'éclat, et il suffit.
+ */
+const LUMIERE = (id) =>
+  `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="6" y1="30" x2="42" y2="2">` +
+  `<stop offset="0" stop-color="#ffffff" stop-opacity="0"></stop>` +
+  `<stop offset="0.22" stop-color="#ffffff" stop-opacity="0.58"></stop>` +
+  `<stop offset="0.5" stop-color="#ffffff" stop-opacity="0.72"></stop>` +
+  `<stop offset="0.74" stop-color="#ffffff" stop-opacity="0.32"></stop>` +
+  `<stop offset="1" stop-color="#ffffff" stop-opacity="0"></stop>` +
+  `</linearGradient>`;
+
+/**
+ * L'OMBRE : le même dispositif en bas, dans l'autre sens et plus sourd. Elle
+ * tient le disque au sol — sans elle, la marque a l'air découpée et posée sur
+ * la page plutôt qu'appuyée sur elle (c'est la § I de la philosophie).
+ */
+const OMBRE = (id) =>
+  `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="2" y1="0" x2="46" y2="0">` +
+  `<stop offset="0" stop-color="#6d1013" stop-opacity="0"></stop>` +
+  `<stop offset="0.5" stop-color="#6d1013" stop-opacity="0.42"></stop>` +
+  `<stop offset="1" stop-color="#6d1013" stop-opacity="0"></stop>` +
+  `</linearGradient>`;
+
+/**
  * LES PEINTURES : deux façons de peindre la MÊME géométrie. Elles sont
  * déclarées, et non recopiées par emplacement — c'est là que les six recopies
  * divergeaient.
  *
- *   * `marque` — la marque telle qu'elle a été envoyée : disque en dégradé,
- *     halo, anneau et K blancs. C'est la peinture de tous les emplacements sur
- *     fond clair.
- *   * `inverse` — le disque BLANC et le K dans la couleur de l'emplacement
- *     (`currentColor`). Elle sert sur fond coloré (l'écran de chargement, qui
- *     est un dégradé orange) : un disque rouge sur orange n'y aurait ni
- *     contraste ni lecture. Sans anneau ni halo, qui n'ont plus d'objet quand
- *     le disque est déjà la couleur la plus claire de la composition.
+ *   * `marque` — le poinçon tel qu'il a été retenu : la matière du disque, les
+ *     deux arcs (ombre en bas, lumière en haut), le collet et le plateau, la
+ *     lettre blanche. C'est la peinture de tous les emplacements sur fond clair.
+ *   * `inverse` — le MÊME dessin retourné : disque blanc, lettre et collet dans
+ *     la couleur de l'emplacement (`currentColor`). Elle sert sur fond coloré
+ *     (l'écran de chargement, qui est un dégradé orange) : un disque rouge sur
+ *     orange n'y aurait ni contraste ni lecture. Les deux arcs n'y ont plus
+ *     d'objet — il n'y a rien à modeler sur un aplat blanc — mais le COLLET y
+ *     reste : c'est lui qui dit que la lettre est frappée, et c'est le seul
+ *     détail du dessin qui survive à l'inversion.
  */
 export const PEINTURES = {
   marque: {
-    defs: (id) =>
-      // Le dégradé : quatre arrêts, et le PREMIER n'est pas au centre — la
-      // lumière vient de la haut-gauche, comme la tache de l'original. L'arrêt
-      // de fin est plus SOMBRE que le rouge du bord (#b81c20 contre #d21f27) :
-      // c'est ce qui donne l'épaisseur du disque, et ce qui fait tenir le
-      // liseré blanc à toutes les tailles (un rouge qui s'éclaircit vers le bord
-      // mange le liseré à 16 px).
-      `<radialGradient id="${id}" cx="0.28" cy="0.22" r="1.05">` +
-      `<stop offset="0" stop-color="#ff8a3d"></stop>` +
-      `<stop offset="0.34" stop-color="#ef5f28"></stop>` +
-      `<stop offset="0.72" stop-color="#dc2f22"></stop>` +
-      `<stop offset="1" stop-color="#b81c20"></stop>` +
-      `</radialGradient>` +
-      `<radialGradient id="${id}-halo">` +
-      `<stop offset="0" stop-color="#ffffff" stop-opacity="0.32"></stop>` +
-      `<stop offset="0.5" stop-color="#ffffff" stop-opacity="0.14"></stop>` +
-      `<stop offset="1" stop-color="#ffffff" stop-opacity="0"></stop>` +
-      `</radialGradient>`,
+    defs: (id) => MATIERE(id) + LUMIERE(`${id}-lumiere`) + OMBRE(`${id}-ombre`),
     corps: (id) =>
-      `<circle cx="24" cy="24" r="${DISQUE_R}" fill="url(#${id})"></circle>` +
-      `<ellipse cx="20.2" cy="17.3" rx="10.6" ry="10.6" fill="url(#${id}-halo)"></ellipse>` +
-      // L'ARÊTE DE LUMIÈRE : un arc blanc au bord supérieur-gauche, à l'intérieur
-      // du liseré. Sans lui le disque est un aplat, et le passage du dégradé au
-      // liseré se fait en marche d'escalier ; avec lui, le bord reçoit la lumière
-      // comme un objet bombé — c'est la seule addition de cette passe, et elle ne
-      // coûte rien (un chemin, pas un filtre).
-      arcDeLumiere() +
-      `<circle cx="24" cy="24" r="${ANNEAU_R}" fill="none" stroke="#ffffff" stroke-width="${ANNEAU_LARGEUR}"></circle>` +
+      `<circle cx="24" cy="24" r="${POINCON_R}" fill="url(#${id})"></circle>` +
+      // L'ombre du bas PUIS la lumière du haut : les deux arcs se partagent le
+      // cercle (18° → 162° et 172° → 350°) et ne se touchent jamais — c'est
+      // l'ordre, et non un masque, qui garantit qu'aucun des deux ne mord sur
+      // l'autre au raccord.
+      `<path d="${arc(18, 162, OMBRE_R)}" fill="none" stroke="url(#${id}-ombre)" stroke-width="2.3"></path>` +
+      `<path d="${arc(172, 350, CERCLAGE_R)}" fill="none" stroke="url(#${id}-lumiere)" stroke-width="1.4"></path>` +
+      // Le GLACIS : le trait net qui finit le bord, à 0,35 unité du disque. Il
+      // ne scintille pas (aucun filtre, aucune animation) : il donne au bord
+      // l'épaisseur d'un émail. À 36 px il fait 0,4 px — il ne se voit donc pas
+      // comme un trait, il se voit comme une arête.
+      `<path d="${arc(205, 335, GLACIS_R)}" fill="none" stroke="url(#${id}-lumiere)" stroke-width="0.55" stroke-opacity="0.9"></path>` +
+      // Le COLLET (sombre) et le PLATEAU (clair), dans cet ordre : la lumière
+      // tombe sur l'arête intérieure de la gorge, donc le filet clair est
+      // DEDANS. Inversés, la marque se lit comme une pastille cerclée — le
+      // dessin dont elle vient justement d'être séparée.
+      `<circle cx="24" cy="24" r="${COLLET_R}" fill="none" stroke="#7a1a12" stroke-opacity="0.34" stroke-width="1.2"></circle>` +
+      `<circle cx="24" cy="24" r="${PLATEAU_R}" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1"></circle>` +
       leK('#ffffff'),
   },
   inverse: {
     defs: () => '',
     corps: () =>
-      `<circle cx="24" cy="24" r="${DISQUE_R}" fill="#ffffff"></circle>` +
+      `<circle cx="24" cy="24" r="${POINCON_R}" fill="#ffffff"></circle>` +
+      `<circle cx="24" cy="24" r="${COLLET_R}" fill="none" stroke="currentColor" stroke-opacity="0.2" stroke-width="1.2"></circle>` +
       leK('currentColor'),
   },
 };
@@ -219,9 +324,13 @@ export function corpsDeLaMarque(nom) {
 
 /**
  * Le composant de la PAGE. Le `<svg>` porte `data-marque` (le repère que les
- * sondes et les gardes vérifient) et `aria-hidden` : la marque est décorative
- * partout où elle paraît — le nom du site est publié en texte à côté d'elle
- * (le mot « Kojo » du verrou de la barre).
+ * sondes et les gardes vérifient) et `aria-hidden` : la marque est DÉCORATIVE
+ * partout où elle paraît, y compris dans la barre, où le mot « Kojo » qui
+ * l'accompagnait a été retiré le 28/09/2026 (il redisait ce que le dessin
+ * disait). Ce qui reste doit donc être porté par le LIEN qui l'enveloppe :
+ * son nom accessible est écrit une fois, dans `Navbar.js`, et nulle part
+ * ailleurs — un `aria-label` ici, sur un `<svg>` caché aux lecteurs d'écran,
+ * ne nommerait rien du tout.
  */
 export function MarqueKojo({ emplacement = 'barre' }) {
   const { boite } = emplacementDeLaMarque(emplacement);
