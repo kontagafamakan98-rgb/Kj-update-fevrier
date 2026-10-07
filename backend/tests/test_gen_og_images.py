@@ -260,3 +260,25 @@ class TestMiseEnPageEtCarte:
                 reserved["title"]["max_lines"] * 4 * ["ligne"],
                 reserved["description"]["max_lines"] * 4 * ["ligne"],
             )
+
+
+class TestFaviconSombreQuiComposeLaMarque:
+    """Le favicon sombre ne DESSINE plus rien : il COMPOSE la marque du site (le
+    poinçon), pour que l'onglet et le site montrent le même dessin. Sans elle, il
+    n'a rien à composer, et écrire un carré vide publierait un onglet qui n'est
+    plus la marque — c'est le refus que ce cas verrouille (ajouté le 07/10/2026 :
+    le harnais `.github/scripts/check-og-test-mutations.py` le nommait, sa
+    neutralisation ne faisait rougir aucun test).
+
+    Le dossier de sortie est redirigé vers un temporaire VIDE : le refus ne
+    dépend donc pas de l'état de `public/icons/` sur la machine, et aucun fichier
+    du dépôt n'est lu ni écrit. Le nom attendu est celui du GÉNÉRATEUR
+    (`MARK_PATH`) — pas une seconde fois écrit ici."""
+
+    def test_refuse_de_composer_si_la_marque_est_absente(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(GENERATOR, "OUT_DIR", str(tmp_path))
+
+        with pytest.raises(SystemExit) as failure:
+            GENERATOR.make_dark_favicon()
+
+        assert Path(GENERATOR.MARK_PATH).name in str(failure.value)
