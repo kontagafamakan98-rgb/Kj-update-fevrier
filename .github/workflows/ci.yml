@@ -734,7 +734,14 @@ jobs:
       # dimensions, type, purpose) et exige qu'un « maskable » soit PROUVÉ par
       # la mesure, dans les deux sens : aucune fausse revendication, et aucune
       # variante fabriquée pour le masque qui ne serait jamais servie.
-      - name: Check PWA manifest (declared icons + maskable safe zone)
+      # Depuis le 07/10/2026 il juge AUSSI l'installation elle-même : « id »,
+      # « start_url » et « scope » doivent rester sous le domaine du site (une
+      # entrée absolue ailleurs ferait ouvrir l'application installée sur un
+      # domaine qu'on n'exploite pas), et chaque entrée de la liste de précache
+      # du service worker doit être un littéral de chaîne SOUS CE DOMAINE — une
+      # liste vide ou une adresse calculée est refusée, parce qu'un vert sur une
+      # liste vide ne dirait rien de son contenu.
+      - name: Check PWA manifest (declared icons, maskable safe zone, install origin, service-worker precache)
         working-directory: frontend
         run: node scripts/check-pwa-manifest.js
 
