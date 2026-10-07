@@ -709,6 +709,22 @@
       "runner": "vitest",
       "motif": "le complément DYNAMIQUE de « aucun tiers avant interaction » : la règle qui classe ce que le navigateur a RÉELLEMENT demandé APRÈS un geste (ce qui est autorisé pour ce geste, nommément, et rien d'autre) — un geste a le droit de contacter ce qui est DÉCLARÉ pour lui, et une adresse voisine du même hôte est refusée. Le VERDICT est prononcé par le parcours Chromium frontend/e2e/tiers-apres-interaction.spec.js, hors du périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/), donc ce module se déclare outil ; sa preuve fixe le contrat, et il partage estTiers/nommerInitiateur avec le module d'avant plutôt que de les redéclarer",
       "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : le VERDICT de cette règle est prononcé par le parcours Chromium frontend/e2e/tiers-apres-interaction.spec.js, hors de la table, et son contrat est verrouillé par ses cas unitaires directs — il n'y a pas de ligne de verdict à neutraliser dans un module qui ne sort jamais en 1"
+    },
+    {
+      "chemin": "frontend/scripts/check-marque-kojo.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-marque-kojo.test.js",
+      "runner": "vitest",
+      "motif": "juge le DESSIN de la marque, là où check-generated-icons.js juge la CONFORMITÉ de ses artefacts (inventaire, manifeste, dimensions, empreintes de pixels) : trois mesures que l’atelier du 28/09/2026 avait prises pour corriger le poinçon — le contraste de la lettre sur la matière (2,67:1, illisible ; ramené à 3,29:1), le débordement des cercles du disque (l’arc d’ombre à 22,6 + 1,15 = 23,75 peignait 0,55 unité de liseré DEHORS, sur le fond) et les pixels peints hors du disque — et qui n’étaient tenues par RIEN depuis la suppression de l’atelier : ce qui restait était de la prose d’en-tête et deux nombres dans AGENTS.md, c’est-à-dire rien qui rougisse à la prochaine retouche de la géométrie. Le seuil de contraste est 3:1 (WCAG 1.4.11, objet graphique : la marque est un tracé, pas du texte) — une NORME, jamais le relevé du jour. La règle des cercles est rayon + largeur/2 ≤ rayon du disque (ledit rayon lu dans le MÊME JSON que la page, la coquille et le rasteriseur). La mesure de pixels porte sur l’ARTEFACT SERVI : les PNG clairs sont décodés ici en Node (zlib + dé-filtrage, aucune dépendance ajoutée), et leur empreinte de pixels a été vérifiée égale à celle de icons-assets.manifest.json, donc la mesure porte bien sur l’image que l’inventaire de la famille verrouille. La tolérance de pixels n’est pas un confort : 0,5 px de rampe d’anti-aliasing plus au plus la demi-diagonale d’un pixel de sortie, parce que les icônes sont dessinées à 512 px puis RÉDUITES par moyenne de surface (reduce_area) — un pixel de sortie dont le pavé touche encore l’encre est teinté même si son propre centre est dehors (mesuré : 0,35 px sur icon-192x192.png). La troisième mesure porte une CONTREPARTIE obligatoire (le disque doit être peint, plancher 0,9) sans laquelle « aucun pixel dehors » serait vrai d’une image transparente. Il ne juge PAS les variantes maskable ni le favicon sombre (fonds OPAQUES par exigence : le pixel y est toujours peint, c’est le fond), ni les PNG de favicon.ico (extraits et vérifiés par check-generated-icons.js) — ces frontières sont écrites dans l’en-tête du garde."
+    },
+    {
+      "chemin": "frontend/scripts/marque-kojo-mesures.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-marque-kojo.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même, sans aucune E/S : elle reçoit la géométrie et un tampon RGBA, elle ne lit et n’écrit rien. Contraste : le protocole de l’atelier rejoué tel quel (un tube de rayon largeur/2 promené sur les trois segments, un échantillon tous les quarts d’unité, l’axe plus huit points de bord), la couleur sous chaque échantillon COMPOSÉE couche par couche en source-over prémultiplié — donc la mesure reste valable par construction si la lettre grandissait jusqu’à passer sous le collet ou sous un arc —, puis le rapport WCAG (luminance relative sRGB) contre la couleur déclarée de la lettre. Cercles : rayon + largeur/2 pour chaque cercle et chaque arc, comparés au rayon du disque, avec le nom de la couche et le débordement. Pixels : comptage sur l’artefact décodé, tolérance = rampe d’anti-aliasing + traîne du ré-échantillonnage, et part du disque peinte. Les fonctions de dessin (lireChemin M/L/V/H, distanceAuSegment à bouts PLATS, couverture analytique, dégradés radiaux dans la boîte du disque et linéaires en coordonnées de grille, dernier arrêt prolongé) sont celles du rasteriseur, parce qu’une mesure qui peindrait autrement que l’artefact mesurerait un dessin qui n’existe pas."
     }
   ],
   "rejeux": [
@@ -2824,6 +2840,86 @@
       "cwd": "frontend",
       "attend": [
         "est composé à partir de public"
+      ]
+    },
+    {
+      "id": "marque-kojo: seuil de contraste neutralise",
+      "garde": "frontend/scripts/marque-kojo-mesures.js",
+      "cible": "frontend/scripts/marque-kojo-mesures.js",
+      "trouve": "    ok: pire.contraste >= SEUIL_CONTRASTE,",
+      "remplace": "    ok: true,",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-marque-kojo.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-marque-kojo.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une lettre dont le fond est trop clair"
+      ]
+    },
+    {
+      "id": "marque-kojo: debordement des cercles neutralise",
+      "garde": "frontend/scripts/marque-kojo-mesures.js",
+      "cible": "frontend/scripts/marque-kojo-mesures.js",
+      "trouve": "    ok: bords.every((bord) => bord.debordement === 0),",
+      "remplace": "    ok: true,",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-marque-kojo.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-marque-kojo.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un cercle qui déborde du disque"
+      ]
+    },
+    {
+      "id": "marque-kojo: contrepartie du disque peint neutralisee",
+      "garde": "frontend/scripts/marque-kojo-mesures.js",
+      "cible": "frontend/scripts/marque-kojo-mesures.js",
+      "trouve": "    ok: hors === 0 && partPeinte >= PLANCHER_DISQUE_PEINT,",
+      "remplace": "    ok: true,",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-marque-kojo.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-marque-kojo.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un disque vidé"
+      ]
+    },
+    {
+      "id": "marque-kojo: verdict du CLI neutralise sur le contraste",
+      "garde": "frontend/scripts/check-marque-kojo.js",
+      "cible": "frontend/scripts/check-marque-kojo.js",
+      "trouve": "  if (!contraste.ok) {",
+      "remplace": "  if (false && !contraste.ok) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-marque-kojo.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-marque-kojo.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort en 1 et nomme le contraste"
       ]
     }
   ]

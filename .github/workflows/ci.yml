@@ -690,6 +690,24 @@ jobs:
         working-directory: frontend
         run: node scripts/check-generated-icons.js
 
+      # Garde-fou de la MESURE du poinçon — le dessin lui-même, et non la
+      # conformité de ses artefacts. L'atelier du 28/09/2026 avait mesuré trois
+      # choses (le contraste de la lettre sur la matière : 2,67:1, illisible ;
+      # le débordement de l'arc d'ombre : 0,55 unité de liseré peint DEHORS, sur
+      # le fond ; les pixels peints hors du disque), corrigé le dessin avec
+      # elles, puis été supprimé — il ne restait que de la prose et deux nombres
+      # dans un journal, c'est-à-dire rien qui rougisse à la prochaine retouche
+      # de la géométrie. Le check rejoue les trois, sur la géométrie DÉCLARÉE
+      # (src/config/marque-kojo.json, la même que lisent la page, la coquille et
+      # le rasteriseur) et sur les PNG CLAIRS réellement servis, décodés ici en
+      # Node (zlib + dé-filtrage, aucune dépendance) : seuil de contraste WCAG
+      # 1.4.11 (3:1), rayon + demi-trait ≤ rayon du disque pour les cinq cercles,
+      # et zéro pixel peint hors du disque — avec sa contrepartie, sans quoi
+      # « rien dehors » serait vrai d'une image transparente.
+      - name: Check the poinçon's measurements (contrast, circles, overflow)
+        working-directory: frontend
+        run: node scripts/check-marque-kojo.js
+
       # Garde-fou du manifeste PWA : il déclarait « any maskable » sur ses deux
       # icônes alors qu'AUCUNE ne tenait dans la zone de sécurité (contenu à un
       # rayon de 0,495 pour une limite de 0,400) et que le fichier « -maskable »
