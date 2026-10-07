@@ -51,11 +51,17 @@ const BLOC_CONTACT = {
 
 // ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
 // L'ÉLÉMENT LCP DE « / » A CHANGÉ DE NATURE LE 27/09/2026, et c'est mesuré : la
-// refonte éditoriale a donné au héros une ILLUSTRATION (`/assets/kojo-hero.svg`,
-// 960 × 720) dont l'aire peinte dépasse celle du titre — **62 700 px² en mobile
-// et 139 733 en desktop** contre 33 220 et 90 454 pour le `<h1>`, dans les DEUX
+// refonte éditoriale a donné au héros une ILLUSTRATION — aujourd'hui une PHOTO
+// (`/assets/kojo-hero.jpg` et ses cinq suivantes, publiées à leur rapport 3/4 de
+// 720 × 960 ; le dessin qu'elles ont remplacé le 29/09/2026 était en 4/3, 960 ×
+// 720) — dont l'aire peinte dépasse celle du titre, RE-MESURÉE le 29/09/2026 sur
+// la photo publiée à son rapport : **69 920 px² en mobile et 306 870 en desktop**
+// (la veille : 62 700 et 139 733, le cadre 4/3), contre **37 400 et 110 500**
+// pour le `<h1>` lors de sa propre dernière mesure (28/09/2026 — l'aire d'un
+// texte que Chrome élit est celle de son encre, pas celle de sa boîte : les deux
+// chiffres ne se comparent qu'entre eux, chacun à sa date), dans les DEUX
 // canaux, une seule candidate, horodatée au premier paint (`e2e/
-// lcp-geometrie.spec.js`, 40/40 ; le CLS de « / » reste 0,0000). Le LCP n'est
+// lcp-geometrie.spec.js`, 24/24 ; le CLS de « / » reste 0,0000). Le LCP n'est
 // donc plus un texte mais une image : l'invariant que la parité coquille/React
 // doit tenir est le MÊME qu'avant — une seule candidate, la même aire des deux
 // côtés, au premier paint — et il tient. Ce qui suit garde sa raison d'être

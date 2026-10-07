@@ -17,6 +17,11 @@ import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS, couperLeTitre } from '../config/page-sections';
 import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from '../config/contact';
 import MapEmbed from '../components/MapEmbed';
+// La photo du héros — et son alternance. Ses chemins, ses dimensions et son
+// délai appartiennent à src/config/photos-heros.js, que la coquille pré-rendue
+// lit AUSSI : les deux canaux ne peuvent pas peindre deux photos différentes au
+// premier rendu (voir le commentaire du module).
+import PhotoDuHeros from '../components/PhotoDuHeros';
 import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 // Les quatre moyens de contact du bloc N.A.P. ci-dessous sont déclarés UNE
@@ -46,8 +51,9 @@ export default function Home() {
     categories, promises, steps, stats: STATS, icone: iconeSequestre,
     // Le héros : même clé i18n et mêmes classes que la coquille pré-rendue
     // (src/config/page-sections.js). Depuis la refonte éditoriale du 27/09/2026,
-    // l'élément LCP de « / » est l'ILLUSTRATION du héros (mesuré : 62 700 px² en
-    // mobile, 139 733 en desktop, contre 33 220 et 90 454 pour ce titre) — le
+    // l'élément LCP de « / » est l'ILLUSTRATION du héros (re-mesuré le
+    // 29/09/2026, photo 3/4 : 69 920 px² en mobile, 306 870 en desktop, contre
+    // 37 400 et 110 500 pour ce titre à sa dernière mesure du 28/09/2026) — le
     // titre en reste le plus grand bloc de texte, et c'est sa géométrie qui
     // ancre la parité : la coquille le peint avant le JavaScript, React
     // reconstruit ensuite EXACTEMENT la même boîte, et c'est cette égalité qui
@@ -238,26 +244,49 @@ export default function Home() {
             </div>
           </div>
 
-          {/* L'ILLUSTRATION : un SVG de 960 × 720 posé sur son propre sol, avec
-              un cadre qui se décale derrière elle. Le fond crème appartient à
-              l'image (l'illustration est dessinée pour un fond clair) : la
-              poser nue sur l'orange du héros salirait ses teintes.
+          {/* LA PHOTO DU HÉROS : des PHOTOGRAPHIES RÉELLES, servies par le site
+              (SIX clichés Pexels — 8487367, 8487764, 20814721, 6790757,
+              20853658, 8487345 — licence Pexels : usage commercial libre, sans
+              attribution obligatoire), recadrées en 3/4 à la source, puis
+              réduites ici à 720 px de large (62 à 126 ko chacune, 560 ko à
+              six), publiées ENTIÈRES et à leur rapport (720 × 960, soit 3/4).
 
-              `alt=""` : l'illustration ILLUSTRE le texte qui la précède, elle
-              ne dit rien qu'il faille lire — et un texte de remplacement est un
-              texte publié, donc il appartient au dictionnaire, pas à une
-              chaîne écrite ici (scripts/shell-text-provenance.js). */}
+              Elles remplacent le DESSIN qui occupait cette place
+              (`kojo-hero.svg`, deux personnages et une maison) : trois versions
+              de ce dessin ont été refusées par le propriétaire du site (« ça a
+              l'air trop générique », « c'est moche ») — un dessin plat ne dit
+              pas qu'un artisan est un professionnel. Une photo dit ce qu'un
+              dessin promet, et c'est la règle qui a déjà fait entrer les trois
+              photos de la galerie dans la page.
+
+              ── ENTIÈRES, PLUS GRANDES, ET ALTERNÉES (29/09/2026) ───────────────
+              La première version les recadrait en 4/3 (960 × 720, `fit=crop`) —
+              le rapport du dessin, donc la boîte du héros ne bougeait pas d'un
+              pixel. Le propriétaire a tranché autrement : « j'aime l'image mais
+              agrandis-la un peu plus, que toute l'image soit visible », puis
+              « fais-les s'interchanger toutes les 15 secondes ». Le cadrage est
+              donc RETIRÉ (le fichier est publié à son rapport d'origine), le
+              cadre est ÉLARGI (30 rem au lieu de 27, voir `.cadre-illustration`,
+              src/index.css) et la photo change toutes les 15 s
+              (`src/components/PhotoDuHeros.js`).
+
+              Ce qui ne change pas, c'est la règle de la parité : les DEUX canaux
+              publient la même première photo, les mêmes attributs et les mêmes
+              classes — la coquille peint le premier `<img>` en littéral
+              (`shells-home.js`, qui lit la liste du MÊME module de
+              configuration) et React reconstruit exactement la même boîte, donc
+              le premier paint reste celui que le navigateur retient. Les six
+              fichiers étant au même rapport, l'alternance seule ne déplace rien
+              non plus : la boîte est réservée avant le chargement par
+              `width`/`height` (les dimensions RÉELLES du fichier).
+
+              `alt=""` : les photos ILLUSTRENT le texte qui les précède, elles ne
+              disent rien qu'il faille lire — et un texte de remplacement est un
+              texte publié, donc il appartient au dictionnaire, pas à une chaîne
+              écrite ici (scripts/shell-text-provenance.js). */}
           <div className={heroIllustrationClass}>
             <span className={heroIllustrationFondClass} aria-hidden="true"></span>
-            <img
-              src="/assets/kojo-hero.svg"
-              alt=""
-              width="960"
-              height="720"
-              fetchpriority="high"
-              decoding="async"
-              className={heroIllustrationImageClass}
-            />
+            <PhotoDuHeros className={heroIllustrationImageClass} />
           </div>
         </div>
       </section>

@@ -143,7 +143,13 @@ const MESURE = {
   //   /contact         218,4 → 168,5 (−49,9)     42,7 → 32,8 (−9,8)
   //   /how-it-works    300,3 → 286,6 (−13,7)     57,3 → 55,4 (−1,8)
   //   /support         254,7 → 209,0 (−45,7)     49,4 → 39,2 (−10,2)
-  '/': { mobile: 424, desktop: 82 },
+  // 29/09/2026 : le héros de l'accueil est une PHOTO (six photos alternées,
+  // héros plus haut de 405 px en mobile et 611 en desktop). Relevé de la sonde,
+  // minimum de 3 runs : 287,1 ms mobile et 50,0 ms desktop. L'ÉTENDUE des trois
+  // runs mobiles vaut 935 ms sur cet hôte partagé — le chiffre est publié pour
+  // la provenance de la case, pas jugé (l'axe du temps n'appartient pas à
+  // l'artefact : le même document vaut 80,4 ms sur le runner de la CI).
+  '/': { mobile: 287.1, desktop: 50 },
   '/about': { mobile: 231, desktop: 44 },
   // Relevé du 28/09/2026, après la refonte éditoriale des quatre pages de
   // confiance (mêmes conditions, mêmes 3 runs) : /contact 169 → 158,4 ms mobile
@@ -247,6 +253,13 @@ const NOEUDS = {
   // lien, une image et une légende) et la photo du parcours ajoutent 15 nœuds à
   // la coquille, et 504 à React (contre 489) — le même écart de méthode, remesuré
   // sur le même passage que la hauteur.
+  // 443 → 443 (29/09/2026) : le héros passe du DESSIN à SIX PHOTOS qui alternent,
+  // et le compte ne bouge pas d'un nœud — c'est mesuré (443 dans les deux
+  // conditions), pas déduit. C'est exactement ce que le composant a été écrit
+  // pour faire : UN seul `<img>` dont le `src` change
+  // (src/components/PhotoDuHeros.js), là où un carrousel naïf publierait un
+  // second `<img>` caché ou un conteneur de plus. Les six `<img>` n'existent
+  // jamais en même temps dans la coquille : elle n'en publie qu'un.
   '/': 443,
   // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
   // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
@@ -356,7 +369,14 @@ const HAUTEUR = {
   // la vérification que les dix constantes de src/App.css sont justes — avant
   // re-accord, le levier actif réservait 6 802 et 5 035 px, soit 924 et 372 px de
   // matière manquante, mesurés sur le même passage.
-  '/': { mobile: 7726, desktop: 5407 },
+  // 7 726 → 8 131 px en mobile et 5 407 → 6 018 en desktop (29/09/2026) : le
+  // héros remplace le DESSIN (432 × 324, le rapport 4/3 du fichier) par une PHOTO
+  // publiée à son rapport 3/4 dans un cadre élargi (`min(100%, 30rem)`,
+  // src/index.css) — la boîte passe à 480 × 640 px en desktop, donc +316 px de
+  // matière à elle seule, le reste venant du repli des sections qui suivent.
+  // Mesuré par `e2e/style-layout-document.spec.js` (minimum de 3 runs, bundle
+  // d'entrée bloqué, deux conditions), 443 nœuds dans les deux cas.
+  '/': { mobile: 8131, desktop: 6018 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
   // 1 718 → 1 721 px en mobile (28/09/2026) : la page prend le vocabulaire

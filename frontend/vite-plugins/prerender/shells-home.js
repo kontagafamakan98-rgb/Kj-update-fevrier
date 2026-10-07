@@ -15,6 +15,14 @@ import { nomDuDrapeau } from '../../src/config/flags.js'
 // mêmes moitiés que src/pages/Home.js, sur les cinq langues, sans recopier la
 // règle (voir `couperLeTitre`, src/config/page-sections.js).
 import { couperLeTitre } from '../../src/config/page-sections.js'
+// Les photos du héros : le chemin de la PREMIÈRE, et ses dimensions réelles.
+// Le module est partagé avec src/components/PhotoDuHeros.js — la coquille peint
+// donc la photo sur laquelle React ouvre son alternance, par construction, et
+// changer la photo de tête se fait dans un seul fichier (voir le commentaire du
+// module : les deux canaux publient le même `<img>`, sans quoi la bascule
+// coquille → React remplacerait une boîte par une autre, et l'élément LCP de
+// « / » serait ré-élu par le JavaScript).
+import { PHOTOS_HEROS, PHOTO_HEROS_LARGEUR, PHOTO_HEROS_HAUTEUR } from '../../src/config/photos-heros.js'
 import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
@@ -192,13 +200,17 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<a href="/how-it-works" class="${lienFlecheClairClass}">${esc(T('howItWorksLink'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
     `</div>`,
     `</div>`,
-    // L'illustration : même fichier, mêmes attributs et mêmes classes que la
-    // page. `alt=""` des deux côtés (l'illustration illustre le texte qui la
+    // LA PHOTO DU HÉROS : la PREMIÈRE de la liste partagée, avec ses
+    // dimensions réelles, les mêmes attributs et les mêmes classes que la page
+    // (voir le commentaire de src/pages/Home.js). C'est elle que React peint à
+    // son premier rendu — l'alternance ne commence qu'après — donc les deux
+    // canaux peignent la même boîte, et l'élément LCP de « / » reste la peinture
+    // du document. `alt=""` des deux côtés (la photo illustre le texte qui la
     // précède ; un texte de remplacement est un texte publié, donc il
     // appartiendrait au dictionnaire).
     `<div class="${heroIllustrationClass}">`,
     `<span class="${heroIllustrationFondClass}" aria-hidden="true"></span>`,
-    `<img src="/assets/kojo-hero.svg" alt="" width="960" height="720" fetchpriority="high" decoding="async" class="${heroIllustrationImageClass}">`,
+    `<img src="${esc(PHOTOS_HEROS[0])}" alt="" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="async" class="${heroIllustrationImageClass}">`,
     `</div>`,
     `</div>`,
     `</section>`,

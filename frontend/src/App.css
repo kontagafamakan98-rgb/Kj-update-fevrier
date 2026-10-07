@@ -298,8 +298,9 @@
 
    LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : depuis
    la refonte du 27/09/2026 l'élément élu de « / » est l'ILLUSTRATION du héros
-   (62 700 px² en mobile, 139 733 en desktop, mesuré identique dans les deux
-   canaux), et un élément LCP ne se met pas derrière une hauteur estimée. Il est
+   (re-mesuré le 29/09/2026 sur la photo 3/4 : 69 920 px² en mobile, 306 870 en
+   desktop, mesuré identique dans les deux canaux), et un élément LCP ne se met
+   pas derrière une hauteur estimée. Il est
    peint au premier écran, donc jamais « différé » — mesuré, la règle ne change
    ni l'élément élu ni son horodatage.
 

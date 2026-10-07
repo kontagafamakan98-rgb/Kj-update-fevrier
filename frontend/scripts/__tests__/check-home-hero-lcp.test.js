@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 // Le HÉROS de l'accueil porte l'élément LCP de « / » : son TITRE jusqu'au
 // 27/09/2026, son ILLUSTRATION depuis la refonte éditoriale de ce jour-là
-// (mesuré, les deux canaux : 62 700 px² en mobile et 139 733 en desktop pour
-// l'image, contre 33 220 et 90 454 pour le titre — une seule candidate, au
+// (re-mesuré le 29/09/2026 sur la PHOTO 3/4 publiée à la place du dessin, les
+// deux canaux : 69 920 px² en mobile et 306 870 en desktop pour l'image, contre
+// 37 400 et 110 500 pour le titre à sa dernière mesure du 28/09/2026 — une seule
+// candidate, au
 // premier paint). Les deux invariants ci-dessous gardent donc leur raison
 // d'être : c'est la GÉOMÉTRIE de la boîte reconstruite par React qui décide si
 // Chrome ré-élit une seconde peinture plus tardive, et elle vaut pour le titre
