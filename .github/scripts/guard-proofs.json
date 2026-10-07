@@ -700,6 +700,15 @@
       "preuve": "frontend/scripts/__tests__/import-health.test.js",
       "runner": "vitest",
       "motif": "la correction du verdict non portable du parcours d'import : le budget n'est plus emprunté aux 20 s de `vite.config.js` (marge taillée pour des gardes qui LANCENT un sous-processus), il est DÉRIVÉ d'une mesure prise à l'exécution (temps d'import d'un échantillon de 10 modules, extrapolé au nombre total de modules du périmètre), avec un plancher pour la zone de flottement connue, un plafond pour qu'un vrai blocage meure encore, et une marge couvrant la non-linéarité. Un budget épuisé lève `BudgetDeVivaciteEpuise` et n'accuse JAMAIS le code : c'est la distinction que la mutation « le budget ne suit plus la mesure » fait rougir."
+    },
+    {
+      "chemin": "frontend/scripts/tiers-apres-interaction.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/tiers-apres-interaction.test.js",
+      "runner": "vitest",
+      "motif": "le complément DYNAMIQUE de « aucun tiers avant interaction » : la règle qui classe ce que le navigateur a RÉELLEMENT demandé APRÈS un geste (ce qui est autorisé pour ce geste, nommément, et rien d'autre) — un geste a le droit de contacter ce qui est DÉCLARÉ pour lui, et une adresse voisine du même hôte est refusée. Le VERDICT est prononcé par le parcours Chromium frontend/e2e/tiers-apres-interaction.spec.js, hors du périmètre de ce registre (frontend/scripts/, .github/scripts/, backend/scripts/), donc ce module se déclare outil ; sa preuve fixe le contrat, et il partage estTiers/nommerInitiateur avec le module d'avant plutôt que de les redéclarer",
+      "hors_mutation": "le harnais ne mute que le fichier qu'une mutation NOMME (`cible` = `garde`) : le VERDICT de cette règle est prononcé par le parcours Chromium frontend/e2e/tiers-apres-interaction.spec.js, hors de la table, et son contrat est verrouillé par ses cas unitaires directs — il n'y a pas de ligne de verdict à neutraliser dans un module qui ne sort jamais en 1"
     }
   ],
   "rejeux": [
@@ -2775,6 +2784,46 @@
       "cwd": "frontend",
       "attend": [
         "aucune réf distante dans ce dépôt"
+      ]
+    },
+    {
+      "id": "generated-icons: geometrie de la marque non verifiee",
+      "garde": "frontend/scripts/check-generated-icons.js",
+      "cible": "frontend/scripts/check-generated-icons.js",
+      "trouve": "    const geometrie = manifest.source && manifest.source.geometry;",
+      "remplace": "    const geometrie = null;",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-generated-icons.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-generated-icons.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "marque déclarée mais absente"
+      ]
+    },
+    {
+      "id": "og-assets: favicon sombre compose d'une marque perimee tolere",
+      "garde": "frontend/scripts/check-og-assets.js",
+      "cible": "frontend/scripts/check-og-assets.js",
+      "trouve": "        if (typeof entry.compose === 'string' && entry.compose) {",
+      "remplace": "        if (false && typeof entry.compose === 'string' && entry.compose) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-og-assets.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-og-assets.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "est composé à partir de public"
       ]
     }
   ]

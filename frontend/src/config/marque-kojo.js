@@ -72,21 +72,56 @@
 // elles se lisaient comme deux poussières blanches sur le disque, et agrandies
 // elles devenaient un ornement — un repère de vignette, pas de marque.
 //
-// ── Un propriétaire, deux canaux ─────────────────────────────────────────
-// La PAGE (React) passe par `MarqueKojo`, la COQUILLE (Node) par
-// `svgDeLaMarque` (vite-plugins/prerender/icons-serveur.js) :
-// les deux lisent les attributs, les peintures et les emplacements ci-dessous,
-// exactement comme `page-icons.js` le fait pour les icônes dessinées. Un
-// emplacement inconnu lève des deux côtés — jamais une pastille vide publiée en
-// silence.
+// ── Un dessin, TROIS consommateurs ───────────────────────────────────────
+// La GÉOMÉTRIE du poinçon (rayons, arrêts de dégradé, arcs, lettre) vit dans
+// `marque-kojo.json`, à côté de ce fichier, et NULLE PART ailleurs :
+//
+//   • la PAGE (React) passe par `MarqueKojo` ;
+//   • la COQUILLE (Node) par `svgDeLaMarque`
+//     (vite-plugins/prerender/icons-serveur.js) ;
+//   • le RASTERISEUR des icônes PWA et du favicon
+//     (public/icons/generate_icons.py) lit le MÊME fichier et peint les mêmes
+//     couches — l'onglet du navigateur porte donc la marque du site, et pas un
+//     second dessin qui lui ressemblerait.
+//
+// Les deux canaux JS lisent les attributs, les peintures et les emplacements
+// ci-dessous, exactement comme `page-icons.js` le fait pour les icônes
+// dessinées. Un emplacement inconnu lève des deux côtés — jamais une pastille
+// vide publiée en silence — et une couche nommée absente du JSON lève aussi.
 //
 // L'identifiant du dégradé est DÉRIVÉ de l'emplacement (`kojo-marque-barre`…) :
 // deux marques peuvent cohabiter sur une page (la barre et l'en-tête de /login),
 // et deux `<defs>` de même identifiant seraient un doublon dans le document.
 import { createElement } from 'react';
+// L'ATTRIBUT D'IMPORT est exigé par Node (« needs an import attribute of
+// type: json ») ; Vite, Rollup et Vitest le portent aussi. Le JSON est lu comme
+// DONNÉES, jamais évalué : c'est ce qui permet au rasteriseur Python de lire
+// exactement le même dessin.
+import GEOMETRIE from './marque-kojo.json' with { type: 'json' };
+
+/**
+ * LA GÉOMÉTRIE, relue du JSON par NOM de couche. Un nom absent lève : une
+ * couche renommée dans le JSON ne peut pas devenir un dessin muet (le `poinçon`
+ * sans disque, par exemple), elle casse au premier import — ce qui est mesuré
+ * par la page, par la coquille ET par le rasteriseur des icônes.
+ */
+const couche = (peinture, nom) => {
+  const trouvee = GEOMETRIE.peintures[peinture].couches.find((candidat) => candidat.nom === nom);
+  if (!trouvee) {
+    throw new Error(
+      `marque-kojo : la couche « ${nom} » de la peinture « ${peinture} » n’est pas déclarée ` +
+        'dans marque-kojo.json — la marque ne peut pas être dessinée à moitié.'
+    );
+  }
+  return trouvee;
+};
+
+/** Le nom du `<defs>` d'une peinture nommée : seul `matiere` porte l'identifiant
+ * nu (c'est le remplissage du disque), les autres le suffixent par leur nom. */
+const idDeGradient = (nom, id) => (nom === 'matiere' ? id : `${id}-${nom}`);
 
 /** La grille de dessin (48 × 48) : le double des icônes (24), pour le dégradé. */
-export const GRILLE_MARQUE = '0 0 48 48';
+export const GRILLE_MARQUE = `0 0 ${GEOMETRIE.grille} ${GEOMETRIE.grille}`;
 
 /** Le repère du build et des sondes : la marque est vérifiable, pas décorative. */
 export const MARQUEUR_DE_LA_MARQUE = 'data-marque="kojo"';
@@ -100,15 +135,15 @@ export const MARQUEUR_DE_LA_MARQUE = 'data-marque="kojo"';
  * le collet 31,5 et le plateau 30,3 — les trois tiennent dans l'épaisseur d'un
  * cheveu du bord, et c'est voulu : ces filets sont une MATIÈRE, pas un motif.
  */
-const POINCON_R = 23.2;
+const POINCON_R = couche('marque', 'poincon').rayon;
 /** La gorge : le collet de la pièce frappée, à 2 unités du bord. */
-const COLLET_R = 21.0;
+const COLLET_R = couche('marque', 'collet').rayon;
 /** Le filet clair : l'arête du plateau, à l'intérieur du collet. */
-const PLATEAU_R = 20.2;
+const PLATEAU_R = couche('marque', 'plateau').rayon;
 /** Le cerclage : l'arc de lumière, large et doux, en haut à gauche. */
-const CERCLAGE_R = 22.2;
+const CERCLAGE_R = couche('marque', 'cerclage').rayon;
 /** Le glacis : le trait net qui finit le bord, juste dedans le disque. */
-const GLACIS_R = 22.85;
+const GLACIS_R = couche('marque', 'glacis').rayon;
 /**
  * L'ombre : l'arc du bas, qui dit d'où vient la lumière. Son rayon PLUS son
  * demi-trait tiennent dans le disque (22,0 + 1,15 = 23,15 ≤ 23,2) : un trait
@@ -116,7 +151,7 @@ const GLACIS_R = 22.85;
  * peint 0,6 unité de rouge sombre DEHORS, sur le fond — un liseré que personne
  * n'a demandé, et le seul défaut de ce dessin qui se voie à l'œil nu.
  */
-const OMBRE_R = 22.0;
+const OMBRE_R = couche('marque', 'ombre').rayon;
 
 /** Un point de la grille, sur un cercle de rayon donné, à l'angle donné (SVG :
  * l'axe des ordonnées descend, donc 0° est à droite et 90° en BAS). */
@@ -146,10 +181,10 @@ const arc = (debut, fin, rayon) =>
  * plus éloigné du centre est à 13,05 unités, donc à 7 unités du plateau (r 20,2)
  * au plus court. Le dessin a de la réserve — c'est la § VII de la philosophie.
  */
-const K_TRONC = 'M17.3 14.7V33.3';
-const K_BRAS_HAUT = 'M18.8 24 30.8 15.7';
-const K_BRAS_BAS = 'M18.8 24 30.8 32.3';
-const K_LARGEUR = 4.9;
+const K_TRONC = GEOMETRIE.lettre.tronc;
+const K_BRAS_HAUT = GEOMETRIE.lettre.brasHaut;
+const K_BRAS_BAS = GEOMETRIE.lettre.brasBas;
+const K_LARGEUR = GEOMETRIE.lettre.largeur;
 
 const leK = (couleur) =>
   `<g fill="none" stroke="${couleur}" stroke-width="${K_LARGEUR}">` +
@@ -175,14 +210,39 @@ const leK = (couleur) =>
  * arrêt sans le dépasser. À 1,00 il tombait juste dessus (bord mou), à 1,12 il
  * s'arrêtait à 0,89 et le bord gardait un rouge plus clair que voulu.
  */
-const MATIERE = (id) =>
-  `<radialGradient id="${id}" cx="0.17" cy="0.17" r="1.02">` +
-  `<stop offset="0" stop-color="#f97c22"></stop>` +
-  `<stop offset="0.16" stop-color="#ee6320"></stop>` +
-  `<stop offset="0.45" stop-color="#dc4620"></stop>` +
-  `<stop offset="0.75" stop-color="#bb231c"></stop>` +
-  `<stop offset="1" stop-color="#8a1418"></stop>` +
-  `</radialGradient>`;
+/**
+ * UN ARRÊT de dégradé, en données : `[décalage, couleur]`, la troisième valeur
+ * — l'opacité — n'étant écrite QUE lorsqu'elle est déclarée (la matière n'en
+ * porte aucune, la lumière et l'ombre s'éteignent aux deux bouts).
+ */
+const arretDeGradient = ([decalage, couleur, opacite]) =>
+  `<stop offset="${decalage}" stop-color="${couleur}"` +
+  (opacite === undefined ? '' : ` stop-opacity="${opacite}"`) +
+  `></stop>`;
+
+/**
+ * UNE PEINTURE NOMMÉE, en SVG : l'axe, le centre, la portée et les arrêts sont
+ * ceux de `marque-kojo.json`. Le suffixe d'identifiant est celui de
+ * `idDeGradient` — c'est lui qui permet à deux marques de cohabiter.
+ */
+const GRADIENT = (nom, id) => {
+  const peinture = GEOMETRIE.gradients[nom];
+  const corps = peinture.arrets.map(arretDeGradient).join('');
+  if (peinture.sorte === 'radial') {
+    return (
+      `<radialGradient id="${idDeGradient(nom, id)}" cx="${peinture.centre[0]}" cy="${peinture.centre[1]}" ` +
+      `r="${peinture.portee}">${corps}</radialGradient>`
+    );
+  }
+  const [x1, y1, x2, y2] = peinture.axe;
+  return (
+    `<linearGradient id="${idDeGradient(nom, id)}" gradientUnits="userSpaceOnUse" ` +
+    `x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${corps}</linearGradient>`
+  );
+};
+
+/** La MATIÈRE du disque — le dégradé radial décrit juste au-dessus. */
+const MATIERE = (id) => GRADIENT('matiere', id);
 
 /**
  * LA LUMIÈRE : un dégradé LINÉAIRE en coordonnées de la grille, posé sur le
@@ -196,26 +256,14 @@ const MATIERE = (id) =>
  * plus comme une arête mais comme un reflet de plastique. C'est le glacis —
  * 0,55 unité, le trait le plus fin du dessin — qui porte l'éclat, et il suffit.
  */
-const LUMIERE = (id) =>
-  `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="6" y1="30" x2="42" y2="2">` +
-  `<stop offset="0" stop-color="#ffffff" stop-opacity="0"></stop>` +
-  `<stop offset="0.22" stop-color="#ffffff" stop-opacity="0.58"></stop>` +
-  `<stop offset="0.5" stop-color="#ffffff" stop-opacity="0.72"></stop>` +
-  `<stop offset="0.74" stop-color="#ffffff" stop-opacity="0.32"></stop>` +
-  `<stop offset="1" stop-color="#ffffff" stop-opacity="0"></stop>` +
-  `</linearGradient>`;
+const LUMIERE = (id) => GRADIENT('lumiere', id);
 
 /**
  * L'OMBRE : le même dispositif en bas, dans l'autre sens et plus sourd. Elle
  * tient le disque au sol — sans elle, la marque a l'air découpée et posée sur
  * la page plutôt qu'appuyée sur elle (c'est la § I de la philosophie).
  */
-const OMBRE = (id) =>
-  `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="2" y1="0" x2="46" y2="0">` +
-  `<stop offset="0" stop-color="#6d1013" stop-opacity="0"></stop>` +
-  `<stop offset="0.5" stop-color="#6d1013" stop-opacity="0.42"></stop>` +
-  `<stop offset="1" stop-color="#6d1013" stop-opacity="0"></stop>` +
-  `</linearGradient>`;
+const OMBRE = (id) => GRADIENT('ombre', id);
 
 /**
  * LES PEINTURES : deux façons de peindre la MÊME géométrie. Elles sont
@@ -233,38 +281,92 @@ const OMBRE = (id) =>
  *     reste : c'est lui qui dit que la lettre est frappée, et c'est le seul
  *     détail du dessin qui survive à l'inversion.
  */
-export const PEINTURES = {
-  marque: {
-    defs: (id) => MATIERE(id) + LUMIERE(`${id}-lumiere`) + OMBRE(`${id}-ombre`),
-    corps: (id) =>
-      `<circle cx="24" cy="24" r="${POINCON_R}" fill="url(#${id})"></circle>` +
-      // L'ombre du bas PUIS la lumière du haut : les deux arcs se partagent le
-      // cercle (18° → 162° et 172° → 350°) et ne se touchent jamais — c'est
-      // l'ordre, et non un masque, qui garantit qu'aucun des deux ne mord sur
-      // l'autre au raccord.
-      `<path d="${arc(18, 162, OMBRE_R)}" fill="none" stroke="url(#${id}-ombre)" stroke-width="2.3"></path>` +
-      `<path d="${arc(172, 350, CERCLAGE_R)}" fill="none" stroke="url(#${id}-lumiere)" stroke-width="1.4"></path>` +
-      // Le GLACIS : le trait net qui finit le bord, à 0,35 unité du disque. Il
-      // ne scintille pas (aucun filtre, aucune animation) : il donne au bord
-      // l'épaisseur d'un émail. À 36 px il fait 0,4 px — il ne se voit donc pas
-      // comme un trait, il se voit comme une arête.
-      `<path d="${arc(205, 335, GLACIS_R)}" fill="none" stroke="url(#${id}-lumiere)" stroke-width="0.55" stroke-opacity="0.9"></path>` +
-      // Le COLLET (sombre) et le PLATEAU (clair), dans cet ordre : la lumière
-      // tombe sur l'arête intérieure de la gorge, donc le filet clair est
-      // DEDANS. Inversés, la marque se lit comme une pastille cerclée — le
-      // dessin dont elle vient justement d'être séparée.
-      `<circle cx="24" cy="24" r="${COLLET_R}" fill="none" stroke="#7a1a12" stroke-opacity="0.34" stroke-width="1.2"></circle>` +
-      `<circle cx="24" cy="24" r="${PLATEAU_R}" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1"></circle>` +
-      leK('#ffffff'),
-  },
-  inverse: {
-    defs: () => '',
-    corps: () =>
-      `<circle cx="24" cy="24" r="${POINCON_R}" fill="#ffffff"></circle>` +
-      `<circle cx="24" cy="24" r="${COLLET_R}" fill="none" stroke="currentColor" stroke-opacity="0.2" stroke-width="1.2"></circle>` +
-      leK('currentColor'),
-  },
+/**
+ * LES PEINTURES NOMMÉES : le vocabulaire que le JSON emploie (la « peinture »
+ * d'un disque, d'un arc, d'un `<defs>`). Un nom absent d'ici LÈVE — un dégradé
+ * renommé dans le JSON ne peut pas devenir un aplat noir silencieux, ni sur la
+ * page, ni dans la coquille, ni dans le favicon.
+ */
+const PEINTURES_NOMMEES = { matiere: MATIERE, lumiere: LUMIERE, ombre: OMBRE };
+
+/**
+ * UNE COUCHE, en SVG. C'est ICI que la peinture devient un dessin : la SORTE de
+ * couche dit comment la peindre (un disque, un arc au trait, un cercle au trait,
+ * la lettre), et l'ORDRE des couches du JSON est celui du dessin — c'est lui qui
+ * garantit qu'aucun arc ne mord sur l'autre, et que le filet clair du plateau
+ * tombe DEDANS le collet.
+ */
+const COUCHE_SVG = (coucheDessinee, id) => {
+  switch (coucheDessinee.sorte) {
+    case 'disque':
+      return (
+        `<circle cx="24" cy="24" r="${coucheDessinee.rayon}" fill="` +
+        (coucheDessinee.peinture
+          ? `url(#${idDeGradient(coucheDessinee.peinture, id)})`
+          : coucheDessinee.couleur) +
+        `"></circle>`
+      );
+    case 'arc':
+      return (
+        `<path d="${arc(coucheDessinee.de, coucheDessinee.a, coucheDessinee.rayon)}" fill="none" ` +
+        `stroke="url(#${idDeGradient(coucheDessinee.peinture, id)})" stroke-width="${coucheDessinee.largeur}"` +
+        (coucheDessinee.opacite === undefined ? '' : ` stroke-opacity="${coucheDessinee.opacite}"`) +
+        `></path>`
+      );
+    case 'cercle':
+      return (
+        `<circle cx="24" cy="24" r="${coucheDessinee.rayon}" fill="none" ` +
+        `stroke="${coucheDessinee.couleur}" stroke-opacity="${coucheDessinee.opacite}" ` +
+        `stroke-width="${coucheDessinee.largeur}"></circle>`
+      );
+    case 'lettre':
+      return leK(coucheDessinee.couleur);
+    default:
+      throw new Error(
+        `marque-kojo : la couche « ${coucheDessinee.nom} » a une sorte inconnue ` +
+          `(« ${coucheDessinee.sorte} ») — le JSON et ce module ont divergé.`
+      );
+  }
 };
+
+/**
+ * LES PEINTURES : deux façons de peindre la MÊME géométrie. Elles sont
+ * DÉCLARÉES dans le JSON (leurs `<defs>` et leurs couches, dans l'ordre), et
+ * non recopiées par emplacement — c'est là que les six recopies divergeaient.
+ *
+ *   * `marque` — le poinçon tel qu'il a été retenu : la matière du disque, les
+ *     deux arcs (ombre en bas, lumière en haut), le collet et le plateau, la
+ *     lettre blanche. C'est la peinture de tous les emplacements sur fond clair,
+ *     ET celle que le rasteriseur des icônes PWA peint pour le favicon.
+ *   * `inverse` — le MÊME dessin retourné : disque blanc, lettre et collet dans
+ *     la couleur de l'emplacement (`currentColor`). Elle sert sur fond coloré
+ *     (l'écran de chargement, qui est un dégradé orange) : un disque rouge sur
+ *     orange n'y aurait ni contraste ni lecture. Les deux arcs n'y ont plus
+ *     d'objet — il n'y a rien à modeler sur un aplat blanc — mais le COLLET y
+ *     reste : c'est lui qui dit que la lettre est frappée, et c'est le seul
+ *     détail du dessin qui survive à l'inversion.
+ */
+export const PEINTURES = Object.fromEntries(
+  Object.entries(GEOMETRIE.peintures).map(([nom, peinture]) => [
+    nom,
+    {
+      defs: (id) =>
+        peinture.defs
+          .map((nom) => {
+            const emetteur = PEINTURES_NOMMEES[nom];
+            if (!emetteur) {
+              throw new Error(
+                `marque-kojo : le dégradé « ${nom} » n’est pas déclaré — le JSON et ce ` +
+                  'module ont divergé.'
+              );
+            }
+            return emetteur(id);
+          })
+          .join(''),
+      corps: (id) => peinture.couches.map((coucheDessinee) => COUCHE_SVG(coucheDessinee, id)).join(''),
+    },
+  ])
+);
 
 /**
  * LES EMPLACEMENTS : où la marque paraît, à quelle taille, dans quelle peinture.

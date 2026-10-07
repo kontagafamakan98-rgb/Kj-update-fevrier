@@ -49,11 +49,13 @@
       "width": 1200
     },
     {
-      "bytes": 27941,
+      "bytes": 66191,
+      "compose": "icons/icon-512x512.png",
+      "compose_sha256": "4bad98df1ef5529627816570c11a2bf73fa637ed1d53bffa31096b6beb825785",
       "file": "icons/icon-dark.png",
       "format": "favicon sombre",
       "height": 512,
-      "sha256": "061847c3566d31375589b95af5f9d61b523346e2dd500e023af15c100753e4bd",
+      "sha256": "9058d178125c4b2cde7d500d17454876395f912c690b149c5227dceaaf658b9f",
       "width": 512
     }
   ],
@@ -138,5 +140,5 @@
     "regular": "arial.ttf"
   },
   "generator": "gen-og-images.py",
-  "generator_sha256": "e31533d3acee96ddc4d42802f75da979ea820d48354f469c706930c8b21c86a5"
+  "generator_sha256": "d3b27a3efd7b27d8b86571333ad874ceefdf3d19c538f2048cb388538d406d01"
 }

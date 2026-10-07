@@ -4,8 +4,12 @@
  *
  * Deuxième famille d'images générées du dépôt, après les cartes Open Graph
  * (scripts/check-og-assets.js). Elle a son propre générateur,
- * public/icons/generate_icons.py, qui descend une source 512×512 vers les huit
- * tailles PWA et vers le favicon clair (favicon.ico, images PNG embarquées).
+ * public/icons/generate_icons.py, qui DESSINE la marque du site (le poinçon,
+ * déclaré dans src/config/marque-kojo.json — le même dessin que la page et la
+ * coquille) puis en descend les huit tailles PWA et le favicon clair
+ * (favicon.ico, images PNG embarquées). La source n'est donc plus un raster
+ * fourni : elle est peinte par le générateur, et c'est le REJEU qui la lie à sa
+ * déclaration.
  *
  * Cette famille a une faiblesse que les cartes OG n'ont pas : elle est
  * INVISIBLE. Une icône remplacée à la main, un favicon jamais régénéré (le
@@ -29,7 +33,10 @@
  *      public/icons/ doit être déclaré en lecture seule, et le CONTENU est
  *      inspecté pour repérer une seconde source de vérité au nom anodin ;
  *   2. exige le manifeste écrit PAR le générateur (aucune constante dupliquée
- *      ici) et le refuse s'il est périmé (empreinte du générateur) ;
+ *      ici) et le refuse s'il est périmé (empreinte du générateur) — et, quand
+ *      il la déclare, refuse une GÉOMÉTRIE de la marque retouchée depuis la
+ *      dernière génération (l'onglet montrerait alors une autre marque que la
+ *      page) ;
  *   3. dresse l'INVENTAIRE de la famille : chaque image de public/icons/ doit
  *      être déclarée — sortie générée, actif non géré, ou actif d'une autre
  *      famille — sinon une icône peut apparaître sans que rien ne le dise ;
@@ -73,6 +80,26 @@ export const OG_MANIFEST_PATH = path.join('scripts', 'og-assets.manifest.json');
 // présent garde s'y déclare lui-même — il inspecte la famille, il ne la produit
 // pas — et un test de non-rot vérifie que chaque entrée existe bien sur disque.
 export const ICON_READ_ONLY_SCRIPTS = ['check-generated-icons.js'];
+
+/**
+ * Scripts HORS de la famille qui COMPOSENT une de ses icônes sans la dessiner.
+ *
+ * Ils sont déclarés, comme les lecteurs, et pour la même raison : la détection du
+ * « second générateur » est une lecture de CONTENU (un script qui écrit une image
+ * ET mentionne un nom d'icône), et un script qui POSER la marque sur un fond
+ * tombe exactement dans ce motif. Mesuré le 07/10/2026 : le favicon sombre
+ * (scripts/gen-og-images.py, `make_dark_favicon`) pose le poinçon dessiné ici sur
+ * le graphite des onglets sombres — il lit `icons/icon-512x512.png`, il ne le
+ * produit pas, et le lui interdire reviendrait à interdire à l'onglet d'avoir la
+ * même marque que la page.
+ *
+ * La distinction est TENUE par le garde lui-même : le manifeste d'un actif
+ * composé porte la source et son empreinte (`compose`, `compose_sha256`), et le
+ * garde de l'autre famille refuse un écart — une déclaration ne remplace pas une
+ * preuve. Chaque entrée de cette liste doit exister sur disque (refus nommé),
+ * sinon une exemption survivrait au fichier qu'elle exemptait.
+ */
+export const ICON_COMPOSING_SCRIPTS = ['scripts/gen-og-images.py'];
 
 export const SCRIPT_EXTENSIONS = ['.py', '.js', '.mjs', '.cjs', '.ts', '.sh'];
 export const IMAGE_EXTENSIONS = ['.png', '.ico', '.svg'];
@@ -203,9 +230,11 @@ export const makeRegenerate = (root) => {
       execFileSync(
         python,
         [
+          // Pas de `--source` : la source est DESSINÉE par le générateur, à partir
+          // de la géométrie de la marque (src/config/marque-kojo.json), qu'il
+          // résout depuis son propre chemin — le rejeu est donc le même que le
+          // dépôt soit en place ou copié dans un dossier temporaire.
           generator,
-          '--source',
-          'icon-512x512.png',
           '--out-dir',
           tmp,
           '--favicon',
@@ -256,6 +285,17 @@ export const runGeneratedIconsCheck = (opts = {}) => {
     );
   }
 
+  // Les composeurs déclarés doivent exister : une exemption qui survit au fichier
+  // qu'elle exemptait est une exemption qui autorise n'importe quoi.
+  for (const composeur of ICON_COMPOSING_SCRIPTS) {
+    if (!existsSync(path.join(root, composeur))) {
+      fail(
+        `composeur déclaré introuvable (${composeur}) : retire-le de ` +
+          'ICON_COMPOSING_SCRIPTS, ou remets le fichier qu’il exempte'
+      );
+    }
+  }
+
   for (const name of familyFiles.filter((n) => SCRIPT_EXTENSIONS.includes(path.extname(n).toLowerCase()))) {
     if (name === GENERATOR_NAME) continue;
     if (ICON_READ_ONLY_SCRIPTS.includes(name)) continue;
@@ -276,6 +316,8 @@ export const runGeneratedIconsCheck = (opts = {}) => {
       .filter((entry) => entry.isFile())
       .map((entry) => entry.name)) {
       if (name === GENERATOR_NAME || ICON_READ_ONLY_SCRIPTS.includes(name)) continue;
+      const relatif = path.relative(root, path.join(dir, name)).replace(/\\/g, '/');
+      if (ICON_COMPOSING_SCRIPTS.includes(relatif)) continue;
       if (!SCRIPT_EXTENSIONS.includes(path.extname(name).toLowerCase())) continue;
       let source = '';
       try {
@@ -289,7 +331,8 @@ export const runGeneratedIconsCheck = (opts = {}) => {
             `${path.relative(root, path.join(dir, name)).replace(/\\/g, '/')}) : ` +
             `ce fichier écrit une image de la famille, or une seule source de vérité est ` +
             `autorisée, ${FAMILY_LABEL}/${GENERATOR_NAME} — s'il ne fait que LIRE les icônes, ` +
-            `déclare-le dans ICON_READ_ONLY_SCRIPTS`
+            `déclare-le dans ICON_READ_ONLY_SCRIPTS ; s'il en COMPOSE une sans la dessiner, ` +
+            `déclare-le dans ICON_COMPOSING_SCRIPTS`
         );
       }
     }
@@ -320,6 +363,31 @@ export const runGeneratedIconsCheck = (opts = {}) => {
         fail(
           `${FAMILY_LABEL}/${GENERATOR_NAME} a changé depuis la dernière génération : relance-le ` +
             `et committe le manifeste (et les fichiers si leurs pixels bougent)`
+        );
+      }
+    }
+
+    // ── 2b. La GÉOMÉTRIE de la marque, si le manifeste la déclare ───────────
+    // Les icônes de cette famille sont DESSINÉES à partir d'une déclaration
+    // partagée avec la page et la coquille (`source.geometry`, des coordonnées
+    // relatives au manifeste). Le rejeu du générateur la couvre déjà — il
+    // produirait d'autres pixels — mais ce contrôle-ci la NOMME, et il ne
+    // dépend ni de Python ni d'un décodage : une géométrie retouchée sans
+    // régénération dit son nom au lieu de se lire dans un écart de pixels.
+    const geometrie = manifest.source && manifest.source.geometry;
+    if (typeof geometrie === 'string' && geometrie) {
+      const cheminGeometrie = path.resolve(path.dirname(manifestPath), geometrie);
+      const libelleGeometrie = path.relative(root, cheminGeometrie).replace(/\\/g, '/');
+      if (!existsSync(cheminGeometrie)) {
+        fail(
+          `${libelleGeometrie} manquant : les icônes de ${FAMILY_LABEL} sont dessinées à partir ` +
+            `de cette déclaration, sans elle la famille n'est plus reproductible`
+        );
+      } else if (manifest.source.geometry_sha256 !== generatorFingerprint(cheminGeometrie)) {
+        fail(
+          `${libelleGeometrie} a changé depuis la dernière génération des icônes : relance ` +
+            `${FAMILY_LABEL}/${GENERATOR_NAME} et committe les icônes — sinon l'onglet du ` +
+            `navigateur montre une marque que la page ne dessine plus`
         );
       }
     }

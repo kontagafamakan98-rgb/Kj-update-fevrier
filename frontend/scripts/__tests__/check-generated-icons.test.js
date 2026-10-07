@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import {
   FAMILY_DIR,
   GENERATOR_NAME,
+  ICON_COMPOSING_SCRIPTS,
   ICON_READ_ONLY_SCRIPTS,
   MANIFEST_NAME,
   OG_MANIFEST_PATH,
@@ -143,6 +144,17 @@ const buildFixture = (mutate = () => {}) => {
   const scriptsDir = path.join(root, 'scripts');
   fs.mkdirSync(family, { recursive: true });
   fs.mkdirSync(scriptsDir, { recursive: true });
+
+  // Les composeurs DÉCLARÉS doivent exister : celui du favicon sombre vit hors
+  // de la famille (scripts/gen-og-images.py) et lit la marque pour la poser sur
+  // le graphite des onglets sombres. Sans un fichier à cet emplacement, le
+  // fixture d'une famille CONFORME serait refusé pour une raison qui n'a rien à
+  // voir avec ce qu'il mesure (le garde exige la présence de chaque exemption).
+  for (const composeur of ICON_COMPOSING_SCRIPTS) {
+    const chemin = path.join(root, composeur);
+    fs.mkdirSync(path.dirname(chemin), { recursive: true });
+    fs.writeFileSync(chemin, '# composeur déclaré (fixture)\n');
+  }
 
   const generatorPath = path.join(family, GENERATOR_NAME);
   fs.writeFileSync(generatorPath, '#!/usr/bin/env python3\nSIZES = [72, 96]\n');
@@ -289,6 +301,69 @@ describe('inventaire et structure', () => {
     const result = fixture.run();
     expect(result.ok).toBe(false);
     expect(result.errors.join('\n')).toMatch(/second générateur d'icônes détecté/);
+  });
+
+  it('refuse une GÉOMÉTRIE de la marque retouchée depuis la dernière génération', () => {
+    // Les icônes de la famille sont DESSINÉES à partir de la déclaration de la
+    // marque (source.geometry). Le rejeu du générateur la couvre déjà ; ce
+    // contrôle-ci la NOMME, sans Python ni décodage de PNG.
+    let cheminGeometrie = null;
+    const contenu = '{ "grille": 48 }\n';
+    const fixture = buildFixture(({ root, manifestPath, manifest }) => {
+      cheminGeometrie = path.join(root, 'src', 'config', 'marque-kojo.json');
+      fs.mkdirSync(path.dirname(cheminGeometrie), { recursive: true });
+      fs.writeFileSync(cheminGeometrie, contenu);
+      manifest.source.geometry = '../../src/config/marque-kojo.json';
+      manifest.source.geometry_sha256 = hash(Buffer.from(contenu));
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    });
+
+    expect(fixture.run().ok).toBe(true);
+
+    fs.appendFileSync(cheminGeometrie, '\n');
+    const result = fixture.run();
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/a changé depuis la dernière génération des icônes/);
+  });
+
+  it('refuse une géométrie de la marque déclarée mais absente', () => {
+    const fixture = buildFixture(({ manifestPath, manifest }) => {
+      manifest.source.geometry = '../../src/config/marque-kojo.json';
+      manifest.source.geometry_sha256 = hash(Buffer.from('peu importe'));
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    });
+    const result = fixture.run();
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/manquant : les icônes de public\/icons sont dessinées/);
+  });
+
+  it('refuse un composeur déclaré introuvable (une exemption survit-elle au fichier ?)', () => {
+    const fixture = buildFixture(({ root }) => {
+      // Le fichier déclaré comme composeur disparaît : l'exemption qu'il porte
+      // ne doit pas continuer à couvrir un nom libre.
+      for (const composeur of ICON_COMPOSING_SCRIPTS) {
+        fs.rmSync(path.join(root, composeur), { force: true });
+      }
+    });
+    const result = fixture.run();
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(/composeur déclaré introuvable/);
+  });
+
+  it('déclare le composeur du favicon sombre, et il COMPOSE la marque sans la redessiner', () => {
+    // Le favicon sombre (onglets en mode sombre) est le seul actif de la famille
+    // produit ailleurs : il pose la marque sur le graphite. Sa déclaration doit
+    // rester vraie — le fichier existe, il lit la marque dessinée ici, et il ne
+    // la redessine pas (l'ancienne version composait un « K » de police, ce qui
+    // faisait dépendre l'onglet de la police résolue sur l'hôte).
+    expect(ICON_COMPOSING_SCRIPTS).toContain('scripts/gen-og-images.py');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '..', '..', 'scripts', 'gen-og-images.py'),
+      'utf8'
+    );
+    expect(source).toMatch(/MARK_PATH = os\.path\.join\('icons', 'icon-512x512\.png'\)/);
+    expect(source).toMatch(/mark_path = os\.path\.join\(OUT_DIR, MARK_PATH\)/);
+    expect(source).not.toMatch(/load_font\(int\(size \* 0\.62\)/);
   });
 
   it('déclare ses propres lecteurs en lecture seule, et ceux-ci existent bien', () => {
