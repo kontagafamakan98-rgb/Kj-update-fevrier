@@ -116,8 +116,10 @@ export default function Home() {
     panneauOrbeClass,
     panneauImageClass,
     panneauEstampilleClass,
-    bandeClass,
-    chiffreClass,
+    faitsClass,
+    faitClass,
+    faitFigureClass,
+    faitLibelleClass,
     ctaClass,
     ctaInnerClass,
     ctaActionsClass,
@@ -533,20 +535,32 @@ export default function Home() {
               </Link>
             </div>
           )}
-        </div>
-      </section>
 
-      {/* ── LES FAITS VÉRIFIABLES ───────────────────────────────────────────
-          Deux chiffres, à filets, séparés par le même trait que les listes.
-          Aucun compteur inventé : ce que la coquille pré-rendue publie est
-          exactement ce que la page affiche. */}
-      <section className={`${sectionClass} ${sandClass}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={bandeClass}>
+          {/* ── LES DEUX FAITS ───────────────────────────────────────────────
+              Ils servaient de BANDEAU à filets, seuls sur toute une section,
+              entre cette clôture et « Qui sommes-nous ». C'est leur EMPLACEMENT
+              autant que leur espacement que le propriétaire du site a jugés laids
+              (« pour application ») : 245 px de section pour 115 px de bande, et
+              deux nombres centrés qui dominaient leur propre libellé. Ils sont
+              ici — sous les deux boutons, à l'endroit exact où le visiteur
+              hésite — et ils reprennent le pas du site depuis la refonte du
+              25/09/2026 : alignés à GAUCHE (la clôture est centrée, donc cette
+              rangée déclare son alignement), bornés en largeur, chiffre ramené
+              à 1,5 rem pour ne pas disputer la hiérarchie au titre.
+
+              Les deux valeurs et leurs deux dessins sortent de la DÉCLARATION
+              du plan (PAGE_SECTIONS['/'].stats) : la même liste que la coquille
+              pré-rendue publie, donc aucun compteur inventé, et le globe et le
+              téléphone viennent du registre d'icônes — le MÊME dessin des deux
+              côtés, jamais un emoji d'un côté et un SVG de l'autre. */}
+          <div className={faitsClass}>
             {STATS.map((stat) => (
-              <div key={stat.labelKey}>
-                <div className={`${chiffreClass} mb-2`}>{stat.fallback}</div>
-                <div className={noteLigneClass}>{t(stat.labelKey)}</div>
+              <div key={stat.labelKey} className={faitClass}>
+                <span className={faitFigureClass}>
+                  <IconePage nom={stat.icone} classe={CLASSES_ICONE.heros} />
+                  {stat.fallback}
+                </span>
+                <span className={faitLibelleClass}>{t(stat.labelKey)}</span>
               </div>
             ))}
           </div>

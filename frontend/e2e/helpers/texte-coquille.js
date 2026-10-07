@@ -71,10 +71,15 @@
  *        • la coquille ne publie un glyphe que si React peint un glyphe DANS LA
  *          MÊME BANDE — texte non verbal, `<svg>` ou `<img>` (`svg` et `img` sont
  *          comptés sans texte, leur contenu n'est pas lisible) ;
- *        • si React peint un glyphe TEXTUEL dans cette bande, il doit être le
+ *        • si la coquille publie un glyphe TEXTUEL (un « · », un emoji) et que
+ *          React peint un glyphe TEXTUEL dans cette bande, il doit être le
  *          MÊME glyphe. C'est la moitié qui a du mordant : publier « 📮 » là où
  *          React peint « 📞 » est refusé, alors que remplacer l'emoji par une
- *          icône SVG ne l'est pas.
+ *          icône SVG ne l'est pas. L'égalité de texte est demandée au glyphe
+ *          TEXTUEL de la coquille, jamais à un DESSIN (`svg`, image) : un
+ *          dessin n'a pas de texte à comparer, et l'exiger faisait rougir une
+ *          coquille sur une coïncidence de bande (mesure du 07/10/2026, cf.
+ *          `glyphesDivergents` plus bas).
  *      Ce que la règle ne juge PAS, et qu'il ne faut pas lui demander : la
  *      SÉMANTIQUE d'un dessin. Depuis le 26/09/2026 les pages pré-rendues ne
  *      publient plus d'emoji : leurs glyphes sont DESSINÉS, déclarés par un nom
@@ -318,8 +323,25 @@ export function comparerTextes({ route, coquille, react }) {
         );
         continue;
       }
+      // ── L'ÉGALITÉ DE TEXTE ne se demande QU'À UN GLYPHE TEXTUEL ──────────
+      // C'est le seul qui ait un texte à comparer. Un DESSIN (`svg`, image) n'a
+      // pas d'identité textuelle : lui demander d'« égaler » un texte de React
+      // est un contresens, et c'est pourtant ce que faisait cette ligne sur une
+      // simple COÏNCIDENCE DE BANDE. Mesuré le 07/10/2026 sur / (412×823) :
+      // l'icône de la ligne « Envoyer un e-mail » (un `svg` de 20 px de haut à
+      // y=6570,94) recouvre la bande du paragraphe de liens (l'ÉLÉMENT `p`,
+      // 40 px, y 6580,78 → 6620,78) de 10,16 px — soit 0,16 px de plus que la
+      // moitié de la plus petite hauteur, la relation `MEME_BANDE` que le
+      // harnais partage avec la géométrie — et React peint un `svg` à la MÊME
+      // boîte (y=6570,94, x=43) : le pendant existe, et c'est le bon. Le rouge
+      // accusait donc la coquille d'avoir « remplacé » les deux « · » du
+      // paragraphe par une icône que React peint AUSSI. Ce qui reste exigé d'un
+      // dessin est ce que la règle peut honnêtement exiger : un pendant PEINT
+      // dans sa bande (glyphesSansPendant, juste au-dessus). La SÉMANTIQUE du
+      // dessin, elle, n'est pas jugeable ici (deux `svg` n'ont pas de texte) et
+      // se décide au plan (`shellIconKey`, src/config/page-sections.js).
       const textuels = pendants.filter((item) => item.sorte === 'texte');
-      if (textuels.length && !textuels.some((item) => item.texte === glyphe.texte)) {
+      if (glyphe.sorte === 'texte' && textuels.length && !textuels.some((item) => item.texte === glyphe.texte)) {
         glyphesDivergents.push(
           `[${zone.nom}] ${court(glyphe.texte)} (${bande(glyphe)}) : React peint du TEXTE dans cette bande, mais ` +
             `${textuels.map((item) => court(item.texte, 16)).join(', ')} — deux glyphes différents au même endroit`

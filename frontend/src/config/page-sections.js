@@ -182,8 +182,21 @@ const EDITORIAL_ACCUEIL = {
   panneauOrbeClass: 'panneau-orbe',
   panneauImageClass: 'panneau-image',
   panneauEstampilleClass: 'panneau-estampille',
-  bandeClass: 'bande-chiffres',
-  chiffreClass: 'chiffre',
+  // ── LES DEUX FAITS DE LA CLÔTURE (07/10/2026) ────────────────────────────
+  // Ils étaient une BANDE à filets posée seule entre la clôture orange et
+  // « Qui sommes-nous » : MESURÉ (Chromium, 412 × 823) 245 px de section pour
+  // 115 px de bande, elle-même deux cases vides de 187 px pour 64 px d'encre,
+  // et deux nombres centrés en 2,25 rem qui dominaient leur libellé de 12 px.
+  // Étirée sur toute la largeur en desktop, la rangée ressemblait à un TABLEAU,
+  // pas à une application. Elle vit maintenant DANS la clôture, sous les deux
+  // boutons : c'est là que le visiteur hésite, donc là que la réassurance sert.
+  // La rangée est bornée en largeur (elle ne s'étire plus), alignée à gauche
+  // (comme tout le site depuis la refonte du 25/09/2026) et le chiffre redescend
+  // à 1,5 rem pour céder la hiérarchie au titre de la clôture.
+  faitsClass: 'faits-cta',
+  faitClass: 'fait-cta',
+  faitFigureClass: 'fait-cta-figure',
+  faitLibelleClass: 'fait-cta-libelle',
   ctaClass: 'cta-final',
   ctaInnerClass: 'cta-final-inner',
   ctaActionsClass: 'cta-actions',
@@ -421,18 +434,26 @@ export const PAGE_SECTIONS = {
       { labelKey: 'electrical', image: '/assets/kojo-metier-electricite.jpg' },
       { labelKey: 'carpentry', image: '/assets/kojo-metier-menuiserie.jpg' },
     ],
-    // Les chiffres de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
+    // Les faits de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
     // inventés. Les deux anciens (« 1 000+ travailleurs », « 500+ projets »)
     // étaient des replis FABRIQUÉS avant l'appel à /public/stats : le HTML
     // pré-rendu les publiait donc à un crawler, et le premier paint les
     // affichait à un visiteur, comme s'ils étaient mesurés. Ils sont RETIRÉS
-    // (règle « pas de faux compteurs »). « 24/7 » l'était aussi : le support
-    // répond du lundi au samedi (cf. contactIntro), donc la valeur dit « 6j/7 ».
+    // (règle « pas de faux compteurs »).
     // `shellText` est le texte EXACT que la coquille écrit ; `fallback` la même
-    // valeur côté page — les deux sortent d'ici, une seule liste.
+    // valeur côté page — les deux sortent d'ici, une seule liste. `icone` nomme
+    // le dessin (src/config/page-icons.js), publié par les deux canaux : le
+    // globe pour les pays, le téléphone pour le support.
+    //
+    // RECTIFIÉ le 07/10/2026 : la valeur disait « 6j/7 » et trois textes FR
+    // portaient l'énoncé « du lundi au samedi ». Le propriétaire du site a
+    // tranché : le support répond SEPT JOURS SUR SEPT. Le chiffre et les huit
+    // textes qui l'énonçaient sont corrigés ensemble — un chiffre faux dans la
+    // seule bande de faits d'une page est exactement ce que cette bande
+    // interdit, et une phrase qui le contredit ailleurs le serait autant.
     stats: [
-      { labelKey: 'countriesCovered', fallback: '4', shellText: '4' },
-      { labelKey: 'customerSupport', fallback: '6j/7', shellText: '6j/7' },
+      { labelKey: 'countriesCovered', fallback: '4', shellText: '4', icone: 'countryGlobe' },
+      { labelKey: 'customerSupport', fallback: '7j/7', shellText: '7j/7', icone: 'contactCall' },
     ],
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le

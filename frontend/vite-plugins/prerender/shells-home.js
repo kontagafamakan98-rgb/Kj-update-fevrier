@@ -78,7 +78,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     sectionClass, carteClass,
     pastilleClass, pastilleCreuseClass, nomLigneClass, noteLigneClass, flecheLigneClass,
     panneauClass, panneauArtClass, panneauOrbeClass, panneauImageClass, panneauEstampilleClass,
-    bandeClass, chiffreClass, ctaClass, ctaInnerClass, ctaActionsClass,
+    faitsClass, faitClass, faitFigureClass, faitLibelleClass,
+    ctaClass, ctaInnerClass, ctaActionsClass,
     lienFlecheClass, lienFlecheClairClass,
     galerieGrilleClass, galerieCarteClass, galerieLegendeClass,
     etapesGrilleClass, etapesTeteClass, cadrePhotoClass, photoEtapes,
@@ -92,7 +93,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     carteClass, listeClass,
     listeColonnesClass, ligneMetierClass, ligneEtapeClass, pastilleClass, pastilleCreuseClass,
     nomLigneClass, noteLigneClass, flecheLigneClass, panneauClass, panneauArtClass,
-    panneauOrbeClass, panneauImageClass, panneauEstampilleClass, bandeClass, chiffreClass,
+    panneauOrbeClass, panneauImageClass, panneauEstampilleClass,
+    faitsClass, faitClass, faitFigureClass, faitLibelleClass,
     ctaClass, ctaInnerClass, ctaActionsClass, lienFlecheClass, lienFlecheClairClass,
     galerieGrilleClass, galerieCarteClass, galerieLegendeClass,
     etapesGrilleClass, etapesTeteClass, cadrePhotoClass,
@@ -380,20 +382,21 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<a href="/register?type=client" class="bouton bouton-creme">${esc(T('lookingForServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
     `<a href="/register?type=worker" class="bouton bouton-contour">${esc(T('offerServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
     `</div>`,
-    `</div>`,
-    `</section>`,
 
-    // Faits vérifiables (pays couverts, support) : la MÊME déclaration
-    // (homePlan.stats) est lue par Home.js et par cette coquille — une seule
-    // liste, deux rendus, et aucun compteur inventé (cf. page-sections.js).
-    `<section class="${sectionClass} ${sandClass}">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="${bandeClass}">`,
+    // ── LES DEUX FAITS DE LA CLÔTURE (07/10/2026) ─────────────────────────────
+    // Ils étaient une BANDE à filets seule sur toute une section, ENTRE cette
+    // clôture et « Qui sommes-nous » (245 px de section pour 115 px de bande,
+    // mesuré sur l'artefact). Ils vivent maintenant DANS la clôture, sous les
+    // deux boutons : l'endroit où le visiteur hésite. La structure, les classes
+    // et les deux dessins sont ceux de src/pages/Home.js — lus dans le plan
+    // (homePlan.stats : labelKey, shellText, icone), donc la même liste pour les
+    // deux canaux, et jamais un compteur inventé.
+    `<div class="${faitsClass}">`,
     ...homePlan.stats.map(
-      ({ labelKey, shellText }) =>
-        `<div>` +
-        `<div class="${chiffreClass} mb-2">${esc(shellText)}</div>` +
-        `<div class="${noteLigneClass}">${esc(T(labelKey))}</div>` +
+      ({ labelKey, shellText, icone }) =>
+        `<div class="${faitClass}">` +
+        `<span class="${faitFigureClass}">${svgDeLIcone(icone, CLASSES_ICONE.heros)}${esc(shellText)}</span>` +
+        `<span class="${faitLibelleClass}">${esc(T(labelKey))}</span>` +
         `</div>`
     ),
     `</div>`,

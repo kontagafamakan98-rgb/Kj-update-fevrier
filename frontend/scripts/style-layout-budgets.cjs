@@ -149,7 +149,11 @@ const MESURE = {
   // runs mobiles vaut 935 ms sur cet hôte partagé — le chiffre est publié pour
   // la provenance de la case, pas jugé (l'axe du temps n'appartient pas à
   // l'artefact : le même document vaut 80,4 ms sur le runner de la CI).
-  '/': { mobile: 287.1, desktop: 50 },
+  // 07/10/2026 : la BANDE DE CHIFFRES de l'accueil devient la rangée de faits
+  // de la clôture (section en moins, rangée en plus). Relevé de la sonde,
+  // minimum de 3 runs sur le même protocole : 281,9 ms mobile, 51,6 ms desktop.
+  // Le chiffre est publié, pas jugé : il atteste la provenance de la case.
+  '/': { mobile: 281.9, desktop: 51.6 },
   '/about': { mobile: 231, desktop: 44 },
   // Relevé du 28/09/2026, après la refonte éditoriale des quatre pages de
   // confiance (mêmes conditions, mêmes 3 runs) : /contact 169 → 158,4 ms mobile
@@ -249,6 +253,16 @@ const NOEUDS = {
   // mesuré ici et non déduit : React publie ses composants là où la coquille
   // écrit le HTML). Ce budget-ci porte la COQUILLE, et la valeur publiée est la
   // sienne. La hauteur, elle, ne les sépare pas (6 706 px des deux côtés).
+  // 443 → 447 (07/10/2026) : les deux faits quittent la SECTION qui les
+  // isolait — elle comptait NEUF nœuds (la `<section>`, le conteneur, la bande,
+  // puis deux fois trois nœuds de cellule) — pour la rangée de la clôture, qui
+  // en compte TREIZE (la rangée, deux cellules, et dans chacune deux `<span>`
+  // — le chiffre et son libellé — plus le `<svg>` du dessin et ses tracés :
+  // trois pour le globe de `countryGlobe`, un pour le téléphone de
+  // `contactCall`). Solde **+4**, mesuré sur l'artefact dans les deux
+  // conditions, et une SECTION de MOINS sur la page (onze → dix). Le compte de
+  // chaque moitié est relevé, pas déduit : le balisage de la bande retirée et
+  // celui de la rangée publiée, comptés par `querySelectorAll('*')`.
   // 428 → 443 (27/09/2026) : la GALERIE des métiers (trois cartes, chacune un
   // lien, une image et une légende) et la photo du parcours ajoutent 15 nœuds à
   // la coquille, et 504 à React (contre 489) — le même écart de méthode, remesuré
@@ -376,7 +390,14 @@ const HAUTEUR = {
   // matière à elle seule, le reste venant du repli des sections qui suivent.
   // Mesuré par `e2e/style-layout-document.spec.js` (minimum de 3 runs, bundle
   // d'entrée bloqué, deux conditions), 443 nœuds dans les deux cas.
-  '/': { mobile: 8131, desktop: 6018 },
+  // 8 131 → 7 170 px en mobile et 6 018 → 5 179 en desktop (07/10/2026) : la
+  // section de la bande disparaît (245 px peints) et la rangée de faits entre
+  // dans la clôture (73 px plus sa marge, la clôture passe de 385 à 483 px —
+  // mesuré sur React). Le reste de l'écart est la RÉSERVATION
+  // `content-visibility: auto` du document : MESURÉ en neutralisant la
+  // propriété sur le même artefact, elle vaut 759 px en mobile et 693 en
+  // desktop, et retirer une section déplace les suivantes dans sa fenêtre.
+  '/': { mobile: 7170, desktop: 5179 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
   // 1 718 → 1 721 px en mobile (28/09/2026) : la page prend le vocabulaire

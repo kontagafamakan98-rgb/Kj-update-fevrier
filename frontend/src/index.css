@@ -2052,35 +2052,74 @@ code {
   box-shadow: 6px 6px 0 var(--kojo-papier);
 }
 
-/* ── LA BANDE DES CHIFFRES ET LA CLÔTURE ────────────────────────────────────
+/* ── LES DEUX FAITS DE LA CLÔTURE ──────────────────────────────────────────
 
-   Les chiffres vérifiables tenaient dans une carte à ombre ; ils deviennent une
-   bande à filets, séparés par le même trait que les listes. Le chiffre reste en
-   orange — c'est la seule graisse colorée de la page, donc l'œil y va — et il
-   est en chiffres tabulaires (le socle du `body` s'en charge). */
-.bande-chiffres {
+   Ils étaient une BANDE à filets (`.bande-chiffres`), seule sur toute une
+   section, entre la clôture orange et « Qui sommes-nous ». MESURÉ sur
+   l'artefact (Chromium, 412 × 823, 07/10/2026) : 245 px de section pour 115 px
+   de bande, deux cases de 187 px pour 64 px d'encre, et un chiffre en 2,25 rem
+   qui dominait son libellé de 12 px. Étirée en desktop sur les 1 270 px du
+   conteneur, la rangée avait l'air d'un TABLEAU — le propriétaire du site l'a
+   dit laid « pour application », et c'est ce mot qui décide ici.
+
+   Ce qui change, et pourquoi :
+     • ils vivent DANS la clôture, sous les deux boutons : c'est là que le
+       visiteur hésite, donc là que la réassurance sert — et la section
+       orpheline qu'ils occupaient disparaît avec la bande ;
+     • la rangée est BORNÉE (26 rem) et centrée comme BLOC : deux faits ne
+       remplissent pas une page large, ils se lisent côte à côte ;
+     • elle est alignée à GAUCHE, explicitement, contre le `text-align: center`
+       hérité de `.cta-final-inner` : depuis la refonte du 25/09/2026 la centure
+       est DÉCLARÉE bloc par bloc, et un chiffre suivi de son libellé se lit
+       mieux à gauche qu'en drapeau centré ;
+     • le chiffre redescend à 1,5 rem : il ne dispute plus la hiérarchie au
+       titre de la clôture, et le libellé monte en capitales espacées ;
+     • le filet est en BLANC translucide, comme tout ce qui sépare dans cette
+       section : la clôture est orange, le filet sable des sections claires y
+       serait un trait gris.
+   Rien n'est codé pour un fond clair : ces deux faits ne se peignent que sur
+   l'orange. Le libellé tient sur une ligne à 320 px (mesuré : 110 px de large
+   pour 124 px disponibles). */
+.faits-cta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--kojo-filet);
-  border-bottom: 1px solid var(--kojo-filet);
+  max-width: 26rem;
+  margin: 2.5rem auto 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  text-align: left;
 }
 
-.bande-chiffres > div {
-  padding-block: var(--rythme-bloc);
-  padding-inline: 1rem;
-  text-align: center;
+.fait-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding-right: 1.25rem;
 }
 
-.bande-chiffres > div + div {
-  border-left: 1px solid var(--kojo-filet);
+.fait-cta + .fait-cta {
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  padding-right: 0;
+  padding-left: 1.25rem;
 }
 
-.bande-chiffres .chiffre {
-  color: var(--kojo-orange-fonce);
+.fait-cta-figure {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #fff;
   font-family: var(--kojo-serif);
-  font-size: 2.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.fait-cta-libelle {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* La CLÔTURE : orange, pleine largeur, avec deux anneaux qui débordent — le
