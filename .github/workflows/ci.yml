@@ -563,6 +563,24 @@ jobs:
         working-directory: frontend
         run: node scripts/check-origines-bundles.js
 
+      # LA COUVERTURE DES CLASSES DE TIERS. Le dépôt regarde les tiers par cinq
+      # canaux (les deux gardes statiques ci-dessus, plus le parcours sans geste,
+      # le parcours après geste et la carte différée), et chacun publie ses
+      # limites en prose — mais RIEN ne reliait une CLASSE de tiers (« lien
+      # rendu », « chargé après interaction »…) aux canaux qui peuvent
+      # l’observer. Un classement qu’aucun canal ne confronte est une exemption
+      # invérifiable : elle survit à son contrôle et justifie alors le suivant.
+      # Ce garde refuse une classe ORPHELINE (aucun canal ne l’observe), une
+      # classe sans ligne, une ligne périmée, une raison d’absence donnée à un
+      # canal qui observe, un canal cité qui n’existe pas, une absence muette,
+      # un module ou une sonde ABSENT sur disque, et une déclaration `CE_QUE_*`
+      # vidée ou renommée. La matrice et la règle vivent dans
+      # scripts/couverture-tiers.js ; preuve d’échec dans
+      # scripts/__tests__/check-couverture-tiers.test.js.
+      - name: Check third-party class coverage (no class observed by no channel)
+        working-directory: frontend
+        run: node scripts/check-couverture-tiers.js
+
       # Le garde ci-dessus compare les textes que le plan DÉCLARE. Celui-ci
       # compare TOUT ce que les coquilles publient — chaque fragment visible des
       # HTML du build — aux textes que la page peut publier : un mot ajouté à la

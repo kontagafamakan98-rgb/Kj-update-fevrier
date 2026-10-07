@@ -725,6 +725,22 @@
       "preuve": "frontend/scripts/__tests__/check-marque-kojo.test.js",
       "runner": "vitest",
       "motif": "la règle elle-même, sans aucune E/S : elle reçoit la géométrie et un tampon RGBA, elle ne lit et n’écrit rien. Contraste : le protocole de l’atelier rejoué tel quel (un tube de rayon largeur/2 promené sur les trois segments, un échantillon tous les quarts d’unité, l’axe plus huit points de bord), la couleur sous chaque échantillon COMPOSÉE couche par couche en source-over prémultiplié — donc la mesure reste valable par construction si la lettre grandissait jusqu’à passer sous le collet ou sous un arc —, puis le rapport WCAG (luminance relative sRGB) contre la couleur déclarée de la lettre. Cercles : rayon + largeur/2 pour chaque cercle et chaque arc, comparés au rayon du disque, avec le nom de la couche et le débordement. Pixels : comptage sur l’artefact décodé, tolérance = rampe d’anti-aliasing + traîne du ré-échantillonnage, et part du disque peinte. Les fonctions de dessin (lireChemin M/L/V/H, distanceAuSegment à bouts PLATS, couverture analytique, dégradés radiaux dans la boîte du disque et linéaires en coordonnées de grille, dernier arrêt prolongé) sont celles du rasteriseur, parce qu’une mesure qui peindrait autrement que l’artefact mesurerait un dessin qui n’existe pas."
+    },
+    {
+      "chemin": "frontend/scripts/check-couverture-tiers.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "runner": "vitest",
+      "motif": "le trou qu’il ferme est une RELATION, pas une mesure : le dépôt regarde les tiers par CINQ canaux (les deux gardes statiques — shell-remote-resources.js et origines-bundles.js —, le parcours sans geste, le parcours après geste et la carte différée), et chacun publie ses limites en prose, mais RIEN ne reliait une CLASSE de tiers (SORTES : identifiant, message de bibliothèque, lien rendu, chargé après interaction, chargé quand le bloc entre dans le viewport, chargé si la variable de build le demande) aux canaux qui peuvent l’observer. Un classement qu’aucun canal ne confronte est une exemption invérifiable — la faute que le dépôt refuse partout (« une exemption qu’on n’ose plus retirer est une exemption qui mente »). Il refuse donc : une classe ORPHELINE (aucun canal ne l’observe), une classe sans ligne de matrice, une ligne dont la classe n’existe plus, un canal cité qui n’existe pas, une raison d’absence donnée à un canal qui observe la classe, une absence muette, un canal listé deux fois. Il porte EN PLUS ce que la règle pure ne peut pas voir : chaque `module` et chaque `sonde` nommés EXISTENT sur disque (une sonde supprimée laisserait le canal sans exécutant) et chaque déclaration `CE_QUE_*` est réellement CHARGÉE et rend un tableau NON VIDE (un export renommé ou une liste vidée retirerait au canal ses limites publiées sans que sa prose change d’un mot). Des planchers de lecture (5 canaux, 6 classes, 3 déclarations lues) refusent de juger un balayage qui n’a rien lu. Il ne juge PAS le bien-fondé d’une classe (c’est CLASSEMENT_ORIGINES et ses preuves) ni la véracité d’une limite de canal (chaque sonde la prouve à son niveau) : il dit QUI regarde, jamais si le regard est bon. Quirk mesuré (07/10/2026) : ce fichier n’a PAS de `#!`, contrairement à ses voisins — il charge une déclaration par un `import()` dont le spécificateur est une VARIABLE, que Vite réécrit en préfixant le module, ce qui repousserait le hashbang au-delà de la première ligne et ferait refuser le fichier par vitest (« Parse failure: Expected ident » à 1:68)."
+    },
+    {
+      "chemin": "frontend/scripts/couverture-tiers.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même, pure et sans E/S : `CANAUX` (le vocabulaire FERMÉ des cinq vues, chacune avec son module, sa sonde et l’endroit où elle publie ses limites), `MATRICE` (une ligne par classe, qui nomme les canaux qui l’observent et POURQUOI les autres ne l’observent pas) et `lacunesDeCouverture` (la confrontation, qui rend sept listes : classe sans ligne, classe orpheline, ligne périmée, canal cité inexistant, raison manquante, absence donnée à un canal qui observe, canal observateur listé deux fois). Les CLASSES ne sont pas redéclarées : elles viennent du propriétaire du vocabulaire (`SORTES`, dans origines-bundles.js), et la clé d’une ligne de matrice est la VALEUR de `SORTES` — la seule forme sous laquelle une classe est réellement écrite dans le dépôt (`CLASSEMENT_ORIGINES[].sorte`) ; `classesDuVocabulaire` REFUSE un vocabulaire ambigu (deux clés de même valeur feraient disparaître une classe de la couverture, en silence). Deux vocabulaires divergeraient à la première classe ajoutée — la faute que ce dépôt refuse partout. Ce module ne juge pas le bien-fondé d’une classe (c’est `CLASSEMENT_ORIGINES` et ses `preuve`), ni la véracité d’une limite (chaque sonde la prouve, sa prose la publie)."
     }
   ],
   "rejeux": [
@@ -2920,6 +2936,126 @@
       "cwd": "frontend",
       "attend": [
         "sort en 1 et nomme le contraste"
+      ]
+    },
+    {
+      "id": "couverture: orpheline neutralisee",
+      "garde": "frontend/scripts/couverture-tiers.js",
+      "cible": "frontend/scripts/couverture-tiers.js",
+      "trouve": "    if (reels.length === 0) orphelines.push(classe);",
+      "remplace": "    if (false && reels.length === 0) orphelines.push(classe);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-couverture-tiers.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une classe ORPHELINE"
+      ]
+    },
+    {
+      "id": "couverture: ligne perimee neutralisee",
+      "garde": "frontend/scripts/couverture-tiers.js",
+      "cible": "frontend/scripts/couverture-tiers.js",
+      "trouve": "    if (!classes.includes(classe)) classesInconnues.push(classe);",
+      "remplace": "    if (false && !classes.includes(classe)) classesInconnues.push(classe);",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-couverture-tiers.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une ligne PÉRIMÉE"
+      ]
+    },
+    {
+      "id": "couverture: absence muette neutralisee",
+      "garde": "frontend/scripts/couverture-tiers.js",
+      "cible": "frontend/scripts/couverture-tiers.js",
+      "trouve": "      if (absence === '' && !particuliere[canal]) raisonsManquantes.push({ classe, canal });",
+      "remplace": "      if (false && absence === '' && !particuliere[canal]) raisonsManquantes.push({ classe, canal });",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-couverture-tiers.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une absence MUETTE"
+      ]
+    },
+    {
+      "id": "couverture: absence pour un canal qui observe neutralisee",
+      "garde": "frontend/scripts/couverture-tiers.js",
+      "cible": "frontend/scripts/couverture-tiers.js",
+      "trouve": "      if (vusPar.includes(canal)) absencesIncoherentes.push({ classe, canal });",
+      "remplace": "      if (false && vusPar.includes(canal)) absencesIncoherentes.push({ classe, canal });",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-couverture-tiers.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une raison d’ABSENCE donnée à un canal qui OBSERVE la classe"
+      ]
+    },
+    {
+      "id": "couverture-tiers: existence sur disque neutralisee",
+      "garde": "frontend/scripts/check-couverture-tiers.js",
+      "cible": "frontend/scripts/check-couverture-tiers.js",
+      "trouve": "      if (!fs.existsSync(path.resolve(racineDepot, relatif))) {",
+      "remplace": "      if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-couverture-tiers.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un canal dont le module ou la sonde est ABSENT sur disque"
+      ]
+    },
+    {
+      "id": "couverture-tiers: declaration vide neutralisee",
+      "garde": "frontend/scripts/check-couverture-tiers.js",
+      "cible": "frontend/scripts/check-couverture-tiers.js",
+      "trouve": "    if (!Array.isArray(liste) || liste.length === 0) {",
+      "remplace": "    if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-couverture-tiers.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une déclaration de limites VIDÉE"
       ]
     }
   ]
