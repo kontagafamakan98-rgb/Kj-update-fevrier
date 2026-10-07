@@ -178,7 +178,14 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // déplace rien, et c'est cette égalité qui empêche Chrome de ré-élire un
     // second élément LCP plus tardif.
     `<section class="bg-gradient-to-br from-orange-600 via-orange-600 to-orange-700 text-white relative overflow-hidden">`,
-    `<div class="absolute inset-0 bg-black bg-opacity-5"></div>`,
+    // `pointer-events-none` : le voile du héros est une teinte de PEINTURE, pas
+    // une cible — sans quoi il se peint au-dessus de la grille de contenu (il
+    // est positionné, la grille est statique) et avale l'appui sur les deux
+    // appels à l'action. La classe est la même que dans src/pages/Home.js, pour
+    // que le HTML pré-rendu n'ait pas deux boutons morts avant l'hydratation.
+    // MESURÉ le 07/10/2026 : c'est exactement ce `<div>` que rendait
+    // `document.elementFromPoint` au centre des deux boutons.
+    `<div class="absolute inset-0 bg-black bg-opacity-5 pointer-events-none"></div>`,
     `<div class="${heroGrilleClass}">`,
     `<div class="${heroCopieClass}">`,
     `<span class="${heroKickerClass} mb-6">`,

@@ -1,4 +1,12 @@
-import { Link } from 'react-router-dom';
+// Le lien interne du site, PAS le `Link` de React Router : c'est lui qui ouvre
+// la transition de vue native (`components/LienVue.js`). Ce fichier était le
+// DERNIER à garder le `Link` brut après la migration du 27/09/2026 — mesuré le
+// 07/10/2026 : ses DEUX liens (l'appel « Commencer maintenant » de l'état vide
+// de la liste, et la carte de mission cliquable) changeaient de page d'un coup,
+// sans le raccord que tout le reste du site avait déjà. Le composant se comporte
+// comme le `Link` d'origine : mêmes propriétés, même `<a href>` réel pour un
+// crawler et pour « ouvrir dans un nouvel onglet ».
+import Link from './LienVue';
 import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobPageSafeHelpers';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import { DEMO_JOBS } from '../config/demoJobs';

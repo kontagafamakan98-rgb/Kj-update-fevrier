@@ -186,7 +186,20 @@ export default function Home() {
           lecture, deux actions de poids différent, et sous les deux, trois
           repères de confiance. */}
       <section className="bg-gradient-to-br from-orange-600 via-orange-600 to-orange-700 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-black bg-opacity-5"></div>
+        {/* Le voile du héros — et sa seule règle : il PEINT, il ne capte
+            jamais. MESURÉ (Chromium, 07/10/2026) : ce `<div>` est positionné
+            (`absolute`), donc il se peint APRÈS les frères en flux normal, et
+            la grille de contenu du héros est statique — le voile passait donc
+            AU-DESSUS des deux appels à l'action. `document.elementFromPoint`
+            au centre des deux boutons rendait `DIV.absolute.inset-0.bg-black
+            .bg-opacity-5` : chaque appui sur « Commencer maintenant » et
+            « Voir les emplois » était avalé par une teinte à 5 %, visible mais
+            décorative. `pointer-events-none` dit la règle en un mot — une
+            couche de PEINTURE n'est pas une cible — et il la dit pour les deux
+            canaux : la coquille pré-rendue publie la même classe
+            (vite-plugins/prerender/shells-home.js), sinon le HTML d'avant
+            l'hydratation garderait deux boutons morts. */}
+        <div className="absolute inset-0 bg-black bg-opacity-5 pointer-events-none"></div>
         <div className={heroGrilleClass}>
           <div className={heroCopieClass}>
             <span className={`${heroKickerClass} mb-6`}>
