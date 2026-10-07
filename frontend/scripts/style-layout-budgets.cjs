@@ -397,7 +397,24 @@ const HAUTEUR = {
   // `content-visibility: auto` du document : MESURÉ en neutralisant la
   // propriété sur le même artefact, elle vaut 759 px en mobile et 693 en
   // desktop, et retirer une section déplace les suivantes dans sa fenêtre.
-  '/': { mobile: 7170, desktop: 5179 },
+  //
+  // 7 170 → 7 929 px en mobile et 5 179 → 5 872 en desktop (07/10/2026, même
+  // journée) : la RÉSERVATION ci-dessus a été RÉ-ACCORDÉE, et ces 759 / 693 px
+  // n'étaient pas une propriété du document mais un DÉFAUT. Les constantes
+  // `contain-intrinsic-size` (src/App.css) sont indexées par `nth-of-type`, et
+  // la section de la bande retirée au MILIEU de l'accueil avait décalé la
+  // réserve de TOUS les rangs suivants : le rang 9 lisait 122,8 au lieu de
+  // 669,11 (à propos), le rang 10 lisait 676,92 au lieu de 839,75 (contact),
+  // et la onzième règle ne réservait plus rien du tout. Le document ne faisait
+  // donc que MENTIR sur les 759 / 693 px manquants au premier écran, puis les
+  // rattrapait en cours de défilement — la dérive publiée par
+  // `e2e/carte-facade.spec.js` valait 599,4 px sur / mobile, et poussait la
+  // façade HORS de la fenêtre sur / desktop (le cas rouge du 07/10). Après
+  // re-accord des neuf constantes, le levier ACTIF réserve EXACTEMENT la
+  // hauteur rendue : Δ 0 px mesuré dans les deux canaux, aux deux tailles
+  // (7 929 et 5 872 px levier actif comme neutralisé). La référence est
+  // re-mesurée, jamais élargie — la marge de la sonde reste de 20 %.
+  '/': { mobile: 7929, desktop: 5872 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
   // 1 718 → 1 721 px en mobile (28/09/2026) : la page prend le vocabulaire
@@ -489,10 +506,10 @@ const HAUTEUR = {
  * les mêmes polices : une hauteur qui suit le retour à la ligne ne doit pas
  * devenir un test de police.
  *
- * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses DIX
- * dernières sections descend de 443 à 123 nœuds (0,28 du relevé) et de 7 726 à
- * 1 236 px en mobile, de 5 407 à 1 086 px en desktop (0,16 et 0,20) — deux fois
- * et demie sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
+ * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses NEUF
+ * dernières sections descend de 447 à 123 nœuds (0,28 du relevé) et de 7 929 à
+ * 1 443 px en mobile, de 5 872 à 1 086 px en desktop (0,18 et 0,18) — près de
+ * trois fois sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
  * icônes SVG) donnait 279 → 105 nœuds avec les MÊMES hauteurs : la hauteur suit
  * les sections retirées, pas le nombre de nœuds qui les composent. Le rejeu
  * VIVANT est `e2e/style-layout-preuve-echec.spec.js` — il ampute le corps publié
@@ -502,14 +519,14 @@ const HAUTEUR = {
  *
  * ── Ce que la sonde NE sait PAS attraper, et c'est une mesure ───────────────
  * Casser une TAILLE ne fait PAS mordre la sonde. Remplacer chaque
- * `contain-intrinsic-size: auto Npx` (les DIX sections différées de l'accueil)
+ * `contain-intrinsic-size: auto Npx` (les NEUF sections différées de l'accueil)
  * par `auto 4px` NE CHANGE PLUS LA HAUTEUR au point de mesure du protocole :
- * re-mesuré le 27/09/2026, le document reste à 7 726 px en mobile et 5 407 px en
- * desktop, Δ 0 px et Δ nœuds 0, très loin des planchers de hauteur (6 180 / 4 325).
+ * re-mesuré le 07/10/2026, le document reste à 7 929 px en mobile et 5 872 px en
+ * desktop, Δ 0 px et Δ nœuds 0, très loin des planchers de hauteur (6 343 / 4 697).
  * Le relevé publié auparavant (−121 px mobile, −1 px desktop) n'était pas une
  * propriété du document mais un INSTANT de sa convergence : les sections se sont
- * RENDUES avant le relevé — la sonde lit leurs hauteurs vraies (937 px pour le
- * rang 3, contre une constante de 841,14) — et le mot-clé `auto` MÉMORISE la
+ * RENDUES avant le relevé — la sonde lit leurs hauteurs vraies (962,19 px pour le
+ * rang 3, contre une constante de 841,47) — et le mot-clé `auto` MÉMORISE la
  * taille rendue. Les constantes ne gouvernent donc que la PREMIÈRE mise en page :
  * la même mutation, échantillonnée au premier commit en desktop, donne
  * 5 407 → 1 819 px. La conséquence est assumée : la sonde n'a qu'une BORNE BASSE,
