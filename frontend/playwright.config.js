@@ -7,7 +7,14 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // `ecarts-moteurs` est déclaré APRÈS `html`, et l'ordre est le sujet : les
+  // rapporteurs sont appelés dans cet ordre, le rapporteur HTML efface puis
+  // régénère `playwright-report/` dans SON `onEnd`, et le nôtre y dépose le
+  // résumé des écarts APRÈS — un fichier écrit plus tôt serait perdu (mesuré
+  // dans la source de Playwright 1.63.0, cf. e2e/reporters/ecarts-moteurs.js).
+  reporter: process.env.CI
+    ? [['list'], ['html', { open: 'never' }], ['./e2e/reporters/ecarts-moteurs.js']]
+    : 'list',
   // Les relevés par moteur : vidés avant la suite, agrégés après elle. C'est le
   // seul moment où les trois projets coexistent (un processus de travail par
   // projet), donc le seul endroit où un ÉCART se calcule — voir

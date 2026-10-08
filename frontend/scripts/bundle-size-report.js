@@ -155,8 +155,21 @@ export const readPayload = (source) => {
  * @param {string} body
  * @returns {object|null}
  */
-export const extractPayload = (body) => {
-  const match = PAYLOAD_RE.exec(String(body || ''));
+export const extractPayload = (body) => extractPayloadAvec(body, PAYLOAD_RE);
+
+/**
+ * La même extraction, pour un AUTRE marqueur de charge utile.
+ *
+ * Le rapport des écarts par moteur publie lui aussi un commentaire unique — mis
+ * à jour à chaque push — et a donc sa propre charge utile : il réutilise cette
+ * extraction au lieu d'en écrire une seconde (deux extractions divergeraient).
+ *
+ * @param {string} body Corps de commentaire.
+ * @param {RegExp} motif Expression portant la charge utile en groupe 1.
+ * @returns {object|null}
+ */
+export const extractPayloadAvec = (body, motif) => {
+  const match = new RegExp(motif.source, motif.flags).exec(String(body || ''));
   if (!match) return null;
   try {
     const parsed = JSON.parse(match[1]);
@@ -291,6 +304,7 @@ export const postOrUpdateComment = async ({
   fetchImpl = fetch,
   apiBase = 'https://api.github.com',
   dryRun = false,
+  marker = MARKER,
 }) => {
   const headers = {
     accept: 'application/vnd.github+json',
@@ -310,7 +324,7 @@ export const postOrUpdateComment = async ({
   const comments = (await listRes.json()) || [];
   if (!Array.isArray(comments)) throw new Error('réponse GitHub inattendue (pas une liste)');
 
-  const existing = comments.find((c) => typeof c?.body === 'string' && c.body.includes(MARKER));
+  const existing = comments.find((c) => typeof c?.body === 'string' && c.body.includes(marker));
   if (existing && String(existing.body).trim() === String(body).trim()) {
     return { action: 'inchangé', id: existing.id ?? null };
   }
@@ -352,6 +366,8 @@ export const fetchPriorPayload = async ({
   token,
   fetchImpl = fetch,
   apiBase = 'https://api.github.com',
+  marker = MARKER,
+  payloadRe = PAYLOAD_RE,
 }) => {
   try {
     const res = await fetchImpl(
@@ -359,7 +375,7 @@ export const fetchPriorPayload = async ({
       {
         headers: {
           accept: 'application/vnd.github+json',
-          'user-agent': 'kojo-bundle-size/1.0',
+          'user-agent': 'kojo-reports/1.0',
           authorization: `Bearer ${token}`,
           'x-github-api-version': '2022-11-28',
         },
@@ -368,9 +384,9 @@ export const fetchPriorPayload = async ({
     if (!res.ok) return { payload: null, error: `liste des commentaires HTTP ${res.status}` };
     const comments = (await res.json()) || [];
     if (!Array.isArray(comments)) return { payload: null, error: 'réponse GitHub inattendue (pas une liste)' };
-    const prior = comments.find((c) => typeof c?.body === 'string' && c.body.includes(MARKER));
+    const prior = comments.find((c) => typeof c?.body === 'string' && c.body.includes(marker));
     if (!prior) return { payload: null, error: '' };
-    const payload = extractPayload(prior.body);
+    const payload = extractPayloadAvec(prior.body, payloadRe);
     return {
       payload,
       error: payload ? '' : 'commentaire précédent trouvé mais charge utile illisible',

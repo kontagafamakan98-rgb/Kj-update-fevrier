@@ -20,6 +20,7 @@ import {
   publierLesEcarts,
   ligneDEcart,
 } from '../../e2e/helpers/moteurs.js';
+import { placerLeResume } from '../../e2e/reporters/ecarts-moteurs.js';
 
 /**
  * LES PREUVES DU GARDE DU PÉRIMÈTRE MULTI-MOTEURS.
@@ -419,5 +420,83 @@ describe('les relevés partagés entre processus', () => {
       accord: false,
     });
     expect(texte).toBe('m — a=x · b=y — DIVERGENT');
+  });
+});
+
+describe('écarts par moteur — le résumé PLACÉ dans le report Playwright', () => {
+  // Ce que ces cas éprouvent, et pourquoi ils sont ici : le tableau est publié
+  // par le teardown, mais le rapport HTML n'existe qu'APRÈS lui (le rapporteur
+  // HTML efface puis régénère son dossier dans son propre `onEnd`) — c'est donc
+  // un RAPPORTEUR, déclaré après `html`, qui dépose le résumé dans le report.
+  // Ses trois comportements sont ceux qui décident d'un faux vert : placer,
+  // dire qu'il ne peut pas placer, et NOMMER une source absente au lieu de
+  // réussir en ne faisant rien.
+  const dossier = fs.mkdtempSync(path.join(os.tmpdir(), 'report-ecarts-'));
+  const source = path.join(dossier, 'ecarts-moteurs.md');
+  const resumeRun = path.join(dossier, 'resume-run.md');
+  afterAll(() => fs.rmSync(dossier, { recursive: true, force: true }));
+
+  it('dépose le résumé dans le report ET l’ajoute au résumé du run', () => {
+    // Sans saut de ligne final : c'est le cas où un `append` brut collerait le
+    // tableau au mot précédent du résumé du run.
+    fs.writeFileSync(source, '# Écarts par moteur\n\n- appui : étendue 60', 'utf8');
+    fs.writeFileSync(resumeRun, '## titre du run\n', 'utf8');
+    const dossierReport = fs.mkdtempSync(path.join(dossier, 'report-'));
+    const destination = path.join(dossierReport, 'ecarts-moteurs.md');
+    const lignes = [];
+
+    const resultat = placerLeResume({
+      source,
+      destination,
+      resume: resumeRun,
+      journaliser: (l) => lignes.push(l),
+    });
+
+    expect(resultat.manquant).toBeNull();
+    expect(fs.readFileSync(destination, 'utf8')).toBe(fs.readFileSync(source, 'utf8'));
+    const resume = fs.readFileSync(resumeRun, 'utf8');
+    expect(resume).toContain('## titre du run');
+    expect(resume).toContain('étendue 60');
+    // Le résumé du run n'est pas collé au mot précédent.
+    expect(resume).toContain('titre du run\n# Écarts par moteur');
+    expect(resume.endsWith('étendue 60\n')).toBe(true);
+    expect(resultat.place).toEqual([destination, resumeRun]);
+  });
+
+  it('NOMME la source absente au lieu de réussir en ne plaçant rien', () => {
+    const dossierReport = fs.mkdtempSync(path.join(dossier, 'report-vide-'));
+    const destination = path.join(dossierReport, 'ecarts-moteurs.md');
+    const lignes = [];
+
+    const resultat = placerLeResume({
+      source: path.join(dossier, 'jamais-publie.md'),
+      destination,
+      resume: '',
+      journaliser: (l) => lignes.push(l),
+    });
+
+    expect(resultat.manquant).toBe(path.join(dossier, 'jamais-publie.md'));
+    expect(resultat.place).toEqual([]);
+    expect(fs.existsSync(destination)).toBe(false);
+    expect(lignes.join('\n')).toContain('résumé des écarts non placé');
+    expect(lignes.join('\n')).toContain('globalTeardown');
+  });
+
+  it('ne fabrique pas un dossier de report absent, et le DIT', () => {
+    fs.writeFileSync(source, '# Écarts par moteur\n', 'utf8');
+    const resume = path.join(dossier, 'resume-sans-report.md');
+    const lignes = [];
+
+    const resultat = placerLeResume({
+      source,
+      destination: path.join(dossier, 'playwright-report-absent', 'ecarts-moteurs.md'),
+      resume,
+      journaliser: (l) => lignes.push(l),
+    });
+
+    expect(fs.existsSync(path.join(dossier, 'playwright-report-absent'))).toBe(false);
+    expect(resultat.place).toEqual([resume]);
+    expect(lignes.join('\n')).toContain("n'existe pas");
+    expect(lignes.join('\n')).toContain('produit pas de report HTML');
   });
 });

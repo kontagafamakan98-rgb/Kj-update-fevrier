@@ -439,6 +439,15 @@
       "hors_mutation": "outil sans verdict : son ok/errors vient de check-bundle-size.js (muté ci-dessus) ; ses seuls refus sont la PUBLICATION du commentaire GitHub (réseau + GITHUB_TOKEN), et sa preuve couvre la mise en forme, pas un refus — rien à neutraliser qui rougisse hors ligne"
     },
     {
+      "chemin": "frontend/scripts/ecarts-moteurs-report.js",
+      "role": "outil",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/ecarts-moteurs-report.test.js",
+      "runner": "vitest",
+      "motif": "rapport des écarts par moteur publié en commentaire de PR (un seul commentaire, mis à jour à chaque push) : le CALCUL appartient à e2e/helpers/moteurs.js et la PUBLICATION à bundle-size-report.js",
+      "hors_mutation": "outil sans verdict : une table vide ne le fait pas rougir (il la publie avec son compte de relevés, comme le teardown dont il transporte la mesure) ; ses seuls refus sont la publication du commentaire GitHub (réseau + GITHUB_TOKEN), et sa preuve couvre la mise en forme, les comparaisons absentes ou illisibles et la séparation des marqueurs — rien à neutraliser qui rougisse hors ligne"
+    },
+    {
       "chemin": "frontend/scripts/gen-og-images.py",
       "role": "outil",
       "invoque_par": "test",

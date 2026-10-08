@@ -933,6 +933,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: frontend-build
+    # Le tableau des écarts par moteur est publié en COMMENTAIRE de PR (même
+    # mécanique que le rapport de taille du bundle : un seul commentaire,
+    # marqueur invisible, charge utile relue au push suivant). Ce job a donc
+    # besoin du droit d'écrire dans la PR — sans lui, la publication échoue à
+    # la première PR et le tableau reste invisible là où on le lit.
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -977,16 +985,39 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e
 
-      - name: Upload Playwright report on failure
-        if: failure()
+      # `if: always()` : le tableau des écarts est une MESURE, et une MESURE se
+      # publie aussi les jours de rouge — c'est même le jour où on la lit. Le
+      # script ne recalcule rien (les relevés et les écarts viennent de
+      # e2e/helpers/moteurs.js) et ne fait pas échouer le job pour une table
+      # vide : il DIT le vide, avec son compte de relevés.
+      - name: Publish engine gap table as PR comment (always)
+        if: always()
+        working-directory: frontend
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node scripts/ecarts-moteurs-report.js \
+            --releves test-results/mesures-moteurs.jsonl \
+            --table test-results/ecarts-moteurs.md \
+            --markdown .ecarts-moteurs/comment.md \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --post
+
+      # `if: always()` — et non `failure()` : le tableau des écarts par moteur est
+      # une MESURE, pas un verdict. Un artefact publié les jours de rouge
+      # seulement n'existe pas le jour où l'on veut comparer un moteur à l'autre
+      # sur une exécution verte, c'est-à-dire presque toujours.
+      - name: Upload Playwright report and engine gaps (always)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          # Le rapport HTML, ET le tableau des écarts entre moteurs : c'est le
-          # seul artefact qui dit ce que Firefox et WebKit ont mesuré des mêmes
-          # gestes (publié aussi au journal par e2e/global-teardown-moteurs.js,
-          # mais un rouge se diagnostique mieux avec les deux chiffres sous les
-          # yeux).
+          # Le rapport HTML, le RÉSUMÉ des écarts placé DANS le rapport
+          # (frontend/playwright-report/ecarts-moteurs.md, déposé par
+          # e2e/reporters/ecarts-moteurs.js après la génération du rapport), et
+          # la table elle-même — le seul endroit qui dit ce que Firefox et
+          # WebKit ont mesuré des mêmes gestes.
           path: |
             frontend/playwright-report/
             frontend/test-results/ecarts-moteurs.md
