@@ -87,14 +87,46 @@ describe('la règle du périmètre, sur l’arbre réel', () => {
     ]);
   });
 
-  it('le registre porte les cinq parcours, y compris ceux dont le geste n’est pas détectable', () => {
-    expect(PARCOURS_DE_GESTE.map(({ fichier }) => fichier)).toEqual([
+  it('le registre porte les REJOUÉS et les EXCLUS, chacun avec sa raison vérifiable', () => {
+    expect(PARCOURS_DE_GESTE.filter(({ horsPerimetre }) => !horsPerimetre).map(({ fichier }) => fichier)).toEqual([
       'appuis-exterieurs.spec.js',
       'notifications.spec.js',
       'barres-rupture.spec.js',
+    ]);
+    const exclus = PARCOURS_DE_GESTE.filter(({ horsPerimetre }) => horsPerimetre);
+    expect(exclus.map(({ fichier }) => fichier).sort()).toEqual([
       'carte-facade.spec.js',
       'tiers-apres-interaction.spec.js',
     ]);
+    // Une exclusion sans RAISON, ou sans PREUVE, serait un silence : les deux sont
+    // écrites ici pour être lues, pas pour être crues.
+    for (const { horsPerimetre, preuve } of exclus) {
+      expect(horsPerimetre.length).toBeGreaterThan(60);
+      expect(preuve).toBeInstanceOf(RegExp);
+    }
+  });
+
+  it('refuse une exclusion SANS raison vérifiable (hors périmètre, sans preuve)', () => {
+    const registre = PARCOURS_DE_GESTE.map((entree) =>
+      entree.fichier === 'carte-facade.spec.js' ? { ...entree, preuve: undefined } : entree
+    );
+    expect(refusDuPerimetreMoteurs({ ...ARBRE, registre }).join('\n')).toContain('est exclu du périmètre');
+  });
+
+  it('refuse une exclusion dont la PREUVE a disparu de la source (raison périmée)', () => {
+    const registre = PARCOURS_DE_GESTE.map((entree) =>
+      entree.fichier === 'carte-facade.spec.js'
+        ? { ...entree, preuve: /geste-qui-n-existe-plus-\d+/ }
+        : entree
+    );
+    expect(refusDuPerimetreMoteurs({ ...ARBRE, registre }).join('\n')).toContain('la raison est périmée');
+  });
+
+  it('refuse un parcours EXCLU que le testMatch rejoue quand même (exclusion contredite)', () => {
+    const config = ARBRE.config.replace('|barres-rupture', '|barres-rupture|carte-facade');
+    expect(refusDuPerimetreMoteurs({ ...ARBRE, config }).join('\n')).toContain(
+      "l'exclusion et le périmètre se contredisent"
+    );
   });
 
   it('les deux projets moteurs portent le même périmètre et le bon appareil', () => {
@@ -144,15 +176,17 @@ describe('la règle du périmètre, refus par refus', () => {
     );
   });
 
-  it('refuse un fichier du registre que le testMatch a lâché', () => {
-    const config = ARBRE.config.replace(/\|carte-facade/g, '');
+  it("refuse un fichier REJOUÉ du registre que le testMatch a lâché", () => {
+    const config = ARBRE.config.replace(/\|barres-rupture/g, '');
     expect(refusDuPerimetreMoteurs({ ...ARBRE, config }).join('\n')).toContain(
-      '`carte-facade.spec.js` est au registre des gestes sans être rejoué par les projets moteurs'
+      '`barres-rupture.spec.js` est au registre des gestes sans être rejoué par les projets moteurs'
     );
   });
 
-  it('refuse un fichier rejoué par les moteurs mais absent du registre', () => {
-    const config = ARBRE.config.replace(/carte-facade/g, 'carte-facade|sinueux');
+  it("refuse un fichier rejoué par les moteurs mais absent du registre", () => {
+    // On ajoute au `testMatch` LUI-MÊME (le commentaire du périmètre nomme aussi
+    // `notifications`, et un `replace` de chaîne l'aurait attrapé lui).
+    const config = ARBRE.config.replace(/testMatch: \/([^/]*)\//g, 'testMatch: /($1|sinueux)/');
     const specs = [...ARBRE.specs, { fichier: 'sinueux.spec.js', source: 'publier(test, "x", 1);' }];
     expect(refusDuPerimetreMoteurs({ ...ARBRE, config, specs }).join('\n')).toContain(
       '`sinueux.spec.js` est rejoué par les projets moteurs sans figurer au registre des gestes'
@@ -226,12 +260,12 @@ describe('le garde, en sous-processus, sur les arbres fixtures', () => {
     "    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },",
     '    {',
     "      name: 'firefox',",
-    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-facade|tiers-apres-interaction)\\.spec\\.js/,',
+    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture)\\.spec\\.js/,',
     "      use: { ...devices['Desktop Firefox'] },",
     '    },',
     '    {',
     "      name: 'webkit',",
-    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-facade|tiers-apres-interaction)\\.spec\\.js/,',
+    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture)\\.spec\\.js/,',
     "      use: { ...devices['Desktop Safari'] },",
     '    },',
     '  ],',
@@ -241,13 +275,22 @@ describe('le garde, en sous-processus, sur les arbres fixtures', () => {
 
   const CI = 'run: npx playwright install --with-deps chromium firefox webkit\n';
 
-  /** Les cinq parcours du registre, chacun publiant, plus des parcours hors périmètre. */
+  /**
+   * Les CINQ parcours du registre (trois rejoués, deux exclus), plus des parcours
+   * sans geste. Les exclus existent ici SANS être dans le `testMatch` : c'est
+   * exactement la forme que le garde doit accepter, et les refus neufs (exclusion
+   * sans raison, preuve périmée) mordent dedans.
+   */
   const SPECS_PROPRES = {
     'appuis-exterieurs.spec.js': "await page.locator('a').click();\npublier(test, 'appuis nécessaires', 1);\n",
     'notifications.spec.js': 'await page.setViewportSize({ width: 500, height: 900 });\npublier(test, "n", 1);\n',
     'barres-rupture.spec.js': 'await page.mouse.wheel(0, 900);\npublier(test, "w", 1);\n',
-    'carte-facade.spec.js': 'await bouton.tap();\npublier(test, "c", 1);\n',
-    'tiers-apres-interaction.spec.js': 'await bouton.tap();\npublier(test, "t", 1);\n',
+    // Les deux parcours EXCLUS : ils portent un geste ET ce que leur `preuve`
+    // exige — c'est elle qui rend leur exclusion vérifiable.
+    'carte-facade.spec.js':
+      'await bouton.tap();\n// harnais : e2e/helpers/parcours-carte.js\npublier(test, "c", 1);\n',
+    'tiers-apres-interaction.spec.js':
+      'await bouton.tap();\nimport { ecouterLesRequetes } from "./helpers/requetes.js";\npublier(test, "t", 1);\n',
     ...Object.fromEntries(
       Array.from({ length: MIN_SPECS - 5 }, (_, i) => [`hors-perimetre-${i}.spec.js`, 'const x = 1;\n'])
     ),
@@ -268,10 +311,13 @@ describe('le garde, en sous-processus, sur les arbres fixtures', () => {
   it('sort 0 sur un arbre propre, et PUBLIE ce qu’il a lu', () => {
     const { frontend, fichierCi } = ecrireArbre({ nom: 'propre', config: CONFIG, specs: SPECS_PROPRES, ci: CI });
     const { code, sortie } = lancerGarde({ frontend, fichierCi });
-    expect(sortie).toContain('✅ Les trois moteurs couvrent le même périmètre (5 parcours)');
+    expect(sortie).toContain('✅ Les trois moteurs couvrent le même périmètre (3 parcours)');
     expect(code).toBe(0);
     // Le sujet est chiffré : sans ces comptes, un vert ne dirait pas ce qu'il a lu.
-    expect(sortie).toContain('5 parcours rejoués sur chromium, firefox et webkit');
+    expect(sortie).toContain('3 parcours rejoués sur chromium, firefox et webkit');
+    // Ce qui n'est PAS mesuré est publié aussi : un silence sur un parcours écarté
+    // serait la dette que ce garde refuse.
+    expect(sortie).toContain('Hors périmètre, avec leur raison (2)');
     expect(sortie).toContain('barres-rupture.spec.js (molette)');
   });
 

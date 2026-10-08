@@ -74,7 +74,12 @@ export function executerVerification(options = {}) {
   return {
     refus: refusDuPerimetreMoteurs(sources),
     detectes,
-    registre: PARCOURS_DE_GESTE.map(({ fichier }) => fichier),
+    // Le `testMatch` ne couvre que les REJOUÉS : c'est donc eux que le compte du
+    // journal doit nommer, sinon un vert dirait « 5 parcours » en mesurant 3.
+    registre: PARCOURS_DE_GESTE.filter(({ horsPerimetre }) => !horsPerimetre).map(({ fichier }) => fichier),
+    exclus: PARCOURS_DE_GESTE.filter(({ horsPerimetre }) => horsPerimetre).map(
+      ({ fichier, horsPerimetre }) => `${fichier} (${horsPerimetre})`
+    ),
     fichiersLus: sources.specs.length,
     gestesDetectes: detectes.map(({ fichier, gestes }) => `${fichier} (${gestes.join(', ')})`),
   };
@@ -105,6 +110,11 @@ function main() {
     `✅ Les trois moteurs couvrent le même périmètre (${rapport.registre.length} parcours), et chaque parcours du ` +
       'périmètre publie ses mesures.'
   );
+  // Les exclusions sont PUBLIÉES : un silence sur ce qui n'est PAS mesuré est
+  // exactement ce que ce garde existe pour empêcher.
+  if (rapport.exclus.length) {
+    console.log(`⚠️  Hors périmètre, avec leur raison (${rapport.exclus.length}) : ${rapport.exclus.join(' · ')}`);
+  }
   process.exit(0);
 }
 

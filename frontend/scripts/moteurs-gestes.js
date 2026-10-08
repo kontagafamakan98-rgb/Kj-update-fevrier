@@ -36,7 +36,10 @@
  *   • la CI installe les TROIS moteurs (la ligne qui installe les BINAIRES,
  *     `install --with-deps`, pas celle des dépendances système) ;
  *   • des PLANCHERS DE LECTURE : un périmètre cassé (mauvais chemin, dossier
- *     vide) doit ROUGIR au lieu de rendre un vert vide.
+ *     vide) doit ROUGIR au lieu de rendre un vert vide ;
+ *   • un parcours peut être DÉCLARÉ HORS PÉRIMÈTRE, mais alors avec sa RAISON et
+ *     une `preuve` (un motif que la source doit encore porter) : une exclusion
+ *     que rien ne contrôle serait un silence, pas une décision.
  *
  * La règle ne lit rien : elle reçoit les sources et rend ses refus. C'est ce qui
  * permet de l'éprouver à l'unité (`scripts/__tests__/check-moteurs-gestes.test.js`)
@@ -65,15 +68,29 @@ export const PARCOURS_DE_GESTE = [
     geste: 'molette (défilement inertiel) et bascule de taille (re-mise en page)',
     motif: /mouse\.wheel|setViewportSize/,
   },
-  {
-    fichier: 'carte-facade.spec.js',
-    geste: 'appui au doigt qui monte la carte tierce (l’instant où la requête PART dépend du moteur)',
-    motif: /\.tap\(|hasTouch/,
-  },
+  // ── DEUX PARCOURS SONT HORS PÉRIMÈTRE, ET C'EST MESURÉ (08/10/2026) ────────
+  //
+  // Ces deux parcours MESURENT UN GESTE et le premier passage de CI qui a
+  // réellement exécuté ce périmètre (run 37772882341, 08/10/2026) a rendu 22 cas
+  // rouges, tous dans ces deux fichiers, sur `firefox` et `webkit`. Ils restent
+  // au registre — c'est le seul endroit qui dit QUI est rejoué où, et POURQUOI —
+  // mais marqués `horsPerimetre` : la raison est écrite, et `preuve` est ce qui la
+  // rend vérifiable (une exclusion que rien ne contrôle est un silence).
   {
     fichier: 'tiers-apres-interaction.spec.js',
     geste: 'appui au doigt après lequel le seul tiers autorisé est contacté (l’ordre requête/peinture diffère d’un moteur à l’autre)',
     motif: /\.tap\(|hasTouch/,
+    horsPerimetre:
+      'sa sonde lit le CDP (`Network.enable`) — `CDP session is only available in Chromium` — donc il ne PEUT pas être rejoué hors Chromium ; la mesure des tiers sur trois moteurs reste à faire par une sonde sans CDP',
+    preuve: /requetes\.js/,
+  },
+  {
+    fichier: 'carte-facade.spec.js',
+    geste: 'appui au doigt qui monte la carte tierce (l’instant où la requête PART dépend du moteur)',
+    motif: /\.tap\(|hasTouch/,
+    horsPerimetre:
+      'son harnais rougit sur firefox et webkit (6 cas « la façade n’a pas pu être amenée dans le viewport » et carte différée, run 37772882341) : dette NOMMÉE, à rouvrir — le mesurer sur trois moteurs demande de réparer `parcours-carte.js`',
+    preuve: /parcours-carte/,
   },
 ];
 
@@ -187,7 +204,11 @@ export function refusDuPerimetreMoteurs({ config, ci, specs, registre = PARCOURS
     );
   }
 
-  const declares = registre.map(({ fichier }) => fichier);
+  // Un parcours EXCLU n'est pas rejoué : le `testMatch` ne doit couvrir que
+  // les rejoués, et l'égalité dans les deux sens porte donc sur ceux-là.
+  const exclus = registre.filter(({ horsPerimetre }) => horsPerimetre);
+  const rejoues = registre.filter(({ horsPerimetre }) => !horsPerimetre);
+  const declares = rejoues.map(({ fichier }) => fichier);
   const parFichier = new Map(specs.map(({ fichier, source }) => [fichier, source]));
 
   if (!specs.length) {
@@ -201,12 +222,28 @@ export function refusDuPerimetreMoteurs({ config, ci, specs, registre = PARCOURS
     refus.push('le registre des gestes est VIDE : le garde ne prouverait rien');
     return refus;
   }
-  for (const { fichier, geste, motif } of registre) {
+  for (const { fichier, geste, motif, horsPerimetre, preuve } of registre) {
     if (!parFichier.has(fichier)) {
       refus.push(`le registre déclare \`${fichier}\`, mais ce fichier n'existe pas dans frontend/e2e/`);
       continue;
     }
     const source = parFichier.get(fichier);
+    if (horsPerimetre) {
+      // La raison d'une exclusion doit être VÉRIFIABLE : sans preuve, ou si la
+      // preuve ne mord plus, l'exclusion redevient un silence.
+      if (!(preuve instanceof RegExp)) {
+        refus.push(
+          `\`${fichier}\` est exclu du périmètre (« ${horsPerimetre} ») sans \`preuve\` : une exclusion dont rien ` +
+            'ne se vérifie est un silence, pas une décision'
+        );
+      } else if (!preuve.test(source)) {
+        refus.push(
+          `l'exclusion de \`${fichier}\` s'appuie sur « ${horsPerimetre} », mais la source ne porte plus ${preuve} : ` +
+            'la raison est périmée, et l’exclusion avec elle'
+        );
+      }
+      continue;
+    }
     if (!motif.test(source)) {
       refus.push(
         `\`${fichier}\` est déclaré comme mesurant « ${geste} », mais la source ne porte AUCUN geste de ce genre : ` +
@@ -231,17 +268,31 @@ export function refusDuPerimetreMoteurs({ config, ci, specs, registre = PARCOURS
       }
     }
     for (const fichier of couverts) {
-      if (!declares.includes(fichier)) {
-        refus.push(`\`${fichier}\` est rejoué par les projets moteurs sans figurer au registre des gestes`);
+      if (declares.includes(fichier)) continue;
+      // Un parcours EXCLU que le `testMatch` rejoue est une contradiction, et
+      // elle est nommée pour ce qu'elle est (juste en dessous), pas deux fois.
+      if (exclus.some((exclu) => exclu.fichier === fichier)) continue;
+      refus.push(`\`${fichier}\` est rejoué par les projets moteurs sans figurer au registre des gestes`);
+    }
+    for (const { fichier, horsPerimetre } of exclus) {
+      if (new RegExp(firefox.motif.slice(1, -1)).test(fichier)) {
+        refus.push(
+          `\`${fichier}\` est exclu du périmètre (« ${horsPerimetre} ») alors que le \`testMatch\` le rejoue : ` +
+            "l'exclusion et le périmètre se contredisent"
+        );
       }
     }
   }
 
   for (const { fichier, gestes } of parcoursDetectes(specs)) {
-    if (!declares.includes(fichier)) {
+    // L'entrée au REGISTRE suffit : un parcours peut être rejoué OU exclu avec sa
+    // raison et sa preuve. Ce que la règle refuse, c'est un parcours qui mesure un
+    // geste et que personne n'a déclaré — le cas de l'ajout oublié.
+    if (!registre.some((entree) => entree.fichier === fichier)) {
       refus.push(
-        `\`${fichier}\` porte un geste de bas niveau (${gestes.join(', ')}) sans être rejoué sur Firefox ni WebKit : ` +
-          'ajouter son entrée au registre PARCOURS_DE_GESTE (scripts/moteurs-gestes.js), et le `testMatch` suit'
+        `\`${fichier}\` porte un geste de bas niveau (${gestes.join(', ')}) sans être déclaré : l'ajouter au registre ` +
+          'PARCOURS_DE_GESTE (scripts/moteurs-gestes.js) — rejoué, ou bien exclu avec `horsPerimetre` ET `preuve` si ' +
+          'le rejouer sur trois moteurs est impossible (le `testMatch` suit les rejoués)'
       );
     }
   }
