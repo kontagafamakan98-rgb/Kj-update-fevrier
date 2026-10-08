@@ -163,11 +163,74 @@ const publierLesBornes = (test, nom, attente) => {
   return attente;
 };
 
+/**
+ * QUEL GESTE DE DÉFILEMENT CE MOTEUR DÉLIVRE-T-IL ?
+ *
+ * La molette était le geste de ce cas, et le tableau des écarts du run
+ * 37783948030 (08/10/2026) a montré qu'elle n'y est pas délivrée partout : la
+ * colonne `webkit` est VIDE pour les trois mesures de molette (`900 px` n'ont
+ * jamais atteint `300 px` en 3 s), alors que les appuis tactiles du MÊME run y
+ * sont identiques aux deux autres moteurs — la séquence d'événements d'un appui
+ * est un fait de moteur, et elle y est la même. Le geste n'était donc pas CAPTÉ
+ * (ce que ce cas doit attraper) : il n'était pas DÉLIVRÉ (ce qui ne parle pas du
+ * sujet — le verrou du tiroir).
+ *
+ * Le geste est donc CHOISI par une mesure faite ici, sans verrou, sur la page du
+ * cas : si `900 px` de molette ne déplacent pas une page qui a de quoi défiler,
+ * ce moteur ne délivre pas la molette et le cas utilise le CLAVIER (`End`), un
+ * vrai geste que le verrou bloque tout autant — mesuré sur les trois moteurs :
+ * avec le tiroir ouvert (`overflow: hidden`), `End` laisse la position à `0` sur
+ * chromium, firefox ET webkit. Ce que le cas juge (la page refile) ne change
+ * donc pas : seul le stimulus est choisi pour être délivré. Le geste employé est
+ * PUBLIÉ, et si aucun des deux ne défilait, le cas rougirait sur son assertion
+ * au lieu de passer.
+ */
+const GESTE_MOLETTE = 'molette de 900 px';
+const GESTE_CLAVIER = 'touche Fin';
+
+/** Envoie le geste de défilement retenu. */
+async function envoyerLeGesteDeDefilement(page, geste) {
+  if (geste === GESTE_MOLETTE) {
+    await page.mouse.move(MOBILE.width / 2, MOBILE.height / 2);
+    await page.mouse.wheel(0, 900);
+    return;
+  }
+  await page.keyboard.press('End');
+}
+
+/**
+ * Choisit le geste de défilement de ce moteur, par une mesure de sa délivrance.
+ *
+ * La remise à zéro se fait au `Home` du clavier — un geste, jamais un
+ * `scrollTo` : celui-ci défile MÊME sous `overflow: hidden`, donc il rendrait le
+ * cas vert sur une page que personne ne peut faire défiler.
+ *
+ * @param {import('@playwright/test').Page} page Page du cas, sans verrou.
+ * @returns {Promise<string>} `GESTE_MOLETTE` ou `GESTE_CLAVIER`.
+ */
+async function gesteDeDefilementDeCeMoteur(page) {
+  const etat = await etatDeLaPage(page);
+  if (etat.hauteurDeDefilement <= 300) return GESTE_MOLETTE; // rien à défliler : le cas le dira lui-même
+  await page.mouse.move(MOBILE.width / 2, MOBILE.height / 2);
+  await page.mouse.wheel(0, 900);
+  const livree = await attendreLaCondition(page, SONDE_ETAT, (vue) => vue.positionDeDefilement > 0, {
+    plafondMs: 1500,
+  });
+  await page.keyboard.press('Home');
+  await attendreLaCondition(page, SONDE_ETAT, (vue) => vue.positionDeDefilement === 0, { plafondMs: 1500 });
+  return livree.atteinte ? GESTE_MOLETTE : GESTE_CLAVIER;
+}
+
 test.describe('les barres et le point de rupture', () => {
   test("le menu mobile se ferme quand sa barre cesse d'être affichée (et la page défile à nouveau)", async ({ page }) => {
     await page.setViewportSize(MOBILE);
     await page.goto('/');
     await attendreLeMontage(page);
+    // AVANT d'ouvrir le tiroir (donc sans verrou) : quel geste de défilement ce
+    // moteur délivre-t-il ? Le cas ne peut juger le verrou qu'avec un stimulus
+    // que le moteur reçoit (voir `gesteDeDefilementDeCeMoteur`).
+    const geste = await gesteDeDefilementDeCeMoteur(page);
+    publier(test, 'geste de défilement délivré par le moteur', geste);
     await ouvrirLeMenuMobile(page);
 
     const ouvert = await etatDeLaPage(page);
@@ -202,14 +265,15 @@ test.describe('les barres et le point de rupture', () => {
     expect(apres.hamburgerAffiche, 'aucun hamburger sur cette taille : rien ne pourrait fermer le tiroir').toBe(0);
     expect(apres.verrouDeDefilement, 'le verrou de défilement doit être rendu avec le menu').toBe('');
 
-    // Le fait qui compte pour le visiteur, et il se mesure au VRAI geste.
+    // Le fait qui compte pour le visiteur, et il se mesure au VRAI geste —
+    // celui que CE moteur délivre (molette, ou touche Fin : voir le choix).
     expect(apres.hauteurDeDefilement, 'la page doit avoir de quoi défiler, sinon le cas ne prouverait rien').toBeGreaterThan(300);
     await page.mouse.move(DESKTOP.width / 2, DESKTOP.height / 2);
-    await page.mouse.wheel(0, 900);
-    // La molette est un geste INERTIEL sur certains moteurs : la position
-    // atteinte n'est pas la même au bout du même temps, donc on attend la
-    // condition (la page a défilé) et on PUBLIE la durée — l'écart entre
-    // moteurs est précisément ce qu'un délai fixe cachait.
+    await envoyerLeGesteDeDefilement(page, geste);
+    // Le geste est INERTIEL sur certains moteurs : la position atteinte n'est
+    // pas la même au bout du même temps, donc on attend la condition (la page a
+    // défilé) et on PUBLIE la durée — l'écart entre moteurs est précisément ce
+    // qu'un délai fixe cachait.
     const defilement = await attendreLaCondition(
       page,
       SONDE_ETAT,
@@ -217,18 +281,18 @@ test.describe('les barres et le point de rupture', () => {
     );
     expect(
       defilement.atteinte,
-      "900 px de molette n'ont pas bougé la page : le verrou du tiroir a survécu à sa barre"
+      `après la bascule en desktop, « ${geste} » n'a pas bougé la page : le verrou du tiroir a survécu à sa barre`
     ).toBe(true);
-    publierLesBornes(test, 'molette de 900 px : défiler jusqu’à 300 px', defilement);
+    publierLesBornes(test, `défilement réel (${geste}) : défiler jusqu’à 300 px`, defilement);
     // Puis on attend l'ARRÊT du geste, qui n'est pas la même question : une
     // position lue en plein défilement amorti mesurerait un instant du mouvement.
     // Un défilement verrouillé reste à 0, et c'est l'assertion suivante qui le dit.
     await attendreLaStabiliteDuDefilement(page);
     const defile = await etatDeLaPage(page);
-    publier(test, 'molette de 900 px : position atteinte', defile.positionDeDefilement, 'px');
+    publier(test, `défilement réel (${geste}) : position atteinte`, defile.positionDeDefilement, 'px');
     expect(
       defile.positionDeDefilement,
-      "900 px de molette n'ont pas bougé la page : le verrou du tiroir a survécu à sa barre"
+      `après la bascule en desktop, « ${geste} » n'a pas bougé la page : le verrou du tiroir a survécu à sa barre`
     ).toBeGreaterThan(300);
   });
 

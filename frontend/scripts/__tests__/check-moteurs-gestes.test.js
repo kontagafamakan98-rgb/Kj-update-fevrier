@@ -284,7 +284,11 @@ describe('le garde, en sous-processus, sur les arbres fixtures', () => {
   const SPECS_PROPRES = {
     'appuis-exterieurs.spec.js': "await page.locator('a').click();\npublier(test, 'appuis nécessaires', 1);\n",
     'notifications.spec.js': 'await page.setViewportSize({ width: 500, height: 900 });\npublier(test, "n", 1);\n',
-    'barres-rupture.spec.js': 'await page.mouse.wheel(0, 900);\npublier(test, "w", 1);\n',
+    // Le geste de DÉFILEMENT porte les DEUX marqueurs depuis le 08/10/2026 : la
+    // molette, et le repli au clavier quand le moteur ne délivre pas la molette
+    // (le motif du registre exige les deux — une déclaration qu'on peut démentir).
+    'barres-rupture.spec.js':
+      "await page.mouse.wheel(0, 900);\nawait page.keyboard.press('End');\npublier(test, \"w\", 1);\n",
     // Les deux parcours EXCLUS : ils portent un geste ET ce que leur `preuve`
     // exige — c'est elle qui rend leur exclusion vérifiable.
     'carte-facade.spec.js':

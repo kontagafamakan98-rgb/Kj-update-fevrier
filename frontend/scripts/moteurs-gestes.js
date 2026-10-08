@@ -65,8 +65,13 @@ export const PARCOURS_DE_GESTE = [
   },
   {
     fichier: 'barres-rupture.spec.js',
-    geste: 'molette (défilement inertiel) et bascule de taille (re-mise en page)',
-    motif: /mouse\.wheel|setViewportSize/,
+    // Le geste de DÉFILEMENT est choisi par une mesure faite dans le cas : la
+    // molette quand le moteur la délivre, la touche `Fin` sinon (mesuré le
+    // 08/10/2026 : le WebKit de la CI ne délivre pas la molette, run 37783948030).
+    // Le motif garde les DEUX marqueurs, pour que le geste ne puisse pas
+    // disparaitre du fichier sans que le registre s'en aperçoive.
+    geste: 'défilement réel (molette, ou touche Fin quand le moteur ne délivre pas la molette) et bascule de taille (re-mise en page)',
+    motif: /mouse\.wheel[\s\S]*keyboard\.press\('End'\)/,
   },
   // ── DEUX PARCOURS SONT HORS PÉRIMÈTRE, ET C'EST MESURÉ (08/10/2026) ────────
   //
