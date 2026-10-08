@@ -253,9 +253,10 @@
 }
 
 /* ── MISE EN PAGE DIFFÉRÉE des sections sous la ligne de flottaison ────────
-   L'accueil pré-rendu publie ONZE sections (27/09/2026 ; dix avant la galerie),
-   dont une seule (le héros) tient dans le premier écran. Les dix autres étaient
-   mises en page AVANT que le visiteur les regarde. Mesuré le 26/09/2026 (minima
+   L'accueil pré-rendu publie DIX sections (07/10/2026 ; onze du 27/09 au 07/10,
+   le temps de la galerie ; dix avant elle), dont une seule (le héros) tient dans
+   le premier écran. Les NEUF autres étaient mises en page AVANT que le visiteur
+   les regarde. Mesuré le 26/09/2026 (minima
    entrelacés, 412×823 cpu×4, sondes `_sonde-cv.mjs`, sur les NEUF sections
    d'alors) : `content-visibility: auto` sur ces sections retire **−100,5 ms** de
    « Style & Layout » (419,8 → 319,3 ms, −24 %).
@@ -298,17 +299,39 @@
 
    LE HÉROS EST EXCLU (`:not(:first-of-type)`), et c'est la garantie LCP : depuis
    la refonte du 27/09/2026 l'élément élu de « / » est l'ILLUSTRATION du héros
-   (62 700 px² en mobile, 139 733 en desktop, mesuré identique dans les deux
-   canaux), et un élément LCP ne se met pas derrière une hauteur estimée. Il est
+   (re-mesuré le 29/09/2026 sur la photo 3/4 : 69 920 px² en mobile, 306 870 en
+   desktop, mesuré identique dans les deux canaux), et un élément LCP ne se met
+   pas derrière une hauteur estimée. Il est
    peint au premier écran, donc jamais « différé » — mesuré, la règle ne change
    ni l'élément élu ni son horodatage.
 
    UN SEUL PROPRIÉTAIRE : les deux canaux posent la MÊME classe sur le conteneur
-   des sections (`sections-differees`), dans src/pages/Home.js comme dans
-   vite-plugins/prerender/shells-home.js. Une section AJOUTÉE à l'accueil doit
+   des sections (`sections-differees`), dans src/pages/Home.js comme dans   vite-plugins/prerender/shells-home.js. Une section AJOUTÉE à l'accueil doit
    donc porter un `contain-intrinsic-size` de plus : sans lui, elle retombe sur
-   la taille de repli par défaut (0) et la hauteur du document s'effondre —
-   c'est ce que la sonde du document mesure. */
+   la taille de repli par défaut (0) et la hauteur du document s'effondre — c'est
+   ce que la sonde du document mesure.
+
+   ET UNE SECTION RETIRÉE DOIT FAIRE DISPARAÎTRE LA DERNIÈRE RÈGLE (07/10/2026).
+   Ces constantes sont indexées par RANG (`nth-of-type`) : retirer une section AU
+   MILIEU décale TOUS les rangs suivants, et chacun hérite alors de la constante
+   de son voisin. C'est exactement ce que la suppression de la bande des chiffres
+   a produit — les rangs 9 et 10 (à propos, contact) lisaient encore les
+   constantes des chiffres (122,8) et de l'à-propos (676,92), la onzième règle ne
+   correspondait plus à aucune section, et le document se DÉPLAÇAIT de 599,4 px
+   (mobile) en cours de défilement. Mesuré, pas déduit : `e2e/carte-facade.spec.js`
+   a rougi sur / desktop (la façade, amenée dans la vue, était repoussée HORS de
+   la fenêtre par la matière qui reprenait sa place). Le défaut était visible pour
+   le visiteur — un saut de plusieurs centaines de px au défilement — et il est
+   réparé ICI plutôt que toléré dans la sonde.
+
+   Le moyen de le voir, et c'est la vérification qui fait foi : le levier ACTIF
+   doit réserver EXACTEMENT la hauteur rendue. Re-mesuré le 07/10/2026 en
+   neutralisant `content-visibility` sur le même artefact (feuille injectée, les
+   DEUX canaux, 412×823 et 1350×940), la coquille et React donnent la MÊME
+   géométrie au pixel — 7 929 px (mobile) et 5 872 px (desktop) levier actif
+   COMME levier neutralisé. Ce que la suppression avait coûté : 7170 / 5179 px
+   réservés pour 7929 / 5872 px rendus, soit 759 / 693 px de matière MANQUANTE,
+   et une dérive de défilement du même ordre. */
 .sections-differees > section:not(:first-of-type) {
   content-visibility: auto;
 }
@@ -345,21 +368,29 @@
    soit 924 et 372 px de matière MANQUANTE. Après re-accord, les deux hauteurs
    sont égales au pixel dans les deux canaux.
 
-   Les dix constantes, hauteur de CONTENU (boîte de bordure moins les paddings et
-   les bordures, mêmes règles que ci-dessus) :
+   LES NEUF CONSTANTES, RE-MESURÉES LE 07/10/2026 (même protocole, les deux
+   canaux, identiques au pixel) — hauteur de CONTENU, boîte de bordure moins les
+   paddings et les bordures :
 
-     section            boîte de bordure   − padding − bordure = CONSTANTE
+     section            boîte de bordure   − padding = CONSTANTE
                          mob. / desk.        mob. / desk.
-       2  ruban          159,0 /  81,5       159,0 /  81,5   (aucun padding)
-       3  métiers        937,1 / 636,5       841,14 / 508,47
-       4  galerie        813,0 / 715,6       717,0 / 587,63
-       5  promesses      707,3 / 318,0       611,34 / 189,98
-       6  étapes         774,0 / 489,0       678,0 / 361,0
-       7  séquestre      786,3 / 500,8       690,3 / 372,84
-       8  clôture        385,1 / 302,9       385,05 / 302,88  (aucun padding)
-       9  chiffres       218,8 / 250,8       122,8 / 122,8
-      10  à propos       772,9 / 566,8       676,92 / 438,81
-      11  contact        936,4 / 791,1       839,42 / 662,06  (1 px de bordure)
+       2  ruban          159,00 /  81,50   159,00 /  81,50  (aucun padding)
+       3  métiers        962,19 / 696,05   841,47 / 519,05
+       4  galerie        837,72 / 764,63   717,00 / 587,63
+       5  promesses      720,53 / 376,27   599,81 / 199,27
+       6  étapes         806,86 / 538,00   686,14 / 361,00
+       7  séquestre      766,27 / 527,13   645,55 / 350,13  (aucun padding)
+       8  clôture        482,91 / 468,27   482,91 / 468,27
+       9  à propos       789,83 / 607,00   669,11 / 430,00
+      10  contact        961,47 / 850,64   839,75 / 672,64  (1 px de bordure)
+
+   CE QUE LA SUPPRESSION A DÉCALÉ, NOMMÉ : le rang 8 était « chiffres », le rang 9
+   « à propos » et le rang 10 « contact » ; sans la section retirée, le rang 9
+   portait 122,8 (les chiffres) et le rang 10 portait 676,92 (l'à-propos), et il
+   restait une onzième règle de 839,42 px qui ne réservait plus rien du tout. La
+   matière à réserver ne manquait donc pas d'un peu partout : elle manquait
+   EXACTEMENT de 546,31 + 162,83 px (mobile) et 307,20 + 233,83 px (desktop) sur
+   les deux derniers rangs.
 
    LES ÉTAPES PERDENT 148 px EN DESKTOP (509,5 → 361) : elles passent d'une
    entête pleine largeur à deux colonnes, et la photo de la colonne de gauche
@@ -367,30 +398,28 @@
    (471,4 → 678) : la photo s'ajoute sous l'entête, et la grille retombe sur une
    seule colonne. Les deux sens sont mesurés, et c'est la même page. */
 .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 159px; }
-.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 841.14px; }
+.sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 841.47px; }
 .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 717px; }
-.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 611.34px; }
-.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 678px; }
-.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 690.3px; }
-.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 385.05px; }
-.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 122.8px; }
-.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 676.92px; }
-.sections-differees > section:nth-of-type(11) { contain-intrinsic-size: auto 839.42px; }
+.sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 599.81px; }
+.sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 686.14px; }
+.sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 645.55px; }
+.sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 482.91px; }
+.sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 669.11px; }
+.sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 839.75px; }
 
 /* Au-delà de 768 px, `py-12` devient `py-16` (128 px) et les contenus prennent
    une autre forme : les tailles de contenu sont donc déclarées À PART, jamais
    déduites de celles du mobile. */
 @media (min-width: 768px) {
   .sections-differees > section:nth-of-type(2) { contain-intrinsic-size: auto 81.5px; }
-  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 508.47px; }
+  .sections-differees > section:nth-of-type(3) { contain-intrinsic-size: auto 519.05px; }
   .sections-differees > section:nth-of-type(4) { contain-intrinsic-size: auto 587.63px; }
-  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 189.98px; }
+  .sections-differees > section:nth-of-type(5) { contain-intrinsic-size: auto 199.27px; }
   .sections-differees > section:nth-of-type(6) { contain-intrinsic-size: auto 361px; }
-  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 372.84px; }
-  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 302.88px; }
-  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 122.8px; }
-  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 438.81px; }
-  .sections-differees > section:nth-of-type(11) { contain-intrinsic-size: auto 662.06px; }
+  .sections-differees > section:nth-of-type(7) { contain-intrinsic-size: auto 350.13px; }
+  .sections-differees > section:nth-of-type(8) { contain-intrinsic-size: auto 468.27px; }
+  .sections-differees > section:nth-of-type(9) { contain-intrinsic-size: auto 430px; }
+  .sections-differees > section:nth-of-type(10) { contain-intrinsic-size: auto 672.64px; }
 }
 
 /* ── LE FORMULAIRE DE /register : LE MÊME LEVIER, MESURÉ AVANT D'ÊTRE POSÉ ───

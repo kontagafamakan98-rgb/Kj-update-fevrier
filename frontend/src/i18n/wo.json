@@ -844,7 +844,7 @@
   "forgotPasswordErrorDeliveryError": "Mënunuñu yónnee email leegi. Jéemaat ci kanam.",
   "forgotPasswordErrorUnknownEmail": "Adresse email bii amul.",
   "forgotPasswordErrorGeneric": "Am na njumte. Jéemaat.",
-  "homeContactText": "L’équipe Kojo vous répond par téléphone, par e-mail ou sur WhatsApp, du lundi au samedi, pour toute question sur une mission, un paiement ou votre compte.",
+  "homeContactText": "L’équipe Kojo vous répond par téléphone, par e-mail ou sur WhatsApp, sept jours sur sept, pour toute question sur une mission, un paiement ou votre compte.",
   "homeContactCall": "Appeler le support",
   "homeContactFollow": "Suivez-nous",
   "footerAbout": "Ci nun",

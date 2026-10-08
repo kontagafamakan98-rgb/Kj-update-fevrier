@@ -143,7 +143,17 @@ const MESURE = {
   //   /contact         218,4 → 168,5 (−49,9)     42,7 → 32,8 (−9,8)
   //   /how-it-works    300,3 → 286,6 (−13,7)     57,3 → 55,4 (−1,8)
   //   /support         254,7 → 209,0 (−45,7)     49,4 → 39,2 (−10,2)
-  '/': { mobile: 424, desktop: 82 },
+  // 29/09/2026 : le héros de l'accueil est une PHOTO (six photos alternées,
+  // héros plus haut de 405 px en mobile et 611 en desktop). Relevé de la sonde,
+  // minimum de 3 runs : 287,1 ms mobile et 50,0 ms desktop. L'ÉTENDUE des trois
+  // runs mobiles vaut 935 ms sur cet hôte partagé — le chiffre est publié pour
+  // la provenance de la case, pas jugé (l'axe du temps n'appartient pas à
+  // l'artefact : le même document vaut 80,4 ms sur le runner de la CI).
+  // 07/10/2026 : la BANDE DE CHIFFRES de l'accueil devient la rangée de faits
+  // de la clôture (section en moins, rangée en plus). Relevé de la sonde,
+  // minimum de 3 runs sur le même protocole : 281,9 ms mobile, 51,6 ms desktop.
+  // Le chiffre est publié, pas jugé : il atteste la provenance de la case.
+  '/': { mobile: 281.9, desktop: 51.6 },
   '/about': { mobile: 231, desktop: 44 },
   // Relevé du 28/09/2026, après la refonte éditoriale des quatre pages de
   // confiance (mêmes conditions, mêmes 3 runs) : /contact 169 → 158,4 ms mobile
@@ -243,10 +253,27 @@ const NOEUDS = {
   // mesuré ici et non déduit : React publie ses composants là où la coquille
   // écrit le HTML). Ce budget-ci porte la COQUILLE, et la valeur publiée est la
   // sienne. La hauteur, elle, ne les sépare pas (6 706 px des deux côtés).
+  // 443 → 447 (07/10/2026) : les deux faits quittent la SECTION qui les
+  // isolait — elle comptait NEUF nœuds (la `<section>`, le conteneur, la bande,
+  // puis deux fois trois nœuds de cellule) — pour la rangée de la clôture, qui
+  // en compte TREIZE (la rangée, deux cellules, et dans chacune deux `<span>`
+  // — le chiffre et son libellé — plus le `<svg>` du dessin et ses tracés :
+  // trois pour le globe de `countryGlobe`, un pour le téléphone de
+  // `contactCall`). Solde **+4**, mesuré sur l'artefact dans les deux
+  // conditions, et une SECTION de MOINS sur la page (onze → dix). Le compte de
+  // chaque moitié est relevé, pas déduit : le balisage de la bande retirée et
+  // celui de la rangée publiée, comptés par `querySelectorAll('*')`.
   // 428 → 443 (27/09/2026) : la GALERIE des métiers (trois cartes, chacune un
   // lien, une image et une légende) et la photo du parcours ajoutent 15 nœuds à
   // la coquille, et 504 à React (contre 489) — le même écart de méthode, remesuré
   // sur le même passage que la hauteur.
+  // 443 → 443 (29/09/2026) : le héros passe du DESSIN à SIX PHOTOS qui alternent,
+  // et le compte ne bouge pas d'un nœud — c'est mesuré (443 dans les deux
+  // conditions), pas déduit. C'est exactement ce que le composant a été écrit
+  // pour faire : UN seul `<img>` dont le `src` change
+  // (src/components/PhotoDuHeros.js), là où un carrousel naïf publierait un
+  // second `<img>` caché ou un conteneur de plus. Les six `<img>` n'existent
+  // jamais en même temps dans la coquille : elle n'en publie qu'un.
   '/': 443,
   // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
   // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
@@ -280,7 +307,13 @@ const NOEUDS = {
   // DESSIN change (titre serif, filet qui ouvre l'entrée) — et un filet ne se
   // compte pas en nœuds.
   '/privacy': 109,
-  '/register': 236,
+  // 236 → 249 (28/09/2026) : la JAUGE du formulaire (la piste et son jaugeant)
+  // s'ajoute sous les trois pastilles de parcours, qui restaient statiques —
+  // +2 nœuds — et la marque de la page est désormais un DESSIN partagé
+  // (src/config/marque-kojo.js) au lieu d'un `<div>` et de son `<span>`, ce que
+  // la page gagne en nœuds (la marque porte un `<svg>` et ses tracés). Compte
+  // MESURÉ sur l'artefact livré par la sonde, jamais déduit.
+  '/register': 249,
   // 157 → 166 (28/09/2026) : les quatre lignes de contact prennent la ligne à
   // filet. Les trois lignes qui mènent quelque part gagnent la flèche (un
   // `<svg>` + ses deux tracés = 3 nœuds chacune) ; la quatrième — l'adresse
@@ -350,7 +383,38 @@ const HAUTEUR = {
   // la vérification que les dix constantes de src/App.css sont justes — avant
   // re-accord, le levier actif réservait 6 802 et 5 035 px, soit 924 et 372 px de
   // matière manquante, mesurés sur le même passage.
-  '/': { mobile: 7726, desktop: 5407 },
+  // 7 726 → 8 131 px en mobile et 5 407 → 6 018 en desktop (29/09/2026) : le
+  // héros remplace le DESSIN (432 × 324, le rapport 4/3 du fichier) par une PHOTO
+  // publiée à son rapport 3/4 dans un cadre élargi (`min(100%, 30rem)`,
+  // src/index.css) — la boîte passe à 480 × 640 px en desktop, donc +316 px de
+  // matière à elle seule, le reste venant du repli des sections qui suivent.
+  // Mesuré par `e2e/style-layout-document.spec.js` (minimum de 3 runs, bundle
+  // d'entrée bloqué, deux conditions), 443 nœuds dans les deux cas.
+  // 8 131 → 7 170 px en mobile et 6 018 → 5 179 en desktop (07/10/2026) : la
+  // section de la bande disparaît (245 px peints) et la rangée de faits entre
+  // dans la clôture (73 px plus sa marge, la clôture passe de 385 à 483 px —
+  // mesuré sur React). Le reste de l'écart est la RÉSERVATION
+  // `content-visibility: auto` du document : MESURÉ en neutralisant la
+  // propriété sur le même artefact, elle vaut 759 px en mobile et 693 en
+  // desktop, et retirer une section déplace les suivantes dans sa fenêtre.
+  //
+  // 7 170 → 7 929 px en mobile et 5 179 → 5 872 en desktop (07/10/2026, même
+  // journée) : la RÉSERVATION ci-dessus a été RÉ-ACCORDÉE, et ces 759 / 693 px
+  // n'étaient pas une propriété du document mais un DÉFAUT. Les constantes
+  // `contain-intrinsic-size` (src/App.css) sont indexées par `nth-of-type`, et
+  // la section de la bande retirée au MILIEU de l'accueil avait décalé la
+  // réserve de TOUS les rangs suivants : le rang 9 lisait 122,8 au lieu de
+  // 669,11 (à propos), le rang 10 lisait 676,92 au lieu de 839,75 (contact),
+  // et la onzième règle ne réservait plus rien du tout. Le document ne faisait
+  // donc que MENTIR sur les 759 / 693 px manquants au premier écran, puis les
+  // rattrapait en cours de défilement — la dérive publiée par
+  // `e2e/carte-facade.spec.js` valait 599,4 px sur / mobile, et poussait la
+  // façade HORS de la fenêtre sur / desktop (le cas rouge du 07/10). Après
+  // re-accord des neuf constantes, le levier ACTIF réserve EXACTEMENT la
+  // hauteur rendue : Δ 0 px mesuré dans les deux canaux, aux deux tailles
+  // (7 929 et 5 872 px levier actif comme neutralisé). La référence est
+  // re-mesurée, jamais élargie — la marge de la sonde reste de 20 %.
+  '/': { mobile: 7929, desktop: 5872 },
   // 1 667 → 1 718 px en mobile (les trois cartes d'À propos se replient d'une
   // ligne de plus avec Inter) ; desktop inchangé.
   // 1 718 → 1 721 px en mobile (28/09/2026) : la page prend le vocabulaire
@@ -409,7 +473,12 @@ const HAUTEUR = {
   // s'additionnent, mesurées, pas déduites.
   '/privacy': { mobile: 1720, desktop: 1212 },
   // 2 947 → 2 997 px en mobile, 2 517 → 2 534 en desktop.
-  '/register': { mobile: 2997, desktop: 2534 },
+  // 2 997 → 2 964 et 2 534 → 2 513 (28/09/2026) : re-mesure de la case après la
+  // jauge du formulaire et la marque DESSINÉE (le « K » typographique de
+  // l'en-tête laisse la place au tracé partagé, dont la boîte de 64 px n'a pas
+  // la même hauteur de ligne que l'ancien `<div>`). La jauge, elle, ajoute une
+  // hauteur de rail et son écart — le solde est mesuré, pas déduit.
+  '/register': { mobile: 2964, desktop: 2513 },
   // 1 652 px en mobile (inchangé) et 990 → 1 014 px en desktop.
   // 1 652 → 1 649 px en mobile et 1 014 → 1 023 px en desktop (28/09/2026) : le
   // titre de page passe au dessin serif du site. Ici les DEUX tailles suivent le
@@ -437,10 +506,10 @@ const HAUTEUR = {
  * les mêmes polices : une hauteur qui suit le retour à la ligne ne doit pas
  * devenir un test de police.
  *
- * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses DIX
- * dernières sections descend de 443 à 123 nœuds (0,28 du relevé) et de 7 726 à
- * 1 236 px en mobile, de 5 407 à 1 086 px en desktop (0,16 et 0,20) — deux fois
- * et demie sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
+ * Ce qui la franchit est MESURÉ, et rejoué : l'accueil amputé de ses NEUF
+ * dernières sections descend de 447 à 123 nœuds (0,28 du relevé) et de 7 929 à
+ * 1 443 px en mobile, de 5 872 à 1 086 px en desktop (0,18 et 0,18) — près de
+ * trois fois sous la borne. Le PREMIER rejeu (25/09/2026, artefact d'avant les
  * icônes SVG) donnait 279 → 105 nœuds avec les MÊMES hauteurs : la hauteur suit
  * les sections retirées, pas le nombre de nœuds qui les composent. Le rejeu
  * VIVANT est `e2e/style-layout-preuve-echec.spec.js` — il ampute le corps publié
@@ -450,14 +519,14 @@ const HAUTEUR = {
  *
  * ── Ce que la sonde NE sait PAS attraper, et c'est une mesure ───────────────
  * Casser une TAILLE ne fait PAS mordre la sonde. Remplacer chaque
- * `contain-intrinsic-size: auto Npx` (les DIX sections différées de l'accueil)
+ * `contain-intrinsic-size: auto Npx` (les NEUF sections différées de l'accueil)
  * par `auto 4px` NE CHANGE PLUS LA HAUTEUR au point de mesure du protocole :
- * re-mesuré le 27/09/2026, le document reste à 7 726 px en mobile et 5 407 px en
- * desktop, Δ 0 px et Δ nœuds 0, très loin des planchers de hauteur (6 180 / 4 325).
+ * re-mesuré le 07/10/2026, le document reste à 7 929 px en mobile et 5 872 px en
+ * desktop, Δ 0 px et Δ nœuds 0, très loin des planchers de hauteur (6 343 / 4 697).
  * Le relevé publié auparavant (−121 px mobile, −1 px desktop) n'était pas une
  * propriété du document mais un INSTANT de sa convergence : les sections se sont
- * RENDUES avant le relevé — la sonde lit leurs hauteurs vraies (937 px pour le
- * rang 3, contre une constante de 841,14) — et le mot-clé `auto` MÉMORISE la
+ * RENDUES avant le relevé — la sonde lit leurs hauteurs vraies (962,19 px pour le
+ * rang 3, contre une constante de 841,47) — et le mot-clé `auto` MÉMORISE la
  * taille rendue. Les constantes ne gouvernent donc que la PREMIÈRE mise en page :
  * la même mutation, échantillonnée au premier commit en desktop, donne
  * 5 407 → 1 819 px. La conséquence est assumée : la sonde n'a qu'une BORNE BASSE,

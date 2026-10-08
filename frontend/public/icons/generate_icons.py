@@ -2,19 +2,29 @@
 """Génère les icônes PWA Kojo en pur Python (stdlib uniquement, sans PIL).
 
 Usage :
-    python generate_icons.py [--source SRC] [--out-dir DIR] [--favicon FILE]
-                             [--manifest FILE] [--skip-size-pngs]
+    python generate_icons.py [--out-dir DIR] [--favicon FILE] [--manifest FILE]
+                             [--skip-size-pngs] [--skip-maskable]
     python generate_icons.py --digest FICHIER...
 
-Source par défaut : icon-512x512.png (le plus grand → meilleure qualité en
-downscale). Produit les tailles PWA déclarées par SIZES, le favicon CLAIR
-(favicon.ico, images PNG embarquées aux tailles de FAVICON_ICO_SIZES) puis le
-MANIFESTE de la famille (MANIFEST_NAME), qui la verrouille en CI via
-scripts/check-generated-icons.js.
+LA SOURCE EST DESSINÉE, et elle n'est plus un raster fourni : le poinçon — la
+marque du site — est peint ici à partir de src/config/marque-kojo.json, le
+MÊME fichier que la page et la coquille lisent (src/config/marque-kojo.js).
+L'onglet du navigateur porte donc la marque du site, et pas un second dessin
+qui lui ressemblerait. Produit les tailles PWA déclarées par SIZES, les
+variantes maskable, le favicon CLAIR (favicon.ico, images PNG embarquées aux
+tailles de FAVICON_ICO_SIZES) puis le MANIFESTE de la famille (MANIFEST_NAME),
+qui la verrouille en CI via scripts/check-generated-icons.js.
+
+Ce que la CI vérifie, et qui rend ce fichier un GÉNÉRATEUR et non un outil :
+elle REJOUE ce script dans un dossier temporaire et compare les empreintes de
+pixels des sorties à celles du manifeste. Éditer marque-kojo.json sans
+régénérer fait donc rougir la CI (les pixels produits changent), tout comme
+éditer ce script sans régénérer (l'empreinte du générateur change).
 
 Remplace l'ancienne version PIL (non installée) : les anciennes icônes
 72/96/128/152/384 étaient des fichiers vides de 100 octets (zéros), ce qui
-cassait le badge des notifications push et les apple-touch-icons.
+cassait le badge des notifications push et les apple-touch-icons — et celle
+d'avant réduisait un raster de l'ancien profil au plus proche voisin.
 
 ── Pourquoi le manifeste consigne des empreintes de PIXELS, pas d'octets ────
 
@@ -55,6 +65,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import struct
 import sys
 import zlib
@@ -112,11 +123,15 @@ MASKABLE_BACKGROUND = (15, 23, 42)  # #0f172a
 # l'inventaire de la famille, et le manifeste consigne leur empreinte d'OCTETS
 # telle qu'elle est committée. Toute modification silencieuse devient donc
 # détectable, sans prétendre pour autant qu'ils sont reproductibles.
-# Les variantes maskable NE sont plus ici : elles sont désormais produites par
-# ce générateur (voir MASKABLE_SIZES), donc enregistrées comme sorties.
-UNMANAGED_ASSETS = {
-    "kojo-icon.svg": "icône vectorielle source (dessin, pas de génération)",
-}
+#
+# VIDE depuis le 07/10/2026 : `kojo-icon.svg` y était seul — un carré orange à
+# « K » Arial, c'est-à-dire l'ANCIENNE marque, que plus rien ne référençait
+# (ni index.html, ni le manifeste PWA, ni le service worker). La marque vit
+# maintenant dans marque-kojo.json, et ses icônes sont dessinées ici : garder ce
+# fichier aurait laissé, dans le dossier des icônes, une copie de la marque que
+# le site n'affiche plus. Un actif « sans générateur » qui n'existe plus n'a rien
+# à déclarer ; le mécanisme, lui, reste (une entrée ici est encore possible).
+UNMANAGED_ASSETS = {}
 
 # Actifs de la famille produits par un AUTRE générateur : déclarés ici pour
 # qu'ils ne soient ni orphelins dans cette famille ni revendiqués deux fois. Le
@@ -274,6 +289,326 @@ def content_radius(pixels, width, height, channels, background=None):
     return worst
 
 
+# ── LA MARQUE, DESSINÉE ICI ──────────────────────────────────────────────────
+#
+# Le favicon et les icônes PWA descendaient d'un RASTER fourni (l'ancien profil,
+# 512 × 512, réduit au plus proche voisin). Ils descendent maintenant du
+# POINÇON, dessiné par ce fichier à partir de la MÊME déclaration que la page et
+# la coquille — src/config/marque-kojo.json, lu par src/config/marque-kojo.js :
+# l'onglet du navigateur porte donc la marque du site, et pas un second dessin
+# qui lui ressemblerait.
+#
+# Ce que ce dessin DOIT au SVG, et qui n'est pas négociable :
+#
+#   • les COUCHES sont peintes dans l'ORDRE du JSON (le disque, l'ombre, le
+#     cerclage, le glacis, le collet, le plateau, la lettre) — c'est cet ordre,
+#     et non un masque, qui garantit qu'aucun arc ne mord sur l'autre ;
+#   • les PEINTURES NOMMÉES sont ré-échantillonnées comme le fait un navigateur :
+#     les arrêts sont interpolés en sRGB, alpha compris, et la portée du dégradé
+#     radial est celle de la BOÎTE DU DISQUE (unités `objectBoundingBox`), pas
+#     celle de la grille — l'erreur d'un facteur 48 ;
+#   • les BORDS sont anti-aliasés par une couverture ANALYTIQUE (distance signée
+#     au bord, rampe d'un pixel) : sans elle, les trois filets concentriques du
+#     poinçon (collet 1,2 / plateau 1,0 / glacis 0,55) se transforment en
+#     escaliers dès 192 px ;
+#   • les ÉCHANTILLONS sont pris au CENTRE du pixel, et le pixel n'est peint que
+#     si le disque peut l'atteindre (les coins d'un disque inscrit sont un tiers
+#     de l'image) : c'est la même image, calculée une seule fois.
+#
+# Ce qu'il ne fait PAS, et ne prétend pas faire : `currentColor` (une couleur
+# héritée n'existe pas dans un raster — la peinture `inverse` de la marque ne
+# sert qu'à la page, sur un fond coloré), les filtres, l'animation. La marque n'a
+# ni les uns ni les autres : « rien ne brille » (§ IV de la philosophie d'atelier).
+MARQUE_SOURCE_SIZE = 512
+MARQUE_GEOMETRIE_PATH = Path(__file__).resolve().parents[2] / "src" / "config" / "marque-kojo.json"
+MARQUE_PEINTURE = "marque"
+
+
+def load_geometry(path=None):
+    """La géométrie du poinçon, lue du fichier que la page et la coquille lisent.
+
+    Une copie des nombres ici (un rayon retapé, une couleur recopiée) serait une
+    seconde source : le favicon dériverait du dessin à la première retouche, et
+    personne ne le verrait — un raster de 16 px ne se relit pas à l'œil.
+    """
+    chemin = Path(path) if path else MARQUE_GEOMETRIE_PATH
+    if not chemin.exists():
+        raise ValueError(
+            f"{chemin} : la géométrie de la marque est absente — les icônes PWA et le "
+            "favicon ne peuvent pas être dessinés"
+        )
+    return json.loads(chemin.read_text(encoding="utf-8"))
+
+
+def couleur_css(valeur):
+    """« #rrggbb » → (r, g, b). Une couleur héritée n'existe pas dans un raster."""
+    if not isinstance(valeur, str) or not valeur.startswith("#") or len(valeur) != 7:
+        raise ValueError(
+            f"couleur « {valeur} » : ce générateur ne peint que des couleurs explicites "
+            "(« currentColor » dépend de la feuille de style de la page, pas de l'icône)"
+        )
+    return tuple(int(valeur[i:i + 2], 16) for i in (1, 3, 5))
+
+
+class Peinture:
+    """Un dégradé de la déclaration, et sa loi d'échantillonnage.
+
+    `lineaire` projette le point sur l'axe (coordonnées de la grille, comme
+    `gradientUnits="userSpaceOnUse"`) ; `radial` mesure sa distance au centre
+    dans les unités de la BOÎTE de l'élément qui le référence (le défaut SVG,
+    `objectBoundingBox`) — c'est pourquoi la boîte est un paramètre d'appel.
+    Hors des bornes, un dégradé PROLONGE son dernier arrêt (spreadMethod par
+    défaut) : ne pas le faire peindrait du noir.
+    """
+
+    def __init__(self, nom, declaration):
+        self.nom = nom
+        self.sorte = declaration["sorte"]
+        self.centre = declaration.get("centre")
+        self.portee = declaration.get("portee")
+        self.axe = declaration.get("axe")
+        self.arrets = [
+            (
+                float(arret[0]),
+                couleur_css(arret[1]) + (float(arret[2]) if len(arret) > 2 else 1.0,),
+            )
+            for arret in declaration["arrets"]
+        ]
+
+    def _melange(self, decalage):
+        if decalage <= self.arrets[0][0]:
+            return self.arrets[0][1]
+        if decalage >= self.arrets[-1][0]:
+            return self.arrets[-1][1]
+        for index in range(1, len(self.arrets)):
+            gauche, droite = self.arrets[index - 1], self.arrets[index]
+            if decalage <= droite[0]:
+                part = (decalage - gauche[0]) / (droite[0] - gauche[0]) if droite[0] > gauche[0] else 0.0
+                return tuple(
+                    gauche[1][canal] + (droite[1][canal] - gauche[1][canal]) * part
+                    for canal in range(4)
+                )
+        return self.arrets[-1][1]
+
+    def couleur(self, x, y, boite):
+        """La couleur (r, g, b, a) de ce dégradé au point (x, y) de la grille."""
+        if self.sorte == "radial":
+            gauche, haut, largeur, hauteur = boite
+            decalage = math.hypot(
+                (x - gauche) / largeur - self.centre[0],
+                (y - haut) / hauteur - self.centre[1],
+            ) / self.portee
+        else:
+            x1, y1, x2, y2 = self.axe
+            dx, dy = x2 - x1, y2 - y1
+            carre = dx * dx + dy * dy
+            decalage = ((x - x1) * dx + (y - y1) * dy) / carre if carre else 0.0
+        return self._melange(decalage)
+
+
+def couverture(valeur, pas):
+    """La couverture d'un bord : 1 dedans, 0 dehors, une rampe d'un pixel au bord.
+
+    `valeur` est la distance SIGNÉE au bord, positive à l'extérieur : la rampe
+    d'un pixel n'est qu'un lissage de cette distance, ce qui est la définition
+    de l'anti-aliasing analytique (et ce qui le rend indépendant de la taille).
+    """
+    if valeur <= -0.5 * pas:
+        return 1.0
+    if valeur >= 0.5 * pas:
+        return 0.0
+    return 0.5 - valeur / pas
+
+
+def _angle_sur_le_cercle(x, y, centre_x, centre_y):
+    """L'angle d'un point de la grille, en degrés dans [0, 360), comme le tracé."""
+    return math.degrees(math.atan2(y - centre_y, x - centre_x)) % 360.0
+
+
+def _ecart_angulaire(angle, debut, fin):
+    """L'écart (en degrés) d'un angle à l'INTERVALLE parcouru par un arc.
+
+    Zéro quand l'angle tombe dedans — c'est ce qui fait la coupe franche des
+    bouts (les arcs de la marque sont en `butt`), et non un arrondi.
+    """
+    if debut <= angle <= fin:
+        return 0.0
+    return min(abs(angle - debut), abs(angle - fin))
+
+
+def _distance_au_segment(x, y, depart, arrivee, demi_trait):
+    """La distance signée d'un point à un SEGMENT À BOUTS PLATS (rectangle).
+
+    La version « capsule » (distance au segment) donnerait des bouts RONDS : le
+    « K » du poinçon est un gras géométrique à coupes franches, ses trois traits
+    ont donc une coupe perpendiculaire — un rectangle, et non un bâton arrondi.
+    """
+    x1, y1 = depart
+    x2, y2 = arrivee
+    dx, dy = x2 - x1, y2 - y1
+    longueur = math.hypot(dx, dy)
+    if longueur == 0:
+        return math.hypot(x - x1, y - y1) - demi_trait
+    axe = ((x - x1) * dx + (y - y1) * dy) / longueur
+    perpendiculaire = abs((x - x1) * dy - (y - y1) * dx) / longueur
+    debordement = max(0.0 - axe, axe - longueur)
+    return max(perpendiculaire - demi_trait, debordement)
+
+
+def lire_chemin(donnee):
+    """Les SEGMENTS d'un chemin SVG minimal : « M x y », « L x y », « V y », « H x ».
+
+    Les trois tracés de la lettre sont déclarés dans marque-kojo.json en syntaxe
+    SVG — parce que le SVG est ce que peint la page. Les recopier ici en couples
+    de points serait une SECONDE déclaration de la lettre, et c'est exactement
+    elle qui doit rester identique entre l'onglet et le site.
+    """
+    jetons = re.findall(r"[A-Za-z]|-?\d*\.?\d+", donnee)
+    segments = []
+    courant = None
+    commande = None
+    index = 0
+    while index < len(jetons):
+        jeton = jetons[index]
+        if jeton.isalpha():
+            commande = jeton.upper()
+            index += 1
+            continue
+        if commande in (None, "Z"):
+            raise ValueError(f"chemin « {donnee} » : commande manquante avant « {jeton} »")
+        if commande == "M":
+            courant = (float(jetons[index]), float(jetons[index + 1]))
+            index += 2
+            commande = "L"  # les couples suivants sont des lignes IMPLICITES
+            continue
+        if commande == "L":
+            suivant = (float(jetons[index]), float(jetons[index + 1]))
+            index += 2
+        elif commande == "V":
+            suivant = (courant[0], float(jetons[index]))
+            index += 1
+        elif commande == "H":
+            suivant = (float(jetons[index]), courant[1])
+            index += 1
+        else:
+            raise ValueError(
+                f"chemin « {donnee} » : la commande « {commande} » n'est pas supportée par "
+                "le rasteriseur (seuls M, L, V et H sont nécessaires à la lettre)"
+            )
+        segments.append((courant, suivant))
+        courant = suivant
+    return segments
+
+
+def dessiner_la_marque(taille, geometrie, peinture=MARQUE_PEINTURE):
+    """Le poinçon, en pixels RGBA (`taille` × `taille`), peint couche par couche.
+
+    Les trois traits de la lettre sont UNE seule couche (leur union) : ils sont
+    de la même couleur, opaque, donc peindre l'union ou les empiler donne la
+    même image — mais l'union est deux fois plus rapide.
+    """
+    grille = float(geometrie["grille"])
+    pas = grille / taille
+    couches = geometrie["peintures"][peinture]["couches"]
+    nommees = {
+        nom: Peinture(nom, declaration)
+        for nom, declaration in geometrie["gradients"].items()
+    }
+    lettre = geometrie["lettre"]
+
+    # Le rayon du disque commande tout l'extérieur : hors de sa portée (+ 1 px),
+    # le pixel est transparent et rien n'est évalué. C'est ce qui rend le dessin
+    # de 512 px tenable (les coins d'un disque inscrit sont un tiers de l'image).
+    disque = next((couche for couche in couches if couche["sorte"] == "disque"), None)
+    if disque is None:
+        raise ValueError("marque-kojo.json : la peinture n'a pas de disque — rien à dessiner")
+    rayon_disque = float(disque["rayon"])
+    boite_disque = (24.0 - rayon_disque, 24.0 - rayon_disque, 2 * rayon_disque, 2 * rayon_disque)
+
+    segments_lettre = [
+        (segment[0], segment[1], float(lettre["largeur"]))
+        for trace in (lettre["tronc"], lettre["brasHaut"], lettre["brasBas"])
+        for segment in lire_chemin(trace)
+    ]
+
+    def peinture_de(couche):
+        if "peinture" in couche:
+            return nommees[couche["peinture"]]
+        return None
+
+    pixels = bytearray(taille * taille * 4)
+    for ligne in range(taille):
+        y = (ligne + 0.5) * pas
+        for colonne in range(taille):
+            x = (colonne + 0.5) * pas
+            distance = math.hypot(x - 24.0, y - 24.0)
+            if distance > rayon_disque + pas:
+                continue
+            rouge = vert = bleu = alpha = 0.0
+            for couche in couches:
+                sorte = couche["sorte"]
+                if sorte == "disque":
+                    portee = couverture(distance - float(couche["rayon"]), pas)
+                elif sorte == "arc":
+                    rayon = float(couche["rayon"])
+                    demi = float(couche["largeur"]) / 2.0
+                    bord = abs(distance - rayon) - demi
+                    if bord >= 0.5 * pas:
+                        continue
+                    angle = _angle_sur_le_cercle(x, y, 24.0, 24.0)
+                    ecart = _ecart_angulaire(angle, float(couche["de"]), float(couche["a"]))
+                    portee = couverture(max(bord, math.radians(ecart) * rayon), pas)
+                elif sorte == "cercle":
+                    rayon = float(couche["rayon"])
+                    portee = couverture(
+                        abs(distance - rayon) - float(couche["largeur"]) / 2.0, pas
+                    )
+                elif sorte == "lettre":
+                    portee = 0.0
+                    for depart, arrivee, largeur in segments_lettre:
+                        portee = max(
+                            portee,
+                            couverture(
+                                _distance_au_segment(x, y, depart, arrivee, largeur / 2.0),
+                                pas,
+                            ),
+                        )
+                else:
+                    raise ValueError(f"marque-kojo.json : sorte de couche inconnue « {sorte} »")
+                if portee <= 0.0:
+                    continue
+                degrade = peinture_de(couche)
+                if degrade is not None:
+                    couleur = degrade.couleur(x, y, boite_disque)
+                    r, g, b = couleur[0], couleur[1], couleur[2]
+                    opacite = portee * couleur[3]
+                else:
+                    r, g, b = couleur_css(couche["couleur"])
+                    opacite = portee
+                if "opacite" in couche:
+                    opacite *= float(couche["opacite"])
+                # Composition « source-over », en prémultiplié : c'est ce qui
+                # permet à l'ombre et au glacis (semi-transparents) de se poser
+                # sur la matière sans la remplacer.
+                if opacite <= 0.0:
+                    continue
+                restant = 1.0 - opacite
+                rouge = r * opacite + rouge * restant
+                vert = g * opacite + vert * restant
+                bleu = b * opacite + bleu * restant
+                alpha = opacite + alpha * restant
+            if alpha <= 0.0:
+                continue
+            # La couleur accumulée est déjà prémultipliée par l'alpha courant :
+            # on la ramène en couleur droite pour l'écriture du PNG.
+            index = (ligne * taille + colonne) * 4
+            pixels[index] = min(255, int(rouge / alpha + 0.5))
+            pixels[index + 1] = min(255, int(vert / alpha + 0.5))
+            pixels[index + 2] = min(255, int(bleu / alpha + 0.5))
+            pixels[index + 3] = min(255, int(alpha * 255.0 + 0.5))
+    return bytes(pixels)
+
+
 def make_maskable(pixels, width, height, channels, size, scale):
     """Fabrique une variante maskable : contenu réduit de `scale`, centré sur
     un fond OPAQUE (la couleur de fond du manifeste PWA).
@@ -283,7 +618,7 @@ def make_maskable(pixels, width, height, channels, size, scale):
     du logo.
     """
     inner = max(1, int(round(size * scale)))
-    scaled = scale_nearest(pixels, width, height, channels, inner, inner)
+    scaled = reduce_area(pixels, width, height, channels, inner, inner)
     red, green, blue = MASKABLE_BACKGROUND
     out = bytearray(bytes((red, green, blue, 255)) * (size * size))
     offset = (size - inner) // 2
@@ -382,15 +717,61 @@ def digest_file(path):
     }
 
 
-def scale_nearest(pixels, width, height, channels, new_width, new_height):
+def reduce_area(pixels, width, height, channels, new_width, new_height):
+    """Réduction par MOYENNE DE SURFACE (filtre boîte), et non au plus proche voisin.
+
+    C'est cette fonction qui décidait de l'aspect du favicon : à 16 px, chaque
+    pixel de sortie vaut 32 px de la source, et « le pixel le plus proche » tombe
+    régulièrement à côté du trait de la lettre (2 px à cette taille) — l'onglet
+    montrait alors un K tronqué ou un bord en escalier. La moyenne de surface
+    intègre TOUT ce que la case couvre, et rend la réduction insensible à la
+    position du trait : c'est la propriété qu'on veut d'une marque réduite.
+
+    Sur une image à canal alpha, la moyenne se fait en PRÉMULTIPLIÉ : moyenner la
+    couleur et l'alpha séparément ferait tirer les bords vers le noir, les pixels
+    transparents d'un logo ayant une couleur (voir l'en-tête de `dessiner_la_marque`).
+    """
+    if (new_width, new_height) == (width, height):
+        return bytes(pixels)
     out = bytearray(new_width * new_height * channels)
+    alpha_index = channels - 1 if channels == 4 else None
     for y in range(new_height):
-        sy = min(height - 1, y * height // new_height)
+        debut_y = y * height // new_height
+        fin_y = max(debut_y + 1, (y + 1) * height // new_height)
         for x in range(new_width):
-            sx = min(width - 1, x * width // new_width)
-            src = (sy * width + sx) * channels
-            dst = (y * new_width + x) * channels
-            out[dst:dst + channels] = pixels[src:src + channels]
+            debut_x = x * width // new_width
+            fin_x = max(debut_x + 1, (x + 1) * width // new_width)
+            total = [0] * channels
+            compte = 0
+            for ligne in range(debut_y, fin_y):
+                base = ligne * width
+                for colonne in range(debut_x, fin_x):
+                    source = (base + colonne) * channels
+                    if alpha_index is None:
+                        for canal in range(channels):
+                            total[canal] += pixels[source + canal]
+                    else:
+                        alpha = pixels[source + alpha_index]
+                        total[alpha_index] += alpha
+                        for canal in range(alpha_index):
+                            total[canal] += pixels[source + canal] * alpha
+                    compte += 1
+            cible = (y * new_width + x) * channels
+            if alpha_index is None:
+                for canal in range(channels):
+                    out[cible + canal] = (total[canal] + compte // 2) // compte
+                continue
+            alpha_moyen = (total[alpha_index] + compte // 2) // compte
+            out[cible + alpha_index] = alpha_moyen
+            for canal in range(alpha_index):
+                # total[canal] est une somme de couleur × alpha : on la ramène à
+                # une couleur droite en divisant par la somme des alphas.
+                somme_alpha = total[alpha_index]
+                out[cible + canal] = (
+                    min(255, (total[canal] + somme_alpha // 2) // somme_alpha)
+                    if somme_alpha > 0
+                    else 0
+                )
     return bytes(out)
 
 
@@ -444,7 +825,7 @@ def sha256_of(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build_manifest(out_dir, source_path, size_entries, favicon_rel, favicon_entries, maskable):
+def build_manifest(out_dir, geometrie_rel, size_entries, favicon_rel, favicon_entries, maskable):
     unmanaged = []
     for name in sorted(UNMANAGED_ASSETS):
         path = out_dir / name
@@ -473,12 +854,21 @@ def build_manifest(out_dir, source_path, size_entries, favicon_rel, favicon_entr
             "zlib variant d'une installation à l'autre (101 592 octets committés "
             "contre 101 049 régénérés ici pour des pixels identiques)."
         ),
+        # La SOURCE n'est plus un fichier fourni : c'est le DESSIN, à la plus
+        # grande taille servie (voir main). On enregistre donc le fichier, ses
+        # pixels, ET la déclaration dont ils descendent — de sorte qu'une
+        # géométrie retouchée sans régénération soit NOMMÉE, et pas seulement
+        # déduite d'un écart de pixels.
         "source": {
-            "file": source_path.name,
+            "file": f"icon-{size_entries['width']}x{size_entries['height']}.png",
             "width": size_entries["width"],
             "height": size_entries["height"],
             "color_type": size_entries["color_type"],
             "pixel_sha256": size_entries["pixel_sha256"],
+            "drawn_by": Path(__file__).name,
+            "peinture": MARQUE_PEINTURE,
+            "geometry": geometrie_rel,
+            "geometry_sha256": generator_sha256(MARQUE_GEOMETRIE_PATH),
         },
         "sizes": SIZES,
         "favicon_sizes": FAVICON_ICO_SIZES,
@@ -494,7 +884,6 @@ def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--source", help="PNG source (défaut : icon-512x512.png, relatif au dossier courant)")
     parser.add_argument("--out-dir", default=".", help="dossier des icônes PWA (défaut : dossier courant)")
     parser.add_argument("--favicon", help=f"chemin du favicon clair (défaut : <out-dir>/../{FAVICON_ICO_NAME})")
     parser.add_argument("--manifest", help=f"chemin du manifeste (défaut : <out-dir>/{MANIFEST_NAME})")
@@ -534,15 +923,29 @@ def main():
     # Résolu une bonne fois : le favicon se déduit du PARENT du dossier des
     # icônes, et « . » donnerait sinon « ./favicon.ico » (donc DANS icons/).
     out_dir = Path(args.out_dir).resolve()
-    source_path = Path(args.source) if args.source else Path("icon-512x512.png")
-    width, height, colortype, channels, pixels = read_png(source_path)
-    print(f"Source : {source_path} ({width}x{height}, type couleur {colortype}, {channels} canaux)")
+    # LA MARQUE EST DESSINÉE, et non plus réduite d'un raster fourni : les icônes
+    # PWA et le favicon descendent du poinçon déclaré dans marque-kojo.json — le
+    # même dessin que la page et la coquille.
+    geometrie = load_geometry()
+    if MARQUE_SOURCE_SIZE != max(SIZES):
+        raise ValueError(
+            f"MARQUE_SOURCE_SIZE ({MARQUE_SOURCE_SIZE}) doit être la plus grande taille servie "
+            f"({max(SIZES)}) : c'est le dessin d'origine, toutes les autres en descendent"
+        )
+    width = height = MARQUE_SOURCE_SIZE
+    colortype = 6  # RGBA : la marque est un disque, ses coins sont transparents
+    channels = CHANNELS_BY_COLOR_TYPE[colortype]
+    print(
+        f"Marque dessinée : {width}x{height}, grille {geometrie['grille']}, peinture "
+        f"« {MARQUE_PEINTURE} » — géométrie {MARQUE_GEOMETRIE_PATH}"
+    )
+    pixels = dessiner_la_marque(width, geometrie)
 
     source_digest = pixels_sha256(pixels)
 
     outputs = []
     for size in SIZES:
-        scaled = scale_nearest(pixels, width, height, channels, size, size)
+        scaled = reduce_area(pixels, width, height, channels, size, size)
         out = out_dir / f"icon-{size}x{size}.png"
         digest = pixels_sha256(scaled)
         if args.skip_size_pngs:
@@ -601,7 +1004,7 @@ def main():
     images = []
     favicon_entries = []
     for size in FAVICON_ICO_SIZES:
-        scaled = scale_nearest(pixels, width, height, channels, size, size)
+        scaled = reduce_area(pixels, width, height, channels, size, size)
         images.append((size, encode_png(size, size, colortype, scaled)))
         favicon_entries.append(
             {"width": size, "height": size, "color_type": colortype, "pixel_sha256": pixels_sha256(scaled)}
@@ -612,7 +1015,7 @@ def main():
     manifest_path = Path(args.manifest).resolve() if args.manifest else out_dir / MANIFEST_NAME
     manifest = build_manifest(
         out_dir,
-        source_path,
+        os.path.relpath(MARQUE_GEOMETRIE_PATH, manifest_path.parent).replace(os.sep, "/"),
         {
             "width": width,
             "height": height,

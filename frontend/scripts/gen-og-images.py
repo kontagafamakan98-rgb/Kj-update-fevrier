@@ -12,8 +12,15 @@ Deux formats par page :
     (WhatsApp, Telegram, iMessage, LinkedIn, aperçus Twitter) : un recadrage
     1:1 du centre conserve le contenu essentiel.
 
-Génère aussi le favicon SOMBRE (fond graphite + K dégradé) pour les surfaces
-sombres (onglets navigateur en mode sombre, cartes de partage sur fond foncé).
+Génère aussi le favicon SOMBRE pour les surfaces sombres (onglets navigateur en
+mode sombre, cartes de partage sur fond foncé) : c'est la MARQUE DU SITE — le
+poinçon dessiné par la famille des icônes (public/icons/generate_icons.py, à
+partir de src/config/marque-kojo.json) — posée sur le graphite. Elle est
+COMPOSÉE, jamais redessinée : deux dessins de la même marque divergeraient à la
+première retouche, et c'est l'onglet qui montrerait l'ancienne. Ce fichier ne
+la produit donc plus lui-même (le « K » typographique a disparu, avec la police
+qui le composait) : il doit être lancé APRÈS generate_icons.py, dont il lit la
+sortie 512.
 
 Usage (Pillow) :
     cd frontend && ../backend/.venv/Scripts/python scripts/gen-og-images.py
@@ -65,6 +72,9 @@ W, H = 1200, 630
 SQUARE = 1200
 FAVICON = 512
 FAVICON_PATH = os.path.join('icons', 'icon-dark.png')
+# La MARQUE, telle que la famille des icônes la dessine (voir make_dark_favicon) :
+# chemin relatif à OUT_DIR, et jamais recopié ailleurs.
+MARK_PATH = os.path.join('icons', 'icon-512x512.png')
 OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'public')
 MANIFEST_NAME = 'og-assets.manifest.json'
 MANIFEST_PATH = os.path.join(os.path.dirname(__file__), MANIFEST_NAME)
@@ -306,39 +316,34 @@ def render_square(title_lines, description_lines, accent_tag=None):
 
 
 def make_dark_favicon(size=512):
-    """Favicon sombre : fond graphite + K dégradé orange→rouge.
+    """Favicon sombre : LA MARQUE DU SITE, posée sur le graphite des surfaces sombres.
 
-    Destiné aux surfaces sombres (onglets en mode sombre, cartes de partage
-    sur fond foncé) où l'icône claire actuelle disparaîtrait.
+    Destiné aux onglets en mode sombre et aux cartes de partage sur fond foncé,
+    où l'icône claire — un disque à coins transparents — disparaîtrait. Ce qu'il
+    porte est la marque elle-même (le poinçon), pas une variante dessinée ici :
+    la composition laisse les pixels de la marque INTACTS, et se contente de
+    remplacer la transparence par le fond. C'est ce qui garantit que l'onglet et
+    le site montrent le même dessin, à la même échelle.
+
+    Ce fichier ne dessine donc plus rien pour ce favicon : l'ancienne version
+    composait un « K » de police et un dégradé — deux paramètres dont dépendait
+    l'aspect (police résolue sur l'hôte, dégradé recopié), et une marque que le
+    site n'affiche plus. Il lit la sortie 512 de la famille des icônes, et
+    refuse de composer si elle manque (plutôt que d'écrire un carré vide).
     """
-    bg = (24, 24, 27)  # zinc-900
-    img = Image.new("RGB", (size, size), bg)
-
-    # Lueur centrale subtile pour détacher le K du fond.
-    glow = Image.new("L", (size, size), 0)
-    gd = ImageDraw.Draw(glow)
-    gd.ellipse([size * 0.12, size * 0.12, size * 0.88, size * 0.88], fill=60)
-    glow = glow.filter(__import__('PIL.ImageFilter', fromlist=['GaussianBlur']).GaussianBlur(radius=size * 0.12))
-    dark = Image.new("RGB", (size, size), bg)
-    img = Image.composite(Image.new("RGB", (size, size), (255, 255, 255)), dark, glow)
-    img = Image.blend(img, Image.new("RGB", (size, size), bg), 0.35)
-
-    # Dégradé vertical orange→rouge pour le K.
-    grad = make_gradient(size, size)
-
-    draw = ImageDraw.Draw(img)
-    font_k = load_font(int(size * 0.62), bold=True)
-    bbox = draw.textbbox((0, 0), "K", font=font_k)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    x0 = (size - tw) / 2 - bbox[0]
-    y0 = (size - th) / 2 - bbox[1]
-
-    # Texte -> masque, puis le dégradé est poussé à travers le masque.
-    mask = Image.new("L", (size, size), 0)
-    md = ImageDraw.Draw(mask)
-    md.text((x0, y0), "K", fill=255, font=font_k)
-    img = Image.composite(grad, img, mask)
-    return img.convert("RGBA")
+    mark_path = os.path.join(OUT_DIR, MARK_PATH)
+    if not os.path.exists(mark_path):
+        raise SystemExit(
+            f"{mark_path} absent : lance generate_icons.py (public/icons/) avant ce "
+            "script — le favicon sombre COMPOSE la marque, il ne la dessine pas"
+        )
+    marque = Image.open(mark_path).convert("RGBA")
+    if marque.size != (size, size):
+        marque = marque.resize((size, size), Image.LANCZOS)
+    fond = (24, 24, 27, 255)  # zinc-900, le fond des surfaces sombres du site
+    img = Image.new("RGBA", (size, size), fond)
+    img.alpha_composite(marque)
+    return img
 
 
 def load_cards():
@@ -551,7 +556,18 @@ def write_manifest(out_dir, manifest_path, cards):
             manifest_entry(out_dir, card['square'], SQUARE, SQUARE, 'carré'),
         )
     ]
-    assets.append(manifest_entry(out_dir, FAVICON_PATH, FAVICON, FAVICON, 'favicon sombre'))
+    # Le favicon sombre COMPOSE la marque du site : son entrée dit DE QUOI elle
+    # est faite, et l'empreinte de cette source. Sans ces deux champs, régénérer
+    # les icônes sans régénérer le favicon laisserait l'onglet en mode sombre sur
+    # l'ancienne marque — sans qu'une seule empreinte de ce manifeste ne bouge.
+    # Le garde (scripts/check-og-assets.js) refuse un écart entre les deux.
+    favicon_entry = manifest_entry(out_dir, FAVICON_PATH, FAVICON, FAVICON, 'favicon sombre')
+    mark_full = os.path.join(OUT_DIR, MARK_PATH)
+    if os.path.exists(mark_full):
+        with open(mark_full, 'rb') as handle:
+            favicon_entry['compose'] = MARK_PATH.replace(os.sep, '/')
+            favicon_entry['compose_sha256'] = hashlib.sha256(handle.read()).hexdigest()
+    assets.append(favicon_entry)
     manifest = {
         'generator': os.path.basename(__file__),
         'generator_sha256': generator_sha256(__file__),

@@ -54,6 +54,7 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
     page: 1,
     q: filters.search.trim() || undefined,
     category: filters.category || undefined,
+    country: filters.country || undefined,
     mine: effectiveTab === JOB_TAB_MISSIONS
       ? (user?.user_type === 'client' ? 'posted' : 'assigned')
       : undefined,
@@ -88,6 +89,13 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
       const params = { limit: JOBS_PAGE_SIZE, page: targetPage };
       if (filters.search.trim()) params.q = filters.search.trim();
       if (filters.category) params.category = filters.category;
+      // Le pays est un filtre de DÉCOUVERTE : le backend l'accepte depuis
+      // toujours (`GET /jobs?country=mali`) et il est la seule façon de voir
+      // les offres d'un autre pays que le sien. Il ne s'applique donc pas aux
+      // vues personnelles (candidatures, missions), qui portent déjà leurs ids
+      // ou leur `mine` : un pays y retirerait des lignes que l'utilisateur
+      // possède sans qu'il ait rien demandé.
+      if (filters.country && effectiveTab === JOB_TAB_DISCOVER) params.country = filters.country;
 
       if (effectiveTab === JOB_TAB_MISSIONS) {
         params.mine = user?.user_type === 'client' ? 'posted' : 'assigned';
@@ -144,8 +152,19 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
   };
 
   useEffect(() => {
+    // L'URL est la source de vérité des deux filtres qu'un LIEN peut poser :
+    // les rangées de métiers de l'accueil (`?category=`) et le ruban des pays
+    // (`?country=`). Les lire séparément ferait perdre l'un quand l'autre
+    // arrive — et un lien depuis /jobs vers /jobs change les `searchParams`
+    // SANS remonter la page, donc sans relire l'URL : le pays resterait celui
+    // de l'appui précédent.
     const category = searchParams.get('category') || '';
-    setFilters((previous) => previous.category === category ? previous : { ...previous, category });
+    const country = searchParams.get('country') || '';
+    setFilters((previous) =>
+      previous.category === category && previous.country === country
+        ? previous
+        : { ...previous, category, country }
+    );
     if (user?.user_type === 'worker') {
       jobsAPI.getMyProposals()
         .then((response) => {
@@ -162,7 +181,7 @@ export function useJobsData({ effectiveTab, filters, setFilters, searchParams, u
   useEffect(() => {
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveTab, filters.search, filters.category, filters.status, user?.id, user?.user_type]);
+  }, [effectiveTab, filters.search, filters.category, filters.country, filters.status, user?.id, user?.user_type]);
 
   return {
     jobs,

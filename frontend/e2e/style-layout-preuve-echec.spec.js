@@ -10,12 +10,12 @@
  * (`scripts/style-layout-budgets.cjs`). Rien, dans la sonde elle-même, ne dit
  * qu'elle sait ROUGIR — un plancher que rien ne franchit est un plancher qui
  * peut devenir aveugle en silence (le motif F17 du registre des preuves). Ce
- * fichier rejoue donc l'échec : il AMPUTE l'accueil de ses dix sections
+ * fichier rejoue donc l'échec : il AMPUTE l'accueil de ses NEUF sections
  * différées, exige que la sonde rougisse sur les DEUX axes (nœuds ET hauteur),
  * et le prouve sans jamais toucher à l'artefact sur disque.
  *
  * ── Les deux mutations, et ce que la mesure a appris sur la SECONDE ─────────
- *  1. AMPUTATION — retirer les dix sections différées du corps publié fait
+ *  1. AMPUTATION — retirer les neuf sections différées du corps publié fait
  *     tomber les nœuds ET la hauteur sous leurs planchers, dans les deux
  *     conditions : c'est la seule direction que la sonde sait faire rougir, et
  *     elle est ici rejouée, pas seulement citée.
@@ -24,7 +24,7 @@
  *     et le chiffre a été CORRIGÉ le 27/09/2026 : le relevé publié auparavant
  *     (−121 px en mobile, −1 px en desktop) dépendait du MOMENT de
  *     l'échantillonnage, et non du document — au point de mesure du protocole,
- *     la hauteur ne bouge plus du tout (Δ 0 px : 7 726 et 5 407 px, nœuds
+ *     la hauteur ne bouge plus du tout (Δ 0 px : 7 929 et 5 872 px, nœuds
  *     identiques), parce que les sections se sont RENDUES entre-temps : la
  *     sonde lit leurs hauteurs vraies (937 px pour le rang 3 contre une
  *     constante de 841,14) et le mot-clé `auto` MÉMORISE cette taille. Les
@@ -58,10 +58,17 @@ const COQUILLE_ACCUEIL = path.join(RACINE, 'build', 'index.html');
 const ENTREE_APPLICATION = /\/assets\/index-[^/]*\.js$/;
 /** En dessous, la page n'a manifestement pas été lue (build absent, coquille vide). */
 const PLANCHER_MS = 5;
-/** Le nombre de sections différées de l'accueil : le héros plus DIX (27/09/2026,
- * la galerie des métiers s'est ajoutée). Compté sur le document livré, jamais
- * déduit : ce fichier refuse d'amputer un accueil dont la structure a changé. */
-const SECTIONS_ACCUEIL = 11;
+/** Le nombre de sections de l'accueil : le héros plus NEUF différées (07/10/2026 ;
+ * le héros plus DIX du 27/09 au 07/10, le temps de la galerie, puis de la bande
+ * des chiffres — cette dernière retirée du corps). Compté sur le document livré,
+ * jamais déduit : ce fichier refuse d'amputer un accueil dont la structure a
+ * changé, ce qui est exactement ce qui l'avait arrêté le 07/10.
+ *
+ * Le rang de ce compteur n'est PAS cosmétique : les `contain-intrinsic-size` de
+ * `src/App.css` sont indexés par `nth-of-type`, donc retirer une section au
+ * milieu décale la réserve de tous les rangs suivants. La preuve d'échec est le
+ * premier endroit où ce décalage s'est vu. */
+const SECTIONS_ACCUEIL = 10;
 
 /**
  * Retire du corps publié toutes les sections SAUF le héros — exactement la
@@ -139,7 +146,7 @@ test.describe('preuve d’échec rejouée — la sonde du document mord sur les 
   const htmlSain = fs.readFileSync(COQUILLE_ACCUEIL, 'utf8');
 
   for (const condition of CONDITIONS) {
-    test(`l’accueil amputé de ses dix sections différées franchit les deux planchers (${condition.nom})`, async ({ browser }) => {
+    test(`l’accueil amputé de ses neuf sections différées franchit les deux planchers (${condition.nom})`, async ({ browser }) => {
       const plancherNoeuds = plancherNoeudsDe(NOEUDS['/']);
       const plancherHauteur = plancherHauteurDe(HAUTEUR['/']?.[condition.nom]);
 

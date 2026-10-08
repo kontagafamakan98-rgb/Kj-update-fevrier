@@ -1,4 +1,12 @@
-import { Link } from 'react-router-dom';
+// Le lien interne du site, PAS le `Link` de React Router : c'est lui qui ouvre
+// la transition de vue native (`components/LienVue.js`). Ce fichier était le
+// DERNIER à garder le `Link` brut après la migration du 27/09/2026 — mesuré le
+// 07/10/2026 : ses DEUX liens (l'appel « Commencer maintenant » de l'état vide
+// de la liste, et la carte de mission cliquable) changeaient de page d'un coup,
+// sans le raccord que tout le reste du site avait déjà. Le composant se comporte
+// comme le `Link` d'origine : mêmes propriétés, même `<a href>` réel pour un
+// crawler et pour « ouvrir dans un nouvel onglet ».
+import Link from './LienVue';
 import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobPageSafeHelpers';
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import { DEMO_JOBS } from '../config/demoJobs';
@@ -109,8 +117,19 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
               ligne que le squelette (titre text-lg, pastille 24 px). */}
           <div className="mb-2 flex flex-wrap items-center gap-3">
             <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
-            <span className="inline-flex items-center gap-1.5 rounded border border-orange-200 bg-orange-50 px-2 py-1 text-xs text-orange-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-orange-500" aria-hidden="true"></span>
+            {/* L'ÉTAT, PAR LA COULEUR : la pastille était orange POUR TOUS les
+                états — « Terminée », « Annulée » et « Ouverte » avaient la même
+                teinte, donc la couleur ne disait rien et il fallait lire le mot.
+                Elle porte maintenant l'état en donnée (`data-statut`) et la
+                feuille en tire la teinte (src/index.css) : ouverte = orange
+                (l'action est ouverte), en cours = bleu, terminée = vert,
+                annulée = gris. Le POINT suit la teinte du texte
+                (`currentColor`), donc les deux ne peuvent pas se contredire. */}
+            <span
+              className="pastille-statut inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs"
+              data-statut={job.status || 'inconnu'}
+            >
+              <span className="pastille-statut-point h-1.5 w-1.5 rounded-full" aria-hidden="true"></span>
               {formatJobStatus(job.status, t)}
             </span>
           </div>

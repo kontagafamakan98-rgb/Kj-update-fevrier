@@ -1,0 +1,93 @@
+{
+  "_lisezmoi": [
+    "LA GÉOMÉTRIE DU POINÇON — la marque de Kojo, DÉCLARÉE une fois.",
+    "Trois consommateurs, un seul dessin :",
+    "  * la PAGE (React) et la COQUILLE pré-rendue lisent ce fichier par",
+    "    src/config/marque-kojo.js — mêmes `defs`, mêmes couches, même ordre,",
+    "    donc le même <svg> des deux côtés (vite-plugins/prerender/icons-serveur.js) ;",
+    "  * le RASTERISEUR des icônes PWA et du favicon",
+    "    (public/icons/generate_icons.py, stdlib pure) le lit par chemin et",
+    "    peint exactement les mêmes couches — l’onglet du navigateur et le site",
+    "    portent donc la même marque, pas deux dessins voisins.",
+    "Une valeur écrite ailleurs (un littéral dans le JS, un rayon retapé dans le",
+    "Python) serait une seconde source : les rayons, les arrêts de dégradé, les",
+    "arcs et la lettre ne vivent QU’ICI.",
+    "Les unités sont celles de la grille 48 (voir « grille »), comme dans le SVG."
+  ],
+
+  "grille": 48,
+
+  "gradients": {
+    "matiere": {
+      "sorte": "radial",
+      "centre": [0.17, 0.17],
+      "portee": 1.02,
+      "arrets": [
+        [0, "#f97c22"],
+        [0.16, "#ee6320"],
+        [0.45, "#dc4620"],
+        [0.75, "#bb231c"],
+        [1, "#8a1418"]
+      ]
+    },
+    "lumiere": {
+      "sorte": "lineaire",
+      "axe": [6, 30, 42, 2],
+      "arrets": [
+        [0, "#ffffff", 0],
+        [0.22, "#ffffff", 0.58],
+        [0.5, "#ffffff", 0.72],
+        [0.74, "#ffffff", 0.32],
+        [1, "#ffffff", 0]
+      ]
+    },
+    "ombre": {
+      "sorte": "lineaire",
+      "axe": [2, 0, 46, 0],
+      "arrets": [
+        [0, "#6d1013", 0],
+        [0.5, "#6d1013", 0.42],
+        [1, "#6d1013", 0]
+      ]
+    }
+  },
+
+  "lettre": {
+    "tronc": "M17.3 14.7V33.3",
+    "brasHaut": "M18.8 24 30.8 15.7",
+    "brasBas": "M18.8 24 30.8 32.3",
+    "largeur": 4.9
+  },
+
+  "peintures": {
+    "marque": {
+      "defs": ["matiere", "lumiere", "ombre"],
+      "couches": [
+        { "nom": "poincon", "sorte": "disque", "rayon": 23.2, "peinture": "matiere" },
+        { "nom": "ombre", "sorte": "arc", "de": 18, "a": 162, "rayon": 22, "peinture": "ombre", "largeur": 2.3 },
+        { "nom": "cerclage", "sorte": "arc", "de": 172, "a": 350, "rayon": 22.2, "peinture": "lumiere", "largeur": 1.4 },
+        {
+          "nom": "glacis",
+          "sorte": "arc",
+          "de": 205,
+          "a": 335,
+          "rayon": 22.85,
+          "peinture": "lumiere",
+          "largeur": 0.55,
+          "opacite": 0.9
+        },
+        { "nom": "collet", "sorte": "cercle", "rayon": 21, "couleur": "#7a1a12", "opacite": 0.34, "largeur": 1.2 },
+        { "nom": "plateau", "sorte": "cercle", "rayon": 20.2, "couleur": "#ffffff", "opacite": 0.16, "largeur": 1 },
+        { "nom": "lettre", "sorte": "lettre", "couleur": "#ffffff" }
+      ]
+    },
+    "inverse": {
+      "defs": [],
+      "couches": [
+        { "nom": "poincon", "sorte": "disque", "rayon": 23.2, "couleur": "#ffffff" },
+        { "nom": "collet", "sorte": "cercle", "rayon": 21, "couleur": "currentColor", "opacite": 0.2, "largeur": 1.2 },
+        { "nom": "lettre", "sorte": "lettre", "couleur": "currentColor" }
+      ]
+    }
+  }
+}

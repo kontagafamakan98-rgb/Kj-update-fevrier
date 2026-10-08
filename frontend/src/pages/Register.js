@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import { useAuth } from '../contexts/AuthContext';
 import { getCountriesList, detectUserCountry, getPhoneExampleForCountry } from '../services/geolocationService';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -10,6 +12,7 @@ import RegistrationLanguageSelector from '../components/RegistrationLanguageSele
 import LoadingButton from '../components/LoadingButton';
 import { MapPin, Globe, Gift } from 'lucide-react';
 import GoogleButton from '../components/GoogleButton';
+import { isGoogleAuthEnabled } from '../utils/googleAuth';
 import CountryDisplay, { CountrySelect } from '../components/CountryDisplay';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
 import { normalizeCountryCode } from '../utils/pack2PageI18n/core';
@@ -19,6 +22,7 @@ import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import { IconePage, CLASSES_ICONE } from '../config/page-icons';
+import { MarqueKojo } from '../config/marque-kojo';
 import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../config/phone-format';
 import { COUNTRY_PLACEHOLDER } from '../config/country-placeholder';
 
@@ -369,6 +373,36 @@ export default function Register() {
     });
   };
 
+  // ── CE QUI RESTE À REMPLIR ────────────────────────────────────────────────
+  // Les trois pastilles du haut montrent le PARCOURS (trois pages) ; elles ne
+  // bougeaient pas d'un pixel, quel que soit l'avancement du formulaire — un
+  // visiteur qui avait rempli sept champs sur neuf ne voyait rien avancer. La
+  // jauge ci-dessous mesure autre chose, et c'est ce qu'elle dit : ce qui reste
+  // à remplir ICI.
+  //
+  // Elle ne compte que les champs EXIGÉS, et le consentement légal en est un
+  // (l'envoi le refuse sans lui). Le téléphone est compté sur le NUMÉRO, jamais
+  // sur le préfixe : la géolocalisation le pré-remplit avec « +223 » seul, et un
+  // préfixe n'est pas une réponse.
+  const champsExiges = [
+    formData.first_name,
+    formData.last_name,
+    formData.email,
+    stripPhonePrefix(formData.phone, activePhonePrefix),
+    formData.password,
+    formData.confirmPassword,
+    formData.country,
+    formData.user_type,
+    formData.legal_documents_accepted ? 'ok' : '',
+  ];
+  const champsRemplis = champsExiges.filter((valeur) => String(valeur || '').trim()).length;
+  const pourcentage = Math.round((champsRemplis / champsExiges.length) * 100);
+  // La couleur est le VERDICT, pas la décoration : gris tant qu'il n'y a rien,
+  // orange pendant la saisie, vert quand tout ce qui est exigé est là. C'est la
+  // partie « colors to communicate » du formulaire — un état lisible d'un coup
+  // d'œil, sans lire les champs un par un.
+  const etatDuFormulaire = pourcentage === 100 ? 'complet' : (pourcentage > 0 ? 'en-cours' : 'vide');
+
   const handleCountrySelect = (countryCode) => {
     setManualCountrySelection(true);
     manualCountrySelectionRef.current = true;
@@ -384,9 +418,9 @@ export default function Register() {
     <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-orange-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-2xl font-bold">{t('brandMark')}</span>
-          </div>
+          {/* La marque : le même tracé partagé que /login et que la barre (voir
+              src/config/marque-kojo.js) — la pastille garde sa boîte de 64 px. */}
+          <MarqueKojo emplacement="enregistrement" />
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (register.html). Classes inchangées. */}
           {/* Le titre RESTE en sans 30 px, et c'est MESURÉ, pas un oubli : le
@@ -460,7 +494,31 @@ export default function Register() {
               </div>
             </div>
             
-            <p className={pagePlan.stepNoticeClass}>
+            {/* ── LA JAUGE : où en est LE FORMULAIRE ────────────────────────
+                Elle ne porte AUCUN texte : sa largeur et sa couleur sont la
+                réponse, et un pourcentage écrit serait un texte publié de plus
+                à tenir d'accord entre la coquille et React — or la valeur
+                change à chaque frappe. Son nom accessible est la notice
+                ci-dessous (elle dit précisément ce qu'il reste à faire), donc
+                elle n'invente aucune phrase. `aria-valuenow` porte la valeur
+                aux lecteurs d'écran : c'est la même information, donnée deux
+                fois, une fois à l'œil et une fois à la synthèse vocale. */}
+            <div
+              className={pagePlan.progressTrackClass}
+              role="progressbar"
+              aria-labelledby="inscription-notice"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={pourcentage}
+            >
+              <span
+                className={pagePlan.progressFillClass}
+                data-etat={etatDuFormulaire}
+                style={{ width: `${pourcentage}%` }}
+              />
+            </div>
+
+            <p id="inscription-notice" className={pagePlan.stepNoticeClass}>
               <IconePage nom={pagePlan.stepNoticeIcon} classe={CLASSES_ICONE.noticePetite} />{' '}
               {formData.user_type === 'worker' ? pageT('workerStepNotice') : pageT(pagePlan.stepNoticeKey)}
             </p>
@@ -483,14 +541,21 @@ export default function Register() {
               disabled={loading}
             />
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
+            {/* Le séparateur n'a de sens QUE si le bouton qu'il sépare existe :
+                sans client_id Google, il restait une ligne barrée d'un « ou »
+                suspendu (le bouton, lui, se masque tout seul). La condition est
+                la MÊME que celle du bouton, et la coquille la lit du même
+                `VITE_GOOGLE_CLIENT_ID` (vite-plugins/prerender-route-meta.js). */}
+            {isGoogleAuthEnabled() && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="bg-white px-3 text-gray-400">{pageT('orSeparator') || 'ou'}</span>
+                </div>
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="bg-white px-3 text-gray-400">{pageT('orSeparator') || 'ou'}</span>
-              </div>
-            </div>
+            )}
 
             {/* User Type */}
             <fieldset>

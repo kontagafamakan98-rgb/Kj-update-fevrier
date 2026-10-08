@@ -564,6 +564,102 @@ code {
   }
 }
 
+/* ── L'ÉTAT D'UNE MISSION, DIT PAR LA COULEUR ───────────────────────────────
+
+   La pastille d'état d'une carte de mission était orange POUR TOUS LES ÉTATS :
+   « Ouverte », « En cours », « Terminée » et « Annulée » portaient la même
+   teinte et le même point orange. La couleur n'y disait donc rien — il fallait
+   lire le mot, et un mot se lit après la couleur. Elle est maintenant une
+   DONNÉE de l'élément (`data-statut`), et la teinte en découle :
+
+     ouverte / en attente → orange  (quelque chose est ouvert, on peut agir)
+     en cours             → bleu    (quelqu'un travaille dessus)
+     terminée             → vert    (c'est fini, et bien fini)
+     annulée / inconnu    → gris    (rien à faire ici)
+
+   La boîte ne change pas d'un pixel (mêmes rayon, rembourrage et taille de
+   texte : le squelette de la liste est calibré sur elle), et le POINT prend la
+   teinte du texte par `currentColor` — impossible que les deux se contredisent. */
+.pastille-statut {
+  border-color: #e7e5e4;
+  background-color: #fafaf9;
+  color: #78716c;
+}
+
+.pastille-statut[data-statut='open'],
+.pastille-statut[data-statut='pending'] {
+  border-color: #fdba74;
+  background-color: #fff7ed;
+  color: #c2410c;
+}
+
+.pastille-statut[data-statut='in_progress'] {
+  border-color: #bfdbfe;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+}
+
+.pastille-statut[data-statut='completed'] {
+  border-color: #bbf7d0;
+  background-color: #f0fdf4;
+  color: #15803d;
+}
+
+.pastille-statut-point {
+  background-color: currentColor;
+}
+
+/* ── LA JAUGE DU FORMULAIRE D'INSCRIPTION ──────────────────────────────────
+
+   Elle remplace ce qui n'existait pas : trois pastilles STATIQUES disaient le
+   parcours (trois pages) et jamais l'avancement, donc remplir sept champs sur
+   neuf ne changeait rien à l'écran. La piste est un rail gris, la jauge le
+   remplit, et sa LARGEUR est une donnée de l'écran (le pré-rendu la peint
+   vide : c'est l'état du document, et la boîte est identique dans les deux
+   canaux).
+
+   LA COULEUR EST LE VERDICT, pas la décoration — c'est à cela qu'une jauge
+   sert : « vide » (rien de rempli), « en-cours » (l'orange de la marque :
+   l'action est commencée), « complet » (le vert : les champs exigés sont tous
+   là, la suite est ouverte). Trois états, trois couleurs, et aucune phrase à
+   traduire en cinq langues — le texte de la jauge n'appartient pas au
+   dictionnaire parce qu'il n'y a pas de texte. */
+.jauge-inscription {
+  height: 0.5rem;
+  margin-top: 1rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: #e7e5e4;
+}
+
+.jauge-inscription-remplie {
+  display: block;
+  height: 100%;
+  border-radius: 9999px;
+  background-color: var(--kojo-orange);
+  transition:
+    width 0.25s var(--kojo-ease),
+    background-color 0.25s var(--kojo-ease);
+}
+
+.jauge-inscription-remplie[data-etat='vide'] {
+  background-color: transparent;
+}
+
+.jauge-inscription-remplie[data-etat='en-cours'] {
+  background-color: var(--kojo-orange);
+}
+
+.jauge-inscription-remplie[data-etat='complet'] {
+  background-color: #15803d;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jauge-inscription-remplie {
+    transition: none;
+  }
+}
+
 /* ── LA COUCHE ÉDITORIALE ───────────────────────────────────────────────────
 
    Ce qu'elle remplace. Le corps des pages publiques était une accumulation
@@ -1074,27 +1170,54 @@ code {
   gap: 0.5rem;
 }
 
-/* L'ILLUSTRATION ENCADRÉE. Le fichier est un SVG de 960 × 720, sur un fond
-   crème : le poser tel quel sur l'orange du héros salirait ses teintes claires.
-   Il reçoit donc son propre sol (papier), un cadre qui se décale derrière lui
-   et une ombre portée — la vignette se lit comme une image posée sur la page,
-   pas comme un aplat de plus. Aucun texte : la note de la maquette portait une
-   phrase française écrite à la main, et un texte ne s'invente pas ici (la
-   provenance du texte appartient au dictionnaire). */
+/* LA PHOTO ENCADRÉE. Le fichier est une PHOTOGRAPHIE (six clichés Pexels :
+   public/assets/kojo-hero.jpg à kojo-hero-6.jpg, 720 × 960 — le choix de cette
+   taille et sa mesure sont dans src/config/photos-heros.js),
+   publiée ENTIÈRE et à son rapport : le cadre porte donc le 3/4, et non le 4/3
+   du dessin qu'elle remplace. La largeur a été ÉLARGIE (30 rem au lieu de
+   27, soit 480 px en desktop, 640 px de haut) à la demande du propriétaire
+   — « agrandis-la un peu plus, que toute l'image soit visible » — donc le
+   premier écran de « / » est plus haut qu'avant : c'est une décision de dessin,
+   et les tables de structure de l'accueil (scripts/style-layout-budgets.cjs)
+   ont été re-mesurées après elle.
+
+   Elle est posée sur un plan décalé (voir plus bas) : la vignette se lit comme
+   une image posée sur la page, pas comme un aplat de plus. Aucun texte : la note
+   de la maquette portait une phrase française écrite à la main, et un texte ne
+   s'invente pas ici (la provenance du texte appartient au dictionnaire). */
 .cadre-illustration {
   position: relative;
   justify-self: center;
-  width: min(100%, 27rem);
+  width: min(100%, 30rem);
 }
 
+/* ── LE PLAN DÉCALÉ (28/09/2026) ────────────────────────────────────────────
+
+   Le fond de l'illustration était un CARTE BLANCHE à ombre portée, doublée
+   d'un cadre en filet décalé : trois plans empilés pour une seule feuille, et
+   le vocabulaire exact d'un gabarit d'application — ce que le propriétaire a
+   refusé (« ça a l'air trop générique »).
+
+   Il y a maintenant DEUX plans, et l'ombre n'est plus un flou : la table est un
+   APLAT de sable (`--kojo-sable`, visible sous la photo pendant son chargement),
+   et ce qui la décolle de l'orange est un second aplat de brun décalé de
+   0.75 rem (`--kojo-brun`, 40 %) — un cran de ton, pas une diffusion. Les photos
+   du héros (`public/assets/kojo-hero.jpg` à `kojo-hero-6.jpg`) ne portent plus
+   ni cadre en filet ni ombre portée : elles sont posées sur leur plan, et c'est
+   le seul relief de la composition.
+
+   L'ALTERNANCE ne touche pas ce plan : React remplace le `src` d'UN seul
+   `<img>` (voir src/components/PhotoDuHeros.js), donc la boîte, l'ombre et le
+   décalage restent les mêmes d'une photo à l'autre. */
 .cadre-fond {
   position: absolute;
   top: 0.75rem;
   left: 0.75rem;
   width: 100%;
   height: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 0.75rem;
+  background-color: var(--kojo-brun);
+  opacity: 0.4;
 }
 
 .cadre-image {
@@ -1103,8 +1226,10 @@ code {
   width: 100%;
   height: auto;
   border-radius: 0.75rem;
-  background-color: var(--kojo-papier);
-  box-shadow: 0 24px 48px -28px rgba(69, 26, 3, 0.75);
+  /* Le fond de l'image EST la table : il ne se voit qu'AVANT le chargement de
+     la photo (et si elle manque), et c'est le sable du plan décalé — la lecture
+     « une image posée sur un meuble » vient de ce contraste, pas d'une ombre. */
+  background-color: var(--kojo-sable);
 }
 
 /* ── LE RUBAN DES PAYS ──────────────────────────────────────────────────────
@@ -1167,6 +1292,37 @@ code {
   color: #fff;
   font-size: 0.8125rem;
   font-weight: 600;
+  /* Le jeton est devenu un LIEN (vers `/jobs` filtré sur son pays) : ces
+     quatre états sont ce qui le dit. Sans eux, la pastille resterait
+     exactement ce qu'elle était quand elle ne menait nulle part — et rien à
+     l'écran ne distinguerait une liste de pays d'un jeu de filtres. */
+  text-decoration: none;
+  transition:
+    background-color 0.18s var(--kojo-ease),
+    border-color 0.18s var(--kojo-ease),
+    transform 0.18s var(--kojo-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ruban-jeton:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.38);
+  }
+}
+
+.ruban-jeton:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.ruban-jeton:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ruban-jeton {
+    transition: none;
+  }
 }
 
 /* ── LES LISTES EN LIGNES ───────────────────────────────────────────────────
@@ -1402,7 +1558,8 @@ code {
    moins, pour un affichage de 190 à 420 px de large selon l'écran. Elles sont
    SOUS LA LIGNE DE FLOTTAISON et chargées en `lazy` : elles n'entrent ni dans le
    premier écran ni dans le graphe du LCP (dont l'élément est, lui, mesuré à
-   62 700 px² en mobile et 139 733 en desktop sur l'illustration du héros).
+   69 920 px² en mobile et 306 870 en desktop sur la photo du héros, re-mesuré le
+   29/09/2026 — voir le commentaire de `.cadre-illustration`).
 
    Aucune légende n'a été inventée : chaque carte porte le NOM DU MÉTIER lu dans
    le plan (`galerie`, src/config/page-sections.js), donc dans le dictionnaire —
@@ -1895,35 +2052,74 @@ code {
   box-shadow: 6px 6px 0 var(--kojo-papier);
 }
 
-/* ── LA BANDE DES CHIFFRES ET LA CLÔTURE ────────────────────────────────────
+/* ── LES DEUX FAITS DE LA CLÔTURE ──────────────────────────────────────────
 
-   Les chiffres vérifiables tenaient dans une carte à ombre ; ils deviennent une
-   bande à filets, séparés par le même trait que les listes. Le chiffre reste en
-   orange — c'est la seule graisse colorée de la page, donc l'œil y va — et il
-   est en chiffres tabulaires (le socle du `body` s'en charge). */
-.bande-chiffres {
+   Ils étaient une BANDE à filets (`.bande-chiffres`), seule sur toute une
+   section, entre la clôture orange et « Qui sommes-nous ». MESURÉ sur
+   l'artefact (Chromium, 412 × 823, 07/10/2026) : 245 px de section pour 115 px
+   de bande, deux cases de 187 px pour 64 px d'encre, et un chiffre en 2,25 rem
+   qui dominait son libellé de 12 px. Étirée en desktop sur les 1 270 px du
+   conteneur, la rangée avait l'air d'un TABLEAU — le propriétaire du site l'a
+   dit laid « pour application », et c'est ce mot qui décide ici.
+
+   Ce qui change, et pourquoi :
+     • ils vivent DANS la clôture, sous les deux boutons : c'est là que le
+       visiteur hésite, donc là que la réassurance sert — et la section
+       orpheline qu'ils occupaient disparaît avec la bande ;
+     • la rangée est BORNÉE (26 rem) et centrée comme BLOC : deux faits ne
+       remplissent pas une page large, ils se lisent côte à côte ;
+     • elle est alignée à GAUCHE, explicitement, contre le `text-align: center`
+       hérité de `.cta-final-inner` : depuis la refonte du 25/09/2026 la centure
+       est DÉCLARÉE bloc par bloc, et un chiffre suivi de son libellé se lit
+       mieux à gauche qu'en drapeau centré ;
+     • le chiffre redescend à 1,5 rem : il ne dispute plus la hiérarchie au
+       titre de la clôture, et le libellé monte en capitales espacées ;
+     • le filet est en BLANC translucide, comme tout ce qui sépare dans cette
+       section : la clôture est orange, le filet sable des sections claires y
+       serait un trait gris.
+   Rien n'est codé pour un fond clair : ces deux faits ne se peignent que sur
+   l'orange. Le libellé tient sur une ligne à 320 px (mesuré : 110 px de large
+   pour 124 px disponibles). */
+.faits-cta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-top: 1px solid var(--kojo-filet);
-  border-bottom: 1px solid var(--kojo-filet);
+  max-width: 26rem;
+  margin: 2.5rem auto 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  text-align: left;
 }
 
-.bande-chiffres > div {
-  padding-block: var(--rythme-bloc);
-  padding-inline: 1rem;
-  text-align: center;
+.fait-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding-right: 1.25rem;
 }
 
-.bande-chiffres > div + div {
-  border-left: 1px solid var(--kojo-filet);
+.fait-cta + .fait-cta {
+  border-left: 1px solid rgba(255, 255, 255, 0.22);
+  padding-right: 0;
+  padding-left: 1.25rem;
 }
 
-.bande-chiffres .chiffre {
-  color: var(--kojo-orange-fonce);
+.fait-cta-figure {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #fff;
   font-family: var(--kojo-serif);
-  font-size: 2.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
   line-height: 1;
+}
+
+.fait-cta-libelle {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* La CLÔTURE : orange, pleine largeur, avec deux anneaux qui débordent — le

@@ -175,7 +175,15 @@ export const ROUTES_LCP = [
       // ligne, donc de l'aire mesurée (rejoué après la correction :
       // `e2e/lcp-geometrie.spec.js`, une seule candidate, aire identique entre
       // les deux canaux).
-      'text-lg text-orange-50 max-w-2xl mx-auto',
+      //
+      // 07/10/2026 : la GÉOMÉTRIE change, et c'est cette liste-ci qui l'a dit le
+      // premier — `text-lg` → `text-xl leading-relaxed`. Avec `text-lg`, l'aire
+      // mesurée (29 260 px²) ne dépassait la plus grande note d'étape que de
+      // 1,5 % à 397 px de mise en page : le runner Linux (barre de défilement
+      // classique, 15 px de moins) élisait la note deux fois de suite à la place
+      // du sous-titre. La valeur mesurée après le remède est 33 642 / 36 480 px²
+      // (mobile / desktop) — la marge passe à 30-48 % selon la largeur.
+      'text-xl leading-relaxed text-orange-50 max-w-2xl mx-auto',
     ],
   },
   // ── Les quatre routes de la seconde passe (26/09/2026) ───────────────────

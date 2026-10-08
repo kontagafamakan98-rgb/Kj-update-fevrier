@@ -114,6 +114,10 @@ describe('publicJobsPrefetch — la requête doit correspondre exactement', () =
     ['statut filtré', { ...DEFAULT_PARAMS, status: 'completed' }],
     ['recherche plein texte', { ...DEFAULT_PARAMS, q: 'plomberie' }],
     ['catégorie', { ...DEFAULT_PARAMS, category: 'plumbing' }],
+    // Le pays est arrivé ici par un défaut MESURÉ : le préchargement sans filtre
+    // était servi à `/jobs?country=mali`, donc la liste du pays n'était jamais
+    // demandée et la page affichait toutes les offres sous une puce « Mali ».
+    ['pays', { ...DEFAULT_PARAMS, country: 'mali' }],
     ['onglet « mes missions »', { ...DEFAULT_PARAMS, mine: 'posted' }],
     ['ids explicites', { ...DEFAULT_PARAMS, ids: 'a,b' }],
   ];

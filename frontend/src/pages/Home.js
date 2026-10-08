@@ -1,4 +1,11 @@
-import { Link } from 'react-router-dom';
+// Le lien interne du site, PAS le `Link` de React Router : c'est lui qui ouvre
+// la transition de vue native (`components/LienVue.js`). L'accueil portait
+// jusque-là le `Link` brut, donc TOUS ses liens de contenu — les dix métiers,
+// les trois photos, les deux appels du héros — changeaient de page d'un coup,
+// sans le raccord que le chrome avait déjà. Le composant se comporte comme le
+// `Link` d'origine (mêmes propriétés, même `<a href>` réel pour un crawler et
+// pour « ouvrir dans un nouvel onglet »).
+import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { getAllCountries } from '../components/CountryDisplay';
@@ -10,6 +17,11 @@ import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS, couperLeTitre } from '../config/page-sections';
 import { CONTACT, SOCIAL_LINKS, mailtoHref, telHref } from '../config/contact';
 import MapEmbed from '../components/MapEmbed';
+// La photo du héros — et son alternance. Ses chemins, ses dimensions et son
+// délai appartiennent à src/config/photos-heros.js, que la coquille pré-rendue
+// lit AUSSI : les deux canaux ne peuvent pas peindre deux photos différentes au
+// premier rendu (voir le commentaire du module).
+import PhotoDuHeros from '../components/PhotoDuHeros';
 import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 // Les quatre moyens de contact du bloc N.A.P. ci-dessous sont déclarés UNE
@@ -39,8 +51,9 @@ export default function Home() {
     categories, promises, steps, stats: STATS, icone: iconeSequestre,
     // Le héros : même clé i18n et mêmes classes que la coquille pré-rendue
     // (src/config/page-sections.js). Depuis la refonte éditoriale du 27/09/2026,
-    // l'élément LCP de « / » est l'ILLUSTRATION du héros (mesuré : 62 700 px² en
-    // mobile, 139 733 en desktop, contre 33 220 et 90 454 pour ce titre) — le
+    // l'élément LCP de « / » est l'ILLUSTRATION du héros (re-mesuré le
+    // 29/09/2026, photo 3/4 : 69 920 px² en mobile, 306 870 en desktop, contre
+    // 37 400 et 110 500 pour ce titre à sa dernière mesure du 28/09/2026) — le
     // titre en reste le plus grand bloc de texte, et c'est sa géométrie qui
     // ancre la parité : la coquille le peint avant le JavaScript, React
     // reconstruit ensuite EXACTEMENT la même boîte, et c'est cette égalité qui
@@ -103,8 +116,10 @@ export default function Home() {
     panneauOrbeClass,
     panneauImageClass,
     panneauEstampilleClass,
-    bandeClass,
-    chiffreClass,
+    faitsClass,
+    faitClass,
+    faitFigureClass,
+    faitLibelleClass,
     ctaClass,
     ctaInnerClass,
     ctaActionsClass,
@@ -173,7 +188,20 @@ export default function Home() {
           lecture, deux actions de poids différent, et sous les deux, trois
           repères de confiance. */}
       <section className="bg-gradient-to-br from-orange-600 via-orange-600 to-orange-700 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-black bg-opacity-5"></div>
+        {/* Le voile du héros — et sa seule règle : il PEINT, il ne capte
+            jamais. MESURÉ (Chromium, 07/10/2026) : ce `<div>` est positionné
+            (`absolute`), donc il se peint APRÈS les frères en flux normal, et
+            la grille de contenu du héros est statique — le voile passait donc
+            AU-DESSUS des deux appels à l'action. `document.elementFromPoint`
+            au centre des deux boutons rendait `DIV.absolute.inset-0.bg-black
+            .bg-opacity-5` : chaque appui sur « Commencer maintenant » et
+            « Voir les emplois » était avalé par une teinte à 5 %, visible mais
+            décorative. `pointer-events-none` dit la règle en un mot — une
+            couche de PEINTURE n'est pas une cible — et il la dit pour les deux
+            canaux : la coquille pré-rendue publie la même classe
+            (vite-plugins/prerender/shells-home.js), sinon le HTML d'avant
+            l'hydratation garderait deux boutons morts. */}
+        <div className="absolute inset-0 bg-black bg-opacity-5 pointer-events-none"></div>
         <div className={heroGrilleClass}>
           <div className={heroCopieClass}>
             <span className={`${heroKickerClass} mb-6`}>
@@ -231,26 +259,49 @@ export default function Home() {
             </div>
           </div>
 
-          {/* L'ILLUSTRATION : un SVG de 960 × 720 posé sur son propre sol, avec
-              un cadre qui se décale derrière elle. Le fond crème appartient à
-              l'image (l'illustration est dessinée pour un fond clair) : la
-              poser nue sur l'orange du héros salirait ses teintes.
+          {/* LA PHOTO DU HÉROS : des PHOTOGRAPHIES RÉELLES, servies par le site
+              (SIX clichés Pexels — 8487367, 8487764, 20814721, 6790757,
+              20853658, 8487345 — licence Pexels : usage commercial libre, sans
+              attribution obligatoire), recadrées en 3/4 à la source, puis
+              réduites ici à 720 px de large (62 à 126 ko chacune, 560 ko à
+              six), publiées ENTIÈRES et à leur rapport (720 × 960, soit 3/4).
 
-              `alt=""` : l'illustration ILLUSTRE le texte qui la précède, elle
-              ne dit rien qu'il faille lire — et un texte de remplacement est un
-              texte publié, donc il appartient au dictionnaire, pas à une
-              chaîne écrite ici (scripts/shell-text-provenance.js). */}
+              Elles remplacent le DESSIN qui occupait cette place
+              (`kojo-hero.svg`, deux personnages et une maison) : trois versions
+              de ce dessin ont été refusées par le propriétaire du site (« ça a
+              l'air trop générique », « c'est moche ») — un dessin plat ne dit
+              pas qu'un artisan est un professionnel. Une photo dit ce qu'un
+              dessin promet, et c'est la règle qui a déjà fait entrer les trois
+              photos de la galerie dans la page.
+
+              ── ENTIÈRES, PLUS GRANDES, ET ALTERNÉES (29/09/2026) ───────────────
+              La première version les recadrait en 4/3 (960 × 720, `fit=crop`) —
+              le rapport du dessin, donc la boîte du héros ne bougeait pas d'un
+              pixel. Le propriétaire a tranché autrement : « j'aime l'image mais
+              agrandis-la un peu plus, que toute l'image soit visible », puis
+              « fais-les s'interchanger toutes les 15 secondes ». Le cadrage est
+              donc RETIRÉ (le fichier est publié à son rapport d'origine), le
+              cadre est ÉLARGI (30 rem au lieu de 27, voir `.cadre-illustration`,
+              src/index.css) et la photo change toutes les 15 s
+              (`src/components/PhotoDuHeros.js`).
+
+              Ce qui ne change pas, c'est la règle de la parité : les DEUX canaux
+              publient la même première photo, les mêmes attributs et les mêmes
+              classes — la coquille peint le premier `<img>` en littéral
+              (`shells-home.js`, qui lit la liste du MÊME module de
+              configuration) et React reconstruit exactement la même boîte, donc
+              le premier paint reste celui que le navigateur retient. Les six
+              fichiers étant au même rapport, l'alternance seule ne déplace rien
+              non plus : la boîte est réservée avant le chargement par
+              `width`/`height` (les dimensions RÉELLES du fichier).
+
+              `alt=""` : les photos ILLUSTRENT le texte qui les précède, elles ne
+              disent rien qu'il faille lire — et un texte de remplacement est un
+              texte publié, donc il appartient au dictionnaire, pas à une chaîne
+              écrite ici (scripts/shell-text-provenance.js). */}
           <div className={heroIllustrationClass}>
             <span className={heroIllustrationFondClass} aria-hidden="true"></span>
-            <img
-              src="/assets/kojo-hero.svg"
-              alt=""
-              width="960"
-              height="720"
-              fetchpriority="high"
-              decoding="async"
-              className={heroIllustrationImageClass}
-            />
+            <PhotoDuHeros className={heroIllustrationImageClass} />
           </div>
         </div>
       </section>
@@ -269,13 +320,23 @@ export default function Home() {
             {t('availableIn4Countries')}
           </span>
           <div className={rubanJetonsClass}>
-            {countries.map((country, index) => (
-              /* Jeton informatif : ni curseur main ni effet de survol — il ne
-                 mène nulle part. */
-              <span key={index} className={rubanJetonClass}>
+            {countries.map((country) => (
+              /* CES QUATRE JETONS SONT DES LIENS, et ils ne l'étaient pas : le
+                 backend accepte `GET /jobs?country=mali` depuis toujours, mais
+                 l'interface n'offrait aucun moyen de le poser — un visiteur qui
+                 voulait les offres d'un autre pays que le sien n'avait aucun
+                 chemin, et quatre pastilles colorées restaient inertes au
+                 survol comme au doigt. Le lien porte la MÊME classe que le
+                 jeton : la forme ne change pas, c'est l'affordance qui
+                 apparaît (état de survol et de focus dans src/index.css). */
+              <Link
+                key={country.code}
+                to={`/jobs?country=${country.code}`}
+                className={rubanJetonClass}
+              >
                 <FlagIcon country={country.code} className="h-4 w-6 rounded-sm" />
                 {country.name}
-              </span>
+              </Link>
             ))}
           </div>
         </div>
@@ -382,7 +443,15 @@ export default function Home() {
 
             <div className={listeClass}>
               {steps.map(({ icone, numberKey, titleKey, descriptionKey }) => (
-                <div key={titleKey} className={ligneEtapeClass}>
+                /* CHAQUE MARCHE EST UN LIEN. Ces lignes portent la classe des
+                   lignes CLIQUABLES (`.ligne-editoriale` : c'est elle qui donne
+                   le fond au survol, le décalage du rembourrage et la flèche
+                   qui s'allume et se décale — voir src/index.css), mais
+                   c'étaient des `<div>` : la page réagissait au survol comme si
+                   l'on pouvait appuyer, et l'appui ne faisait rien. Elles
+                   mènent à la page qui détaille le parcours, comme les lignes
+                   de métier mènent à la liste filtrée. */
+                <Link key={titleKey} to="/how-it-works" className={ligneEtapeClass}>
                   <span className={pastilleCreuseClass}>
                     <span className="text-lg font-bold">{t(numberKey)}</span>
                   </span>
@@ -394,10 +463,10 @@ export default function Home() {
                     <p className={noteLigneClass}>{t(descriptionKey)}</p>
                   </div>
                   <IconePage
-                    nom="flecheBas"
+                    nom="flecheDroite"
                     classe={`${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`}
                   />
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -466,20 +535,32 @@ export default function Home() {
               </Link>
             </div>
           )}
-        </div>
-      </section>
 
-      {/* ── LES FAITS VÉRIFIABLES ───────────────────────────────────────────
-          Deux chiffres, à filets, séparés par le même trait que les listes.
-          Aucun compteur inventé : ce que la coquille pré-rendue publie est
-          exactement ce que la page affiche. */}
-      <section className={`${sectionClass} ${sandClass}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className={bandeClass}>
+          {/* ── LES DEUX FAITS ───────────────────────────────────────────────
+              Ils servaient de BANDEAU à filets, seuls sur toute une section,
+              entre cette clôture et « Qui sommes-nous ». C'est leur EMPLACEMENT
+              autant que leur espacement que le propriétaire du site a jugés laids
+              (« pour application ») : 245 px de section pour 115 px de bande, et
+              deux nombres centrés qui dominaient leur propre libellé. Ils sont
+              ici — sous les deux boutons, à l'endroit exact où le visiteur
+              hésite — et ils reprennent le pas du site depuis la refonte du
+              25/09/2026 : alignés à GAUCHE (la clôture est centrée, donc cette
+              rangée déclare son alignement), bornés en largeur, chiffre ramené
+              à 1,5 rem pour ne pas disputer la hiérarchie au titre.
+
+              Les deux valeurs et leurs deux dessins sortent de la DÉCLARATION
+              du plan (PAGE_SECTIONS['/'].stats) : la même liste que la coquille
+              pré-rendue publie, donc aucun compteur inventé, et le globe et le
+              téléphone viennent du registre d'icônes — le MÊME dessin des deux
+              côtés, jamais un emoji d'un côté et un SVG de l'autre. */}
+          <div className={faitsClass}>
             {STATS.map((stat) => (
-              <div key={stat.labelKey}>
-                <div className={`${chiffreClass} mb-2`}>{stat.fallback}</div>
-                <div className={noteLigneClass}>{t(stat.labelKey)}</div>
+              <div key={stat.labelKey} className={faitClass}>
+                <span className={faitFigureClass}>
+                  <IconePage nom={stat.icone} classe={CLASSES_ICONE.heros} />
+                  {stat.fallback}
+                </span>
+                <span className={faitLibelleClass}>{t(stat.labelKey)}</span>
               </div>
             ))}
           </div>

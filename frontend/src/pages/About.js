@@ -1,5 +1,7 @@
 import { Fragment } from 'react';
-import { Link } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js) : le
+// `Link` brut de React Router change la page d'un coup, sans raccord.
+import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';

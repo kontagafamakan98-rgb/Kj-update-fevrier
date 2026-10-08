@@ -51,11 +51,17 @@ const BLOC_CONTACT = {
 
 // ── La GÉOMÉTRIE du héros de l'accueil ────────────────────────────────────────
 // L'ÉLÉMENT LCP DE « / » A CHANGÉ DE NATURE LE 27/09/2026, et c'est mesuré : la
-// refonte éditoriale a donné au héros une ILLUSTRATION (`/assets/kojo-hero.svg`,
-// 960 × 720) dont l'aire peinte dépasse celle du titre — **62 700 px² en mobile
-// et 139 733 en desktop** contre 33 220 et 90 454 pour le `<h1>`, dans les DEUX
+// refonte éditoriale a donné au héros une ILLUSTRATION — aujourd'hui une PHOTO
+// (`/assets/kojo-hero.jpg` et ses cinq suivantes, publiées à leur rapport 3/4 de
+// 720 × 960 ; le dessin qu'elles ont remplacé le 29/09/2026 était en 4/3, 960 ×
+// 720) — dont l'aire peinte dépasse celle du titre, RE-MESURÉE le 29/09/2026 sur
+// la photo publiée à son rapport : **69 920 px² en mobile et 306 870 en desktop**
+// (la veille : 62 700 et 139 733, le cadre 4/3), contre **37 400 et 110 500**
+// pour le `<h1>` lors de sa propre dernière mesure (28/09/2026 — l'aire d'un
+// texte que Chrome élit est celle de son encre, pas celle de sa boîte : les deux
+// chiffres ne se comparent qu'entre eux, chacun à sa date), dans les DEUX
 // canaux, une seule candidate, horodatée au premier paint (`e2e/
-// lcp-geometrie.spec.js`, 40/40 ; le CLS de « / » reste 0,0000). Le LCP n'est
+// lcp-geometrie.spec.js`, 24/24 ; le CLS de « / » reste 0,0000). Le LCP n'est
 // donc plus un texte mais une image : l'invariant que la parité coquille/React
 // doit tenir est le MÊME qu'avant — une seule candidate, la même aire des deux
 // côtés, au premier paint — et il tient. Ce qui suit garde sa raison d'être
@@ -176,8 +182,21 @@ const EDITORIAL_ACCUEIL = {
   panneauOrbeClass: 'panneau-orbe',
   panneauImageClass: 'panneau-image',
   panneauEstampilleClass: 'panneau-estampille',
-  bandeClass: 'bande-chiffres',
-  chiffreClass: 'chiffre',
+  // ── LES DEUX FAITS DE LA CLÔTURE (07/10/2026) ────────────────────────────
+  // Ils étaient une BANDE à filets posée seule entre la clôture orange et
+  // « Qui sommes-nous » : MESURÉ (Chromium, 412 × 823) 245 px de section pour
+  // 115 px de bande, elle-même deux cases vides de 187 px pour 64 px d'encre,
+  // et deux nombres centrés en 2,25 rem qui dominaient leur libellé de 12 px.
+  // Étirée sur toute la largeur en desktop, la rangée ressemblait à un TABLEAU,
+  // pas à une application. Elle vit maintenant DANS la clôture, sous les deux
+  // boutons : c'est là que le visiteur hésite, donc là que la réassurance sert.
+  // La rangée est bornée en largeur (elle ne s'étire plus), alignée à gauche
+  // (comme tout le site depuis la refonte du 25/09/2026) et le chiffre redescend
+  // à 1,5 rem pour céder la hiérarchie au titre de la clôture.
+  faitsClass: 'faits-cta',
+  faitClass: 'fait-cta',
+  faitFigureClass: 'fait-cta-figure',
+  faitLibelleClass: 'fait-cta-libelle',
   ctaClass: 'cta-final',
   ctaInnerClass: 'cta-final-inner',
   ctaActionsClass: 'cta-actions',
@@ -415,18 +434,26 @@ export const PAGE_SECTIONS = {
       { labelKey: 'electrical', image: '/assets/kojo-metier-electricite.jpg' },
       { labelKey: 'carpentry', image: '/assets/kojo-metier-menuiserie.jpg' },
     ],
-    // Les chiffres de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
+    // Les faits de l'accueil — des FAITS VÉRIFIABLES, jamais des compteurs
     // inventés. Les deux anciens (« 1 000+ travailleurs », « 500+ projets »)
     // étaient des replis FABRIQUÉS avant l'appel à /public/stats : le HTML
     // pré-rendu les publiait donc à un crawler, et le premier paint les
     // affichait à un visiteur, comme s'ils étaient mesurés. Ils sont RETIRÉS
-    // (règle « pas de faux compteurs »). « 24/7 » l'était aussi : le support
-    // répond du lundi au samedi (cf. contactIntro), donc la valeur dit « 6j/7 ».
+    // (règle « pas de faux compteurs »).
     // `shellText` est le texte EXACT que la coquille écrit ; `fallback` la même
-    // valeur côté page — les deux sortent d'ici, une seule liste.
+    // valeur côté page — les deux sortent d'ici, une seule liste. `icone` nomme
+    // le dessin (src/config/page-icons.js), publié par les deux canaux : le
+    // globe pour les pays, le téléphone pour le support.
+    //
+    // RECTIFIÉ le 07/10/2026 : la valeur disait « 6j/7 » et trois textes FR
+    // portaient l'énoncé « du lundi au samedi ». Le propriétaire du site a
+    // tranché : le support répond SEPT JOURS SUR SEPT. Le chiffre et les huit
+    // textes qui l'énonçaient sont corrigés ensemble — un chiffre faux dans la
+    // seule bande de faits d'une page est exactement ce que cette bande
+    // interdit, et une phrase qui le contredit ailleurs le serait autant.
     stats: [
-      { labelKey: 'countriesCovered', fallback: '4', shellText: '4' },
-      { labelKey: 'customerSupport', fallback: '6j/7', shellText: '6j/7' },
+      { labelKey: 'countriesCovered', fallback: '4', shellText: '4', icone: 'countryGlobe' },
+      { labelKey: 'customerSupport', fallback: '7j/7', shellText: '7j/7', icone: 'contactCall' },
     ],
     // Le bloc « séquestre » de l'accueil ouvre sur un glyphe que la page
     // (src/pages/Home.js) et sa coquille publiaient chacune en littéral — le
@@ -502,6 +529,36 @@ export const PAGE_SECTIONS = {
     // coupé par le bas de la fenêtre. Le plancher de 18 000 px² de
     // `e2e/lcp-geometrie-declaree.spec.js` reste très en dessous des deux tailles.
     //
+    // ── RE-MESURÉ LE 07/10/2026 : LA MARGE ÉTAIT TROP MINCE, ET ELLE A CASSÉ ──
+    // **33 642 px² en mobile et 36 480 en desktop** pour le sous-titre (classes
+    // ci-dessous, une seule candidate au premier paint). Le relevé précédent
+    // (29 260 / 32 830) n'était PAS faux — il était FRAGILE, et la CI l'a dit
+    // deux fois de suite sur le runner Linux : l'élément élu y était
+    // `<p class="note-de-ligne">`, c'est-à-dire la description d'une ÉTAPE,
+    // jamais le sous-titre du héros.
+    //
+    // Ce qui se passait, mesuré et reproduit (Chromium, sonde des candidates
+    // `largest-contentful-paint`, mobile) : les trois descriptions d'étapes sont
+    // des paragraphes larges et multi-lignes, presque aussi grands que le
+    // sous-titre — **28 201 px² de boîte pour une note contre 31 920 pour le
+    // sous-titre à 412 px**. Or la colonne de texte d'une ligne d'étape
+    // s'ÉTRÉCIT quand la mise en page rétrécit (340 px de large à 412, 211 px à
+    // 397) : la note se replie alors sur plus de lignes et sa boîte MONTE à
+    // 30 717 (397 px) puis 32 610 (382 px), pendant que le sous-titre, lui, ne
+    // bougeait pas — à 397 px l'écart tombait à **1,5 %**, et l'élection
+    // basculait. Un écart de 15 px de mise en page a suffi : c'est exactement ce
+    // qu'une barre de défilement CLASSIQUE (Linux) retire à la fenêtre, quand
+    // l'hôte du poste partagé la laisse en surimpression.
+    //
+    // Le remède est une MARGE, pas une tolérance : `text-lg` (18 px, interligne
+    // 28) devient `text-xl` (20 px) avec `leading-relaxed`. Re-mesuré sur le
+    // MÊME artefact à quatre largeurs de mise en page, sous-titre contre la
+    // plus grande note : 412 px **33 642** contre 25 860 (+30 %), 397 px **42 578**
+    // contre 28 840 (+48 %), 382 px **42 456** contre 32 610 (+30 %). Les sept
+    // autres routes déclarées gardent leur élément élu aux trois largeurs — le
+    // défaut était propre à cette page, et c'est la marge de SON sous-titre qui
+    // le ferme.
+    //
     // `heroFrameClass` porte la largeur du héros (donc le retour à la ligne du
     // sous-titre, qui porte lui-même son `max-w-2xl`), `heroSubtitleClass` sa
     // hauteur, et `heroTitleClass` le texte qui le précède et pourrait lui
@@ -513,13 +570,17 @@ export const PAGE_SECTIONS = {
     // (`.heros-grille`).
     heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 section-publique text-center',
     heroTitleClass: 'titre-page mb-4',
-    // Le sous-titre du héros est l'élément LCP de la page : sa GÉOMÉTRIE ne
-    // change pas d'un caractère (`text-lg` et `max-w-2xl` décident du retour à
-    // la ligne, donc de l'aire mesurée). Ce qui change est sa COULEUR, et c'est
-    // un défaut qui a été mesuré : `text-stone-600` sur le fond orange du héros
-    // donne un contraste de 2,6:1 — la page publiait un paragraphe illisible
-    // depuis sa mise en ligne. `text-orange-50` mesure 7,3:1 sur `#ea580c`.
-    heroSubtitleClass: 'text-lg text-orange-50 max-w-2xl mx-auto',
+    // Le sous-titre du héros est l'élément LCP de la page : sa GÉOMÉTRIE
+    // décide du retour à la ligne, donc de l'aire mesurée — et c'est ELLE qu'on
+    // ne peut pas laisser mince (voir le relevé du 07/10/2026 plus haut :
+    // `text-xl leading-relaxed` donne 30 à 48 % de marge sur la plus grande note
+    // d'étape, contre 1,5 % avec `text-lg`). `max-w-2xl` reste : il ne bride pas
+    // la largeur à 412 px (380 px disponibles), il borne le desktop.
+    // Ce qui change AUSSI, et c'est un défaut mesuré : la COULEUR.
+    // `text-stone-600` sur le fond orange du héros donne un contraste de 2,6:1 —
+    // la page publiait un paragraphe illisible depuis sa mise en ligne.
+    // `text-orange-50` mesure 7,3:1 sur `#ea580c`.
+    heroSubtitleClass: 'text-xl leading-relaxed text-orange-50 max-w-2xl mx-auto',
     escrowTitleKey: 'escrowWhatTitle',
     escrowTextKey: 'escrowWhatText',
     // L'illustration et l'estampille du panneau de séquestre : le MÊME fichier et
@@ -664,6 +725,18 @@ export const PAGE_SECTIONS = {
     step1NumberKey: 'stepNumber1',
     step2NumberKey: 'stepNumber2',
     step3NumberKey: 'stepNumber3',
+    // ── LA JAUGE DU FORMULAIRE (28/09/2026) ───────────────────────────────
+    // Les trois pastilles ci-dessus montrent le PARCOURS (trois pages) et ne
+    // bougeaient jamais : quelqu'un qui avait rempli sept champs sur neuf n'y
+    // voyait aucun avancement. Sous elles, une jauge dit ce qui reste à remplir
+    // ICI — sa largeur est une donnée de l'écran (le pré-rendu la peint vide,
+    // et les deux canaux lui donnent donc la même boîte) et sa couleur un
+    // verdict : gris, orange pendant la saisie, vert quand les champs exigés
+    // sont tous remplis. Ces deux classes sont DÉCLARÉES ici parce que la
+    // coquille les publie aussi : sans porteur des deux côtés, la bascule
+    // coquille → React ferait sauter la jauge et remonterait toute la notice.
+    progressTrackClass: 'jauge-inscription',
+    progressFillClass: 'jauge-inscription-remplie',
     stepNoticeKey: 'clientStepNotice',
     // La chaîne de la notice d'étape EST l'élément LCP de la page (mesuré :
     // 10 048 px² mobile / 12 544 desktop après le passage de son ⚠️ de l'emoji

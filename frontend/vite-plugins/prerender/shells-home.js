@@ -15,6 +15,14 @@ import { nomDuDrapeau } from '../../src/config/flags.js'
 // mêmes moitiés que src/pages/Home.js, sur les cinq langues, sans recopier la
 // règle (voir `couperLeTitre`, src/config/page-sections.js).
 import { couperLeTitre } from '../../src/config/page-sections.js'
+// Les photos du héros : le chemin de la PREMIÈRE, et ses dimensions réelles.
+// Le module est partagé avec src/components/PhotoDuHeros.js — la coquille peint
+// donc la photo sur laquelle React ouvre son alternance, par construction, et
+// changer la photo de tête se fait dans un seul fichier (voir le commentaire du
+// module : les deux canaux publient le même `<img>`, sans quoi la bascule
+// coquille → React remplacerait une boîte par une autre, et l'élément LCP de
+// « / » serait ré-élu par le JavaScript).
+import { PHOTOS_HEROS, PHOTO_HEROS_LARGEUR, PHOTO_HEROS_HAUTEUR } from '../../src/config/photos-heros.js'
 import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
@@ -70,7 +78,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     sectionClass, carteClass,
     pastilleClass, pastilleCreuseClass, nomLigneClass, noteLigneClass, flecheLigneClass,
     panneauClass, panneauArtClass, panneauOrbeClass, panneauImageClass, panneauEstampilleClass,
-    bandeClass, chiffreClass, ctaClass, ctaInnerClass, ctaActionsClass,
+    faitsClass, faitClass, faitFigureClass, faitLibelleClass,
+    ctaClass, ctaInnerClass, ctaActionsClass,
     lienFlecheClass, lienFlecheClairClass,
     galerieGrilleClass, galerieCarteClass, galerieLegendeClass,
     etapesGrilleClass, etapesTeteClass, cadrePhotoClass, photoEtapes,
@@ -84,7 +93,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     carteClass, listeClass,
     listeColonnesClass, ligneMetierClass, ligneEtapeClass, pastilleClass, pastilleCreuseClass,
     nomLigneClass, noteLigneClass, flecheLigneClass, panneauClass, panneauArtClass,
-    panneauOrbeClass, panneauImageClass, panneauEstampilleClass, bandeClass, chiffreClass,
+    panneauOrbeClass, panneauImageClass, panneauEstampilleClass,
+    faitsClass, faitClass, faitFigureClass, faitLibelleClass,
     ctaClass, ctaInnerClass, ctaActionsClass, lienFlecheClass, lienFlecheClairClass,
     galerieGrilleClass, galerieCarteClass, galerieLegendeClass,
     etapesGrilleClass, etapesTeteClass, cadrePhotoClass,
@@ -170,7 +180,14 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // déplace rien, et c'est cette égalité qui empêche Chrome de ré-élire un
     // second élément LCP plus tardif.
     `<section class="bg-gradient-to-br from-orange-600 via-orange-600 to-orange-700 text-white relative overflow-hidden">`,
-    `<div class="absolute inset-0 bg-black bg-opacity-5"></div>`,
+    // `pointer-events-none` : le voile du héros est une teinte de PEINTURE, pas
+    // une cible — sans quoi il se peint au-dessus de la grille de contenu (il
+    // est positionné, la grille est statique) et avale l'appui sur les deux
+    // appels à l'action. La classe est la même que dans src/pages/Home.js, pour
+    // que le HTML pré-rendu n'ait pas deux boutons morts avant l'hydratation.
+    // MESURÉ le 07/10/2026 : c'est exactement ce `<div>` que rendait
+    // `document.elementFromPoint` au centre des deux boutons.
+    `<div class="absolute inset-0 bg-black bg-opacity-5 pointer-events-none"></div>`,
     `<div class="${heroGrilleClass}">`,
     `<div class="${heroCopieClass}">`,
     `<span class="${heroKickerClass} mb-6">`,
@@ -192,13 +209,22 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<a href="/how-it-works" class="${lienFlecheClairClass}">${esc(T('howItWorksLink'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
     `</div>`,
     `</div>`,
-    // L'illustration : même fichier, mêmes attributs et mêmes classes que la
-    // page. `alt=""` des deux côtés (l'illustration illustre le texte qui la
+    // LA PHOTO DU HÉROS : la PREMIÈRE de la liste partagée, avec ses
+    // dimensions réelles, les mêmes attributs et les mêmes classes que la page
+    // (voir le commentaire de src/pages/Home.js). C'est elle que React peint à
+    // son premier rendu — l'alternance ne commence qu'après — donc les deux
+    // canaux peignent la même boîte, et l'élément LCP de « / » reste la peinture
+    // du document. `alt=""` des deux côtés (la photo illustre le texte qui la
     // précède ; un texte de remplacement est un texte publié, donc il
     // appartiendrait au dictionnaire).
     `<div class="${heroIllustrationClass}">`,
     `<span class="${heroIllustrationFondClass}" aria-hidden="true"></span>`,
-    `<img src="/assets/kojo-hero.svg" alt="" width="960" height="720" fetchpriority="high" decoding="async" class="${heroIllustrationImageClass}">`,
+    // `decoding="sync"` : MÊME attribut que src/components/PhotoDuHeros.js, et
+    // pour la même raison mesurée — l'image se peindrait sinon une trame après
+    // le texte du héros, et l'élément LCP serait ré-élu par le repaint de React
+    // (voir le commentaire détaillé du composant et du préchargement dans
+    // vite-plugins/prerender-route-meta.js).
+    `<img src="${esc(PHOTOS_HEROS[0])}" alt="" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}">`,
     `</div>`,
     `</div>`,
     `</section>`,
@@ -226,10 +252,14 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         )
       }
       return (
-        `<span class="${rubanJetonClass}">` +
+        // LE JETON EST UN LIEN (même adresse que la page : `/jobs` filtré sur
+        // le pays, `country` étant un paramètre que `GET /api/jobs` accepte
+        // depuis toujours). Un crawler qui ne lit pas le JavaScript atteint
+        // donc les offres de chaque pays sans passer par l'accueil React.
+        `<a href="/jobs?country=${esc(country.code)}" class="${rubanJetonClass}">` +
         svgDuDrapeau(drapeau, 'h-4 w-6 rounded-sm') +
         `${esc(country.name)}` +
-        `</span>`
+        `</a>`
       )
     }),
     `</div>`,
@@ -309,15 +339,19 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="${listeClass}">`,
     ...homePlan.steps.map(
       ({ icone, numberKey, titleKey, descriptionKey: textKey }) =>
-        `<div class="${ligneEtapeClass}">` +
+        // La ligne d'étape est un LIEN vers la page du parcours, comme chez
+        // React : elle porte la classe des lignes cliquables (état de survol
+        // compris), donc un `<div>` y peignait une affordance qui n'existait
+        // pas. La flèche suit : à DROITE, puisqu'elle mène quelque part.
+        `<a href="/how-it-works" class="${ligneEtapeClass}">` +
         `<span class="${pastilleCreuseClass}"><span class="text-lg font-bold">${esc(T(numberKey))}</span></span>` +
         `<span class="${pastilleClass}">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
         `<div>` +
         `<h3 class="${nomLigneClass}">${esc(T(titleKey))}</h3>` +
         `<p class="${noteLigneClass}">${esc(T(textKey))}</p>` +
         `</div>` +
-        svgDeLIcone('flecheBas', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
-        `</div>`
+        svgDeLIcone('flecheDroite', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
+        `</a>`
     ),
     `</div>`,
     `</div>`,
@@ -353,20 +387,21 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<a href="/register?type=client" class="bouton bouton-creme">${esc(T('lookingForServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
     `<a href="/register?type=worker" class="bouton bouton-contour">${esc(T('offerServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
     `</div>`,
-    `</div>`,
-    `</section>`,
 
-    // Faits vérifiables (pays couverts, support) : la MÊME déclaration
-    // (homePlan.stats) est lue par Home.js et par cette coquille — une seule
-    // liste, deux rendus, et aucun compteur inventé (cf. page-sections.js).
-    `<section class="${sectionClass} ${sandClass}">`,
-    `<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">`,
-    `<div class="${bandeClass}">`,
+    // ── LES DEUX FAITS DE LA CLÔTURE (07/10/2026) ─────────────────────────────
+    // Ils étaient une BANDE à filets seule sur toute une section, ENTRE cette
+    // clôture et « Qui sommes-nous » (245 px de section pour 115 px de bande,
+    // mesuré sur l'artefact). Ils vivent maintenant DANS la clôture, sous les
+    // deux boutons : l'endroit où le visiteur hésite. La structure, les classes
+    // et les deux dessins sont ceux de src/pages/Home.js — lus dans le plan
+    // (homePlan.stats : labelKey, shellText, icone), donc la même liste pour les
+    // deux canaux, et jamais un compteur inventé.
+    `<div class="${faitsClass}">`,
     ...homePlan.stats.map(
-      ({ labelKey, shellText }) =>
-        `<div>` +
-        `<div class="${chiffreClass} mb-2">${esc(shellText)}</div>` +
-        `<div class="${noteLigneClass}">${esc(T(labelKey))}</div>` +
+      ({ labelKey, shellText, icone }) =>
+        `<div class="${faitClass}">` +
+        `<span class="${faitFigureClass}">${svgDeLIcone(icone, CLASSES_ICONE.heros)}${esc(shellText)}</span>` +
+        `<span class="${faitLibelleClass}">${esc(T(labelKey))}</span>` +
         `</div>`
     ),
     `</div>`,

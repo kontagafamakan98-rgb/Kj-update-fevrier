@@ -563,6 +563,24 @@ jobs:
         working-directory: frontend
         run: node scripts/check-origines-bundles.js
 
+      # LA COUVERTURE DES CLASSES DE TIERS. Le dépôt regarde les tiers par cinq
+      # canaux (les deux gardes statiques ci-dessus, plus le parcours sans geste,
+      # le parcours après geste et la carte différée), et chacun publie ses
+      # limites en prose — mais RIEN ne reliait une CLASSE de tiers (« lien
+      # rendu », « chargé après interaction »…) aux canaux qui peuvent
+      # l’observer. Un classement qu’aucun canal ne confronte est une exemption
+      # invérifiable : elle survit à son contrôle et justifie alors le suivant.
+      # Ce garde refuse une classe ORPHELINE (aucun canal ne l’observe), une
+      # classe sans ligne, une ligne périmée, une raison d’absence donnée à un
+      # canal qui observe, un canal cité qui n’existe pas, une absence muette,
+      # un module ou une sonde ABSENT sur disque, et une déclaration `CE_QUE_*`
+      # vidée ou renommée. La matrice et la règle vivent dans
+      # scripts/couverture-tiers.js ; preuve d’échec dans
+      # scripts/__tests__/check-couverture-tiers.test.js.
+      - name: Check third-party class coverage (no class observed by no channel)
+        working-directory: frontend
+        run: node scripts/check-couverture-tiers.js
+
       # Le garde ci-dessus compare les textes que le plan DÉCLARE. Celui-ci
       # compare TOUT ce que les coquilles publient — chaque fragment visible des
       # HTML du build — aux textes que la page peut publier : un mot ajouté à la
@@ -690,6 +708,24 @@ jobs:
         working-directory: frontend
         run: node scripts/check-generated-icons.js
 
+      # Garde-fou de la MESURE du poinçon — le dessin lui-même, et non la
+      # conformité de ses artefacts. L'atelier du 28/09/2026 avait mesuré trois
+      # choses (le contraste de la lettre sur la matière : 2,67:1, illisible ;
+      # le débordement de l'arc d'ombre : 0,55 unité de liseré peint DEHORS, sur
+      # le fond ; les pixels peints hors du disque), corrigé le dessin avec
+      # elles, puis été supprimé — il ne restait que de la prose et deux nombres
+      # dans un journal, c'est-à-dire rien qui rougisse à la prochaine retouche
+      # de la géométrie. Le check rejoue les trois, sur la géométrie DÉCLARÉE
+      # (src/config/marque-kojo.json, la même que lisent la page, la coquille et
+      # le rasteriseur) et sur les PNG CLAIRS réellement servis, décodés ici en
+      # Node (zlib + dé-filtrage, aucune dépendance) : seuil de contraste WCAG
+      # 1.4.11 (3:1), rayon + demi-trait ≤ rayon du disque pour les cinq cercles,
+      # et zéro pixel peint hors du disque — avec sa contrepartie, sans quoi
+      # « rien dehors » serait vrai d'une image transparente.
+      - name: Check the poinçon's measurements (contrast, circles, overflow)
+        working-directory: frontend
+        run: node scripts/check-marque-kojo.js
+
       # Garde-fou du manifeste PWA : il déclarait « any maskable » sur ses deux
       # icônes alors qu'AUCUNE ne tenait dans la zone de sécurité (contenu à un
       # rayon de 0,495 pour une limite de 0,400) et que le fichier « -maskable »
@@ -698,7 +734,14 @@ jobs:
       # dimensions, type, purpose) et exige qu'un « maskable » soit PROUVÉ par
       # la mesure, dans les deux sens : aucune fausse revendication, et aucune
       # variante fabriquée pour le masque qui ne serait jamais servie.
-      - name: Check PWA manifest (declared icons + maskable safe zone)
+      # Depuis le 07/10/2026 il juge AUSSI l'installation elle-même : « id »,
+      # « start_url » et « scope » doivent rester sous le domaine du site (une
+      # entrée absolue ailleurs ferait ouvrir l'application installée sur un
+      # domaine qu'on n'exploite pas), et chaque entrée de la liste de précache
+      # du service worker doit être un littéral de chaîne SOUS CE DOMAINE — une
+      # liste vide ou une adresse calculée est refusée, parce qu'un vert sur une
+      # liste vide ne dirait rien de son contenu.
+      - name: Check PWA manifest (declared icons, maskable safe zone, install origin, service-worker precache)
         working-directory: frontend
         run: node scripts/check-pwa-manifest.js
 
