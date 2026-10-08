@@ -219,7 +219,12 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // appartiendrait au dictionnaire).
     `<div class="${heroIllustrationClass}">`,
     `<span class="${heroIllustrationFondClass}" aria-hidden="true"></span>`,
-    `<img src="${esc(PHOTOS_HEROS[0])}" alt="" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="async" class="${heroIllustrationImageClass}">`,
+    // `decoding="sync"` : MÊME attribut que src/components/PhotoDuHeros.js, et
+    // pour la même raison mesurée — l'image se peindrait sinon une trame après
+    // le texte du héros, et l'élément LCP serait ré-élu par le repaint de React
+    // (voir le commentaire détaillé du composant et du préchargement dans
+    // vite-plugins/prerender-route-meta.js).
+    `<img src="${esc(PHOTOS_HEROS[0])}" alt="" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}">`,
     `</div>`,
     `</div>`,
     `</section>`,

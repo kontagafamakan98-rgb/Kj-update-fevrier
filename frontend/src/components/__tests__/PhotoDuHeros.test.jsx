@@ -125,7 +125,15 @@ describe('la photo du héros (et son alternance)', () => {
     expect(img.className).toBe('cadre-image');
     // La photo de tête est celle du LCP : elle part en priorité haute.
     expect(img.getAttribute('fetchpriority')).toBe('high');
-    expect(img.getAttribute('decoding')).toBe('async');
+    // `decoding="sync"` depuis le 07/10/2026, et ce n'est PAS un détail de
+    // réglage : en décodage asynchrone, l'image se peint une TRAME après le
+    // texte du héros, Chrome ré-élit un second élément LCP plus tardif, et la
+    // sonde `e2e/lcp-geometrie.spec.js` compte deux candidates au lieu d'une
+    // (mesuré sur Chromium, 412×823, CPU limité par CDP). Le préchargement posé
+    // dans le `<head>` par vite-plugins/prerender-route-meta.js est l'autre
+    // moitié du remède ; le refus de cette paire est tenu par
+    // scripts/__tests__/check-home-hero-lcp.test.js.
+    expect(img.getAttribute('decoding')).toBe('sync');
   });
 
   it('tourne sur AU MOINS cinq photos, toutes uniques et toutes présentes', () => {

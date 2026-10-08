@@ -100,10 +100,15 @@ const ROUTES_DECLAREES = [
   // Re-mesuré le 28/09/2026 au port du vocabulaire éditorial : 29 260 / 32 830
   // px² (la veille : 26 334 / 32 928 — le mobile gagne de l'encre parce que le
   // paragraphe remonte entièrement au-dessus de la ligne de flottaison, voir le
-  // commentaire du plan). Le plancher reste à 18 000 : il vaut ≈ 62 % du plus
-  // petit des deux relevés, donc il attrape une page vidée de son texte sans
-  // devenir un test de police.
-  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 29 260 / 32 830
+  // commentaire du plan). Re-mesuré le 07/10/2026 : **33 642 / 36 480 px²**,
+  // après `text-lg` → `text-xl leading-relaxed` (décision mesurée, voir le plan
+  // de /how-it-works) : à 29 260 px² la marge sur la plus grande note d'étape
+  // n'était que de 1,5 % à 397 px de mise en page, et un runner Linux — barre de
+  // défilement classique, 15 px de moins — faisait élire la note au lieu du
+  // sous-titre, deux fois de suite. Le plancher reste à 18 000 : il vaut ≈ 53 %
+  // du plus petit des deux relevés, donc il attrape une page vidée de son texte
+  // sans devenir un test de police.
+  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 33 642 / 36 480
   // Le plus grand texte peint de ces quatre pages est un paragraphe secondaire,
   // pas le titre : ligne légale de /login, notice d'étape de /register,
   // sous-titres de /forgot-password et de /support (voir la mesure en tête).

@@ -529,6 +529,36 @@ export const PAGE_SECTIONS = {
     // coupé par le bas de la fenêtre. Le plancher de 18 000 px² de
     // `e2e/lcp-geometrie-declaree.spec.js` reste très en dessous des deux tailles.
     //
+    // ── RE-MESURÉ LE 07/10/2026 : LA MARGE ÉTAIT TROP MINCE, ET ELLE A CASSÉ ──
+    // **33 642 px² en mobile et 36 480 en desktop** pour le sous-titre (classes
+    // ci-dessous, une seule candidate au premier paint). Le relevé précédent
+    // (29 260 / 32 830) n'était PAS faux — il était FRAGILE, et la CI l'a dit
+    // deux fois de suite sur le runner Linux : l'élément élu y était
+    // `<p class="note-de-ligne">`, c'est-à-dire la description d'une ÉTAPE,
+    // jamais le sous-titre du héros.
+    //
+    // Ce qui se passait, mesuré et reproduit (Chromium, sonde des candidates
+    // `largest-contentful-paint`, mobile) : les trois descriptions d'étapes sont
+    // des paragraphes larges et multi-lignes, presque aussi grands que le
+    // sous-titre — **28 201 px² de boîte pour une note contre 31 920 pour le
+    // sous-titre à 412 px**. Or la colonne de texte d'une ligne d'étape
+    // s'ÉTRÉCIT quand la mise en page rétrécit (340 px de large à 412, 211 px à
+    // 397) : la note se replie alors sur plus de lignes et sa boîte MONTE à
+    // 30 717 (397 px) puis 32 610 (382 px), pendant que le sous-titre, lui, ne
+    // bougeait pas — à 397 px l'écart tombait à **1,5 %**, et l'élection
+    // basculait. Un écart de 15 px de mise en page a suffi : c'est exactement ce
+    // qu'une barre de défilement CLASSIQUE (Linux) retire à la fenêtre, quand
+    // l'hôte du poste partagé la laisse en surimpression.
+    //
+    // Le remède est une MARGE, pas une tolérance : `text-lg` (18 px, interligne
+    // 28) devient `text-xl` (20 px) avec `leading-relaxed`. Re-mesuré sur le
+    // MÊME artefact à quatre largeurs de mise en page, sous-titre contre la
+    // plus grande note : 412 px **33 642** contre 25 860 (+30 %), 397 px **42 578**
+    // contre 28 840 (+48 %), 382 px **42 456** contre 32 610 (+30 %). Les sept
+    // autres routes déclarées gardent leur élément élu aux trois largeurs — le
+    // défaut était propre à cette page, et c'est la marge de SON sous-titre qui
+    // le ferme.
+    //
     // `heroFrameClass` porte la largeur du héros (donc le retour à la ligne du
     // sous-titre, qui porte lui-même son `max-w-2xl`), `heroSubtitleClass` sa
     // hauteur, et `heroTitleClass` le texte qui le précède et pourrait lui
@@ -540,13 +570,17 @@ export const PAGE_SECTIONS = {
     // (`.heros-grille`).
     heroFrameClass: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 section-publique text-center',
     heroTitleClass: 'titre-page mb-4',
-    // Le sous-titre du héros est l'élément LCP de la page : sa GÉOMÉTRIE ne
-    // change pas d'un caractère (`text-lg` et `max-w-2xl` décident du retour à
-    // la ligne, donc de l'aire mesurée). Ce qui change est sa COULEUR, et c'est
-    // un défaut qui a été mesuré : `text-stone-600` sur le fond orange du héros
-    // donne un contraste de 2,6:1 — la page publiait un paragraphe illisible
-    // depuis sa mise en ligne. `text-orange-50` mesure 7,3:1 sur `#ea580c`.
-    heroSubtitleClass: 'text-lg text-orange-50 max-w-2xl mx-auto',
+    // Le sous-titre du héros est l'élément LCP de la page : sa GÉOMÉTRIE
+    // décide du retour à la ligne, donc de l'aire mesurée — et c'est ELLE qu'on
+    // ne peut pas laisser mince (voir le relevé du 07/10/2026 plus haut :
+    // `text-xl leading-relaxed` donne 30 à 48 % de marge sur la plus grande note
+    // d'étape, contre 1,5 % avec `text-lg`). `max-w-2xl` reste : il ne bride pas
+    // la largeur à 412 px (380 px disponibles), il borne le desktop.
+    // Ce qui change AUSSI, et c'est un défaut mesuré : la COULEUR.
+    // `text-stone-600` sur le fond orange du héros donne un contraste de 2,6:1 —
+    // la page publiait un paragraphe illisible depuis sa mise en ligne.
+    // `text-orange-50` mesure 7,3:1 sur `#ea580c`.
+    heroSubtitleClass: 'text-xl leading-relaxed text-orange-50 max-w-2xl mx-auto',
     escrowTitleKey: 'escrowWhatTitle',
     escrowTextKey: 'escrowWhatText',
     // L'illustration et l'estampille du panneau de séquestre : le MÊME fichier et

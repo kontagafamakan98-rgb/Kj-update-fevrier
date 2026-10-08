@@ -11,6 +11,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { buildHomeShell } from './prerender/shells-home.js'
+// La photo de TÊTE du héros de l'accueil : son chemin est lu ici pour être
+// PRÉCHARGÉ dans le `<head>` d'index.html (voir le commentaire de l'injection,
+// plus bas). Le domicile unique de ces faits est src/config/photos-heros.js —
+// jamais un littéral recopié dans index.html, qui ne suivrait pas un changement
+// de photo et laisserait l'image LCP hors du chemin critique, en silence.
+import { PHOTOS_HEROS } from '../src/config/photos-heros.js'
 import { buildRouteShells } from './prerender/shells-routes.js'
 import { chromeDePage, piedDePage } from './prerender/app-chrome.js'
 import { makeDeclaredBodyGuard } from './prerender/declared-body.js'
@@ -252,11 +258,35 @@ export function prerenderRouteMetaPlugin({ ogCards, pageMeta, pageSections, page
       // Même chrome que les routes (cf. app-chrome.js) : l'accueil ne peut pas
       // être la seule page dont la coquille hérite d'un autre alignement que
       // celui que React applique au même corps.
-      const withHomeShell = html.replace(
+      // ── LE PRÉCHARGEMENT DE LA PHOTO DE TÊTE (07/10/2026) ──────────
+      // L'`<img>` du héros est l'élément LCP de « / » (69 920 px², mesuré),
+      // mais il se DÉCODE plus tard que le texte : le `<h1>` du héros se peint
+      // dans une première trame et l'image dans la suivante. Chrome ré-élit
+      // alors un élément LCP plus tardif — deux candidates au lieu d'une — et
+      // toute la chaîne JavaScript entre dans le graphe LCP simulé de Lantern.
+      // Mesuré (Chromium, 412×823, limitation du CPU par CDP) : à ×8 et ×15,
+      // la navigation réelle sortait 2 candidates (`<h1>` puis `<img>`) ; avec
+      // ce seul préchargement, elle en sort UNE, l'`<img>`, dès ×1.
+      // Le préchargement démarre la requête pendant l'analyse du `<head>`,
+      // donc bien avant que le corps — et son `<img>` — ne soit atteint :
+      // l'image est en mémoire au premier paint, et les deux peintures tombent
+      // dans la MÊME trame. Même mécanisme que les deux préchargements de
+      // police d'index.html, et comme eux il est posé AVANT les liens du corps
+      // pour ne pas être servi après eux.
+      const preloadPhoto =
+        `<link rel="preload" as="image" fetchpriority="high" href="${esc(PHOTOS_HEROS[0])}">`
+      const withPreload = html.replace('<head>', `<head>\n    ${preloadPhoto}`)
+      if (withPreload === html) {
+        throw new Error(
+          'prerender-route-meta : <head> introuvable dans index.html — la photo de tête du héros ' +
+            "n'est PAS préchargée, et l'élément LCP de « / » repasserait au JavaScript."
+        )
+      }
+      const withHomeShell = withPreload.replace(
         '<div id="root"></div>',
         `<div id="root">${chromeDePage(homeShell, pied)}</div>`
       )
-      if (withHomeShell === html) {
+      if (withHomeShell === withPreload) {
         throw new Error(
           'prerender-route-meta : <div id="root"></div> introuvable dans index.html — shell accueil NON injecté'
         )

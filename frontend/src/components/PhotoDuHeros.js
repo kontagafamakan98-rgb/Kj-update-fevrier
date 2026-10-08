@@ -106,7 +106,21 @@ export default function PhotoDuHeros({ className }) {
       width={PHOTO_HEROS_LARGEUR}
       height={PHOTO_HEROS_HAUTEUR}
       fetchpriority="high"
-      decoding="async"
+      // ── `decoding="sync"`, ET C'EST UNE DÉCISION MESURÉE (07/10/2026) ──────
+      // Cette image est l'élément LCP de « / » (69 920 px²). En décodage
+      // `async`, elle se peint une TRAME APRÈS le texte du héros : Chrome
+      // ré-élit alors un élément LCP plus tardif, le repaint de React entre
+      // dans le graphe LCP simulé de Lantern, et la sonde
+      // `e2e/lcp-geometrie.spec.js` compte DEUX candidates au lieu d'une.
+      // Reproduit puis mesuré (Chromium, 412×823, limitation du CPU par CDP) :
+      // à ×15, la navigation réelle sortait `<h1>` à t=1580 puis `<img>` à
+      // t=1948 ; le préchargement de la photo (prerender-route-meta.js) ET le
+      // décodage synchrone la ramènent à UNE candidate, l'`<img>`, horodatée
+      // au premier paint. Ce que le décodage synchrone NE fait PAS : retarder
+      // le LCP — sans lui, le premier paint est plus tôt mais l'image arrive
+      // après, et c'est ELLE le LCP. Il aligne les deux peintures sur la même
+      // trame, ce qui est la condition de l'égalité coquille → React.
+      decoding="sync"
       className={className}
     />
   );
