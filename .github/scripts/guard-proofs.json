@@ -2136,8 +2136,8 @@
       "id": "environment: ref distante orpheline non nommee",
       "garde": "frontend/scripts/check-git-branches.js",
       "cible": "frontend/scripts/check-git-branches.js",
-      "trouve": "  const raison = raisonDuContenu(ref.ref, base, cwd, lire);\n",
-      "remplace": "  const raison = null; // mutation : la ref distante orpheline n'est plus jugee\n",
+      "trouve": "    .map((ref) => ({ ...ref, raison: raisonDuContenu(ref.ref, baseDistante.ref, cwd, lire) }))",
+      "remplace": "    .map((ref) => ({ ...ref, raison: null }))",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
       "commande": [
@@ -2156,8 +2156,8 @@
       "id": "environment: ref distante non livree nommee quand meme",
       "garde": "frontend/scripts/check-git-branches.js",
       "cible": "frontend/scripts/check-git-branches.js",
-      "trouve": "  return raison\n    ? `réf distante",
-      "remplace": "  return raison ?? true // mutation : une ref non livree est nommee quand meme\n    ? `réf distante",
+      "trouve": "    .filter((residu) => Boolean(residu.raison));",
+      "remplace": "    .filter(() => true);",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
       "commande": [
@@ -3176,6 +3176,26 @@
       "cwd": "frontend",
       "attend": [
         "refuse de juger quand la liste est INTROUVABLE (déclaration renommée)"
+      ]
+    },
+    {
+      "id": "environment: nettoyage execute sans accord",
+      "garde": "frontend/scripts/check-test-environment.js",
+      "cible": "frontend/scripts/check-test-environment.js",
+      "trouve": "  if (!MOTS_D_ACCORD.includes(accord)) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-test-environment.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-test-environment.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "n’exécute RIEN sans accord"
       ]
     }
   ]

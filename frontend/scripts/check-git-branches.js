@@ -34,6 +34,16 @@
  * qui est seulement rappelé » se décide en un seul endroit (`verdictDeLaPasse`,
  * scripts/check-test-environment.js).
  *
+ *   4. Le nettoyage de (1) et (2) ne se contente plus d'être NOMMÉ : il est
+ *      PROPOSÉ, puis exécuté après accord. Une phrase ne se rejoue pas — ce
+ *      résidu devient un PLAN (une commande par réf orpheline, dite telle
+ *      qu'elle sera lancée), l'accord est demandé SUR LE TERMINAL par le
+ *      pré-vol de push (voir `proposerLeNettoyage` dans
+ *      scripts/check-test-environment.js), et le nettoyage se conclut par une
+ *      RELECTURE des réfs : c'est elle, et jamais le code de sortie d'une
+ *      commande, qui dit si le résidu a disparu. Sans terminal, ou sans accord,
+ *      rien n'est touché et le remède reste nommé, exactement comme avant.
+ *
  * Un contrôle qui ne peut pas lire son sujet échoue au lieu de se taire (git
  * illisible, aucune branche de base à comparer).
  */
@@ -89,11 +99,68 @@ export function rapportBranche(branche, base, cwd, lire) {
   return `branche locale « ${branche.nom} » : ${raison}, et sa réf distante « ${branche.suivi} » a disparu — la supprimer (git branch -D ${branche.nom})`;
 }
 
-export function rapportRefDistante(ref, base, cwd, lire) {
-  const raison = raisonDuContenu(ref.ref, base, cwd, lire);
-  return raison
-    ? `réf distante « ${ref.ref} » : ${raison}, et aucune branche locale ne la porte — la retirer (git push ${ref.distant} --delete ${ref.nom}, ou git remote prune ${ref.distant} si elle a disparu du distant)`
-    : null;
+// Le message d'un résidu, à partir du résidu STRUCTURÉ (réf, distant, nom,
+// raison) : c'est la même donnée qui devient une phrase pour le lecteur et un
+// plan pour l'exécutant, donc une seule décision de résidu pour les deux. Le
+// `base` n'est plus un paramètre : la raison est déjà mesurée, et c'est elle qui
+// la nommait (`son arbre est identique à origin/main (fusion par squash)`).
+export function messageRefDistante(residu) {
+  return `réf distante « ${residu.ref} » : ${residu.raison}, et aucune branche locale ne la porte — la retirer (git push ${residu.distant} --delete ${residu.nom}, ou git remote prune ${residu.distant} si elle a disparu du distant)`;
+}
+
+// ── Le nettoyage d'un résidu : un PLAN, puis une RELECTURE ──────────────────
+// Le remède était une phrase entre parenthèses (« git push origin --delete X,
+// ou git remote prune origin ») ; c'est maintenant une donnée, parce qu'une
+// phrase ne s'exécute pas. La règle reste PURE : aucune E/S ici, la lecture est
+// passée en paramètre comme partout dans ce module — c'est ce qui rend le
+// nettoyage éprouvable sans réseau.
+
+export function planDeNettoyage(residus = []) {
+  return residus.map((residu) => ({
+    ref: residu.ref,
+    distant: residu.distant,
+    nom: residu.nom,
+    raison: residu.raison,
+    args: ['push', residu.distant, '--delete', residu.nom],
+    commande: `git push ${residu.distant} --delete ${residu.nom}`,
+  }));
+}
+
+/**
+ * La réf de suivi est-elle ENCORE là ? C'est la seule preuve d'un nettoyage.
+ *
+ * Ni le code de sortie de `push --delete` ni celui de `remote prune` ne
+ * répondent à cette question : `prune` sort en 0 en n'élaguant RIEN, donc un
+ * nettoyage jugé sur son code de sortie serait vert sur un résidu intact.
+ */
+export function refEncorePresente(ref, cwd, lire) {
+  return lire(['for-each-ref', '--format=%(refname)', `refs/remotes/${ref}`], cwd).lignes.length > 0;
+}
+
+/**
+ * Deux tentatives, dans l'ordre où le message les nommait.
+ *
+ * (1) `git push <distant> --delete <nom>` retire la réf DU DISTANT : c'est le
+ * remède qui agit quand elle y est encore. (2) S'il échoue, `git remote prune
+ * <distant>` retire la réf de SUIVI restée seule — le cas où le distant l'a déjà
+ * supprimée sans qu'aucun élagage ne soit passé. L'ordre compte : élaguer
+ * d'abord ferait disparaître la trace locale d'une réf qui existe encore sur le
+ * distant, et le jugement deviendrait aveugle à ce qui reste à retirer là-bas.
+ */
+export function nettoyerResidus(plan, { cwd = process.cwd(), lire = lireGit } = {}) {
+  return plan.map((etape) => {
+    const suppression = lire(etape.args, cwd);
+    if (!refEncorePresente(etape.ref, cwd, lire)) {
+      return { ...etape, ok: true, par: etape.commande, erreur: suppression.erreur };
+    }
+    const elagage = lire(['remote', 'prune', etape.distant], cwd);
+    return {
+      ...etape,
+      ok: !refEncorePresente(etape.ref, cwd, lire),
+      par: `git remote prune ${etape.distant}`,
+      erreur: suppression.erreur || elagage.erreur,
+    };
+  });
 }
 
 // Les branches qu'un push EN COURS publie : le pré-vol les passe par
@@ -195,6 +262,9 @@ export function mesurerBranches({
       // aussi, sinon un dépôt dont la branche de base a été renommée perdrait
       // le seul verdict qui parle du travail qui n'existe que sur ce disque.
       publication: mesurerPublication(branches, refsDistantes, distant, cwd, lire, publiees),
+      // Aucune base : rien n'a pu être jugé livré, donc aucun résidu n'a pu être
+      // établi — et un plan de nettoyage vide est la seule réponse honnête.
+      residusDistants: [],
     };
   }
   const candidates = branches.filter((branche) => branche.suivi && branche.nom !== base);
@@ -205,11 +275,18 @@ export function mesurerBranches({
         && ref.nom !== base && !locales.has(ref.nom),
     )
     : [];
+  // Les réfs orphelines sont gardées STRUCTURÉES en plus d'être mises en phrase :
+  // c'est ce que le pré-vol propose puis exécute, et le message seul ne suffit
+  // pas. Une seule lecture de la raison sert aux deux — la décision de résidu
+  // (contenu déjà livré) reste donc prise en un seul endroit.
+  const residusDistants = orphelines
+    .map((ref) => ({ ...ref, raison: raisonDuContenu(ref.ref, baseDistante.ref, cwd, lire) }))
+    .filter((residu) => Boolean(residu.raison));
   const issues = candidates
     .filter((branche) => branche.disparue)
     .map((branche) => rapportBranche(branche, base, cwd, lire))
     .filter(Boolean)
-    .concat(orphelines.map((ref) => rapportRefDistante(ref, baseDistante.ref, cwd, lire)).filter(Boolean));
+    .concat(residusDistants.map((residu) => messageRefDistante(residu)));
   // La partition est stricte, comme pour les réfs distantes ci-dessus : une
   // branche DÉJÀ nommée comme résidu est livrée (son contenu est dans la base),
   // donc elle ne porte pas de travail propre à ce disque — un résidu ne produit
@@ -229,7 +306,7 @@ export function mesurerBranches({
   // sans branche locale, branches locales jugées du point de vue de la
   // publication). Ces compteurs alimentent la ligne de résumé informatif affichée
   // en console lors du succès, attestant du périmètre effectivement contrôlé.
-  return { issues, examinees: candidates.length, distantes: orphelines.length, publication };
+  return { issues, examinees: candidates.length, distantes: orphelines.length, publication, residusDistants };
 }
 
 export function ecrireStepSummary({ issues, examinees, distantes, publication }, cheminFichier = process.env.GITHUB_STEP_SUMMARY) {
