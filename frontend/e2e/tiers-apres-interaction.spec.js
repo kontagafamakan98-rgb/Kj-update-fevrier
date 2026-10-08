@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { publier } from './helpers/moteurs.js'
 // Les deux règles, chacune chez elle : celle d'AVANT (aucun tiers, jamais) et
 // celle d'APRÈS (seulement ce qui est autorisé, nommément). Les deux partagent
 // `estTiers` et `nommerInitiateur`, donc elles ne peuvent pas diverger sur QUI
@@ -167,6 +168,12 @@ test.describe('Après interaction — le seul tiers est celui qui est autorisé'
 
           // ── Le verdict d'APRÈS, sur le SEUL journal du geste ──────────────
           const duGeste = requetes.slice(avant)
+          publier(test, `${route} (${taille}) : requêtes parties pendant le geste`, duGeste.length)
+          publier(
+            test,
+            `${route} (${taille}) : hôtes distincts contactés par le geste`,
+            new Set(duGeste.map((requete) => new URL(requete.url).host)).size
+          )
           expect(
             duGeste.length,
             `aucune requête journalisée après l’appui sur ${route} (${taille}) : l’écouteur ne lit rien, ` +
@@ -236,6 +243,12 @@ test.describe('Après interaction — le seul tiers est celui qui est autorisé'
     await attendreLaFinDuGeste(requetes)
 
     const duGeste = requetes.slice(avant)
+    publier(test, 'recherche /jobs : requêtes parties pendant le geste', duGeste.length)
+    publier(
+      test,
+      'recherche /jobs : hôtes distincts contactés par le geste',
+      new Set(duGeste.map((requete) => new URL(requete.url).host)).size
+    )
     const verdict = jugerApresInteraction(duGeste, {
       interaction: 'chercher-une-mission',
       origineDeLaPage: page.url(),

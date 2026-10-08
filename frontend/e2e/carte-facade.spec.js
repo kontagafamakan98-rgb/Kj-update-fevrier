@@ -2,6 +2,10 @@ import { test } from '@playwright/test';
 // Le protocole et les deux tailles viennent du harnais partagé, comme la page
 // « coquille » (bundle d'entrée bloqué).
 import { TAILLES, ouvrirLaPage } from './helpers/geometrie.js';
+// `publier` enregistre une mesure POUR LE MOTEUR DU PROJET : c'est ce qui permet
+// à `e2e/global-teardown-moteurs.js` de comparer ce que les trois moteurs ont
+// fait du même geste, au lieu de rejouer trois fois en silence.
+import { publier } from './helpers/moteurs.js';
 // LE PARCOURS LUI-MÊME EST PARTAGÉ : un seul protocole, rejoué sur chaque route
 // qui publie la façade (`ROUTES_A_FACADE`). La copie par route est ce que ce
 // dépôt refuse — elle divergerait au premier correctif.
@@ -12,6 +16,7 @@ import {
   verifierLaCarteDifferee,
   verifierLaFacadeDeCarte,
   verifierLaFacadeEnCoquille,
+  CARTE_TIERS,
 } from './helpers/parcours-carte.js';
 
 /**
@@ -51,7 +56,15 @@ test.describe('Parcours E2E — la façade de carte ne part qu’à l’appui', 
         const requetes = [];
         page.on('request', (requete) => requetes.push(requete.url()));
         try {
-          await verifierLaFacadeDeCarte(page, requetes, { route, taille, tactile });
+          const mesure = await verifierLaFacadeDeCarte(page, requetes, { route, taille, tactile });
+          publier(test, `carte-facade ${route} (${taille}) : appui → carte montée`, mesure.delaiAppuiMs, 'ms');
+          publier(test, `carte-facade ${route} (${taille}) : requêtes de carte parties à l'appui`, mesure.appelsAuTiers);
+          publier(
+            test,
+            `carte-facade ${route} (${taille}) : hauteur du bloc (façade puis carte)`,
+            Math.round(mesure.hauteurBoitePx),
+            'px'
+          );
         } finally {
           await page.close();
         }
@@ -65,6 +78,14 @@ test.describe('Parcours E2E — la façade de carte ne part qu’à l’appui', 
         page.on('request', (requete) => requetes.push(requete.url()));
         try {
           await verifierLaFacadeEnCoquille(page, requetes, { route, taille });
+          // Sans JavaScript, la coquille ne doit pas tirer un octet de carte —
+          // publié pour que l'accord des trois moteurs soit un RELEVÉ, et non
+          // une confiance dans le HTML pré-rendu.
+          publier(
+            test,
+            `carte-facade ${route} (${taille}, coquille) : requêtes de carte sans JavaScript`,
+            requetes.filter((url) => CARTE_TIERS.test(url)).length
+          );
         } finally {
           await page.close();
         }

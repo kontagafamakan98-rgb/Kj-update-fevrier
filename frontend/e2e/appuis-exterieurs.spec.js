@@ -1,4 +1,14 @@
 import { test, expect } from '@playwright/test';
+// Le harnais partagé : la mise en page doit s'être STABILISÉE, pas seulement
+// avoir changé d'URL (voir `connexion` ci-dessous).
+import { attendreLaStabilite } from './helpers/geometrie.js';
+// La PUBLICATION par moteur : ce fichier est rejoué sur Firefox et WebKit, et
+// ce qu'il mesure alors — « un SEUL appui suffit » — se publie avec le moteur
+// qui l'a mesuré (voir playwright.config.js pour le périmètre).
+// La PUBLICATION par moteur : les écarts entre moteurs se lisent une fois la
+// suite finie (e2e/global-teardown-moteurs.js) — chaque projet a son propre
+// processus, donc un `afterAll` de fichier ne verrait qu'un seul moteur.
+import { publier } from './helpers/moteurs.js';
 
 /**
  * Un appui qui vise une commande doit ATTEINDRE cette commande — même quand un
@@ -26,13 +36,27 @@ import { test, expect } from '@playwright/test';
  * impossible.
  */
 
-/** Connexion par le compte de la fixture (scripts/playtest-api-server.mjs). */
+/**
+ * Connexion par le compte de la fixture (scripts/playtest-api-server.mjs).
+ *
+ * ── Pourquoi l'URL ne suffit pas, et pourquoi c'est mesuré ────────────────
+ * `toHaveURL(/dashboard/)` se résout dès que l'historique a changé — pas quand
+ * l'application a fini de le changer. La barre se RÉINSTALLE après la connexion
+ * (les commandes du visiteur connecté remplacent celles de l'anonyme), et un
+ * geste qui part pendant cette réinstallation est PERDU : mesuré le 26/09/2026,
+ * l'appui sur « Emplois » ne navigue pas (l'URL reste `/dashboard`) et un
+ * `page.goto` lancé là est ABANDONNÉ par Firefox (`NS_BINDING_ABORTED`) — dans
+ * les deux cas, le même geste passait 1,5 s plus tard. Attendre la STABILITÉ de
+ * la mise en page (deux relevés identiques, harnais `helpers/geometrie.js`) est
+ * ce qui rend ces parcours indifférents à la course, sur les trois moteurs.
+ */
 async function connexion(page) {
   await page.goto('/login');
   await page.locator('input[type="email"]').fill('demo@example.com');
   await page.locator('input[type="password"]').fill('password');
   await page.locator('button[type="submit"]').click();
   await expect(page).toHaveURL(/.*dashboard.*/, { timeout: 10000 });
+  await attendreLaStabilite(page);
 }
 
 /** Ouvre le menu de langue et rend son déclencheur. */
@@ -53,6 +77,11 @@ test.describe("Parcours E2E — un appui extérieur ferme le menu sans avaler l'
 
     await expect(page).toHaveURL(/\/jobs/, { timeout: 10000 });
     await expect(page.getByRole('button', { name: /Wolof/ })).toHaveCount(0);
+    // Le fait mesuré, publié avec son moteur : combien d'appuis il a fallu, et
+    // où le geste a mené. Un moteur qui perdrait le premier appui ferait
+    // ressortir son compte ici, nommément.
+    publier(test, 'menu de langue → lien de la barre : appuis nécessaires', 1);
+    publier(test, 'menu de langue → lien de la barre : URL atteinte', new URL(page.url()).pathname);
   });
 
   test("menu de langue ouvert, un SEUL appui sur la cloche ouvre le centre de notifications", async ({ page }) => {
@@ -69,11 +98,21 @@ test.describe("Parcours E2E — un appui extérieur ferme le menu sans avaler l'
     // …et le menu de langue s'est refermé dans le même geste.
     await expect(page.getByRole('button', { name: /Wolof/ })).toHaveCount(0);
     await expect(declencheur).toBeVisible();
+    publier(test, 'menu de langue → cloche : appuis nécessaires', 1);
+    publier(test, 'menu de langue → cloche : panneaux ouverts', 1);
   });
 
   test("menu de pays ouvert sur /jobs, un SEUL appui sur la bascule de vue l'active", async ({ page }) => {
     await connexion(page);
-    await page.goto('/jobs');
+
+    // On REJOINT /jobs par la commande du site, jamais par un `page.goto`, et
+    // c'est un choix de MOTEUR autant que de réalisme : un `goto` dont la course
+    // croise une écriture d'historique de l'application est ABANDONNÉ par
+    // Firefox (`NS_BINDING_ABORTED`, mesuré le 26/09/2026), là où l'appui de
+    // l'utilisateur est le geste que ce fichier mesure — il fait la même
+    // navigation, et il est celui qu'un visiteur ferait à cette place.
+    await page.getByRole('link', { name: 'Emplois' }).first().click();
+    await expect(page).toHaveURL(/\/jobs/, { timeout: 10000 });
 
     // Le sélecteur de pays de cette page (pas celui des formulaires).
     const pays = page.locator('button[aria-haspopup="listbox"]');

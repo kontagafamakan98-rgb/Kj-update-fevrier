@@ -290,11 +290,20 @@ export async function verifierLaFacadeDeCarte(page, requetes, { route, taille, t
     await routeInterceptee.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: REPONSE_CARTE });
   });
 
+  // ── La DURÉE du geste, mesurée et rendue à l'appelant ───────────────────
+  // C'est la seule mesure de ce parcours qui ne soit pas une RÈGLE : « l'instant
+  // où la requête PART » dépend du moteur, et c'est lui qui se compare d'un
+  // projet à l'autre (cf. e2e/helpers/moteurs.js). `debutAppui` est posé AVANT
+  // l'appui, et la borne est la fin de l'attente Playwright de l'iframe : c'est
+  // une BORNE HAUTE — elle inclut le pas de sondage de Playwright, donc elle se
+  // lit comme telle, jamais comme une précision au millième.
+  const debutAppui = Date.now();
   if (tactile) await controle.tap();
   else await controle.click();
 
   const carte = page.locator('iframe');
   await expect(carte, 'la carte n’est pas montée à l’appui').toHaveCount(1);
+  const delaiAppuiMs = Date.now() - debutAppui;
   expect(await carte.getAttribute('src'), 'la carte montée n’est pas l’embed attendu').toBe(CONTACT.mapsEmbedUrl);
   expect(await carte.getAttribute('title'), 'l’iframe n’a pas le titre du dictionnaire').toBe(TITRE_CARTE);
   // Le document du cadre est RÉELLEMENT chargé : une iframe vide ne prouverait
@@ -333,6 +342,17 @@ export async function verifierLaFacadeDeCarte(page, requetes, { route, taille, t
       `src/App.css contre les polices de cet hôte — publié, pas jugé) : ` +
       `${(boiteAvant.hautDocument - boiteAuChargement.hautDocument).toFixed(1)} px`
   );
+
+  // Ce que le parcours PUBLIE (le tableau des écarts par moteur) : la durée du
+  // geste, les requêtes de carte parties à l'appui, et la boîte du bloc — le
+  // fait que l'appui n'a rien déplacé est une règle, donc un ACCORD attendu
+  // entre moteurs, et c'est le relevé qui le dit plutôt qu'une croyance.
+  return {
+    delaiAppuiMs,
+    appelsAuTiers,
+    largeurBoitePx: boiteApres.largeur,
+    hauteurBoitePx: boiteApres.hauteur,
+  };
 }
 
 /**

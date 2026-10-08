@@ -7,6 +7,12 @@
 
 # testing
 /coverage
+# Sortie de Playwright : le rapport HTML (artefact de CI), les fichiers d'échec
+# (`test-results/<cas>/`) et, depuis le 28/09/2026, les relevés de gestes par
+# moteur que `e2e/global-teardown-moteurs.js` agrège en `ecarts-moteurs.md` et
+# `mesures-moteurs.jsonl` : ce sont des MESURES d'un run, jamais du dépôt.
+/playwright-report
+/test-results
 
 # production
 /build
