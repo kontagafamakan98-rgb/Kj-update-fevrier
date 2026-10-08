@@ -1,8 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import MobilePhotoTest from '../components/MobilePhotoTest';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/mobileTest';
+import { Smartphone, CheckCircle2, Layers, Rocket, Wrench } from 'lucide-react';
 
 export default function MobileTest() {
   const { t, currentLanguage } = useLanguage();
@@ -32,11 +34,17 @@ export default function MobileTest() {
         <MobilePhotoTest />
 
         <div className="mt-12 bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold text-orange-600 mb-4">{pageT('appInfo')}</h2>
+          <h2 className="text-2xl font-bold text-orange-600 mb-4 flex items-center gap-2">
+            <Smartphone className="h-6 w-6" aria-hidden="true" />
+            {pageT('appInfo')}
+          </h2>
 
           <div className="space-y-4">
             <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-blue-800 mb-2">{pageT('featuresImplemented')}</h3>
+              <h3 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+                {pageT('featuresImplemented')}
+              </h3>
               <ul className="text-blue-700 space-y-1">
                 <li>{pageT('feat1')}</li>
                 <li>{pageT('feat2')}</li>
@@ -49,7 +57,10 @@ export default function MobileTest() {
             </div>
 
             <div className="bg-green-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-green-800 mb-2">{pageT('screensIntegrated')}</h3>
+              <h3 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                <Layers className="h-5 w-5" aria-hidden="true" />
+                {pageT('screensIntegrated')}
+              </h3>
               <ul className="text-green-700 space-y-1">
                 <li>{pageT('screen1')}</li>
                 <li>{pageT('screen2')}</li>
@@ -60,7 +71,10 @@ export default function MobileTest() {
             </div>
 
             <div className="bg-orange-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-orange-800 mb-2">{pageT('testOnMobile')}</h3>
+              <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                <Rocket className="h-5 w-5" aria-hidden="true" />
+                {pageT('testOnMobile')}
+              </h3>
               <div className="text-orange-700 space-y-2">
                 <p><strong>{pageT('step1')}</strong></p>
                 <p><strong>{pageT('step2')}:</strong></p>
@@ -72,9 +86,12 @@ export default function MobileTest() {
               </div>
             </div>
 
-            <div className="bg-purple-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-purple-800 mb-2">{pageT('troubleshooting')}</h3>
-              <ul className="text-purple-700 space-y-1">
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-orange-800 mb-2 flex items-center gap-2">
+                <Wrench className="h-5 w-5" aria-hidden="true" />
+                {pageT('troubleshooting')}
+              </h3>
+              <ul className="text-gray-700 space-y-1">
                 <li>{pageT('help1')}</li>
                 <li>{pageT('help2')}</li>
                 <li>{pageT('help3')}</li>

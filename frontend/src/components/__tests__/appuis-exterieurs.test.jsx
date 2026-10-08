@@ -234,22 +234,27 @@ describe("CountrySelect — l'écouteur n'existe que quand il a quelque chose à
  *     décision d'interface : un tiroir ou une modale bloque la page derrière,
  *     c'est l'intention. Ces surfaces restent, et la règle les distingue par le
  *     fond, pas par une liste d'exceptions à tenir à jour.
+ *
+ * ── Et une TROISIÈME forme, mesurée le 07/10/2026 (le héros de l'accueil) ────
+ * Une couche de PEINTURE plein-bleed — `absolute inset-0`, VIDE, sans écouteur —
+ * se peint APRÈS le contenu statique de son conteneur (elle est positionnée, le
+ * contenu ne l'est pas) : elle passe donc AU-DESSUS, sans que personne l'ait
+ * voulu, et devient la cible de tout appui tombant sur sa surface. MESURÉ sur
+ * l'accueil : `document.elementFromPoint` au centre des DEUX appels du héros
+ * rendait `DIV.absolute.inset-0.bg-black.bg-opacity-5` — un voile décoratif à
+ * 5 % avalait « Commencer maintenant » et « Voir les emplois » (et il était
+ * aussi publié par la coquille pré-rendue, donc mort avant l'hydratation).
+ * Le scan de fond ci-dessus ne pouvait pas le voir : il ne regarde que
+ * `fixed inset-0` et il EXEMPTE tout ce qui déclare un fond — or un voile de
+ * 5 % n'est pas la décision d'interface d'une modale, c'est une teinte.
+ * La règle ajoutée en fin de fichier exige donc `pointer-events-none` sur ces
+ * couches de peinture, DANS les deux canaux (src/ ET vite-plugins/prerender/,
+ * qui publie le même balisage en HTML).
  */
-const RACINE_SRC = path.resolve(__dirname, '../..');
-
-/** Les fichiers livrés de `src/` : les tests et le harnais ne se jugent pas. */
-function fichiersSource(dossier = RACINE_SRC, accumule = []) {
-  for (const entree of fs.readdirSync(dossier, { withFileTypes: true })) {
-    const complet = path.join(dossier, entree.name);
-    if (entree.isDirectory()) {
-      if (entree.name === '__tests__') continue;
-      fichiersSource(complet, accumule);
-    } else if (/\.jsx?$/.test(entree.name) && entree.name !== 'setupTests.js') {
-      accumule.push(complet);
-    }
-  }
-  return accumule;
-}
+// La marche sur les fichiers LIVRÉS est partagée avec le garde du propriétaire
+// du lien interne (`LienVue.test.jsx`) : les deux jugent la même population, et
+// deux copies divergeraient au premier dossier ajouté.
+import { RACINE_SRC, fichiersSource } from './aide-sources-livrees';
 
 /**
  * La chaîne de la classe CSS qui PRÉCÈDE la position donnée — la classe de
@@ -349,5 +354,135 @@ describe('le motif de fermeture extérieure est pinné sur tout src/', () => {
 
     expect([sansTest, avecTest].filter((source) => APPUI_EXTERIEUR.test(source) && !source.includes('.contains(')))
       .toEqual([sansTest]);
+  });
+});
+
+/**
+ * Les balises d'une source JSX/HTML, avec leurs attributs et leur vacuité.
+ *
+ * Le balayage ne comprend que ce qu'il a besoin de comprendre : la fin d'une
+ * balise (premier `>` hors chaîne et hors accolades — sinon un `=>` de `onClick`
+ * ou un `>` dans un libellé la couperait au milieu), et si l'élément est VIDE
+ * (fermé sur lui-même, ou suivi immédiatement de sa balise de fin — un
+ * commentaire JSX entre les deux ne fait pas un enfant).
+ */
+function balisesDe(source) {
+  const balises = [];
+  const motif = /<([A-Za-z][\w.]*)\b/g;
+  let trouvaille;
+  while ((trouvaille = motif.exec(source)) !== null) {
+    let curseur = motif.lastIndex;
+    let accolades = 0;
+    let chaine = null;
+    while (curseur < source.length) {
+      const caractere = source[curseur];
+      if (chaine) {
+        if (caractere === chaine && source[curseur - 1] !== '\\') chaine = null;
+      } else if (caractere === '"' || caractere === "'" || caractere === '`') {
+        chaine = caractere;
+      } else if (caractere === '{') {
+        accolades += 1;
+      } else if (caractere === '}') {
+        accolades -= 1;
+      } else if (caractere === '>' && accolades === 0) {
+        break;
+      }
+      curseur += 1;
+    }
+    const nom = trouvaille[1];
+    const attributs = source.slice(motif.lastIndex, curseur);
+    const suite = source.slice(curseur + 1);
+    const finDeLuiMeme = new RegExp(`^\\s*(?:\\{\\s*/\\*[\\s\\S]*?\\*/\\s*\\}\\s*)*</\\s*${nom}\\s*>`);
+    balises.push({
+      ligne: source.slice(0, trouvaille.index).split('\n').length,
+      attributs,
+      vide: /\/\s*$/.test(attributs) || finDeLuiMeme.test(suite),
+    });
+  }
+  return balises;
+}
+
+/** La classe portée par les attributs d'une balise (`className` ou `class`). */
+function classeDe(attributs) {
+  const trouvee = attributs.match(/(?:className|class)\s*=\s*(?:\{\s*)?(["'`])([\s\S]*?)\1/);
+  return trouvee ? trouvee[2] : null;
+}
+
+/**
+ * Les COUCHES DE PEINTURE plein-bleed d'une source : un élément `inset-0` qui
+ * couvre son conteneur, ne contient RIEN et n'écoute RIEN.
+ *
+ * Un tel élément ne peut rien faire d'autre que se peindre — et comme il est
+ * positionné, il se peint après le contenu statique, donc au-dessus : c'est une
+ * cible potentielle pour un appui qu'il n'a jamais voulu recevoir.
+ */
+function couchesDePeinture(source) {
+  return balisesDe(source)
+    .filter(({ attributs }) => /(?:^|[\s"'`])-?inset-0(?:$|[\s"'`])/.test(classeDe(attributs) || ''))
+    .filter(({ attributs, vide }) => vide && !/\bon[A-Z]\w*\s*=/.test(attributs))
+    .map(({ ligne, attributs }) => ({ ligne, classe: classeDe(attributs) }));
+}
+
+/** Celles qui ne se protègent pas de l'appui. */
+const couchesSansProtection = (couches) =>
+  couches.filter(({ classe }) => !/\bpointer-events-none\b/.test(classe));
+
+describe('une couche de PEINTURE plein-bleed ne reçoit jamais un appui qui ne la vise pas', () => {
+  // Le balayage couvre les DEUX canaux : les composants de `src/` et les
+  // coquilles pré-rendues, qui publient le même balisage en HTML — une couche
+  // décorative publiée par la coquille rendait les deux appels du héros morts
+  // AVANT l'hydratation, et personne ne le voyait.
+  const racines = [RACINE_SRC, path.resolve(RACINE_SRC, '../vite-plugins/prerender')];
+  const sources = racines.flatMap((racine) =>
+    fichiersSource(racine).map((fichier) => ({
+      relatif: path.relative(RACINE_SRC, fichier).replace(/\\/g, '/'),
+      contenu: fs.readFileSync(fichier, 'utf8'),
+    })));
+
+  it('la règle sait mordre, et elle distingue une couche d’un conteneur', () => {
+    // Le défaut, tel qu'il était écrit : une couche vide, sans protection.
+    expect(
+      couchesSansProtection(
+        couchesDePeinture('  <div className="absolute inset-0 bg-black bg-opacity-5"></div>'),
+      ).map(({ classe }) => classe),
+    ).toEqual(['absolute inset-0 bg-black bg-opacity-5']);
+
+    // Protégée : la MÊME couche passe.
+    expect(
+      couchesSansProtection(
+        couchesDePeinture('  <div className="absolute inset-0 bg-black bg-opacity-5 pointer-events-none"></div>'),
+      ),
+    ).toHaveLength(0);
+
+    // Une surface qui ÉCOUTE (le fond d'un tiroir, qui se referme sur l'appui)
+    // n'est pas une couche de peinture : elle reste, c'est son travail.
+    expect(couchesDePeinture('  <div className="fixed inset-0 z-10" onClick={fermer} />')).toHaveLength(0);
+
+    // Un CONTENEUR plein-bleed (celui du séparateur « ou ») porte du contenu :
+    // ce n'est pas une couche de peinture non plus.
+    expect(
+      couchesDePeinture('  <div className="relative"><div className="absolute inset-0 flex items-center"><div className="w-full border-t"></div></div></div>'),
+    ).toHaveLength(0);
+
+    // Le commentaire JSX ne fait pas un enfant.
+    expect(
+      couchesDePeinture('  <div className="absolute inset-0">{/* teinte */}</div>'),
+    ).toHaveLength(1);
+  });
+
+  it('chaque couche de peinture livrée déclare pointer-events-none (dans src/ ET dans les coquilles)', () => {
+    const toutes = sources.flatMap(({ relatif, contenu }) =>
+      couchesDePeinture(contenu).map(({ ligne, classe }) => ({ relatif, ligne, classe })));
+
+    // Le contrôle a-t-il lu son sujet ? Un balayage aveugle (mauvais chemin,
+    // extraction cassée) passerait au vert en ne trouvant rien.
+    expect(sources.length).toBeGreaterThan(100);
+    expect(toutes.length).toBeGreaterThan(0);
+
+    const fautives = couchesSansProtection(toutes).map(
+      ({ relatif, ligne, classe }) =>
+        `${relatif}:${ligne} — « ${classe} » reçoit l'appui des commandes qu'elle recouvre : elle doit porter « pointer-events-none »`,
+    );
+    expect(fautives).toEqual([]);
   });
 });

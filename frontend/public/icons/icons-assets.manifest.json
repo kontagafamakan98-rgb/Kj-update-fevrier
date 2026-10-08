@@ -1,6 +1,6 @@
 {
   "generator": "generate_icons.py",
-  "generator_sha256": "4086aa54014dcd46b1a14a7907943fdf3279a26ccc4cf10e2a9c82a6e3cfc227",
+  "generator_sha256": "c8a7cbf7e40c022e54e18daf57bd4cede851e2799745346c6dd692363f3586e9",
   "paths_relative_to": "this manifest",
   "pixel_rule": "Les empreintes « pixel_sha256 » couvrent le flux IDAT décompressé et dé-filtré : c'est l'invariant comparable entre machines, la compression zlib variant d'une installation à l'autre (101 592 octets committés contre 101 049 régénérés ici pour des pixels identiques).",
   "source": {
@@ -8,7 +8,11 @@
     "width": 512,
     "height": 512,
     "color_type": 6,
-    "pixel_sha256": "cbbf220384d9fd59dd58aa20ab11b1cb702915702bdd81f14f99b6a2e9373eb4"
+    "pixel_sha256": "a8c8fb4ada26dd11dd8efa9da77ca9d709e2c8f70590bc229927188237eca19e",
+    "drawn_by": "generate_icons.py",
+    "peinture": "marque",
+    "geometry": "../../src/config/marque-kojo.json",
+    "geometry_sha256": "1138b0acbb13aab78deff23075fd2b66a8aa59b5dcf3af53e0613e05d7446ef3"
   },
   "sizes": [
     72,
@@ -31,56 +35,56 @@
       "width": 72,
       "height": 72,
       "color_type": 6,
-      "pixel_sha256": "4c145876566588eb9f4f013ff69d713cd648029df049195c94a5d3216589066b"
+      "pixel_sha256": "51b67cff6be090d204424abeb25867034becbb2fc058e380636c0becafec0512"
     },
     {
       "file": "icon-96x96.png",
       "width": 96,
       "height": 96,
       "color_type": 6,
-      "pixel_sha256": "8b85f24602c18e79b6b051442c7398e086cb7d12fc5d70053e8f5296743f7b58"
+      "pixel_sha256": "1262f7dc87602b4a3a2b44dfc12a084773c2a68b5895e890a33d01d8af5c86c3"
     },
     {
       "file": "icon-128x128.png",
       "width": 128,
       "height": 128,
       "color_type": 6,
-      "pixel_sha256": "b58b4e6f931d3c17b6df7a3ed12dc0404863b1f315ff68850e21a0209a7230f9"
+      "pixel_sha256": "e38cf554d74945404316b10e21c1afd5205466cab1e2568dd88bff7ad8f1d91f"
     },
     {
       "file": "icon-144x144.png",
       "width": 144,
       "height": 144,
       "color_type": 6,
-      "pixel_sha256": "ac1d25b48f77f5c5547ecbd8143eeed9d7acad55e61d4719e2e6b7c351be4156"
+      "pixel_sha256": "cb60c1cec40ac46ed7bdabb2ea6951f277b677b1f0e872d9f794fdc0b73d2eb9"
     },
     {
       "file": "icon-152x152.png",
       "width": 152,
       "height": 152,
       "color_type": 6,
-      "pixel_sha256": "5b950fc3a7586117cb31b68fc7eab0118116a1e2331fc518ef85ab2f9166f9c5"
+      "pixel_sha256": "5ed623e3d86d41fe140e7a73554e5b9ff59b7ae34ac41625547c771ea2ded7e9"
     },
     {
       "file": "icon-192x192.png",
       "width": 192,
       "height": 192,
       "color_type": 6,
-      "pixel_sha256": "49dcbd4d02be17ad433a942585e2acdbf2c5290b81ce90a4fbf50e6db3f82244"
+      "pixel_sha256": "ce4d28e2e7784271f141149d928935c3fd89f5c77ad15a21a6e991f2fbe6d36c"
     },
     {
       "file": "icon-384x384.png",
       "width": 384,
       "height": 384,
       "color_type": 6,
-      "pixel_sha256": "d989978d08579af79e4eeba0620c2d76eb46ce82acbe2f7ce8682452de3a5fa9"
+      "pixel_sha256": "fff0d34055bfdd9674857e96b2b2a960a5c77e276cdee1dc1408648f1146ed07"
     },
     {
       "file": "icon-512x512.png",
       "width": 512,
       "height": 512,
       "color_type": 6,
-      "pixel_sha256": "cbbf220384d9fd59dd58aa20ab11b1cb702915702bdd81f14f99b6a2e9373eb4"
+      "pixel_sha256": "a8c8fb4ada26dd11dd8efa9da77ca9d709e2c8f70590bc229927188237eca19e"
     }
   ],
   "favicon": {
@@ -90,19 +94,19 @@
         "width": 16,
         "height": 16,
         "color_type": 6,
-        "pixel_sha256": "53904897c03da3c5b4e63dae8e7a1d42c454b89b9e8d9355bae8ca2a59b4d104"
+        "pixel_sha256": "43b7660f914321afcc784d07e0e5078b854736714903c502d1322875139218f7"
       },
       {
         "width": 32,
         "height": 32,
         "color_type": 6,
-        "pixel_sha256": "eb8505fea6b42d24431dc01a1370966bdab9fca13750883e6e18581b61d3614d"
+        "pixel_sha256": "fc25072a2ef61ee676715fd32830e224dbe11923e48e8569ffb2b03400d5fc90"
       },
       {
         "width": 48,
         "height": 48,
         "color_type": 6,
-        "pixel_sha256": "80438e369d98ed8db36fd5503e656bd018a8263aee51285224bc38cc024f8d41"
+        "pixel_sha256": "62c31bb13acdba2571315c5afd0eb5dc9f3a1f2201b707ca418a9b586e95d624"
       }
     ]
   },
@@ -114,16 +118,16 @@
     "background": "#0f172a",
     "safe_zone_radius": 0.4,
     "content_radius_target": 0.38,
-    "source_content_radius": 0.4947,
-    "scale": 0.7682,
+    "source_content_radius": 0.4843,
+    "scale": 0.7847,
     "outputs": [
       {
         "file": "icon-192x192-maskable.png",
         "width": 192,
         "height": 192,
         "color_type": 6,
-        "pixel_sha256": "c2ec125f365181f00bd918be09aa38c1ce21f4e2fb25646ec129207b193ad13d",
-        "content_radius": 0.3776,
+        "pixel_sha256": "60571339efc5fd560eb8646899de23f8eeb4f0101689390492c99252f495bb74",
+        "content_radius": 0.386,
         "opaque": true
       },
       {
@@ -131,20 +135,13 @@
         "width": 512,
         "height": 512,
         "color_type": 6,
-        "pixel_sha256": "755654cb837bd721ba71a070e670c45a1548a9103c30c0cf6c0c55d6ef31ab2b",
-        "content_radius": 0.3789,
+        "pixel_sha256": "5014d18f35de8a2fb861f156f432eb748539aab6218aab31c2d8da016e2de521",
+        "content_radius": 0.3819,
         "opaque": true
       }
     ]
   },
-  "unmanaged": [
-    {
-      "file": "kojo-icon.svg",
-      "bytes": 287,
-      "sha256": "6ce77ca2b23c84cb47681972cdadf5734e4efb19ebbcd1a6f9a0149ef1b8fcec",
-      "why": "icône vectorielle source (dessin, pas de génération)"
-    }
-  ],
+  "unmanaged": [],
   "foreign": [
     {
       "file": "icon-dark.png",

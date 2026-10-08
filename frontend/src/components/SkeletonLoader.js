@@ -16,7 +16,7 @@ export const Skeleton = ({ className = '', width, height, pulse = true }) => {
 
   return (
     <div
-      className={`${pulse ? 'animate-pulse ' : ''}bg-gray-200 rounded ${className}`}
+      className={`${pulse ? 'animate-pulse ' : ''}bg-stone-200 rounded-[3px] ${className}`}
       style={style}
     />
   );
@@ -36,7 +36,7 @@ export const Skeleton = ({ className = '', width, height, pulse = true }) => {
 // PageSkeleton générique, +236 px avant ce calibrage).
 export const JobCardSkeleton = () => {
   return (
-    <div className="block bg-white rounded-2xl border border-gray-100 p-6 min-h-[277px] md:min-h-0">
+    <div className="carte-editoriale block p-6 min-h-[277px] md:min-h-0">
       {/* Une SEULE animation pour toute la carte : le fond blanc et la bordure
           (portés par la racine) restent fixes, et les 9 barres pulsent en phase
           comme avant — mais sans 9 recalcs de style par image. */}
@@ -73,7 +73,7 @@ export const JobCardSkeleton = () => {
 // Skeleton pour une carte de profil
 export const ProfileCardSkeleton = () => {
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="carte-editoriale p-6">
       <div className="flex items-center space-x-4 mb-4">
         <Skeleton className="h-16 w-16 rounded-full" />
         <div className="flex-1 space-y-2">
@@ -98,7 +98,7 @@ export const ProfileCardSkeleton = () => {
 // Skeleton pour un message
 export const MessageSkeleton = () => {
   return (
-    <div className="flex items-start space-x-3 p-4 hover:bg-gray-50">
+    <div className="flex items-start space-x-3 p-4 hover:bg-stone-50">
       <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
       <div className="flex-1 space-y-2">
         <div className="flex items-center justify-between">
@@ -132,9 +132,9 @@ export const ListSkeleton = ({ count = 3, type = 'job' }) => {
 // Skeleton pour un tableau
 export const TableSkeleton = ({ rows = 5, cols = 4 }) => {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="carte-editoriale overflow-hidden">
       {/* Header */}
-      <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+      <div className="fond-sable px-6 py-3 border-b border-stone-200">
         <div className="flex gap-4">
           {Array.from({ length: cols }).map((_, index) => (
             <Skeleton key={index} className="h-4 flex-1" />
@@ -189,7 +189,7 @@ export const FormSkeleton = ({ fields = 4 }) => {
 // sa page (min-h-full + blocs calibrés) pour que le footer ne bouge pas.
 export const PageSkeleton = () => {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen fond-sable">
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
         {/* Bandeau principal */}
         <div className="space-y-3">
@@ -200,7 +200,7 @@ export const PageSkeleton = () => {
         {/* Blocs de contenu */}
         <div className="grid gap-6 md:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="bg-white rounded-lg shadow p-6 space-y-3">
+            <div key={index} className="carte-editoriale p-6 space-y-3">
               <Skeleton className="h-5 w-24" />
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-4/5" />
@@ -269,7 +269,7 @@ export const JobsSkeleton = () => {
       </div>
 
       {/* Barre rayon (proximité) */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-4">
+      <div className="carte-editoriale mb-6 flex flex-wrap items-center gap-3 p-4">
         <Skeleton className="h-5 w-24" />
         <Skeleton className="h-10 w-32 rounded-xl" />
         <Skeleton className="h-10 w-36 rounded-xl" />
@@ -298,7 +298,7 @@ export const JobDetailsSkeleton = () => {
       <Skeleton className="h-6 w-28 mb-6" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="carte-editoriale p-6">
             <Skeleton className="h-8 w-3/4" />
             <div className="flex items-center gap-3 mt-3">
               <Skeleton className="h-6 w-24 rounded-full" />
@@ -313,7 +313,7 @@ export const JobDetailsSkeleton = () => {
               <Skeleton className="h-12 w-28 rounded-xl" />
             </div>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
+          <div className="carte-editoriale p-6 space-y-3">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-5/6" />
             <Skeleton className="h-4 w-4/6" />
@@ -321,12 +321,12 @@ export const JobDetailsSkeleton = () => {
           </div>
         </div>
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="carte-editoriale p-6">
             <Skeleton className="h-6 w-32 mb-4" />
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-4 w-1/2 mt-2" />
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="carte-editoriale p-6">
             <Skeleton className="h-6 w-24 mb-4" />
             <div className="flex items-center gap-3">
               <Skeleton className="h-12 w-12 rounded-full" />
@@ -351,7 +351,7 @@ export const JobDetailsSkeleton = () => {
 // laissait un saut de hauteur au remplacement du formulaire.
 export const LoginSkeleton = () => {
   return (
-    <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
           <Skeleton className="mx-auto h-12 w-12 rounded-full" />
@@ -413,7 +413,7 @@ export const LoginSkeleton = () => {
 // phases, le footer ne bouge plus (CLS mesuré 0,0000).
 export const ForgotPasswordSkeleton = () => {
   return (
-    <div className="min-h-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-full flex items-center justify-center fond-sable py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <Skeleton className="mx-auto h-14 w-14 rounded-full" />
@@ -421,7 +421,11 @@ export const ForgotPasswordSkeleton = () => {
           <Skeleton className="mx-auto mt-3 h-10 w-72" />
         </div>
 
-        <div className="space-y-6 rounded-2xl bg-white p-6 shadow-md">
+        {/* La carte du site (`carte-editoriale`) : c'est celle de la page réelle
+            ET de la coquille. Le filet remplace l'ombre, et ajoute les 2 px de
+            bordure sur les TROIS canaux à la fois — sans quoi le swap du
+            squelette vers la page déplaçait le pied de page. */}
+        <div className="carte-editoriale space-y-6 p-6">
           {/* Indicateur d'étapes (1. Email / 2. Code / 3. Mot de passe) */}
           <div className="flex items-center justify-between">
             <Skeleton className="h-3 w-16" />
@@ -469,7 +473,7 @@ export const DashboardSkeleton = () => {
       {/* 4 cartes statistiques : même grille que le rendu final */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="bg-white rounded-lg shadow-md p-6">
+          <div key={index} className="carte-editoriale p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <Skeleton className="h-4 w-20" />
@@ -484,7 +488,7 @@ export const DashboardSkeleton = () => {
       </div>
 
       {/* Section quick-actions : conteneur stable, contenu skeleton */}
-      <div className="bg-white rounded-lg shadow mb-8">
+      <div className="carte-editoriale mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <Skeleton className="h-5 w-40" />
         </div>
@@ -501,7 +505,7 @@ export const DashboardSkeleton = () => {
       </div>
 
       {/* Liste récente : header + lignes skeleton (même structure que la page) */}
-      <div className="bg-white rounded-lg shadow">
+      <div className="carte-editoriale">
         <div className="px-6 py-4 border-b border-gray-200">
           <Skeleton className="h-5 w-40" />
         </div>
@@ -539,7 +543,7 @@ export const DashboardSkeleton = () => {
 export const ProfileSkeleton = () => {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="carte-editoriale overflow-hidden">
         {/* Header orange / photo / nom */}
         <div className="bg-orange-600 px-6 py-8">
           <div className="flex items-center">
@@ -611,7 +615,7 @@ export const MessagesSkeleton = () => {
       {/* Titre de page réel (h1 text-2xl) */}
       <Skeleton className="h-8 w-40 mb-4" />
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[75vh] flex">
+      <div className="carte-editoriale overflow-hidden h-[75vh] flex">
         {/* Colonne des conversations (pleine largeur sur mobile) */}
         <div className="w-full sm:w-[320px] sm:flex-shrink-0 border-r border-gray-100 flex flex-col">
           <div className="px-4 py-3 border-b border-gray-100">
@@ -639,7 +643,7 @@ export const PaymentContentSkeleton = () => {
   return (
     <div className="space-y-6">
       {/* Carte quote : en-tête + 3 champs */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+      <div className="carte-editoriale p-6">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-5">
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-6 w-32 rounded-full" />
@@ -663,7 +667,7 @@ export const PaymentContentSkeleton = () => {
       </div>
 
       {/* Carte paiements récents */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+      <div className="carte-editoriale p-6">
         <Skeleton className="h-6 w-56" />
         <div className="mt-4 space-y-3">
           <Skeleton className="h-16 w-full rounded-xl" />
@@ -681,9 +685,9 @@ export const PaymentContentSkeleton = () => {
 // cartes.
 export const PaymentSkeleton = () => {
   return (
-    <div className="min-h-full bg-gray-50 py-8">
+    <div className="min-h-full fond-sable py-8">
       <div className="max-w-6xl mx-auto px-4 space-y-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="carte-editoriale p-6">
           {/* h1 text-3xl + sous-titre */}
           <Skeleton className="h-9 w-72 max-w-full" />
           <Skeleton className="h-6 w-96 max-w-full mt-2" />

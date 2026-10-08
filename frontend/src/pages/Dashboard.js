@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import {
   Briefcase,
   CircleDollarSign,
@@ -14,7 +15,11 @@ import {
   Sparkles,
   Wrench,
   Zap,
-  PanelsTopLeft
+  PanelsTopLeft,
+  Crown,
+  Smartphone,
+  Rocket,
+  Camera
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -92,13 +97,13 @@ export default function Dashboard() {
     const baseActions = user?.user_type === 'client'
       ? [
           { to: '/create-job', label: t('postJob'), icon: PlusCircle, iconClass: 'text-orange-600 bg-orange-100' },
-          { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-blue-600 bg-blue-100' },
-          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' }
+          { to: '/jobs', label: t('myJobs'), icon: Briefcase, iconClass: 'text-orange-700 bg-orange-100' },
+          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-orange-700 bg-orange-100' }
         ]
       : [
           { to: '/jobs', label: `${t('searchJobs')} ${t('jobs')}`, icon: Briefcase, iconClass: 'text-orange-600 bg-orange-100' },
-          { to: '/profile', label: t('workerProfile'), icon: Wrench, iconClass: 'text-blue-600 bg-blue-100' },
-          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-green-600 bg-green-100' }
+          { to: '/profile', label: t('workerProfile'), icon: Wrench, iconClass: 'text-orange-700 bg-orange-100' },
+          { to: '/messages', label: t('messages'), icon: MessageSquare, iconClass: 'text-orange-700 bg-orange-100' }
         ];
 
     if (isFamakan) {
@@ -107,7 +112,7 @@ export default function Dashboard() {
         label: t('languagesPayments'),
         subtitle: t('publicFeature'),
         icon: Monitor,
-        iconClass: 'text-amber-600 bg-amber-100',
+        iconClass: 'text-orange-700 bg-orange-100',
         cardClass: 'bg-gradient-to-r from-orange-50 to-yellow-50'
       });
       baseActions.push({
@@ -153,7 +158,11 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">
+        {/* Le titre de page prend l'échelle serif du site (`.titre-page`,
+            src/index.css) : c'est la même page d'arrivée que l'accueil pour un
+            utilisateur connecté, elle ne peut pas être typographiée comme un
+            gabarit d'administration. */}
+        <h1 className="titre-page">
           {t('welcomeUser')} {user?.first_name || 'User'}!
         </h1>
         <p className="text-gray-600 mt-1">
@@ -164,14 +173,19 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {statCards.map((item) => {
           const Icon = item.icon;
+          // La carte à FILET du site, et la pastille ronde qui porte le glyphe :
+          // le même couple que les cartes de /about et que les lignes de
+          // l'accueil. `pastille-rond-large` fait 48 px, soit EXACTEMENT la
+          // boîte `p-3` + icône 24 px qu'elle remplace — le squelette ci-dessous
+          // garde donc la même hauteur (pas de CLS).
           return (
-            <div key={item.label} className="bg-white rounded-lg shadow-md p-6">
+            <div key={item.label} className="carte-editoriale p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{item.label}</p>
                   <p className="text-2xl font-bold text-gray-900 mt-1">{item.value}</p>
                 </div>
-                <div className="rounded-xl bg-orange-50 p-3 text-orange-600">
+                <div className="pastille-rond pastille-rond-large">
                   <Icon className="w-6 h-6" />
                 </div>
               </div>
@@ -180,11 +194,15 @@ export default function Dashboard() {
         })}
       </div>
 
+      {/* L'ENCART du site (filet gauche orange, fond sable) à la place du
+          dégradé orange → ROUGE : c'était le dernier dégradé vers le rouge du
+          site, et il ne disait rien de plus que « voici un bloc à part » — ce
+          que l'encart dit mieux, avec une seule teinte. */}
       {isFamakan && (
-        <div className="mb-8 p-6 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg">
+        <div className="encart mb-8">
           <div className="flex items-center mb-4">
-            <span className="text-2xl mr-3">👑</span>
-            <h2 className="text-xl font-semibold text-orange-900">{t('famakanAccess')}</h2>
+            <Crown className="h-6 w-6 mr-3 text-orange-500" aria-hidden="true" />
+            <h2 className="titre-section">{t('famakanAccess')}</h2>
           </div>
           <p className="text-sm text-orange-800 mb-4">{t('famakanDescription')}</p>
 
@@ -194,29 +212,29 @@ export default function Dashboard() {
                 (import.meta.env.DEV dans App.js) — en prod elles 404.
                 /photo-debug est l'équivalent prod (owner-only). */}
             {import.meta.env.DEV && (
-              <Link to="/mobile-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 transition-colors shadow-md">
-                📱 {t('testMobileFeatures')}
+              <Link to="/mobile-test" className="bouton bouton-clair">
+                <Smartphone className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('testMobileFeatures')}
               </Link>
             )}
-            <Link to="/create-job" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
-              🚀 {t('createJobGPS')}
+            <Link to="/create-job" className="bouton bouton-encre">
+              <Rocket className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('createJobGPS')}
             </Link>
             {import.meta.env.DEV && (
               /* La branche DEV est ÉLIMINÉE du bundle de production : Tailwind, lui,
-                 génère quand même les utilitaires qu'il lit ici, et deux d'entre eux
-                 (un fond pourpre 600 et son survol 700) n'étaient posés par AUCUN
-                 élément livré — mesuré : 2 règles mortes, 199 o par page. Ce lien de
-                 test reprend donc des classes qui, elles, SONT posées (mesure du
-                 25/09/2026 : 2 poses pour le fond pourpre 100, 2 pour le texte 700).
-                 PIÈGE MESURÉ : Nommer ces deux classes en toutes lettres ici les
-                 RESSUSCITE — Tailwind 4 lit le TEXTE BRUT des sources, commentaires
-                 compris, et régénère l'utilitaire qu'on vient de retirer. */
-              <Link to="/photo-test" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-purple-100 text-purple-700 rounded-xl transition-colors shadow-md">
-                📷 {t('debugPhotos')}
+                 génère quand même les utilitaires qu'il lit ici. Ce lien de test ne
+                 reçoit donc AUCUNE teinte propre — il emprunte le gris neutre que le
+                 reste du tableau de bord pose déjà, ce qui ne coûte aucune règle au
+                 CSS servi (mesuré le 27/09/2026 : plus aucune teinte pourpre n'est
+                 générée, son dernier porteur ayant disparu avec ce lot).
+                 PIÈGE MESURÉ : nommer une classe d'une teinte retirée, même en
+                 commentaire, la RESSUSCITE — Tailwind lit le TEXTE BRUT des sources,
+                 prose comprise, et régénère l'utilitaire qu'on vient de retirer. */
+              <Link to="/photo-test" className="bouton bouton-clair">
+                <Camera className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('debugPhotos')}
               </Link>
             )}
-            <Link to="/commission-dashboard" className="inline-flex w-full sm:w-auto items-center justify-center px-5 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors shadow-md">
-              💼 {t('commissionDashboard')}
+            <Link to="/commission-dashboard" className="bouton bouton-clair">
+              <Briefcase className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('commissionDashboard')}
             </Link>
           </div>
 
@@ -228,7 +246,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow mb-8">
+      <div className="carte-editoriale mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">{t('quickActions')}</h2>
         </div>
@@ -256,7 +274,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow mb-8">
+      <div className="carte-editoriale mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">{t('popularCategories')}</h2>
         </div>
@@ -294,7 +312,10 @@ export default function Dashboard() {
                     <div className="flex items-center mt-2 space-x-4 flex-wrap">
                       <span className="text-xs text-gray-500">{translateCategory(job.category)}</span>
                       <span className="text-xs text-gray-500">{pageT('recentBudget', { min: job.budget_min, max: job.budget_max })}</span>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
+                      {/* Le badge d'ÉTAT est carré : le site a retiré la forme
+                          pilule de tous ses badges, et une pastille de statut
+                          reste une étiquette. */}
+                      <span className={`px-2 py-1 text-xs rounded-lg ${
                         job.status === 'open'
                           ? 'bg-green-100 text-green-800'
                           : job.status === 'in_progress'
@@ -340,7 +361,7 @@ function SkeletonDashboardShell({ t, pageT, cardWrappers }) {
       {/* 4 cartes statistiques : même grille que le rendu final */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {cardWrappers.map((_, index) => (
-          <div key={index} className="bg-white rounded-lg shadow-md p-6">
+          <div key={index} className="carte-editoriale p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <Skeleton className="h-4 w-20" />
@@ -348,14 +369,14 @@ function SkeletonDashboardShell({ t, pageT, cardWrappers }) {
                   <Skeleton className="h-7 w-28" />
                 </div>
               </div>
-              <Skeleton className="h-12 w-12 rounded-xl" />
+              <Skeleton className="h-12 w-12 rounded-full" />
             </div>
           </div>
         ))}
       </div>
 
       {/* Section quick-actions : conteneur stable, contenu skeleton */}
-      <div className="bg-white rounded-lg shadow mb-8">
+      <div className="carte-editoriale mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <Skeleton className="h-5 w-40" />
         </div>

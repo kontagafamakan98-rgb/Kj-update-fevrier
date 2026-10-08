@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { LANGUAGES } from '../config/languages';
 import FlagIcon from './FlagIcon';
@@ -63,7 +64,7 @@ const LanguageSelector = ({
             bg-white hover:bg-gray-50 transition-colors ${buttonClassName}
           `}
         >
-          {showFlags && <FlagIcon country={currentLang.code} className="w-5 h-4" showEmoji={false} />}
+          {showFlags && <FlagIcon country={currentLang.code} className="w-5 h-4" />}
           <span className="text-sm font-medium">{currentLang.nativeName}</span>
           <svg 
             className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -90,13 +91,13 @@ const LanguageSelector = ({
                     ${currentLanguage === lang.code ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}
                   `}
                 >
-                  {showFlags && <FlagIcon country={lang.code} className="w-5 h-4" showEmoji={false} />}
+                  {showFlags && <FlagIcon country={lang.code} className="w-5 h-4" />}
                   <div>
                     <div className="font-medium">{lang.nativeName}</div>
                     <div className="text-xs text-gray-500">{lang.name}</div>
                   </div>
                   {currentLanguage === lang.code && (
-                    <span className="ml-auto text-orange-600">✓</span>
+                    <Check className="ml-auto h-4 w-4 text-orange-600" aria-hidden="true" />
                   )}
                 </button>
               ))}
@@ -123,7 +124,7 @@ const LanguageSelector = ({
           `}
         >
           <span className="inline-flex items-center gap-2">
-            {showFlags && <FlagIcon country={lang.code} className="w-5 h-4" showEmoji={false} />}
+            {showFlags && <FlagIcon country={lang.code} className="w-5 h-4" />}
             <span>{lang.code.toUpperCase()}</span>
           </span>
         </button>

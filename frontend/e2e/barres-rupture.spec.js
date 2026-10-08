@@ -1,9 +1,22 @@
 import { test, expect } from '@playwright/test';
 import { MARQUEUR_DE_MONTAGE } from './helpers/geometrie.js';
-import { attendreLaCondition } from './helpers/attentes.js';
-// La PUBLICATION par moteur : ce que les trois moteurs font des mêmes gestes se
-// lit au tableau des écarts, publié une fois la suite finie
-// (e2e/global-teardown-moteurs.js).
+import {
+  attendreLaCondition,
+  attendreLaStabiliteDuDefilement,
+} from './helpers/attentes.js';
+// Les attentes de CONDITION (et pourquoi il n'y en a plus une seule d'horloge
+// ici) : `e2e/helpers/attentes.js`. Un franchissement de point de rupture
+// attend la PEINTURE du nouveau rendu, un geste de molette attend l'arrêt du
+// DÉFILEMENT — jamais « 100 ms, on verra bien ».
+//
+// Depuis la preuve multi-moteurs (28/09/2026), ces bascules sont en plus
+// MESURÉES : `attendreLaCondition` attend la condition que le cas juge et rend
+// sa fourchette de durée, que `publierLesBornes` publie sous un même nom ; le
+// tableau des écarts d'un run (`e2e/reporters/ecarts-moteurs.js`) compare ces
+// durées d'un moteur à l'autre. Les deux cohabitent et ne disent pas la même
+// chose : la condition dit QUAND le fait est arrivé, la fourchette COMBIEN DE
+// TEMPS il a mis. L'assertion sur `atteinte` est la contrepartie obligatoire de
+// cette attente-là — sans elle, un fait jamais arrivé passerait pour un succès.
 import { publier } from './helpers/moteurs.js';
 
 /**
@@ -40,20 +53,20 @@ import { publier } from './helpers/moteurs.js';
  * et le CONTRÔLE DE LANGUE — et, en creux, la réponse à « combien d'instances
  * sont affichées à la fois ».
  *
- * ── LE MENU DE LANGUE EST PARTAGÉ, ET JAMAIS PEINT DEUX FOIS ────────────────
- * Les deux barres montent le MÊME composant (`LanguageSelector`) : le tiroir
- * mobile n'a plus de `<select>` à lui, donc un seul menu — mêmes libellés, même
- * comportement d'appui extérieur — pour les deux dispositions. Elles ne peuvent
- * pas pour autant peindre deux contrôles à la fois : le sous-arbre desktop est
- * `hidden md:flex`, et celui du tiroir n'existe que menu ouvert (`md:hidden`).
- * C'est le compte du cas 3, à trois états : mobile fermé 0, mobile ouvert 1,
- * desktop 1. Le composant ne pose AUCUN `id` (rien à dupliquer dans le
- * document), aucun verrou global, et son écouteur d'appui extérieur n'existe que
- * tant que SA liste est ouverte (`e2e/appuis-exterieurs.spec.js` prouve l'autre
- * moitié : un seul appui suit sa cible). Une surface laissée ouverte dans la
- * barre masquée ne peut RIEN avaler : son sous-arbre entier est `display:none`,
- * donc ni peint ni captant — le nombre de contrôles affichés tombe à zéro, et
- * c'est encore le cas 3 qui le dit.
+ * ── Le CONTRÔLE DE LANGUE est indemne, et voici pourquoi plutôt que « on a regardé » ──
+ * Il n'est monté QU'UNE fois : le seul `<LanguageSelector>` de `src/` est dans
+ * la barre desktop, dont le sous-arbre est `hidden md:flex`. La barre mobile
+ * publie, elle, un `<select id="mobile_language_selector">` DANS son menu, qui
+ * n'existe que menu ouvert. Les deux dispositions ne peuvent donc pas peindre
+ * deux contrôles à la fois — c'est le compte du cas 3, à trois états différents,
+ * et c'est ce compte qui échouerait le jour où l'on ajouterait le second. Trois
+ * autres raisons, lues dans la source : il ne pose AUCUN `id` (rien à dupliquer
+ * dans le document), il ne pose aucun verrou global, et son écouteur d'appui
+ * extérieur n'existe que tant que SA liste est ouverte (`e2e/appuis-exterieurs.spec.js`
+ * prouve l'autre moitié : un seul appui suit sa cible). Une surface laissée
+ * ouverte dans la barre masquée ne peut RIEN avaler : son sous-arbre entier est
+ * `display:none`, donc ni peint ni captant — le nombre de contrôles affichés
+ * tombe à zéro, et c'est encore le cas 3 qui le dit.
  *
  * ── La frontière jsdom / Chromium ───────────────────────────────────────────
  * jsdom ne calcule aucune mise en page : il ne verra jamais le défaut
@@ -107,19 +120,27 @@ const attendreLeMontage = async (page) => {
 /** Le menu mobile tel que le visiteur le voit : ouvert par un seul appui. */
 const ouvrirLeMenuMobile = async (page) => {
   await page.getByRole('button', { name: 'Ouvrir le menu' }).click();
-  await expect(page.locator('#mobile_menu')).toBeVisible();
+  await expect(page.locator('#mobile_language_selector')).toBeVisible();
 };
 
 /**
- * Les contrôles de LANGUE AFFICHÉS : les deux barres montent le même composant,
- * dont le déclencheur est un `<button>` portant le nom de la langue courante
- * (« Français »). La question de l'instance dupliquée se répond par ce compte :
- * jamais deux à l'écran, quelle que soit la disposition.
+ * Les contrôles de LANGUE affichés : celui de la barre du haut (un `<button>`
+ * qui porte le nom de la langue courante) et celui du menu mobile (un
+ * `<select>` natif). La question de l'instance dupliquée se répond par ce
+ * compte : jamais deux à l'écran.
+ *
+ * La sonde est séparée de sa lecture, comme `SONDE_ETAT` : `attendreLaCondition`
+ * évalue la FONCTION dans la page, donc lui passer `controlesDeLangue` (qui prend
+ * un `page`) lui enverrait du code qui ne peut pas s'exécuter là-bas.
  */
-const SONDE_LANGUE = () =>
-  [...document.querySelectorAll('nav button')].filter(
-    (b) => b.textContent.includes('Français') && b.getClientRects().length > 0
+const SONDE_LANGUE = () => {
+  const affiche = (el) => el.getClientRects().length > 0;
+  const barre = [...document.querySelectorAll('nav button')].filter(
+    (b) => b.textContent.includes('Français') && affiche(b)
   ).length;
+  const select = [...document.querySelectorAll('#mobile_language_selector')].filter(affiche).length;
+  return { barre, select, total: barre + select };
+};
 
 const controlesDeLangue = (page) => page.evaluate(SONDE_LANGUE);
 
@@ -156,11 +177,11 @@ test.describe('les barres et le point de rupture', () => {
     // Le franchissement : c'est ce que fait une rotation d'écran. L'état est
     // LU, puis jugé — un `toHaveCount(0)` aurait rougi sans dire pourquoi, et
     // un rouge qui n'est pas nommé n'est pas réparable.
-    //
+    await page.setViewportSize(DESKTOP);
     // La bascule est un GESTE, et sa durée se MESURE (elle se compare d'un
     // moteur à l'autre : une re-mise en page de rupture n'est pas instantanée
-    // partout). L'ancien `waitForTimeout(100)` la décidait au lieu de la lire.
-    await page.setViewportSize(DESKTOP);
+    // partout). Un délai fixe de 100 ms la DÉCIDAIT au lieu de la lire — et le
+    // garde des temps absolus lit ce fichier : ne pas réécrire l'appel ici.
     const bascule = await attendreLaCondition(
       page,
       SONDE_ETAT,
@@ -198,9 +219,17 @@ test.describe('les barres et le point de rupture', () => {
       defilement.atteinte,
       "900 px de molette n'ont pas bougé la page : le verrou du tiroir a survécu à sa barre"
     ).toBe(true);
-    const defile = defilement.dernier;
     publierLesBornes(test, 'molette de 900 px : défiler jusqu’à 300 px', defilement);
+    // Puis on attend l'ARRÊT du geste, qui n'est pas la même question : une
+    // position lue en plein défilement amorti mesurerait un instant du mouvement.
+    // Un défilement verrouillé reste à 0, et c'est l'assertion suivante qui le dit.
+    await attendreLaStabiliteDuDefilement(page);
+    const defile = await etatDeLaPage(page);
     publier(test, 'molette de 900 px : position atteinte', defile.positionDeDefilement, 'px');
+    expect(
+      defile.positionDeDefilement,
+      "900 px de molette n'ont pas bougé la page : le verrou du tiroir a survécu à sa barre"
+    ).toBeGreaterThan(300);
   });
 
   test("l'état ne survit pas au retour en mobile : le hamburger dit « Ouvrir le menu »", async ({ page }) => {
@@ -246,7 +275,8 @@ test.describe('les barres et le point de rupture', () => {
       `après le retour en mobile, le hamburger dit « ${retour.dernier.libelleHamburger} » ` +
         `(${retour.dernier.hamburgerAffiche} affiché(s)) : le menu mobile aurait dû se refermer en quittant le point de rupture`
     ).toBe(true);
-    await expect(page.locator('#mobile_menu')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Ouvrir le menu' })).toBeVisible();
+    await expect(page.locator('#mobile_language_selector')).toHaveCount(0);
     expect((await etatDeLaPage(page)).verrouDeDefilement).toBe('');
   });
 
@@ -261,18 +291,19 @@ test.describe('les barres et le point de rupture', () => {
     // Mobile fermé : la langue n'est atteignable qu'en ouvrant le menu — le
     // compte est donc 0, et le contrôle de la barre desktop ne doit pas être
     // affiché « en plus » (c'est la forme du doublon).
-    expect(await controlesDeLangue(page), 'menu fermé sur mobile').toBe(0);
+    expect(await controlesDeLangue(page), 'menu fermé sur mobile').toEqual({ barre: 0, select: 0, total: 0 });
 
     await ouvrirLeMenuMobile(page);
-    expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toBe(1);
+    expect(await controlesDeLangue(page), 'menu ouvert sur mobile').toEqual({ barre: 0, select: 1, total: 1 });
 
     await page.setViewportSize(DESKTOP);
-    const barre = await attendreLaCondition(page, SONDE_LANGUE, (n) => n === 1);
-    expect(barre.atteinte, `après la bascule, ${barre.dernier} contrôle(s) de langue affiché(s) au lieu d'un`).toBe(
-      true
-    );
+    const barre = await attendreLaCondition(page, SONDE_LANGUE, (etat) => etat.total === 1);
+    expect(
+      barre.atteinte,
+      `après la bascule, ${barre.dernier.total} contrôle(s) de langue affiché(s) au lieu d'un`
+    ).toBe(true);
     publierLesBornes(test, 'bascule mobile→desktop : un seul contrôle de langue', barre);
-    expect(await controlesDeLangue(page), 'barre desktop').toBe(1);
+    expect(await controlesDeLangue(page), 'barre desktop').toEqual({ barre: 1, select: 0, total: 1 });
   });
 
   test("un menu de langue laissé ouvert dans la barre masquée ne peint plus rien et n'avale rien", async ({ page }) => {
@@ -284,13 +315,17 @@ test.describe('les barres et le point de rupture', () => {
     // rétrécissant : son état reste « ouvert » dans un conteneur `display:none`.
     await page.locator('nav button', { hasText: 'Français' }).first().click();
     await expect(page.getByRole('button', { name: /Wolof/ })).toBeVisible();
-    expect(await controlesDeLangue(page), 'déclencheur + la liste ouverte').toBeGreaterThan(1);
+    expect((await controlesDeLangue(page)).barre).toBeGreaterThan(1); // déclencheur + la liste
 
     await page.setViewportSize(MOBILE);
-    const masquee = await attendreLaCondition(page, SONDE_LANGUE, (n) => n === 0);
-    expect(masquee.atteinte, `la barre masquée peint encore ${masquee.dernier} contrôle(s) de langue`).toBe(true);
+    const masquee = await attendreLaCondition(page, SONDE_LANGUE, (etat) => etat.total === 0);
+    expect(masquee.atteinte, `la barre masquée peint encore ${masquee.dernier.total} contrôle(s) de langue`).toBe(true);
     publierLesBornes(test, 'bascule desktop→mobile : barre masquée vidée', masquee);
-    expect(await controlesDeLangue(page), 'la barre masquée ne doit plus rien peindre').toBe(0);
+    expect(await controlesDeLangue(page), 'la barre masquée ne doit plus rien peindre').toEqual({
+      barre: 0,
+      select: 0,
+      total: 0,
+    });
 
     // L'appui suit sa cible au PREMIER geste (le menu de langue resté ouvert
     // ferme par effet de bord, sans rien capturer) et le tiroir s'ouvre. Ce

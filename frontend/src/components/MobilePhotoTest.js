@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { PartyPopper, Smartphone, Camera, Image, Trash2, Rocket, Scissors, Save, Cloud, Lock, Zap } from 'lucide-react';
 
 const MobilePhotoTest = () => {
   const { t } = useLanguage();
@@ -43,14 +44,14 @@ const MobilePhotoTest = () => {
       padding: '20px', 
       maxWidth: '600px', 
       margin: '0 auto',
-      fontFamily: 'Arial, sans-serif' 
+      fontFamily: 'inherit' 
     }}>
       <h2 style={{ 
         color: '#EA580C', 
         textAlign: 'center',
         marginBottom: '30px' 
       }}>
-        🎉 Test Photo de Profil Kojo Mobile
+        <PartyPopper className="inline h-6 w-6 mr-1 align-[-0.15em]" aria-hidden="true" /> Test Photo de Profil Kojo Mobile
       </h2>
       
       <div style={{ 
@@ -58,12 +59,12 @@ const MobilePhotoTest = () => {
         marginBottom: '30px' 
       }}>
         <p style={{ 
-          backgroundColor: '#f0f0f0',
+          backgroundColor: '#f5f5f4',
           padding: '15px',
           borderRadius: '8px',
-          color: '#666'
+          color: '#57534e'
         }}>
-          📱 Cette fonctionnalité sera pleinement disponible sur l’application mobile native.<br/>
+          <Smartphone className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Cette fonctionnalité sera pleinement disponible sur l’application mobile native.<br/>
           Voici une démonstration de la logique sur web.
         </p>
       </div>
@@ -107,7 +108,7 @@ const MobilePhotoTest = () => {
           )}
         </div>
         {selectedPhoto && (
-          <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+          <p style={{ fontSize: '12px', color: '#57534e', marginTop: '10px' }}>
             {interpolate(t('addedOn'), { timestamp: selectedPhoto.timestamp })}
           </p>
         )}
@@ -133,14 +134,14 @@ const MobilePhotoTest = () => {
             fontWeight: '500'
           }}
         >
-          📷 Simuler Appareil Photo
+          <Camera className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Simuler Appareil Photo
         </button>
         
         <button
           onClick={simulatePhotoSelection}
           style={{
-            backgroundColor: '#4ECDC4',
-            color: 'white',
+            backgroundColor: '#1c1917',
+            color: '#fff7ed',
             border: 'none',
             padding: '12px 20px',
             borderRadius: '8px',
@@ -149,14 +150,14 @@ const MobilePhotoTest = () => {
             fontWeight: '500'
           }}
         >
-          🖼️ Simuler Galerie
+          <Image className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Simuler Galerie
         </button>
 
         {selectedPhoto && (
           <button
             onClick={() => deletePhoto(selectedPhoto.id)}
             style={{
-              backgroundColor: '#FF6B6B',
+              backgroundColor: '#b91c1c',
               color: 'white',
               border: 'none',
               padding: '12px 20px',
@@ -166,7 +167,7 @@ const MobilePhotoTest = () => {
               fontWeight: '500'
             }}
           >
-            🗑️ Supprimer
+            <Trash2 className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Supprimer
           </button>
         )}
       </div>
@@ -210,7 +211,7 @@ const MobilePhotoTest = () => {
                     position: 'absolute',
                     top: '5px',
                     right: '5px',
-                    background: 'rgba(255, 0, 0, 0.8)',
+                    background: 'rgba(185, 28, 28, 0.85)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '50%',
@@ -235,18 +236,18 @@ const MobilePhotoTest = () => {
       <div style={{
         marginTop: '40px',
         padding: '20px',
-        backgroundColor: '#f9f9f9',
+        backgroundColor: '#fafaf9',
         borderRadius: '8px'
       }}>
-        <h3 style={{ color: '#EA580C' }}>🚀 Sur l’App Mobile Native :</h3>
-        <ul style={{ color: '#666', lineHeight: '1.6' }}>
-          <li>📱 Accès direct à l’appareil photo</li>
-          <li>🖼️ Sélection depuis la galerie photos</li>
-          <li>✂️ Recadrage automatique en carré</li>
-          <li>💾 Sauvegarde persistante</li>
-          <li>☁️ Upload vers serveur</li>
-          <li>🔐 Gestion des permissions</li>
-          <li>⚡ Compression automatique</li>
+        <h3 style={{ color: '#EA580C' }}><Rocket className="inline h-5 w-5 mr-1 align-[-0.15em]" aria-hidden="true" /> Sur l’App Mobile Native :</h3>
+        <ul style={{ color: '#57534e', lineHeight: '1.6' }}>
+          <li><Smartphone className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Accès direct à l’appareil photo</li>
+          <li><Image className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Sélection depuis la galerie photos</li>
+          <li><Scissors className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Recadrage automatique en carré</li>
+          <li><Save className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Sauvegarde persistante</li>
+          <li><Cloud className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Upload vers serveur</li>
+          <li><Lock className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Gestion des permissions</li>
+          <li><Zap className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> Compression automatique</li>
         </ul>
       </div>
     </div>

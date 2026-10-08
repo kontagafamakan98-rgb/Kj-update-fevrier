@@ -3,11 +3,21 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Le TITRE DU HÉROS de l'accueil est l'élément LCP de « / ».
+// Le HÉROS de l'accueil porte l'élément LCP de « / » : son TITRE jusqu'au
+// 27/09/2026, son ILLUSTRATION depuis la refonte éditoriale de ce jour-là
+// (re-mesuré le 29/09/2026 sur la PHOTO 3/4 publiée à la place du dessin, les
+// deux canaux : 69 920 px² en mobile et 306 870 en desktop pour l'image, contre
+// 37 400 et 110 500 pour le titre à sa dernière mesure du 28/09/2026 — une seule
+// candidate, au
+// premier paint). Les deux invariants ci-dessous gardent donc leur raison
+// d'être : c'est la GÉOMÉTRIE de la boîte reconstruite par React qui décide si
+// Chrome ré-élit une seconde peinture plus tardive, et elle vaut pour le titre
+// comme pour l'image.
 //
 // Deux invariants le protègent, et un défaut mesuré justifie chacun d'eux :
 //
-//  1. UN PROPRIÉTAIRE POUR LES DEUX PEINTURES. La coquille pré-rendue peint le
+//  1. UN PROPRIÉTAIRE POUR LES DEUX PEINTURES (du titre ; l'illustration, elle,
+//     n'a qu'un propriétaire par construction — un fichier de `public/assets/`). La coquille pré-rendue peint le
 //     titre avant le JavaScript, puis React reconstruit le même. Les chaînes de
 //     classes étaient recopiées face à face (src/pages/Home.js et
 //     vite-plugins/prerender/shells-home.js) : retoucher l'une faisait diverger
@@ -41,21 +51,35 @@ const PLAN = 'src/config/page-sections.js';
 const PAGE = 'src/pages/Home.js';
 const COQUILLE = 'vite-plugins/prerender/shells-home.js';
 const AMORCAGE = 'src/index.js';
+// L'`<img>` du héros (le composant React), le plugin qui écrit le `<head>`
+// d'index.html, et index.html lui-même — le préchargement de la photo de tête
+// vit dans le second et doit lire son chemin dans son domicile, jamais dans le
+// troisième (voir le 5e refus).
+const COMPOSANT = 'src/components/PhotoDuHeros.js';
+const PLUGIN_HEAD = 'vite-plugins/prerender-route-meta.js';
+const INDEX_HTML = 'index.html';
 
 // Les DEUX chaînes de classes de géométrie du héros : elles ne doivent exister
 // QUE dans la déclaration (le plan), jamais recopiées dans un canal.
+//
+// Mises à jour le 28/09/2026 avec la refonte éditoriale : ce sont les VALEURS
+// MESURÉES d'aujourd'hui. Les laisser sur les anciennes chaînes rendait le
+// second verdict VIDE — il refuse de retrouver ces chaînes dans un canal, et
+// elles n'existaient plus nulle part, donc il ne pouvait plus rien refuser.
+// Un garde qu'on ne peut plus faire mordre est un garde qu'on croit vert.
 const CLASSES_DU_HEROS = [
-  'text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight max-w-4xl mx-auto',
-  'text-lg md:text-xl lg:text-2xl mb-8 opacity-90 max-w-3xl mx-auto',
+  'titre-heros mb-5 md:mb-7 max-w-4xl mx-auto',
+  'text-lg md:text-xl lg:text-2xl mb-8 text-white/90 max-w-3xl mx-auto',
 ];
 
 /**
  * Refus opposés à un jeu de sources. Vide = la classe de défaut est fermée.
  *
- * @param {{plan: string, page: string, coquille: string, amorcage: string}} sources
+ * @param {{plan: string, page: string, coquille: string, amorcage: string,
+ *   composant: string, pluginHead: string, indexHtml: string}} sources
  * @returns {string[]}
  */
-export function refusDuHerosLcp({ plan, page, coquille, amorcage }) {
+export function refusDuHerosLcp({ plan, page, coquille, amorcage, composant, pluginHead, indexHtml }) {
   const refus = [];
 
   // 1. La déclaration porte le titre, le sous-titre et leur géométrie —
@@ -120,6 +144,47 @@ export function refusDuHerosLcp({ plan, page, coquille, amorcage }) {
     );
   }
 
+  // 5. LA PHOTO DE TÊTE EST PRÉCHARGÉE DEPUIS SON DOMICILE, ET LES DEUX CANAUX
+  //    LA DÉCODENT SYNCHRONEMENT (07/10/2026).
+  //    L'image est l'élément LCP de « / » (69 920 px²), mais elle se DÉCODE plus
+  //    tard que le texte : en `decoding="async"`, mesuré sur Chromium (412×823,
+  //    CPU limité par CDP), la navigation réelle sortait DEUX candidates — le
+  //    `<h1>` du héros, puis l'`<img>` ~100 à 400 ms plus tard — c'est-à-dire un
+  //    élément LCP ré-élu par le repaint, toute la chaîne JavaScript facturée
+  //    dans le graphe LCP simulé de Lantern. Le préchargement démarre la
+  //    requête pendant l'analyse du `<head>`, donc bien avant que le corps ne
+  //    soit atteint, et le décodage synchrone fait tomber les deux peintures
+  //    dans la MÊME trame : mesuré, UNE seule candidate dès ×1.
+  //    Les deux refus ci-dessous gardent les deux moitiés du remède : un
+  //    préchargement qui ne LIT plus son chemin dans src/config/photos-heros.js
+  //    (un littéral recopié ici ne suivrait pas un changement de photo), et un
+  //    canal qui redescend en décodage asynchrone alors que l'autre non.
+  if (!/as="image"/.test(pluginHead) || !/PHOTOS_HEROS\[0\]/.test(pluginHead)) {
+    refus.push(
+      `${PLUGIN_HEAD} n'émet plus le préchargement de la photo de tête depuis ` +
+        'src/config/photos-heros.js (`PHOTOS_HEROS[0]`, `as="image"`) : la requête de l’image ' +
+        'LCP repartirait à l’analyse du corps, donc après le texte, et le repaint deviendrait ' +
+        'l’élément LCP'
+    )
+  }
+  if (/kojo-hero/.test(indexHtml)) {
+    refus.push(
+      `${INDEX_HTML} cite un chemin de photo du héros en littéral — le préchargement est écrit ` +
+        'par le plugin, depuis src/config/photos-heros.js : deux propriétaires du même fait ' +
+        'divergent au premier changement de photo, en silence'
+    )
+  }
+  for (const [nom, source] of [
+    ['le composant React', composant],
+    ['la coquille', coquille],
+  ]) {
+    if (!/decoding="sync"/.test(source)) {
+      refus.push(          `${nom} ne décode plus la photo du héros en synchrone (decoding="async") : elle se ` +
+          'peindrait une trame après le texte, et Chrome ré-élirait un second élément LCP'
+      )
+    }
+  }
+
   return refus;
 }
 
@@ -129,6 +194,9 @@ describe('le titre du héros de l’accueil (élément LCP de « / »)', () => {
     page: lire(PAGE),
     coquille: lire(COQUILLE),
     amorcage: lire(AMORCAGE),
+    composant: lire(COMPOSANT),
+    pluginHead: lire(PLUGIN_HEAD),
+    indexHtml: lire(INDEX_HTML),
   };
 
   it('a un seul propriétaire — la déclaration du corps de page — et les deux canaux la lisent', () => {
@@ -157,5 +225,35 @@ describe('le titre du héros de l’accueil (élément LCP de « / »)', () => {
     const muté = { ...sources, amorcage: sources.amorcage.replace(/first-contentful-paint/g, 'x') };
     const refus = refusDuHerosLcp(muté);
     expect(refus.join('\n')).toContain('ne monte plus React après le premier paint');
+  });
+
+  it('refuse un préchargement de la photo écrit en littéral dans le plugin', () => {
+    const muté = {
+      ...sources,
+      pluginHead: sources.pluginHead.replace(/PHOTOS_HEROS\[0\]/g, "'/assets/kojo-hero.jpg'"),
+    };
+    const refus = refusDuHerosLcp(muté);
+    expect(refus.join('\n')).toContain('n\'émet plus le préchargement de la photo de tête');
+  });
+
+  it('refuse un index.html qui cite la photo du héros en littéral', () => {
+    const muté = {
+      ...sources,
+      indexHtml: sources.indexHtml.replace(
+        '<head>',
+        '<head>\n    <link rel="preload" as="image" href="/assets/kojo-hero.jpg">'
+      ),
+    };
+    const refus = refusDuHerosLcp(muté);
+    expect(refus.join('\n')).toContain('cite un chemin de photo du héros en littéral');
+  });
+
+  it('refuse un canal qui redescend en décodage asynchrone', () => {
+    const muté = {
+      ...sources,
+      composant: sources.composant.replaceAll('decoding="sync"', 'decoding="async"'),
+    };
+    const refus = refusDuHerosLcp(muté);
+    expect(refus.join('\n')).toContain('le composant React ne décode plus la photo du héros en synchrone');
   });
 });

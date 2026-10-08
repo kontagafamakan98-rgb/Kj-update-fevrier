@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 500" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Paiement Kojo protégé jusqu’à la fin de la mission</title>
+  <desc id="desc">Un portefeuille et des pièces protégés par un bouclier avec une coche, symbolisant un paiement sécurisé libéré à la validation du travail.</desc>
+  <defs>
+    <linearGradient id="bg" x1="105" y1="58" x2="514" y2="451" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF4E7"/><stop offset="1" stop-color="#EAF3E4"/></linearGradient>
+    <linearGradient id="shield" x1="248" y1="93" x2="408" y2="310" gradientUnits="userSpaceOnUse"><stop stop-color="#7FB850"/><stop offset="1" stop-color="#4C913C"/></linearGradient>
+    <linearGradient id="wallet" x1="100" y1="220" x2="347" y2="399" gradientUnits="userSpaceOnUse"><stop stop-color="#FB923C"/><stop offset="1" stop-color="#EA580C"/></linearGradient>
+    <filter id="shadow" x="-25%" y="-25%" width="150%" height="165%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="13" stdDeviation="15" flood-color="#54391E" flood-opacity=".13"/></filter>
+  </defs>
+  <circle cx="311" cy="250" r="205" fill="url(#bg)"/>
+  <circle cx="311" cy="250" r="176" stroke="#D9E7D1" stroke-width="2" stroke-dasharray="4 11"/>
+  <path d="M116 400c99 24 222 28 352-1" stroke="#D8C4AD" stroke-width="3" stroke-linecap="round"/>
+  <!-- Wallet -->
+  <g filter="url(#shadow)">
+    <rect x="95" y="216" width="260" height="170" rx="28" fill="url(#wallet)"/>
+    <path d="M119 216v-23c0-16 13-29 29-29h165c18 0 32 14 32 32v20H119Z" fill="#FB923C"/>
+    <path d="M129 264h227" stroke="#FED7AA" stroke-width="3" opacity=".85"/>
+    <rect x="267" y="267" width="115" height="76" rx="20" fill="#FFF8EE"/>
+    <circle cx="298" cy="305" r="8" fill="#EA580C"/>
+    <path d="M324 305h34" stroke="#E2C6A7" stroke-width="5" stroke-linecap="round"/>
+    <path d="M132 354h72" stroke="#FED7AA" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <!-- Shield -->
+  <g filter="url(#shadow)">
+    <path d="M333 88c31 20 65 31 105 33v91c0 66-41 114-105 145-64-31-105-79-105-145v-91c40-2 74-13 105-33Z" fill="url(#shield)" stroke="#FFF" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M281 210 319 248l70-77" stroke="#FFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M282 139c17-7 34-15 51-26" stroke="#B6D897" stroke-width="6" stroke-linecap="round" opacity=".9"/>
+  </g>
+  <!-- Coins -->
+  <g filter="url(#shadow)">
+    <ellipse cx="421" cy="370" rx="56" ry="18" fill="#F9BF5B"/>
+    <path d="M365 351v20c0 10 25 18 56 18s56-8 56-18v-20" fill="#EAA63F"/>
+    <ellipse cx="421" cy="350" rx="56" ry="18" fill="#FFD47E"/>
+    <ellipse cx="421" cy="350" rx="34" ry="10" stroke="#D58B27" stroke-width="4"/>
+    <path d="M421 342v16m-8-12h12c8 0 8 9 0 9h-9" stroke="#C17A20" stroke-width="3.5" stroke-linecap="round"/>
+  </g>
+  <!-- Floating check and sparkles -->
+  <circle cx="479" cy="167" r="28" fill="#FFF"/>
+  <circle cx="479" cy="167" r="20" fill="#E7F1E1"/>
+  <path d="m470 167 6 6 12-14" stroke="#579842" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m149 146 7 17 17 7-17 7-7 17-7-17-17-7 17-7 7-17Z" fill="#F5B04F" opacity=".9"/>
+  <circle cx="488" cy="292" r="7" fill="#F3A448"/>
+  <circle cx="191" cy="289" r="6" fill="#78AA4D"/>
+  <path d="M178 385c-19-26-10-46 19-49 4 24-4 41-19 49Z" fill="#83B653"/>
+  <path d="M180 388c3-15 9-27 19-37" stroke="#4D913E" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

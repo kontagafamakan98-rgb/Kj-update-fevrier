@@ -71,16 +71,22 @@
  *        • la coquille ne publie un glyphe que si React peint un glyphe DANS LA
  *          MÊME BANDE — texte non verbal, `<svg>` ou `<img>` (`svg` et `img` sont
  *          comptés sans texte, leur contenu n'est pas lisible) ;
- *        • si React peint un glyphe TEXTUEL dans cette bande, il doit être le
+ *        • si la coquille publie un glyphe TEXTUEL (un « · », un emoji) et que
+ *          React peint un glyphe TEXTUEL dans cette bande, il doit être le
  *          MÊME glyphe. C'est la moitié qui a du mordant : publier « 📮 » là où
  *          React peint « 📞 » est refusé, alors que remplacer l'emoji par une
- *          icône SVG ne l'est pas.
+ *          icône SVG ne l'est pas. L'égalité de texte est demandée au glyphe
+ *          TEXTUEL de la coquille, jamais à un DESSIN (`svg`, image) : un
+ *          dessin n'a pas de texte à comparer, et l'exiger faisait rougir une
+ *          coquille sur une coïncidence de bande (mesure du 07/10/2026, cf.
+ *          `glyphesDivergents` plus bas).
  *      Ce que la règle ne juge PAS, et qu'il ne faut pas lui demander : la
- *      SÉMANTIQUE d'une icône de remplacement. La coquille publie « 💬 » sur la
- *      première carte de /support pendant que React y peint `lucide-bot` — les
- *      deux canaux disent des choses différentes, et aucun de ces deux noms
- *      n'est vérifiable par une sonde qui ne connaît pas l'intention. Ce genre
- *      d'écart se voit en relisant le plan (`shellIconKey`, src/config/page-sections.js).
+ *      SÉMANTIQUE d'un dessin. Depuis le 26/09/2026 les pages pré-rendues ne
+ *      publient plus d'emoji : leurs glyphes sont DESSINÉS, déclarés par un nom
+ *      d'icône (`icone`, src/config/page-icons.js) que les deux canaux rendent
+ *      par le même registre — la coquille et React peignent donc le même `<svg>`
+ *      par construction. Le contrôle se contente d'exiger, dans la même bande,
+ *      un pendant NON verbal (SVG ou image), sans juger lequel.
  *
  * ── La borne, dite une fois ─────────────────────────────────────────────────
  * La bande comparée est celle de la COQUILLE. Un bloc ASYNCHRONE que React
@@ -93,20 +99,16 @@
  * sera LÉGITIME : la coquille aura cessé d'être l'endroit où ce texte est peint,
  * et c'est un fait à traiter (une frontière à déclarer), pas à contourner.
  *
- * ── Les écarts DÉCLARÉS (et pourquoi il n'y en a que deux) ──────────────────
- * Un seul endroit du site publie des mots que React ne peut pas publier : les
- * quatre chiffres de l'accueil. La page les lit de `/public/stats` et les
- * formate par `toLocaleString()`, la coquille publie le repli statique déclaré
- * dans `src/config/page-sections.js` (`stats[].shellText`) — « 1 000+ » contre
- * « 1+ » avec la fixture mesurée le 25/09/2026. Aucune géométrie ne peut
- * rapprocher une valeur de donnée d'un repli : cet écart est DÉCLARÉ, avec sa
- * raison, et sa contrepartie est VÉRIFIÉE (React doit peindre, dans la bande,
- * un nombre suivi du suffixe — la preuve que le bloc est toujours vivant et que
- * l'écart est bien « une donnée contre un repli », pas « un texte disparu »).
- * Un écart déclaré qui n'est PLUS utilisé, ou dont la contrepartie n'est plus
- * peinte, est PÉRIMÉ et fait rougir : sans cette règle, la table des écarts
- * deviendrait le cimetière des exceptions qu'on n'ose plus retirer (la règle
- * que `scripts/shell-text-provenance.js` applique déjà à ses marqueurs).
+ * ── Les écarts DÉCLARÉS, et pourquoi il n'y en a PLUS ────────────────────────
+ * Deux chiffres de l'accueil étaient lus de `/public/stats` et formatés par
+ * `toLocaleString()`, tandis que la coquille publiait le repli statique — un
+ * écart impossible à rapprocher par la géométrie, qui vivait donc ici, DÉCLARÉ.
+ * Le 26/09/2026, ces deux compteurs INVENTÉS (« 1 000+ travailleurs », « 500+
+ * projets ») ont été retirés (règle « pas de faux compteurs ») : la section des
+ * statistiques ne publie plus que des faits vérifiables, identiques dans les
+ * deux canaux. Il n'y a donc plus AUCUN écart déclaré — la table reste, VIDE,
+ * parce que son contrôle tient la règle qui compte : un écart périmé fait
+ * rougir (une exception qu'on n'ose plus retirer est une exception qui mente).
  */
 
 /**
@@ -219,29 +221,13 @@ const ZONES = [
  * dans la même bande pour que l'écart reste ce qu'il prétend être. Un écart
  * déclaré qui n'est plus utilisé, ou dont la contrepartie n'est plus peinte,
  * fait rougir la sonde.
+ *
+ * VIDE depuis le 26/09/2026 : les deux compteurs inventés de l'accueil ont été
+ * retirés, donc plus aucun écart n'est déclaré. La table reste vide plutôt que
+ * supprimée : c'est SON CONTRÔLE (un écart périmé rougit) qui empêche le
+ * cimetière des exceptions de se reformer.
  */
-export const ECARTS_DECLARES = [
-  {
-    route: '/',
-    texte: '1 000+',
-    raison:
-      "les quatre chiffres de l'accueil sont des DONNÉES : la page les lit de /public/stats et les formate " +
-      'par toLocaleString() (séparateur de milliers selon la locale du navigateur), la coquille publie le repli ' +
-      'statique déclaré dans src/config/page-sections.js (`stats[].shellText`) — mesuré le 25/09/2026 avec la ' +
-      'fixture : React peint « 1+ », la coquille « 1 000+ ». Aucune géométrie ni aucun texte ne peut rapprocher ' +
-      'une valeur de donnée d’un repli.',
-    contrepartie: /^\p{N}[\p{N}\s\u00a0.,]*\+$/u,
-  },
-  {
-    route: '/',
-    texte: '500+',
-    raison:
-      'même bloc que « 1 000+ » : le deuxième chiffre de la grille est lu de /public/stats et formaté par la page ' +
-      '(mesuré : « 0+ » avec la fixture), tandis que la coquille publie le repli « 500+ » déclaré dans ' +
-      'src/config/page-sections.js.',
-    contrepartie: /^\p{N}[\p{N}\s\u00a0.,]*\+$/u,
-  },
-];
+export const ECARTS_DECLARES = [];
 
 /**
  * Compare les deux inventaires d'une route et rend les divergences NOMMÉES,
@@ -337,8 +323,25 @@ export function comparerTextes({ route, coquille, react }) {
         );
         continue;
       }
+      // ── L'ÉGALITÉ DE TEXTE ne se demande QU'À UN GLYPHE TEXTUEL ──────────
+      // C'est le seul qui ait un texte à comparer. Un DESSIN (`svg`, image) n'a
+      // pas d'identité textuelle : lui demander d'« égaler » un texte de React
+      // est un contresens, et c'est pourtant ce que faisait cette ligne sur une
+      // simple COÏNCIDENCE DE BANDE. Mesuré le 07/10/2026 sur / (412×823) :
+      // l'icône de la ligne « Envoyer un e-mail » (un `svg` de 20 px de haut à
+      // y=6570,94) recouvre la bande du paragraphe de liens (l'ÉLÉMENT `p`,
+      // 40 px, y 6580,78 → 6620,78) de 10,16 px — soit 0,16 px de plus que la
+      // moitié de la plus petite hauteur, la relation `MEME_BANDE` que le
+      // harnais partage avec la géométrie — et React peint un `svg` à la MÊME
+      // boîte (y=6570,94, x=43) : le pendant existe, et c'est le bon. Le rouge
+      // accusait donc la coquille d'avoir « remplacé » les deux « · » du
+      // paragraphe par une icône que React peint AUSSI. Ce qui reste exigé d'un
+      // dessin est ce que la règle peut honnêtement exiger : un pendant PEINT
+      // dans sa bande (glyphesSansPendant, juste au-dessus). La SÉMANTIQUE du
+      // dessin, elle, n'est pas jugeable ici (deux `svg` n'ont pas de texte) et
+      // se décide au plan (`shellIconKey`, src/config/page-sections.js).
       const textuels = pendants.filter((item) => item.sorte === 'texte');
-      if (textuels.length && !textuels.some((item) => item.texte === glyphe.texte)) {
+      if (glyphe.sorte === 'texte' && textuels.length && !textuels.some((item) => item.texte === glyphe.texte)) {
         glyphesDivergents.push(
           `[${zone.nom}] ${court(glyphe.texte)} (${bande(glyphe)}) : React peint du TEXTE dans cette bande, mais ` +
             `${textuels.map((item) => court(item.texte, 16)).join(', ')} — deux glyphes différents au même endroit`

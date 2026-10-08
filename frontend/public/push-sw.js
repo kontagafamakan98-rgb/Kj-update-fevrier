@@ -7,7 +7,14 @@
 //   JAMAIS mises en cache (données utilisateur sensibles).
 // ============================================================
 
-const CACHE_NAME = 'kojo-shell-v1';
+// v2 (07/10/2026) : le favicon et les icônes PWA descendent maintenant du
+// POINÇON (public/icons/generate_icons.py, à partir de src/config/marque-kojo.json)
+// au lieu du raster de l'ancien profil. Les DEUX icônes précachées ci-dessous
+// font partie de l'app shell : sans un changement de NOM de cache, une
+// installation déjà ouverte continuerait de servir les anciennes — l'onglet
+// aurait la nouvelle marque et l'application installée l'ancienne. Changer le nom
+// purge l'ancien cache à l'activation (voir plus bas).
+const CACHE_NAME = 'kojo-shell-v2';
 const APP_SHELL_URLS = ['/', '/index.html', '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
 self.addEventListener('install', (event) => {

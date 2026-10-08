@@ -537,6 +537,48 @@ describe('check-og-assets — manifeste de reproductibilité', () => {
     );
   });
 
+  it('refuse un favicon sombre composé d’une marque qui a changé depuis', () => {
+    // Le favicon sombre POSE la marque du site sur le graphite : il ne la
+    // redessine pas. Si la marque est régénérée (famille des icônes) sans que le
+    // favicon le soit, aucune empreinte de CE manifeste ne bouge — l'onglet en
+    // mode sombre montrerait alors une marque que la page ne dessine plus. La
+    // déclaration `compose` / `compose_sha256` est ce qui rend l'écart visible.
+    const marque = fakePng(512, 512);
+    const root = makeFixture();
+    const cheminMarque = path.join(root, 'public', 'icons', 'icon-512x512.png');
+    // La marque vit HORS du manifeste des cartes : elle appartient à la famille
+    // des icônes, dont le garde est ailleurs (scripts/check-generated-icons.js).
+    fs.writeFileSync(cheminMarque, marque);
+    const manifest = readManifest(root);
+    const entree = manifest.assets.find((asset) => asset.file === 'icons/icon-dark.png');
+    entree.compose = 'icons/icon-512x512.png';
+    entree.compose_sha256 = crypto.createHash('sha256').update(marque).digest('hex');
+    writeManifest(root, manifest);
+
+    expect(run({ root }).ok).toBe(true);
+
+    fs.writeFileSync(cheminMarque, Buffer.concat([fakePng(512, 512), Buffer.from('x')]));
+    const result = run({ root });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /a été composé à partir de public\/icons\/icon-512x512\.png, qui a changé depuis/
+    );
+  });
+
+  it('refuse un favicon sombre composé d’une marque absente', () => {
+    const root = makeFixture();
+    const manifest = readManifest(root);
+    const entree = manifest.assets.find((asset) => asset.file === 'icons/icon-dark.png');
+    entree.compose = 'icons/icon-512x512.png';
+    entree.compose_sha256 = 'peu importe';
+    writeManifest(root, manifest);
+    const result = run({ root });
+    expect(result.ok).toBe(false);
+    expect(result.errors.join('\n')).toMatch(
+      /est composé à partir de public\/icons\/icon-512x512\.png, qui est absent/
+    );
+  });
+
   it('détecte des dimensions de manifeste incohérentes avec le générateur', () => {
     const root = makeFixture();
     const manifest = readManifest(root);

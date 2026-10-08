@@ -588,6 +588,31 @@ export const runOgAssetsCheck = (opts = {}) => {
               `≠ celles déclarées par ${GENERATOR_NAME} (${asset.width}×${asset.height})`
           );
         }
+        // 5c bis. Une image COMPOSÉE D'UNE AUTRE : si elle le déclare, la source
+        // qu'elle compose doit être intacte. C'est le cas du favicon sombre, qui
+        // pose la marque du site (dessinée par la famille des icônes) sur le
+        // graphite : régénérer les icônes sans régénérer le favicon laisserait
+        // l'onglet en mode sombre sur l'ANCIENNE marque, sans qu'une seule
+        // empreinte de ce manifeste ne bouge. Un choix qui n'est plus vérifié
+        // est un choix qui ment.
+        if (typeof entry.compose === 'string' && entry.compose) {
+          const composePath = path.join(publicDir, entry.compose);
+          if (!existsSync(composePath)) {
+            fail(
+              `public/${asset.file} est composé à partir de public/${entry.compose}, qui est ` +
+                `absent : régénère d'abord la famille qui le produit`
+            );
+          } else {
+            const composeSha = createHash('sha256').update(readFileSync(composePath)).digest('hex');
+            if (entry.compose_sha256 !== composeSha) {
+              fail(
+                `public/${asset.file} a été composé à partir de public/${entry.compose}, qui a ` +
+                  `changé depuis : relance scripts/${GENERATOR_NAME} — sinon l'onglet en mode ` +
+                  `sombre montre une marque que la page ne dessine plus`
+              );
+            }
+          }
+        }
       }
 
       // 5d. Le manifeste ne décrit pas de carte que le générateur a abandonnée.

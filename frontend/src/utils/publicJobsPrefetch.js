@@ -59,12 +59,20 @@ export const makePublicJobsPrefetch = ({
   // Compare les params réels du composant à ceux du préchargement : on ne
   // réutilise le cache que pour la MÊME requête (découverte, 1re page, open,
   // sans filtre/mine/ids). Tout écart → on recharge normalement.
+  // `country` en fait partie depuis le 28/09/2026, et c'est un défaut MESURÉ
+  // qui l'a mis là : le ruban des pays de l'accueil mène à `/jobs?country=mali`,
+  // la page partait bien avec ses filtres (`filters.country` était posé), mais
+  // `matches` ne regardait pas ce paramètre — le préchargement SANS filtre était
+  // donc jugé « la même requête », la liste du pays n'était jamais demandée, et
+  // la page affichait toutes les offres sous une puce « Mali ». Un filtre ignoré
+  // en silence est pire qu'un filtre absent : la puce affirme ce qui n'est pas.
   const matches = (requestParams = {}) =>
     requestParams.limit === pageSize &&
     requestParams.page === 1 &&
     requestParams.status === 'open' &&
     !requestParams.q &&
     !requestParams.category &&
+    !requestParams.country &&
     !requestParams.mine &&
     !requestParams.ids;
 

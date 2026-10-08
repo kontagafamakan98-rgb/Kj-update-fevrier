@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Link from "./components/LienVue";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { LanguageProvider, useLanguage } from "./contexts/LanguageContext";
@@ -8,6 +9,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { CountryProvider } from "./contexts/CountryContext";
 import { NotificationProvider } from './contexts/NotificationContext';
 import Navbar from "./components/Navbar";
+import { MarqueKojo } from "./config/marque-kojo";
 import NotificationPanel from "./components/NotificationPanel";
 import CountryChangePopup from "./components/CountryChangePopup";
 import OfflineIndicator from "./components/OfflineIndicator";
@@ -34,6 +36,9 @@ const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Privacy = lazy(() => import("./pages/Privacy"));
+// Les CGU, en page citable (le pied de page et les écrans d'inscription y
+// renvoyaient par un .docx fusionné : un crawler n'en lisait rien).
+const Terms = lazy(() => import("./pages/Terms"));
 
 // Lazy load protected pages (loaded only when needed after authentication)
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -43,8 +48,15 @@ const Messages = lazy(() => import("./pages/Messages"));
 const Profile = lazy(() => import("./pages/Profile"));
 const CreateJob = lazy(() => import('./pages/CreateJob'));
 
-// Lazy load test and demo pages (rarely used)
-const MobileTest = lazy(() => import('./pages/MobileTest'));
+// Lazy load test and demo pages (rarely used).
+// MobileTest (et son composant MobilePhotoTest) n'existe qu'en DÉV : la route
+// est déjà gardée par import.meta.env.DEV plus bas, mais un `lazy()` au niveau
+// MODULE fait ÉMETTRE le chunk en production — et ce chunk porte une origine
+// TIERCE (`picsum.photos`, ses images d'exemple). Conditionner la DÉCLARATION
+// retire le chunk du graphe de build : en prod, `MobileTest` vaut `null` et la
+// route n'est pas montée (la branche `import.meta.env.DEV &&` l'élimine). PhotoTest
+// reste inconditionnel : `/photo-debug` l'utilise en production (owner-only).
+const MobileTest = import.meta.env.DEV ? lazy(() => import('./pages/MobileTest')) : null;
 const PhotoTest = lazy(() => import('./pages/PhotoTest'));
 const Payment = lazy(() => import('./pages/Payment'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -123,9 +135,9 @@ function MobileLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-orange-600 to-orange-700">
       <div className="text-center">
-        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <span className="text-3xl font-bold text-orange-600">{t('brandMark')}</span>
-        </div>
+        {/* La marque, en orange sur la pastille blanche : le même tracé que
+            partout ailleurs (src/config/marque-kojo.js). */}
+        <MarqueKojo emplacement="ouverture" />
         <div className="text-white text-2xl font-bold mb-2">Kojo</div>
         <div className="text-orange-200 text-sm mb-6">Afrique de l’Ouest</div>
         <div className="flex justify-center space-x-2">
@@ -140,7 +152,6 @@ function MobileLoader() {
 
 function LegalFooter() {
   const { t } = useLanguage();
-  const legalDocumentUrl = '/legal/kojo_politique_confidentialite_et_cgu_fusionnees.docx';
   // Les libellés du pied de page sont des CLÉS i18n (src/i18n/*.json), les
   // mêmes que celles que publie la coquille statique de l'accueil : cette
   // carte locale était un troisième domicile pour « Itinéraire », « Conditions
@@ -195,9 +206,9 @@ function LegalFooter() {
           <Link to="/privacy" className="hover:text-orange-800 underline underline-offset-2">
             {t('footerPrivacy')}
           </Link>
-          <a href={legalDocumentUrl} target="_blank" rel="noreferrer" className="hover:text-orange-800 underline underline-offset-2">
+          <Link to="/terms" className="hover:text-orange-800 underline underline-offset-2">
             {t('footerTerms')}
-          </a>
+          </Link>
           {SOCIAL_LINKS.map((social) => (
             <a
               key={social.key}
@@ -285,7 +296,13 @@ function AppRoutes() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative flex flex-col">
+    // Le fond de l'application prend le SABLE du site (`fond-sable`,
+    // src/index.css) : c'était le dernier `bg-gray-50` de la coquille — le
+    // gris froid de la gamme Tailwind, celui qui donnait aux pages
+    // d'application une autre couleur de papier que le site public. Les pages
+    // pré-rendues posent leur propre fond, donc ce changement ne touche que
+    // celles qui n'en posaient pas.
+    <div className="min-h-screen fond-sable relative flex flex-col">
       {/* Network Status and Offline Indicator */}
       <NetworkStatus />
       <OfflineIndicator />
@@ -330,6 +347,7 @@ function AppRoutes() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
             <Route path="/login" element={
               <Suspense fallback={<LoginSkeleton />}>
                 <Login />

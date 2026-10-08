@@ -26,6 +26,33 @@
  *     tout `<main>` republié = ×0,99, le héros publié trois fois = +3 %.
  *   • REACT N'EST PAS LE COÛT DU DOCUMENT : +25,8 ms de style et +51,3 ms de
  *     layout sur l'accueil (647 → 724 ms).
+ *   • LES GLYPHES EMOJI ÉTAIENT LE COÛT, ET ILS SONT PARTIS (26/09/2026) : les
+ *     remplacer par un caractère latin retire ~194 à 202 ms sur l'accueil mobile
+ *     (~31 %), à hauteur et nœuds inchangés. Appliqué (icônes SVG,
+ *     src/config/page-icons.js), le document d'accueil est passé de 639 à 467 ms
+ *     (mobile cpu×4) — la sonde ci-dessous le republie à chaque passage.
+ *     ÉTENDU le même jour aux quatre pages qui en publiaient encore (À propos,
+ *     Comment ça marche, Support, Contact) et aux quatre glyphes du bloc de
+ *     contact de l'accueil, mesuré ENTRELACÉ (25-30 tours) : /contact −22,8 %
+ *     et /support −17,9 % en mobile, /about −5,4 % et /how-it-works −4,6 %. Le
+ *     gain suit la MATIÈRE : ~8 à 10 ms par emoji mobile, donc une page qui en
+ *     porte trois n'en gagne que ~13.
+ *   • LEVIER CSS APPLIQUÉ (26/09/2026) : `content-visibility: auto` PLUS un
+ *     `contain-intrinsic-size` EXACT par section (la hauteur de CONTENU mesurée,
+ *     héros exclu) sur les neuf sections sous la ligne de flottaison de
+ *     l'accueil. Mesuré entrelacé (15 tours, mobile cpu×4) : 419,8 → 319,3 ms,
+ *     −100,5 ms (−24 %) ; hauteur du document inchangée (7 080 / 4 783 px contre
+ *     une référence de 7 079 / 4 782), et la sonde ci-dessous republie ce coût à
+ *     chaque passage (~316 ms mobile) sans le juger. Depuis que la police est
+ *     SERVIE par le site (26/09/2026), les constantes de repli ont été
+ *     re-mesurées : le document mesure 7 187 px (mobile) et 4 868 px (desktop)
+ *     avec la règle (le titre du héros rendu concret a ajouté ~60 px en desktop
+ *     le 26/09/2026).
+ *   • CE QUI SE MESURE S'ENTRELACE. Une variante mesurée à la suite d'une autre
+ *     hérite de la DÉRIVE de l'hôte : la réorganisation de la pile de polices
+ *     montrait −54 ms en séquentiel, et +15 ms en ENTRELACÉ (25 runs) — c'était
+ *     la dérive. Un écart de quelques dizaines de ms se lit en alternant les
+ *     variantes à chaque tour, jamais en mesurant l'une après l'autre.
  *
  * ── Ce que la CI a appris à cette sonde, et ce qu'elle juge désormais ───────
  * Le premier verdict portait sur le TEMPS (0,6 × à 1,5 × le relevé du poste). Au
@@ -53,7 +80,7 @@
  * `src/config/page-meta.js` : une route ajoutée sans référence rougit ici.
  */
 import { test, expect } from '@playwright/test';
-import { ROUTES, ouvrirLaPage } from './helpers/geometrie.js';
+import { ROUTES, ouvrirLaPage, attendreLaStabilite } from './helpers/geometrie.js';
 import budgets from '../scripts/style-layout-budgets.cjs';
 
 const { CONDITIONS, MESURE, MESURE_CI, NOEUDS, HAUTEUR, plancherNoeudsDe, plancherHauteurDe } = budgets;
@@ -71,7 +98,7 @@ async function relever(browser, chemin, condition) {
   await session.send('Performance.enable');
   if (condition.cpu > 1) await session.send('Emulation.setCPUThrottlingRate', { rate: condition.cpu });
   await page.goto(chemin, { waitUntil: 'load' });
-  await page.waitForTimeout(400);
+  await attendreLaStabilite(page);
   const dom = await page.evaluate(() => ({
     noeuds: document.querySelectorAll('*').length,
     hauteur: document.documentElement.scrollHeight,
@@ -132,14 +159,15 @@ test.describe('le document pré-rendu : sa structure publiée, son coût publié
         // ── La coquille publie-t-elle toujours son corps ? ────────────────
         // Un document qui perd sa matière perd d'abord ses NŒUDS, et c'est la
         // seule direction que les mutations savent faire rougir : l'accueil
-        // amputé de ses neuf dernières sections tombe de 279 à 27 nœuds.
+        // amputé de ses NEUF dernières sections tombe de 447 à 123 nœuds (le
+        // rejeu est dans e2e/style-layout-preuve-echec.spec.js).
         const plancherNoeuds = plancherNoeudsDe(noeudsReference);
         expect(
           mesure.noeuds,
           `${chemin} (${condition.nom}) : ${mesure.noeuds} nœuds peints, sous le plancher de ${plancherNoeuds} ` +
             `(${budgets.BORNE_STRUCTURE} × les ${noeudsReference} nœuds du relevé) — la coquille a perdu son corps, ` +
             'et c’est une régression du contrat SEO / sans-JavaScript (mesuré : accueil amputé de ses neuf dernières ' +
-            `sections, 279 → 105 nœuds et 7 075 → 1 125 px). La hauteur, elle, mesure ${mesure.hauteur} px ` +
+            `sections, 447 → 123 nœuds et 7 929 → 1 443 px). La hauteur, elle, mesure ${mesure.hauteur} px ` +
             `(plancher ${plancherHauteurDe(hauteurReference)} px). ` +
             'Un nœud ne dépend pas de la machine : c’est ce qui décide ici.'
         ).toBeGreaterThanOrEqual(plancherNoeuds);

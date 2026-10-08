@@ -414,21 +414,29 @@ export const SIGNATURE_DE_STABILITE = () => {
 };
 
 /**
+ * Pas d'échantillonnage par défaut pour sonder la stabilité de la mise en page.
+ * Ce délai n'est pas un verdict d'attente fixe : c'est la fréquence d'échantillonnage
+ * de la condition de stabilité (deux signatures successives identiques).
+ */
+export const PAS_ECHANTILLONNAGE_STABILITE_MS = 250;
+
+/**
  * Attend que la signature de mise en page se répète (ou renonce au bout de
  * `maxMs`, pour que le test échoue sur la COMPARAISON et non sur une attente
  * muette).
  *
  * @param {import('@playwright/test').Page} page Page ouverte sur une route.
  * @param {number} [maxMs] Plafond d'attente en millisecondes.
+ * @param {number} [pasMs] Intervalle entre deux vérifications de la signature.
  */
-export async function attendreLaStabilite(page, maxMs = 6000) {
+export async function attendreLaStabilite(page, maxMs = 6000, pasMs = PAS_ECHANTILLONNAGE_STABILITE_MS) {
   const debut = Date.now();
   let precedente = null;
   while (Date.now() - debut < maxMs) {
     const courante = await page.evaluate(SIGNATURE_DE_STABILITE);
     if (precedente !== null && courante === precedente) return true;
     precedente = courante;
-    await page.waitForTimeout(250);
+    await new Promise((resolve) => setTimeout(resolve, pasMs));
   }
   return false;
 }

@@ -18,7 +18,15 @@
  *      ce chunk à 87 044 o / 29 538 o gzip (−82 %), et son initialisation est
  *      désormais différée après interaction (voir src/utils/sentry.js).
  *   2. PLUS GROS CHUNK — mesure : vendor-leaflet 47,5 Ko gzip.
- *   3. BUILD TOTAL (brut, tous fichiers) — mesure : 2,28 Mo.
+ *   3. BUILD TOTAL (brut, tous fichiers) — mesure du 29/09/2026 : 4,28 Mo,
+ *      dont ~1 Mo d'IMAGES DE CONTENU (les six photos du héros, 561 Ko, et les
+ *      quatre de la galerie, 452 Ko) et ~1,5 Mo de la MÊME feuille de styles
+ *      pré-rendue recopiée dans les 22 pages (69 Ko × 22) : le total est donc un
+ *      budget de CONTENU autant que de code, et il suit une page ou une photo
+ *      ajoutée. Il est relevé de 4,00 à 4,50 Mo pour cette raison, mesurée (voir
+ *      le commentaire de BUDGETS.totalRaw) — les trois autres budgets, qui
+ *      gardent la STRUCTURE (chemin critique, plus gros chunk, unité paresseuse),
+ *      ne bougent pas d'un octet.
  *   4. CHUNKS À LA DEMANDE — un chunk listé dans CHUNKS_A_LA_DEMANDE ne doit
  *      être atteignable que par `import()` dynamique. Un budget de TAILLE ne
  *      peut pas attraper cette régression : le chunk existe et pèse pareil dans
@@ -49,10 +57,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // Budgets en OCTETS (Ko = 1024). Toute modification doit s'accompagner d'une
 // mesure du build réel et d'une explication dans le message de commit.
+//
+// `totalRaw` est passé de 4,00 à 4,50 Mo le 29/09/2026, et la mesure est écrite
+// ici pour que la raison survive au commit : build mesuré à 4,28 Mo, dont
+// ~950 Ko d'IMAGES DE CONTENU — les six photos du héros de l'accueil (561 Ko
+// après ré-échantillonnage, voir src/config/photos-heros.js) et les quatre de la
+// galerie (452 Ko). Ce budget n'a jamais été un budget de CODE : le code, lui,
+// est borné par les trois autres (JS initial, plus gros chunk, unité paresseuse),
+// qui n'ont pas bougé. Un total qui inclut le contenu doit donc suivre le
+// contenu — mais il doit le DIRE, et c'est à ça que sert ce paragraphe.
 export const BUDGETS = {
   initialGzip: 130 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
-  totalRaw: 4 * 1024 * 1024, // build/ entier, brut
+  totalRaw: 4.5 * 1024 * 1024, // build/ entier, brut (voir la mesure ci-dessus)
 };
 
 const ko = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;

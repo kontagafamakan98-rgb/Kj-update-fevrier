@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { safeLog } from '../utils/env';
 
@@ -59,7 +60,7 @@ class ErrorBoundaryInner extends React.Component {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
-            <div className="text-6xl mb-4">😵</div>
+            <AlertTriangle className="mx-auto mb-4 h-14 w-14 text-red-500" aria-hidden="true" />
             <h2 className="text-xl font-bold text-gray-800 mb-2">{t('unexpectedErrorTitle')}</h2>
             <p className="text-gray-600 mb-4">{t('unexpectedErrorText')}</p>
             <button onClick={() => window.location.reload()} className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">{t('refreshPage')}</button>

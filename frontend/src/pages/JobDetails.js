@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
@@ -14,6 +16,7 @@ import { formatBudgetRange, formatJobDate, formatJobStatus, isOwnedByCurrentUser
 import { normalizeJobRecord } from '../utils/jobDisplayBridge';
 import JobReviews from '../components/JobReviews';
 import { JobDetailsSkeleton } from '../components/SkeletonLoader';
+import { MapPin, ShieldCheck } from 'lucide-react';
 import { VerifiedBadge, WorkerTrustBadge } from '../utils/workerTrustLevel';
 import { usePageTitle, usePageOpenGraph, absoluteUrl } from '../utils/seo';
 import { jobSeo } from '../utils/jobSeo';
@@ -59,7 +62,11 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
   const workerPerson = proposal?.worker || proposal?.worker_profile || proposal;
 
   return (
-    <div className={`rounded-xl border p-4 shadow-sm ${isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-gray-100 bg-white'}`}>
+    // Le `shadow-sm` est retiré mais la CARTE à filet ne peut pas être posée ici :
+    // ses deux états (sélectionné / non) se distinguent par `border-orange-300`
+    // et `bg-orange-50/40`, deux utilitaires que `.carte-editoriale` ÉCRASERAIT
+    // (une feuille non posée dans une couche l'emporte sur les utilitaires).
+    <div className={`rounded-lg border p-4 ${isSelected ? 'border-orange-300 bg-orange-50/40' : 'border-gray-100 bg-white'}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
@@ -102,7 +109,7 @@ function ProposalCard({ proposal, isSelected, isAccepted, onOpenDiscussion, onAc
 function MessageBubble({ message, isCurrentUser, authorName }) {
   return (
     <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${isCurrentUser ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
+      <div className={`max-w-[85%] rounded-lg px-4 py-3 text-sm ${isCurrentUser ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
         <div className={`mb-1 text-xs font-semibold ${isCurrentUser ? 'text-orange-100' : 'text-gray-500'}`}>
           {authorName}
         </div>
@@ -543,10 +550,10 @@ export default function JobDetails() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="carte-editoriale p-6">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
+                <h1 className="titre-page mb-2">{job.title}</h1>
                 <div className="flex items-center gap-4 flex-wrap">
                   {(() => {
                     const isCompleted = job.status === 'completed';
@@ -558,19 +565,19 @@ export default function JobDetails() {
                         ? 'bg-orange-50 text-orange-700 border-orange-200'
                         : 'bg-gray-50 text-gray-700 border-gray-200';
                     return (
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium border ${badgeClass}`}>
+                      <span className={`px-3 py-1 rounded-lg text-sm font-medium border ${badgeClass}`}>
                         {label}
                       </span>
                     );
                   })()}
                   <span className="text-sm text-gray-500">{t('jobUiPublishedOnPrefix')} {publishedLabel}</span>
                   {hasApplied && !isJobOwner && (
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="px-3 py-1 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {pageT('proposalSentBadge')}
                     </span>
                   )}
                   {assignedToCurrentWorker && (
-                    <span className="px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="px-3 py-1 rounded-lg text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                       {pageT('youAreAssigned')}
                     </span>
                   )}
@@ -669,7 +676,7 @@ export default function JobDetails() {
                     ))}
                   </div>
 
-                  <div className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium ${statusBadge.className}`}>
+                  <div className={`mt-4 inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium ${statusBadge.className}`}>
                     {paymentStatusLoading ? t('payStatusChecking') : statusBadge.text}
                   </div>
 
@@ -699,7 +706,7 @@ export default function JobDetails() {
 
             {job.shared_location?.maps_url && (
               <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
-                <span className="text-sm text-orange-800">📍 {t('sharedPositionText')}</span>
+                <span className="text-sm text-orange-800"><MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {t('sharedPositionText')}</span>
                 <a href={job.shared_location.maps_url} target="_blank" rel="noreferrer" className="flex-shrink-0 text-sm font-semibold text-orange-700 underline underline-offset-2">
                   {t('viewOnMap')}
                 </a>
@@ -707,18 +714,23 @@ export default function JobDetails() {
             )}
           </div>
 
-          {/* Bandeau de confiance : le paiement séquestré est LE différenciateur */}
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
+          {/* Bandeau de confiance : le paiement séquestré est LE différenciateur.
+              Il quitte le VERT d'eau pour l'ENCART du site (filet gauche orange,
+              fond sable, src/index.css) — le même bloc que la confiance de
+              /about, et la même raison : une tache d'une teinte que le site
+              n'emploie nulle part ailleurs dit « ceci est d'un autre produit »,
+              ce qui est exactement le contraire d'un bandeau de confiance. */}
+          <div className="encart">
             <div className="flex items-start gap-3">
-              <span className="text-2xl">🛡️</span>
+              <ShieldCheck className="h-6 w-6 text-orange-600" aria-hidden="true" />
               <div>
-                <div className="font-semibold text-emerald-800">{t('escrowBannerTitle')}</div>
-                <p className="text-sm text-emerald-700 mt-1">
+                <div className="font-semibold">{t('escrowBannerTitle')}</div>
+                <p className="text-sm text-stone-600 mt-1">
                   {t('escrowBannerText')}
                 </p>
                 <Link
                   to="/how-it-works"
-                  className="mt-2 inline-block text-sm font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-800"
+                  className="mt-2 inline-block text-sm font-semibold text-orange-700 underline underline-offset-2 hover:text-orange-800"
                 >
                   {t('howItWorksLink')}
                 </Link>
@@ -726,13 +738,13 @@ export default function JobDetails() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="carte-editoriale p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiDescription')}</h2>
             <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
           </div>
 
           {isJobOwner && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="carte-editoriale p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiReceivedProposals')}</h2>
               {proposals.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-sm text-gray-500">
@@ -761,7 +773,7 @@ export default function JobDetails() {
           )}
 
           {discussionTarget?.id && (
-            <div id="job-discussion" ref={discussionSectionRef} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <div id="job-discussion" ref={discussionSectionRef} className="carte-editoriale p-6 space-y-4">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">
@@ -772,7 +784,7 @@ export default function JobDetails() {
                   </p>
                 </div>
                 {proposalAccepted && (
-                  <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                  <div className="inline-flex rounded-lg bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
                     {pageT('proposalAssigned')}
                   </div>
                 )}
@@ -792,7 +804,7 @@ export default function JobDetails() {
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{messageSuccess}</div>
               )}
 
-              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 min-h-[180px] space-y-3">
+              <div className="carte-editoriale p-4 min-h-[180px] space-y-3">
                 {messagesLoading ? (
                   <div className="text-sm text-gray-500">{pageT('loadingDiscussion')}</div>
                 ) : visibleMessages.length === 0 ? (
@@ -845,7 +857,7 @@ export default function JobDetails() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="carte-editoriale p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiInformation')}</h2>
             <div className="space-y-3 text-gray-700">
               <div>{job.location_text}</div>
@@ -854,9 +866,9 @@ export default function JobDetails() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="carte-editoriale p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{t('jobUiClient')}</h2>              <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
+              <div className="pastille-rond pastille-rond-large font-bold">
                 {String(job.client_name || 'C').charAt(0).toUpperCase()}
               </div>
               <div>
@@ -870,7 +882,7 @@ export default function JobDetails() {
           </div>
 
           {!isJobOwner && currentUserProposal && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="carte-editoriale p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">{pageT('yourProposal')}</h2>
               <div className="space-y-2 text-sm text-gray-700">
                 {currentUserProposal?.proposed_amount && <div><span className="font-semibold">{pageT('amountLabel')}</span> {formatBudgetRange(currentUserProposal.proposed_amount, null)}</div>}

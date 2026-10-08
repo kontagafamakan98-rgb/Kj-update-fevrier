@@ -47,6 +47,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { CONTACT } from '../src/config/contact.js';
+import { PAGE_SECTIONS, couperLeTitre } from '../src/config/page-sections.js';
 import { COUNTRY_PLACEHOLDER } from '../src/config/country-placeholder.js';
 import {
   PHONE_NUMBER_MASK,
@@ -320,6 +321,20 @@ export const valeursDerivees = (frontendDir) => {
     for (const valeur of Object.values(dictionnaire)) {
       if (typeof valeur === 'string') mots.add(valeur);
     }
+    // ── LES DEUX MOITIÉS DU TITRE DU HÉROS ─────────────────────────────
+    // Le titre de l'accueil est publié en DEUX fragments par les deux canaux
+    // (le plan le coupe sur sa virgule pour porter la seconde moitié en
+    // italique : voir `couperLeTitre`, src/config/page-sections.js). Ce ne sont
+    // pas des textes nouveaux : c'est le texte du dictionnaire, coupé par la
+    // MÊME fonction des deux côtés — la moitié n'est donc pas une copie
+    // écrite à la main, c'est une valeur CALCULÉE, et elle se déclare ici comme
+    // les exemples de téléphone ou la date du jour.
+    const titreDuHeros = dictionnaire[PAGE_SECTIONS['/'].titleKey];
+    if (typeof titreDuHeros === 'string') {
+      for (const moitie of couperLeTitre(titreDuHeros)) {
+        if (moitie) derivees.add(normaliser(moitie));
+      }
+    }
   }
   for (const prefixe of ['', PHONE_PREFIX_FALLBACK, PHONE_NUMBER_MASK]) {
     mots.add(prefixe);
@@ -449,10 +464,13 @@ export const divergencesDeProvenance = ({ coquilles, atomes, derivees = new Set(
  * SEULE à la fois :
  *
  *   * PORTEUR PARTAGÉ — une clé du dictionnaire le détient et les deux canaux la
- *     résolvent : le plan la nomme (`escrowIconKey`, `step1NumberKey`…), la page
- *     l'affiche par `t()`, la coquille par `T()`. C'est le cas du logo
- *     (`brandMark`), des numéros d'étape (`stepNumber1..3`), des glyphes `icon*`
- *     et du repère de la FAQ (`faqMarker`).
+ *     résolvent : le plan la nomme (`step1NumberKey`…), la page l'affiche par
+ *     `t()`, la coquille par `T()`. C'est le cas du logo (`brandMark`), des
+ *     numéros d'étape (`stepNumber1..3`) et du repère de la FAQ (`faqMarker`).
+ *     Les glyphes `icon*` du dictionnaire (📜 ⚠️ 👤…), eux, ne sont PLUS publiés
+ *     par aucune coquille depuis le 26/09/2026 : ils sont DESSINÉS (icônes SVG,
+ *     voir plus bas). Ils restent au dictionnaire comme valeurs INTERDITES en
+ *     littéral (`GLYPHES_INTERDITS`, check-prerender-shells).
  *   * EXEMPTION DOCUMENTÉE — la valeur n'est pas un glyphe du produit : le
  *     SUFFIXE d'un chiffre (`1 000+`, partie du nombre), ou la ponctuation de
  *     mise en page (` · `), qui n'a pas de clé parce qu'elle n'est pas du texte.
@@ -460,11 +478,13 @@ export const divergencesDeProvenance = ({ coquilles, atomes, derivees = new Set(
  *     une exemption devenue inutile rougit.
  *
  * Tous les AUTRES glyphes que le plan détenait en littéral (catégories, promesses,
- * étapes, cartes d'À propos, modes et lignes du support) sont déclarés par leur
- * clé (`iconCategoryGeneral`, `iconContactWhatsapp`…) et résolus par les deux
- * canaux : le plan ne porte plus un seul octet de glyphe. La règle 1 ci-dessous
- * reste la garde de ce mouvement — elle refuse la RÉINTRODUCTION d'un littéral —
- * et la règle 4 vérifie que chaque clé qu'il déclare a bien un propriétaire.
+ * étapes, cartes d'À propos, modes et lignes du support, cartes de type de
+ * compte, notices, sélecteur de pays…) sont désormais DESSINÉS — `icone` dans une
+ * liste, `*Icon` au niveau route — et résolus par le même registre
+ * (src/config/page-icons.js) : le plan ne porte plus un seul octet de glyphe. La
+ * règle 1 ci-dessous reste la garde de ce mouvement — elle refuse la
+ * RÉINTRODUCTION d'un littéral — et la règle 4 vérifie que chaque exemption
+ * déclarée est encore utile.
  *
  * Les deux défauts refusés : un littéral du plan qui RECOPIE la valeur d'une clé
  * (changer la clé laisserait la copie derrière, en silence — c'était le cas du
@@ -488,7 +508,7 @@ const dictionnaire = (frontendDir, langue = 'fr') =>
 /**
  * Les CLÉS du dictionnaire. Un littéral qui EST une clé n'est pas de la copie :
  * c'est le NOM de la clé, c'est-à-dire la façon dont une coquille résout son
- * texte (`T('login')`, `plan.escapRowIconKey`). Un texte affiché, lui, n'est
+ * texte (`T('login')`, `plan.step1NumberKey`). Un texte affiché, lui, n'est
  * jamais un nom de clé.
  */
 export const clesDuDictionnaire = (frontendDir, langue = 'fr') =>
@@ -587,14 +607,10 @@ const sourcesDesCanaux = (frontendDir) => {
 };
 
 export const MARQUEURS_EN_EXEMPTION = [
-  {
-    valeur: '+',
-    sorte: 'plan',
-    motif:
-      "suffixe d'un chiffre, dans la composition d'un chiffre affiché (`1 000+`, `500+`) : " +
-      "ce n'est pas un glyphe mais une partie du NOMBRE, donc il reste au plan — le repère " +
-      'du dépliant de la FAQ, lui, est la clé `faqMarker`',
-  },
+  // L'exemption de « + » (suffixe d'un chiffre : `1 000+`, `500+`) a été RETIRÉE
+  // avec les compteurs inventés de l'accueil (26/09/2026, règle « pas de faux
+  // compteurs ») : plus aucun « + » n'est publié ni déclaré, donc l'exemption
+  // était devenue PÉRIMÉE — et le garde la refuse précisément pour ça.
   {
     valeur: '·',
     sorte: 'publie',
@@ -606,6 +622,29 @@ export const MARQUEURS_EN_EXEMPTION = [
       'périmètre de cette passe',
   },
 ];
+
+/**
+ * Le champ d'une entrée du plan qui nomme une icône DESSINÉE — l'autre façon,
+ * depuis le 26/09/2026, de donner un domicile à un glyphe : on ne le publie plus
+ * comme un caractère (emoji), on le DESSINE. Deux formes : `icone: 'nom'` dans
+ * une LISTE d'entrées (catégories, étapes, lignes de contact…) et un champ de
+ * niveau ROUTE terminé par `Icon` (`legalNoticeIcon`, `clientIcon`…) — la
+ * dernière vague, /login, /register, /forgot-password et /payment. Le nom doit
+ * exister dans le registre, sinon `IconePage` lève au build.
+ */
+const CHAMP_ICONE_DESSINEE = /(?:\bicone|\b\w+Icon): '([^']*)'/;
+
+/** Les icônes dessinées déclarées par le plan, avec leur ligne. */
+export const iconesDuPlan = (frontendDir) => {
+  const sortie = [];
+  readFileSync(path.join(frontendDir, PLAN_DES_SECTIONS), 'utf8')
+    .split('\n')
+    .forEach((ligne, index) => {
+      const trouve = ligne.match(CHAMP_ICONE_DESSINEE);
+      if (trouve) sortie.push({ nom: trouve[1], ligne: index + 1 });
+    });
+  return sortie;
+};
 
 /** Les clés de glyphe déclarées par le plan, avec leur ligne. */
 export const clesDeGlypheDuPlan = (frontendDir) => {
@@ -640,7 +679,7 @@ export const divergencesDeMarqueur = ({
   const derivees = valeursDerivees(frontendDir);
   // Les littéraux des deux canaux : un marqueur est à porteur partagé si la clé
   // qui le détient est NOMMÉE dans un littéral — par le plan
-  // (`escrowIconKey: 'iconEscrow'`) ou par un module qui la résout
+  // (le plan nomme la clé du marqueur) ou par un module qui la résout
   // (`T('brandMark')`, y compris à l'intérieur d'un gabarit). Les commentaires
   // sont écartés, donc une clé citée dans un commentaire ne prouve rien.
   const canaux = [...sourcesDesCanaux(frontendDir)].join('\n');

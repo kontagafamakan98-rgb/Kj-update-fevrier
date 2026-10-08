@@ -55,22 +55,28 @@ export default defineConfig({
     //     molette et l'ouverture du tiroir : trois gestes qui dépendent du
     //     moteur pour des raisons différentes (re-mise en page, défilement
     //     inertiel, capture du premier appui) ;
-    //   • `carte-accueil` — l'appui qui monte la carte tierce : ce qu'on mesure
+    //   • `carte-facade` — l'appui qui monte la carte tierce : ce qu'on mesure
     //     est l'instant où la requête PART, et il n'est pas le même d'un moteur
     //     à l'autre (un moteur qui préchargerait l'iframe ferait payer le tiers
-    //     au premier écran).
+    //     au premier écran). Ce parcours a remplacé `carte-accueil`, supprimé
+    //     avec la refonte de l'accueil (#152/#157) : le registre a suivi, et
+    //     c'est le garde qui l'a exigé ;
+    //   • `tiers-apres-interaction` — le geste APRÈS lequel le seul tiers
+    //     autorisé est contacté : ce qui dépend du moteur est l'ORDRE entre la
+    //     requête du geste et la peinture, donc la fenêtre dans laquelle la
+    //     sonde lit le journal.
     //
     // Le périmètre est tenu par `scripts/__tests__/check-moteurs-gestes.test.js` :
     // un parcours qui mesurerait un geste sans être rejoué ici est REFUSÉ — le
     // figer en commentaire l'aurait laissé dériver.
     {
       name: 'firefox',
-      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-accueil)\.spec\.js/,
+      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-facade|tiers-apres-interaction)\.spec\.js/,
       use: { ...devices['Desktop Firefox'] },
     },
     {
       name: 'webkit',
-      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-accueil)\.spec\.js/,
+      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-facade|tiers-apres-interaction)\.spec\.js/,
       use: { ...devices['Desktop Safari'] },
     },
   ],

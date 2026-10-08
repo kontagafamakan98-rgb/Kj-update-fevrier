@@ -173,7 +173,7 @@ export default function RobotChat({ onBack }) {
               key={motif}
               type="button"
               onClick={() => setInputValue(motif)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${inputValue === motif ? 'border-orange-600 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${inputValue === motif ? 'border-orange-600 bg-orange-50 text-orange-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
             >
               {motif}
             </button>

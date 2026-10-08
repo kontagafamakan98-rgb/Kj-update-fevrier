@@ -81,17 +81,19 @@ describe('la règle du périmètre, sur l’arbre réel', () => {
   it('les gestes DÉTECTÉS sont nommés, geste par geste — un vert sans sujet n’est pas un vert', () => {
     expect(parcoursDetectes(ARBRE.specs).map(({ fichier, gestes }) => `${fichier} : ${gestes.join(' + ')}`).sort()).toEqual([
       'barres-rupture.spec.js : molette + bascule de taille',
-      'carte-accueil.spec.js : appui au doigt',
+      'carte-facade.spec.js : appui au doigt',
       'notifications.spec.js : appui au doigt + bascule de taille',
+      'tiers-apres-interaction.spec.js : appui au doigt',
     ]);
   });
 
-  it('le registre porte les quatre parcours, y compris celui dont le geste n’est pas détectable', () => {
+  it('le registre porte les cinq parcours, y compris ceux dont le geste n’est pas détectable', () => {
     expect(PARCOURS_DE_GESTE.map(({ fichier }) => fichier)).toEqual([
       'appuis-exterieurs.spec.js',
       'notifications.spec.js',
       'barres-rupture.spec.js',
-      'carte-accueil.spec.js',
+      'carte-facade.spec.js',
+      'tiers-apres-interaction.spec.js',
     ]);
   });
 
@@ -143,14 +145,14 @@ describe('la règle du périmètre, refus par refus', () => {
   });
 
   it('refuse un fichier du registre que le testMatch a lâché', () => {
-    const config = ARBRE.config.replace(/\|carte-accueil/g, '');
+    const config = ARBRE.config.replace(/\|carte-facade/g, '');
     expect(refusDuPerimetreMoteurs({ ...ARBRE, config }).join('\n')).toContain(
-      '`carte-accueil.spec.js` est au registre des gestes sans être rejoué par les projets moteurs'
+      '`carte-facade.spec.js` est au registre des gestes sans être rejoué par les projets moteurs'
     );
   });
 
   it('refuse un fichier rejoué par les moteurs mais absent du registre', () => {
-    const config = ARBRE.config.replace(/carte-accueil/g, 'carte-accueil|sinueux');
+    const config = ARBRE.config.replace(/carte-facade/g, 'carte-facade|sinueux');
     const specs = [...ARBRE.specs, { fichier: 'sinueux.spec.js', source: 'publier(test, "x", 1);' }];
     expect(refusDuPerimetreMoteurs({ ...ARBRE, config, specs }).join('\n')).toContain(
       '`sinueux.spec.js` est rejoué par les projets moteurs sans figurer au registre des gestes'
@@ -224,12 +226,12 @@ describe('le garde, en sous-processus, sur les arbres fixtures', () => {
     "    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },",
     '    {',
     "      name: 'firefox',",
-    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-accueil)\\.spec\\.js/,',
+    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-facade|tiers-apres-interaction)\\.spec\\.js/,',
     "      use: { ...devices['Desktop Firefox'] },",
     '    },',
     '    {',
     "      name: 'webkit',",
-    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-accueil)\\.spec\\.js/,',
+    '      testMatch: /(appuis-exterieurs|notifications|barres-rupture|carte-facade|tiers-apres-interaction)\\.spec\\.js/,',
     "      use: { ...devices['Desktop Safari'] },",
     '    },',
     '  ],',
@@ -239,14 +241,15 @@ describe('le garde, en sous-processus, sur les arbres fixtures', () => {
 
   const CI = 'run: npx playwright install --with-deps chromium firefox webkit\n';
 
-  /** Les quatre parcours du registre, chacun publiant, plus des parcours hors périmètre. */
+  /** Les cinq parcours du registre, chacun publiant, plus des parcours hors périmètre. */
   const SPECS_PROPRES = {
     'appuis-exterieurs.spec.js': "await page.locator('a').click();\npublier(test, 'appuis nécessaires', 1);\n",
     'notifications.spec.js': 'await page.setViewportSize({ width: 500, height: 900 });\npublier(test, "n", 1);\n',
     'barres-rupture.spec.js': 'await page.mouse.wheel(0, 900);\npublier(test, "w", 1);\n',
-    'carte-accueil.spec.js': 'await bouton.tap();\npublier(test, "c", 1);\n',
+    'carte-facade.spec.js': 'await bouton.tap();\npublier(test, "c", 1);\n',
+    'tiers-apres-interaction.spec.js': 'await bouton.tap();\npublier(test, "t", 1);\n',
     ...Object.fromEntries(
-      Array.from({ length: MIN_SPECS - 4 }, (_, i) => [`hors-perimetre-${i}.spec.js`, 'const x = 1;\n'])
+      Array.from({ length: MIN_SPECS - 5 }, (_, i) => [`hors-perimetre-${i}.spec.js`, 'const x = 1;\n'])
     ),
   };
 
@@ -265,10 +268,10 @@ describe('le garde, en sous-processus, sur les arbres fixtures', () => {
   it('sort 0 sur un arbre propre, et PUBLIE ce qu’il a lu', () => {
     const { frontend, fichierCi } = ecrireArbre({ nom: 'propre', config: CONFIG, specs: SPECS_PROPRES, ci: CI });
     const { code, sortie } = lancerGarde({ frontend, fichierCi });
-    expect(sortie).toContain('✅ Les trois moteurs couvrent le même périmètre (4 parcours)');
+    expect(sortie).toContain('✅ Les trois moteurs couvrent le même périmètre (5 parcours)');
     expect(code).toBe(0);
     // Le sujet est chiffré : sans ces comptes, un vert ne dirait pas ce qu'il a lu.
-    expect(sortie).toContain('4 parcours rejoués sur chromium, firefox et webkit');
+    expect(sortie).toContain('5 parcours rejoués sur chromium, firefox et webkit');
     expect(sortie).toContain('barres-rupture.spec.js (molette)');
   });
 

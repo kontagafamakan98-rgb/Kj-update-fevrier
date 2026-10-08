@@ -44,9 +44,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { metaContent, shellFileFor } from './site-meta.js';
+import { texteVisible } from './texte-visible.js';
 // La liste des pages pré-rendues est DÉRIVÉE de la table des textes : c'était une
 // seconde déclaration des mêmes pages que le build (voir PRERENDERED_PAGES).
 import { PAGE_META } from '../src/config/page-meta.js';
+import { PAGE_SECTIONS } from '../src/config/page-sections.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.resolve(__dirname, '..');
@@ -87,6 +89,38 @@ export function extractRootHtml(html) {
   const marker = '<div id="root">';
   const start = html.indexOf(marker);
   if (start === -1) return '';
+  return contenuDeLaRacine(html, marker, start).contenu;
+}
+
+/**
+ * POURQUOI la racine est vide, quand elle l'est. Le même symptôme a DEUX
+ * causes, et les confondre envoie sur une fausse piste : le contenu a disparu
+ * (marqueur absent, plugin de pré-rendu débrayé), ou le contenu est là mais une
+ * balise `<div>` n'est jamais refermée — le compteur de profondeur ne revient
+ * jamais à zéro et l'extraction rend une chaîne vide alors que le shell est
+ * plein. MESURÉ le 27/09/2026 : un `</div>` oublié dans la section des étapes
+ * du shell a fait dire au garde « `<div id="root">` est VIDE — le shell a
+ * disparu (plugin désactivé ?) », alors que le shell publiait 520 mots ; la
+ * cause réelle était le déséquilibre, et le diagnostic a coûté plus cher que la
+ * correction. Le message le NOMME désormais.
+ *
+ * @returns {'absent'|'vide'|'desquilibre'|'present'} la cause : le marqueur
+ * manque, le div se referme mais ne contient rien, le div ne se referme JAMAIS,
+ * ou tout va bien.
+ */
+export function raisonRacineProblem(html) {
+  const marker = '<div id="root">';
+  const start = html.indexOf(marker);
+  if (start === -1) return 'absent';
+  const { contenu, ferme } = contenuDeLaRacine(html, marker, start);
+  if (!ferme) return 'desquilibre';
+  return contenu.trim() ? 'present' : 'vide';
+}
+
+/** Le contenu du div `#root` et si son `</div>` fermant a été TROUVÉ. */
+function contenuDeLaRacine(html, marker, start) {
+  const vide = { contenu: '', ferme: false };
+  if (start === -1) return vide;
   const openTag = /<div\b/gi;
   const closeTag = /<\/div>/gi;
   openTag.lastIndex = start;
@@ -98,7 +132,7 @@ export function extractRootHtml(html) {
     closeTag.lastIndex = cursor;
     const nextOpen = openTag.exec(html);
     const nextClose = closeTag.exec(html);
-    if (!nextClose) return '';
+    if (!nextClose) return vide;
     if (nextOpen && nextOpen.index < nextClose.index) {
       depth += 1;
       cursor = nextOpen.index + nextOpen[0].length;
@@ -108,21 +142,21 @@ export function extractRootHtml(html) {
     depth -= 1;
     cursor = nextClose.index + nextClose[0].length;
     if (depth === 0) {
-      return html.slice(start + marker.length, nextClose.index);
+      return { contenu: html.slice(start + marker.length, nextClose.index), ferme: true };
     }
   }
-  return '';
+  return vide;
 }
 
-/** Texte visible d'un fragment HTML : balises, scripts et styles retirés. */
+/** Texte visible d'un fragment HTML : balises, scripts et styles retirés.
+ *
+ * La lecture elle-même appartient à `scripts/texte-visible.js` : le garde de
+ * corps déclaré du build (vite-plugins/prerender/declared-body.js) posait la
+ * même question que ce contrôle et y répondait autrement — il cherchait la
+ * chaîne BRUTE, donc refusait un titre dont une moitié est en italique dans un
+ * `<em>` (voir l'en-tête du module partagé). */
 export function visibleText(html) {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return texteVisible(html);
 }
 
 export function countWords(text) {
@@ -268,15 +302,18 @@ export function runHomeShellCheck(options = {}) {
 
   const rootHtml = extractRootHtml(html);
   if (!rootHtml.trim()) {
-    return {
-      ok: false,
-      errors: [
-        'index.html : <div id="root"> est VIDE — le shell de l\'accueil a disparu ' +
-          '(plugin prerender-route-meta désactivé ?). Sans lui, la page n\'a ni h1, ni contenu, ni lien pour un crawler.',
-      ],
-      notices,
-      words: 0,
-    };
+    // DEUX causes pour le même symptôme : le contenu a disparu, ou il est là
+    // mais déséquilibré. Les confondre envoie sur une fausse piste (mesuré).
+    const raison = raisonRacineProblem(html);
+    const message =
+      raison === 'desquilibre'
+        ? 'index.html : les balises `<div>` du shell d\'accueil sont DÉSÉQUILIBRÉES — le contenu est ' +
+          'publié, mais un `</div>` manque (le compteur de profondeur ne revient jamais à zéro). ' +
+          'Un navigateur RÉPARE ce document en silence (la balise de fermeture la plus proche referme ' +
+          'l\'ancêtre en portée), donc AUCUNE sonde de navigateur ne le voit : il se répare ici, à la lecture.'
+        : 'index.html : <div id="root"> est VIDE — le shell de l\'accueil a disparu ' +
+          '(plugin prerender-route-meta désactivé ?). Sans lui, la page n\'a ni h1, ni contenu, ni lien pour un crawler.';
+    return { ok: false, errors: [message], notices, words: 0 };
   }
 
   // ── 1. Structure de titres : un seul h1, et c'est le titre du dictionnaire ─
@@ -369,21 +406,40 @@ export function runHomeShellCheck(options = {}) {
     if (names.length === 0) {
       errors.push(`${COUNTRIES_MODULE} : aucune liste de pays extraite — le garde ne prouve rien`);
     }
-    // Le nom doit apparaître comme TITRE DE CARTE, pas seulement dans la prose :
-    // le sous-titre du hero cite les quatre pays (« …au Mali, au Sénégal, au
-    // Burkina Faso et en Côte d'Ivoire »), donc une simple recherche du nom
-    // était satisfaite même section des pays supprimée du shell — le contrôle
-    // ne prouvait plus rien. Il prouve maintenant que la carte est publiée.
+    // Le nom doit apparaître dans un JETON de la liste des pays, pas seulement
+    // dans la prose : le sous-titre du hero cite les quatre pays (« …au Mali, au
+    // Sénégal, au Burkina Faso et en Côte d'Ivoire »), donc une simple recherche
+    // du nom était satisfaite même section des pays supprimée du shell — le
+    // contrôle ne prouvait plus rien.
+    //
+    // Ce jeton a changé de forme le 27/09/2026 : les quatre cartes à drapeau
+    // (une par pays, avec un titre `<h3>` et « Services disponibles » sous
+    // chacune) sont devenues une BANDE de jokens — la même information, quatre
+    // fois moins de hauteur, et lue comme une portée au lieu d'une grille de
+    // produits. Le contrôle ne cherche donc plus un `<h3>` : il cherche le nom
+    // DANS un élément qui porte la classe du jeton, et cette classe est
+    // DÉCLARÉE (src/config/page-sections.js) — la déplacer ne peut pas rendre
+    // le contrôle aveugle, et vider la liste le fait toujours échouer.
+    const classeDuJeton = String(PAGE_SECTIONS['/'].rubanJetonClass || '').split(/\s+/).pop();
+    if (!classeDuJeton) {
+      errors.push(
+        "src/config/page-sections.js ne déclare plus « rubanJetonClass » pour / : le shell ne peut pas " +
+          'publier la liste des pays sans elle, et ce contrôle ne saurait plus où regarder.'
+      );
+    }
     for (const name of names) {
-      const titreDeCarte = new RegExp(`<h3[^>]*>${echapperPourRegex(name)}</h3>`);
-      if (!titreDeCarte.test(rootHtml)) {
+      const jeton = new RegExp(
+        `<[a-z]+[^>]*class="[^"]*${echapperPourRegex(classeDuJeton)}[^"]*"[^>]*>[\\s\\S]*?${echapperPourRegex(name)}[\\s\\S]*?</[a-z]+>`
+      );
+      if (!classeDuJeton || !jeton.test(rootHtml)) {
         errors.push(
-          `le shell ne publie pas le pays « ${name} » comme une carte (référentiel ${COUNTRIES_MODULE}) — ` +
-            'la section des pays a disparu, ou la coquille ne suit plus le référentiel'
+          `le shell ne publie pas le pays « ${name} » dans un jeton de la liste des pays ` +
+            `(référentiel ${COUNTRIES_MODULE}, classe « ${classeDuJeton} » déclarée par src/config/page-sections.js) — ` +
+            'la liste des pays a disparu, ou la coquille ne suit plus le référentiel'
         );
       }
     }
-    if (names.length) notices.push(`${names.length} pays du référentiel publiés en carte par le shell`);
+    if (names.length) notices.push(`${names.length} pays du référentiel publiés par le shell`);
   }
 
   // ── 7. SEO local : LocalBusiness + carte intégrée ─────────────────────────
@@ -455,7 +511,7 @@ export function runHomeShellCheck(options = {}) {
       errors.push(
         'le shell publie l\'iframe Google (output=embed) au premier écran — ' +
           'elle charge ~300 Ko de tiers et repousse le LCP de l\'accueil ; ' +
-          'publier le contrôle déclaré par le plan (mapButtonKey / mapIconKey / ' +
+          'publier le contrôle déclaré par le plan (mapButtonKey / icone / ' +
           'mapFrameClass / mapControlClass dans src/config/page-sections.js)'
       );
     }

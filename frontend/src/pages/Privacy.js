@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
-import { Link } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
@@ -34,12 +35,16 @@ export default function Privacy() {
     introClass,
     sectionTitleClass,
     sectionBodyClass,
+    // Le filet qui fait d'une section une ENTRÉE de la page, déclaré dans le
+    // plan comme le reste : la coquille le lit aussi (le garde refuse même sa
+    // CITATION ici — une classe nommée dans une page est une classe recopiée).
+    sectionWrapClass,
     sections,
     links,
   } = PAGE_SECTIONS['/privacy'];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen fond-papier">
       {/* La géométrie est LUE dans le plan, jamais recopiée. Sur cette page le
           plus grand texte peint n'est pas l'introduction mais le CORPS d'une
           section : c'est `sectionBodyClass` qui porte l'élément LCP, et
@@ -50,13 +55,13 @@ export default function Privacy() {
         <p className={introClass}>{t(introKey)}</p>
 
         {sections.map((section) => (
-          <section key={section.titleKey} className="mb-8">
+          <section key={section.titleKey} className={sectionWrapClass}>
             <h2 className={sectionTitleClass}>{t(section.titleKey)}</h2>
             <p className={sectionBodyClass}>{t(section.bodyKey)}</p>
           </section>
         ))}
 
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-stone-500">
           {links.map((link, index) => (
             <Fragment key={link.to}>
               {index > 0 && ' · '}

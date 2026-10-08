@@ -49,7 +49,6 @@ export const CountryProvider = ({ children }) => {
   const currentCountryDetails = availableCountries.find(c => c.id === currentCountry) || {
     id: currentCountry,
     name: currentCountry.charAt(0).toUpperCase() + currentCountry.slice(1).replace('_', ' '),
-    flag: '🌍',
     languages: ['fr', 'en']
   };
 

@@ -58,16 +58,26 @@ export default function TicketTracker() {
     }
   };
 
+  // Trois états, trois couleurs : elles disent quelque chose (résolu, en cours,
+  // reçu) et ne sont peintes qu'APRÈS une réponse du serveur — la coquille ne
+  // les publie jamais. Le défaut est passé du bleu au gris chaud du site : le
+  // bleu ne portait aucun sens, il était la couleur « par défaut » d'un tableau
+  // de bord.
   const statusBadgeColor = (status) => {
     if (/résolu|resolved/i.test(status || '')) return 'bg-emerald-100 text-emerald-700';
     if (/en cours|progress/i.test(status || '')) return 'bg-amber-100 text-amber-700';
-    return 'bg-blue-100 text-blue-700';
+    return 'bg-stone-100 text-stone-700';
   };
 
   return (
-    <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-gray-900 mb-1">{t('supportTrackTitle')}</h2>
-      <p className="text-sm text-gray-500 mb-4">{t('supportTrackSubtitle')}</p>
+    // La carte à FILET du site, comme les deux cartes de /support qui la
+    // suivent : ce bloc était la dernière carte à ombre (`shadow-sm`) de la
+    // page, et ses deux champs sont les seuls du site qui vivent HORS d'un
+    // `<form>` — donc les seuls que le socle `form :is(input…)` ne dessine pas.
+    // Ils portent maintenant le même rayon (0,5 rem) que ce socle, en clair.
+    <div className="mb-6 carte-editoriale carte-publique">
+      <h2 className="titre-entree mb-1">{t('supportTrackTitle')}</h2>
+      <p className="text-sm text-stone-500 mb-4">{t('supportTrackSubtitle')}</p>
 
       <div className="flex flex-col sm:flex-row gap-2">
         <input
@@ -76,7 +86,7 @@ export default function TicketTracker() {
           onChange={(e) => setTicketId(e.target.value)}
           placeholder={t('supportTicketIdPlaceholder')}
           aria-label={t('supportTicketIdPlaceholder')}
-          className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
         />
         <input
           type="email"
@@ -84,12 +94,12 @@ export default function TicketTracker() {
           onChange={(e) => setTicketEmail(e.target.value)}
           placeholder={t('supportTicketEmailPlaceholder')}
           aria-label={t('supportTicketEmailPlaceholder')}
-          className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+          className="flex-1 rounded-lg border border-stone-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
         />
         <button
           onClick={trackTicket}
           disabled={tracking || !ticketId.trim() || !ticketEmail.trim()}
-          className="rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
+          className="rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-50"
         >
           {tracking ? t('supportTracking') : t('supportTrackCta')}
         </button>
@@ -98,23 +108,25 @@ export default function TicketTracker() {
       {trackError && <p className="mt-3 text-sm text-red-600">{trackError}</p>}
 
       {trackResult === 'not_found' && (
-        <p className="mt-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <p className="mt-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
           {t('supportTrackNotFound')}
         </p>
       )}
 
       {trackResult && trackResult !== 'not_found' && (
-        <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-4">
+        <div className="mt-4 rounded-lg bg-stone-50 border border-stone-200 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-gray-900 line-clamp-1">{trackResult.reason}</p>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <p className="text-sm font-semibold text-stone-900 line-clamp-1">{trackResult.reason}</p>
+              <p className="text-xs text-stone-500 mt-0.5">
                 {t('supportTicketSentOn')}{' '}
                 {trackResult.created_at ? new Date(trackResult.created_at).toLocaleDateString() : ''}
                 {' • '}{t('supportTicketIdLabel')}: {String(trackResult.ticket_id || trackResult.id || '').slice(0, 8)}…
               </p>
             </div>
-            <span className={`inline-flex items-center rounded-full px-4 py-1.5 text-sm font-semibold ${statusBadgeColor(trackResult.status)}`}>
+            {/* Un badge d'ÉTAT, pas un bouton — mais le site a retiré la forme
+                pilule partout, y compris ici : rayon des cartes (0,5 rem). */}
+            <span className={`inline-flex items-center rounded-lg px-4 py-1.5 text-sm font-semibold ${statusBadgeColor(trackResult.status)}`}>
               {t('supportTicketStatusLabel')}: {trackResult.status}
             </span>
           </div>

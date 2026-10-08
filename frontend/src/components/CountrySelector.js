@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { useCountry } from '../contexts/CountryContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import FlagIcon from './FlagIcon';
@@ -75,7 +76,7 @@ export default function CountrySelector({ className = '' }) {
         {saving ? (
           <span className="w-5 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin inline-block" />
         ) : (
-          <FlagIcon country={current.id} className="w-5 h-4" showEmoji={false} />
+          <FlagIcon country={current.id} className="w-5 h-4" />
         )}
         <span className="text-sm font-medium">{isOwner ? t('allCountries') : current.name}</span>
         {!isOwner && (
@@ -101,10 +102,10 @@ export default function CountrySelector({ className = '' }) {
                   ${currentCountry === country.id ? 'bg-orange-50 text-orange-600' : 'text-gray-700'}
                 `}
               >
-                <FlagIcon country={country.id} className="w-5 h-4" showEmoji={false} />
+                <FlagIcon country={country.id} className="w-5 h-4" />
                 <span className="font-medium">{country.name}</span>
                 {currentCountry === country.id && (
-                  <span className="ml-auto text-orange-600">✓</span>
+                  <Check className="ml-auto h-4 w-4 text-orange-600" aria-hidden="true" />
                 )}
               </button>
             ))}

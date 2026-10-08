@@ -12,6 +12,7 @@ import { mapPaymentAccountErrorToField } from '../utils/paymentAccountErrors';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/paymentVerification';
 import { clearRegistrationFlow, loadRegistrationFlow, mergeRegistrationFlow } from '../utils/registrationFlowStorage';
 import { devLog, safeLog } from '../utils/env';
+import { Hand, Target, Mail, XCircle, Lock, MapPin } from 'lucide-react';
 
 const PaymentVerificationPage = () => {
   const navigate = useNavigate();
@@ -102,7 +103,7 @@ const PaymentVerificationPage = () => {
       // ne sélectionne pas un pays dont le code est vide.
       if (country && country.detected !== false) {
         setDetectedCountry(country);
-        devLog.info(`📍 Pays détecté pour paiements: ${country.nameFrench} ${country.flag}`);
+        devLog.info(`📍 Pays détecté pour paiements: ${country.nameFrench}`);
       }
     } catch (geoError) {
       safeLog.error('Erreur détection pays pour paiements:', geoError);
@@ -252,7 +253,7 @@ const PaymentVerificationPage = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-4">{t('paymentVerification')}</h1>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-2xl mx-auto">
             <div className="flex items-center justify-center mb-4">
-              <span className="text-4xl mr-4">👋</span>
+              <Hand className="h-9 w-9 mr-4 text-blue-600" aria-hidden="true" />
               <div className="text-left">
                 <p className="text-lg font-semibold text-blue-900">
                   {pageT('welcome', { firstName: effectiveUser.first_name, lastName: effectiveUser.last_name })}
@@ -273,13 +274,17 @@ const PaymentVerificationPage = () => {
             ) : detectedCountry ? (
               <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded text-center">
                 <p className="text-sm text-green-800">
+                  <MapPin className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" />
                   <span className="font-medium">{pageT('position')}:</span> <CountryDisplay countryCode={detectedCountry.code} className="inline-flex align-middle" />
                 </p>
                 <p className="text-xs text-green-600 mt-1">{pageT('examplesAdjusted')}</p>
               </div>
             ) : (
               <div className="mb-4 p-3 bg-yellow-100 border border-yellow-300 rounded text-center">
-                <p className="text-xs text-yellow-700">{pageT('positionNotDetected')}</p>
+                <p className="text-xs text-yellow-700">
+                  <MapPin className="inline h-3.5 w-3.5 mr-1 align-[-0.15em]" aria-hidden="true" />
+                  {pageT('positionNotDetected')}
+                </p>
               </div>
             )}
 
@@ -288,11 +293,11 @@ const PaymentVerificationPage = () => {
                 <strong>{t('lastStep')}:</strong> {isAccountCompletionMode ? t('completePaymentSetupToUnlock') : t('linkAccountsToComplete')}
               </p>
               <p>
-                🎯 {effectiveUser.user_type === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
+                <Target className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {effectiveUser.user_type === 'worker' ? t('workerPaymentRequirement') : t('clientPaymentRequirement')}
               </p>
               {!isAccountCompletionMode && (
                 <p>
-                  📧 {pageT('emailStepNotice')}
+                  <Mail className="inline h-4 w-4 mr-1 align-[-0.15em]" aria-hidden="true" /> {pageT('emailStepNotice')}
                 </p>
               )}
             </div>
@@ -312,7 +317,7 @@ const PaymentVerificationPage = () => {
         {displayedError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center">
-              <span className="text-red-500 text-xl mr-3">❌</span>
+              <XCircle className="h-5 w-5 text-red-500 mr-3" aria-hidden="true" />
               <div>
                 <h3 className="font-semibold text-red-800">{pageT('registrationErrorTitle')}</h3>
                 <p className="text-red-700 text-sm">{displayedError}</p>
@@ -353,7 +358,7 @@ const PaymentVerificationPage = () => {
 
         <div className="mt-12 bg-gray-50 border border-gray-200 rounded-lg p-6">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
-            <span className="text-xl mr-2">🔐</span>
+            <Lock className="h-5 w-5 mr-2" aria-hidden="true" />
             {pageT('securityTitle')}
           </h3>
           <div className="text-sm text-gray-700 space-y-2">

@@ -53,18 +53,31 @@ const {
 const ROUTES = Object.keys(PAGE_META).sort();
 const CONDITIONS_NOMS = CONDITIONS.map((c) => c.nom);
 
-/** Le plancher sous lequel un relevé de temps n'est plus une mesure (ms). */
-const PLANCHER_MESURE = 20;
+/** Le plancher sous lequel un relevé de temps n'est plus une mesure (ms).
+ *  Il ne BORNE pas le coût de l'artefact : il refuse un zéro de repli, et il est
+ *  calibré pour ça — pas pour le document le plus léger. /terms en desktop
+ *  (cpu×1) descend légitimement sous les 20 ms : la refonte éditoriale du
+ *  28/09/2026 l'a mesuré à 19,9 ms (minimum de 3 runs), et un plancher qui
+ *  refuserait une mesure vraie serait un plancher faux. */
+const PLANCHER_MESURE = 10;
 /** Le plus petit document de la table (ne doit pas devenir un cas dégénéré). */
 const PLANCHER_NOEUDS = 20;
 const PLANCHER_HAUTEUR = 200;
 
 /**
- * La mutation qui doit franchir la borne, MESURÉE le 25/09/2026 : l'accueil
- * amputé de ses neuf dernières sections (shell bâti 94 329 o → 75 601 o,
- * SHA-1 997b3d3c… → dbb86205…, restauré à l'identique).
+ * La mutation qui doit franchir la borne, MESURÉE le 25/09/2026 (279 → 105
+ * nœuds, shell bâti 94 329 o → 75 601 o, SHA-1 997b3d3c… → dbb86205…),
+ * RE-MESURÉE le 26/09/2026 sur l'artefact à icônes SVG (370 → 113 nœuds) puis le
+ * 27/09/2026 après la galerie des métiers et la photo du parcours : l'accueil
+ * amputé de ses DIX dernières sections tombe à 123 nœuds (de 443). La hauteur
+ * suit les sections retirées, pas le nombre de nœuds qui les composent : elle
+ * mesure 1 236 px en mobile (de 7 726) et 1 086 px en desktop (de 5 407) — le
+ * desktop ne bouge pas d'un tiers de si tôt parce que l'amputation retire la
+ * MÊME matière, quelle que soit la largeur. Le rejeu vivant est dans
+ * `e2e/style-layout-preuve-echec.spec.js`, et cette constante est ce qui
+ * l'empêche de devenir une cérémonie : elle est MESURÉE, jamais déduite.
  */
-const MUTATION_ACCUEIL_AMPUTE = { noeuds: 105, hauteur: { mobile: 1125, desktop: 1086 } };
+const MUTATION_ACCUEIL_AMPUTE = { noeuds: 123, hauteur: { mobile: 1236, desktop: 1086 } };
 
 describe('la table de structure du document pré-rendu, et le coût qu’elle publie', () => {
   it('couvre EXACTEMENT les routes pré-rendues, avec les deux conditions par case', () => {
@@ -140,8 +153,8 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
   it('la mutation qui doit franchir la borne la franchit VRAIMENT (mesurée)', () => {
     // Un plancher que rien ne peut franchir ne prouve rien : la seule direction
     // que les mutations savent faire rougir est la perte de matière, et elle est
-    // mesurée — accueil amputé de ses neuf dernières sections (105 nœuds,
-    // 1 125 px mobile, 1 086 px desktop), deux fois et demie sous la borne.
+    // mesurée — accueil amputé de ses dix dernières sections (123 nœuds,
+    // 1 236 px mobile, 1 086 px desktop), deux fois et demie sous la borne.
     expect(MUTATION_ACCUEIL_AMPUTE.noeuds).toBeLessThan(plancherNoeudsDe(NOEUDS['/']));
     for (const condition of CONDITIONS_NOMS) {
       expect(MUTATION_ACCUEIL_AMPUTE.hauteur[condition], condition).toBeLessThan(
@@ -159,8 +172,34 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
     // temps (0,6 × à 1,5 × le relevé du poste) et le runner de la CI a rendu
     // 18 des 22 cases rouges sur le même artefact — / mobile 662 ms ici contre
     // 80,4 ms là-bas, soit ×8,2. Aucune marge ne couvre les deux hôtes.
+    // Certaines routes ont CHANGÉ d'artefact depuis la mesure de la CI : leur
+    // rapport poste/CI compare alors les temps de DEUX documents différents et ne
+    // dit plus rien de la portabilité. Sont exclues les routes dont le document a
+    // été re-mesuré après le remplacement emoji→SVG — l'accueil, puis /about,
+    // /contact, /how-it-works et /support (26/09/2026), puis les quatre écrans de
+    // compte /login, /register, /forgot-password et /payment (dernière vague,
+    // même jour) : leur relevé CI porte sur l'artefact d'AVANT.
+    // 28/09/2026 : /privacy et /terms rejoignent l'ensemble — la refonte
+    // éditoriale des pages de confiance a changé LEUR document (sections à filet,
+    // titres serif), donc leur rapport poste/CI comparerait deux artefacts
+    // différents. Leurs nouveaux relevés sont dans la table : /privacy
+    // 169 → 105,7 ms en mobile, /terms 142,4 → 136,7.
+    const ARTEFACT_CHANGE = new Set([
+      '/',
+      '/about',
+      '/contact',
+      '/how-it-works',
+      '/support',
+      '/login',
+      '/register',
+      '/forgot-password',
+      '/payment',
+      '/privacy',
+      '/terms',
+    ]);
+    const routesComparables = ROUTES.filter((route) => !ARTEFACT_CHANGE.has(route));
     const ecarts = [];
-    for (const route of ROUTES) {
+    for (const route of routesComparables) {
       for (const condition of CONDITIONS_NOMS) {
         const coutCI = MESURE_CI[route][condition];
         if (coutCI === null) continue;
@@ -170,11 +209,17 @@ describe('la table de structure du document pré-rendu, et le coût qu’elle pu
         ecarts.push(MESURE[route][condition] / coutCI);
       }
     }
-    // Le fait mesuré, nommé une fois : le runner de la CI est TOUJOURS moins cher,
-    // de 1,85 × (/payment desktop : 43 → 23,2 ms) à 8,2 × (accueil mobile :
-    // 662 → 80,4 ms).
+    // Le fait mesuré, nommé une fois : sur ces routes à artefact inchangé, le
+    // runner de la CI est TOUJOURS moins cher — il ne reste que /jobs mobile
+    // (155 → 45,9 ms, 3,4 ×) depuis que les onze autres routes ont changé de
+    // document, une par une. L'ancrage suit donc ce qui reste comparable au lieu
+    // de citer une route re-mesurée : c'est la même leçon, elle repose sur une
+    // paire au lieu de quatre, et TOUT l'historique des autres paires (de 1,85 ×
+    // à 8,2 ×, deux hôtes, un seul artefact) est publié en tête de
+    // scripts/style-layout-budgets.cjs — le fait n'a pas besoin d'être rejoué
+    // pour être vrai, mais il ne doit pas être recopié d'une route à l'autre.
     expect(Math.min(...ecarts)).toBeGreaterThan(1.8);
-    expect(MESURE['/'].mobile / MESURE_CI['/'].mobile).toBeGreaterThan(8);
+    expect(Math.max(...ecarts)).toBeGreaterThan(3);
     // Et l'ancrage du verdict — la structure — n'a, lui, rien de commun avec la
     // machine : les nœuds sont identiques sur les deux hôtes, mesuré sur les 11
     // routes, et c'est ce que la sonde compare.

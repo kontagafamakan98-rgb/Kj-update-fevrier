@@ -493,6 +493,50 @@ jobs:
         working-directory: frontend
         run: node scripts/audit_api_returns.cjs --fail-on-warning
 
+      # Un drapeau est un DESSIN du registre (`src/config/flags.js`), jamais un
+      # caractère : les données pays/langue portaient un champ `flag` valant un
+      # EMOJI, que la coquille publiait pendant que React peignait un SVG — deux
+      # peintures pour un même drapeau, dépendantes de la police du visiteur. Le
+      # champ a été retiré ; ce garde refuse qu'il REVIENNE (emoji de drapeau dans
+      # le code de `src/`, ou champ `flag` dans les cinq modules de données
+      # déclarés). Il ne lit que `src/`, donc il passe AVANT le build : un
+      # `flag: '🇲🇱'` recopié rougit ici, sans attendre qu'un build le publie.
+      - name: Check no flag emoji in country/language/geolocation data
+        working-directory: frontend
+        run: node scripts/check-drapeaux-emoji.js
+
+      # Une `@keyframes` doit être JOUÉE, et une animation jouée doit être
+      # DÉCLARÉE : le garde « aucun sélecteur sans porteur » juge des SÉLECTEURS,
+      # jamais un nom d'ANIMATION, donc les deux directions de cet angle mort
+      # étaient à la main. La seconde est SILENCIEUSE (un `@keyframes` manquant
+      # n'est pas une erreur pour un navigateur) : l'animation ne tourne plus et
+      # aucun test n'échoue. Le décodeur est conscient du JavaScript parce que
+      # LE SUJET Y EST ENTIÈREMENT sur cet arbre : `ToastContainer.js` et
+      # `serviceWorkerRegistration.js` déclarent leurs `@keyframes` dans un
+      # littéral de gabarit, et les usages sont un objet de style JSX et un
+      # `cssText` — un lecteur CSS seul rendrait un vert VIDE. Il ne lit que
+      # `src/`, donc il passe AVANT le build.
+      - name: Check every @keyframes is played and every played animation is declared
+        working-directory: frontend
+        run: node scripts/check-keyframes-animations.js
+
+      # AUCUN VERDICT NE PORTE SUR UN TEMPS ABSOLU sans être déclaré et classé.
+      # Le défaut d'origine est mesuré : un garde jugeait la hauteur du document
+      # pré-rendu contre un nombre de pixels absolu relevé sur une machine — vert
+      # ici, rouge ailleurs, parce que le verdict portait sur l'HÔTE. Ce défaut
+      # vit aussi dans un budget Lighthouse en millisecondes et dans un délai de
+      # test. Le garde n'essaie pas de rendre portables les métriques de
+      # laboratoire : il empêche qu'une borne entre en SILENCE et décide seule.
+      # Chaque borne des surfaces déclarées doit porter une classe d'un
+      # vocabulaire fermé et une justification ; une borne qui DÉCIDE (classe
+      # HOTE ou MESURE) n'est tolérée que si un angle accepté nomme ce qui la
+      # compense ; une borne nouvelle, une borne disparue et une surface
+      # introuvable rougissent. Il lit des fichiers de configuration, donc il
+      # passe AVANT le build.
+      - name: Check no verdict rests on an absolute time bound
+        working-directory: frontend
+        run: node scripts/check-juges-de-temps.js
+
       - name: Build
         working-directory: frontend
         env:
@@ -507,6 +551,35 @@ jobs:
       - name: Check prerender shells (jobs/login html)
         working-directory: frontend
         run: node scripts/check-prerender-shells.js
+
+      # Les deux gardes de coquille lisent le HTML publié ; celui-ci lit les
+      # FICHIERS LIVRÉS (`build/assets/*.js` et `*.css`), seul endroit où vit
+      # l'URL qu'un composant écrit en clair (`script.src = 'https://…'`). Il
+      # refuse une origine TIERCE non classée dans `scripts/origines-bundles.js`,
+      # une entrée de classement PÉRIMÉE (qu'aucun fichier livré ne porte plus) et
+      # un motif vide — donc ajouter une dépendance qui parle à un tiers rougit
+      # ici tant que personne n'a écrit POURQUOI elle a le droit d'y être.
+      - name: Check third-party origins in delivered JS/CSS bundles
+        working-directory: frontend
+        run: node scripts/check-origines-bundles.js
+
+      # LA COUVERTURE DES CLASSES DE TIERS. Le dépôt regarde les tiers par cinq
+      # canaux (les deux gardes statiques ci-dessus, plus le parcours sans geste,
+      # le parcours après geste et la carte différée), et chacun publie ses
+      # limites en prose — mais RIEN ne reliait une CLASSE de tiers (« lien
+      # rendu », « chargé après interaction »…) aux canaux qui peuvent
+      # l’observer. Un classement qu’aucun canal ne confronte est une exemption
+      # invérifiable : elle survit à son contrôle et justifie alors le suivant.
+      # Ce garde refuse une classe ORPHELINE (aucun canal ne l’observe), une
+      # classe sans ligne, une ligne périmée, une raison d’absence donnée à un
+      # canal qui observe, un canal cité qui n’existe pas, une absence muette,
+      # un module ou une sonde ABSENT sur disque, et une déclaration `CE_QUE_*`
+      # vidée ou renommée. La matrice et la règle vivent dans
+      # scripts/couverture-tiers.js ; preuve d’échec dans
+      # scripts/__tests__/check-couverture-tiers.test.js.
+      - name: Check third-party class coverage (no class observed by no channel)
+        working-directory: frontend
+        run: node scripts/check-couverture-tiers.js
 
       # Le garde ci-dessus compare les textes que le plan DÉCLARE. Celui-ci
       # compare TOUT ce que les coquilles publient — chaque fragment visible des
@@ -650,6 +723,24 @@ jobs:
         working-directory: frontend
         run: node scripts/check-generated-icons.js
 
+      # Garde-fou de la MESURE du poinçon — le dessin lui-même, et non la
+      # conformité de ses artefacts. L'atelier du 28/09/2026 avait mesuré trois
+      # choses (le contraste de la lettre sur la matière : 2,67:1, illisible ;
+      # le débordement de l'arc d'ombre : 0,55 unité de liseré peint DEHORS, sur
+      # le fond ; les pixels peints hors du disque), corrigé le dessin avec
+      # elles, puis été supprimé — il ne restait que de la prose et deux nombres
+      # dans un journal, c'est-à-dire rien qui rougisse à la prochaine retouche
+      # de la géométrie. Le check rejoue les trois, sur la géométrie DÉCLARÉE
+      # (src/config/marque-kojo.json, la même que lisent la page, la coquille et
+      # le rasteriseur) et sur les PNG CLAIRS réellement servis, décodés ici en
+      # Node (zlib + dé-filtrage, aucune dépendance) : seuil de contraste WCAG
+      # 1.4.11 (3:1), rayon + demi-trait ≤ rayon du disque pour les cinq cercles,
+      # et zéro pixel peint hors du disque — avec sa contrepartie, sans quoi
+      # « rien dehors » serait vrai d'une image transparente.
+      - name: Check the poinçon's measurements (contrast, circles, overflow)
+        working-directory: frontend
+        run: node scripts/check-marque-kojo.js
+
       # Garde-fou du manifeste PWA : il déclarait « any maskable » sur ses deux
       # icônes alors qu'AUCUNE ne tenait dans la zone de sécurité (contenu à un
       # rayon de 0,495 pour une limite de 0,400) et que le fichier « -maskable »
@@ -658,7 +749,14 @@ jobs:
       # dimensions, type, purpose) et exige qu'un « maskable » soit PROUVÉ par
       # la mesure, dans les deux sens : aucune fausse revendication, et aucune
       # variante fabriquée pour le masque qui ne serait jamais servie.
-      - name: Check PWA manifest (declared icons + maskable safe zone)
+      # Depuis le 07/10/2026 il juge AUSSI l'installation elle-même : « id »,
+      # « start_url » et « scope » doivent rester sous le domaine du site (une
+      # entrée absolue ailleurs ferait ouvrir l'application installée sur un
+      # domaine qu'on n'exploite pas), et chaque entrée de la liste de précache
+      # du service worker doit être un littéral de chaîne SOUS CE DOMAINE — une
+      # liste vide ou une adresse calculée est refusée, parce qu'un vert sur une
+      # liste vide ne dirait rien de son contenu.
+      - name: Check PWA manifest (declared icons, maskable safe zone, install origin, service-worker precache)
         working-directory: frontend
         run: node scripts/check-pwa-manifest.js
 
@@ -719,6 +817,17 @@ jobs:
       - name: Check no interactive control unmounted during press
         working-directory: frontend
         run: node scripts/check-appui-demontage-controles.js
+
+      # Parité du levier "content-visibility" du formulaire de /register : les
+      # quatre blocs différés (photo, légal, envoi, lien) doivent être posés par
+      # les DEUX canaux (src/pages/Register.js ET shells-routes.js) et porter
+      # leur constante de hauteur de contenu dans src/App.css. Une classe posée
+      # d'un seul côté, ou une constante disparue, ferait diverger les deux
+      # peintures ou effondrerait le document — la parité e2e n'est mesurée que
+      # sur les routes déclarées, donc ce garde refuse la divergence à la source.
+      - name: Check deferred form blocks parity (/register)
+        working-directory: frontend
+        run: node scripts/check-formulaire-differe.js
 
       # Même harnais que dans backend-tests, runner Node (Vitest) : les mutations
       # des gardes frontend sont rejouées ici, seul job qui a `node_modules`.

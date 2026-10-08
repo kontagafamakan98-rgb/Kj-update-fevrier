@@ -1,10 +1,12 @@
 import { Fragment } from 'react';
-import { Link } from 'react-router-dom';
+// Le lien interne AVEC la transition de vue native (components/LienVue.js).
+import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
 import { CONTACT } from '../config/contact';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import MapEmbed from '../components/MapEmbed';
+import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 /**
  * Page « Nous contacter ».
@@ -31,10 +33,14 @@ export default function Contact() {
 
   const {
     titleKey, introKey, noteKey, actions, links,
+    // Le vocabulaire éditorial des quatre lignes de contact, DÉCLARÉ dans le
+    // plan : la coquille pré-rendue lit les mêmes cinq chaînes, donc les deux
+    // peintures ne peuvent pas diverger sur l'habillage d'une ligne.
+    listeContactClass, pastilleContactClass, etiquetteContactClass, valeurContactClass,
     // La carte : un contrôle, pas un embed au premier écran (voir le commentaire
     // du plan). La page et la coquille publient les mêmes classes, donc la
     // bascule shell → React ne déplace rien.
-    mapButtonKey, mapIconKey, mapFrameClass, mapControlClass,
+    mapButtonKey, icone, mapFrameClass, mapControlClass,
     // La géométrie du plus grand texte peint — le paragraphe d'introduction,
     // élément LCP de cette page — et de son cadre. Deux propriétaires rendraient
     // les deux peintures divergentes, et une seconde peinture PLUS GRANDE que
@@ -45,31 +51,35 @@ export default function Contact() {
   const titreDeLaCarte = t('mapIframeTitle').replace('{address}', CONTACT.address);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen fond-papier">
       <div className={frameClass}>
         <h1 className={titleClass}>{t(titleKey)}</h1>
         <p className={introClass}>{t(introKey)}</p>
         <p className={noteClass}>{t(noteKey)}</p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Les quatre moyens de contact : une LISTE EN LIGNES, comme les
+            métiers de l'accueil — la pastille ronde (sable et orange du
+            site), le libellé, la valeur, et la flèche qui dit que la ligne
+            mène quelque part. La flèche est peinte pour TOUTES les lignes de
+            cette page : la quatrième mène à la fiche Google (`mapsUrl`). */}
+        <div className={listeContactClass}>
           {actions.map((action) => (
             <a
               key={action.labelKey}
               href={action.href}
               {...(action.external ? { target: '_blank', rel: 'noreferrer' } : {})}
-              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 hover:bg-gray-50 transition-colors"
+              className={action.rowClass}
             >
-              <span
-                className={`flex h-10 w-10 items-center justify-center rounded-full ${action.badgeClass}`}
-              >
-                {t(action.iconKey)}
+              <span className={pastilleContactClass}>
+                <IconePage nom={action.icone} classe={CLASSES_ICONE.ligne} />
               </span>
-              <div>
-                <div className="text-sm font-semibold text-gray-900">{t(action.labelKey)}</div>
-                <div className={`text-xs text-gray-500${action.breakAll ? ' break-all' : ''}`}>
+              <span>
+                <span className={etiquetteContactClass}>{t(action.labelKey)}</span>
+                <span className={`${valeurContactClass}${action.breakAll ? ' break-all' : ''}`}>
                   {action.value}
-                </div>
-              </div>
+                </span>
+              </span>
+              <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
             </a>
           ))}
         </div>
@@ -85,12 +95,13 @@ export default function Contact() {
           href={CONTACT.mapsUrl}
           title={titreDeLaCarte}
           label={t(mapButtonKey)}
-          icon={t(mapIconKey)}
+          icone={icone}
+          classeIcone={CLASSES_ICONE.carteContact}
           frameClass={mapFrameClass}
           controlClass={mapControlClass}
         />
 
-        <p className="mt-6 text-sm text-gray-500">
+        <p className="mt-6 text-sm text-stone-500">
           {links.map((link, index) => (
             <Fragment key={link.to}>
               {index > 0 && ' · '}

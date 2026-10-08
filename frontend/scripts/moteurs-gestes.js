@@ -66,8 +66,13 @@ export const PARCOURS_DE_GESTE = [
     motif: /mouse\.wheel|setViewportSize/,
   },
   {
-    fichier: 'carte-accueil.spec.js',
+    fichier: 'carte-facade.spec.js',
     geste: 'appui au doigt qui monte la carte tierce (l’instant où la requête PART dépend du moteur)',
+    motif: /\.tap\(|hasTouch/,
+  },
+  {
+    fichier: 'tiers-apres-interaction.spec.js',
+    geste: 'appui au doigt après lequel le seul tiers autorisé est contacté (l’ordre requête/peinture diffère d’un moteur à l’autre)',
     motif: /\.tap\(|hasTouch/,
   },
 ];

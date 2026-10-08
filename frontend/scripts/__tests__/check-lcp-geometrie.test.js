@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// LE LCP DE CES QUATRE ROUTES EST PEINT PAR LA COQUILLE PRÉ-RENDUE, et la
+// LE LCP DE CES HUIT ROUTES EST PEINT PAR LA COQUILLE PRÉ-RENDUE, et la
 // géométrie qui le tient a UN propriétaire : la déclaration du corps de page
 // (`src/config/page-sections.js`).
 //
@@ -27,6 +27,19 @@ import { fileURLToPath } from 'node:url';
 //   /about           <p> l'introduction                        74 466 / 80 262 px²
 //   /privacy         <p> le CORPS d'une section                84 360 / 86 676 px²
 //   /how-it-works    <p> le sous-titre du héros                30 320 / 32 656 px²
+//                    (sa couleur a changé le 28/09/2026 — voir plus bas —, sa
+//                    géométrie est celle de ce relevé)
+//
+// ── Puis le 26/09/2026, les quatre routes restantes ───────────────────────
+// Chrome 152, sonde des candidates `largest-contentful-paint`, NAVIGATION
+// RÉELLE (React peint), 412×823 et 1350×940 : UNE SEULE candidate par route et
+// par taille, horodatée au premier paint.
+//
+//   route              élément LCP (élu)                    mobile / desktop
+//   /login             <p> la ligne légale de contact        10 848 / 12 448 px²
+//   /register          <p> la notice d'étape                 10 560 / 13 056 px²
+//   /forgot-password   <p> le sous-titre                     14 001 / 16 458 px²
+//   /support           <p> le sous-titre                     16 468 /  9 324 px²
 //
 // UNE SEULE candidate dans les deux canaux, horodatée au premier paint, d'aire
 // IDENTIQUE de part et d'autre : c'est cette ÉGALITÉ qui fait que la peinture de
@@ -55,7 +68,7 @@ const PLAN = 'src/config/page-sections.js';
 const COQUILLE = 'vite-plugins/prerender/shells-routes.js';
 
 /**
- * Les quatre routes, leur élément LCP, et ce que chaque canal doit peindre.
+ * Les huit routes, leur élément LCP, et ce que chaque canal doit peindre.
  *
  * `classes` porte les chaînes MESURÉES : elles doivent exister dans le plan
  * (valeur des champs déclarés) et nulle part ailleurs — ni dans la page, ni dans
@@ -76,9 +89,17 @@ export const ROUTES_LCP = [
       { champ: 'introClass', page: 'className={pagePlan.introClass}', coquille: 'class="${jobsPlan.introClass}"' },
     ],
     classes: [
-      'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8',
-      'text-3xl font-bold text-gray-900',
-      'mb-6 max-w-3xl text-base leading-relaxed text-gray-600 min-h-[104px] md:min-h-[52px]',
+      // `min-h-screen` (27/09/2026) : réserve la viewport dans la coquille
+      // /jobs, sinon son pied de page tombait au bas de l'écran (0,0862).
+      // `cadre-page` (28/09/2026) remplace le `py-8` : le pas d'un cadre de
+      // page publique est le MÊME sur toutes ces pages et il est fluide.
+      'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page min-h-screen',
+      // Refonte éditoriale du 28/09/2026 : l'échelle de titres passe au
+      // vocabulaire déclaré (`.titre-page`, src/index.css) et le corps au gris
+      // chaud. Les bornes `min-h` de l'intro sont INCHANGÉES : elles réservent
+      // la hauteur du squelette de Suspense (antiClsSkeletons.test.jsx).
+      'titre-page',
+      'mb-6 max-w-3xl text-base leading-relaxed text-stone-600 min-h-[104px] md:min-h-[52px]',
     ],
   },
   {
@@ -93,9 +114,11 @@ export const ROUTES_LCP = [
       { champ: 'introClass', page: 'className={introClass}', coquille: 'class="${aboutPlan.introClass}"' },
     ],
     classes: [
-      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-      'text-3xl font-bold text-gray-900 mb-4',
-      'text-gray-600 mb-8',
+      // `cadre-page` (28/09/2026) : le cadre de la page n'écrit plus ses 48 px
+      // de tête — il prend le pas fluide commun à tous les cadres de page.
+      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
+      'titre-page mb-4',
+      'text-stone-600 mb-8',
     ],
   },
   {
@@ -110,13 +133,22 @@ export const ROUTES_LCP = [
       { champ: 'introClass', page: 'className={introClass}', coquille: 'class="${privacyPlan.introClass}"' },
       { champ: 'sectionTitleClass', page: 'className={sectionTitleClass}', coquille: 'class="${privacyPlan.sectionTitleClass}"' },
       { champ: 'sectionBodyClass', page: 'className={sectionBodyClass}', coquille: 'class="${privacyPlan.sectionBodyClass}"' },
+      // Ajouté le 28/09/2026 : le filet qui fait d'une section une ENTRÉE
+      // (`.bloc-de-section`) change la boîte de la section, donc il fait partie
+      // de la géométrie déclarée et les deux canaux doivent le lire.
+      { champ: 'sectionWrapClass', page: 'className={sectionWrapClass}', coquille: 'class="${privacyPlan.sectionWrapClass}"' },
     ],
     classes: [
-      'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12',
-      'text-3xl font-bold text-gray-900 mb-4',
-      'text-gray-600 mb-8',
-      'text-xl font-semibold text-gray-900 mb-2',
-      'text-gray-600',
+      'max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 cadre-page',
+      'titre-page mb-4',
+      'text-stone-600 mb-8',
+      // 28/09/2026 : le titre d'une section quitte la typographie d'un tableau
+      // de bord (`text-xl font-semibold text-stone-900`) pour le titre serif
+      // d'entrée du site. La TAILLE est la même (`1.25rem`), donc le CORPS d'une
+      // section reste le plus grand texte peint — l'élément LCP de la page.
+      'titre-entree mb-2',
+      'text-stone-600',
+      'bloc-de-section',
     ],
   },
   {
@@ -131,10 +163,115 @@ export const ROUTES_LCP = [
       { champ: 'heroSubtitleClass', page: 'className={plan.heroSubtitleClass}', coquille: 'class="${howItWorksPlan.heroSubtitleClass}"' },
     ],
     classes: [
-      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 text-center',
-      'text-3xl md:text-4xl font-bold mb-4',
-      'text-lg opacity-90 max-w-2xl mx-auto',
+      // `section-publique` (28/09/2026) : le premier écran de la page prend le
+      // pas de SECTION — c'est le premier temps du rythme, comme le héros de
+      // l'accueil, et non un bloc à part avec ses propres valeurs.
+      'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 section-publique text-center',
+      'titre-page mb-4',
+      // 28/09/2026 : la COULEUR du sous-titre est corrigée — il était publié en
+      // `text-stone-600` sur le fond orange du héros, soit 2,6:1 de contraste,
+      // depuis la mise en ligne de la page. La géométrie, elle, ne bouge pas
+      // d'un caractère : `text-lg` et `max-w-2xl` décident seuls du retour à la
+      // ligne, donc de l'aire mesurée (rejoué après la correction :
+      // `e2e/lcp-geometrie.spec.js`, une seule candidate, aire identique entre
+      // les deux canaux).
+      //
+      // 07/10/2026 : la GÉOMÉTRIE change, et c'est cette liste-ci qui l'a dit le
+      // premier — `text-lg` → `text-xl leading-relaxed`. Avec `text-lg`, l'aire
+      // mesurée (29 260 px²) ne dépassait la plus grande note d'étape que de
+      // 1,5 % à 397 px de mise en page : le runner Linux (barre de défilement
+      // classique, 15 px de moins) élisait la note deux fois de suite à la place
+      // du sous-titre. La valeur mesurée après le remède est 33 642 / 36 480 px²
+      // (mobile / desktop) — la marge passe à 30-48 % selon la largeur.
+      'text-xl leading-relaxed text-orange-50 max-w-2xl mx-auto',
     ],
+  },
+  // ── Les quatre routes de la seconde passe (26/09/2026) ───────────────────
+  // Sur ces pages, l'élément élu est un PARAGRAPHE SECONDAIRE (la ligne légale
+  // de /login, la notice d'étape de /register, le sous-titre de
+  // /forgot-password et de /support), pas le titre. Chacune de ces chaînes n'a
+  // qu'un seul domicile : le plan.
+  {
+    route: '/login',
+    page: 'src/pages/Login.js',
+    plan: 'loginPlan',
+    bornes: ['login: `', 'register: `'],
+    identite: ["titleKey: 'login'", "legalContactLineKey: 'legalContactLine'"],
+    champs: [
+      {
+        champ: 'legalContactClass',
+        page: 'className={pagePlan.legalContactClass}',
+        coquille: 'class="${loginPlan.legalContactClass}"',
+      },
+    ],
+    classes: ['text-xs text-stone-600'],
+  },
+  {
+    route: '/register',
+    page: 'src/pages/Register.js',
+    plan: 'registerPlan',
+    bornes: ['register: `', "'forgot-password': `"],
+    identite: ["titleKey: 'title'", "stepNoticeKey: 'clientStepNotice'"],
+    champs: [
+      {
+        champ: 'stepNoticeClass',
+        page: 'className={pagePlan.stepNoticeClass}',
+        coquille: 'class="${registerPlan.stepNoticeClass}"',
+      },
+    ],
+    classes: ['text-xs text-amber-800 mt-3'],
+  },
+  {
+    route: '/forgot-password',
+    page: 'src/pages/ForgotPassword.js',
+    plan: 'forgotPasswordPlan',
+    bornes: ["'forgot-password': `", 'payment: `'],
+    identite: ["titleKey: 'forgotPasswordPageTitle'", "subtitleKey: 'forgotPasswordSubtitle'"],
+    champs: [
+      {
+        champ: 'subtitleClass',
+        page: 'className={pagePlan.subtitleClass}',
+        coquille: 'class="${forgotPasswordPlan.subtitleClass}"',
+      },
+    ],
+    classes: ['mt-3 text-sm text-stone-600'],
+  },
+  {
+    route: '/support',
+    page: 'src/pages/Support.js',
+    plan: 'supportPlan',
+    bornes: ['support: `', 'about: `'],
+    identite: ["titleKey: 'support'", "subtitleKey: 'supportSubtitle'"],
+    champs: [
+      {
+        champ: 'subtitleClass',
+        page: 'className={subtitleClass}',
+        coquille: 'class="${supportPlan.subtitleClass}"',
+      },
+      // Le 28/09/2026, la sonde e2e de /support a DÛ apprendre à attendre une
+      // classe différente selon la taille : en desktop, le plus grand texte
+      // peint est le TITRE d'entrée de la première carte (`titreEntreeClass`),
+      // passé devant le sous-titre depuis qu'il a pris l'échelle serif. La
+      // sonde ne peut le désigner que si ce champ a bien UN domicile : il est
+      // donc vérifié ici comme le sous-titre — lu du plan dans les deux canaux.
+      {
+        champ: 'titreEntreeClass',
+        page: 'className={titreEntreeClass}',
+        coquille: 'class="${supportPlan.titreEntreeClass}"',
+      },
+      // Le CADRE de la page (28/09/2026) : il portait `py-8` en littéral, écrit
+      // deux fois. Le pas est maintenant déclaré, donc vérifiable ici.
+      {
+        champ: 'frameClass',
+        page: 'className={frameClass}',
+        coquille: 'class="${supportPlan.frameClass}"',
+      },
+    ],
+    // La borne est le couple « couleur + rôle » : c'est le sous-titre qui porte
+    // le corps chaud de la page, et la chaîne doit vivre dans SON plan — pas
+    // dans Support.js ni dans le corps de sa coquille, où les lignes de contact
+    // portaient autrefois la même teinte sous un autre nom.
+    classes: ['text-stone-600', 'max-w-2xl mx-auto px-4 cadre-page'],
   },
 ];
 
@@ -305,19 +442,23 @@ describe('le LCP des routes pré-rendues a un propriétaire unique', () => {
     coquille: lire(COQUILLE),
   };
 
-  it('les quatre routes déclarent leur géométrie, et les deux canaux la lisent', () => {
+  it('les huit routes déclarent leur géométrie, et les deux canaux la lisent', () => {
     expect(refusDuLcpDesRoutes(sources)).toEqual([]);
   });
 
-  it('couvre bien les quatre routes visées, avec leur élément LCP', () => {
-    // Un vert sans sujet n'est pas un vert : le tableau doit porter les quatre
-    // routes, et chacune son champ de corps (sur /privacy, le LCP est un CORPS
-    // de section, pas l'introduction).
+  it('couvre bien les huit routes visées, avec leur élément LCP', () => {
+    // Un vert sans sujet n'est pas un vert : le tableau doit porter les huit
+    // routes pré-rendues, et chacune son champ de corps (sur /privacy, le LCP
+    // est un CORPS de section, pas l'introduction).
     expect(ROUTES_LCP.map(({ route }) => route)).toEqual([
       '/jobs',
       '/about',
       '/privacy',
       '/how-it-works',
+      '/login',
+      '/register',
+      '/forgot-password',
+      '/support',
     ]);
     expect(ROUTES_LCP.find(({ route }) => route === '/privacy').champs.map((c) => c.champ)).toContain(
       'sectionBodyClass'

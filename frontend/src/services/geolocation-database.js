@@ -5,7 +5,6 @@ export const FALLBACK_COUNTRY_DATA = {
   mali: {
     country: 'Mali',
     nameFrench: 'Mali',
-    flag: '🇲🇱',
     phonePrefix: '+223',
     currency: 'XOF',
     language: 'fr',
@@ -15,7 +14,6 @@ export const FALLBACK_COUNTRY_DATA = {
   senegal: {
     country: 'Senegal',
     nameFrench: 'Sénégal',
-    flag: '🇸🇳',
     phonePrefix: '+221',
     currency: 'XOF',
     language: 'fr',
@@ -25,7 +23,6 @@ export const FALLBACK_COUNTRY_DATA = {
   burkina_faso: {
     country: 'Burkina Faso',
     nameFrench: 'Burkina Faso',
-    flag: '🇧🇫',
     phonePrefix: '+226',
     currency: 'XOF',
     language: 'fr',
@@ -35,7 +32,6 @@ export const FALLBACK_COUNTRY_DATA = {
   cote_divoire: {
     country: 'Ivory Coast',
     nameFrench: "Côte d’Ivoire",
-    flag: '🇨🇮',
     phonePrefix: '+225',
     currency: 'XOF',
     language: 'fr',

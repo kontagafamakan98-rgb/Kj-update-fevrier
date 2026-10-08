@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { TAILLES } from './helpers/geometrie.js';
+import { TAILLES, MARQUEUR_DE_MONTAGE, attendreLaStabilite } from './helpers/geometrie.js';
 // Le plan est LE propriétaire de la géométrie du plus grand texte (voir le
 // fichier et `scripts/__tests__/check-lcp-geometrie.test.js`) : cette sonde le
 // lit au lieu de recopier les classes attendues, sinon elle vérifierait sa
@@ -32,6 +32,57 @@ import { PAGE_SECTIONS } from '../src/config/page-sections.js';
  *   /privacy        <p> le CORPS d'une section  84 360 / 86 676 px²
  *   /how-it-works   <p> le sous-titre du héros   30 320 / 32 656 px²
  *
+ * ── Et le 26/09/2026, les quatre routes restantes ───────────────────────────
+ * Même sonde, navigation RÉELLE : l'élément élu y est un paragraphe SECONDAIRE
+ * (ligne légale, notice d'étape, sous-titres), mesuré sur 412×823 et 1350×940 :
+ * /login (10 848 / 12 448 px²), /register (10 048 / 12 544), /forgot-password
+ * (14 001 / 16 458) et /support (16 468 / 9 324).
+ * (La notice d'étape de /register est passée de 10 560 à 10 048 px² mobile le
+ * 26/09/2026 : son ⚠️ emoji est devenu un SVG, et la ligne se replie un cran
+ * plus bas — même élément élu, aire légèrement plus petite.)
+ *
+ * ── LES PLANCHERS, ET CE QUE LA POLICE SERVIE LEUR A FAIT (26/09/2026) ──────
+ * Première leçon, mesurée : l'aire de l'ENCRE d'un texte n'est pas portable, elle
+ * suit les polices de l'hôte. Le MÊME document, mêmes classes, même élément élu,
+ * mesuré sur le runner Linux de la CI (run 36254013043, Chrome 152) : /jobs
+ * 35 055 / 30 874, /about 73 340 / 78 208, /privacy 83 058 / 83 400,
+ * /how-it-works 27 056 / 30 240, /login 10 290 / 12 120, /register 9 796 /
+ * 12 183, /forgot-password 13 104 / 15 336 et /support 15 120 / 7 616 — jusqu'à
+ * −18 % de ce poste-ci, alors que la BOÎTE de l'élément ne bouge pas (16 380 px²
+ * pour le sous-titre de /support des deux côtés : c'est l'encre qui change, pas
+ * le cadre). Des planchers calés à 1 ou 3 % sous le relevé d'UN SEUL hôte
+ * (/forgot-password mobile : 13 000 pour 13 104 mesurés ici ; /support desktop :
+ * 9 000 pour 7 616 là-bas) ne bornaient pas la page, ils bornaient la MACHINE.
+ *
+ * Deuxième leçon, et c'est le remède : depuis que `src/index.css` sert Inter et
+ * que toutes les pages la préchargent, LES DEUX HÔTES RENDENT LA MÊME POLICE.
+ * Les valeurs ci-dessus décrivent l'artefact d'AVANT (police du système) et sont
+ * gardées comme histoire ; les planchers sont re-calés sur les DEUX tailles
+ * re-mesurées avec la police servie, chaque route en commentaire de sa ligne.
+ * Relevé du 26/09/2026 (une seule candidate au premier paint, élément élu et
+ * classes inchangés sur les 8 routes) : /jobs 36 750 / 35 144, /about 82 940 /
+ * 79 540, /privacy 91 630 / 100 788, /how-it-works 26 334 / 32 928, /login
+ * 15 040 / 12 834, /register 9 548 / 12 338, /forgot-password 13 690 / 16 095 et
+ * /support 16 720 / 9 480 — la police servie est un peu plus large que celle de
+ * ce poste-ci, donc l'encre monte (sauf /how-it-works, /register et
+ * /forgot-password, qui perdent quelques centaines de px² au re-pli).
+ *
+ * Chaque plancher vaut ≈ 70 % de la PLUS PETITE DES DEUX tailles servies : une
+ * seule police pour tous les hôtes, donc plus de marge à prendre pour couvrir un
+ * écart de police — c'est exactement ce que l'auto-hébergement a acheté.
+ *
+ * CE QUE CE PLANCHER EST, ET CE QU'IL N'EST PAS (mesuré le 26/09/2026) : une
+ * borne de SANITY, pas le discriminateur de l'identité. Sonde d'atelier
+ * (`_sonde-plancher.spec.js` : feuille injectée dans le <head> servi, avant le
+ * premier paint) — quand l'élément DÉCLARÉ est rendu minuscule, le plus grand
+ * texte qui reste vaut encore 12 285 px² (/support mobile), 9 025 (/support
+ * desktop) et 11 480 (/forgot-password) : aucun plancher ne peut donc trancher
+ * « le bloc déclaré est là » de « un autre texte a pris sa place ». Ce qui
+ * tranche, c'est l'IDENTITÉ ci-dessous — l'élément élu doit porter l'ensemble de
+ * classes du plan — et `e2e/lcp-geometrie.spec.js` (une seule candidate, de la
+ * géométrie de la coquille). Le plancher, lui, refuse un premier paint vidé de
+ * sa matière : c'est pour ça qu'il peut être bas sans être un faux vert.
+ *
  * UNE SEULE candidate dans les deux canaux, au premier paint, d'aire IDENTIQUE :
  * la peinture de la coquille reste celle que Chrome retient, et rien du
  * JavaScript n'entre dans le graphe LCP simulé de Lantern. Un remplacement PLUS
@@ -39,12 +90,48 @@ import { PAGE_SECTIONS } from '../src/config/page-sections.js';
  * `elementRenderDelay` de 1156 à 2345 ms, score desktop 92 au lieu de 100).
  */
 const ROUTES_DECLAREES = [
-  { route: '/jobs', champ: 'introClass', plancher: 30000 },
-  { route: '/about', champ: 'introClass', plancher: 60000 },
+  // Plancher ≈ 0,7 × la plus petite des deux tailles ; mesures en commentaire, en
+  // px², MOBILE / DESKTOP, police servie par le site (26/09/2026).
+  { route: '/jobs', champ: 'introClass', plancher: 24000 }, // 36 750 / 35 144
+  { route: '/about', champ: 'introClass', plancher: 55000 }, // 82 940 / 79 540
   // Sur cette page, le plus grand texte peint est un CORPS de section : c'est
   // `sectionBodyClass` qui porte l'élément élu, pas l'introduction.
-  { route: '/privacy', champ: 'sectionBodyClass', plancher: 70000 },
-  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 25000 },
+  { route: '/privacy', champ: 'sectionBodyClass', plancher: 64000 }, // 91 630 / 100 788
+  // Re-mesuré le 28/09/2026 au port du vocabulaire éditorial : 29 260 / 32 830
+  // px² (la veille : 26 334 / 32 928 — le mobile gagne de l'encre parce que le
+  // paragraphe remonte entièrement au-dessus de la ligne de flottaison, voir le
+  // commentaire du plan). Re-mesuré le 07/10/2026 : **33 642 / 36 480 px²**,
+  // après `text-lg` → `text-xl leading-relaxed` (décision mesurée, voir le plan
+  // de /how-it-works) : à 29 260 px² la marge sur la plus grande note d'étape
+  // n'était que de 1,5 % à 397 px de mise en page, et un runner Linux — barre de
+  // défilement classique, 15 px de moins — faisait élire la note au lieu du
+  // sous-titre, deux fois de suite. Le plancher reste à 18 000 : il vaut ≈ 53 %
+  // du plus petit des deux relevés, donc il attrape une page vidée de son texte
+  // sans devenir un test de police.
+  { route: '/how-it-works', champ: 'heroSubtitleClass', plancher: 18000 }, // 33 642 / 36 480
+  // Le plus grand texte peint de ces quatre pages est un paragraphe secondaire,
+  // pas le titre : ligne légale de /login, notice d'étape de /register,
+  // sous-titres de /forgot-password et de /support (voir la mesure en tête).
+  { route: '/login', champ: 'legalContactClass', plancher: 8900 }, // 15 040 / 12 834
+  { route: '/register', champ: 'stepNoticeClass', plancher: 6600 }, // 9 548 / 12 338
+  { route: '/forgot-password', champ: 'subtitleClass', plancher: 9500 }, // 13 690 / 16 095
+  // /support a DEUX élus selon la taille depuis le 28/09/2026 : en mobile le
+  // sous-titre du héros, en desktop le TITRE d'entrée de la première carte, qui
+  // passe devant depuis que les titres d'entrée ont pris l'échelle serif
+  // (1,25 rem contre 1 rem : le plus grand texte peint a changé de camp). Le
+  // plan déclare LES DEUX classes — le sujet et le titre d'entrée — donc
+  // l'unique propriétaire existe toujours ; ce que la sonde doit dire, c'est
+  // laquelle il attend à chaque taille, sans quoi elle accuserait le canal
+  // d'avoir recopié une classe alors que c'est le plan qui en a deux.
+  // Les deux planchers valent ≈ 62 % de LEUR relevé, chacun à sa taille (la
+  // règle du fichier) : 10 000 pour 16 632 px² en mobile, 5 900 pour 9 648 px²
+  // en desktop. Un plancher unique aurait dû descendre à celui du desktop, donc
+  // n'aurait plus attrapé une page mobile vidée de son texte.
+  {
+    route: '/support',
+    champ: { mobile: 'subtitleClass', desktop: 'titreEntreeClass' },
+    plancher: { mobile: 10000, desktop: 5900 },
+  },
 ];
 
 /**
@@ -84,8 +171,13 @@ const ensembleDeClasses = (valeur) =>
 test.describe('Parcours E2E — le LCP déclaré de chaque route reste la peinture de la coquille', () => {
   test.describe.configure({ mode: 'serial' });
 
-  for (const { route, champ, plancher } of ROUTES_DECLAREES) {
+  for (const entree of ROUTES_DECLAREES) {
+    const { route } = entree;
     for (const { nom: taille, viewport } of TAILLES) {
+      // Une déclaration par TAILLE quand la plus grande peinture change de camp
+      // entre le mobile et le desktop ; une seule valeur sinon.
+      const champ = typeof entree.champ === 'string' ? entree.champ : entree.champ[taille];
+      const plancher = typeof entree.plancher === 'number' ? entree.plancher : entree.plancher[taille];
       test(`${route} — ${taille} : l'élément élu porte la géométrie déclarée (${champ})`, async ({ browser }) => {
         const declare = PAGE_SECTIONS[route]?.[champ];
         expect(
@@ -99,8 +191,9 @@ test.describe('Parcours E2E — le LCP déclaré de chaque route reste la peintu
           await page.addInitScript(ESPION_LCP);
           await page.goto(route);
           // Laisse le temps à createRoot, à la reconstruction de la page et au
-          // repaint : une seconde candidate, si elle existe, apparaît ici.
-          await page.waitForTimeout(1500);
+          // repaint : une seconde candidate, si elle existe, apparaîtrait lors du montage.
+          await page.waitForSelector(MARQUEUR_DE_MONTAGE, { timeout: 15000 });
+          await attendreLaStabilite(page);
           const releve = await page.evaluate(() => window.__kojoLcp);
 
           expect(
@@ -140,7 +233,7 @@ test.describe('Parcours E2E — le LCP déclaré de chaque route reste la peintu
           expect(
             candidate.taille,
             `${route} (${taille}) : l'élément LCP déclaré est trop petit pour être le plus grand texte peint `
-              + `(${candidate.taille} px² pour un plancher mesuré de ${plancher}) — la page n'a plus de bloc `
+              + `(${candidate.taille} px² pour un plancher de ${plancher}) — la page n'a plus de bloc `
               + 'assez grand au premier paint, et le plus grand texte devient celui d\'un état asynchrone'
           ).toBeGreaterThan(plancher);
 
