@@ -303,7 +303,7 @@ export function contenuDeLICone(nom) {
  */
 const erreurDeRole = (role) =>
   new Error(
-    `page-icons : le rôle d'icône « ${role} » n'est pas déclaré dans CLASSES_ICONE — ` +
+    `page-icons : le rôle d’icône « ${role} » n’est pas déclaré dans CLASSES_ICONE — ` +
       'un emplacement d’icône ne s’écrit pas en clair, il se déclare au domicile des classes.'
   );
 
