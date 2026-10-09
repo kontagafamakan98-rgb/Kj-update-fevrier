@@ -178,6 +178,19 @@ describe('renderMarkdown', () => {
     expect(body).toContain('index-entry.js');
     expect(body).toContain('<details>');
   });
+
+  it('omet la cadence quand personne ne la fournit, et la publie sinon', () => {
+    expect(renderMarkdown({ current })).not.toContain('Retard de livraison');
+    const avec = renderMarkdown({ current, livraison: '- base « origin/main » ↔ branche « x » : rien.\n- production : révision abc.\n' });
+    expect(avec).toContain('#### ⏱️ Retard de livraison et âge de la production');
+    expect(avec).toContain('- production : révision abc.');
+  });
+
+  it('dit qu\'une cadence non mesurée l\'est, et nomme pourquoi', () => {
+    const body = renderMarkdown({ current, livraison: '', livraisonError: 'fichier absent (x.md)' });
+    expect(body).toContain('Retard de livraison');
+    expect(body).toContain('Non mesuré (fichier absent (x.md))');
+  });
 });
 
 describe('extractPayload / readPayload', () => {
@@ -393,9 +406,10 @@ describe('resolvePrNumber / parseArgs', () => {
   });
 
   it('parse les arguments du CLI', () => {
-    const args = parseArgs(['--out', 'a.json', '--baseline', 'b.json', '--post', '--dry-run']);
+    const args = parseArgs(['--out', 'a.json', '--baseline', 'b.json', '--post', '--dry-run', '--livraison', 'l.md']);
     expect(args).toEqual({
       out: 'a.json',
+      livraison: 'l.md',
       baseline: 'b.json',
       previous: '',
       markdown: '',

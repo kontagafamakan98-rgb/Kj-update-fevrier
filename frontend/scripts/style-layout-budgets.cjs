@@ -274,7 +274,15 @@ const NOEUDS = {
   // (src/components/PhotoDuHeros.js), là où un carrousel naïf publierait un
   // second `<img>` caché ou un conteneur de plus. Les six `<img>` n'existent
   // jamais en même temps dans la coquille : elle n'en publie qu'un.
-  '/': 443,
+  // 443 → 451 (08/10/2026) : la variante 480/720 du héros ajoute le `<picture>`
+  // et ses DEUX `<source>` (+3, src/components/PhotoDuHeros.js et
+  // vite-plugins/prerender/shells-home.js — la même structure des deux côtés),
+  // et le CONTRÔLE de pause ajoute son bouton (+1). Le reste de l'écart venait
+  // d'un relevé antérieur de cette table. MESURÉ sur l'artefact dans les deux
+  // conditions : 451. La valeur ne sert que de PLANCHER (0,8 × 451) : elle dit
+  // « le corps de la page est là », pas « la page fait exactement ce nombre de
+  // nœuds » — c'est la hauteur qui départage ce que les nœuds laissent passer.
+  '/': 451,
   // +3 à +4 nœuds par icône dessinée là où un emoji en tenait un : les trois
   // cartes d'À propos (112 → 123), les quatre lignes de contact (120 → 132),
   // les trois étapes plus le séquestre de « Comment ça marche » (157 → 169) et

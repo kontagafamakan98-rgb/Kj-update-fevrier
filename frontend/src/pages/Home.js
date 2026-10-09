@@ -5,6 +5,7 @@
 // sans le raccord que le chrome avait déjà. Le composant se comporte comme le
 // `Link` d'origine (mêmes propriétés, même `<a href>` réel pour un crawler et
 // pour « ouvrir dans un nouvel onglet »).
+import { IconePage } from '../config/page-icons';
 import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,7 +23,6 @@ import MapEmbed from '../components/MapEmbed';
 // lit AUSSI : les deux canaux ne peuvent pas peindre deux photos différentes au
 // premier rendu (voir le commentaire du module).
 import PhotoDuHeros from '../components/PhotoDuHeros';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 // Les quatre moyens de contact du bloc N.A.P. ci-dessous sont déclarés UNE
 // fois, par /contact (`actions` de src/config/page-sections.js) — la même
@@ -205,7 +205,7 @@ export default function Home() {
         <div className={heroGrilleClass}>
           <div className={heroCopieClass}>
             <span className={`${heroKickerClass} mb-6`}>
-              <IconePage nom="escrow" classe={CLASSES_ICONE.heros} />
+              <IconePage nom="escrow" role="heros" />
               {t('escrowBannerTitle')}
             </span>
             {/* Le titre est l'élément LCP de « / » : il est publié par la
@@ -245,16 +245,16 @@ export default function Home() {
                 comme le reste de l'accueil. */}
             <div className={heroReperesClass}>
               <span>
-                <IconePage nom="escrow" classe={CLASSES_ICONE.heros} />
+                <IconePage nom="escrow" role="heros" />
                 {t('escrowTrustTitle')}
               </span>
               <span>
-                <IconePage nom="promiseSecurePayments" classe={CLASSES_ICONE.heros} />
+                <IconePage nom="promiseSecurePayments" role="heros" />
                 {t('securePayments')}
               </span>
               <Link to="/how-it-works" className={lienFlecheClairClass}>
                 {t('howItWorksLink')}
-                <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
+                <IconePage nom="flecheDroite" role="flecheLigne" />
               </Link>
             </div>
           </div>
@@ -316,7 +316,7 @@ export default function Home() {
       <section className={rubanClass}>
         <div className={rubanInnerClass}>
           <span className={rubanEtiquetteClass}>
-            <IconePage nom="countryGlobe" classe={CLASSES_ICONE.pastille} />
+            <IconePage nom="countryGlobe" role="pastille" />
             {t('availableIn4Countries')}
           </span>
           <div className={rubanJetonsClass}>
@@ -361,12 +361,13 @@ export default function Home() {
                 className={ligneMetierClass}
               >
                 <span className={pastilleClass}>
-                  <IconePage nom={category.icone} classe={CLASSES_ICONE.pastille} />
+                  <IconePage nom={category.icone} role="pastille" />
                 </span>
                 <span className={nomLigneClass}>{t(category.labelKey)}</span>
                 <IconePage
                   nom="flecheDroite"
-                  classe={`${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`}
+                  role="flecheLigne"
+                  enPlus={flecheLigneClass}
                 />
               </Link>
             ))}
@@ -402,7 +403,7 @@ export default function Home() {
             {promises.map(({ icone, titleKey, descriptionKey }) => (
               <div key={titleKey} className={`${cardClass} ${carteClass}`}>
                 <span className={`${pastilleClass} mb-5`}>
-                  <IconePage nom={icone} classe={CLASSES_ICONE.pastille} />
+                  <IconePage nom={icone} role="pastille" />
                 </span>
                 <h3 className={`${nomLigneClass} mb-3`}>{t(titleKey)}</h3>
                 <p className={noteLigneClass}>{t(descriptionKey)}</p>
@@ -456,7 +457,7 @@ export default function Home() {
                     <span className="text-lg font-bold">{t(numberKey)}</span>
                   </span>
                   <span className={pastilleClass}>
-                    <IconePage nom={icone} classe={CLASSES_ICONE.pastille} />
+                    <IconePage nom={icone} role="pastille" />
                   </span>
                   <div>
                     <h3 className={nomLigneClass}>{t(titleKey)}</h3>
@@ -464,7 +465,8 @@ export default function Home() {
                   </div>
                   <IconePage
                     nom="flecheDroite"
-                    classe={`${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`}
+                    role="flecheLigne"
+                    enPlus={flecheLigneClass}
                   />
                 </Link>
               ))}
@@ -496,7 +498,7 @@ export default function Home() {
                   elle reprend un texte que la page publie déjà (`securePayments`)
                   plutôt que d'en inventer un. */}
               <span className={panneauEstampilleClass}>
-                <IconePage nom={iconeSequestre} classe={CLASSES_ICONE.heros} />
+                <IconePage nom={iconeSequestre} role="heros" />
                 {t('securePayments')}
               </span>
             </div>
@@ -506,7 +508,7 @@ export default function Home() {
               <p className={`${noteLigneClass} mb-6`}>{t('escrowTrustBullets')}</p>
               <Link to="/how-it-works" className="bouton bouton-encre">
                 {t('learnMore')}
-                <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
+                <IconePage nom="flecheDroite" role="flecheLigne" />
               </Link>
             </div>
           </div>
@@ -527,11 +529,11 @@ export default function Home() {
             <div className={ctaActionsClass}>
               <Link to="/register?type=client" className="bouton bouton-creme">
                 {t('lookingForServices')}
-                <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
+                <IconePage nom="flecheDroite" role="flecheLigne" />
               </Link>
               <Link to="/register?type=worker" className="bouton bouton-contour">
                 {t('offerServices')}
-                <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
+                <IconePage nom="flecheDroite" role="flecheLigne" />
               </Link>
             </div>
           )}
@@ -557,7 +559,7 @@ export default function Home() {
             {STATS.map((stat) => (
               <div key={stat.labelKey} className={faitClass}>
                 <span className={faitFigureClass}>
-                  <IconePage nom={stat.icone} classe={CLASSES_ICONE.heros} />
+                  <IconePage nom={stat.icone} role="heros" />
                   {stat.fallback}
                 </span>
                 <span className={faitLibelleClass}>{t(stat.labelKey)}</span>
@@ -614,7 +616,7 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl mx-auto">
             <a href={telHref} className={ligneDeContactClass}>
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-orange-600">
-                <IconePage nom={ICONE_DE_CONTACT.contactCall} classe={CLASSES_ICONE.ligne} />
+                <IconePage nom={ICONE_DE_CONTACT.contactCall} role="ligne" />
               </span>
               <div>
                 <div className="text-sm font-semibold text-stone-900">{t('homeContactCall')}</div>
@@ -623,7 +625,7 @@ export default function Home() {
             </a>
             <a href={CONTACT.whatsappUrl} target="_blank" rel="noreferrer" className={ligneDeContactClass}>
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <IconePage nom={ICONE_DE_CONTACT.contactWhatsapp} classe={CLASSES_ICONE.ligne} />
+                <IconePage nom={ICONE_DE_CONTACT.contactWhatsapp} role="ligne" />
               </span>
               <div>
                 <div className="text-sm font-semibold text-stone-900">{t('contactWhatsapp')}</div>
@@ -632,7 +634,7 @@ export default function Home() {
             </a>
             <a href={mailtoHref} className={ligneDeContactClass}>
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                <IconePage nom={ICONE_DE_CONTACT.contactSendEmail} classe={CLASSES_ICONE.ligne} />
+                <IconePage nom={ICONE_DE_CONTACT.contactSendEmail} role="ligne" />
               </span>
               <div>
                 <div className="text-sm font-semibold text-stone-900">{t('contactSendEmail')}</div>
@@ -648,7 +650,7 @@ export default function Home() {
               className={ligneDeContactClass}
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-600">
-                <IconePage nom={ICONE_DE_CONTACT.contactAddress} classe={CLASSES_ICONE.ligne} />
+                <IconePage nom={ICONE_DE_CONTACT.contactAddress} role="ligne" />
               </span>
               <div>
                 <div className="text-sm font-semibold text-stone-900">{t('contactAddress')}</div>
@@ -688,7 +690,7 @@ export default function Home() {
             title={titreDeLaCarte}
             label={t(mapButtonKey)}
             icone={iconeDeLaCarte}
-            classeIcone={CLASSES_ICONE.carteContact}
+            roleIcone="carteContact"
             frameClass={mapFrameClass}
             controlClass={mapControlClass}
           />

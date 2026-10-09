@@ -832,6 +832,18 @@ export const PAGE_SECTIONS = {
     noJobIcon: 'promiseFindWork',
     titleKey: 'paymentPageTitle',
     subtitleKey: 'paymentPageSubtitle',
+    // LE CADRE, ET POURQUOI IL EST ICI PLUTÔT QUE DANS app-cadres.js : /payment a
+    // une COQUILLE, donc les deux canaux peignent ce cadre — une chaîne recopiée
+    // de chaque côté divergerait en silence, et c'est exactement le défaut que ce
+    // bloc ferme (`src/pages/Payment.js` et `vite-plugins/prerender/shells-routes.js`
+    // écrivaient tous deux `min-h-full bg-gray-50 py-8` et
+    // `max-w-6xl mx-auto px-4 space-y-6` à la main).
+    // /payment ne passe PAS par `CadrePage` : ce composant sert les routes SANS
+    // coquille (`src/config/app-cadres.js`), et le fond gris de celle-ci est une
+    // décision de cette page-là, pas un pas de site.
+    frameClass: 'min-h-full bg-gray-50 py-8',
+    corpsClass: 'max-w-6xl mx-auto px-4 space-y-6',
+    titleClass: 'titre-page mb-2',
     noJobTitleKey: 'paymentPageNoJobTitle',
     noJobTextKey: 'paymentPageNoJobText',
     noJobCtaKey: 'paymentPageNoJobCta',

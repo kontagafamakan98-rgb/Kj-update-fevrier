@@ -24,6 +24,18 @@
  * les relève dans le source, et `scripts/check-css-selecteurs-morts.js` exige
  * que chaque classe servie ait un porteur — une classe fabriquée par
  * concaténation n'aurait ni l'un ni l'autre.
+ *
+ * ── Où vivent les DEUX CLASSES D'ANCRAGE, et pourquoi elles ne sont plus ici ──
+ * Ce module portait une table `ANCRAGES` (et son lecteur `ancrageDe`), mesurée
+ * MAUVAISE le 07/10/2026 : le verdict de la feuille LIVRÉE suivait une valeur de
+ * RETOUR de fonction, donc `.bottom-full` — que le panneau peint pourtant — était
+ * déclaré servi sans porteur. Une table exportée ne pouvait pas réparer ça : la
+ * minification renomme les variables (`CLASSES_ANCRAGE` n'existe pas dans
+ * `build/assets/`), et le seul fait que le corpus sache lire est un LITTÉRAL écrit
+ * dans une position de classe. Les deux classes sont donc dans le `className` du
+ * panneau (`bottom-full mb-2` vers le haut, `mt-2` vers le bas), à l'endroit qui
+ * les peint ; ce module garde ce qu'il est seul à savoir : DE QUEL CÔTÉ s'ouvre
+ * le panneau, et pourquoi.
  */
 
 /** Le panneau s'ouvre sous la cloche : la barre du haut. */
@@ -38,10 +50,6 @@ export const VERS_LE_HAUT = 'versLeHaut';
  * celle du portail dans le conteneur — juste après le bouton de la cloche.
  * C'est l'ancrage d'origine, inchangé.
  */
-export const ANCRAGES = {
-  [VERS_LE_BAS]: 'mt-2',
-  [VERS_LE_HAUT]: 'bottom-full mb-2',
-};
-
-/** L'ancrage d'un sens, avec repli sur celui de la barre du haut. */
-export const ancrageDe = (sens) => ANCRAGES[sens] || ANCRAGES[VERS_LE_BAS];
+// Les deux classes d'ancrage vivent dans le `className` du panneau — cf. l'en-tête
+// (« Où vivent les DEUX CLASSES D'ANCRAGE ») : c'est le seul endroit que le garde
+// des sélecteurs morts sache lire.

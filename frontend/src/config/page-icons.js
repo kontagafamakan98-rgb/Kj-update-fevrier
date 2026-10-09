@@ -198,16 +198,46 @@ export const CLASSES_ICONE = {
   // la ligne, dans ce contexte-là seulement : un `align` en `em` ne peut pas
   // convenir aux trois tailles avec une icône de taille FIXE.
   noticePetite: 'inline h-4 w-4 align-[-0.29em]',
-  // Le repère d'un BADGE (11 px, `workerTrustLevel.js`) : 12 px et un
-  // alignement qui le pose sur la ligne de base du libellé qu'il précède.
+  // ── LE REPÈRE DU BADGE DE CONFIANCE N'EST PLUS ICI (07/10/2026) ─────────────
+  // Il s'appelait `badgeRepere` (`inline h-3 w-3 align-[-0.125em]`) et il a
+  // rejoint le composant qui le peint, `src/utils/workerTrustLevel.js`. Deux
+  // raisons, chacune vérifiable : (1) ce registre existe pour une classe lue par
+  // les DEUX canaux (React et la coquille pré-rendue), or ce badge-là n'est peint
+  // que par React — il dépend de données du travailleur, donc aucune coquille ne
+  // le publie ; (2) lue ici, sa classe était INVISIBLE au corpus de
+  // `check-css-selecteurs-morts.js` — la valeur d'un membre dont l'objet est
+  // déclaré dans un AUTRE chunk est intraçable, la minification renommant le
+  // binding (mesuré : `CLASSES_ICONE` n'existe plus dans `build/assets/`), et
+  // l'alignement `align-[-0.125em]` était donc la SEULE règle du site servie sans
+  // porteur visible. L'écrire à son site la rend au corpus.
   //
-  // Il s'appelait `badge`, et `badge` était déclaré DEUX fois dans cet objet :
-  // la seconde déclaration (celle de l'étape de /forgot-password, 24 px et
-  // blanche) écrasait celle-ci, et le repère du badge de confiance se peignait
-  // donc en BLANC de 24 px dans une pastille orange pâle — invisible, et personne
-  // ne le voyait parce qu'un doublon de clé ne fait qu'avertir à la compilation.
-  // Deux emplacements, deux noms : `badgeRepere` (dans une phrase) et
-  // `badgeEtape` (dans une tuile).
+  // L'histoire à ne pas reperdre : il s'appelait `badge`, et `badge` était
+  // déclaré DEUX fois dans cet objet — la seconde déclaration (celle de l'étape de
+  // /forgot-password, 24 px et blanche) écrasait la première, et le repère du
+  // badge de confiance se peignait en BLANC de 24 px dans une pastille orange
+  // pâle : invisible, et personne ne le voyait parce qu'un doublon de clé ne fait
+  // qu'avertir à la compilation. C'est ce qui a fait nommer l'autre `badgeEtape`
+  // ci-dessous.
+  // ── LE REPÈRE DU BADGE DE CONFIANCE EST REVENU ICI (09/10/2026) ─────────────
+  // Il s'appelle `badgeRepere` (`inline h-3 w-3 align-[-0.125em]`). Il vit ici
+  // depuis toujours, en est parti le 07/10/2026 (le temps d'une journée : sa
+  // classe avait été écrite chez son seul lecteur, `src/utils/workerTrustLevel.js`)
+  // et y revient pour la raison qui l'en avait fait sortir.
+  //
+  // POURQUOI IL ÉTAIT SORTI : le corpus de `check-css-selecteurs-morts.js` ne
+  // lisait AUCUNE valeur de ce registre (mesuré le 09/10/2026 : `classesDuJs` de
+  // ce fichier rendait **0 valeur**), donc une classe qui n'était peinte par
+  // aucun HTML de coquille — ce badge ne l'est pas, il dépend de données du
+  // travailleur — n'avait aucun porteur lisible : la règle `.align-\[-0.125em\]`
+  // était servie SANS porteur et le garde refusait le build. Écrite chez son
+  // lecteur, elle redevenait lisible — au prix de la règle que ce fichier porte.
+  //
+  // POURQUOI IL REVIENT : le registre est maintenant NOMMÉ DANS UNE POSITION DE
+  // CLASSE *ici*, par `IconePage` (`className: CLASSES_ICONE[role]`), donc le
+  // corpus en lit TOUTES les valeurs DEPUIS CE FICHIER, sans dépendre d'un
+  // littéral écrit ailleurs (le HTML d'une coquille, ou une prop en clair chez
+  // un composant). Les deux canaux lisent le même domicile, et aucune de ses
+  // classes n'a besoin d'être recopiée pour être vue.
   badgeRepere: 'inline h-3 w-3 align-[-0.125em]',
   // Les deux cartes de type de compte de /register (l'ancien `text-2xl` d'un
   // emoji, centré par le `text-center` du parent).
@@ -262,14 +292,51 @@ export function contenuDeLICone(nom) {
 }
 
 /**
- * Le composant de la PAGE. `nom` doit exister dans le registre ; `classe` vient
- * de `CLASSES_ICONE`. `data-icone` rend l'icône vérifiable par le build (garde
- * `declared-body`) et par toute sonde qui voudrait la compter.
+ * La CLASSE d'un emplacement, par son RÔLE — un nom d'emplacement du registre,
+ * pas une classe écrite sur place.
+ *
+ * C'est la forme sous laquelle les DEUX canaux demandent une classe d'icône : la
+ * page par `IconePage`, la coquille par `svgDeLIcone`. Un rôle inconnu LÈVE (mêmes
+ * raisons que pour un dessin : un emplacement sans classe peindrait un `<svg>` sans
+ * taille, donc un glyphe à la taille du texte — un défaut qui ne se voit qu'à
+ * l'œil, et sur une seule page).
  */
-export function IconePage({ nom, classe }) {
+const erreurDeRole = (role) =>
+  new Error(
+    `page-icons : le rôle d'icône « ${role} » n'est pas déclaré dans CLASSES_ICONE — ` +
+      'un emplacement d’icône ne s’écrit pas en clair, il se déclare au domicile des classes.'
+  );
+
+export function classeDeRole(role) {
+  const classe = CLASSES_ICONE[role];
+  if (!classe) throw erreurDeRole(role);
+  return classe;
+}
+
+/**
+ * Le composant de la PAGE. `nom` doit exister dans le registre des DESSINS,
+ * `role` dans celui des CLASSES — les deux lèvent si le nom est inconnu.
+ * `data-icone` rend l'icône vérifiable par le build (garde `declared-body`) et par
+ * toute sonde qui voudrait la compter.
+ *
+ * `className: CLASSES_ICONE[role]` N'EST PAS UNE ÉCRITURE COMME UNE AUTRE : c'est
+ * le seul endroit du dépôt où le registre des classes est nommé DANS UNE POSITION
+ * DE CLASSE (`className`), et c'est ce qui le rend lisible d'un bout au corpus de
+ * `check-css-selecteurs-morts.js` — qui ne résout un objet que depuis le fichier
+ * où il est déclaré (mesuré : sans cette ligne, ce fichier rend 0 valeur, et les
+ * classes du registre ne tiennent que par le HTML des coquilles qui les posent).
+ * La remplacer par un appel (`className: classeDeRole(role)`) rendrait le
+ * registre invisible à nouveau : la lecture suit `className:`, pas le nom de la
+ * fonction. Le refus du rôle inconnu, lui, reste explicite — et `enPlus` (la mise
+ * en page qu'un PLAN ajoute à la classe du domicile, la flèche d'une ligne) est
+ * COMPOSÉ ici, jamais écrit chez l'appelant : aucun emplacement ne passe plus une
+ * classe en clair, ni le rôle, ni le complément.
+ */
+export function IconePage({ nom, role, enPlus = '' }) {
+  if (!(role in CLASSES_ICONE)) throw erreurDeRole(role);
   return createElement('svg', {
     ...ATTRIBUTS_SVG,
-    className: classe,
+    className: [CLASSES_ICONE[role], enPlus].filter(Boolean).join(' '),
     'aria-hidden': true,
     'data-icone': nom,
     dangerouslySetInnerHTML: { __html: contenuDeLICone(nom) },

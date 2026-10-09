@@ -10,7 +10,7 @@
 //   - Nouveau   : tout le reste (peu/pas d'avis)
 
 import { useLanguage } from '../contexts/LanguageContext';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
+import { IconePage } from '../config/page-icons';
 
 // 28/09/2026 : l'échelle de teintes quitte l'émeraude et le BLEU — les deux
 // dernières teintes du produit qui n'appartenaient à personne — pour la gamme
@@ -83,8 +83,19 @@ export const VerifiedBadge = ({ verified, className = '' }) => {
     >
       {/* Le repère du badge est DESSINÉ (`check`) : c'était un caractère `✓`,
           c'est-à-dire un glyphe qui dépend de la police du poste — la règle du
-          site est qu'une icône se dessine (src/config/page-icons.js). */}
-      <IconePage nom="check" classe={CLASSES_ICONE.badgeRepere} /> {t('verifiedBadge')}
+          site est qu'une icône se dessine (src/config/page-icons.js).
+          SA CLASSE SE DEMANDE AU DOMICILE PAR SON RÔLE (09/10/2026). Elle a été
+          écrite ici en clair du 07/10 au 09/10, et cette forme est fermée : la
+          raison de l'écrire alors était que le corpus de
+          `check-css-selecteurs-morts.js` ne lisait AUCUNE valeur de
+          `CLASSES_ICONE` (mesuré : 0 valeur), donc la classe d'un badge que seule
+          la PAGE peint — aucune coquille ne publie ce repère, il dépend de
+          données du travailleur — n'avait aucun porteur lisible. C'est le
+          DOMICILE qui a été rendu lisible (`IconePage` y nomme le registre dans
+          une position de classe, `className: CLASSES_ICONE[role]`), et pas
+          l'appelant qui a gardé sa classe : un emplacement d'icône dit un rôle,
+          jamais une classe, et un rôle inconnu lève. */}
+      <IconePage nom="check" role="badgeRepere" /> {t('verifiedBadge')}
     </span>
   );
 };

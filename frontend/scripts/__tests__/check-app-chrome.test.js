@@ -425,6 +425,75 @@ describe('les autres reliquats du gabarit dans src/App.css, TRANCHÉS eux aussi'
     }
   });
 
+  it('les replis serif sont SÉPARÉS : le héros garde sa face, les titres ont la leur', () => {
+    // ── Pourquoi ce cas existe ────────────────────────────────────────────
+    // Une SEULE face servait tout le titrage, avec la constante du titre du
+    // héros (92,1 % — c'est l'élément LCP de « / », sa boîte est suivie à
+    // part). Or le rapport des LARGEURS dépend de la phrase : mesuré sur 48
+    // titres réels, la médiane du corpus vaut 94,3 %, donc la constante du
+    // héros n'était pas celle des titres de section. Les deux faces sont
+    // désormais séparées, et ce cas tient les TROIS faits qui pourraient
+    // revenir en silence : une constante écrasée, une pile qui reprend l'autre
+    // face, un sélecteur qui repasse à `--kojo-serif` (c'est exactement ce que
+    // les 24 titres de section mesurés paieraient : la sonde de police
+    // retardée a mesuré la somme des écarts d'encre à 513,1 px en mobile et
+    // 518,8 en desktop avec la face des titres, contre 724,8 et 790,6 avec
+    // celle du héros).
+    const CSS = INDEX_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const face = (nom) => {
+      const bloc = (CSS.match(new RegExp(`@font-face\\s*\\{[^}]*font-family:\\s*'${nom}'[^}]*\\}`)) || [])[0];
+      expect(bloc, `la face « ${nom} » a disparu de src/index.css`).toBeTruthy();
+      return bloc;
+    };
+
+    // 1. Chaque face porte SA constante, et la boîte de Cormorant est rendue.
+    expect(face('Cormorant Garamond repli Times')).toContain('size-adjust: 92.1%');
+    const section = face('Cormorant Garamond repli Times section');
+    expect(section).toContain('size-adjust: 94.3%');
+    expect(section).toContain('ascent-override: 97.6%');
+    expect(section).toContain('descent-override: 30.8%');
+    // (97,6 + 30,8) × 0,943 = 121 % — la hauteur du dessin servi, comme les
+    // deux faces du héros (le `size-adjust` s'applique aussi aux `override`).
+    expect(Math.abs((97.6 + 30.8) * 0.943 - 121)).toBeLessThan(0.3);
+
+    // 2. Deux PILES, et chacune nomme la face qui lui correspond.
+    const pile = (variable) => (CSS.match(new RegExp(`${variable}:\\s*([^;]*);`)) || [])[1] || '';
+    expect(pile('--kojo-serif'), 'la pile du héros a changé de face de repli').toContain(
+      "'Cormorant Garamond repli Times'"
+    );
+    expect(pile('--kojo-serif')).not.toContain('repli Times section');
+    expect(pile('--kojo-serif-section'), 'la pile des titres ne nomme plus la face médiane').toContain(
+      "'Cormorant Garamond repli Times section'"
+    );
+    // Georgia n'a QU'UNE face : la re-mesure du 08/10/2026 donne, contre elle,
+    // une médiane de 76,4 % là où la face du héros vaut 76,3 % — les deux ancres
+    // coïncident, une seconde face serait une constante inventée.
+    expect(pile('--kojo-serif-section')).toContain("'Cormorant Garamond repli Georgia'");
+    expect(CSS).not.toContain("'Cormorant Garamond repli Georgia section'");
+
+    // 3. QUI EMPLOIE QUOI : le héros garde la sienne, tout le reste du titrage
+    //    serif passe à la face des titres. C'est le fait qui, défait, rendrait
+    //    la séparation inopérante sans que rien ne le dise.
+    const bloc = (selecteur) =>
+      (CSS.match(new RegExp(`${selecteur.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`)) || [])[1] || '';
+    expect(bloc('.titre-heros'), 'le titre du héros a changé de pile').toContain(
+      'font-family: var(--kojo-serif)'
+    );
+    for (const selecteur of [
+      '.titre-section',
+      '.titre-page',
+      '.titre-entree',
+      '.nom-de-ligne',
+      '.galerie-legende',
+      '.fait-cta-figure',
+      '.faq-ligne > summary',
+    ]) {
+      expect(bloc(selecteur), `${selecteur} n'emploie plus la face des titres de section`).toContain(
+        'font-family: var(--kojo-serif-section)'
+      );
+    }
+  });
+
   it('et ce qu’App.css apporte VRAIMENT à `body` y est resté', () => {
     // Le pendant du test précédent : retirer la duplication ne doit pas
     // emporter ce qu'aucune autre feuille ne fournit. `overscroll-behavior`,

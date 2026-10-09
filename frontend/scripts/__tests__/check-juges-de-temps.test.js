@@ -41,7 +41,12 @@ const FRONTEND = path.resolve(ICI, '..', '..');
 
 /** Un texte minimal qui reproduit EXACTEMENT la déclaration réelle. */
 const FICHIERS_DECLARES = {
-  'frontend/lighthouserc.cjs': "maxNumericValue: 3500\nmaxNumericValue: 2500\n",
+  // AUCUN littéral : les plafonds de la passe mobile sont DÉRIVÉS de la table
+  // mesurée (`socleMobile(hote)`, angle mort 19(b) fermé le 07/10/2026), donc la
+  // déclaration réelle de cette surface est VIDE. La racine témoin doit décrire
+  // la MÊME déclaration — un `3500`/`2500` littéral y serait une borne NON
+  // DÉCLARÉE, c'est-à-dire qu'elle décrirait un autre dépôt que le nôtre.
+  'frontend/lighthouserc.cjs': 'maxNumericValue: plafondDe(entree.pire, entree.marge)\n',
   'frontend/lighthouserc.desktop.cjs': 'maxNumericValue: plafondTbtDesktop(route)\n',
   'frontend/vite.config.js': 'testTimeout: 20000\n',
   'frontend/playwright.config.js': 'timeout: 30000\ntimeout: 30000\ntimeout: 30000\n',
@@ -252,13 +257,26 @@ describe('classes et angles acceptés', () => {
     expect(delits.map((d) => d.type)).toEqual(['SANS_JUSTIFICATION']);
   });
 
-  it('la déclaration RÉELLE ne porte aucun délit, et chaque mesure a son angle', () => {
+  it('la déclaration RÉELLE ne porte aucun délit, et plus AUCUNE mesure littérale', () => {
     expect(delitsDeDeclaration(JUGES, ANGLES_ACCEPTES)).toEqual([]);
     const mesures = toutesLesDeclarations(JUGES).filter((d) => d.classe === 'MESURE');
-    expect(mesures.length).toBeGreaterThan(0);
-    for (const mesure of mesures) {
-      expect(angleAccepte(mesure, ANGLES_ACCEPTES)).toBeTruthy();
-    }
+    // C'est le RÉSULTAT de l'angle mort 19(b), pas un oubli : plus aucun budget
+    // en millisecondes n'est écrit ici. Il est DÉRIVÉ de sa mesure par
+    // `plafondDe(pire, marge)`, dans `scripts/lhci-cls-budgets.cjs`, et re-mesurer
+    // la table DÉPLACE le plafond. Un littéral qui reviendrait serait vu
+    // (`nonDeclarees`) : la seule façon d'en avoir un est donc de l'écrire ICI,
+    // classe MESURE, avec son angle — c'est-à-dire jamais en silence.
+    expect(mesures).toEqual([]);
+    // Le mécanisme n'est pas mort pour autant : une mesure DÉCLARÉE reste
+    // couverte par son angle (et le cas synthétique ci-dessus prouve qu'une
+    // mesure qui déciderait SANS angle rougirait).
+    const uneMesure = {
+      chemin: 'frontend/lighthouserc.cjs',
+      motif: 'maxNumericValue',
+      valeur: 3500,
+      classe: 'MESURE',
+    };
+    expect(angleAccepte(uneMesure, ANGLES_ACCEPTES)).toBeTruthy();
   });
 });
 
@@ -350,7 +368,7 @@ describe('bras de la CI', () => {
     const presqueVide = Object.fromEntries(
       Object.entries(FICHIERS_DECLARES).map(([chemin, texte]) => [
         chemin,
-        texte.replace(/maxNumericValue: 3500\n/, '').replace(/timeout: 30000\n/g, ''),
+        texte.replace(/timeout: 30000\n/g, ''),
       ])
     );
     avecRacineTemporaire(presqueVide, (dir) => {

@@ -162,16 +162,16 @@ const CommissionDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard icon={<Banknote className="h-6 w-6 text-green-600" aria-hidden="true" />} bg="bg-green-100" title={pageT('totalCommissions')} value={`${formatMoney(displayStats.total_commission_earned || displayStats.totalCommissions)} XOF`} valueColor="text-green-600" />
-          <StatCard icon={<BarChart3 className="h-6 w-6 text-blue-600" aria-hidden="true" />} bg="bg-blue-100" title={pageT('totalVolume')} value={`${formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF`} valueColor="text-blue-600" />
+          <StatCard icon={<Banknote className="h-6 w-6 text-green-600" aria-hidden="true" />} classeFond="bg-green-100" title={pageT('totalCommissions')} value={`${formatMoney(displayStats.total_commission_earned || displayStats.totalCommissions)} XOF`} classeValeur="text-green-600" />
+          <StatCard icon={<BarChart3 className="h-6 w-6 text-blue-600" aria-hidden="true" />} classeFond="bg-blue-100" title={pageT('totalVolume')} value={`${formatMoney(displayStats.total_volume || displayStats.totalVolume)} XOF`} classeValeur="text-blue-600" />
           {/* Le nombre de transactions est une MESURE, pas une émotion : il porte
               le graphite, quand les deux cartes de montants gardent la couleur du
               mouvement d'argent (vert perçu, bleu du volume) et la journée de
               référence garde l'orange de marque. Quatre teintes qui ne se
               chevauchent pas, et aucune qui appartienne à une autre famille de
               sens. */}
-          <StatCard icon={<Hash className="h-6 w-6 text-slate-600" aria-hidden="true" />} bg="bg-slate-100" title={pageT('transactions')} value={displayStats.total_transactions || displayStats.totalTransactions || 0} valueColor="text-slate-700" />
-          <StatCard icon={<CalendarDays className="h-6 w-6 text-orange-600" aria-hidden="true" />} bg="bg-orange-100" title={pageT('today')} value={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} valueColor="text-orange-600" />
+          <StatCard icon={<Hash className="h-6 w-6 text-slate-600" aria-hidden="true" />} classeFond="bg-slate-100" title={pageT('transactions')} value={displayStats.total_transactions || displayStats.totalTransactions || 0} classeValeur="text-slate-700" />
+          <StatCard icon={<CalendarDays className="h-6 w-6 text-orange-600" aria-hidden="true" />} classeFond="bg-orange-100" title={pageT('today')} value={`${formatMoney(displayStats.daily_commission || displayStats.todayCommissions)} XOF`} classeValeur="text-orange-600" />
         </div>
 
         <div className="carte-editoriale p-6 mb-8">
@@ -289,14 +289,18 @@ const CommissionDashboard = () => {
   );
 };
 
-function StatCard({ icon, bg, title, value, valueColor }) {
+// `bg`/`valueColor` portaient des CLASSES sous un nom qui ne le disait pas — le
+// verdict de la feuille LIVRÉE en déclarait deux mortes (`bg-slate-100`,
+// `text-slate-700`), quand Tailwind ne les générait que depuis ce fichier.
+// `classe*` est la convention lue par `scripts/css-selecteurs-morts.js`.
+function StatCard({ icon, classeFond, title, value, classeValeur }) {
   return (
     <div className="carte-editoriale p-6">
       <div className="flex items-center">
-        <div className={`p-3 rounded-full ${bg} mr-4`}><span className="text-2xl">{icon}</span></div>
+        <div className={`p-3 rounded-full ${classeFond} mr-4`}><span className="text-2xl">{icon}</span></div>
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className={`text-2xl font-bold ${valueColor}`}>{value}</p>
+          <p className={`text-2xl font-bold ${classeValeur}`}>{value}</p>
         </div>
       </div>
     </div>

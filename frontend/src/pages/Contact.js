@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import { Fragment } from 'react';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
 import Link from '../components/LienVue';
@@ -6,7 +7,6 @@ import { usePageMeta } from '../utils/seo';
 import { CONTACT } from '../config/contact';
 import { PAGE_SECTIONS } from '../config/page-sections';
 import MapEmbed from '../components/MapEmbed';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 /**
  * Page « Nous contacter ».
@@ -71,7 +71,7 @@ export default function Contact() {
               className={action.rowClass}
             >
               <span className={pastilleContactClass}>
-                <IconePage nom={action.icone} classe={CLASSES_ICONE.ligne} />
+                <IconePage nom={action.icone} role="ligne" />
               </span>
               <span>
                 <span className={etiquetteContactClass}>{t(action.labelKey)}</span>
@@ -79,7 +79,7 @@ export default function Contact() {
                   {action.value}
                 </span>
               </span>
-              <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
+              <IconePage nom="flecheDroite" role="flecheLigne" />
             </a>
           ))}
         </div>
@@ -96,7 +96,7 @@ export default function Contact() {
           title={titreDeLaCarte}
           label={t(mapButtonKey)}
           icone={icone}
-          classeIcone={CLASSES_ICONE.carteContact}
+          roleIcone="carteContact"
           frameClass={mapFrameClass}
           controlClass={mapControlClass}
         />

@@ -106,6 +106,11 @@ kojo-jobs-*-report.txt
 .tmp-*/
 *.tmp.cjs
 *.tmp.mjs
+# Résidu d'un run de `frontend/scripts/__tests__/import-health.test.js`
+# interrompu : le cas crée son dossier DANS le projet (Vite refuse de servir
+# hors de son `fs.allow`) et le retire dans un `finally` — un run tué avant
+# d'y arriver laisse donc ce dossier derrière lui.
+.import-health-*/
 # Rapports et cache produits par `lhci autorun` en local.
 frontend/lhci-reports/
 .lighthouseci/

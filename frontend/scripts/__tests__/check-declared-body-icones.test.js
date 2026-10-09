@@ -27,13 +27,20 @@
  *     nomme la COQUILLE, là où le registre nomme le PLAN. Le registre ne peut pas
  *     le remplacer : il ne regarde QUE le nom, jamais ce que la coquille publie.
  */
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { describe, expect, it } from 'vitest';
 import { makeDeclaredBodyGuard } from '../../vite-plugins/prerender/declared-body.js';
 import { CLASSES_ICONE, contenuDeLICone, marqueurDIcone, NOMS_D_ICONES } from '../../src/config/page-icons.js';
+import { classesDuJs } from '../css-selecteurs-morts.js';
 import { PAGE_SECTIONS, pageSectionParts } from '../../src/config/page-sections.js';
+
+const ICI = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SRC = join(ICI, 'src');
+
+/** La SOURCE du domicile des classes — lue brute, pour ce que l'objet cache. */
+const lireLaSourceDesIcones = () => readFileSync(join(SRC, 'config', 'page-icons.js'), 'utf8');
 
 /** Un garde monté sur un plan SYNTHÉTIQUE : seul le champ `*Icon` compte ici. */
 const gardeAvec = (plan) =>
@@ -109,10 +116,7 @@ describe('forme `*Icon` — preuve d’échec rejouée', () => {
     // (la classe écrasée n'existe simplement plus). Ce contrôle lit la SOURCE de
     // l'objet — c'est le seul endroit où le doublon est encore visible — et
     // compare la liste des clés écrite à la liste que JavaScript garde.
-    const source = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'config', 'page-icons.js'),
-      'utf8'
-    );
+    const source = readFileSync(join(ICI, 'src', 'config', 'page-icons.js'), 'utf8');
     const debut = source.indexOf('export const CLASSES_ICONE');
     expect(debut, '`CLASSES_ICONE` a quitté src/config/page-icons.js — ce contrôle ne lit plus rien').toBeGreaterThan(-1);
     const corps = source.slice(debut, source.indexOf('};', debut));
@@ -125,5 +129,63 @@ describe('forme `*Icon` — preuve d’échec rejouée', () => {
     // Et le témoin direct : ce que JavaScript garde vraiment de cet objet porte
     // autant de clés qu'il en est écrit — sinon l'extraction lit un autre objet.
     expect(Object.keys(CLASSES_ICONE).length).toBe(ecrites.length);
+  });
+
+  /**
+   * LE DOMICILE EST LISIBLE D'UN BOUT (09/10/2026).
+   *
+   * Une classe d'icône n'est vue par `check-css-selecteurs-morts.js` que si une
+   * POSITION DE CLASSE la porte — et ce corpus ne résout un objet que depuis le
+   * fichier où il est déclaré. Mesuré avant ce contrôle : `classesDuJs` de
+   * `page-icons.js` rendait **0 valeur**, donc chaque classe du domicile ne tenait
+   * que par le HTML d'une coquille qui la posait, et une classe peinte par la
+   * PAGE SEULE (le repère du badge de confiance) n'avait aucun porteur lisible :
+   * elle devait s'écrire en clair chez son appelant, c'est-à-dire hors du domicile.
+   * `IconePage` nomme maintenant le registre dans une position de classe
+   * (`className: [CLASSES_ICONE[role], …]`) : ce cas tient cette ligne, et il
+   * rougit si elle redevient un appel (`className: classeDeRole(role)` rendrait le
+   * domicile invisible à nouveau).
+   */
+  it('le corpus LIT le domicile : toutes les classes de `CLASSES_ICONE` sont vues', () => {
+    const vues = new Set(classesDuJs(lireLaSourceDesIcones()));
+    const manquantes = [...new Set(Object.values(CLASSES_ICONE))].filter((classe) => !vues.has(classe));
+    expect(
+      manquantes,
+      `classe(s) du domicile INVISIBLES au corpus : ${manquantes.join(' | ')} — une classe d'icône ne doit pas dépendre d'un littéral écrit ailleurs pour être vue`
+    ).toEqual([]);
+    // Le plancher : un lecteur qui ne lirait rien ne prouverait rien. Mesuré le
+    // 09/10/2026 : **0 valeur** avant, 18 après — et non 21, parce que plusieurs
+    // rôles PARTAGENT la même classe (`h-5 w-5`) et que le corpus rend un
+    // ENSEMBLE : le compte des valeurs distinctes est plus petit que celui des
+    // rôles, c'est `manquantes` qui porte l'égalité (par valeur, pas par compte).
+    expect(vues.size).toBeGreaterThanOrEqual(15);
+  });
+
+  /**
+   * AUCUN APPELANT N'ÉCRIT UNE CLASSE D'ICÔNE EN CLAIR.
+   *
+   * C'est la règle que le domicile porte : un emplacement d'icône dit un RÔLE. Le
+   * balayage est un TEXTE, pas une intention — `classe=` dans un fichier qui
+   * dessine une icône du registre est la forme qu'a prise le défaut le 07/10/2026
+   * (le repère du badge écrit chez `workerTrustLevel.js`), et c'est celle qu'on ne
+   * veut plus. Le fichier du domicile est EXCLU : c'est le seul où une classe est
+   * écrite en clair, et c'est son métier.
+   */
+  it('aucun fichier qui dessine une icône du registre ne passe de classe en clair', () => {
+    const dessine = new Set();
+    const parcourir = (dossier) => {
+      for (const entree of readdirSync(dossier, { withFileTypes: true })) {
+        const chemin = join(dossier, entree.name);
+        if (entree.isDirectory()) { parcourir(chemin); continue; }
+        if (!/\.(js|jsx)$/.test(entree.name)) continue;
+        const texte = readFileSync(chemin, 'utf8');
+        if (!/\bIconePage\b/.test(texte)) continue;
+        for (const ligne of texte.split('\n')) {
+          if (/classe=/.test(ligne)) dessine.add(`${chemin.replace(SRC, 'src')} : ${ligne.trim().slice(0, 80)}`);
+        }
+      }
+    };
+    parcourir(SRC);
+    expect([...dessine], 'une classe d’icône écrite hors du domicile est une classe qui n’a pas de propriétaire').toEqual([]);
   });
 });

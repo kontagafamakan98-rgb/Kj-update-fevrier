@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import React, { useState } from 'react';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
 import Link from '../components/LienVue';
@@ -7,7 +8,6 @@ import { usePageMeta } from '../utils/seo';
 import TicketTracker from '../components/TicketTracker';
 import RobotChat from '../components/RobotChat';
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 // Tous les textes de cette page — et de ses deux composants — sont des CLÉS des
 // dictionnaires existants du dépôt (src/i18n/*.json) : la page les résout au
@@ -49,7 +49,7 @@ function DirectContactCard() {
           const interieur = (
             <>
               <span className={pastilleContactClass}>
-                <IconePage nom={row.icone} classe={CLASSES_ICONE.ligne} />
+                <IconePage nom={row.icone} role="ligne" />
               </span>
               <span>
                 <span className={etiquetteContactClass}>{t(row.labelKey)}</span>
@@ -60,7 +60,7 @@ function DirectContactCard() {
               {/* La flèche n'est peinte que si la ligne mène quelque part :
                   l'adresse postale n'a pas de destination, donc pas de
                   promesse. La condition est la MÊME dans la coquille. */}
-              {row.href && <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />}
+              {row.href && <IconePage nom="flecheDroite" role="flecheLigne" />}
             </>
           );
 
@@ -118,7 +118,7 @@ const Support = () => {
               className={carteModeClass}
             >
               <span className={pastilleModeClass}>
-                <IconePage nom={modeDuPlan.icone} classe={CLASSES_ICONE.mode} />
+                <IconePage nom={modeDuPlan.icone} role="mode" />
               </span>
               <span className={titreEntreeClass}>{t(modeDuPlan.titleKey)}</span>
               <span className="text-xs text-stone-500">{t(modeDuPlan.subtitleKey)}</span>

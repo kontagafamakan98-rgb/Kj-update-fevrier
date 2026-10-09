@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
@@ -21,7 +22,6 @@ import { devLog, safeLog } from '../utils/env';
 import { authAPI, handleApiError } from '../services/api';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 import { MarqueKojo } from '../config/marque-kojo';
 import { PHONE_PREFIX_FALLBACK, phoneNumberExample } from '../config/phone-format';
 import { COUNTRY_PLACEHOLDER } from '../config/country-placeholder';
@@ -519,7 +519,7 @@ export default function Register() {
             </div>
 
             <p id="inscription-notice" className={pagePlan.stepNoticeClass}>
-              <IconePage nom={pagePlan.stepNoticeIcon} classe={CLASSES_ICONE.noticePetite} />{' '}
+              <IconePage nom={pagePlan.stepNoticeIcon} role="noticePetite" />{' '}
               {formData.user_type === 'worker' ? pageT('workerStepNotice') : pageT(pagePlan.stepNoticeKey)}
             </p>
           </div>
@@ -582,7 +582,7 @@ export default function Register() {
                     className="sr-only"
                   />
                   <div className="text-center">
-                    <div className="text-2xl mb-2"><IconePage nom={pagePlan.clientIcon} classe={CLASSES_ICONE.carteUserType} /></div>
+                    <div className="text-2xl mb-2"><IconePage nom={pagePlan.clientIcon} role="carteUserType" /></div>
                     <span className="text-sm font-medium text-gray-700">{t('client')}</span>
                     <p className="text-xs text-gray-500 mt-1">{t('iAmClient')}</p>
                   </div>
@@ -607,7 +607,7 @@ export default function Register() {
                     className="sr-only"
                   />
                   <div className="text-center">
-                    <div className="text-2xl mb-2"><IconePage nom={pagePlan.workerIcon} classe={CLASSES_ICONE.carteUserType} /></div>
+                    <div className="text-2xl mb-2"><IconePage nom={pagePlan.workerIcon} role="carteUserType" /></div>
                     <span className="text-sm font-medium text-gray-700">{t('worker')}</span>
                     <p className="text-xs text-gray-500 mt-1">{t('iAmWorker')}</p>
                   </div>
@@ -841,7 +841,7 @@ export default function Register() {
 
           <div className="bloc-differe-legal rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
             <div>
-              <h3 className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} classe={CLASSES_ICONE.notice} /> {pageT('legalNoticeTitle')}</h3>
+              <h3 className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT('legalNoticeTitle')}</h3>
               <p className="text-xs text-orange-800 mt-1">{pageT('legalConsentHelp')}</p>
             </div>
             <a

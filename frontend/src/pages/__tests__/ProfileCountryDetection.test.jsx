@@ -172,11 +172,13 @@ describe('Page Profil — détection IP en échec', () => {
 
     await screen.findByText('Comptes de paiement');
 
-    // Ouvrir le formulaire d'édition (section « Informations personnelles »).
-    const personalSection = screen
-      .getByText('Informations personnelles')
-      .closest('.px-6.py-6.border-b.border-gray-200');
-    fireEvent.click(within(personalSection).getByRole('button', { name: 'Modifier' }));
+    // Ouvrir le formulaire d'édition : le bouton est dans la RANGÉE DE TITRE
+    // (« Informations personnelles » + « Modifier »), qu'on prend par le TEXTE
+    // et non par une classe d'espacement — ces mesures ont un propriétaire (les
+    // jetons de rythme, `carte-cotes` depuis le 09/10/2026) et un test qui les
+    // recopie rougit à chaque retouche du pas.
+    const ligneTitre = screen.getByText('Informations personnelles').closest('div');
+    fireEvent.click(within(ligneTitre).getByRole('button', { name: 'Modifier' }));
 
     // Le sélecteur de pays s'affiche (étiqueté « Pays » via le label associé)
     // et garde le pays du profil : Sénégal.

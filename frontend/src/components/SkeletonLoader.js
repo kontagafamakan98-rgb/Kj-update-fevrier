@@ -1,4 +1,10 @@
 import React from 'react';
+// Les squelettes des routes d'application LISENT le cadre de leur page au lieu de
+// le recopier : un squelette existe pour réserver la géométrie que la page
+// peindra, donc une réserve qui diverge de la page est exactement le CLS qu'elle
+// prétend empêcher — et cette divergence-là ne rougissait nulle part
+// (`antiClsSkeletons.test.jsx` ne lit que les classes qu'il connaît).
+import CadrePage from './CadrePage';
 
 // Composant de base Skeleton.
 //
@@ -290,15 +296,31 @@ export const JobsSkeleton = () => {
 
 // Skeleton de la page JobDetails — extrait du squelette interne de la page
 // (même structure : bouton retour + carte en-tête + carte description +
-// sidebar info/client) pour servir AUSSI de fallback Suspense de /jobs/:id :
-// le swap chunk → page ne change pas la hauteur → footer ancré stable.
+// sidebar info/client) pour servir AUSSI de fallback Suspense de /jobs/:id.
+//
+// ── POURQUOI IL RÉSERVE L'ÉCRAN (08/10/2026) ────────────────────────────────
+// Sa structure est répliquée, sa HAUTEUR ne peut pas l'être : elle dépend de la
+// DESCRIPTION de la mission, dont la longueur n'a pas de maximum. Mesuré avec
+// une mission LONGUE (créée par le chemin réel de la fixture) : la page fait
+// 1 635,6 px en desktop pour un squelette de 590 px, et le pied de page — 1 350×81
+// px à y=858,6, donc VISIBLE — est poussé hors de l'écran à l'arrivée des
+// données : CLS 0,0577, dont le plus grand décalage (0,0537) NOMME le pied de
+// page. La réserve (`squelette` : la hauteur vient de la déclaration de la
+// route) le fait démarrer sous la ligne de flottaison, donc il n'a plus rien à
+// quitter.
+// Contrepartie assumée et mesurée : sur une mission COURTE (celle de la fixture,
+// page de 719,6 px en desktop, plus courte que la fenêtre), le pied de page
+// redescend dans l'écran quand les données arrivent — un déplacement de 161 px
+// (CLS ≈ 0,015) là où il n'y en avait aucun. C'est le prix du cas LONG, qui est
+// celui de la production (une annonce réelle fait plusieurs paragraphes), et il
+// reste sous le plafond de la route (`scripts/lhci-cls-budgets.cjs`).
 export const JobDetailsSkeleton = () => {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Skeleton className="h-6 w-28 mb-6" />
+    <CadrePage chemin="/jobs/:id" classeCorps="" squelette>
+      <Skeleton className="h-6 w-28 bloc-app" />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <div className="carte-editoriale p-6">
+          <div className="carte-editoriale carte-publique">
             <Skeleton className="h-8 w-3/4" />
             <div className="flex items-center gap-3 mt-3">
               <Skeleton className="h-6 w-24 rounded-full" />
@@ -313,7 +335,7 @@ export const JobDetailsSkeleton = () => {
               <Skeleton className="h-12 w-28 rounded-xl" />
             </div>
           </div>
-          <div className="carte-editoriale p-6 space-y-3">
+          <div className="carte-editoriale carte-publique space-y-3">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-5/6" />
             <Skeleton className="h-4 w-4/6" />
@@ -321,12 +343,12 @@ export const JobDetailsSkeleton = () => {
           </div>
         </div>
         <div className="space-y-6">
-          <div className="carte-editoriale p-6">
+          <div className="carte-editoriale carte-publique">
             <Skeleton className="h-6 w-32 mb-4" />
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-4 w-1/2 mt-2" />
           </div>
-          <div className="carte-editoriale p-6">
+          <div className="carte-editoriale carte-publique">
             <Skeleton className="h-6 w-24 mb-4" />
             <div className="flex items-center gap-3">
               <Skeleton className="h-12 w-12 rounded-full" />
@@ -338,7 +360,7 @@ export const JobDetailsSkeleton = () => {
           </div>
         </div>
       </div>
-    </div>
+    </CadrePage>
   );
 };
 
@@ -459,11 +481,20 @@ export const ForgotPasswordSkeleton = () => {
 // skeleton-chunk → skeleton-données → page réelle ne déplace AUCUN élément
 // (footer ancré par le flex-1 du main, CLS ≈ 0). Le squelette vit dans le
 // chunk d'entrée : disponible avant l'arrivée du chunk lazy Dashboard.
+//
+// ── POURQUOI IL RÉSERVE L'ÉCRAN (08/10/2026) ────────────────────────────────
+// La liste récente rend jusqu'à 5 lignes quand le squelette en réserve 3, donc
+// la page (1 522,3 px mesurés en desktop) est plus haute que lui (960 px). Le
+// pied de page restait hors écran par ACCIDENT aux deux tailles d'usage (la
+// fenêtre de 940 px est plus courte que le squelette) : dans une fenêtre de
+// 1 200 px il est VISIBLE (mesuré y=1 119) pendant tout le chargement. La règle
+// est une réserve qui SUIT la fenêtre, donc elle vaut aux trois tailles — et à
+// celles qu'aucune sonde ne visite.
 export const DashboardSkeleton = () => {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <CadrePage chemin="/dashboard" classeCorps="" squelette>
       {/* Header d'accueil */}
-      <div className="mb-8">
+      <div className="tete-app">
         <Skeleton className="h-8 w-64 max-w-full" />
         <div className="mt-2">
           <Skeleton className="h-4 w-80 max-w-full" />
@@ -471,9 +502,9 @@ export const DashboardSkeleton = () => {
       </div>
 
       {/* 4 cartes statistiques : même grille que le rendu final */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bloc-app">
         {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="carte-editoriale p-6">
+          <div key={index} className="carte-editoriale carte-publique">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <Skeleton className="h-4 w-20" />
@@ -488,11 +519,11 @@ export const DashboardSkeleton = () => {
       </div>
 
       {/* Section quick-actions : conteneur stable, contenu skeleton */}
-      <div className="carte-editoriale mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="carte-editoriale bloc-app">
+        <div className="carte-cotes py-4 border-b border-gray-200">
           <Skeleton className="h-5 w-40" />
         </div>
-        <div className="p-6">
+        <div className="carte-publique">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {Array.from({ length: 3 }).map((_, index) => (
               <div key={index} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
@@ -506,12 +537,12 @@ export const DashboardSkeleton = () => {
 
       {/* Liste récente : header + lignes skeleton (même structure que la page) */}
       <div className="carte-editoriale">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="carte-cotes py-4 border-b border-gray-200">
           <Skeleton className="h-5 w-40" />
         </div>
         <div className="divide-y divide-gray-200">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="p-6">
+            <div key={index} className="carte-publique">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <Skeleton className="h-4 w-1/3 max-w-xs" />
@@ -530,22 +561,59 @@ export const DashboardSkeleton = () => {
           ))}
         </div>
       </div>
-    </div>
+    </CadrePage>
   );
 };
 
-// Squelette de page Profile — fallback du Suspense de la route /profile
-// (App.js). Réplique EXACTE de ProfileSkeleton (Profile.js, phase de
-// chargement des données — CLS mesuré 0.112 avant) : carte max-w-4xl, header
-// orange (photo ronde + nom), sections avis / infos personnelles 2×2 /
-// paiement / support. Le squelette vit dans le chunk d'entrée : disponible
-// avant l'arrivée du chunk lazy Profile.
+// Squelette de page Profile — PROPRIÉTAIRE UNIQUE depuis le 07/10/2026 : il sert
+// le repli Suspense de la route /profile (App.js) ET l'état de chargement des
+// données de `Profile.js`. Cette page en portait une SECONDE copie locale,
+// identique au rendu (mesuré : mêmes classes, mêmes blocs) mais invisible à
+// toute relecture — or c'est ELLE qui était peinte pendant le chargement des
+// données, donc la hauteur minimale ajoutée ici n'avait aucun effet (CLS 0,1010
+// sur /profile desktop, mesuré par e2e/cadres-app.spec.js). La copie a été
+// supprimée : une seule définition, donc les deux phases ne peuvent plus
+// diverger (c'est la règle que tient `antiClsSkeletons.test.jsx`).
+//
+// Structure : carte max-w-4xl, header orange (photo ronde + nom), sections avis
+// / infos personnelles 2×2 / paiement / support. Le squelette vit dans le chunk
+// d'entrée : disponible avant l'arrivée du chunk lazy Profile.
+//
+// ── LA HAUTEUR MINIMALE, ET POURQUOI ELLE EST LÀ (07/10/2026) ───────────────
+// La sonde `e2e/cadres-app.spec.js` a MESURÉ 0,1010 de CLS sur /profile en
+// desktop : pendant le chargement, la page est PLUS COURTE QUE LA FENÊTRE, donc
+// le pied de page vient se poser au bas de l'écran ; quand les données
+// arrivent (la page réelle fait 2 399 px), il est tiré de ~1 600 px vers le bas
+// et SORT de l'écran — un déplacement que Chrome compte, et que le plafond de
+// 0,06 refusait à juste titre.
+//
+// Le remède est la règle DÉJÀ ÉCRITE pour les états de chargement génériques
+// (`src/components/__tests__/antiClsSkeletons.test.jsx` : « le footer doit
+// rester HORS de l'écran pendant tout le chargement »), et elle s'applique ici
+// pour la même raison : ce squelette ne peut PAS répliquer la hauteur de la
+// page qu'il remplace, puisque celle-ci dépend des données (2 399 px ici,
+// 2 911 en mobile). Un squelette dédié ne tient la règle inverse (« le footer
+// peut rester visible, il ne bouge plus ») que lorsque sa hauteur ÉGALE celle
+// de la page — vrai de `ForgotPasswordSkeleton`, faux de celui-ci.
+//
+// La hauteur réservée n'est PAS écrite ici depuis le 08/10/2026 : elle est
+// DÉCLARÉE par la route (`src/config/app-cadres.js`, `squelette.hauteurClass`)
+// et c'est `CadrePage` qui l'applique — le squelette dit seulement ce qu'il est
+// (`squelette`). Trois squelettes portent désormais la même règle (/profile,
+// /dashboard, /jobs/:id) : trois littéraux auraient été trois endroits à tenir
+// d'accord, et le premier oublié aurait laissé un pied de page visible pendant
+// le chargement sans que rien ne rougisse.
+//
+// MESURÉ APRÈS CORRECTION (sonde du 07/10/2026, 1350×940) : /profile passe de
+// 0,1010 à **0,0039** — la valeur des deux autres routes connectées, et le
+// reste est la pastille de notifications de la barre du haut, qui se résout à
+// ~130 ms. Le plafond, lui, n'a pas bougé.
 export const ProfileSkeleton = () => {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <CadrePage chemin="/profile" squelette>
       <div className="carte-editoriale overflow-hidden">
         {/* Header orange / photo / nom */}
-        <div className="bg-orange-600 px-6 py-8">
+        <div className="bg-orange-600 carte-cotes py-8">
           <div className="flex items-center">
             <Skeleton className="h-20 w-20 rounded-full bg-white/30 border-2 border-white" />
             <div className="ml-6 flex-1">
@@ -561,7 +629,7 @@ export const ProfileSkeleton = () => {
         </div>
 
         {/* Section avis */}
-        <div className="px-6 py-6 border-b border-gray-200">
+        <div className="carte-cotes py-6 border-b border-gray-200">
           <Skeleton className="h-5 w-40" />
           <div className="mt-4">
             <Skeleton className="h-4 w-3/4 max-w-md" />
@@ -569,7 +637,7 @@ export const ProfileSkeleton = () => {
         </div>
 
         {/* Section informations personnelles */}
-        <div className="px-6 py-6 border-b border-gray-200">
+        <div className="carte-cotes py-6 border-b border-gray-200">
           <div className="flex justify-between items-center mb-4">
             <Skeleton className="h-5 w-48" />
             <Skeleton className="h-4 w-16" />
@@ -587,18 +655,18 @@ export const ProfileSkeleton = () => {
         </div>
 
         {/* Sections bas de carte : paiement + support */}
-        <div className="px-6 py-6 border-b border-gray-200">
+        <div className="carte-cotes py-6 border-b border-gray-200">
           <Skeleton className="h-5 w-40" />
           <div className="mt-4">
             <Skeleton className="h-10 w-full rounded-lg" />
           </div>
         </div>
 
-        <div className="px-6 pb-6">
+        <div className="carte-cotes pb-6">
           <Skeleton className="h-14 w-full rounded-2xl" />
         </div>
       </div>
-    </div>
+    </CadrePage>
   );
 };
 
@@ -611,9 +679,13 @@ export const ProfileSkeleton = () => {
 // (léger décalage du contenu).
 export const MessagesSkeleton = () => {
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Titre de page réel (h1 text-2xl) */}
-      <Skeleton className="h-8 w-40 mb-4" />
+    <CadrePage chemin="/messages" classeCorps="">
+      {/* Titre de page réel : sa BOÎTE est réservée avec la MÊME déclaration
+          que le `<h1>` (`.reserve-titre-page`, src/index.css) — un `h-8` fixe
+          valait 32 px pour un titre de 45,8 px à 1350 de large, et ces 13,8 px
+          d'écart sont exactement la distance dont le pied de page bougeait à
+          l'arrivée des données (mesuré : de y=936, visible, à 949,8). */}
+      <Skeleton className="reserve-titre-page w-40 tete-app" />
 
       <div className="carte-editoriale overflow-hidden h-[75vh] flex">
         {/* Colonne des conversations (pleine largeur sur mobile) */}
@@ -631,7 +703,7 @@ export const MessagesSkeleton = () => {
           <Skeleton className="h-6 w-48" />
         </div>
       </div>
-    </div>
+    </CadrePage>
   );
 };
 

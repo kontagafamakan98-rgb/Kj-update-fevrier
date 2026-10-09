@@ -304,6 +304,22 @@
       "motif": "le frontend SERVI annonce la révision dont il a été construit (meta `kojo-build-revision`, publiée par le build) : c'est ce que `main` n'observait pas, le déploiement de production étant fait par Vercel depuis l'app GitHub. Deux révisions sont acceptées (le commit poussé, et le dernier ayant touché frontend/) pour qu'aucun changement de frontend ne puisse manquer à la production sans rougir, et chaque refus nomme sa cause (cf. CI-COVERAGE.md, F10)"
     },
     {
+      "chemin": "frontend/scripts/check-retard-main.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-retard-main.test.js",
+      "runner": "vitest",
+      "motif": "publie les DEUX nombres qui manquaient pour arbitrer une livraison, à chaque run : le retard en commits de la base sur la branche de travail (et l'inverse), et l'ancienneté du dernier déploiement de production. Le compte brut MENT quand la base a reçu le contenu par une fusion par squash — mesuré le 08/10/2026 sur ce dépôt : `git rev-list --count origin/main..HEAD` valait 14 et l'attente réelle 0 —, donc l'attente se corrige sur les ARBRES (0 si l'arbre de la tête est celui de la base, sinon après le plus ancien commit portant l'arbre de la base), et le motif dit laquelle des deux règles a conclu. L'âge du déploiement se lit dans l'en-tête `Last-Modified` de la production — l'instant où l'artefact SERVI a été construit (mesuré : 51 s après un commit de fusion) — et non dans la date du commit servi, qui aurait parlé d'un artefact reconstruit tard comme d'un artefact ancien. IL NE ROUGIT PAS TOUT SEUL, et c'est délibéré (même décision que le 3e verdict de check-git-branches.js) : une branche de travail porte par définition des commits non livrés et un dépôt calme a légitimement un déploiement ancien, donc les deux mesures sont publiées en ::notice et le refus ne vient que des bornes que l'appelant déclare (`--max-commits`, `--max-heures` — une borne annoncée sur une ancienneté non établie est un refus, jamais un vert). Trois refus nommés : invocation impossible (borne illisible, base locale — code 2), lecture impossible (aucune base, git illisible — code 1, « pas de base » n'est pas un zéro), borne dépassée (une phrase par borne)"
+    },
+    {
+      "chemin": "frontend/scripts/retard-main.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-retard-main.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même, sans aucune E/S : l'attente corrigée du squash (comparaison d'ARBRES, plus le point de livraison quand la tête n'est pas revenue au contenu de la base), l'âge du déploiement lu dans les en-têtes `Last-Modified`/`Date` (horloge de l'edge d'abord, horloge locale en repli et DITE, en-tête absent nommé au lieu d'un âge inventé), la durée en français, et le verdict borné — qui ne prononce rien sans borne déclarée. Le garde prononce le verdict, ce module le rend éprouvable par mutation de chaîne : ses deux corrections d'arbre y sont mutées par le registre, chacune faisant rougir le cas qui la VISE"
+    },
+    {
       "chemin": "frontend/scripts/check-seo-production.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -316,6 +332,14 @@
       "invoque_par": "ci",
       "preuve": "frontend/scripts/__tests__/check-spa-routes.test.js",
       "runner": "vitest"
+    },
+    {
+      "chemin": "backend/kojo_balises.py",
+      "role": "garde",
+      "invoque_par": "test",
+      "preuve": "backend/tests/test_balises_equilibre.py",
+      "runner": "pytest",
+      "motif": "refuse le HTML du backend qui ne ferme pas une balise (fiche mission et sa 404), en NOMMANT la balise : la même règle que le frontend (vite-plugins/prerender/balises.js), portée en Python et prouvée identique sur le même jeu de cas. Un document déséquilibré est invisible à un navigateur, qui le répare en silence ; il ne l'est pas pour un crawler de partage, qui lit le HTML tel quel"
     },
     {
       "chemin": ".github/scripts/check-email-auth.py",
@@ -635,6 +659,23 @@
       "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (valeur arbitraire échappée, nom à crochets et deux-points, variantes hover:/md:, id, liste de sélecteurs, point entre guillemets, crochet nu, bornes de nom, corpus vide, ligne et sélecteur du nom mort, position obligatoire vs alternative, règle livrée sans porteur, règle livrée gardée par UN porteur), et les six mutations qui prouvent le VERDICT portent sur les lignes du garde (verdict, lecture des feuilles source, corpus des feuilles source — large au lieu de serré, trois planchers de lecture), et le module est verrouillé en outre par ses cas directs sur ce qui POSE VRAIMENT une classe (tableau de chaînes, prose, clé i18n, `role`, en-tête HTTP : rien de tout cela ne porte ; `className`, attribut JSX, `classList.add`, `setAttribute('class')`, `el.className =`, clé `…Class`, littéraux descendus d'un gabarit/condition/appel)"
     },
     {
+      "chemin": "frontend/scripts/check-classes-sans-regle.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "runner": "vitest",
+      "motif": "la TROISIÈME direction du même fait que check-css-selecteurs-morts.js : une classe POSÉE par une page livrée doit avoir sa règle dans la feuille SERVIE. Les deux autres directions étaient tenues (un nom de sélecteur sans porteur, une règle servie sans porteur) et le garde des sélecteurs écrivait lui-même la phrase qu'il ne vérifiait pas — « et une classe POSÉE doit exister dans la feuille servie » — à une exception près, les neuf noms de la blocklist. Le SUJET est le HTML des PAGES, et c'est une MESURE (09/10/2026) : Tailwind scanne src/** et génère un utilitaire dès qu'un jeton candidat apparaît dans un fichier scanné, donc un littéral de className écrit dans src/ a sa règle par construction ; mesuré sur le build du jour, le corpus du bundle retenait 2 802 valeurs de classe dont 515 jetons sans règle — et ce vocabulaire était 'leaflet-', 'lucide', 'En', 'cours', 'page', 'completed', 'none', 'canvas', <path, d=\"M15, du SVG, de la prose et des noms de route, c'est-à-dire du bruit (le corpus ne distingue pas une classe d'un fragment de gabarit ou d'un argument de document.createElement('canvas')). Les pages, elles, n'ont aucune ambiguïté : un attribut class= EST une position de classe, et c'est l'artefact où le trou est réel — vite-plugins/prerender/** n'est PAS dans le content de Tailwind, donc une classe qui n'y est écrite que là n'est générée par personne, et c'est la peinture du premier écran. Aucun autre garde ne pouvait le voir : celui des sélecteurs juge des noms morts d'une feuille, ceux des coquilles comparent la géométrie et les mots — une classe manquante ne déplace rien et n'écrit rien. TROUVÉ À SON PREMIER PASSAGE : 'opacity-50' sur le bouton de suivi de /support, écrit par vite-plugins/prerender/shells-routes.js alors que src/components/TicketTracker.js écrit 'disabled:opacity-50' — Tailwind ne génère aucune règle .opacity-50 nue, donc la coquille publiait un bouton PLEIN que React grise au montage (corrigé à la source : la coquille publie maintenant les classes de React et son attribut disabled). MESURÉ APRÈS CORRECTIF sur l'arbre livré : 14 pages, 15 feuilles servies (11 726 règles, 788 noms de classe), 313 classes DISTINCTES posées, 1 nom accepté sans règle (App) et 0 classe sans règle. LE GARDE REFUSE de juger sous cinq planchers de lecture (10 pages, 2 feuilles, 400 règles, 300 noms servis, 150 classes posées — la moitié du mesuré) et REFUSE AUSSI une exemption SANS MOTIF comme une exemption PÉRIMÉE (une exception qu'on n'ose plus retirer est une exception qui mente) ; le seul nom accepté sans règle est App, enveloppe du chrome dont la règle a été retirée le 25/09/2026 (elle recentrait par héritage) et que check-prerender-shells.js exige POSÉE dans #root — c'est la seule classe de l'arbre dont l'absence de règle est exigée des deux côtés."
+    },
+    {
+      "chemin": "frontend/scripts/classes-sans-regle.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "runner": "vitest",
+      "motif": "la règle elle-même (ce qu'une page POSE — l'attribut class=, les blocs <style> RETIRÉS avant lecture pour qu'une feuille ne se justifie pas elle-même, la valeur qui porte chaque nom pour que le verdict désigne la ligne ; ce que la feuille SERVIE offre — les classes SEULES, l'option marques empêchant #root de disculper class=\"root\", et le compte des règles ; la liste des noms acceptés sans règle, avec sa raison obligatoire et ses deux refus) : le garde prononce le verdict, ce module fournit la lecture et les planchers",
+      "hors_mutation": "le harnais ne mute que le garde lui-même (`cible` = `garde`) : les décodeurs de ce module sont verrouillés par leurs cas unitaires directs (attributs class= en guillemets simples et doubles, découpage des listes, content/role ignorés, blocs <style> retirés, valeur porteuse d'un nom, nom compté une fois, échappements CSS des variantes et valeurs arbitraires, ID refusés, union de plusieurs feuilles, verdict et exemptions, exemption sans motif, exemption périmée, motifs réels non vides) et les sept mutations qui prouvent le VERDICT portent sur les lignes du garde (comparaison neutralisée, verdict neutralisé, exemptions neutralisées, lecture des pages neutralisée, quatre planchers de lecture neutralisés)"
+    },
+    {
       "chemin": "frontend/scripts/check-shell-text-provenance.js",
       "role": "garde",
       "invoque_par": "ci",
@@ -741,6 +782,47 @@
       "preuve": "frontend/scripts/__tests__/check-couverture-tiers.test.js",
       "runner": "vitest",
       "motif": "la règle elle-même, pure et sans E/S : `CANAUX` (le vocabulaire FERMÉ des cinq vues, chacune avec son module, sa sonde et l’endroit où elle publie ses limites), `MATRICE` (une ligne par classe, qui nomme les canaux qui l’observent et POURQUOI les autres ne l’observent pas) et `lacunesDeCouverture` (la confrontation, qui rend sept listes : classe sans ligne, classe orpheline, ligne périmée, canal cité inexistant, raison manquante, absence donnée à un canal qui observe, canal observateur listé deux fois). Les CLASSES ne sont pas redéclarées : elles viennent du propriétaire du vocabulaire (`SORTES`, dans origines-bundles.js), et la clé d’une ligne de matrice est la VALEUR de `SORTES` — la seule forme sous laquelle une classe est réellement écrite dans le dépôt (`CLASSEMENT_ORIGINES[].sorte`) ; `classesDuVocabulaire` REFUSE un vocabulaire ambigu (deux clés de même valeur feraient disparaître une classe de la couverture, en silence). Deux vocabulaires divergeraient à la première classe ajoutée — la faute que ce dépôt refuse partout. Ce module ne juge pas le bien-fondé d’une classe (c’est `CLASSEMENT_ORIGINES` et ses `preuve`), ni la véracité d’une limite (chaque sonde la prouve, sa prose la publie)."
+    },
+    {
+      "chemin": "frontend/scripts/check-reliquats-css.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-reliquats-css.test.js",
+      "runner": "vitest",
+      "motif": "aucun jeton de `:root` sans LECTEUR, et aucun mot d'un système de design étranger dans les feuilles du site (`src/**/*.css`) ni dans la configuration de Tailwind. MESURÉ le 08/10/2026 : le `:root` de `src/index.css` déclarait VINGT-TROIS jetons shadcn dont UN SEUL servait (`--radius`, lu treize fois dans la feuille livrée) ; `--foreground` était lu une fois et c'était la couleur de TEXTE de la page (relevé au navigateur : rgb(10, 10, 10) sur `body`), `--background` et `--border` une fois chacun mais BATTUS par une règle plus tardive du site (`background-color: #f9fafb` d'`App.css` ; le préflight pour la bordure : MESURÉ sur `/`, 17 éléments peints en #e7e5e4 et ZÉRO à la valeur du jeton), et les dix-neuf autres JAMAIS. Le garde prononce TROIS verdicts : (1) un jeton déclaré par une feuille du site doit être lu par l'artefact livré — blocs `<style>` des pages, JavaScript servi (une lecture peut vivre dans un style en ligne) et configuration de Tailwind ; (2) un `var(--x)` lu par la CONFIGURATION doit être déclaré par une feuille du site — le périmètre est la configuration, pas tout l'artefact, parce que Tailwind lit ses propres `--tw-*` (81 jetons déclarés dans la feuille livrée, dont 26 `--tw-*` qui ne sont pas le sujet) ; (3) quatre MOTS sont refusés par leur nom, chacun avec SA mesure : la police du gabarit Create React App (`source-code-pro`, mesuré : la règle ne gagnait NULLE PART, le préflight de même spécificité vient plus tard et le seul `<code>` réel déclare `font-mono`), un jeton de `@radix-ui` (paquet absent de package.json), une animation du `Accordion` de shadcn (aucun utilitaire posé, ZÉRO occurrence d'accordion dans la feuille livrée), un `@apply` d'une couleur du thème retiré. Les commentaires sont BLANCHIS avant toute lecture — mesuré à la première exécution : le commentaire qui documente le retrait du bloc `.dark` cite « --chart-4: 280 65% 60% » et le garde y lisait une DÉCLARATION ; les chaînes, elles, ne sont pas blanchies (un `var(--x)` dans une chaîne est une vraie lecture). Le garde REFUSE de juger sans build, sans configuration, sous 2 feuilles source, 12 jetons déclarés, 10 pages ou 10 fichiers servis. Relevé du 08/10/2026 sur l'arbre réel : 2 feuilles (266 règles), 17 jetons déclarés, 14 pages et 75 fichiers servis comme lecteurs, 0 reliquat."
+    },
+    {
+      "chemin": "frontend/scripts/reliquats-css.js",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-reliquats-css.test.js",
+      "runner": "vitest",
+      "motif": "la RÈGLE du garde ci-dessus, pure et sans E/S : elle ne prononce aucun verdict — c'est `check-reliquats-css.js` qui lit le disque et sort en 1 — mais elle est l'objet direct de six cas du test (blanchiment des commentaires CSS et JavaScript avec les numéros de ligne conservés, une `//` qui appartient à une chaîne et n'est donc pas un commentaire, un jeton déclaré sans lecteur, une lecture sans déclaration, les quatre mots refusés et la mesure de chacun, le comptage des lignes). Elle est séparée du garde pour être éprouvable sans arbre de fixture, comme `css-selecteurs-morts.js` l'est de `check-css-selecteurs-morts.js`."
+    },
+    {
+      "chemin": "frontend/scripts/check-hero-images.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-hero-images.test.js",
+      "runner": "vitest",
+      "motif": "les variantes AVIF et WebP du héros existent PARCE QUE le commentaire de src/config/photos-heros.js publie leurs octets (AVIF 720 = 213 059 o à six pour −62,9 % contre le JPEG, WebP 720 = 264 938 pour −53,9 %, et les deux largeurs à 480). Rien, avant ce garde, ne reliait ce tableau au DISQUE : une variante régénérée avec un autre réglage (ou par une montée de libavif/libwebp) pesait autre chose que les octets publiés et le commentaire mentait en silence ; une variante DÉCLARÉE mais jamais générée se serait téléchargée en 404 — le <picture> ne le dit pas, le navigateur retombe alors sur le JPEG de 63 Ko en croyant en servir 20 ; une source JPEG recodée sans régénérer les variantes laissait des variantes qui n'étaient plus celles de la photo affichée ; une variante PLUS LOURDE que le repli qu'elle double faisait télécharger davantage à un navigateur moderne, exactement l'inverse du but et invisible. Il lit l'EN-TÊTE de chaque fichier (boîte `ispe` d'un AVIF, premier morceau d'un WebP : `VP8X`, `VP8 ` ou `VP8L`) au lieu de décoder l'image, retrouve les dimensions par rapport au manifeste et aux deux largeurs de la config, et refuse en plus : un total du manifeste qui ne suit plus les fichiers, un `jpeg_total` faux, un ordre de PHOTO_HEROS_FORMATS où le format publié en premier serait le plus LOURD (c'est l'ordre des <source> qui décide de ce qu'un navigateur télécharge), un encodage publié que rien ne déclare (résidu d'une campagne précédente), et une photo de TÊTE dont la variante n'économise plus la moitié du JPEG (le chiffre publié est −81,3 % ; le plancher est à 50 % pour laisser de la marge à un réglage retouché tout en rougissant sur une « variante » qui n'en serait plus une). Planchers de lecture (4 photos, 16 variantes) : un manifeste vidé rendrait ce garde vert en ne pesant RIEN, et c'est le seul faux vert qu'un garde de contenu puisse produire. Il ne juge PAS le PSNR — une mesure d'encodeur, faite à la campagne et publiée dans le manifeste — ni ce que le navigateur télécharge vraiment : c'est e2e/heros-format.spec.js, qui lit les octets de la réponse dans un vrai Chromium."
+    },
+    {
+      "chemin": "frontend/scripts/gen-hero-images.py",
+      "role": "outil",
+      "invoque_par": "test",
+      "preuve": "frontend/scripts/__tests__/check-hero-images.test.js",
+      "runner": "vitest",
+      "motif": "générateur : il écrit les 24 variantes et scripts/hero-variants.manifest.json, et REFUSE un réglage hors de sa table REGLAGES, un total qui s'écarte de la campagne mesurée, et une source d'une autre boîte que 720 × 960 (le rapport commun est ce qui empêche l'alternance de déplacer la page). Ce n'est pas un garde : il PRODUIT un artefact et ne prononce aucun verdict sur le dépôt — c'est check-hero-images.js qui juge. Son mode `--verifier` rejoue l'encodage et compare les octets sans rien écrire ; c'est ce mode que la preuve exécute, en sous-processus, sur l'arbre réel.",
+      "hors_mutation": "aucune mutation ne peut le viser : ses refus ne sont exerçables que par son propre mode `--verifier`, et la preuve qui le nomme est le MÊME fichier de test que celui du garde — la neutraliser paierait deux fois la même preuve, et cette preuve-là (l'encodage) dépend de la version de libavif/libwebp de l'hôte, pas du dépôt. Le cas est déclaré sauté quand l'hôte n'a pas Pillow, plutôt que de rendre un vert qui ne dirait rien."
+    },
+    {
+      "chemin": "frontend/scripts/check-css-inline-budget.js",
+      "role": "garde",
+      "invoque_par": "ci",
+      "preuve": "frontend/scripts/__tests__/check-css-inline-budget.test.js",
+      "runner": "vitest",
+      "motif": "budget de CSS inline PAR PAGE pré-rendue : la feuille critique du build est recopiée dans CHAQUE document et lue AVANT le premier paint. Le fait vivait en PROSE dans check-bundle-size.js, avec un compte PÉRIMÉ (22 pages, ~1,5 Mo) que la mesure du 09/10/2026 contredit (14 documents, dont 13 portant la même feuille : 69 276 o, sha d8c74e2cb457a497 ; 404.html 392 o ; total 900 980 o = 0,86 Mo) — un budget global ne dit donc ni QUELLE page a enflé ni de combien. Six refus NOMMÉS : dépassement chiffré, plancher (la contrepartie sans laquelle un budget plafond déclarerait « meilleure » une page qui a PERDU sa feuille critique), nombre de blocs <style> (0 = plugin d'inlining inerte, 2 = feuille sans propriétaire), feuille divergente d'une page qui ne l'a pas déclarée, page pré-rendue sans ligne, ligne périmée ; plus deux planchers de lecture qui refusent de juger un build vide ou incomplet. La table est la mesure du build réel, une ligne par document."
     }
   ],
   "rejeux": [
@@ -920,6 +1002,27 @@
       "cwd": "frontend",
       "attend": [
         "WARNING INFRA : verbe interdit"
+      ]
+    },
+    {
+      "id": "balises-backend: refus de l'equilibre neutralise",
+      "garde": "backend/kojo_balises.py",
+      "cible": "backend/kojo_balises.py",
+      "trouve": "    if not problemes:",
+      "remplace": "    if True:",
+      "runner": "python",
+      "preuve": "backend/tests/test_balises_equilibre.py",
+      "commande": [
+        "{python}",
+        "-m",
+        "pytest",
+        "tests/test_balises_equilibre.py",
+        "-q",
+        "--tb=no"
+      ],
+      "cwd": "backend",
+      "attend": [
+        "FAILED tests/test_balises_equilibre.py::test_le_refus_nomme_la_balise_qui_ne_se_referme_pas"
       ]
     },
     {
@@ -1804,6 +1907,66 @@
       ]
     },
     {
+      "id": "retard-main: la correction du squash neutralisee",
+      "garde": "frontend/scripts/retard-main.js",
+      "cible": "frontend/scripts/retard-main.js",
+      "trouve": "  if (arbreBase && arbreTete === arbreBase) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-retard-main.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-retard-main.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "est celui de la base (14 commits comptés"
+      ]
+    },
+    {
+      "id": "retard-main: aucune base toleree",
+      "garde": "frontend/scripts/check-retard-main.js",
+      "cible": "frontend/scripts/check-retard-main.js",
+      "trouve": "  if (!base) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-retard-main.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-retard-main.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "et 1 sans aucune base"
+      ]
+    },
+    {
+      "id": "retard-main: borne de retard non tenue",
+      "garde": "frontend/scripts/check-retard-main.js",
+      "cible": "frontend/scripts/check-retard-main.js",
+      "trouve": "  if (!verdict.ok) {",
+      "remplace": "  if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-retard-main.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-retard-main.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un retard borné, en nommant le compte et la borne"
+      ]
+    },
+    {
       "id": "frontend-revision: la comparaison accepte une autre revision",
       "garde": "frontend/scripts/check-deployed-revision.js",
       "cible": "frontend/scripts/check-deployed-revision.js",
@@ -2318,7 +2481,7 @@
       "id": "css-selecteurs-morts: verdict non prononce",
       "garde": "frontend/scripts/check-css-selecteurs-morts.js",
       "cible": "frontend/scripts/check-css-selecteurs-morts.js",
-      "trouve": "if (!divergencesSource.length && !divergencesLivrees.length) {",
+      "trouve": "if (!divergencesSource.length && !divergencesLivrees.length && !nomsNonGeneresPoses.length) {",
       "remplace": "if (divergencesSource.length >= 0) {",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
@@ -2332,7 +2495,8 @@
       "cwd": "frontend",
       "attend": [
         "sort 1 et nomme fichier, ligne, nom et sélecteur quand une feuille SOURCE écrit un nom mort",
-        "sort 1 quand la feuille LIVRÉE garde une règle sans porteur (utilitaire généré)"
+        "sort 1 quand la feuille LIVRÉE garde une règle sans porteur (utilitaire généré)",
+        "sort 1 quand un nom de la `blocklist` est POSÉ (un nom bloqué mais posé ne peint rien)"
       ]
     },
     {
@@ -2360,7 +2524,7 @@
       "garde": "frontend/scripts/check-css-selecteurs-morts.js",
       "cible": "frontend/scripts/check-css-selecteurs-morts.js",
       "trouve": "const corpus = corpusPoseurs(RACINE);",
-      "remplace": "const corpus = corpusPoseursLarge(RACINE);",
+      "remplace": "const corpus = corpusPoseurs(RACINE); corpus.jetons = new Set(corpus.fichiers.map((f) => fs.readFileSync(f, 'utf8')).join(' ').match(/[\\w\\-[\\]]+/g) || []);",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
       "commande": [
@@ -2379,7 +2543,7 @@
       "id": "css-selecteurs-morts: plancher du corpus neutralise",
       "garde": "frontend/scripts/check-css-selecteurs-morts.js",
       "cible": "frontend/scripts/check-css-selecteurs-morts.js",
-      "trouve": "if (corpusLarge.fichiers.length < MIN_FICHIERS_CORPUS || corpusLarge.jetons.size < MIN_JETONS_CORPUS) {",
+      "trouve": "if (\n    corpus.fichiers.length < MIN_FICHIERS_CORPUS ||\n    corpus.jetons.size < MIN_JETONS_CORPUS ||\n    corpus.valeurs < MIN_VALEURS_CORPUS\n  ) {",
       "remplace": "if (false) {",
       "runner": "node",
       "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
@@ -2433,6 +2597,209 @@
       "cwd": "frontend",
       "attend": [
         "REFUSE de juger un livré sans pages (plancher de pages)"
+      ]
+    },
+    {
+      "id": "css-selecteurs-morts: blocklist non lue neutralisee",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "const nomsNonGeneres = Array.isArray(CONFIG_TAILWIND.blocklist) ? CONFIG_TAILWIND.blocklist : [];",
+      "remplace": "const nomsNonGeneres = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 quand un nom de la `blocklist` est POSÉ (un nom bloqué mais posé ne peint rien)"
+      ]
+    },
+    {
+      "id": "css-selecteurs-morts: noms bloques poses non verifies",
+      "garde": "frontend/scripts/check-css-selecteurs-morts.js",
+      "cible": "frontend/scripts/check-css-selecteurs-morts.js",
+      "trouve": "const nomsNonGeneresPoses = nomsNonGeneres.filter((nom) => nomPose(nom, corpus.jetons, corpus.texte));",
+      "remplace": "const nomsNonGeneresPoses = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-selecteurs-morts.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-selecteurs-morts.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 quand un nom de la `blocklist` est POSÉ (un nom bloqué mais posé ne peint rien)"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: comparaison neutralisee",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "const sansRegle = classesSansRegle(posees.keys(), servie.noms);",
+      "remplace": "const sansRegle = [];",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 en NOMMANT la page, la classe et la valeur qui la porte (le cas réel de /support)",
+        "sort 1 quand la règle n’existe que dans le `.css` du build et qu’il est absent"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: verdict non prononce",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "if (!sansRegle.length && !defauts.sansMotif.length && !defauts.perimees.length) {",
+      "remplace": "if (sansRegle.length >= 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 en NOMMANT la page, la classe et la valeur qui la porte (le cas réel de /support)",
+        "sort 1 quand la règle n’existe que dans le `.css` du build et qu’il est absent",
+        "sort 1 quand une exemption n’est plus POSÉE (une exception qui ment sur l’arbre)"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: exemptions neutralisees",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "const defauts = exemptionsEnDefaut(posees.keys(), NOMS_ACCEPTES_SANS_REGLE);",
+      "remplace": "const defauts = { sansMotif: [], perimees: [] };",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 quand une exemption n’est plus POSÉE (une exception qui ment sur l’arbre)"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: lecture des pages neutralisee",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "for (const [nom, porteur] of classesPoseesDePage(html).porteurDe) {",
+      "remplace": "for (const [nom, porteur] of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 0 sur un arbre conforme, et PUBLIE ce qu’il a lu"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: plancher des pages neutralise",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "if (pages.length < MIN_PAGES_LIVREES) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger un livré sans pages (plancher de pages)"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: plancher de la feuille servie neutralise",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "if (feuilles.length < MIN_FEUILLES_SERVIES || servie.regles < MIN_REGLES_SERVIES) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger une feuille servie illisible (plancher de feuilles et de règles)"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: plancher des noms servis neutralise",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "if (servie.noms.size < MIN_NOMS_SERVIES) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger une feuille servie trop pauvre en noms de classe"
+      ]
+    },
+    {
+      "id": "classes-sans-regle: plancher du sujet neutralise",
+      "garde": "frontend/scripts/check-classes-sans-regle.js",
+      "cible": "frontend/scripts/check-classes-sans-regle.js",
+      "trouve": "if (posees.size < MIN_CLASSES_POSEES) {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-classes-sans-regle.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-classes-sans-regle.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger un sujet vide (plancher de classes posées)"
       ]
     },
     {
@@ -3179,6 +3546,106 @@
       ]
     },
     {
+      "id": "reliquats-css: verdict non prononce",
+      "garde": "frontend/scripts/check-reliquats-css.js",
+      "cible": "frontend/scripts/check-reliquats-css.js",
+      "trouve": "  if (propre) {",
+      "remplace": "  if (propre || true) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-reliquats-css.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-reliquats-css.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme le jeton déclaré que rien ne lit"
+      ]
+    },
+    {
+      "id": "reliquats-css: lecture des jetons neutralisee",
+      "garde": "frontend/scripts/check-reliquats-css.js",
+      "cible": "frontend/scripts/check-reliquats-css.js",
+      "trouve": "for (const [nom, ligne] of declarations(css)) {",
+      "remplace": "for (const [nom, ligne] of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-reliquats-css.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-reliquats-css.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme le jeton déclaré que rien ne lit"
+      ]
+    },
+    {
+      "id": "reliquats-css: plancher des jetons neutralise",
+      "garde": "frontend/scripts/check-reliquats-css.js",
+      "cible": "frontend/scripts/check-reliquats-css.js",
+      "trouve": "if (jetonsDeclares.size < MIN_JETONS_DECLARES) {",
+      "remplace": "if (jetonsDeclares.size < 0) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-reliquats-css.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-reliquats-css.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "REFUSE de juger sous les planchers de lecture"
+      ]
+    },
+    {
+      "id": "reliquats-css: blanchiment des commentaires neutralise",
+      "garde": "frontend/scripts/reliquats-css.js",
+      "cible": "frontend/scripts/reliquats-css.js",
+      "trouve": "if (s[i] === '/' && s[i + 1] === '*') {",
+      "remplace": "if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-reliquats-css.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-reliquats-css.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "ne prend pas un commentaire pour une déclaration ni un mot étranger"
+      ]
+    },
+    {
+      "id": "reliquats-css: mots etrangers neutralises",
+      "garde": "frontend/scripts/reliquats-css.js",
+      "cible": "frontend/scripts/reliquats-css.js",
+      "trouve": "for (const mot of MOTS_ETRANGERS) {",
+      "remplace": "for (const mot of []) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-reliquats-css.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-reliquats-css.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "sort 1 et nomme la police du gabarit (source-code-pro)"
+      ]
+        },
+    {
       "id": "environment: nettoyage execute sans accord",
       "garde": "frontend/scripts/check-test-environment.js",
       "cible": "frontend/scripts/check-test-environment.js",
@@ -3196,6 +3663,126 @@
       "cwd": "frontend",
       "attend": [
         "n’exécute RIEN sans accord"
+      ]
+    },
+    {
+      "id": "hero-images: variante plus lourde que son repli toleree",
+      "garde": "frontend/scripts/check-hero-images.js",
+      "cible": "frontend/scripts/check-hero-images.js",
+      "trouve": "    if (jpegEquivalent !== undefined && buf.length >= jpegEquivalent) {",
+      "remplace": "    if (false && jpegEquivalent !== undefined && buf.length >= jpegEquivalent) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-hero-images.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-hero-images.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une variante PLUS LOURDE que le JPEG qu'elle double"
+      ]
+    },
+    {
+      "id": "hero-images: source recodee sans regeneration toleree",
+      "garde": "frontend/scripts/check-hero-images.js",
+      "cible": "frontend/scripts/check-hero-images.js",
+      "trouve": "      if (mesure.sha256 !== entree.sha256_source) {",
+      "remplace": "      if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-hero-images.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-hero-images.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une source JPEG recodée sans régénérer les variantes (empreinte)"
+      ]
+    },
+    {
+      "id": "hero-images: dimension annoncee non verifiee",
+      "garde": "frontend/scripts/check-hero-images.js",
+      "cible": "frontend/scripts/check-hero-images.js",
+      "trouve": "    if (dimensions.largeur !== info.largeur || dimensions.hauteur !== info.hauteur) {",
+      "remplace": "    if (false) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-hero-images.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-hero-images.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse une variante d'une AUTRE taille que celle annoncée"
+      ]
+    },
+    {
+      "id": "hero-images: encodage orphelin tolere",
+      "garde": "frontend/scripts/check-hero-images.js",
+      "cible": "frontend/scripts/check-hero-images.js",
+      "trouve": "  if (orphelins.length) {",
+      "remplace": "  if (false && orphelins.length) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-hero-images.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-hero-images.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "refuse un résidu publié que personne ne sert"
+      ]
+    },
+    {
+      "id": "css-inline: depassement de budget neutralise",
+      "garde": "frontend/scripts/check-css-inline-budget.js",
+      "cible": "frontend/scripts/check-css-inline-budget.js",
+      "trouve": "    if (page.octets > ligne.budget) {",
+      "remplace": "    if (false && page.octets > ligne.budget) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-inline-budget.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-inline-budget.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "de CSS inline > budget 71680 o"
+      ]
+    },
+    {
+      "id": "css-inline: plancher de la feuille critique neutralise",
+      "garde": "frontend/scripts/check-css-inline-budget.js",
+      "cible": "frontend/scripts/check-css-inline-budget.js",
+      "trouve": "    if (page.octets < ligne.plancher) {",
+      "remplace": "    if (false && page.octets < ligne.plancher) {",
+      "runner": "node",
+      "preuve": "frontend/scripts/__tests__/check-css-inline-budget.test.js",
+      "commande": [
+        "npx",
+        "vitest",
+        "run",
+        "scripts/__tests__/check-css-inline-budget.test.js",
+        "--reporter=basic"
+      ],
+      "cwd": "frontend",
+      "attend": [
+        "< plancher 61440 o"
       ]
     }
   ]

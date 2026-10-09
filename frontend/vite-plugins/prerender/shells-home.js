@@ -9,7 +9,6 @@
 // l'accueil (src/config/page-sections.js, que lit src/pages/Home.js).
 
 import { COUNTRIES } from '../../src/config/countries.js'
-import { CLASSES_ICONE } from '../../src/config/page-icons.js'
 import { nomDuDrapeau } from '../../src/config/flags.js'
 // La COUPURE du titre du héros appartient au plan : la coquille peint les deux
 // mêmes moitiés que src/pages/Home.js, sur les cinq langues, sans recopier la
@@ -22,7 +21,14 @@ import { couperLeTitre } from '../../src/config/page-sections.js'
 // module : les deux canaux publient le même `<img>`, sans quoi la bascule
 // coquille → React remplacerait une boîte par une autre, et l'élément LCP de
 // « / » serait ré-élu par le JavaScript).
-import { PHOTOS_HEROS, PHOTO_HEROS_LARGEUR, PHOTO_HEROS_HAUTEUR } from '../../src/config/photos-heros.js'
+import {
+  PHOTOS_HEROS,
+  PHOTO_HEROS_FORMATS,
+  PHOTO_HEROS_LARGEUR,
+  PHOTO_HEROS_HAUTEUR,
+  PHOTO_HEROS_SIZES,
+  srcsetHeros,
+} from '../../src/config/photos-heros.js'
 import { svgDeLIcone, svgDuDrapeau } from './icons-serveur.js'
 
 export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
@@ -160,7 +166,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
           "(src/config/page-sections.js) — le bloc de contact de l'accueil lit ses glyphes là-bas."
       )
     }
-    return svgDeLIcone(action.icone, CLASSES_ICONE.ligne)
+    return svgDeLIcone(action.icone, 'ligne')
   }
 
   return [
@@ -191,7 +197,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="${heroGrilleClass}">`,
     `<div class="${heroCopieClass}">`,
     `<span class="${heroKickerClass} mb-6">`,
-    svgDeLIcone('escrow', CLASSES_ICONE.heros),
+    svgDeLIcone('escrow', 'heros'),
     `${esc(T('escrowBannerTitle'))}`,
     `</span>`,
     `<h1 class="${heroTitleClass}">${esc(titreTete)}`,
@@ -204,9 +210,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `</div>`,
     // Bandeau de confiance (mêmes clés i18n que src/pages/Home.js).
     `<div class="${heroReperesClass}">`,
-    `<span>${svgDeLIcone('escrow', CLASSES_ICONE.heros)}${esc(T('escrowTrustTitle'))}</span>`,
-    `<span>${svgDeLIcone('promiseSecurePayments', CLASSES_ICONE.heros)}${esc(T('securePayments'))}</span>`,
-    `<a href="/how-it-works" class="${lienFlecheClairClass}">${esc(T('howItWorksLink'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
+    `<span>${svgDeLIcone('escrow', 'heros')}${esc(T('escrowTrustTitle'))}</span>`,
+    `<span>${svgDeLIcone('promiseSecurePayments', 'heros')}${esc(T('securePayments'))}</span>`,
+    `<a href="/how-it-works" class="${lienFlecheClairClass}">${esc(T('howItWorksLink'))}${svgDeLIcone('flecheDroite', 'flecheLigne')}</a>`,
     `</div>`,
     `</div>`,
     // LA PHOTO DU HÉROS : la PREMIÈRE de la liste partagée, avec ses
@@ -224,7 +230,19 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // le texte du héros, et l'élément LCP serait ré-élu par le repaint de React
     // (voir le commentaire détaillé du composant et du préchargement dans
     // vite-plugins/prerender-route-meta.js).
-    `<img src="${esc(PHOTOS_HEROS[0])}" alt="" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}">`,
+    //
+    // LES VARIANTES AVIF ET WEBP SONT PUBLIÉES ICI AUSSI (08/10/2026), avec les
+    // MÊMES `srcset`, le MÊME `sizes` et le MÊME ordre de formats que React :
+    // c'est le module de configuration qui les fournit (`srcsetHeros`,
+    // `PHOTO_HEROS_FORMATS`, `PHOTO_HEROS_SIZES`). Une coquille qui publierait
+    // un autre jeu de candidats ferait télécharger un fichier au premier paint
+    // et un AUTRE à la bascule — deux fichiers pour une seule photo, soit
+    // exactement ce que cette passe cherche à éviter. L'`<img>` reste le
+    // dernier enfant du `<picture>` : c'est lui le repli, et lui l'élément LCP.
+    `<picture>${PHOTO_HEROS_FORMATS.map(
+      (format) =>
+        `<source type="image/${format}" srcset="${esc(srcsetHeros(0, format))}" sizes="${esc(PHOTO_HEROS_SIZES)}">`
+    ).join('')}<img src="${esc(PHOTOS_HEROS[0])}" alt="" width="${PHOTO_HEROS_LARGEUR}" height="${PHOTO_HEROS_HAUTEUR}" fetchpriority="high" decoding="sync" class="${heroIllustrationImageClass}"></picture>`,
     `</div>`,
     `</div>`,
     `</section>`,
@@ -235,7 +253,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // donc la géométrie du ruban.
     `<section class="${rubanClass}">`,
     `<div class="${rubanInnerClass}">`,
-    `<span class="${rubanEtiquetteClass}">${svgDeLIcone('countryGlobe', CLASSES_ICONE.pastille)}${esc(T('availableIn4Countries'))}</span>`,
+    `<span class="${rubanEtiquetteClass}">${svgDeLIcone('countryGlobe', 'pastille')}${esc(T('availableIn4Countries'))}</span>`,
     `<div class="${rubanJetonsClass}">`,
     ...COUNTRIES.map((country) => {
       // Le drapeau est DESSINÉ, comme chez React (`FlagIcon`, qui passe par le
@@ -278,9 +296,9 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     ...homePlan.categories.map(
       (category) =>
         `<a href="/jobs?category=${category.labelKey}" class="${ligneMetierClass}">` +
-        `<span class="${pastilleClass}">${svgDeLIcone(category.icone, CLASSES_ICONE.pastille)}</span>` +
+        `<span class="${pastilleClass}">${svgDeLIcone(category.icone, 'pastille')}</span>` +
         `<span class="${nomLigneClass}">${esc(T(category.labelKey))}</span>` +
-        svgDeLIcone('flecheDroite', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
+        svgDeLIcone('flecheDroite', 'flecheLigne', flecheLigneClass) +
         `</a>`
     ),
     `</div>`,
@@ -313,7 +331,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     ...homePlan.promises.map(
       ({ icone, titleKey, descriptionKey: textKey }) =>
         `<div class="${cardClass} ${carteClass}">` +
-        `<span class="${pastilleClass} mb-5">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
+        `<span class="${pastilleClass} mb-5">${svgDeLIcone(icone, 'pastille')}</span>` +
         `<h3 class="${nomLigneClass} mb-3">${esc(T(titleKey))}</h3>` +
         `<p class="${noteLigneClass}">${esc(T(textKey))}</p>` +
         `</div>`
@@ -345,12 +363,12 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
         // pas. La flèche suit : à DROITE, puisqu'elle mène quelque part.
         `<a href="/how-it-works" class="${ligneEtapeClass}">` +
         `<span class="${pastilleCreuseClass}"><span class="text-lg font-bold">${esc(T(numberKey))}</span></span>` +
-        `<span class="${pastilleClass}">${svgDeLIcone(icone, CLASSES_ICONE.pastille)}</span>` +
+        `<span class="${pastilleClass}">${svgDeLIcone(icone, 'pastille')}</span>` +
         `<div>` +
         `<h3 class="${nomLigneClass}">${esc(T(titleKey))}</h3>` +
         `<p class="${noteLigneClass}">${esc(T(textKey))}</p>` +
         `</div>` +
-        svgDeLIcone('flecheDroite', `${CLASSES_ICONE.flecheLigne} ${flecheLigneClass}`) +
+        svgDeLIcone('flecheDroite', 'flecheLigne', flecheLigneClass) +
         `</a>`
     ),
     `</div>`,
@@ -366,13 +384,13 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<div class="${panneauArtClass}">`,
     `<span class="${panneauOrbeClass}" aria-hidden="true"></span>`,
     `<img src="/assets/kojo-paiement-securise.svg" alt="" width="620" height="500" loading="lazy" decoding="async" class="${panneauImageClass}">`,
-    `<span class="${panneauEstampilleClass}">${svgDeLIcone(homePlan.icone, CLASSES_ICONE.heros)}${esc(T('securePayments'))}</span>`,
+    `<span class="${panneauEstampilleClass}">${svgDeLIcone(homePlan.icone, 'heros')}${esc(T('securePayments'))}</span>`,
     `</div>`,
     `<div>`,
     `<h2 class="${headClass} mb-4">${esc(T('escrowTrustTitle'))}</h2>`,
     `<p class="${sectionIntroClass} mb-4">${esc(T('escrowTrustText'))}</p>`,
     `<p class="${noteLigneClass} mb-6">${esc(T('escrowTrustBullets'))}</p>`,
-    `<a href="/how-it-works" class="bouton bouton-encre">${esc(T('learnMore'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
+    `<a href="/how-it-works" class="bouton bouton-encre">${esc(T('learnMore'))}${svgDeLIcone('flecheDroite', 'flecheLigne')}</a>`,
     `</div>`,
     `</div>`,
     `</div>`,
@@ -384,8 +402,8 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     `<h2 class="titre-section mb-6">${esc(T('joinThousands'))}</h2>`,
     `<p class="text-lg md:text-xl opacity-90">${esc(T('startConnectingToday'))}</p>`,
     `<div class="${ctaActionsClass}">`,
-    `<a href="/register?type=client" class="bouton bouton-creme">${esc(T('lookingForServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
-    `<a href="/register?type=worker" class="bouton bouton-contour">${esc(T('offerServices'))}${svgDeLIcone('flecheDroite', CLASSES_ICONE.flecheLigne)}</a>`,
+    `<a href="/register?type=client" class="bouton bouton-creme">${esc(T('lookingForServices'))}${svgDeLIcone('flecheDroite', 'flecheLigne')}</a>`,
+    `<a href="/register?type=worker" class="bouton bouton-contour">${esc(T('offerServices'))}${svgDeLIcone('flecheDroite', 'flecheLigne')}</a>`,
     `</div>`,
 
     // ── LES DEUX FAITS DE LA CLÔTURE (07/10/2026) ─────────────────────────────
@@ -400,7 +418,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     ...homePlan.stats.map(
       ({ labelKey, shellText, icone }) =>
         `<div class="${faitClass}">` +
-        `<span class="${faitFigureClass}">${svgDeLIcone(icone, CLASSES_ICONE.heros)}${esc(shellText)}</span>` +
+        `<span class="${faitFigureClass}">${svgDeLIcone(icone, 'heros')}${esc(shellText)}</span>` +
         `<span class="${faitLibelleClass}">${esc(T(labelKey))}</span>` +
         `</div>`
     ),
@@ -502,7 +520,7 @@ export function buildHomeShell({ esc, T, contact, socialLinks, pageSections }) {
     // intégrée à l'appui. Les deux canaux publiant les mêmes classes, la
     // bascule coquille → React ne déplace rien.
     `<div class="${contactPlan.mapFrameClass}">`,
-    svgDeLIcone(contactPlan.icone, CLASSES_ICONE.carteContact),
+    svgDeLIcone(contactPlan.icone, 'carteContact'),
     `<a href="${esc(contact.mapsUrl)}" target="_blank" rel="noreferrer" title="${esc(T('mapIframeTitle').replace('{address}', contact.address))}" class="${contactPlan.mapControlClass}">${esc(T(contactPlan.mapButtonKey))}</a>`,
     `</div>`,
     `</div>`,

@@ -7,7 +7,7 @@ import {
   Bell as BellGlyph, CheckCircle2, ClipboardList, Flag, MessageSquare, PartyPopper, Wallet, Wrench,
 } from 'lucide-react';
 import { Icone } from './chrome-icons';
-import { ancrageDe } from './notificationPanelPlacement';
+import { VERS_LE_HAUT } from './notificationPanelPlacement';
 
 // Le message d'un échec d'action, par action : la copie du produit, jamais le
 // statut brut du serveur. Une action qui échoue doit se VOIR — c'est la moitié
@@ -171,7 +171,14 @@ export default function NotificationPanel() {
       tabIndex={-1}
       data-notification-panel="true"
       aria-label={t('notifCenterAria')}
-      className={`carte-flottante absolute right-0 ${ancrageDe(sens)} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col z-50 overflow-hidden outline-none`}
+      // LES DEUX ANCRAGES SONT ÉCRITS ICI, EN CLAIR, et c'est une mesure du
+      // 07/10/2026 : le verdict de la feuille LIVRÉE ne peut pas suivre une valeur
+      // de retour de fonction (`ancrageDe(sens)`), donc `.bottom-full` était servi
+      // sans porteur alors que ce panneau le peint. Un registre exporté ne suffit
+      // pas non plus — la minification renomme les variables, et l'objet vit dans
+      // un autre module que son lecteur. Ce que le corpus lit, c'est un LITTÉRAL
+      // dans une position de classe : il est ici, à l'endroit qui peint.
+      className={`carte-flottante absolute right-0 ${sens === VERS_LE_HAUT ? 'bottom-full mb-2' : 'mt-2'} w-[340px] sm:w-[380px] max-h-[520px] flex flex-col z-50 overflow-hidden outline-none`}
       style={{ maxHeight: 'calc(100vh - 80px)' }}
     >
       {/* En-tête */}

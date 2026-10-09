@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
 import TagInput from '../components/TagInput';
+import CadrePage from '../components/CadrePage';
 import { jobsAPI } from '../services/apiEndpoints';
 import { buildJobCreatePayload, normalizeApiErrorMessage } from '../utils/jobCreateBridge';
 import { getJobUiLabel } from '../utils/jobUiLocale';
@@ -111,12 +112,13 @@ export default function CreateJob() {
   const mapUrl = buildMapEmbedUrl(formData.location);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="titre-page">{ui.createJobTitle}</h1>
-        <p className="mt-2 text-stone-600">{ui.createJobSubtitle}</p>
-      </div>
-      <form onSubmit={handleSubmit} className="carte-editoriale space-y-5 p-6">
+    <CadrePage
+      chemin="/create-job"
+      titre={ui.createJobTitle}
+      chapeau={ui.createJobSubtitle}
+      classeCorps=""
+    >
+      <form onSubmit={handleSubmit} className="carte-editoriale space-y-5 carte-publique">
         {error && <div className="rounded-[3px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         <div>
@@ -204,6 +206,6 @@ export default function CreateJob() {
           <button type="submit" disabled={loading} className="bouton bouton-encre disabled:cursor-not-allowed disabled:opacity-60">{loading ? ui.publishing : ui.createJob}</button>
         </div>
       </form>
-    </div>
+    </CadrePage>
   );
 }

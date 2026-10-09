@@ -59,7 +59,13 @@
 // Les budgets CLS PAR ROUTE et la matrice d'assertions : propriété de
 // scripts/lhci-cls-budgets.cjs (la table mesurée vit avec sa justification, et
 // un test l'éprouve contre le résolveur de @lhci/utils lui-même).
-const { CLS_BUDGETS, REQUETES_HORS_CONTROLE, clsAssertionMatrix } = require('./scripts/lhci-cls-budgets.cjs');
+const {
+  CLS_BUDGETS,
+  REQUETES_HORS_CONTROLE,
+  RETRAITS,
+  clsAssertionMatrix,
+  socleMobile,
+} = require('./scripts/lhci-cls-budgets.cjs');
 // La règle « cette adresse est-elle la nôtre ? » vit dans scripts/site-meta.js,
 // avec les gardes qui la posent : ce fichier l'importe au lieu d'en garder une
 // troisième copie (`package.json` exige Node >= 20.19.0, la version qui active
@@ -266,42 +272,25 @@ module.exports = {
       //   • c'est aussi la seule forme où une exception FUTURE tiendrait sur une
       //     page sans affaiblir les autres — l'entrée globale rendait toute
       //     exception contagieuse.
-      assertMatrix: clsAssertionMatrix(auditedPaths, {
-        // ── Socle commun, mesuré le 16/09/2026 (3 runs par page, médianes) ──
-        //   page        score  FCP ms  LCP ms  TBT ms (médiane, détail)
-        //   /           0,99    1263    1263       1  [2878, 1, 0]
-        //   /dashboard  0,98    1395    2386       0  [0, 0, 0]
-        //   /jobs       0,94     969    2057      30  [665, 12, 30]
-        //   /profile    0,97    1399    2496       2  [7, 2, 0]
-        // Les TBT par run montrent la distribution réelle d'un runner partagé :
-        // 0-30 ms le plus souvent, jusqu'à 2878 ms sur un run. C'est pourquoi
-        // numberOfRuns=3 est indispensable, et pourquoi la grandeur comparée au
-        // seuil est le MEILLEUR des 3 (voir « Quelle statistique pour quelle
-        // grandeur ») : une mesure unique serait une pièce de monnaie, et une
-        // médiane sur 3 runs l'est presque autant quand un run sur trois
-        // souffre.
-        'categories:performance': ['error', { minScore: 0.9 }],
-        // LCP : pire meilleur-run mesuré 2587 ms sur les 2 jobs de main du
-        // 20/09/2026 (39 runs, 13 pages) — la marge reste ~1,4×. Ce plafond
-        // n'est PAS relevé : la route dont le LCP est produit par une réponse
-        // d'API n'est simplement plus assertée sur cette grandeur (elle garde
-        // FCP, TBT et CLS) — voir `LCP_PRODUIT_PAR_UN_TIERS`.
-        'largest-contentful-paint': ['error', { maxNumericValue: 3500 }],
-        // TBT : interactivité. Le plafond du repli local est plus large et
-        // documenté ici parce que ce repli tourne sur un runner partagé (même
-        // commit : 516 ms puis 1397 ms), plutôt que de laisser la CI rougir au
-        // hasard. Les deux plafonds sont INCHANGÉS par la passe du 20/09/2026 :
-        // c'est la statistique qui a changé, pas le budget. Comparés au meilleur
-        // des 3 runs, ils ne sont plus frôlés : sur les 2 jobs de main du
-        // 20/09/2026, le pire meilleur-run vaut 10 ms (déploiement réel).
-        'total-blocking-time': [
-          'error',
-          { maxNumericValue: targetIsLocal ? 1600 : 1200 },
-        ],
-        // FCP : pire meilleur-run mesuré 1380 ms sur les 2 jobs de main du
-        // 20/09/2026 (39 runs, 13 pages) — la marge reste ~1,8×.
-        'first-contentful-paint': ['error', { maxNumericValue: 2500 }],
-      }),
+      // ── LE SOCLE : DES PLAFONDS DÉRIVÉS DE LEURS MESURES, PAR HÔTE ────────
+      // Les quatre littéraux qui vivaient ici (score 0,9 / LCP 3500 / TBT
+      // 1600-1200 / FCP 2500) sont remplacés par `socleMobile(hote)`, qui lit la
+      // table MESURÉE de `scripts/lhci-cls-budgets.cjs` — la même doctrine que le
+      // TBT desktop, qui n'est plus un littéral depuis le 24/09/2026. Deux
+      // conséquences, et la première est vérifiable : les plafonds DÉRIVÉS
+      // valent exactement les anciens (3 500 et 2 500 ms, 1 600 sur le repli
+      // local), donc cette passe ne change AUCUN verdict — elle change d'où le
+      // nombre vient, et re-mesurer la table déplacera le budget sans qu'on ait à
+      // retrouver un nombre rond dans une phrase.
+      //
+      // Ce qui a été RETIRÉ, et c'est la seconde moitié de l'angle mort 19(b) :
+      // le SCORE (`categories:performance`) et le TBT du DÉPLOIEMENT. Les deux
+      // sont écrits, avec la mesure qui les retire, dans `RETRAITS` — un retrait
+      // sans phrase serait un affaiblissement, et `RETRAITS` est ce qui
+      // l'empêche. Aucune grandeur n'est relâchée par ces retraits : le FCP, le
+      // LCP (hors routes produites par une réponse), le TBT de la pile locale et
+      // le CLS par route restent assertés, chacun pour lui-même.
+      assertMatrix: clsAssertionMatrix(auditedPaths, socleMobile(targetIsLocal ? 'pile-locale' : 'deploiement')),
     },
     upload: {
       target: 'filesystem',

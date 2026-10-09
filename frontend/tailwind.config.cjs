@@ -9,6 +9,17 @@
 const couleurs = require('tailwindcss/colors');
 
 module.exports = {
+  // ── `darkMode: ['class']` RESTE, ET C'EST UNE DÉCISION MESURÉE (08/10/2026) ──
+  // Le site n'a PAS de thème sombre : zéro variant `dark:` dans `src/`, zéro
+  // porteur de la classe `.dark` (le bloc `.dark` de `:root` a été retiré le
+  // 28/09/2026) et zéro règle `.dark` dans la feuille livrée. La valeur choisie
+  // décide de ce qui se passerait si un `dark:` était écrit un jour : avec
+  // `'class'`, il ne s'applique QUE si quelqu'un pose la classe — donc jamais,
+  // et la règle reste inerte ; avec le défaut de Tailwind (`'media'`), il
+  // s'activerait tout seul sur un poste réglé en sombre, alors que le site force
+  // `color-scheme: light` (`src/index.css`) et n'a aucune palette pour ce cas.
+  // Inerte est le bon côté de cette alternative : un thème sombre doit être une
+  // décision, pas un effet de bord de la préférence du visiteur.
   darkMode: ['class'],
   content: [
     './index.html',
@@ -27,6 +38,45 @@ module.exports = {
     // que dans une liste d'exceptions tenue ailleurs.
     '!./src/pages/MobileTest.js',
     '!./src/components/MobilePhotoTest.js',
+  ],
+  // ── LES NOMS QUE LE SITE A DÉCIDÉ DE NE PLUS GÉNÉRER (07/10/2026) ──────────
+  //
+  // Tailwind ne lit pas des classes, il lit des JETONS : tout mot d'un fichier
+  // scanné qui ressemble à un utilitaire fait GÉNÉRER cet utilitaire, même quand
+  // ce mot est une variable, une méthode ou de la prose. Les neuf noms ci-dessous
+  // sont donc de VRAIS utilitaires — `container`, `visible`, `static`, `table`,
+  // `resize`, `blur`, `filter`, `transition`, `ease-out` — que PERSONNE n'écrit
+  // comme classe : mesuré le 07/10/2026 sur l'arbre livré, ils produisaient
+  // **195 règles servies** (14 pages : `.container` six fois par page, les huit
+  // autres une fois), toutes sans porteur, c'est-à-dire du CSS que le visiteur
+  // télécharge et que rien ne peint. Chaque source a été vérifiée une par une :
+  //   • `container` ← `const pulseCount = (container) => …` ;
+  //   • `visible`   ← la prose « un trou visible » ;
+  //   • `static`    ← `static getDerivedStateFromError(error)` (ErrorBoundary) ;
+  //   • `table`     ← la prose « la table d'emoji qui vivait … » ;
+  //   • `resize`    ← `addEventListener('resize', …)` ;
+  //   • `blur`      ← `backdropFilter: 'blur(10px)'` ;
+  //   • `filter`    ← `[…].filter(Boolean)` ;
+  //   • `transition` ← la prose « la transition de vue native » ;
+  //   • `ease-out`  ← `animation: 'slideInRight 0.3s ease-out'`.
+  //
+  // Les nommer ici est la moitié « CESSER DE LES GÉNÉRER » de la dette fermée ce
+  // jour-là (l'autre moitié — donner un porteur à ceux qui SONT des classes — vit
+  // dans le code, cf. `scripts/css-selecteurs-morts.js`). Le chemin inverse est
+  // vérifié : `scripts/check-css-selecteurs-morts.js` REFUSE qu'un nom de cette
+  // liste soit posé quelque part — un nom bloqué mais posé serait une classe dont
+  // la règle n'existe plus, le même mensonge à l'envers. Le jour où une page
+  // écrira vraiment `transition` ou `blur` comme classe, le garde le dira.
+  blocklist: [
+    'container',
+    'visible',
+    'static',
+    'table',
+    'resize',
+    'blur',
+    'filter',
+    'transition',
+    'ease-out',
   ],
   theme: {
     extend: {
@@ -59,61 +109,33 @@ module.exports = {
         //     Seule la TEINTE change, et c'est la seule chose qu'on voulait
         //     changer.
         gray: couleurs.stone,
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))'
-        },
-        popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))'
-        },
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))'
-        },
-        secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))'
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))'
-        },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))'
-        },
-        destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))'
-        },
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        chart: {
-          '1': 'hsl(var(--chart-1))',
-          '2': 'hsl(var(--chart-2))',
-          '3': 'hsl(var(--chart-3))',
-          '4': 'hsl(var(--chart-4))',
-          '5': 'hsl(var(--chart-5))'
-        }
-      },
-      keyframes: {
-        'accordion-down': {
-          from: { height: '0' },
-          to: { height: 'var(--radix-accordion-content-height)' }
-        },
-        'accordion-up': {
-          from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: '0' }
-        }
-      },
-      animation: {
-        'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out'
+
+        // ── LES DOUZE ENTRÉES DE COULEUR shadcn SONT RETIRÉES (08/10/2026) ──
+        // `background`, `foreground`, `card`, `popover`, `primary`,
+        // `secondary`, `muted`, `accent`, `destructive`, `border`, `input`,
+        // `ring` et `chart.1..5` renvoyaient toutes vers un jeton de `:root`.
+        // MESURÉ sur la feuille livrée : elles ne génèrent AUCUN utilitaire
+        // (zéro règle `.bg-card`, `.text-primary` ou `.border-border` servie),
+        // et aucun composant ne les nomme (`grep` sur `src/` : une seule
+        // occurrence, le `@apply` de `src/index.css`, retiré lui aussi). Les
+        // seules qui peignaient étaient battues par une règle plus tardive du
+        // site (`App.css` pour le fond, le préflight pour la bordure, cf.
+        // `src/index.css`) ; la couleur de texte, la seule qui restait, est
+        // passée à la palette du site. Les garder aurait laissé une palette
+        // FROIDE (le gris shadcn) à portée d'un `bg-muted` — c'est-à-dire un
+        // nom qui existe sans qu'aucun pixel du site ne lui corresponde.
+        // `scripts/check-reliquats-css.js` refuse leur retour.
       }
+      // ── LES ANIMATIONS `accordion-*` SONT RETIRÉES (08/10/2026) ────────────
+      // Leurs `@keyframes` animaient une hauteur lue dans
+      // `var(--radix-accordion-content-height)`, un jeton du paquet
+      // `@radix-ui/react-accordion` — qui n'est PAS une dépendance du projet
+      // (aucune entrée `radix` dans `package.json`), et qu'aucun composant
+      // n'importe. MESURÉ : les deux utilitaires ne sont posés nulle part et la
+      // feuille livrée ne contient pas une occurrence d'`accordion` — Tailwind
+      // n'émet un `@keyframes` que si son utilitaire `animate-*` est utilisé,
+      // donc ces trois blocs ne servaient rien. Un thème qui cite un paquet
+      // absent est un reliquat du gabarit shadcn, pas une intention.
     }
   },
   plugins: [],

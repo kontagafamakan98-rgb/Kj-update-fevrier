@@ -220,6 +220,31 @@ const PAGES_MIN_H_FULL = [
   'MobileTest.js',
 ];
 
+/**
+ * LES PAGES DONT LE CONTENEUR RACINE VIENT D'UNE DÉCLARATION, et non d'un
+ * littéral : la passe d'unification du 07/10/2026 a RETIRÉ `min-h-full` de
+ * `Payment.js` pour le confier à `PAGE_SECTIONS['/payment']` (les deux canaux de
+ * cette route lisent la même chaîne). Le contrôle ci-dessous suit donc la valeur
+ * jusqu'à son PROPRIÉTAIRE, au lieu d'exiger que la page la recopie — sans quoi
+ * il demanderait exactement le contraire de ce que le dépôt vient de faire.
+ *
+ * Le suivi reste BORNÉ : on n'extrait pas le fichier entier, mais le bloc de la
+ * clé concernée jusqu'à la clé suivante. Une classe trouvée ailleurs dans le plan
+ * ne vaudrait rien, et `min-h-screen` déclaré pour /jobs ne doit pas blanchir
+ * une page de cette liste.
+ */
+const CADRES_DECLARES = {
+  'Payment.js': { plan: '../../config/page-sections.js', cle: "'/payment': {" },
+};
+
+/** Le bloc d'une clé de plan : de la clé à la clé suivante (ou à la fin). */
+const blocDeLaCle = (plan, cle) => {
+  const debut = plan.indexOf(cle);
+  if (debut < 0) return null;
+  const suite = plan.slice(debut + cle.length).search(/\n\s{2}'\//);
+  return suite < 0 ? plan.slice(debut) : plan.slice(debut, debut + cle.length + suite);
+};
+
 describe('anti-CLS — wrappers de page ancrés sur le shell flex-1 (min-h-full)', () => {
   it('chaque page du shell utilise min-h-full et jamais min-h-screen', () => {
     const offenders = [];
@@ -228,7 +253,23 @@ describe('anti-CLS — wrappers de page ancrés sur le shell flex-1 (min-h-full)
         path.resolve(__dirname, '../../pages', page),
         'utf8'
       );
-      if (!source.includes('min-h-full')) {
+      // Où la page déclare-t-elle sa hauteur minimale ? Soit chez elle (littéral),
+      // soit dans le plan qu'elle lit — et le contrôle suit la valeur.
+      let porteur = source;
+      const declare = CADRES_DECLARES[page];
+      if (declare) {
+        const plan = fs.readFileSync(path.resolve(__dirname, declare.plan), 'utf8');
+        const bloc = blocDeLaCle(plan, declare.cle);
+        if (!bloc) {
+          offenders.push(
+            `${page} : le bloc « ${declare.cle} » est introuvable dans ${declare.plan} — ` +
+              'la déclaration a été renommée ou supprimée, le contrôle ne peut plus suivre la valeur.'
+          );
+          continue;
+        }
+        porteur = bloc;
+      }
+      if (!porteur.includes('min-h-full')) {
         offenders.push(`${page} : min-h-full absent (le footer ancré ne sera pas comblé)`);
       }
       if (source.includes('min-h-screen')) {
@@ -238,6 +279,16 @@ describe('anti-CLS — wrappers de page ancrés sur le shell flex-1 (min-h-full)
       }
     }
     expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+
+  it('le suivi de la déclaration SAIT MORDRE — cas synthétiques', () => {
+    // Le plan réel, réduit à deux clés : la classe doit être trouvée dans la BONNE.
+    const plan = `export const PAGE_SECTIONS = {\n  '/payment': {\n    frameClass: 'min-h-full bg-gray-50 py-8',\n  },\n\n  '/jobs': {\n    frameClass: 'cadre-page min-h-screen',\n  },\n};\n`;
+    const payment = blocDeLaCle(plan, "'/payment': {");
+    expect(payment).toContain('min-h-full');
+    expect(payment, 'le bloc /payment a débordé sur la clé suivante').not.toContain('min-h-screen');
+    // Une clé absente rend `null` — donc un refus nommé, pas un vert silencieux.
+    expect(blocDeLaCle(plan, "'/inexistant': {")).toBe(null);
   });
 });
 

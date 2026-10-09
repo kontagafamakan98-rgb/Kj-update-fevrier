@@ -64,6 +64,11 @@ const CONTENT_TYPES = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
+  // Le héros publie ses variantes en AVIF (src/config/photos-heros.js) : sans
+  // cette entrée, le serveur de l'aperçu les servirait en
+  // `application/octet-stream` — le navigateur les décoderait quand même, mais
+  // la mesure du format téléchargé porterait alors sur un type FAUX.
+  '.avif': 'image/avif',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.txt': 'text/plain; charset=utf-8',

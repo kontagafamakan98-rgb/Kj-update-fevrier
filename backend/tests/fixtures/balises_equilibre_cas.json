@@ -1,0 +1,256 @@
+[
+  {
+    "nom": "vide",
+    "html": "",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "equilibre",
+    "html": "<div><p>x</p></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "non-fermee",
+    "html": "<div><span>x</span>",
+    "attendu": [
+      {
+        "type": "non-fermee",
+        "balise": "div",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "<div>"
+      }
+    ],
+    "messages": [
+      "`<div>` ouvert ligne 1 n'est JAMAIS refermé — « <div> »"
+    ]
+  },
+  {
+    "nom": "fermee-en-portee",
+    "html": "<section>\n<div>\nx\n</section>",
+    "attendu": [
+      {
+        "type": "fermee-en-portee",
+        "balise": "div",
+        "ligne": 2,
+        "ligneFin": 4,
+        "fermeePar": "section",
+        "extrait": "<div>"
+      }
+    ],
+    "messages": [
+      "`<div>` ouvert ligne 2 est refermé en PORTÉE par `</section>` ligne 4 au lieu de sa propre balise — « <div> »"
+    ]
+  },
+  {
+    "nom": "fermee-sans-ouverture",
+    "html": "<p>x</p></div>",
+    "attendu": [
+      {
+        "type": "fermee-sans-ouverture",
+        "balise": "div",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "</div>"
+      }
+    ],
+    "messages": [
+      "`</div>` ligne 1 n'a AUCUNE ouverture — « </div> »"
+    ]
+  },
+  {
+    "nom": "non-terminee",
+    "html": "<div class=\"a",
+    "attendu": [
+      {
+        "type": "non-terminee",
+        "balise": "div",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "<div class=\"a"
+      }
+    ],
+    "messages": [
+      "`<div>` ligne 1 n'est pas terminé (aucun `>`) — « <div class=\"a »"
+    ]
+  },
+  {
+    "nom": "vides-et-auto-fermees",
+    "html": "<img src=\"a.png\"><br><path d=\"M0 0\" /><div></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "script-ne-compte-pas",
+    "html": "<script>var s = \"</div>\";</script><div></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "commentaire-ignore",
+    "html": "<!-- </div> --><div></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "doctype-et-instruction",
+    "html": "<!DOCTYPE html><?xml x?><div></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "texte-brut-non-ferme",
+    "html": "<script>var a=1;",
+    "attendu": [
+      {
+        "type": "non-fermee",
+        "balise": "script",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "<script>"
+      }
+    ],
+    "messages": [
+      "`<script>` ouvert ligne 1 n'est JAMAIS refermé — « <script> »"
+    ]
+  },
+  {
+    "nom": "en-portee-multiple",
+    "html": "<div><span><p></div>",
+    "attendu": [
+      {
+        "type": "fermee-en-portee",
+        "balise": "p",
+        "ligne": 1,
+        "ligneFin": 1,
+        "fermeePar": "div",
+        "extrait": "<p>"
+      },
+      {
+        "type": "fermee-en-portee",
+        "balise": "span",
+        "ligne": 1,
+        "ligneFin": 1,
+        "fermeePar": "div",
+        "extrait": "<span>"
+      }
+    ],
+    "messages": [
+      "`<p>` ouvert ligne 1 est refermé en PORTÉE par `</div>` ligne 1 au lieu de sa propre balise — « <p> »",
+      "`<span>` ouvert ligne 1 est refermé en PORTÉE par `</div>` ligne 1 au lieu de sa propre balise — « <span> »"
+    ]
+  },
+  {
+    "nom": "chevron-dans-attribut",
+    "html": "<a title=\"x > y\"></a><div></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "chevron-isole",
+    "html": "1 < 2 et <div></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "fermante-avec-espace",
+    "html": "<div></div >",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "casse-mixte",
+    "html": "<DIV></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "title-texte-brut",
+    "html": "<title>a</div></title><div></div>",
+    "attendu": [],
+    "messages": []
+  },
+  {
+    "nom": "multiligne-non-fermee",
+    "html": "<main>\n  <div>\n    <p>a</p>\n  </div>\n",
+    "attendu": [
+      {
+        "type": "non-fermee",
+        "balise": "main",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "<main>"
+      }
+    ],
+    "messages": [
+      "`<main>` ouvert ligne 1 n'est JAMAIS refermé — « <main> »"
+    ]
+  },
+  {
+    "nom": "emoji-avant-defaut",
+    "html": "<p>😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀</p></span>",
+    "attendu": [
+      {
+        "type": "fermee-sans-ouverture",
+        "balise": "span",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "</span>"
+      }
+    ],
+    "messages": [
+      "`</span>` ligne 1 n'a AUCUNE ouverture — « </span> »"
+    ]
+  },
+  {
+    "nom": "extrait-tronque-utf16",
+    "html": "<div data-x=\"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+    "attendu": [
+      {
+        "type": "non-terminee",
+        "balise": "div",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "<div data-x=\"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\ud83d"
+      }
+    ],
+    "messages": [
+      "`<div>` ligne 1 n'est pas terminé (aucun `>`) — « <div data-x=\"😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀\ud83d »"
+    ]
+  },
+  {
+    "nom": "extrait-long-tronque",
+    "html": "<div class=\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"><span>",
+    "attendu": [
+      {
+        "type": "non-fermee",
+        "balise": "div",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "<div class=\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa…"
+      },
+      {
+        "type": "non-fermee",
+        "balise": "span",
+        "ligne": 1,
+        "ligneFin": null,
+        "fermeePar": null,
+        "extrait": "<span>"
+      }
+    ],
+    "messages": [
+      "`<div>` ouvert ligne 1 n'est JAMAIS refermé — « <div class=\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa… »",
+      "`<span>` ouvert ligne 1 n'est JAMAIS refermé — « <span> »"
+    ]
+  }
+]

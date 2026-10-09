@@ -65,9 +65,26 @@
     font-size: 16px; /* Prevents zoom on iOS */
   }
 
-  /* Touch-friendly buttons */
+  /* ── LA HAUTEUR MINIMALE D'UN CONTRÔLE A UN SEUL PROPRIÉTAIRE (08/10/2026) ──
+
+     Cette règle portait `min-height: 44px`, et le socle d'`index.css` en porte
+     une autre — 48 px, pour `button, [role=button], [type=button],
+     [type=submit]`. C'est la SPÉCIFICITÉ qui décidait, pas la charte : MESURÉ
+     sur `/jobs` (Chromium, deux règles en place) un `<button>` nu calculait
+     `min-height: 44px` (la règle d'ici, plus tardive) pendant qu'un
+     `<button type="button">` calculait `48px` (l'attribut, plus spécifique) —
+     treize puces de catégorie contre quatre boutons, sur la MÊME page, pour la
+     même intention. La hauteur reprend donc la valeur du socle, la même que
+     celle des champs (`input, select, textarea`, 48 px) : les treize puces ne
+     bougent pas (elles étaient déjà à 48), et seuls les boutons dont le contenu
+     mesurait entre 44 et 48 px changent — mesuré, deux sur les six routes
+     balayées : « Vérifier le statut » (44 → 48 px, /support) et « Afficher plus
+     de missions » (45,6 → 48 px, /jobs).
+
+     `min-width` et `touch-action` restent ICI : c'est la seule règle qui donne
+     une largeur minimale à un `<button>` nu (la cible tactile en largeur n'a
+     pas d'autre porteur), et `touch-action: manipulation` non plus. */
   button {
-    min-height: 44px;
     min-width: 44px;
     touch-action: manipulation;
   }
@@ -503,10 +520,17 @@
   .bloc-differe-photo { contain-intrinsic-size: auto 454.7px; }
 }
 
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;    transition-duration: 0.01ms !important;
-  }
-}
+/* ── `prefers-reduced-motion` A UN SEUL PROPRIÉTAIRE : `index.css` (08/10/2026) ─
+
+   Ce bloc-ci en était la SECONDE copie, et la plus pauvre des deux : celui
+   d'`index.css` couvre `*` ET `*::before`/`*::after` et coupe en plus le
+   défilement doux (`scroll-behavior: auto`) ; celui-ci ne couvrait que `*`, et sa
+   forme était fautive — deux déclarations sur la MÊME ligne
+   (`animation-iteration-count: 1 !important;    transition-duration: …`).
+   Comme il venait plus tard dans la feuille, c'est LUI qui gagnait pour les trois
+   déclarations qu'elles partageaient (valeurs identiques, donc aucun changement
+   de rendu visible) — autrement dit, une copie plus étroite décidait, en
+   silence, que les pseudo-éléments n'étaient pas couverts. Un fait, un
+   propriétaire : le bloc restant est celui d'`index.css`, dont celui-ci était un
+   sous-ensemble strict. */
+

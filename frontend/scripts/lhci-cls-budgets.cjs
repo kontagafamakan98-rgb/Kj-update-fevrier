@@ -152,6 +152,60 @@ const CLS_BUDGETS = {
   '/dashboard': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
   '/payment': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 18 runs' },
   '/profile': { max: 0.06, pireMediane: 0.045, mesure: '0,0450 sur 27 runs' },
+  // Route CONNECTÉE qu'AUCUNE passe Lighthouse n'audite (`/messages` n'est pas
+  // dans `DEPLOYMENT_PATHS`) : ce plafond sert la SONDE NAVIGATEUR
+  // (`e2e/cadres-app.spec.js`, qui monte le cadre et mesure le CLS par la
+  // connexion à la fixture, aux deux tailles). 0,02 est la seule entrée dont le
+  // nombre n'est PAS une médiane de job : c'est le pire relevé de la sonde
+  // (0,0043, le 07/10/2026) — 4,6× de marge, et le seuil « bon » de Lighthouse
+  // est 0,1. La valeur se re-mesure en relançant la sonde, qui publie son relevé.
+  '/messages': {
+    max: 0.02,
+    pireMediane: 0.0043,
+    mesure: '0,0043 au pire (0,0039 mobile / 0,0043 desktop) — sonde navigateur du 07/10/2026, aucun run de main (route non auditée)',
+  },
+  // MÊME RÈGLE POUR LES DEUX ROUTES AJOUTÉES À LA SONDE LE 08/10/2026, et même
+  // valeur que /messages pour la première : 0,02 est 5,1× son pire relevé.
+  '/create-job': {
+    max: 0.02,
+    pireMediane: 0.0039,
+    mesure: '0,0039 aux deux tailles (412×823 et 1350×940) — sonde navigateur du 08/10/2026, aucun run de main (route non auditée)',
+  },
+  // `/jobs/:id` LAISSE LE PLUS HAUT DES TROIS PLAFONDS DE SONDE, et c'est une
+  // MESURE : sa fiche réserve l'écran (règle `pied-hors-ecran`, sa description
+  // n'ayant pas de longueur maximale), et la mission COURTE que la fixture servait
+  // rendait alors une page de 940 px pour une fenêtre de 940 — le pied de page,
+  // réservé SOUS la ligne de flottaison, remontait donc DANS l'écran à l'arrivée
+  // des données (0,0166 en desktop, 0,0000 en mobile, 3 relevés, stables ; un
+  // premier relevé du même cas avait donné 0,0127). C'est la contrepartie assumée
+  // et écrite dans `SkeletonLoader.js` : le cas LONG n'a AUCUN décalage de pied de
+  // page, le cas court en a un.
+  //
+  // LA FIXTURE SERT DÉSORMAIS LE CAS LONG (09/10/2026) : la première mission de
+  // `scripts/playtest-api-server.mjs` porte une annonce de plusieurs paragraphes,
+  // comme celle qu'un client publie, donc `e2e/cadres-app.spec.js` — qui visite
+  // `playtest-job-1` — mesure la page de la PRODUCTION et non plus le cas court.
+  // RELEVÉ (09/10/2026, sonde navigateur, 412×823 et 1350×940) : 0,0039 AU PIRE
+  // aux deux tailles (mobile : 0,0000 à 0,0039 selon le run ; desktop : 0,0039
+  // stable), et ce 0,0039 n'est PLUS le pied de page — la sonde le nomme : les
+  // deux conteneurs de la barre du haut se réajustent à t=147 ms quand la
+  // pastille de notifications se résout, comme sur les quatre autres routes
+  // connectées. Le CADRE desktop fait 1 280×1 767,9 px.
+  //
+  // LE PLAFOND N'A PAS ÉTÉ RESSERRÉ, et c'est décidé : le cas court (0,0166) reste
+  // un cas de PRODUCTION — une annonce d'une phrase existe —, et plus aucune sonde
+  // ne le visite maintenant que la fixture sert le cas long. 0,04 le couvre, laisse
+  // 10× le relevé du cas long, et reste 2,5× SOUS le seuil « bon » de Lighthouse
+  // (0,1). Le resserrer garderait le même angle mort en le déguisant : c'est la
+  // couverture de la sonde qu'il faudrait étendre (une seconde mission COURTE),
+  // pas le chiffre qu'il faut baisser.
+  '/jobs/:id': {
+    max: 0.04,
+    pireMediane: 0.0039,
+    mesure:
+      '0,0039 au pire du cas LONG, aux DEUX tailles (412×823 et 1350×940, 09/10/2026) — première mission de la fixture portée à plusieurs paragraphes ; ' +
+      '0,0166 mesuré le 08/10/2026 sur le cas COURT (pied de page réservé qui remonte), désormais hors du périmètre de la sonde — aucun run de main (route non auditée)',
+  },
   // Mesurées le 19/09/2026 (3 runs chacune) contre le serveur de rewrites local,
   // faute de run de main : voir l'en-tête. 0 constaté, 0,01 exigé — même
   // prudence que les autres pages mesurées à 0.
@@ -256,7 +310,10 @@ const soclePour = (route, socle) => {
   if (!Object.hasOwn(LCP_PRODUIT_PAR_UNE_REPONSE, route)) return base;
   // Le score est une moyenne pondérée qui COMPREND le LCP : l'asserter
   // réimporterait exactement la grandeur qu'on vient de retirer.
-  const { 'largest-contentful-paint': _lcp, 'categories:performance': _score, ...reste } = base;
+  // Le score n'a plus à être retiré ICI : il est retiré PARTOUT, à sa source
+  // (`RETRAITS`, et sa justification avec lui). Ne reste que le LCP, qui est la
+  // grandeur que la réponse d'API produit sur cette route-là.
+  const { 'largest-contentful-paint': _lcp, ...reste } = base;
   return reste;
 };
 
@@ -383,12 +440,160 @@ const plafondTbtDesktop = (route) => {
   return TBT_DESKTOP_BUDGETS[route].max;
 };
 
+/**
+ * LE PLAFOND SE DÉRIVE DE LA MESURE — jamais recopié d'un nombre rond.
+ *
+ * `pire` est la pire mesure DÉJÀ RELEVÉE (le pire MEILLEUR-RUN de trois tours,
+ * puisque c'est cette statistique qui est comparée au seuil — cf. l'en-tête),
+ * `marge` est le rapport que le plafond entretient avec elle, et l'arrondi au
+ * centième voisin rend le nombre lisible. La conséquence est ce qui compte :
+ * **re-mesurer la table DÉPLACE le budget**, sans que personne ait à retrouver
+ * un littéral dans une autre phrase. Un littéral, lui, se périme en silence —
+ * c'est exactement ce que l'angle mort 19(b) reprochait à ces seuils.
+ *
+ * La marge n'est pas un confort : le bruit d'un runner est UNILATÉRAL (une
+ * machine chargée ne peut qu'ajouter du temps), donc le meilleur des trois tours
+ * décrit le coût propre de l'artefact, et une régression, elle, monte dans les
+ * trois. La marge couvre donc l'écart entre le meilleur run et ce qu'un run
+ * normal peut rendre — pas la famine, qui est traitée par la SÉPARATION PAR HÔTE.
+ */
+const plafondDe = (pire, marge) => Math.round((pire * marge) / 100) * 100;
+
+/**
+ * LE SOCLE MOBILE EN MILLISECONDES, PAR MESURE — ce que l'angle mort 19(b) a
+ * remplacé les littéraux par.
+ *
+ * Ce qui a été relevé, et ce qui l'a été (deux jobs de `main` du 20/09/2026
+ * portant le MÊME arbre 14e0531, 39 runs, 13 pages) :
+ *
+ *   grandeur               pire meilleur-run   plafond d'avant   marge
+ *   LCP                                 2587 ms            3500    1,35×
+ *   FCP                                 1380 ms            2500    1,81×
+ *
+ * Les deux plafonds sont IDENTIQUES après dérivation (3 500 et 2 500 ms) : c'est
+ * la vérification que la passe n'a pas changé un verdict, elle a changé d'où le
+ * nombre vient. Et la raison pour laquelle les deux grandeurs sont sur la MÊME
+ * table, sans séparation par hôte : la mesure ne les sépare pas — « les mêmes
+ * seuils, un verdict stable » sur les deux jobs, l'un sur le repli local, l'autre
+ * sur le déploiement. Diviser une table que la mesure ne divise pas aurait créé
+ * deux endroits à tenir à jour pour un seul fait.
+ */
+const SOCLE_MOBILE = {
+  'largest-contentful-paint': {
+    pire: 2587,
+    marge: 1.35,
+    mesure:
+      'pire meilleur-run de 2 jobs de main du 20/09/2026 (39 runs, 13 pages) — les deux ' +
+      'ont passé avec le plafond dérivé, qui valait déjà 3 500 ms',
+  },
+  'first-contentful-paint': {
+    pire: 1380,
+    marge: 1.81,
+    mesure:
+      'pire meilleur-run de 2 jobs de main du 20/09/2026 (39 runs, 13 pages) ; le FCP ' +
+      'reste asserti partout, la mesure ne le sépare pas d’un hôte à l’autre',
+  },
+};
+
+/**
+ * LE TBT MOBILE, LUI, EST SÉPARÉ PAR HÔTE — parce que la mesure le sépare.
+ *
+ *   hôte            mesure                                        plafond dérivé
+ *   pile locale     516 puis 1397 ms pour le MÊME commit           1600 ms (1,15×)
+ *   déploiement     0 à 10 ms sur 39 runs (13 pages)               AUCUN (voir RETRAITS)
+ *
+ * Le plafond du repli local est légitime et le reste : un runner partagé a rendu
+ * 1397 ms pour un arbre vert, donc 1600 ms borne un fait observé. Celui du
+ * déploiement ne bornait rien : **1200 ms pour 10 ms mesurés, soit 120×**, un
+ * nombre qu'AUCUNE mesure ne vient adosser — il ne pouvait rougir que sur une
+ * famine d'hôte, c'est-à-dire sur le défaut d'origine (le verdict porté par la
+ * machine). Il est RETIRÉ, et le retrait est écrit dans RETRAITS pour qu'il ne
+ * soit pas pris pour un oubli.
+ */
+const TBT_MOBILE = {
+  'pile-locale': {
+    pire: 1397,
+    marge: 1.15,
+    mesure: '516 puis 1397 ms pour le même commit sur un runner partagé (20/09/2026)',
+  },
+};
+
+/**
+ * LES ASSERTIONS RETIRÉES, ET LA MESURE QUI LES RETIRE.
+ *
+ * Une assertion retirée sans phrase est un affaiblissement ; avec sa phrase,
+ * c'est une décision. Deux formes ici :
+ *
+ *   • `categories:performance` — le SCORE. C'est une MOYENNE PONDÉRÉE des
+ *     grandeurs déjà assertrées (FCP, LCP, TBT, CLS) plus `speed-index`, que ce
+ *     dépôt a décidé de ne JAMAIS asserter. L'asserter réimporte donc par la
+ *     porte du score exactement ce qui a été retiré champ par champ, et y ajoute
+ *     la seule grandeur dont on ne veut pas juger. La mesure ne l'arbitre pas :
+ *     la seule fois où il a décidé dans l'histoire de ce dépôt, il a eu TORT —
+ *     deux jobs de `main` sur le MÊME arbre (14e0531), vert à 08:10 et rouge à
+ *     08:50, l'unique assertion en cause étant `categories:performance >= 0,9`
+ *     sur `/login` (médiane 0,79 ; runs 1,00 / 0,79 / 0,77) pendant que TOUS les
+ *     budgets explicites passaient dans les deux jobs. Le retirer ne relâche
+ *     aucune grandeur : chacune reste assertée pour elle-même.
+ *   • `total-blocking-time@deploiement` — 1200 ms pour 10 ms mesurés (120×). Voir
+ *     TBT_MOBILE : aucun relevé de l'artefact ne l'adosse.
+ *
+ * Ce qui n'est PAS retiré, et pourquoi : le FCP (il borne le premier pixel peint,
+ * la seule métrique qu'une coquille pré-rendue peut dégrader sans que rien
+ * d'autre bouge), le LCP sur les routes où il EST celui de l'artefact, et le TBT
+ * sur la pile locale (une mesure l'adosse).
+ */
+const RETRAITS = {
+  'categories:performance':
+    'moyenne pondérée de grandeurs DÉJÀ assertées, plus `speed-index` que ce dépôt n’asserte ' +
+    'jamais ; son seul verdict documenté est un FAUX rouge (2 jobs de main, même arbre 14e0531, ' +
+    'vert 08:10 / rouge 08:50, décidé par cette seule assertion sur /login alors que tous les ' +
+    'budgets explicites passaient) — la mesure ne l’arbitre pas',
+  'total-blocking-time@deploiement':
+    '1200 ms pour un pire meilleur-run de 10 ms sur 39 runs (13 pages) : 120×, aucune mesure ' +
+    'ne l’adosse. La famine d’hôte qu’il ne pouvait attraper est le défaut d’origine, pas une ' +
+    'régression de l’artefact. La pile locale, elle, GARDE son plafond (1397 ms mesurés)',
+};
+
+/**
+ * Le socle mobile d'une route, sur un hôte donné : les plafonds DÉRIVÉS de la
+ * table, dans la forme qu'attend `ci.assert`.
+ *
+ * `hote` est `'pile-locale'` ou `'deploiement'`. Une valeur d'hôte inconnue LÈVE :
+ * un troisième hôte qui arriverait sans mesure ne doit pas hériter en silence du
+ * plafond d'un autre (c'est la faute que la séparation par hôte existe pour
+ * empêcher).
+ */
+const socleMobile = (hote) => {
+  if (hote !== 'pile-locale' && hote !== 'deploiement') {
+    throw new Error(
+      `hôte inconnu « ${hote} » : les plafonds mobiles sont mesurés pour « pile-locale » et ` +
+        '« deploiement » (scripts/lhci-cls-budgets.cjs). Un hôte sans mesure n’hérite pas du ' +
+        'plafond d’un autre — mesurer, puis l’ajouter à TBT_MOBILE.'
+    );
+  }
+  const socle = {};
+  for (const [grandeur, entree] of Object.entries(SOCLE_MOBILE)) {
+    socle[grandeur] = ['error', { maxNumericValue: plafondDe(entree.pire, entree.marge) }];
+  }
+  // Le TBT n'est ASSERTÉ que là où une mesure l'adosse : la clé absente de
+  // TBT_MOBILE est le RETRAIT, et il est documenté dans RETRAITS.
+  const tbt = TBT_MOBILE[hote];
+  if (tbt) socle['total-blocking-time'] = ['error', { maxNumericValue: plafondDe(tbt.pire, tbt.marge) }];
+  return socle;
+};
+
 module.exports = {
   CLS_BUDGETS,
   LCP_PRODUIT_PAR_UNE_REPONSE,
   TBT_DESKTOP_BUDGETS,
   plafondTbtDesktop,
   REQUETES_HORS_CONTROLE,
+  RETRAITS,
+  SOCLE_MOBILE,
+  TBT_MOBILE,
+  plafondDe,
+  socleMobile,
   clsAssertionMatrix,
   patternFor,
   soclePour,

@@ -145,7 +145,8 @@ export function refusDuHerosLcp({ plan, page, coquille, amorcage, composant, plu
   }
 
   // 5. LA PHOTO DE TÊTE EST PRÉCHARGÉE DEPUIS SON DOMICILE, ET LES DEUX CANAUX
-  //    LA DÉCODENT SYNCHRONEMENT (07/10/2026).
+  //    LA DÉCODENT SYNCHRONEMENT (07/10/2026, préchargement retypé le
+  //    08/10/2026).
   //    L'image est l'élément LCP de « / » (69 920 px²), mais elle se DÉCODE plus
   //    tard que le texte : en `decoding="async"`, mesuré sur Chromium (412×823,
   //    CPU limité par CDP), la navigation réelle sortait DEUX candidates — le
@@ -159,12 +160,28 @@ export function refusDuHerosLcp({ plan, page, coquille, amorcage, composant, plu
   //    préchargement qui ne LIT plus son chemin dans src/config/photos-heros.js
   //    (un littéral recopié ici ne suivrait pas un changement de photo), et un
   //    canal qui redescend en décodage asynchrone alors que l'autre non.
-  if (!/as="image"/.test(pluginHead) || !/PHOTOS_HEROS\[0\]/.test(pluginHead)) {
+  //
+  //    ── CE QUI A CHANGÉ LE 08/10/2026, ET POURQUOI LA RÈGLE A SUIVI ──────
+  //    La photo est publiée dans un `<picture>` (AVIF, WebP, puis JPEG), donc
+  //    le préchargement n'est plus un `href` vers le JPEG : il porte le MÊME
+  //    `srcset` que les `<source>` du corps et son `sizes`, lus du même module
+  //    (`srcsetHeros`, `PHOTO_HEROS_SIZES`). Garder l'ancienne exigence
+  //    (`PHOTOS_HEROS[0]`) aurait refusé un préchargement CORRECT — et l'aurait
+  //    fait au nom du LCP, alors que précharger le JPEG pendant que le corps
+  //    choisit l'AVIF télécharge DEUX fichiers pour une seule photo, ce qui est
+  //    exactement le défaut que ce préchargement existe pour éviter. La règle
+  //    demande donc toujours que le préchargement soit DÉRIVÉ du domicile (et
+  //    non recopié), sans nommer la forme du lien.
+  if (
+    !/as="image"/.test(pluginHead) ||
+    !/srcsetHeros\(/.test(pluginHead) ||
+    !/PHOTO_HEROS_SIZES/.test(pluginHead)
+  ) {
     refus.push(
       `${PLUGIN_HEAD} n'émet plus le préchargement de la photo de tête depuis ` +
-        'src/config/photos-heros.js (`PHOTOS_HEROS[0]`, `as="image"`) : la requête de l’image ' +
-        'LCP repartirait à l’analyse du corps, donc après le texte, et le repaint deviendrait ' +
-        'l’élément LCP'
+        'src/config/photos-heros.js (`srcsetHeros`, `PHOTO_HEROS_SIZES`, `as="image"`) : la ' +
+        'requête de l’image LCP repartirait à l’analyse du corps, donc après le texte, et le ' +
+        'repaint deviendrait l’élément LCP'
     )
   }
   if (/kojo-hero/.test(indexHtml)) {
@@ -230,10 +247,20 @@ describe('le titre du héros de l’accueil (élément LCP de « / »)', () => {
   it('refuse un préchargement de la photo écrit en littéral dans le plugin', () => {
     const muté = {
       ...sources,
-      pluginHead: sources.pluginHead.replace(/PHOTOS_HEROS\[0\]/g, "'/assets/kojo-hero.jpg'"),
+      pluginHead: sources.pluginHead.replace(/srcsetHeros\(0, 'avif'\)/g, "'/assets/kojo-hero-480.avif 480w'"),
     };
-    const refus = refusDuHerosLcp(muté);
-    expect(refus.join('\n')).toContain('n\'émet plus le préchargement de la photo de tête');
+    expect(refusDuHerosLcp(muté).join('\n')).toContain('n\'émet plus le préchargement de la photo de tête');
+  });
+
+  it('refuse un préchargement qui a perdu son `srcset` (donc le candidat du corps)', () => {
+    // Le défaut que la retype du 08/10/2026 ferme : un préchargement d'IMAGE
+    // sans `imagesrcset` demande le fichier du `href` pendant que le `<picture>`
+    // en choisit un autre — deux téléchargements pour une seule photo.
+    const muté = {
+      ...sources,
+      pluginHead: sources.pluginHead.replace(/imagesrcset="[^"]*"/g, 'href="/assets/kojo-hero.jpg"'),
+    };
+    expect(refusDuHerosLcp(muté).join('\n')).toContain('n\'émet plus le préchargement de la photo de tête');
   });
 
   it('refuse un index.html qui cite la photo du héros en littéral', () => {

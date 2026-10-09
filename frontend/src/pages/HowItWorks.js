@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import { useEffect } from 'react';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
 import Link from '../components/LienVue';
@@ -9,7 +10,6 @@ import { usePageMeta } from '../utils/seo';
 // question ajoutée ici paraît aussi dans le HTML que lit un crawler sans
 // JavaScript, ou dans aucun des deux.
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 export default function HowItWorks() {
   const { t } = useLanguage();
@@ -88,7 +88,7 @@ export default function HowItWorks() {
                   <span className="text-lg font-bold">{step.numero}</span>
                 </span>
                 <span className={plan.pastilleClass}>
-                  <IconePage nom={step.icone} classe={CLASSES_ICONE.pastille} />
+                  <IconePage nom={step.icone} role="pastille" />
                 </span>
                 <div>
                   <h2 className={plan.nomLigneClass}>{step.title}</h2>
@@ -96,7 +96,8 @@ export default function HowItWorks() {
                 </div>
                 <IconePage
                   nom="flecheBas"
-                  classe={`${CLASSES_ICONE.flecheLigne} ${plan.flecheLigneClass}`}
+                  role="flecheLigne"
+                  enPlus={plan.flecheLigneClass}
                 />
               </div>
             ))}
@@ -125,7 +126,7 @@ export default function HowItWorks() {
                 className={plan.panneauImageClass}
               />
               <span className={plan.panneauEstampilleClass}>
-                <IconePage nom={plan.icone} classe={CLASSES_ICONE.heros} />
+                <IconePage nom={plan.icone} role="heros" />
                 {t(plan.estampilleKey)}
               </span>
             </div>
@@ -135,7 +136,7 @@ export default function HowItWorks() {
               <ul className={plan.listeGarantiesClass}>
                 {plan.guaranteeKeys.map((key) => (
                   <li key={key}>
-                    <IconePage nom={plan.garantieIcon} classe={CLASSES_ICONE.pastille} />
+                    <IconePage nom={plan.garantieIcon} role="pastille" />
                     {t(key)}
                   </li>
                 ))}
@@ -180,11 +181,11 @@ export default function HowItWorks() {
           <div className={plan.ctaActionsClass}>
             <Link to="/register?type=client" className={plan.boutonClass}>
               {t(plan.lookingKey)}
-              <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
+              <IconePage nom="flecheDroite" role="flecheLigne" />
             </Link>
             <Link to="/register?type=worker" className={plan.boutonSecondClass}>
               {t(plan.offerKey)}
-              <IconePage nom="flecheDroite" classe={CLASSES_ICONE.flecheLigne} />
+              <IconePage nom="flecheDroite" role="flecheLigne" />
             </Link>
           </div>
           {/* Maillage interne : depuis cette page de contenu, un crawler (et

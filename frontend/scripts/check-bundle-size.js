@@ -18,15 +18,29 @@
  *      ce chunk à 87 044 o / 29 538 o gzip (−82 %), et son initialisation est
  *      désormais différée après interaction (voir src/utils/sentry.js).
  *   2. PLUS GROS CHUNK — mesure : vendor-leaflet 47,5 Ko gzip.
- *   3. BUILD TOTAL (brut, tous fichiers) — mesure du 29/09/2026 : 4,28 Mo,
- *      dont ~1 Mo d'IMAGES DE CONTENU (les six photos du héros, 561 Ko, et les
- *      quatre de la galerie, 452 Ko) et ~1,5 Mo de la MÊME feuille de styles
- *      pré-rendue recopiée dans les 22 pages (69 Ko × 22) : le total est donc un
- *      budget de CONTENU autant que de code, et il suit une page ou une photo
- *      ajoutée. Il est relevé de 4,00 à 4,50 Mo pour cette raison, mesurée (voir
- *      le commentaire de BUDGETS.totalRaw) — les trois autres budgets, qui
- *      gardent la STRUCTURE (chemin critique, plus gros chunk, unité paresseuse),
- *      ne bougent pas d'un octet.
+ *   3. BUILD TOTAL (brut, tous fichiers) — mesure du 08/10/2026 : 5,05 Mo,
+ *      dont ~1,3 Mo d'IMAGES DE CONTENU (la famille du héros — les six JPEG,
+ *      561 Ko, et leurs 24 variantes AVIF et WebP, 712 Ko — et les quatre photos
+ *      de la galerie, 452 Ko) et la MÊME feuille de styles pré-rendue recopiée
+ *      dans chaque document — 900 980 o = 0,86 Mo mesurés le 09/10/2026 (14
+ *      documents, dont 13 portant la feuille identique : 69 276 o, sha
+ *      d8c74e2cb457a497) : le total est donc un budget de CONTENU autant que de
+ *      code, et il suit une page ou une photo ajoutée.
+ *
+ *      Ce chiffre porte une DATE parce que la ligne qui le portait avant avait
+ *      DÉRIVÉ : elle annonçait « ~1,5 Mo … recopiée dans les 22 pages (69 Ko ×
+ *      22) », soit un compte de pages que le build ne publie pas (14 documents,
+ *      dont 13 pages pré-rendues et le 404). C'est exactement ce qu'un budget
+ *      global ne peut pas dire — QUELLE page et de COMBIEN — et c'est pourquoi
+ *      cette grandeur a désormais son propre garde, page par page :
+ *      `scripts/check-css-inline-budget.js` (une ligne par document du build,
+ *      dépassement chiffré, plancher, blocs `<style>`, feuille divergente). Le
+ *      budget ci-dessous, lui, reste un budget de BUILD : il absorbe cette
+ *      duplication dans un seul nombre et ne la distingue plus. Il a été relevé de 4,00 à 4,50 Mo le 29/09/2026, puis de 4,50 à
+ *      5,50 Mo le 08/10/2026 avec l'arrivée des variantes du héros (voir le
+ *      commentaire de BUDGETS.totalRaw, qui porte les DEUX mesures) — les trois
+ *      autres budgets, qui gardent la STRUCTURE (chemin critique, plus gros
+ *      chunk, unité paresseuse), ne bougent pas d'un octet.
  *   4. CHUNKS À LA DEMANDE — un chunk listé dans CHUNKS_A_LA_DEMANDE ne doit
  *      être atteignable que par `import()` dynamique. Un budget de TAILLE ne
  *      peut pas attraper cette régression : le chunk existe et pèse pareil dans
@@ -66,10 +80,31 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // est borné par les trois autres (JS initial, plus gros chunk, unité paresseuse),
 // qui n'ont pas bougé. Un total qui inclut le contenu doit donc suivre le
 // contenu — mais il doit le DIRE, et c'est à ça que sert ce paragraphe.
+//
+// ── 08/10/2026 : 4,50 → 5,50 Mo, POUR LES VARIANTES DU HÉROS ──────────────
+// Les six photos du héros sont désormais publiées dans un `<picture>` (AVIF,
+// WebP, puis le JPEG en repli) à DEUX largeurs, 480 et 720 : 24 fichiers de
+// plus, 746 304 o, soit la famille du héros passant de 574 211 à 1 320 515 o
+// (mesuré par scripts/check-hero-images.js, qui relit le manifeste du
+// générateur). Build mesuré : 4,34 Mo SANS ces variantes, 5,05 Mo avec — le
+// dépassement est donc bien celui de cette passe, et il est de CONTENU.
+//
+// ET C'EST LÀ QU'IL FAUT LIRE LES DEUX CHIFFRES ENSEMBLE, sans quoi ce
+// relèvement ressemblerait à un renoncement : ce que ce budget mesure, c'est ce
+// que le BUILD CONTIENT ; ce qu'un VISITEUR télécharge au premier écran, lui, a
+// été divisé par 5,4 (la photo de tête passe de 63 509 o de JPEG à 11 854 o
+// d'AVIF 480, −81,3 %, et la fenêtre mesurée — photo de tête + préchargement du
+// cran suivant — de ~126 Ko à 22 144 o). Les deux nombres ne se contredisent
+// pas : un héros qui télécharge moins peut peser plus dans le build, parce que
+// le repli reste publié pour les navigateurs qui n'ont pas de décodeur AVIF ni
+// WebP. La mesure du téléchargement, elle, se fait dans un vrai navigateur et
+// vit ailleurs : e2e/heros-format.spec.js, qui lit les octets de la réponse,
+// exige UNE seule requête pour la photo de tête et l'absence de tout JPEG du
+// héros sur la navigation.
 export const BUDGETS = {
   initialGzip: 130 * 1024, // JS initial (chunks référencés par index.html), gzip
   largestChunkGzip: 200 * 1024, // plus gros chunk JS, gzip
-  totalRaw: 4.5 * 1024 * 1024, // build/ entier, brut (voir la mesure ci-dessus)
+  totalRaw: 5.5 * 1024 * 1024, // build/ entier, brut (voir les deux mesures ci-dessus)
 };
 
 const ko = (bytes) => `${(bytes / 1024).toFixed(1)} Ko`;

@@ -5,6 +5,10 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { messagesAPI } from '../services/apiEndpoints';
 import { handleApiError } from '../services/api';
 import { MessagesSkeleton } from '../components/SkeletonLoader';
+// Le cadre de page (largeur, gouttière, pas) a UN propriétaire —
+// `src/config/app-cadres.js` — et cette page le LIT : deux chaînes recopiées
+// divergeraient au premier correctif, en silence.
+import CadrePage from '../components/CadrePage';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/messages';
 import { safeLog } from '../utils/env';
@@ -180,9 +184,7 @@ export default function Messages() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="titre-page mb-4">{t('messages')}</h1>
-
+    <CadrePage chemin="/messages" titre={t('messages')} classeCorps="">
       <div className="carte-editoriale overflow-hidden h-[75vh] flex">
         {/* Liste des conversations : plein ecran sur mobile tant qu'aucune n'est ouverte,
             colonne fixe a partir de sm. */}
@@ -341,6 +343,6 @@ export default function Messages() {
           )}
         </div>
       </div>
-    </div>
+    </CadrePage>
   );
 }

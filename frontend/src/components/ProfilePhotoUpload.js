@@ -1,9 +1,9 @@
+import { IconePage } from '../config/page-icons';
 import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useToast } from '../contexts/ToastContext';
 import { devLog, safeLog } from '../utils/env';
 import { photoFormatsLine } from '../config/photo-formats';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 import { Image, Camera, Check } from 'lucide-react';
 
 // Les deux glyphes sont DESSINÉS (icônes SVG) : leur nom est passé par la page,
@@ -117,7 +117,7 @@ const ProfilePhotoUpload = ({
   return (
     <div className={`carte-editoriale carte-publique mb-6${classeBloc ? ` ${classeBloc}` : ''}`}>
       <div className="mb-4 flex items-center gap-3">
-        <IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoTitre} />
+        <IconePage nom={iconePhoto} role="photoTitre" />
         <h3 className="titre-entree">
           {t('profilePhotoOptional')}
         </h3>
@@ -145,7 +145,7 @@ const ProfilePhotoUpload = ({
               onClick={showPhotoOptions}
             >
               <div className="text-center">
-                <div className="mb-3 flex justify-center"><IconePage nom={iconePhoto} classe={CLASSES_ICONE.photoZone} /></div>
+                <div className="mb-3 flex justify-center"><IconePage nom={iconePhoto} role="photoZone" /></div>
                 <div className="text-sm text-stone-600">
                   <p className="font-medium">{t('addProfilePhoto')}</p>
                   <p>{t('clickToChooseOption')}</p>
@@ -320,7 +320,7 @@ const ProfilePhotoUpload = ({
           le budget de /register, et une notice plus haute déplaçait tout ce qui
           le suit. */}
       <div className="mt-4 rounded-[3px] border border-orange-200 bg-orange-50 p-3">
-        <h4 className="mb-1 font-medium text-orange-900"><IconePage nom={iconeConseils} classe={CLASSES_ICONE.notice} /> {t('tipsGoodPhoto')}</h4>
+        <h4 className="mb-1 font-medium text-orange-900"><IconePage nom={iconeConseils} role="notice" /> {t('tipsGoodPhoto')}</h4>
         <ul className="space-y-1 text-xs text-orange-800">
           <li>• {t('useRecentPhoto')}</li>
           <li>• {t('lookCamera')}</li>

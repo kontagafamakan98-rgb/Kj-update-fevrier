@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
@@ -9,7 +10,6 @@ import { authAPI, handleApiError } from '../services/api';
 import { safeLog } from '../utils/env';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 const ForgotPassword = () => {
   const { t } = useLanguage();
@@ -202,7 +202,7 @@ const ForgotPassword = () => {
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="mx-auto h-14 w-14 flex items-center justify-center rounded-lg bg-orange-600">
-            <span className="text-white text-2xl font-bold"><IconePage nom={pagePlan.badgeIcon} classe={CLASSES_ICONE.badgeEtape} /></span>
+            <span className="text-white text-2xl font-bold"><IconePage nom={pagePlan.badgeIcon} role="badgeEtape" /></span>
           </div>
           {/* Titre de PAGE en h1 (voir Login.js) : un h1 par page, identique au
               shell statique du build (forgot-password.html). Classes inchangées. */}

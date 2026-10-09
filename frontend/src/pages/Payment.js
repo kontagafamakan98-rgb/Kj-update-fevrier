@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
@@ -13,7 +14,6 @@ import { handleApiError } from '../services/api';
 import { PaymentContentSkeleton } from '../components/SkeletonLoader';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 import { AlertTriangle } from 'lucide-react';
 
 // Pays proposés, statuts de paiement et méthodes : des CODES, jamais du texte.
@@ -234,10 +234,10 @@ const Payment = () => {
   const statusLabel = (status) => t(PAYMENT_STATUS_KEYS[status] || 'paymentStatusUnknown');
 
   return (
-    <div className="min-h-full bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4 space-y-6">
+    <div className={pagePlan.frameClass}>
+      <div className={pagePlan.corpsClass}>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h1 className="titre-page mb-2">{t(pagePlan.titleKey)}</h1>
+          <h1 className={pagePlan.titleClass}>{t(pagePlan.titleKey)}</h1>
           <p className="text-gray-600">{t(pagePlan.subtitleKey)}</p>
           {jobPaymentContext && (
             <div className="mt-4 rounded-xl bg-orange-50 border border-orange-200 px-4 py-3 text-sm text-orange-800">
@@ -279,7 +279,7 @@ const Payment = () => {
 
         {!jobPaymentContext && !statusParams ? (
           <div className="carte-editoriale p-8 text-center">
-            <div className="text-4xl mb-3"><IconePage nom={pagePlan.noJobIcon} classe={CLASSES_ICONE.carteVide} /></div>
+            <div className="text-4xl mb-3"><IconePage nom={pagePlan.noJobIcon} role="carteVide" /></div>
             <h2 className="titre-entree mb-2">{t(pagePlan.noJobTitleKey)}</h2>
             <p className="text-gray-600 max-w-lg mx-auto mb-5">{t(pagePlan.noJobTextKey)}</p>
             <Link to="/jobs" className="inline-flex items-center rounded-xl bg-orange-600 px-5 py-3 font-semibold text-white hover:bg-orange-700">

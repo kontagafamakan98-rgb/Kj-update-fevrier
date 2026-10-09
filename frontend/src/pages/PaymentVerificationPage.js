@@ -306,11 +306,11 @@ const PaymentVerificationPage = () => {
 
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
-            <StepDot number="✓" label={pageT('stepPersonal')} bg="bg-green-500" text="text-green-600" />
+            <StepDot number="✓" label={pageT('stepPersonal')} classeFond="bg-green-500" classeTexte="text-green-600" />
             <div className="w-16 h-1 bg-green-200"></div>
-            <StepDot number="✓" label={pageT('stepAccess')} bg="bg-green-500" text="text-green-600" />
+            <StepDot number="✓" label={pageT('stepAccess')} classeFond="bg-green-500" classeTexte="text-green-600" />
             <div className="w-16 h-1 bg-orange-200"></div>
-            <StepDot number="3" label={pageT('stepPayments')} bg="bg-orange-500" text="text-orange-600" />
+            <StepDot number="3" label={pageT('stepPayments')} classeFond="bg-orange-500" classeTexte="text-orange-600" />
           </div>
         </div>
 
@@ -374,13 +374,18 @@ const PaymentVerificationPage = () => {
   );
 };
 
-function StepDot({ number, label, bg, text, textColor = 'text-white' }) {
+// Les props portent des CLASSES, et elles le disent depuis le 07/10/2026 : elles
+// s'appelaient `bg`, `text`, `textColor`, et le verdict de la feuille LIVRÉE les
+// déclarait MORTES (`bg-green-500`, `text-green-600`) — le nom ne disait pas ce
+// que la valeur était. `classe*` est la convention que lit
+// `scripts/css-selecteurs-morts.js` (cf. `EST_UNE_CLE_DE_CLASSE`).
+function StepDot({ number, label, classeFond, classeTexte, classeNombre = 'text-white' }) {
   return (
     <div className="flex items-center">
-      <div className={`w-8 h-8 ${bg} ${textColor} rounded-full flex items-center justify-center text-sm font-medium`}>
+      <div className={`w-8 h-8 ${classeFond} ${classeNombre} rounded-full flex items-center justify-center text-sm font-medium`}>
         {number}
       </div>
-      <span className={`ml-2 text-sm font-medium ${text}`}>{label}</span>
+      <span className={`ml-2 text-sm font-medium ${classeTexte}`}>{label}</span>
     </div>
   );
 }

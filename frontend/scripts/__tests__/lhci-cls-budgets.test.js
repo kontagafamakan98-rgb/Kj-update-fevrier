@@ -29,8 +29,13 @@ const {
   CLS_BUDGETS,
   LCP_PRODUIT_PAR_UNE_REPONSE,
   REQUETES_HORS_CONTROLE,
+  RETRAITS,
+  SOCLE_MOBILE,
+  TBT_MOBILE,
   clsAssertionMatrix,
   patternFor,
+  plafondDe,
+  socleMobile,
   soclePour,
 } = require('../lhci-cls-budgets.cjs');
 const { getAllAssertionResults } = require('@lhci/utils/src/assertions.js');
@@ -100,9 +105,26 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
       // le coût propre de l'artefact. Le 20/09/2026, sur deux jobs de `main`
       // portant le MÊME arbre, la MÉDIANE a rendu deux verdicts (0,79 sur /login
       // → main rouge, contre 0,97 de pire meilleur-run) sans qu'un octet change.
-      for (const cle of ['first-contentful-paint', 'total-blocking-time']) {
-        expect(socle.assertions, `${route} : ${cle}`).toHaveProperty(cle);
+      // Le FCP est asserti PARTOUT : c'est la seule métrique qu'une coquille
+      // pré-rendue peut dégrader sans que rien d'autre bouge (le premier pixel
+      // peint), et la mesure ne le sépare pas d'un hôte à l'autre.
+      expect(socle.assertions, `${route} : FCP`).toHaveProperty('first-contentful-paint');
+      // Le TBT, lui, n'est asserti que là où une MESURE l'adosse (la pile locale,
+      // 1397 ms relevés). Là où il manque, le retrait doit être ÉCRIT — sans quoi
+      // une assertion disparaîtrait en silence, ce qui est exactement le défaut
+      // que ce fichier existe pour rendre bruyant.
+      if (!Object.hasOwn(socle.assertions, 'total-blocking-time')) {
+        expect(
+          RETRAITS,
+          `${route} : TBT retiré sur cet hôte sans justification (voir RETRAITS)`
+        ).toHaveProperty('total-blocking-time@deploiement');
       }
+      // Et le SCORE n'est asserti nulle part : sa raison est dans RETRAITS.
+      expect(
+        socle.assertions,
+        `${route} : le score est asserti — il n'est pas arbitré par la mesure`
+      ).not.toHaveProperty('categories:performance');
+      expect(RETRAITS).toHaveProperty('categories:performance');
 
       const cls = entrees.find((e) => e.aggregationMethod === 'median');
       expect(cls.assertions['cumulative-layout-shift']).toEqual([
@@ -174,7 +196,12 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     for (const route of assertes) {
       const verdicts = echecs(lent(route)).map((v) => v.auditId);
       expect(verdicts, `${route} : LCP`).toContain('largest-contentful-paint');
-      expect(verdicts.some((id) => id.startsWith('categories')), `${route} : score`).toBe(true);
+      // Le verdict ne tient QU'au LCP : le score a été retiré (voir RETRAITS),
+      // donc un LCP lent rougit par le budget qui le nomme, pas au travers d'une
+      // moyenne pondérée. C'est ce qui rend le verdict lisible.
+      expect(verdicts, `${route} : une seule grandeur en cause`).toEqual([
+        'largest-contentful-paint',
+      ]);
     }
     // Et sur la route déclarée, la MÊME mesure ne rougit pas : c'est la réponse
     // d'une API, pas l'artefact (les trois issues mesurées le sont : liste, état
@@ -182,9 +209,17 @@ describe('lighthouserc — budgets CLS par route (assertMatrix)', () => {
     for (const route of Object.keys(LCP_PRODUIT_PAR_UNE_REPONSE)) {
       expect(echecs(lent(route)), `${route} : exception`).toEqual([]);
     }
-    expect(soclePour('/login', SOCLE_GLOBAL)['largest-contentful-paint']).toEqual(
-      ['error', { maxNumericValue: 3500 }]
-    );
+    // Le plafond vivant est celui de la TABLE MESURÉE, pas un littéral recopié :
+    // la valeur attendue est DÉRIVÉE ici, comme la config la dérive.
+    expect(soclePour('/login', SOCLE_GLOBAL)['largest-contentful-paint']).toEqual([
+      'error',
+      {
+        maxNumericValue: plafondDe(
+          SOCLE_MOBILE['largest-contentful-paint'].pire,
+          SOCLE_MOBILE['largest-contentful-paint'].marge
+        ),
+      },
+    ]);
   });
 
   it('refuse d’auditer une page sans budget CLS mesuré', () => {
@@ -294,18 +329,70 @@ describe('clsAssertionMatrix — socle commun OU socle par route', () => {
     expect(plafondDe('/jobs')).toBe(150);
   });
 
-  it('retire le score et le LCP aussi quand le socle est une FONCTION', () => {
+  it('retire le LCP aussi quand le socle est une FONCTION', () => {
     // L'exception documentée (/jobs : son LCP est le moment où la réponse de son
     // API est connue) doit survivre au changement de forme du socle.
     const matrice = clsAssertionMatrix(['/jobs'], (route) => ({
       'total-blocking-time': ['error', { maxNumericValue: 150 }],
       'largest-contentful-paint': ['error', { maxNumericValue: 2500 }],
-      'categories:performance': ['error', { minScore: 0.9 }],
     }));
     const socle = matrice.find((e) => e.aggregationMethod === 'optimistic');
 
     expect(socle.assertions['total-blocking-time']).toBeDefined();
     expect(socle.assertions['largest-contentful-paint']).toBeUndefined();
-    expect(socle.assertions['categories:performance']).toBeUndefined();
+  });
+});
+
+/**
+ * LE SOCLE MOBILE EST DÉRIVÉ DE MESURES — angle mort 19(b), première moitié.
+ *
+ * Ce qui est éprouvé ici n'est pas la valeur des plafonds (elle peut changer avec
+ * une re-mesure, c'est même le but) mais la PROPRIÉTÉ qui les rend portables :
+ * chaque plafond vient d'une mesure NOMMÉE, le retrait d'une assertion est écrit,
+ * et un hôte sans mesure n'hérite pas du plafond d'un autre.
+ */
+describe('socle mobile — des plafonds DÉRIVÉS de leurs mesures', () => {
+  it('reproduit EXACTEMENT les plafonds littéraux qu’il remplace', () => {
+    // C'est la vérification qui compte : cette passe ne change aucun verdict, elle
+    // change d'où vient le nombre. Si une re-mesure déplace `pire`, ces égalités
+    // tomberont — et c'est la table qu'il faudra relire, pas une phrase ailleurs.
+    expect(plafondDe(SOCLE_MOBILE['largest-contentful-paint'].pire, SOCLE_MOBILE['largest-contentful-paint'].marge)).toBe(3500);
+    expect(plafondDe(SOCLE_MOBILE['first-contentful-paint'].pire, SOCLE_MOBILE['first-contentful-paint'].marge)).toBe(2500);
+    expect(plafondDe(TBT_MOBILE['pile-locale'].pire, TBT_MOBILE['pile-locale'].marge)).toBe(1600);
+  });
+
+  it('ne porte AUCUN plafond sans mesure nommée au-dessous de lui', () => {
+    for (const [grandeur, entree] of Object.entries(SOCLE_MOBILE)) {
+      expect(entree.pire, `${grandeur} : pire manquant`).toBeGreaterThan(0);
+      expect(entree.marge, `${grandeur} : marge manquante`).toBeGreaterThan(1);
+      expect(entree.mesure.length, `${grandeur} : la mesure doit être citée`).toBeGreaterThan(60);
+      // Un plafond SOUS la pire mesure rougirait sur un fait déjà relevé.
+      expect(plafondDe(entree.pire, entree.marge), grandeur).toBeGreaterThan(entree.pire);
+    }
+    for (const [hote, entree] of Object.entries(TBT_MOBILE)) {
+      expect(entree.mesure.length, `TBT ${hote} : mesure`).toBeGreaterThan(40);
+      expect(plafondDe(entree.pire, entree.marge), `TBT ${hote}`).toBeGreaterThan(entree.pire);
+    }
+  });
+
+  it('REFUSE un hôte sans mesure, au lieu de lui prêter un plafond', () => {
+    expect(() => socleMobile('preview-vercel')).toThrow(/hôte inconnu/);
+    expect(() => socleMobile('preview-vercel')).toThrow(/TBT_MOBILE/);
+    // Non-vacuité : les deux hôtes mesurés passent, eux.
+    for (const hote of ['pile-locale', 'deploiement']) {
+      expect(() => socleMobile(hote), hote).not.toThrow();
+    }
+    // Et la DIFFÉRENCE entre les deux est celle que la mesure a établie : le TBT
+    // n'est asserti que là où un relevé l'adosse.
+    expect(socleMobile('pile-locale')).toHaveProperty('total-blocking-time');
+    expect(socleMobile('deploiement')).not.toHaveProperty('total-blocking-time');
+  });
+
+  it('écrit CHAQUE retrait avec la mesure qui le prononce', () => {
+    expect(Object.keys(RETRAITS).length).toBeGreaterThanOrEqual(2);
+    for (const [cle, justification] of Object.entries(RETRAITS)) {
+      expect(typeof justification, `${cle} : justification`).toBe('string');
+      expect(justification.length, `${cle} : justification`).toBeGreaterThan(80);
+    }
   });
 });

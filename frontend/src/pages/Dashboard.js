@@ -1,6 +1,10 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js).
 import Link from '../components/LienVue';
+// Le CADRE de la page : son pas, sa largeur et sa gouttière sont déclarés une
+// fois (src/config/app-cadres.js), pas écrits ici — la page ne connaît plus
+// qu'un chemin et son corps.
+import CadrePage from '../components/CadrePage';
 import {
   Briefcase,
   CircleDollarSign,
@@ -29,7 +33,14 @@ import { jobsAPI } from '../services/apiEndpoints';
 import { getLocaleForLanguage } from '../utils/pack2PageI18n/core';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/dashboard';
 import { safeLog } from '../utils/env';
-import { Skeleton } from '../components/SkeletonLoader';
+// LE squelette du tableau de bord, partagé par le repli Suspense de la route
+// (App.js) et par l'état de chargement des données ci-dessous. Cette page en
+// portait une SECONDE copie locale (`SkeletonDashboardShell`) : c'est ELLE qui
+// était peinte pendant le chargement des données, donc une correction portée au
+// propriétaire n'aurait rien changé — exactement le défaut qui a coûté 0,1010 de
+// CLS sur /profile (mesuré le 07/10/2026). Une seule définition, donc les deux
+// phases ne peuvent plus diverger.
+import { DashboardSkeleton } from '../components/SkeletonLoader';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -149,15 +160,14 @@ export default function Dashboard() {
   // seul le header d'accueil + les 4 cartes + la liste récente dépendent des
   // jobs API. On reserve donc leur hauteur.
   if (loading) {
-    const cardWrappers = Array.from({ length: 4 });
-    return (
-      <SkeletonDashboardShell t={t} pageT={pageT} cardWrappers={cardWrappers} />
-    );
+    // Le propriétaire unique (cf. l'import) — et il RÉSERVE l'écran, parce que
+    // la hauteur de cette page dépend des données (cf. src/config/app-cadres.js).
+    return <DashboardSkeleton />;
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
+    <CadrePage chemin="/dashboard" classeCorps="">
+      <div className="tete-app">
         {/* Le titre de page prend l'échelle serif du site (`.titre-page`,
             src/index.css) : c'est la même page d'arrivée que l'accueil pour un
             utilisateur connecté, elle ne peut pas être typographiée comme un
@@ -170,7 +180,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bloc-app">
         {statCards.map((item) => {
           const Icon = item.icon;
           // La carte à FILET du site, et la pastille ronde qui porte le glyphe :
@@ -179,7 +189,7 @@ export default function Dashboard() {
           // boîte `p-3` + icône 24 px qu'elle remplace — le squelette ci-dessous
           // garde donc la même hauteur (pas de CLS).
           return (
-            <div key={item.label} className="carte-editoriale p-6">
+            <div key={item.label} className="carte-editoriale carte-publique">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{item.label}</p>
@@ -199,7 +209,7 @@ export default function Dashboard() {
           site, et il ne disait rien de plus que « voici un bloc à part » — ce
           que l'encart dit mieux, avec une seule teinte. */}
       {isFamakan && (
-        <div className="encart mb-8">
+        <div className="encart bloc-app">
           <div className="flex items-center mb-4">
             <Crown className="h-6 w-6 mr-3 text-orange-500" aria-hidden="true" />
             <h2 className="titre-section">{t('famakanAccess')}</h2>
@@ -246,11 +256,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="carte-editoriale mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="carte-editoriale bloc-app">
+        <div className="carte-cotes py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">{t('quickActions')}</h2>
         </div>
-        <div className="p-6">
+        <div className="carte-publique">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {quickActions.map((action) => {
               const Icon = action.icon;
@@ -274,11 +284,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="carte-editoriale mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="carte-editoriale bloc-app">
+        <div className="carte-cotes py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">{t('popularCategories')}</h2>
         </div>
-        <div className="p-6">
+        <div className="carte-publique">
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             {popularCategories.map((category) => {
               const Icon = category.icon;
@@ -296,7 +306,7 @@ export default function Dashboard() {
       </div>
 
       <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="carte-cotes py-4 border-b border-gray-200">
           <h2 className="text-lg font-medium text-gray-900">
             {user?.user_type === 'client' ? t('myRecentJobs') : t('availableJobs')}
           </h2>
@@ -304,7 +314,7 @@ export default function Dashboard() {
         <div className="divide-y divide-gray-200">
           {recentJobs.length > 0 ? (
             recentJobs.map((job) => (
-              <Link key={job.id} to={`/jobs/${job.id}`} className="block p-6 hover:bg-gray-50 transition-colors">
+              <Link key={job.id} to={`/jobs/${job.id}`} className="block carte-publique hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="text-sm font-medium text-gray-900">{job.title}</h3>
@@ -333,97 +343,12 @@ export default function Dashboard() {
               </Link>
             ))
           ) : (
-            <div className="p-6 text-center text-gray-500">
+            <div className="carte-publique text-center text-gray-500">
               {user?.user_type === 'client' ? t('noJobsPosted') : t('noJobsAvailable')}
             </div>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-// Squelette du Dashboard : mêmes conteneurs/grid/paddings que le rendu réel
-// pour que l'apparition des données ne déplace rien (anti-CLS). Le contenu
-// dépendant des jobs API (header d'accueil, 4 cartes stat, liste récente) est
-// remplacé par des blocs skeleton de hauteur identique.
-function SkeletonDashboardShell({ t, pageT, cardWrappers }) {
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header d'accueil */}
-      <div className="mb-8">
-        <Skeleton className="h-8 w-64 max-w-full" />
-        <div className="mt-2">
-          <Skeleton className="h-4 w-80 max-w-full" />
-        </div>
-      </div>
-
-      {/* 4 cartes statistiques : même grille que le rendu final */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {cardWrappers.map((_, index) => (
-          <div key={index} className="carte-editoriale p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <Skeleton className="h-4 w-20" />
-                <div className="mt-3">
-                  <Skeleton className="h-7 w-28" />
-                </div>
-              </div>
-              <Skeleton className="h-12 w-12 rounded-full" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Section quick-actions : conteneur stable, contenu skeleton */}
-      <div className="carte-editoriale mb-8">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <Skeleton className="h-5 w-40" />
-        </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-              <Skeleton className="h-11 w-11 rounded-xl" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-            <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-              <Skeleton className="h-11 w-11 rounded-xl" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-            <div className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-              <Skeleton className="h-11 w-11 rounded-xl" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Liste récente : header + lignes skeleton */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <Skeleton className="h-5 w-40" />
-        </div>
-        <div className="divide-y divide-gray-200">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-1/3 max-w-xs" />
-                  <div className="mt-2">
-                    <Skeleton className="h-3 w-full max-w-lg" />
-                  </div>
-                  <div className="flex items-center mt-3 space-x-4">
-                    <Skeleton className="h-3 w-16" />
-                    <Skeleton className="h-3 w-20" />
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </div>
-                </div>
-                <Skeleton className="h-5 w-5" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    </CadrePage>
   );
 }

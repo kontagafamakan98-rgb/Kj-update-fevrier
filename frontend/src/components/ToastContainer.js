@@ -4,25 +4,39 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { makeToastTranslator } from '../utils/toastScopedI18n';
 import { Icone } from './chrome-icons';
 
+/**
+ * LES CLASSES D'UN MESSAGE, NOMMÉES COMME TELLES (07/10/2026).
+ *
+ * Elles étaient écrites dans un `switch` qui composait `baseStyles` avec un
+ * gabarit, lu par un appel (`className={getToastStyles(toast.type)}`), et le
+ * verdict de la feuille LIVRÉE les déclarait MORTES : `border-l-4`,
+ * `border-green-500`, `border-yellow-500`, `transform`, `ease-in-out`. Le corpus
+ * ne lit pas une valeur de RETOUR de fonction — et il a raison : rien, dans un
+ * `switch`, ne DIT que ces chaînes sont des classes.
+ *
+ * Le registre est donc lu DIRECTEMENT dans le `className` (cf. plus bas), ce qui
+ * fait deux choses à la fois : la composition est visible à l'endroit qui peint,
+ * et l'objet est nommé dans une position de classe — le garde résout alors TOUTES
+ * ses chaînes, sans avoir à deviner ce que le nom de la variable signifie (la
+ * minification renomme les variables, pas les valeurs : mesuré le 07/10/2026,
+ * `CLASSES_TOAST` n'existe pas dans `build/assets/`).
+ *
+ * La valeur rendue est IDENTIQUE à ce que rendait le `switch` : `base` d'un côté,
+ * la teinte du type de l'autre, `info` en repli — la même concaténation, dans le
+ * même ordre.
+ */
+const CLASSES_TOAST = {
+  base: 'flex items-center gap-3 p-4 rounded-lg shadow-lg backdrop-blur-sm transition-all duration-300 ease-in-out transform',
+  success: 'bg-green-50 border-l-4 border-green-500 text-green-800',
+  error: 'bg-red-50 border-l-4 border-red-500 text-red-800',
+  warning: 'bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800',
+  info: 'bg-blue-50 border-l-4 border-blue-500 text-blue-800',
+};
+
 const ToastContainer = () => {
   const { toasts, removeToast } = useToast();
   const { t, currentLanguage } = useLanguage();
 
-  const getToastStyles = (type) => {
-    const baseStyles = 'flex items-center gap-3 p-4 rounded-lg shadow-lg backdrop-blur-sm transition-all duration-300 ease-in-out transform';
-    
-    switch (type) {
-      case 'success':
-        return `${baseStyles} bg-green-50 border-l-4 border-green-500 text-green-800`;
-      case 'error':
-        return `${baseStyles} bg-red-50 border-l-4 border-red-500 text-red-800`;
-      case 'warning':
-        return `${baseStyles} bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800`;
-      case 'info':
-      default:
-        return `${baseStyles} bg-blue-50 border-l-4 border-blue-500 text-blue-800`;
-    }
-  };
 
   // Le DESSIN vient du registre du chrome ; c'est ici que reste la COULEUR, qui
   // dépend du type de message et non de l'icône. Le trait suit `currentColor`,
@@ -66,7 +80,7 @@ const ToastContainer = () => {
         <div
           key={toast.id}
           data-kojo-toast
-          className={getToastStyles(toast.type)}
+          className={`${CLASSES_TOAST.base} ${CLASSES_TOAST[toast.type] || CLASSES_TOAST.info}`}
           style={{
             animation: 'slideInRight 0.3s ease-out',
             animationFillMode: 'both',

@@ -184,9 +184,20 @@ const label = (payload, fallback) => {
  * @param {object|null} [args.previous] Mesure précédente de cette PR.
  * @param {string} [args.baselineReason] Pourquoi la référence manque.
  * @param {string} [args.previousError] Pourquoi la mesure précédente manque.
+ * @param {string|null} [args.livraison] Phrases de cadence (retard, âge de la prod)
+ *   en liste Markdown ; `null` = section absente ; `''` = non mesurée.
+ * @param {string} [args.livraisonError] Pourquoi la cadence n'a pas été mesurée.
  * @returns {string}
  */
-export const renderMarkdown = ({ current, baseline = null, previous = null, baselineReason = '', previousError = '' }) => {
+export const renderMarkdown = ({
+  current,
+  baseline = null,
+  previous = null,
+  baselineReason = '',
+  previousError = '',
+  livraison = null,
+  livraisonError = '',
+}) => {
   const rows = [
     { label: '**JS initial** (gzip)', value: current.initialGzip, base: baseline?.initialGzip, prev: previous?.initialGzip, fmt: fmtKo },
     {
@@ -245,6 +256,20 @@ export const renderMarkdown = ({ current, baseline = null, previous = null, base
   lines.push('');
   lines.push('Légende : 🟢 gain · ✅ écart négligeable (< 1 Ko) · 🟡 faible · 🔴 ≥ 5 % d\'augmentation.');
   lines.push('');
+
+  // Cadence de livraison : même commentaire, donc même mise à jour à chaque push.
+  // Absente tant que personne ne la fournit (le rendu existant reste inchangé).
+  if (livraison !== null) {
+    lines.push('#### ⏱️ Retard de livraison et âge de la production', '');
+    if (livraison) {
+      lines.push(livraison.trimEnd(), '');
+    } else {
+      lines.push(
+        `⚠️ Non mesuré${livraisonError ? ` (${livraisonError})` : ''} — le garde de cadence n'a pas écrit sa mesure pour ce run ; voir le journal de l'étape.`,
+        ''
+      );
+    }
+  }
 
   const detail = current.initialChunks || [];
   if (detail.length) {
@@ -399,7 +424,7 @@ export const resolvePrNumber = (env = process.env) => {
 };
 
 export const parseArgs = (argv = process.argv.slice(2)) => {
-  const args = { out: '', baseline: '', previous: '', markdown: '', summary: '', post: false, dryRun: false };
+  const args = { out: '', baseline: '', previous: '', markdown: '', summary: '', livraison: '', post: false, dryRun: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--out') args.out = argv[++i] || '';
@@ -407,6 +432,7 @@ export const parseArgs = (argv = process.argv.slice(2)) => {
     else if (a === '--previous') args.previous = argv[++i] || '';
     else if (a === '--markdown') args.markdown = argv[++i] || '';
     else if (a === '--summary') args.summary = argv[++i] || '';
+    else if (a === '--livraison') args.livraison = argv[++i] || '';
     else if (a === '--post') args.post = true;
     else if (a === '--dry-run') args.dryRun = true;
   }
@@ -457,13 +483,26 @@ export const runReport = async ({ root, args = parseArgs(), env = process.env, f
     previousError = prior.error;
   }
 
+  // Cadence de livraison : fichier écrit par check-retard-main.js --markdown. Un
+  // fichier absent est DIT (jamais une cadence inventée, ni une section vide).
+  let livraison = null;
+  let livraisonError = '';
+  if (args.livraison) {
+    if (existsSync(args.livraison)) {
+      livraison = readFileSync(args.livraison, 'utf8');
+    } else {
+      livraison = '';
+      livraisonError = `fichier absent (${args.livraison})`;
+    }
+  }
+
   const baselineReason = !args.baseline
     ? 'aucune référence fournie'
     : !existsSync(args.baseline)
       ? 'aucune mesure de `main` en cache'
       : 'référence illisible';
 
-  const markdown = renderMarkdown({ current: payload, baseline, previous, baselineReason, previousError });
+  const markdown = renderMarkdown({ current: payload, baseline, previous, baselineReason, previousError, livraison, livraisonError });
 
   if (args.out) {
     mkdirSync(path.dirname(args.out), { recursive: true });

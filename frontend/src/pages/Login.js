@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +14,6 @@ import { clearRegistrationFlow } from '../utils/registrationFlowStorage';
 import { makeScopedTranslator } from '../utils/pack2PageI18n/register';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 import { MarqueKojo } from '../config/marque-kojo';
 
 const requiresRegistrationCompletion = (user) => {
@@ -239,7 +239,7 @@ export default function Login() {
           </div>
 
           <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 space-y-2">
-            <p className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} classe={CLASSES_ICONE.notice} /> {pageT(pagePlan.legalNoticeTitleKey)}</p>
+            <p className="text-sm font-semibold text-orange-900"><IconePage nom={pagePlan.legalNoticeIcon} role="notice" /> {pageT(pagePlan.legalNoticeTitleKey)}</p>
             <a
               href={legalDocumentUrl}
               className="inline-flex items-center text-sm font-medium text-orange-700 hover:text-orange-800 underline"

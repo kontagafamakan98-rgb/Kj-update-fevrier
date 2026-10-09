@@ -167,6 +167,81 @@ describe('css-selecteurs-morts — ce qui POSE VRAIMENT une classe', () => {
     );
   });
 
+  it('lit une clé qui SE NOMME COMME UNE CLASSE, y compris la convention `classe…`', () => {
+    // `classeFond="bg-green-500"` est la convention du dépôt pour un prop qui
+    // porte une classe (`StepDot`, `StatCard`). Sans le motif `^classe`, ces props
+    // étaient invisibles au corpus et leurs classes déclarées MORTES — c'est ce
+    // qui a fait renommer les props à la source le 07/10/2026.
+    expect(classesDuJs('const a=<StepDot classeFond="bg-green-500" classeTexte="text-white"/>;')).toEqual([
+      'bg-green-500',
+      'text-white',
+    ]);
+    expect(classesDuJs('const o={classeCorps:"corps-page"};')).toEqual(['corps-page']);
+  });
+
+  it('résout un REGISTRE local relu par INDEX dynamique, mais RÉSERVE à ce fichier', () => {
+    // L'objet est nommé dans une position de classe et relu par index : aucune
+    // propriété ne peut être choisie, donc TOUTES ses chaînes sont des classes.
+    expect(classesDuJs('const colorClasses={rouge:"bg-red-500",bleu:"bg-blue-500"};const a={className:`${colorClasses[c]}`};')).toEqual(
+      expect.arrayContaining(['bg-red-500', 'bg-blue-500'])
+    );
+    // Le membre dont l'objet est déclaré dans CE fichier est résolu (c'est la
+    // ligne qui a rendu `badgeRepere` inutile côté registre partagé)…
+    expect(
+      classesDuJs('const X={badge:"inline h-3 w-3 align-[-0.125em]"};const a={className:`${X.badge}`};')
+    ).toContain('inline h-3 w-3 align-[-0.125em]');
+    // …et celui dont l'objet vient d'un AUTRE module ne l'est PAS : c'est la
+    // frontière, pas un oubli. La tolérer demandait 33 noms (title, status,
+    // amount…) pour faire vivre UNE classe — le corpus large que ce module refuse.
+    expect(classesDuJs('const a={className:`${CLASSES_ICONE.badgeRepere}`};')).toEqual([]);
+  });
+
+  it('lit la PROPRIÉTÉ NOMMÉE, et pas l’objet entier : la prose n’est pas une classe', () => {
+    // Le faux positif mesuré le 09/10/2026 : une position de classe qui nomme
+    // `frameClass` faisait lire TOUTES les chaînes de l'entrée du plan — dont le
+    // champ `pourquoi`, écrit en français. La phrase « le pied de page était
+    // visible » déclarait alors POSÉE la classe `visible`, et le garde refusait
+    // ce nom de la `blocklist` de `tailwind.config.cjs` que PERSONNE ne pose.
+    const plan = [
+      'const PLAN={"/":{frameClass:"max-w-7xl mx-auto cadre-page",pourquoi:"le pied de page était visible"}};',
+      'const a={className:`${PLAN["/"].frameClass}`};',
+    ].join('');
+    const valeurs = classesDuJs(plan);
+    expect(valeurs).toContain('max-w-7xl mx-auto cadre-page');
+    expect(valeurs).not.toContain('le pied de page était visible');
+    expect(jetonsDe(valeurs.join('\n')).has('visible')).toBe(false);
+  });
+
+  it('un index DYNAMIQUE garde la lecture large des VALEURS, mais jamais d’un CONTENEUR', () => {
+    // Les valeurs d'un registre relu par index SONT les classes : on ne peut pas
+    // savoir laquelle, donc toutes comptent (`colorClasses[color]`).
+    expect(
+      classesDuJs('const R={a:"bg-red-500",b:"bg-blue-500"};const x={className:`${R[k]}`};')
+    ).toEqual(expect.arrayContaining(['bg-red-500', 'bg-blue-500']));
+    // Le RELAIS par une déclaration locale suit le membre lu : `const t=R[k]`,
+    // puis `t.texte` en position de classe, lit `R['*'].texte` — la propriété
+    // réellement lue, pas tout `R`.
+    expect(
+      classesDuJs(
+        'const R={a:{texte:"text-white"},b:{texte:"text-black"}};const t=R[k];const x={className:`${t.texte}`};'
+      )
+    ).toEqual(expect.arrayContaining(['text-white', 'text-black']));
+    // …et une ENTRÉE qui est un objet n'est jamais une classe : au bout d'un
+    // chemin, on ne lit que les chaînes du nœud, pas celles qu'il contient.
+    expect(classesDuJs('const R={a:{pourquoi:"le pied était visible"}};const x={className:`${R[k]}`};')).toEqual([]);
+    // La lecture HISTORIQUE reste, elle, pour un identifiant lu TEL QUEL :
+    // l'objet y EST le registre, donc toutes ses chaînes sont des classes.
+    expect(classesDuJs('const R={a:"bg-red-500",b:"bg-blue-500"};const x={className:R};')).toEqual(
+      expect.arrayContaining(['bg-red-500', 'bg-blue-500'])
+    );
+  });
+
+  it('ne condamne RIEN quand un fichier est illisible (un fichier non lu ne fait pas rouge)', () => {
+    // Le garde lit des artefacts de build ; un parseur qui lève sur un fichier
+    // exotique ne doit pas transformer une erreur de lecture en dette de CSS.
+    expect(classesDuJs('const (::{')).toEqual([]);
+  });
+
   it('lit les valeurs de classe du HTML, et rien que l’attribut `class`', () => {
     expect(classesDuHtml('<body class="a b"><p class=\'c\'></p>')).toEqual(['a b', 'c']);
     expect(classesDuHtml('<meta name="twitter:card" content="summary">')).toEqual([]);
@@ -223,7 +298,7 @@ describe('css-selecteurs-morts — les règles d’une feuille', () => {
  * `prose` est écrit dans le JS du build SANS être une position de classe : c'est
  * la forme sous laquelle un nom mort se faisait disculper avant le 28/09/2026.
  */
-function ecrireArbre({ regleMorte = null, regleLivree = null, prose = '', nbJs = 25, nbPages = 12, nbFeuilles = 6 } = {}) {
+function ecrireArbre({ regleMorte = null, regleLivree = null, prose = '', classeBloquee = null, nbJs = 25, nbPages = 12, nbFeuilles = 6 } = {}) {
   const racine = fs.mkdtempSync(path.join(os.tmpdir(), 'kojo-css-mort-'));
   const build = path.join(racine, 'build');
   const assets = path.join(build, 'assets');
@@ -237,10 +312,15 @@ function ecrireArbre({ regleMorte = null, regleLivree = null, prose = '', nbJs =
   // chaîne séparée par des espaces n'en produisait que 40, et le garde refusait
   // alors de juger au lieu de rendre un verdict.
   const poses = Array.from({ length: 240 }, (_, i) => `classe-posee-${i}`);
+  // Une classe POSÉE que le site a DÉCIDÉ de ne plus générer : la seule façon de
+  // prouver que le verdict 3 lit la VRAIE `blocklist` de `tailwind.config.cjs`
+  // (le garde la `require`, il ne la copie pas).
+  const bloc = classeBloquee ? `\nconst pose={className:"${classeBloquee}"};
+` : '';
   for (let i = 0; i < nbJs; i += 1) {
     fs.writeFileSync(
       path.join(assets, `chunk-${i}.js`),
-      `const a=[${poses.map((p) => `{className:"${p}"}`).join(',')}];\n${prose}\nexport{a}`,
+      `const a=[${poses.map((p) => `{className:"${p}"}`).join(',')}];\n${prose}${bloc}\nexport{a}`,
       'utf8'
     );
   }
@@ -278,6 +358,19 @@ describe('check-css-selecteurs-morts — le garde, sur des arbres de fixture', (
     expect(code).toBe(0);
     expect(sortie).toMatch(/Aucun sélecteur sans porteur/);
     expect(sortie).toMatch(/6 feuille\(s\) source et 12 page\(s\) livrée\(s\) lues/);
+    // La `blocklist` est lue DANS la vraie configuration de Tailwind, et le
+    // verdict la publie : un zéro qui ne dirait pas combien de noms il a
+    // regardés serait un zéro qu'on ne peut pas distinguer d'une liste vide.
+    expect(sortie).toMatch(/[1-9]\d* nom\(s\) volontairement NON généré\(s\), 0 posé\(s\)/);
+  });
+
+  it('sort 1 quand un nom de la `blocklist` est POSÉ (un nom bloqué mais posé ne peint rien)', () => {
+    // C'est l'autre moitié du mensonge que ce garde combat : une classe que le
+    // livré porte et dont la règle a été retirée de la feuille servie.
+    const arbre = ecrireArbre({ classeBloquee: 'container' });
+    const { code, sortie } = lancerGarde(arbre);
+    expect(code).toBe(1);
+    expect(sortie).toMatch(/« container » est dans la liste des noms volontairement NON générés/);
   });
 
   it('sort 1 et nomme fichier, ligne, nom et sélecteur quand une feuille SOURCE écrit un nom mort', () => {
@@ -305,7 +398,9 @@ describe('check-css-selecteurs-morts — le garde, sur des arbres de fixture', (
     const arbre = ecrireArbre({ nbJs: 1 });
     const { code, sortie } = lancerGarde(arbre);
     expect(code).toBe(1);
-    expect(sortie).toMatch(/corpus illisible \(13 fichier\(s\), \d+ jeton\(s\)\)/);
+    // Le refus publie les TROIS planchers (fichiers, jetons, valeurs de classe) :
+    // c'est le compte de FICHIERS qui est sous le sien, la matière étant complète.
+    expect(sortie).toMatch(/corpus illisible \(13 fichier\(s\), \d+ jeton\(s\), \d+ valeur\(s\) de classe\)/);
   });
 
   it('REFUSE de juger des feuilles source illisibles (plancher de règles)', () => {

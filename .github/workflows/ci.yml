@@ -552,6 +552,25 @@ jobs:
         working-directory: frontend
         run: node scripts/check-prerender-shells.js
 
+      # LA FEUILLE CRITIQUE EST RECOPIÉE DANS CHAQUE DOCUMENT, et elle est lue
+      # AVANT le premier paint : c'est le prix du plugin d'inlining
+      # (`vite-plugins/inline-critical-css.js`, gain mesuré ~140 ms). Ce fait
+      # vivait en PROSE dans `check-bundle-size.js`, et dans son budget le plus
+      # large (le build total) : il ne disait donc ni QUELLE page avait enflé ni
+      # de combien — et son compte écrit à la main avait dérivé (annoncé
+      # « 69 Ko × 22 pages », mesuré le 09/10/2026 : 14 documents, dont 13
+      # portant la même feuille, 900 980 o = 0,86 Mo). Ce garde tient la
+      # grandeur PAGE PAR PAGE : dépassement chiffré, plancher (une page qui a
+      # PERDU sa feuille est plus légère, donc un plafond seul la déclarerait
+      # « meilleure »), nombre de blocs `<style>`, feuille divergente d'une page
+      # qui ne l'a pas déclarée, page pré-rendue sans ligne, ligne périmée — et
+      # il refuse de conclure si son build est vide ou incomplet. La table est
+      # la mesure du build réel ; preuve d'échec dans
+      # scripts/__tests__/check-css-inline-budget.test.js.
+      - name: Check inline CSS budget per prerendered page
+        working-directory: frontend
+        run: node scripts/check-css-inline-budget.js
+
       # Les deux gardes de coquille lisent le HTML publié ; celui-ci lit les
       # FICHIERS LIVRÉS (`build/assets/*.js` et `*.css`), seul endroit où vit
       # l'URL qu'un composant écrit en clair (`script.src = 'https://…'`). Il
@@ -625,6 +644,55 @@ jobs:
       - name: Check no CSS selector without a poser (source and shipped sheets)
         working-directory: frontend
         run: node scripts/check-css-selecteurs-morts.js
+
+      # AUCUNE CLASSE POSÉE SANS RÈGLE — la TROISIÈME direction du même fait, et
+      # la seule que rien ne tenait. Le garde ci-dessus juge les noms d'une
+      # feuille (un sélecteur sans porteur, une règle servie sans porteur) et son
+      # verdict final promet davantage qu'il ne vérifie : « et une classe POSÉE
+      # doit exister dans la feuille servie » — vrai des neuf noms de la
+      # blocklist, de personne d'autre. Le sujet est le HTML des PAGES livrées, et
+      # c'est une mesure : Tailwind scanne src/**, donc un littéral de className
+      # écrit là a sa règle par construction, tandis que le corpus du bundle ne
+      # sait pas distinguer une classe d'un fragment de gabarit, d'un argument de
+      # code ou de prose (mesuré : 515 jetons sans règle, tous du bruit). Ce qui
+      # reste est exactement le trou : les coquilles pré-rendues
+      # (vite-plugins/prerender/**) ne sont PAS dans le content de Tailwind, donc
+      # une classe qui n'y est écrite que là n'est peinte par personne — et c'est
+      # la peinture du premier écran, celle que les gardes de géométrie comparent
+      # sans jamais lire les classes. Trouvé à son premier passage : « opacity-50 »
+      # sur le bouton de suivi de /support, que React grise par
+      # `disabled:opacity-50` — la coquille publiait un bouton plein. Le garde
+      # REFUSE de juger sous cinq planchers de lecture (pages, feuilles, règles,
+      # noms servis, classes posées) et refuse une exemption sans motif comme une
+      # exemption périmée. La règle vit dans scripts/classes-sans-regle.js ;
+      # preuve d'échec dans scripts/__tests__/check-classes-sans-regle.test.js.
+      - name: Check no class posed without a rule (shipped pages ↔ served sheet)
+        working-directory: frontend
+        run: node scripts/check-classes-sans-regle.js
+
+      # AUCUN JETON SANS LECTEUR, AUCUN MOT ÉTRANGER. Le garde ci-dessus juge des
+      # NOMS DE CLASSES ; celui-ci juge des JETONS — deux sujets distincts, et le
+      # second n'était tenu par rien : mesuré le 08/10/2026, le `:root` de
+      # src/index.css déclarait vingt-trois jetons shadcn dont UN SEUL servait
+      # (`--radius`, lu treize fois dans la feuille livrée) ; `--foreground`
+      # peignait la couleur de texte de la page (rgb(10, 10, 10) relevé au
+      # navigateur) et il est passé à la palette du site, `--background` et
+      # `--border` étaient battus par une règle plus tardive (fond #f9fafb
+      # d'App.css ; préflight pour la bordure : 17 éléments en #e7e5e4 sur `/`,
+      # zéro à la valeur du jeton), et les dix-neuf autres n'étaient lus NULLE
+      # PART. Trois verdicts : un jeton déclaré par une feuille du site doit être
+      # lu par l'artefact livré ; un `var(--x)` lu par la CONFIGURATION doit être
+      # déclaré (Tailwind lit ses propres `--tw-*`, d'où ce périmètre) ; et
+      # quatre mots sont refusés par leur nom, chacun avec sa mesure — la police
+      # du gabarit `source-code-pro`, un jeton de `@radix-ui`, une animation du
+      # `Accordion` de shadcn, un `@apply` d'une couleur du thème retiré. Les
+      # commentaires sont blanchis avant lecture (le commentaire qui documente un
+      # retrait citait « --chart-4: 280 65% 60% » et le garde y lisait une
+      # déclaration). La règle vit dans scripts/reliquats-css.js ; preuve d'échec
+      # dans scripts/__tests__/check-reliquats-css.test.js.
+      - name: Check no design token without a reader and no foreign vocabulary
+        working-directory: frontend
+        run: node scripts/check-reliquats-css.js
 
       # Les DEUX canaux qui publient les métadonnées d'une page — la coquille
       # pré-rendue (build) et les pages au runtime — doivent annoncer le même
@@ -725,6 +793,32 @@ jobs:
       - name: Check the poinçon's measurements (contrast, circles, overflow)
         working-directory: frontend
         run: node scripts/check-marque-kojo.js
+
+      # Garde-fou de la famille « photos du héros » : les Six JPEG de l'accueil
+      # sont désormais doublés de variantes AVIF et WebP à DEUX largeurs (480 et
+      # 720), publiées par un `<picture>` — et c'est le commentaire de
+      # src/config/photos-heros.js qui justifie ce choix en publiant les OCTETS
+      # mesurés (AVIF 720 = 213 059 o à six pour −62,9 % contre le JPEG, WebP
+      # 720 = 264 938 pour −53,9 %). Rien ne reliait ce tableau au disque : une
+      # variante régénérée avec un autre réglage pesait autre chose que les
+      # octets publiés, une variante DÉCLARÉE mais jamais générée se serait
+      # téléchargée en 404 (le `<picture>` ne le dit pas — le navigateur
+      # retombe alors sur le JPEG de 63 Ko en croyant en servir 20), une source
+      # recodée sans régénérer les variantes laissait des variantes qui n'étaient
+      # plus celles de la photo affichée, et une variante plus LOURDE que son
+      # repli faisait télécharger davantage à un navigateur moderne. Le check lit
+      # l'EN-TÊTE de chaque fichier (boîte `ispe` d'un AVIF, premier morceau d'un
+      # WebP : `VP8X`, `VP8 ` ou `VP8L`), le compare au manifeste de
+      # scripts/gen-hero-images.py et à la table de la config, et refuse aussi un
+      # total qui ne suit plus les fichiers, un ordre de formats où le premier
+      # publié serait le plus lourd, un encodage orphelin, et une photo de tête
+      # dont la variante n'économise plus la moitié du JPEG. Il n'a besoin ni de
+      # Pillow ni de Python : les 24 fichiers sont lus en Node. Preuve d'échec :
+      # scripts/__tests__/check-hero-images.test.js (une mutation, un refus
+      # nommé), rejouée par le harnais de mutation.
+      - name: Check hero photo variants (disk ↔ manifest ↔ config)
+        working-directory: frontend
+        run: node scripts/check-hero-images.js
 
       # Garde-fou du manifeste PWA : il déclarait « any maskable » sur ses deux
       # icônes alors qu'AUCUNE ne tenait dans la zone de sécurité (contenu à un
@@ -884,6 +978,31 @@ jobs:
           echo "Révisions acceptées : $ATTENDU (commit poussé) ou $DERNIER_FRONTEND (dernier commit ayant touché frontend/)"
           node scripts/check-deployed-revision.js --attendu "$ATTENDU" --sinon "$DERNIER_FRONTEND" --tentatives 9 --delai 20
 
+      # ── COMBIEN la base est-elle en retard, et depuis QUAND la production ? ──
+      # Le step ci-dessus répond OUI/NON (« le frontend servi est-il celui de ce
+      # commit »), et seulement sur `main`. Il ne dit ni de combien de commits la
+      # base est en retard sur la branche de travail, ni depuis quand la
+      # production n'a pas été reconstruite — les deux nombres sur lesquels se
+      # prend la décision de livrer. MESURÉ le 07/10/2026 : dix commits ont
+      # attendu d'être livrés et aucun run ne l'a rappelé.
+      #
+      # Il tourne AUSSI SUR LES PR, et c'est là qu'il sert : la branche de travail
+      # est justement celle dont on veut savoir ce qu'elle porte. Il ne peut pas
+      # rendre une PR rouge : sans borne déclarée il ne publie que des ::notice
+      # (une branche de travail PORTE des commits non livrés, ce n'est pas un
+      # défaut), et une production injoignable ou sans en-tête de datation est
+      # NOMMÉE sans être jugée. Ses seuls refus par défaut sont « je ne peux pas
+      # lire mon sujet » (aucune base, git illisible) — une base distante existe
+      # toujours ici, le job clonant l'historique entier (fetch-depth: 0).
+      #
+      # Le compte de commits est CORRIGÉ du squash : mesuré le 08/10/2026 sur ce
+      # dépôt, `origin/main..HEAD` valait 14 et l'attente réelle 0 (l'arbre de la
+      # tête était celui de la base). Un compte brut ferait chercher un retard
+      # inexistant à chaque branche issue d'une fusion par squash.
+      - name: Retard de la base et âge du déploiement de production (signal)
+        working-directory: frontend
+        run: node scripts/check-retard-main.js
+
   # ─── Frontend : rapport de taille publié en commentaire de PR ────────────
   # `check-bundle-size.js` est un garde BINAIRE (« dans les budgets » ou
   # « dépassé ») : il ne dit pas COMBIEN un changement coûte, et ses seuils
@@ -911,7 +1030,11 @@ jobs:
       pull-requests: write
 
     steps:
+      # Historique complet : la cadence de livraison compare la révision (la tête
+      # de la PR) à `origin/main`, que seul un clone complet fournit.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -948,6 +1071,19 @@ jobs:
           restore-keys: |
             bundle-size-baseline-
 
+      # Cadence de livraison, dans le MÊME commentaire : de combien `main` est en
+      # avance sur la révision mesurée, et depuis quand la production sert un
+      # artefact reconstruit. La révision est celle de la PR (sur `pull_request`,
+      # HEAD est le commit de fusion simulé, qui contient déjà `main`). Advisory :
+      # un échec n'arrête pas le rapport, qui dit « non mesuré » et pourquoi.
+      - name: Retard de livraison et âge de la production (pour le commentaire)
+        id: livraison
+        continue-on-error: true
+        working-directory: frontend
+        env:
+          REVISION_MESUREE: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/check-retard-main.js --base origin/main --tete "$REVISION_MESUREE" --markdown .bundle-size/livraison.md
+
       # Au premier run de `main`, .bundle-size/baseline.json n'existe pas : le
       # script le détecte (existsSync) et rend un rapport sans écarts.
       - name: Mesurer, comparer et publier (commentaire de PR)
@@ -960,6 +1096,7 @@ jobs:
             --baseline .bundle-size/baseline.json \
             --out .bundle-size/current.json \
             --markdown .bundle-size/comment.md \
+            --livraison .bundle-size/livraison.md \
             --summary "$GITHUB_STEP_SUMMARY" \
             --post
 

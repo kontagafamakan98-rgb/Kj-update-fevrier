@@ -1,3 +1,4 @@
+import { IconePage } from '../config/page-icons';
 import { Fragment } from 'react';
 // Le lien interne AVEC la transition de vue native (components/LienVue.js) : le
 // `Link` brut de React Router change la page d'un coup, sans raccord.
@@ -5,7 +6,6 @@ import Link from '../components/LienVue';
 import { useLanguage } from '../contexts/LanguageContext';
 import { usePageMeta } from '../utils/seo';
 import { PAGE_SECTIONS } from '../config/page-sections';
-import { IconePage, CLASSES_ICONE } from '../config/page-icons';
 
 /**
  * Page « À propos » — qui édite le site, et pourquoi il existe.
@@ -48,7 +48,7 @@ export default function About() {
           {cards.map((card) => (
             <div key={card.titleKey} className={carteClass}>
               <span className="pastille-rond mb-4">
-                <IconePage nom={card.icone} classe={CLASSES_ICONE.pastille} />
+                <IconePage nom={card.icone} role="pastille" />
               </span>
               <h2 className="nom-de-ligne mb-2">
                 {t(card.titleKey)}

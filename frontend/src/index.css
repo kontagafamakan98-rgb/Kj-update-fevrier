@@ -309,7 +309,15 @@ button,
    desktop à 0,0037 et fait apparaître 0,0001 sur « / » à t=336 ms, donc AVANT
    le remplacement : du bruit de mise en page, pas de la police. Re-ancrer la
    constante sur le résidu d'une page qui ne porte pas le LCP de l'accueil
-   échangerait une parité GARANTIE contre un zéro du jour. */
+   échangerait une parité GARANTIE contre un zéro du jour.
+
+   CE « NI L'UNE NI L'AUTRE » A ÉTÉ RÉPARÉ, ET PAS EN CHOISISSANT (08/10/2026) :
+   les deux faces ci-dessous servent désormais DEUX populations — celle du titre
+   du héros (la constante de SA phrase) et celle des titres de section (la
+   médiane du corpus), dont la face est déclarée juste après. Une constante
+   unique ne pouvait pas les égaler toutes les deux : c'est le rapport des
+   largeurs, qui dépend de la phrase, qui l'interdit, et non la qualité de la
+   mesure. */
 @font-face {
     font-family: 'Cormorant Garamond repli Times';
     src: local('Times New Roman'), local('Liberation Serif'), local('DejaVu Serif');
@@ -328,6 +336,104 @@ button,
     line-gap-override: 0%;
 }
 
+/* ── LA SECONDE FACE : LES TITRES DE SECTION ONT LA LEUR (08/10/2026) ──────
+
+   Le paragraphe précédent finissait sur « aucune des deux constantes de
+   rechange ne domine », et c'était vrai PARCE QUE la même constante servait les
+   deux textes : 94,3 % améliore les titres de section mais touche aussi
+   l'élément LCP de l'accueil, qui n'a aucune raison de payer pour eux. La
+   question n'était donc pas « quelle constante unique », mais « pourquoi une
+   seule » — le rapport des largeurs DÉPEND DE LA PHRASE, et deux populations de
+   textes ont deux médianes.
+
+   LE CORPUS, ET SA MÉDIANE. Mesuré sur 48 titres réels du site, à leur corps et
+   leur graisse (canvas, Chromium 412×823) : le rapport Cormorant ÷ repli Times
+   va de 1,027 à 1,126, soit un `size-adjust` équivalent de 88,8 % à 97,4 %,
+   MÉDIANE 94,3 % (la mesure est celle qui est citée par la puce 27/09 de
+   `AGENTS.md` et par `CI-COVERAGE.md`). C'est donc 94,3 % qui ancre la face des
+   titres de section — la médiane du corpus mesuré, RÉ-ÉPROUVÉE ici par la
+   sonde de police retardée (protocole ci-dessous).
+
+   CE QUE LA RE-MESURE DU 08/10/2026 AJOUTE, ET POURQUOI LE HÉROS N'EST PAS
+   DANS CE CORPUS. Re-mesurés le 08/10/2026 sur les SEPT routes pré-rendues qui
+   portent des titres serif, 54 titres HORS HÉROS dédoublonnés par leur texte
+   (`e2e/`, sonde d'atelier) : la médiane du rapport vaut 92,1 % contre la
+   famille Times et 76,4 % contre Georgia — et cette médiane-là n'est PAS celle
+   qui décide, parce que son corpus n'est pas celui que la face peint : 19 de
+   ces 54 titres sont des libellés COURTS de `.nom-de-ligne` (« Jardinage »,
+   « Électricité »), qui ne se replient JAMAIS et dont la largeur ne peut donc
+   déplacer aucun élément ; leur médiane, 91,6 %, tire l'ensemble vers le bas
+   sans rien dire du défaut à corriger. Le corpus qui décide est celui des
+   titres RÉELS, et c'est lui qui est mesuré plus haut : 94,3 %. Le héros, lui,
+   est exclu des deux : sa boîte est suivie À PART, c'est l'élément LCP de « / »,
+   et sa constante (92,1 %) reste celle de SA phrase.
+
+   POURQUOI GEORGIA N'A QU'UNE FACE. La face Georgia des titres de section n'est
+   pas ajoutée : la même re-mesure donne, contre Georgia, une médiane de 76,4 %
+   là où la face du héros vaut 76,3 % — les deux ancres COÏNCIDENT pour cette
+   famille à un dixième de point, donc une seconde face n'aurait rien à
+   changer et serait une constante inventée. La face Georgia existante reste
+   donc dans les deux piles, à sa place : elle n'est atteinte que sur un hôte qui
+   a Georgia SANS aucune famille de la métrique Times, et son `size-adjust` y est
+   déjà celui de son dessin.
+
+   CE QUE LA SONDE DE POLICE RETARDÉE MESURE (08/10/2026, Chromium, 412×823 et
+   1350×940, dix routes pré-rendues × 2 tailles) : seules les requêtes
+   `/fonts/cormorant-*.woff2` sont retardées de 1 500 ms, donc tout décalage
+   relevé est le remplacement de la police de titrage et rien d'autre, et le
+   repli a bien peint (`document.fonts.check` rend `false` avant l'arrivée du
+   fichier). L'état d'AVANT est reproduit par mutation de l'artefact SERVI — la
+   VARIABLE `--kojo-serif-section` réécrite vers la pile du héros, avant analyse
+   du corps — et non en renommant les faces : deux `@font-face` du même nom
+   feraient écraser la nouvelle par l'ancienne, et la mutation serait
+   inopérante (constaté : deux relevés identiques au pixel).
+
+   LA GRANDEUR MESURÉE EST L'ENCRE, pas le nombre de lignes : la constante
+   d'ancrage pilote une LARGEUR, et le nombre de lignes ne bouge qu'aux
+   frontières (un seuil, donc une mesure qui ne voit rien tant qu'on est loin du
+   repli). On somme donc, titre par titre, |encre du repli − encre du dessin
+   servi| sur les titres de section, avant et après le remplacement du fichier :
+     • MOBILE — / 132,5 contre 204,2 px · /about 33,3 contre 53,9 · /contact
+       11,5 contre 15,8 · /how-it-works 199,9 contre 245,2 · /jobs 6,2 contre
+       11,9 · /login 6,9 contre 10,0 · /privacy 32,5 contre 52,8 · /register
+       12,3 contre 17,1 · /support 41,8 contre 58,5 · /terms 36,2 contre 55,4 ;
+     • DESKTOP — / 165,1 contre 253,9 · /about 42,9 contre 68,8 · /contact 16,2
+       contre 22,0 · /how-it-works 103,7 contre 182,6 · /jobs 8,7 contre 16,6 ·
+       /login 9,7 contre 13,9 · /privacy 39,1 contre 62,3 · /register 12,3 contre
+       17,1 · /support 74,2 contre 80,2 · /terms 46,9 contre 73,2.
+   Aucune route ne perd : la somme est plus petite PARTOUT, de 8 % (/support
+   desktop) à 48 % (/how-it-works desktop), et de 29,2 % au total en mobile
+   (513,1 contre 724,8 px) comme en desktop (518,8 contre 790,6, soit 34,4 %).
+
+   LE CLS DE LA POLICE, lui, est plus petit OU ÉGAL partout : /how-it-works
+   0,0003 contre 0,0004 en mobile et 0,0002 contre 0,0003 en desktop, /login
+   0,0002 contre 0,0003 en mobile, /support 0,0008 contre 0,0011 en mobile (les
+   autres relevés sont identiques, dont /support desktop 0,0034). Et sur « / »,
+   dont le titre porte LA FACE DU HÉROS, l'encre du titre est IDENTIQUE dans les
+   deux états (278,27 → 295,19 px en mobile, 458,19 → 486,19 en desktop) : c'est
+   l'autre moitié de la preuve — la face des titres de section ne coûte rien à
+   l'élément LCP, parce qu'elle ne le touche pas.
+
+   CE QUE 94,3 % NE FAIT PAS, et la sonde le dit plutôt que de le promettre : le
+   retour à la ligne résiduel de /how-it-works (« Le paiement séquestre, c'est
+   quoi ? », 1 ligne dans le repli, 2 dans le dessin servi) et celui de /support
+   desktop (« Contacter directement le support ») survivent à la médiane — il
+   faudrait 96,4 %, la valeur qui les annule, et qui n'est pas la médiane du
+   corpus. */
+@font-face {
+    font-family: 'Cormorant Garamond repli Times section';
+    src: local('Times New Roman'), local('Liberation Serif'), local('DejaVu Serif');
+    /* La médiane du corpus (94,3 %), et la BOÎTE de Cormorant par la même
+       arithmétique que les deux faces du héros : 92 / 0,943 = 97,6 % et
+       29 / 0,943 = 30,8 % (le `size-adjust` s'applique aussi aux `override`),
+       d'où une boîte de (97,6 + 30,8) × 0,943 = 121 px — la hauteur du dessin
+       servi, comme les deux autres faces. */
+    size-adjust: 94.3%;
+    ascent-override: 97.6%;
+    descent-override: 30.8%;
+    line-gap-override: 0%;
+}
+
 body {
     margin: 0;
     /* 'Inter repli Arial' passe AVANT les familles de l'hôte : elle est le même
@@ -342,41 +448,60 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-        monospace;
-}
+/* ── LA RÈGLE DE `code` ÉTAIT CELLE DU GABARIT, ET ELLE NE PEIGNAIT RIEN ─────
 
-
+   Elle est RETIRÉE le 08/10/2026, sur deux mesures indépendantes :
+     • elle ne gagne nulle part : dans la feuille livrée, `code{font-family:
+       source-code-pro,…}` est écrit AVANT le préflight de Tailwind
+       (`code,kbd,samp,pre{font-family:ui-monospace,…}`), de même spécificité et
+       plus tardif — c'est donc le préflight qui s'applique. Vérifié dans le
+       navigateur sur l'artefact : un `<code>` fraîchement créé calcule
+       `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation
+       Mono", "Courier New", monospace` ;
+     • et son seul porteur réel (`src/pages/Profile.js`) déclare déjà
+       `font-mono` — l'utilitaire, qui gagne par la couche.
+   `source-code-pro` est la police du gabarit Create React App : c'est un
+   reliquat de gabarit, pas une décision de charte. Aucune autre feuille ne
+   déclare de famille pour `code` — le préflight suffit, et il est plus juste
+   (il propose `ui-monospace` en tête). */
 
 @layer base {
+  /* ── LE THÈME shadcn EST RÉDUIT À SON SEUL JETON QUI PEINT (08/10/2026) ────
+
+     Vingt-trois jetons shadcn étaient déclarés ici. MESURÉS un par un sur la
+     feuille livrée (`build/index.html`, 08/10/2026) :
+       • `--radius` est lu TREIZE fois — c'est le seul survivant, et il est le
+         propriétaire du barème des rayons (`tailwind.config.cjs` :
+         `borderRadius.lg/md/sm` valent `var(--radius)`, `- 2px`, `- 4px`). Le
+         retirer ferait tomber à 0 px treize éléments servis ;
+       • `--foreground` était lu UNE fois (`body { @apply text-foreground }`,
+         plus bas) et c'était la couleur de TEXTE de la page : MESURÉ dans le
+         navigateur, `rgb(10, 10, 10)` sur `body` et sur tout ce qui hérite. Elle
+         est remplacée par l'encre du SITE (`--kojo-encre`, #1c1917), déclarée
+         dans le socle en fin de fichier — un jeton étranger ne peint plus rien ;
+       • `--background` était lu une fois aussi, mais sa règle est BATTUE :
+         `App.css` pose `body { background-color: #f9fafb }` plus loin dans la
+         feuille. Le fond calculé est `rgb(249, 250, 251)`, pas le blanc du jeton ;
+       • `--border` était lu une fois, et BATTU lui aussi : le préflight de
+         Tailwind (émis avec le `@tailwind base` d'`App.css`, donc plus loin)
+         pose `border-color: #e7e5e4` sur `*, :before, :after` — la teinte du
+         site, `gray` étant redirigé vers `stone`. MESURÉ sur `/` : 17 éléments
+         peints en #e7e5e4, ZÉRO à la valeur du jeton (#e5e5e5) ;
+       • les dix-neuf autres (`--card*`, `--popover*`, `--primary*`,
+         `--secondary*`, `--muted*`, `--accent*`, `--destructive*`, `--input`,
+         `--ring`, `--chart-1..5`) n'ont AUCUN lecteur : leurs entrées de couleur
+         du thème ne génèrent aucun utilitaire (zéro règle `.bg-card` ou
+         semblable dans la feuille livrée) et ne peignent donc rien.
+
+     Ces jetons portaient en outre une palette FROIDE (le gris par défaut de
+     shadcn) dans un produit dont toute la charte est chaude (encre, sable,
+     filet, papier — `--kojo-*`). La règle qui en sort vaut pour tout jeton à
+     venir, et c'est elle que `scripts/check-reliquats-css.js` tient : un jeton
+     déclaré sans lecteur est du poids mort ET un mensonge de source — la
+     feuille décrit un site qui n'existe pas. */
   :root {
-        --background: 0 0% 100%;
-        --foreground: 0 0% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 0 0% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 3.9%;
-        --primary: 0 0% 9%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 0 0% 96.1%;
-        --secondary-foreground: 0 0% 9%;
-        --muted: 0 0% 96.1%;
-        --muted-foreground: 0 0% 45.1%;
-        --accent: 0 0% 96.1%;
-        --accent-foreground: 0 0% 9%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 0 0% 89.8%;
-        --input: 0 0% 89.8%;
-        --ring: 0 0% 3.9%;
-        --chart-1: 12 76% 61%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-        --radius: 0.5rem;
-    }
+    --radius: 0.5rem;
+  }
 
     /* LE BLOC `.dark` A ÉTÉ RETIRÉ ICI (28/09/2026), et c'est le garde de
        sélecteurs qui l'a nommé : aucun élément livré ne porte la classe `dark`,
@@ -391,14 +516,26 @@ code {
 
 
 
-@layer base {
-  * {
-    @apply border-border;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
-}
+/* ── LES DEUX `@apply` DU THÈME shadcn SONT RETIRÉS (08/10/2026) ─────────────
+
+   Ils posaient `* { border-color: hsl(var(--border)) }` et `body {
+   background-color: hsl(var(--background)); color: hsl(var(--foreground)) }`.
+   MESURÉ dans le navigateur sur l'artefact livré, une déclaration sur trois
+   peignait :
+     • la couleur de bordure posée sur `*` est battue par le préflight de
+       Tailwind, émis plus loin : zéro élément à la teinte du jeton, dix-sept à
+       celle du préflight sur `/`. Elle ne peignait rien ;
+     • `background-color` est battu par `body { background-color: #f9fafb }`
+       d'`App.css` : rien non plus ;
+     • seule la couleur de TEXTE peignait — elle est désormais déclarée par le
+       site, dans le socle : `body { color: var(--kojo-encre) }` (couche
+       `base`, plus bas), avec la palette `--kojo-*` et aucun jeton étranger.
+
+   Le préflight continue de fournir la couleur de bordure par défaut de tous les
+   éléments (`borderColor.DEFAULT`, c'est-à-dire `gray-200` — soit `stone-200`
+   #e7e5e4 depuis la redirection `gray: stone` de `tailwind.config.cjs`) :
+   retirer la règle ne change donc AUCUN pixel de bordure — vérifié en
+   re-mesurant les teintes calculées avant et après. */
 
 /* ── LE SOCLE D'INTERACTION ET DE TYPOGRAPHIE ────────────────────────────────
 
@@ -489,7 +626,14 @@ code {
     scroll-margin-top: 5rem;
   }
 
+  /* LA COULEUR DE TEXTE DU SITE EST LA SIENNE (08/10/2026). Le socle reprend la
+     seule déclaration qui peignait du bloc `@apply` shadcn retiré plus haut :
+     mesuré avant ce changement, `body` calculait `rgb(10, 10, 10)` — le gris
+     `3.9 %` par défaut de shadcn. C'est l'ENCRE de la charte qui prend la place
+     (`--kojo-encre`, #1c1917 : MESURÉ `rgb(28, 25, 23)` après), dans la même
+     règle que les chiffres tabulaires plutôt que dans une règle de plus. */
   body {
+    color: var(--kojo-encre);
     font-variant-numeric: tabular-nums;
   }
 }
@@ -760,7 +904,14 @@ code {
      des pays (« #7c2d12 », contraste 10,4:1 avec le blanc). */
   --kojo-creme: #fff7ed;
   --kojo-brun: #7c2d12;
+  /* LE HÉROS garde la face dont la constante est celle de SA phrase (92,1 %, et
+     sa boîte est suivie à part : c'est l'élément LCP de « / »). */
   --kojo-serif: 'Cormorant Garamond', 'Cormorant Garamond repli Times',
+    'Cormorant Garamond repli Georgia', Georgia, serif;
+  /* LES TITRES DE SECTION ont la LEUR, ancrée sur la MÉDIANE du corpus mesuré
+     (94,3 %, voir « LA SECONDE FACE »). Deux piles parce que deux textes :
+     la première sert `.titre-heros`, la seconde tout le reste du titrage. */
+  --kojo-serif-section: 'Cormorant Garamond', 'Cormorant Garamond repli Times section',
     'Cormorant Garamond repli Georgia', Georgia, serif;
   --kojo-orange: #ea580c;
   --kojo-orange-fonce: #c2410c;
@@ -789,6 +940,24 @@ code {
   --rythme-tete: clamp(2rem, 1.6rem + 1.6vw, 3.5rem);
   --rythme-bloc: clamp(1.5rem, 1.2rem + 1.2vw, 2.25rem);
   --rythme-carte: clamp(1.375rem, 1.2rem + 0.7vw, 2rem);
+
+  /* ── LA BOÎTE DU TITRE DE PAGE (08/10/2026) ────────────────────────────────
+
+     Ces deux jetons existent pour UN consommateur que `.titre-page` ne peut pas
+     servir : le squelette d'attente qui doit RÉSERVER la boîte du titre, sans
+     pouvoir le peindre (son texte vit dans le dictionnaire de la page, donc
+     dans un chunk que le squelette ne charge pas). Recopier le `clamp` aurait
+     fait deux endroits à tenir d'accord — donc un squelette qui dérive du titre
+     qu'il protège, ce qui est exactement le CLS qu'il existe pour empêcher.
+
+     MESURÉ (Chromium, fixture, 08/10/2026), hauteur de la boîte du `<h1>` de
+     /messages : 32,7 px à 412 de large, 45,8 px à 1350. Le bloc du squelette
+     portait `h-8` (32 px) : il en manquait 13,8 px, et c'est EXACTEMENT la
+     distance dont le pied de page bougeait à l'arrivée des données (mesuré :
+     Δ 13,8 px sur /messages en 1350×940, le pied passant de visible à hors
+     écran). */
+  --kojo-titre-page-taille: clamp(1.875rem, 1.4rem + 2.2vw, 2.75rem);
+  --kojo-titre-page-interligne: 1.04;
 }
 
 /* ── LES TROIS CLASSES DU RYTHME ────────────────────────────────────────────
@@ -810,6 +979,52 @@ code {
 
 .carte-publique {
   padding: var(--rythme-carte);
+}
+
+/* ── LE PAS D'UN ÉCRAN D'APPLICATION (09/10/2026) ───────────────────────────
+
+   Les routes d'application n'ont pas de SECTIONS : ce sont des écrans, dont les
+   blocs de premier niveau se répondent. `--rythme-section` (60 à 104 px) y
+   ouvrirait donc des trous entre deux blocs qui se lisent ensemble — et c'est
+   déjà écrit dans `src/config/app-cadres.js` depuis l'unification du cadre.
+   Ce qui manquait n'était pas le jeton : c'était une CLASSE pour le lire. Les
+   cinq routes écrivaient leur pas en utilitaires FIXES — 32, 24, 16 et 8 px —
+   dont trois qu'aucun jeton ne produit, et le titre du tableau de bord restait
+   collé à sa première carte (4 px d'encre, le minimum relevé sur le site).
+
+   DEUX classes, parce qu'il y a deux relations, et chacune lit le jeton dont la
+   définition dit exactement cela (voir l'en-tête des jetons) :
+     • `.tete-app` — ce qu'un EN-TÊTE de page laisse avant le corps qu'il
+       annonce (`--rythme-tete`) ;
+     • `.bloc-app` — l'espace APRÈS un bloc de l'écran, et après le titre d'un
+       groupe (titre de carte → son contenu) : `--rythme-bloc`.
+
+   Relevé du 09/10/2026 (les cinq routes, 412×823 et 1350×940, AVANT) :
+   titre → corps 4 · 8 · 16 px ; entre blocs 16 · 20 · 24 · 32 px ; rembourrage
+   de carte 24 px fixes, contre 22,08 → 28,65 px pour `--rythme-carte`. APRÈS,
+   ces grandeurs sont celles des jetons — et c'est mesuré par le même relevé,
+   pas affirmé (voir RAPPORT-RYTHME-EDITORIAL.md, §10). */
+.tete-app {
+  margin-bottom: var(--rythme-tete);
+}
+
+.bloc-app {
+  margin-bottom: var(--rythme-bloc);
+}
+
+/* L'INSET HORIZONTAL D'UNE CARTE dont le rembourrage est porté par une rangée
+   INTERNE — un en-tête de carte à filet PLEINE LARGEUR, un bandeau, une section
+   séparée par un filet. Le rembourrage de ces cartes ne peut pas être posé sur
+   la carte elle-même (`carte-publique` raccourcirait le filet de séparation),
+   mais la mesure horizontale doit être la MÊME des deux côtés : sinon la ligne
+   de titre et le contenu qu'elle annonce ne s'alignent plus au même filet.
+
+   Seule la mesure HORIZONTALE est ici. La mesure VERTICALE de ces rangées
+   (`py-4`, `py-6`, `py-8`) est un pas INTERNE — celui d'un titre vers son filet
+   — et le dépôt a tranché qu'un pas interne appartient à la page (cf.
+   src/config/app-cadres.js). */
+.carte-cotes {
+  padding-inline: var(--rythme-carte);
 }
 
 /* Le SUR-TITRE : la petite ligne espacée qui annonce ce qui vient. Elle remplace
@@ -860,7 +1075,7 @@ code {
    Le `text-wrap: balance` évite la ligne orpheline d'un titre replié en deux. */
 .titre-section {
   color: var(--kojo-encre);
-  font-family: var(--kojo-serif);
+  font-family: var(--kojo-serif-section);
   font-size: clamp(1.5rem, 1.05rem + 2vw, 2.25rem);
   font-weight: 700;
   letter-spacing: 0;
@@ -870,12 +1085,44 @@ code {
 
 .titre-page {
   color: var(--kojo-encre);
-  font-family: var(--kojo-serif);
-  font-size: clamp(1.875rem, 1.4rem + 2.2vw, 2.75rem);
+  font-family: var(--kojo-serif-section);
+  font-size: var(--kojo-titre-page-taille);
   font-weight: 700;
   letter-spacing: 0;
-  line-height: 1.04;
+  line-height: var(--kojo-titre-page-interligne);
   text-wrap: balance;
+}
+
+/* LA BOÎTE D'UN TITRE DE PAGE, pour une surface qui réserve sa place sans
+   pouvoir le peindre — un squelette de chargement. Elle se calcule des MÊMES
+   jetons que `.titre-page`, donc la réserve ne peut pas dériver du titre :
+   c'est la seule façon d'écrire « même hauteur que lui » sans écrire le
+   `clamp` deux fois. */
+.reserve-titre-page {
+  height: calc(var(--kojo-titre-page-taille) * var(--kojo-titre-page-interligne));
+}
+
+/* LA RÉSERVE D'ÉCRAN D'UN ÉTAT DE CHARGEMENT (08/10/2026) : la hauteur de la
+   fenêtre moins la barre de navigation collée (65 px — `h-16` plus sa
+   bordure), pour que le PIED DE PAGE démarre SOUS la ligne de flottaison. Un
+   squelette dont la page grandit avec ses données ne peut pas répliquer sa
+   hauteur : sans cette réserve, le pied de page s'ancre au bas de l'écran
+   pendant le chargement puis est poussé dehors quand les données arrivent, un
+   déplacement que Chrome compte (CLS 0,1010 mesuré sur /profile le 07/10/2026,
+   le pied de page à y=858,9 nommé par la sonde).
+
+   POURQUOI UNE CLASSE ÉCRITE ICI plutôt qu'un utilitaire Tailwind arbitraire :
+   `min-h-[calc(100vh-65px)]` A ÉTÉ essayé d'abord, et il ne produisait AUCUN
+   effet — Tailwind émet une valeur arbitraire VERBATIM, donc
+   `min-height:calc(100vh-65px)`, qui est du CSS INVALIDE (les opérateurs de
+   `calc()` exigent des espaces autour du `-`) et que le navigateur rejette. La
+   réserve était donc un NO-OP parfaitement silencieux : le build restait vert,
+   les tests jsdom aussi, et seule la sonde des routes connectées l'a dit —
+   « réserve de 0 px pour 758 px annoncés ». Une règle CSS écrite ici n'a pas ce
+   piège, et elle est le pendant exact de `.reserve-titre-page` (même famille :
+   la place d'une surface qui n'a pas encore son contenu). */
+.reserve-pied-hors-ecran {
+  min-height: calc(100vh - 65px);
 }
 
 /* La CARTE : un filet, pas une ombre. `cliquable` n'ajoute que ce qui répond au
@@ -1232,6 +1479,69 @@ code {
   background-color: var(--kojo-sable);
 }
 
+/* ── LE CONTRÔLE DE PAUSE DE L'ALTERNANCE (WCAG 2.2.2, 07/10/2026) ──────────
+
+   Une alternance automatique de plus de cinq secondes doit pouvoir être
+   interrompue par l'utilisateur. Le contrôle est POSÉ SUR la photo, dans le
+   cadre (`.cadre-illustration` est `relative`, donc cette position absolue se
+   lit par rapport à lui) : c'est ce qui fait que son apparition ne décale rien.
+   Une version qui aurait réservé une ligne sous la photo aurait déplacé tout le
+   premier écran au montage de React — le CLS que `e2e/cls-coquille-react.spec.js`
+   mesure, et qui vaut 0 sur « / ».
+
+   Les couleurs ne sont pas décoratives : le fond sombre translucide et le filet
+   clair gardent le dessin lisible sur N'IMPORTE LAQUELLE des six photos (elles
+   vont du jaune de chantier au brun d'atelier), et le blanc sur `rgba(24,24,27,
+   0.72)` reste au-dessus du seuil de contraste des objets non textuels (WCAG
+   1.4.11).
+
+   LA CIBLE EST CARRÉE ET FAIT 3 rem (48 px), ET LES DEUX PROPRIÉTÉS SONT
+   MESURÉES, parce que le socle les contredisait. Le bloc de socle de cette
+   feuille pose `button { min-height: 48px; padding-inline: 16px }` : un bouton
+   de 2,75 rem de haut (la première version) ressortait donc MESURÉ à 44 × 48 px
+   — `min-height` gagne sur `height`, la boîte n'était plus carrée, et un
+   `border-radius: 9999px` sur un rectangle donne un STADE, pas le cercle
+   annoncé. La cible vaut désormais la taille que le socle impose déjà à tout
+   bouton (48 px, au-dessus du minimum de 2.5.5 / 2.5.8), le rembourrage
+   horizontal du socle est neutralisé (il n'y a pas de texte à respirer dans ce
+   cercle, seulement un dessin centré) et la boîte mesurée redevient 48 × 48.
+   C'est `e2e/heros-pause.spec.js` qui tient la mesure : il refuse une cible plus
+   petite que 44 px ET une boîte non carrée. */
+.heros-controle {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  /* Au-dessus de la photo, qui est elle-même `position: relative` : sans ce
+     rang, la photo (peinte après le fond décalé) passerait devant le bouton. */
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  min-height: 3rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 9999px;
+  background-color: rgba(24, 24, 27, 0.72);
+  color: #fff;
+  cursor: pointer;
+}
+
+.heros-controle:hover {
+  background-color: rgba(24, 24, 27, 0.88);
+}
+
+.heros-controle:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.heros-controle svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
 /* ── LE RUBAN DES PAYS ──────────────────────────────────────────────────────
 
    La section « pays couverts » était quatre cartes à drapeau sur un fond
@@ -1422,7 +1732,7 @@ code {
 
 .nom-de-ligne {
   color: var(--kojo-encre);
-  font-family: var(--kojo-serif);
+  font-family: var(--kojo-serif-section);
   font-size: 1.375rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -1633,7 +1943,7 @@ code {
   left: 1rem;
   z-index: 1;
   color: #fff;
-  font-family: var(--kojo-serif);
+  font-family: var(--kojo-serif-section);
   font-size: 1.375rem;
   font-weight: 700;
   line-height: 1.1;
@@ -1776,7 +2086,7 @@ code {
   padding: 1.25rem 0;
   cursor: pointer;
   color: var(--kojo-encre);
-  font-family: var(--kojo-serif);
+  font-family: var(--kojo-serif-section);
   font-size: 1.125rem;
   font-weight: 700;
   line-height: 1.25;
@@ -1875,7 +2185,7 @@ code {
    font-semibold text-gray-900`, qui était la typographie d'un tableau de bord. */
 .titre-entree {
   color: var(--kojo-encre);
-  font-family: var(--kojo-serif);
+  font-family: var(--kojo-serif-section);
   font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.2;
@@ -2108,7 +2418,7 @@ code {
   align-items: center;
   gap: 0.5rem;
   color: #fff;
-  font-family: var(--kojo-serif);
+  font-family: var(--kojo-serif-section);
   font-size: 1.5rem;
   font-weight: 700;
   line-height: 1;
