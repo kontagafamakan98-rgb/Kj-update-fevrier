@@ -185,12 +185,22 @@ const CLS_BUDGETS = {
   // `scripts/playtest-api-server.mjs` porte une annonce de plusieurs paragraphes,
   // comme celle qu'un client publie, donc `e2e/cadres-app.spec.js` — qui visite
   // `playtest-job-1` — mesure la page de la PRODUCTION et non plus le cas court.
-  // RELEVÉ (09/10/2026, sonde navigateur, 412×823 et 1350×940) : 0,0039 AU PIRE
-  // aux deux tailles (mobile : 0,0000 à 0,0039 selon le run ; desktop : 0,0039
-  // stable), et ce 0,0039 n'est PLUS le pied de page — la sonde le nomme : les
-  // deux conteneurs de la barre du haut se réajustent à t=147 ms quand la
-  // pastille de notifications se résout, comme sur les quatre autres routes
-  // connectées. Le CADRE desktop fait 1 280×1 767,9 px.
+  // RELEVÉ (09/10/2026, sonde navigateur, 412×823 et 1350×940) : 0,0000 EN MOBILE
+  // et 0,0039 en desktop, et ce 0,0039 n'est PLUS le pied de page — la sonde le
+  // nomme : les deux conteneurs de la barre du haut se réajustent à t≈147 ms
+  // quand la pastille de notifications se résout, comme sur les quatre autres
+  // routes connectées. Le CADRE desktop fait 1 280×1 767,9 px.
+  //
+  // LE 0,0039 MOBILE A ÉTÉ SUPPRIMÉ À SA CAUSE (09/10/2026), ET CE N'ÉTAIT PAS LE
+  // MÊME DÉCALAGE : la barre de navigation BASSE (`MobileBottomNav`) se
+  // réajustait de 81 à 88,5 px (y 742 → 734,5) quand la session se résolvait —
+  // le premier rendu peint le menu DÉCOUVERTE (4 colonnes, libellés sur une
+  // ligne), puis `/auth/me` répond et le menu APPLICATION (5 colonnes, la
+  // cloche) fait tenir « Tableau de bord » sur DEUX lignes. Deux corrections,
+  // chacune mesurée : la hauteur d'une case ne dépend plus du libellé (elle
+  // réserve la ligne double), et les deux menus ne partagent plus leurs nœuds
+  // (React remontait « Emplois » d'une grille à l'autre). Relevé après
+  // correction : 0,0000 sur 6 runs sur 6, la barre constante à 89 px.
   //
   // LE PLAFOND N'A PAS ÉTÉ RESSERRÉ, et c'est décidé : le cas court (0,0166) reste
   // un cas de PRODUCTION — une annonce d'une phrase existe —, et plus aucune sonde
@@ -203,7 +213,7 @@ const CLS_BUDGETS = {
     max: 0.04,
     pireMediane: 0.0039,
     mesure:
-      '0,0039 au pire du cas LONG, aux DEUX tailles (412×823 et 1350×940, 09/10/2026) — première mission de la fixture portée à plusieurs paragraphes ; ' +
+      '0,0000 mobile / 0,0039 desktop, cas LONG (412×823 et 1350×940, 09/10/2026) — première mission de la fixture portée à plusieurs paragraphes ; le 0,0039 est la barre du haut, pas le pied de page ; ' +
       '0,0166 mesuré le 08/10/2026 sur le cas COURT (pied de page réservé qui remonte), désormais hors du périmètre de la sonde — aucun run de main (route non auditée)',
   },
   // Mesurées le 19/09/2026 (3 runs chacune) contre le serveur de rewrites local,

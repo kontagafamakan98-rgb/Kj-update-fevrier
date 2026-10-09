@@ -246,7 +246,9 @@ export const CADRES_APP = {
         'le CLS mesuré en desktop (0,0577) nomme le pied de page (1 350×81 px à y=858,6, puis poussé hors écran). ' +
         'RELEVÉ DU 09/10/2026, avec l’annonce LONGUE de la fixture (première mission, celle que visite la sonde ' +
         'des routes connectées) : cadre 1 280×1 767,9 px en desktop et CLS 0,0039 — le pied de page, réservé ' +
-        'sous la ligne de flottaison, ne remonte pas',
+        'sous la ligne de flottaison, ne remonte pas, et ce 0,0039 restant vient de la barre du HAUT (la ' +
+        'pastille de notifications), pas de lui. En mobile, 0,0000 : la barre de navigation BASSE ne se ' +
+        'réajuste plus quand la session se résout, sa hauteur ne dépendant plus du nombre d’items (09/10/2026)',
     },
   },
 };
