@@ -181,15 +181,27 @@ const CLS_BUDGETS = {
   // et écrite dans `SkeletonLoader.js` : le cas LONG n'a AUCUN décalage de pied de
   // page, le cas court en a un.
   //
-  // LA FIXTURE SERT DÉSORMAIS LE CAS LONG (09/10/2026) : la première mission de
-  // `scripts/playtest-api-server.mjs` porte une annonce de plusieurs paragraphes,
-  // comme celle qu'un client publie, donc `e2e/cadres-app.spec.js` — qui visite
-  // `playtest-job-1` — mesure la page de la PRODUCTION et non plus le cas court.
-  // RELEVÉ (09/10/2026, sonde navigateur, 412×823 et 1350×940) : 0,0000 EN MOBILE
-  // et 0,0039 en desktop, et ce 0,0039 n'est PLUS le pied de page — la sonde le
-  // nomme : les deux conteneurs de la barre du haut se réajustent à t≈147 ms
-  // quand la pastille de notifications se résout, comme sur les quatre autres
-  // routes connectées. Le CADRE desktop fait 1 280×1 767,9 px.
+  // LA FIXTURE SERT LES DEUX CAS, ET LA SONDE LES VISITE TOUS LES DEUX
+  // (09/10/2026) : la PREMIÈRE mission de `scripts/playtest-api-server.mjs` porte
+  // une annonce de plusieurs paragraphes (le cas LONG, celui de la production),
+  // la SECONDE une annonce COURTE (le cas COURT, le seul qui sollicite vraiment
+  // le plafond), et `e2e/cadres-app.spec.js` ouvre les DEUX à chaque taille —
+  // `playtest-job-1` et `playtest-job-2` — avec un test qui refuse d'en perdre un.
+  // (La deuxième mission a été ajoutée le 09/10/2026 : en portant le cas long sur
+  // la seule première mission, la sonde avait cessé de visiter le cas court, et
+  // le plafond se trouvait vérifié sur le cas qui ne le met PAS à l'épreuve.)
+  //
+  // RELEVÉ (09/10/2026, sonde navigateur, 412×823 et 1350×940) :
+  //   • cas LONG : 0,0000 en mobile et 0,0039 en desktop. Ce 0,0039 n'est PLUS le
+  //     pied de page — la sonde le NOMME : les deux conteneurs de la barre du
+  //     haut se réajustent à t≈147 ms quand la pastille de notifications se
+  //     résout, comme sur les quatre autres routes connectées. Cadre desktop
+  //     1 280×1 767,9 px, donc plus haut que la réserve d'un écran.
+  //   • cas COURT : 0,0000 en mobile et 0,0164 en desktop. La page fait
+  //     1 280×795,3 px pour une fenêtre de 940, donc la réserve (875 px) la
+  //     DÉPASSE et le pied de page REMONTE dans l'écran : la sonde nomme
+  //     `<footer…> : 0×0 px à (0, 0) → 1350×79,7 px à (0, 860.3)` pour 0,0125,
+  //     plus les 0,0039 de la barre du haut, dans la MÊME fenêtre de session.
   //
   // LE 0,0039 MOBILE A ÉTÉ SUPPRIMÉ À SA CAUSE (09/10/2026), ET CE N'ÉTAIT PAS LE
   // MÊME DÉCALAGE : la barre de navigation BASSE (`MobileBottomNav`) se
@@ -202,19 +214,20 @@ const CLS_BUDGETS = {
   // (React remontait « Emplois » d'une grille à l'autre). Relevé après
   // correction : 0,0000 sur 6 runs sur 6, la barre constante à 89 px.
   //
-  // LE PLAFOND N'A PAS ÉTÉ RESSERRÉ, et c'est décidé : le cas court (0,0166) reste
-  // un cas de PRODUCTION — une annonce d'une phrase existe —, et plus aucune sonde
-  // ne le visite maintenant que la fixture sert le cas long. 0,04 le couvre, laisse
-  // 10× le relevé du cas long, et reste 2,5× SOUS le seuil « bon » de Lighthouse
-  // (0,1). Le resserrer garderait le même angle mort en le déguisant : c'est la
-  // couverture de la sonde qu'il faudrait étendre (une seconde mission COURTE),
-  // pas le chiffre qu'il faut baisser.
+  // LE PLAFOND N'A PAS ÉTÉ RESSERRÉ, MAIS SA COUVERTURE A ÉTÉ ÉTENDUE — c'est la
+  // correction que ce commentaire appelait, faite le 09/10/2026 : le cas court
+  // reste un cas de PRODUCTION (une annonce d'une phrase existe), il était sorti
+  // du périmètre quand la fixture n'a plus servi que le cas long, et une SECONDE
+  // mission COURTE l'a remis sous la sonde (`playtest-job-2`). 0,04 couvre les
+  // DEUX relevés — 0,0164 au pire, soit 2,4× de marge — et reste 2,5× SOUS le
+  // seuil « bon » de Lighthouse (0,1) : c'est la COUVERTURE qui a été corrigée,
+  // pas le chiffre qu'il fallait baisser.
   '/jobs/:id': {
     max: 0.04,
     pireMediane: 0.0039,
     mesure:
-      '0,0000 mobile / 0,0039 desktop, cas LONG (412×823 et 1350×940, 09/10/2026) — première mission de la fixture portée à plusieurs paragraphes ; le 0,0039 est la barre du haut, pas le pied de page ; ' +
-      '0,0166 mesuré le 08/10/2026 sur le cas COURT (pied de page réservé qui remonte), désormais hors du périmètre de la sonde — aucun run de main (route non auditée)',
+      'les DEUX cas sont visités (412×823 et 1350×940, 09/10/2026) : cas LONG 0,0000 mobile / 0,0039 desktop (ce 0,0039 est la barre du haut, pas le pied de page) ; cas COURT 0,0000 mobile / 0,0164 desktop (pied de page réservé qui remonte) ; ' +
+      'le cas court avait donné 0,0166 le 08/10/2026, même mécanique — aucun run de main (route non auditée)',
   },
   // Mesurées le 19/09/2026 (3 runs chacune) contre le serveur de rewrites local,
   // faute de run de main : voir l'en-tête. 0 constaté, 0,01 exigé — même

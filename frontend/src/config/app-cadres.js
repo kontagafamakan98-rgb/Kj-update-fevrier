@@ -244,11 +244,13 @@ export const CADRES_APP = {
         'la page grandit avec la DESCRIPTION de la mission (aucune longueur maximale) : avec une mission ' +
         'longue, elle fait 2 904,7 px (mobile) et 1 635,6 (desktop) contre un squelette de 908,5 / 590, et ' +
         'le CLS mesuré en desktop (0,0577) nomme le pied de page (1 350×81 px à y=858,6, puis poussé hors écran). ' +
-        'RELEVÉ DU 09/10/2026, avec l’annonce LONGUE de la fixture (première mission, celle que visite la sonde ' +
-        'des routes connectées) : cadre 1 280×1 767,9 px en desktop et CLS 0,0039 — le pied de page, réservé ' +
-        'sous la ligne de flottaison, ne remonte pas, et ce 0,0039 restant vient de la barre du HAUT (la ' +
-        'pastille de notifications), pas de lui. En mobile, 0,0000 : la barre de navigation BASSE ne se ' +
-        'réajuste plus quand la session se résout, sa hauteur ne dépendant plus du nombre d’items (09/10/2026)',
+        'RELEVÉ DU 09/10/2026, SUR LES DEUX CAS que la fixture sert et que la sonde visite (annonce LONGUE, ' +
+        'première mission ; annonce COURTE, seconde) : en desktop, le cas long vaut 0,0039 (cadre ' +
+        '1 280×1 767,9 px — le pied de page, réservé sous la ligne de flottaison, ne remonte pas, et ce 0,0039 ' +
+        'vient de la barre du HAUT, la pastille de notifications) tandis que le cas COURT vaut 0,0164 — sa page ' +
+        'fait 1 280×795,3 px, donc la réserve la dépasse et le pied de page remonte DANS l’écran. En mobile, ' +
+        '0,0000 dans les deux cas : la barre de navigation BASSE ne se réajuste plus quand la session se ' +
+        'résout, sa hauteur ne dépendant plus du nombre d’items (09/10/2026)',
     },
   },
 };

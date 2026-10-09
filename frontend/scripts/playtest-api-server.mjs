@@ -108,14 +108,50 @@ const ANNONCE_LONGUE = [
   'Pour candidater, précisez en quelques lignes vos installations précédentes, le matériel dont vous disposez (perceuse à percussion, testeur, pince à dénuder) et la date à laquelle vous pouvez commencer. Les candidatures reçues par la plateforme sont transmises directement au propriétaire ; celui-ci répond sous 48 heures.',
 ].join('\n\n');
 
+/**
+ * ── LA SECONDE MISSION PORTE UNE ANNONCE COURTE, ET C'EST L'AUTRE CAS ───────
+ *
+ * `/jobs/:id` n'a aucune longueur maximale (règle `pied-hors-ecran`) : sa page
+ * suit la description, et le PLAFOND de la route (`max: 0.04`,
+ * `scripts/lhci-cls-budgets.cjs`) doit donc couvrir DEUX cas qui n'ont rien à
+ * voir :
+ *
+ *   • le cas LONG — l'annonce de plusieurs paragraphes ci-dessus (`playtest-job-1`),
+ *     dont la page dépasse la réserve d'un écran ; no décalage de pied de page ;
+ *   • le cas COURT — cette annonce-ci (`playtest-job-2`), où la réserve d'un
+ *     écran DÉPASSE la page : c'est le cas où le pied de page, réservé sous la
+ *     ligne de flottaison, remonte DANS l'écran à l'arrivée des données, et
+ *     c'est LUI qui a fixé le plafond (0,0166 en desktop, relevé du 08/10/2026).
+ *
+ * Mesurer le seul cas long laisserait le plus risqué des deux hors du périmètre :
+ * `e2e/cadres-app.spec.js` visite donc les DEUX, et un test y refuse la perte d'un
+ * des deux. Le texte est COURANT mais RÉEL (une intervention brève, comme un
+ * client en publie), et FIXE pour que deux runs peignent la même page — la
+ * hauteur d'une fiche courte décide du décalage, donc elle ne doit pas varier.
+ */
+const ANNONCE_COURTE =
+  "Besoin d'un plombier pour remplacer le mitigeur d'un évier de cuisine et vérifier une petite fuite sous le plan de travail, à Dakar (Sacré-Cœur). Le matériel est fourni et l'intervention devrait prendre une heure environ. Disponible samedi matin de préférence.";
+
+/**
+ * La description d'une mission de démonstration, par INDEX : deux rôles nommés
+ * (le cas long, le cas court) et un remplissage générique pour la liste. Un
+ * tableau plutôt qu'un ternaire imbriqué — deux cas nommés se lisent, un
+ * `index === 1 ? … : …` se relit mal.
+ */
+const DESCRIPTION_PAR_INDEX = {
+  0: ANNONCE_LONGUE,
+  1: ANNONCE_COURTE,
+};
+
+const DESCRIPTION_GENERIQUE = 'Mission locale vérifiable dans le parcours de démonstration.';
+
 const missionsDeDemonstration = () =>
   Array.from({ length: 25 }, (_, index) => ({
     id: `playtest-job-${index + 1}`,
     title: `Mission de démonstration ${index + 1}`,
-    // La PREMIÈRE est l'annonce longue (voir ci-dessus) ; les autres gardent la
-    // phrase courte de la liste.
-    description:
-      index === 0 ? ANNONCE_LONGUE : 'Mission locale vérifiable dans le parcours de démonstration.',
+    // La PREMIÈRE est l'annonce longue, la SECONDE l'annonce courte (les deux
+    // cas mesurés, voir ci-dessus) ; les autres gardent la phrase de liste.
+    description: DESCRIPTION_PAR_INDEX[index] || DESCRIPTION_GENERIQUE,
     category: index % 2 ? 'plumbing' : 'electrical',
     status: 'open',
     budget_min: 100 + index,

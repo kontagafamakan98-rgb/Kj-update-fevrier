@@ -151,9 +151,25 @@ export const ROUTES_CONNECTEES = [
   { route: '/profile', chemin: '/profile' },
   { route: '/messages', chemin: '/messages' },
   { route: '/create-job', chemin: '/create-job' },
-  // La première mission de démonstration de la fixture : son identifiant est
-  // celui que `GET /api/jobs/:id` sait résoudre.
-  { route: '/jobs/:id', chemin: '/jobs/playtest-job-1' },
+  // La FICHE DE MISSION EST SONDÉE DEUX FOIS, et ce n'est pas un doublon :
+  // `/jobs/:id` n'a aucune longueur maximale (sa hauteur suit la DESCRIPTION),
+  // donc son CLS dépend de la TAILLE de l'annonce — et les deux cas opposés
+  // doivent être couverts par le MÊME plafond.
+  //   • `playtest-job-1` : l'annonce LONGUE de la fixture. La page dépasse la
+  //     réserve d'un écran, donc le pied de page, réservé SOUS la ligne de
+  //     flottaison, ne remonte pas ;
+  //   • `playtest-job-2` : l'annonce COURTE. La réserve dépasse la page, et
+  //     c'est le pied de page qui remonte DANS l'écran à l'arrivée des données
+  //     — c'est ce cas-là qui a fixé le plafond (0,0166 en desktop).
+  // Mesurer le seul cas long laisserait le plus risqué des deux hors du
+  // périmètre ; mesurer le seul cas court, l'inverse.
+  //
+  // `cas` est un LIBELLÉ, pas une clé : la clé de route reste `/jobs/:id` (c'est
+  // elle qui porte la déclaration de cadre et le budget), et deux entrées
+  // partageraient sinon le même titre de test — deux cas indistinguables dans le
+  // rapport.
+  { route: '/jobs/:id', chemin: '/jobs/playtest-job-1', cas: 'annonce longue' },
+  { route: '/jobs/:id', chemin: '/jobs/playtest-job-2', cas: 'annonce courte' },
 ];
 
 /**
@@ -432,6 +448,23 @@ test('budgets CLS — chaque route connectée sondée a un plafond MESURÉ', () 
       `(${ROUTES_CONNECTEES.map(({ route }) => route).join(', ')}) : il n'en resterait que ` +
       `${ROUTES_A_SQUELETTE_PEINT.length}, trop peu pour que la sonde de chargement juge quoi que ce soit.`
   ).toBeGreaterThanOrEqual(3);
+  // ── LA FICHE DE MISSION EST SONDÉE DANS SES DEUX CAS ──────────────────
+  // Un plafond unique couvre deux pages qui n'ont rien à voir : celle d'une
+  // annonce longue (le pied de page ne remonte pas) et celle d'une annonce
+  // courte (le pied de page remonte). Perdre le SECOND — le seul qui sollicite
+  // vraiment le plafond — laisserait la route verte sur le cas qui ne la met pas
+  // à l'épreuve. La liste est confrontée à la FIXTURE, pas à un compte : deux
+  // entrées quelconques ne suffiraient pas.
+  const casDeLaFiche = ROUTES_CONNECTEES.filter(({ route }) => route === '/jobs/:id').map(
+    ({ chemin }) => chemin
+  );
+  expect(
+    casDeLaFiche,
+    `la fiche de mission n'est sondée que dans ${casDeLaFiche.length} cas ` +
+      `(${casDeLaFiche.join(', ') || 'aucun'}) — sa hauteur suit la description, donc ses DEUX cas ` +
+      'doivent être mesurés : l’annonce courte est le seul des deux qui fasse remonter le pied de page, ' +
+      'c’est-à-dire le seul qui mette le plafond à l’épreuve.'
+  ).toEqual(['/jobs/playtest-job-1', '/jobs/playtest-job-2']);
 });
 
 /**
@@ -586,9 +619,9 @@ const plusGrands = (releve, max = 3) =>
   [...(releve.decalages || [])].sort((a, b) => b.valeur - a.valeur).slice(0, max);
 
 test.describe('Parcours E2E — le pied de page reste hors de l’écran pendant le chargement', () => {
-  for (const { route, chemin } of ROUTES_A_SQUELETTE_PEINT) {
+  for (const { route, chemin, cas } of ROUTES_A_SQUELETTE_PEINT) {
     for (const { nom: taille, viewport } of TAILLES) {
-      test(`${route} — ${taille}`, async ({ browser }) => {
+      test(`${route}${cas ? ` (${cas})` : ''} — ${taille}`, async ({ browser }) => {
         const declaration = CADRES_APP[route].squelette;
         const releve = await releverSousChargement(browser, chemin, viewport);
 
@@ -674,9 +707,9 @@ test.describe('Parcours E2E — le pied de page reste hors de l’écran pendant
 });
 
 test.describe('Parcours E2E — le cadre et le CLS des routes connectées, par la fixture', () => {
-  for (const { route, chemin } of ROUTES_CONNECTEES) {
+  for (const { route, chemin, cas } of ROUTES_CONNECTEES) {
     for (const { nom: taille, viewport } of TAILLES) {
-      test(`${route} — ${taille}`, async ({ browser }) => {
+      test(`${route}${cas ? ` (${cas})` : ''} — ${taille}`, async ({ browser }) => {
         const budget = CLS_BUDGETS[route] ? CLS_BUDGETS[route].max : null;
         expect(
           budget,
