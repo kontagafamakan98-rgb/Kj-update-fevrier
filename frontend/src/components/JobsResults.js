@@ -11,6 +11,31 @@ import { formatBudgetRange, formatJobDate, formatJobStatus } from '../utils/jobP
 import { getRememberedApplication } from '../utils/jobProposalWorkflow';
 import { DEMO_JOBS } from '../config/demoJobs';
 
+// ── LA DESCRIPTION D'UNE CARTE EST BORNÉE, ET C'EST UNE MESURE DE LCP ──────
+//
+// `max-w-2xl` sur la description n'est pas décoratif : c'est ce qui l'empêche
+// de devenir un SECOND élément LCP sur /jobs, plus grand que l'intro que la
+// coquille pré-rendue publie.
+//
+// MESURÉ (09/10/2026, sonde `e2e/lcp-geometrie.spec.js`, /jobs desktop) : la
+// coquille peint l'intro (`introClass`, `src/config/page-sections.js`) — 768 px
+// sur 2 lignes, encre 34 960 px² — et React peignait EN PLUS la description
+// `line-clamp-2` de la PREMIÈRE carte, large de toute la colonne (928,39 px) :
+// 41 625 px² à t=272 ms. Le repaint devenait donc l'élément LCP, et toute la
+// chaîne JavaScript était facturée. Rouge 3 fois sur 3, reproductible dès
+// qu'une annonce est longue — c'est-à-dire le cas réel (`ANNONCE_LONGUE`,
+// `scripts/playtest-api-server.mjs`).
+//
+// La borne est CALCULÉE contre l'encre de l'intro, pas choisie : à 672 px de
+// large et deux lignes de ~22,4 px, la description plafonne à ~30 100 px², soit
+// 14 % SOUS les 34 960 px² de l'intro. Une annonce de n'importe quelle longueur
+// ne peut donc plus dépasser l'intro, qui reste le seul élément LCP.
+//
+// Ce qui n'est PAS borné ici, et qu'on ne prétend pas fermé : le TITRE de la
+// carte (`<h3>`), dont l'encre d'une ligne reste petite, mais qui sur DEUX
+// lignes dépasserait l'intro. Aucun cas ne le visite aujourd'hui (les titres de
+// la fixture tiennent sur une ligne) : c'est un angle mort DÉCLARÉ, pas un oubli.
+
 // ── Glyphes de la carte de mission ─────────────────────────────────────────
 // Décoratifs par construction : chaque information est portée par un texte
 // juste à côté, donc l'icône est `aria-hidden` — sans quoi un lecteur d'écran
@@ -68,7 +93,7 @@ export function DemoJobsEmptyState({ t }) {
                   <h3 className="text-lg font-semibold text-gray-900">{job.title}</h3>
                   <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-xs text-blue-700">Exemple</span>
                 </div>
-                <p className="mb-4 line-clamp-2 text-gray-600">{job.description}</p>
+                <p className="mb-4 line-clamp-2 max-w-2xl text-gray-600">{job.description}</p>
                 <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                   <span className="inline-flex items-center gap-1.5"><IconeEpingle />{job.location_text}</span>
                   <span className="inline-flex items-center gap-1.5"><IconeEtiquette />{job.category}</span>
@@ -133,7 +158,7 @@ export function JobCard({ job, user, userType, appliedJobIds, t }) {
               {formatJobStatus(job.status, t)}
             </span>
           </div>
-          <p className="mb-4 line-clamp-2 text-stone-600">{job.description}</p>
+          <p className="mb-4 line-clamp-2 max-w-2xl text-stone-600">{job.description}</p>
           <div className="flex flex-wrap gap-4 text-sm text-stone-500">
             <span className="inline-flex items-center gap-1.5"><IconeCalendrier />{formatJobDate(job.posted_at || job.created_at)}</span>
             <span className="inline-flex items-center gap-1.5"><IconeEpingle />{locationText}</span>
