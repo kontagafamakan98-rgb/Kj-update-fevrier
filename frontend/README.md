@@ -4,7 +4,7 @@ Application React 18 + Vite 7 + Tailwind CSS 3 + React Router 7 (SPA, PWA + Capa
 
 ## Prérequis
 
-- Node.js **>= 20.19** (CI : Node 24) — voir `engines` dans `package.json`.
+- Node.js **>= 22.19** (CI : Node 24 ; Lighthouse 13 l'exige) — voir `engines` dans `package.json`.
 - npm **>= 10**.
 
 ## Installation

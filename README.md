@@ -59,7 +59,7 @@ npm install
 npm run dev
 ```
 
-Prérequis frontend : Node >= 20.19 (CI : Node 24).
+Prérequis frontend : Node >= 22.19 (CI : Node 24 ; Lighthouse 13 l'exige).
 
 ### Tests
 ```bash

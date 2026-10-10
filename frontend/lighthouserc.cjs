@@ -68,7 +68,7 @@ const {
 } = require('./scripts/lhci-cls-budgets.cjs');
 // La règle « cette adresse est-elle la nôtre ? » vit dans scripts/site-meta.js,
 // avec les gardes qui la posent : ce fichier l'importe au lieu d'en garder une
-// troisième copie (`package.json` exige Node >= 20.19.0, la version qui active
+// troisième copie (`package.json` exige Node >= 22.19, la version qui active
 // `require(esm)` par défaut — le module est ESM, pas de top-level await).
 const { isLoopbackUrl } = require('./scripts/site-meta.js');
 
